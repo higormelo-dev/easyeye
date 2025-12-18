@@ -1,0 +1,72 @@
+services:
+  medicare_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /var/www/html/app
+    volumes:
+      - ./:/var/www/html/app
+    depends_on:
+      - medicare_redis
+      - medicare_nginx
+    networks:
+      - medicare-network
+    healthcheck:
+      test: curl --fail medicare_app:8080/health || exit 1
+      interval: 5s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+
+  medicare_nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./:/var/www/html/app
+      - ./.docker/nginx/:/etc/nginx/conf.d/
+    networks:
+      - medicare-network
+
+  medicare_queue:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    working_dir: /var/www
+    command: "php artisan queue:work --tries=3"
+    volumes:
+      - .:/var/www
+    depends_on:
+      - medicare_redis
+      - medicare_app
+    networks:
+      - medicare-network
+    healthcheck:
+      test: curl --fail medicare_queue:8080/health || exit 1
+      interval: 5s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+
+  medicare_redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - medicare-network
+    volumes:
+      - ./.docker/redis/data:/var/lib/redis/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 5s
+      retries: 5
+      start_period: 20s
+      timeout: 10s
+
+networks:
+  medicare-network:
+    driver: bridge
