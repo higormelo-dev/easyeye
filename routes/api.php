@@ -13,16 +13,16 @@ Route::get('/user', function (Request $request) {
 
 Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
     Route::post('auth', [EntityIntegratorsController::class, 'store'])->name('auth');
-    Route::group(['middleware' => ['auth:sanctum']], function () {
+    Route::group(['middleware' => ['api', 'auth:sanctum']], static function () {
         Route::delete('auth', [EntityIntegratorsController::class, 'destroy'])->name('logout');
 
         Route::group(['prefix' => 'v1', 'as' => 'v1.'], function () {
             Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)->except(['create', 'edit']);
             Route::apiResource('patients', PatientsController::class)->only('index', 'show');
-            Route::resource('patients.exams', PatientExamsController::class)->except(['create', 'edit', 'update']);
-            Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])->name('patients.exams.update');
+            Route::resource('patients.exams', PatientExamsController::class)->except(['create', 'edit']);
+            // Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])->name('patients.exams.update');
 
-            Route::get('profile', function (Request $request) {
+            Route::get('profile', static function (Request $request) {
                 return response()->json($request->user());
             });
 

@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\PatientExamRequest;
 use App\Http\Resources\PatientExamResource;
-use App\Models\{EntityIntegrator, PatientExam};
+use App\Models\{EntityIntegrator, Patient, PatientExam};
 use Illuminate\Http\{JsonResponse};
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -35,11 +35,17 @@ class PatientExamsController extends Controller
             return $this->unauthorizedResponse();
         }
 
+        $patient = Patient::query()->where('id', $patientId)->first();
+
+        if (!$patient) {
+            return response()->json(['message' => 'Patient not found.'], HttpResponse::HTTP_NOT_FOUND);
+        }
+
         $patientExams = $this->model->query()
             ->join('patients', 'patient_exams.patient_id', '=', 'patients.id')
             ->join('people', 'patients.person_id', '=', 'people.id')
             ->join('entities', 'patients.entity_id', '=', 'entities.id')
-            ->where('patients.id', $patientId)
+            ->where('patients.id', $patient->id)
             ->where('patients.entity_id', $integrator->entity_id);
 
         if (request()->has('search')) {
@@ -183,6 +189,8 @@ class PatientExamsController extends Controller
                 HttpResponse::HTTP_INTERNAL_SERVER_ERROR
             );
         } catch (\Throwable $e) {
+            dd($e);
+
             return $this->serverErrorResponse();
         }
     }

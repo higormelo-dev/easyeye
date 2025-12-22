@@ -73,6 +73,7 @@ class PatientsController extends Controller
 
             return new PatientResource($patient);
         } catch (\Throwable $e) {
+			dd($e);
             return $this->serverErrorResponse();
         }
     }

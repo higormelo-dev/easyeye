@@ -18,13 +18,12 @@ class PatientExamResource extends JsonResource
             'type'       => 'patient_exams',
             'id'         => $this->id,
             'attributes' => [
-                'code'        => $this->code,
-                'archive'     => $this->archive,
-                'archive_url' => $this->archive_url,
-                'name'        => $this->name,
-                'active'      => (bool) $this->active,
-                'created_at'  => $this->created_at,
-                'updated_at'  => $this->updated_at,
+                'code'       => $this->code,
+                'archive'    => $this->archive_url,
+                'name'       => $this->name,
+                'active'     => (bool) $this->active,
+                'created_at' => $this->created_at,
+                'updated_at' => $this->updated_at,
             ],
             'relationships' => [
                 'patient' => [

@@ -63,6 +63,7 @@ class EntityIntegratorEquipmentsController extends Controller
 
             return new EntityIntegratorEquipmentResource($equipment);
         } catch (\Throwable $e) {
+			dd($e);
             return $this->serverErrorResponse();
         }
     }
@@ -72,7 +73,7 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     public function show(string $id): EntityIntegratorEquipmentResource|JsonResponse
     {
-        try {
+		try {
             $integrator = $this->getAuthenticatedIntegrator();
 
             if (!$integrator) {
@@ -141,7 +142,7 @@ class EntityIntegratorEquipmentsController extends Controller
 
             return response()->json([], HttpResponse::HTTP_NO_CONTENT);
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+			return $this->serverErrorResponse();
         }
     }
 

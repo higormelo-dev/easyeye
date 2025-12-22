@@ -1,6 +1,7 @@
 <?php
 
-use App\Http\Middleware\EnsureEntitySelected;
+use App\Http\Middleware\{CheckJsonResponse, EnsureEntitySelected, ParseMultipartFormData};
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
 
@@ -15,7 +16,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'entity.selected' => EnsureEntitySelected::class,
         ]);
+
+        $middleware->api([
+            CheckJsonResponse::class,
+            ParseMultipartFormData::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(function (AuthenticationException $e, $request) {
+            if ($request->is('api/integrators/v1/*')) {
+                return response()->json([
+                    'message' => 'Not authenticated.',
+                ], 401);
+            }
+        });
     })->create();
