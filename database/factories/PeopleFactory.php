@@ -19,8 +19,20 @@ class PeopleFactory extends Factory
         $gender   = fake()->randomElement([1, 0]);
         $fullName = fake()->name($gender === 1 ? 'male' : 'female');
 
-        $firstName = explode(' ', $fullName)[0];
-        $nickname  = mb_convert_case($firstName, MB_CASE_TITLE, 'UTF-8');
+        $nameParts      = explode(' ', $fullName);
+        $titlesToIgnore = ['Dr.', 'Dra.', 'Sr.', 'Sra.', 'Prof.', 'Profa.', 'Mr.', 'Mrs.', 'Ms.'];
+
+        $firstName = $nameParts[0];
+
+        foreach ($nameParts as $part) {
+            if (!in_array($part, $titlesToIgnore)) {
+                $firstName = $part;
+
+                break;
+            }
+        }
+
+        $nickname = mb_convert_case($firstName, MB_CASE_TITLE, 'UTF-8');
 
         return [
             'full_name'              => $fullName,
@@ -32,7 +44,7 @@ class PeopleFactory extends Factory
             'mother_name'            => fake()->name('female'),
             'father_name'            => fake()->name('male'),
             'national_registry'      => str(fake()->cpf())->replaceMatches('/\D/', ''),
-            'state_registry'         => fake()->rg(),
+            'state_registry'         => str(fake()->rg())->replaceMatches('/\D/', ''),
             'state_registry_agency'  => fake()->randomElement(['SSP', 'IFP', 'DETRAN', 'PC']),
             'state_registry_initial' => fake()->stateAbbr(),
             'state_registry_date'    => fake()->dateTimeBetween('-30 years', '-18 years')->format('Y-m-d'),

@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Models\{Entity, People};
+use App\Models\{Entity, IrisType, People, SkinType};
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -21,8 +21,8 @@ class PatientFactory extends Factory
             'entity_id'   => Entity::factory(),
             'person_id'   => People::factory(),
             'covenant_id' => '',
-            'skin_id'     => '',
-            'iris_id'     => '',
+            'skin_id'     => SkinType::factory(),
+            'iris_id'     => IrisType::factory(),
             'code'        => fake()->unique()->numerify('PAC####'),
             'card_number' => fake()->optional(0.6)->creditCardNumber(),
             'active'      => fake()->boolean(90),
