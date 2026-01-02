@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\{DoctorRequest};
 use App\Http\Resources\EntityUserResource;
-use App\Models\{Doctor, EntityUser, People, User};
+use App\Models\{Doctor, EntityUser, Patient, People, User};
 use App\Services\DoctorService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class DoctorsController extends Controller
@@ -171,15 +172,58 @@ class DoctorsController extends Controller
     public function destroy(string $id)
     {
         try {
-	        $record = $this->findDoctor($id);
+            $record = $this->findDoctor($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
-            $userHasOtherEntityUsers = EntityUser::query()
+            return DB::transaction(function () use ($record) {
+                $userId     = $record->entityUser->user_id;
+                $recordData = $record->toArray();
+
+                $userHasOtherEntityUsers = EntityUser::query()
+                    ->where('user_id', $userId)
+                    ->count();
+                $patientHasOtherEntityUsers = Patient::query()
+                    ->where('person_id', $record->person_id)
+                    ->count();
+
+                $record->entityUser->delete();
+                $record->delete();
+
+                if ($userHasOtherEntityUsers <= 1) {
+                    $user = User::query()->find($userId);
+
+                    if ($user) {
+                        $user->delete();
+                    }
+                }
+
+                if ($patientHasOtherEntityUsers <= 1) {
+                    $person = People::query()->find($record->person_id);
+
+                    if ($person) {
+                        $person->delete();
+                    }
+                }
+
+                // Retornar resposta
+                if (request()->wantsJson()) {
+                    return response()->json([
+                        'message' => $this->titleController . ' deletado(a) com sucesso.',
+                        'deleted' => $recordData,
+                    ]);
+                }
+
+                return redirect(action('\\' . static::class . '@index'))
+                    ->with('message', $this->titleController . ' deletado(a) com sucesso.');
+            });
+
+            /*$userHasOtherEntityUsers = EntityUser::query()
                 ->where('user_id', $record->entityUser->user_id)
                 ->count();
+            $record->entityUser->delete();
             $record->delete();
 
             if ($userHasOtherEntityUsers <= 1) {
@@ -200,7 +244,7 @@ class DoctorsController extends Controller
             }
 
             return redirect(action('\\' . static::class . '@index'))
-                ->with('message-error', $this->titleController . ' deletada(a) com sucesso.');
+                ->with('message-error', $this->titleController . ' deletada(a) com sucesso.');*/
 
         } catch (\Throwable $e) {
             return $this->serverErrorResponse();
