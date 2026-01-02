@@ -32,14 +32,17 @@ class Schedule extends Model
     ];
 
     /**
-     * The attributes that should be mutated to dates.
+     * Get the attributes that should be cast.
      *
-     * @var array
+     * @return array<string, string>
      */
-    protected $dates = [
-        'deleted_at',
-        'created_at',
-        'updated_at',
-        'date_time',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'date_time'  => 'datetime',
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
+    }
 }

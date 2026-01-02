@@ -127,6 +127,10 @@ return [
     'active'            => 'Active',
     'Entity'            => 'Entity',
     'integrator'        => 'Integrator',
+    'doctor'            => 'Doctor',
+    'patient'           => 'Patient',
+    'record_advicen'    => 'Record Advicen',
+    'record_specialty'  => 'Record Specialty',
     'sidemenu'          => [
         'dashboard'      => 'Dashboard',
         'entities'       => 'Entities',

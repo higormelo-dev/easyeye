@@ -16,11 +16,11 @@ class EnsureEntitySelected
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check()) {
+        if (! Auth::check()) {
             return redirect()->route('login');
         }
 
-        if (!session('selected_entity_user_id')) {
+        if (! session('selected_entity_user_id')) {
             if (count(Auth::user()->entityUsers) > 1) {
                 return redirect()->route('selectentity.create');
             }
@@ -29,9 +29,10 @@ class EnsureEntitySelected
 
             if ($entityUser) {
                 session([
-                    'selected_entity_user_id' => $entityUser->id,
-                    'selected_entity_id'      => $entityUser->entity->id,
-                    'user_rule'               => $entityUser->rule,
+                    'selected_entity_user_id'   => $entityUser->id,
+                    'selected_entity_user_rule' => $entityUser->rule,
+                    'selected_entity_id'        => $entityUser->entity->id,
+                    'user_rule'                 => $entityUser->rule,
                 ]);
             }
         }

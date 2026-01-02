@@ -25,6 +25,20 @@ class EntityUser extends Model
         'rule',
     ];
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
+    }
+
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'id');
@@ -33,5 +47,10 @@ class EntityUser extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
+    }
+
+    public function doctor(): BelongsTo
+    {
+        return $this->belongsTo(Doctor::class, 'id', 'entity_user_id');
     }
 }

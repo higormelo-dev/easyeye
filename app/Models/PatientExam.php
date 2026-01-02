@@ -35,14 +35,17 @@ class PatientExam extends Model
     protected $appends = ['archive_url'];
 
     /**
-     * The attributes that should be mutated to dates.
+     * Get the attributes that should be cast.
      *
-     * @var array
+     * @return array<string, string>
      */
-    protected $dates = [
-        'created_at',
-        'updated_at',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+        ];
+    }
 
     public function entity(): BelongsTo
     {

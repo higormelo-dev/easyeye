@@ -10,9 +10,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class EntityIntegrator extends Model
 {
-    use HasUuids;
-    use HasFactory;
     use HasApiTokens;
+    use HasFactory;
+    use HasUuids;
     use SoftDeletes;
 
     protected $primaryKey = 'id';
@@ -33,10 +33,21 @@ class EntityIntegrator extends Model
         'active',
     ];
 
-    protected $casts = [
-        'token_session_expires_at' => 'datetime',
-        'active'                   => 'boolean',
-    ];
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'token_session_expires_at' => 'datetime',
+            'active'                   => 'boolean',
+            'created_at'               => 'datetime',
+            'updated_at'               => 'datetime',
+            'deleted_at'               => 'datetime',
+        ];
+    }
 
     public function entity(): BelongsTo
     {

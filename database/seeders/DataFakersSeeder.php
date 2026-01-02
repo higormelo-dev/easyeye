@@ -15,7 +15,7 @@ class DataFakersSeeder extends Seeder
     {
         People::factory(3000)->create();
         Entity::factory(15)->create();
-        $entities = Entity::all();
+        $entities = Entity::query()->whereNot('name', 'Medical Group')->get();
         $users    = User::factory(95)->create(['password' => Hash::make('123456789')]);
 
         $users->each(function ($user) use ($entities) {

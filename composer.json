@@ -7,7 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
-        "ext-http": "*",
+        "laracasts/presenter": "^0.2.8",
         "laravel-lang/common": "^6.7",
         "laravel-lang/publisher": "^16.7",
         "laravel/framework": "^11.31",

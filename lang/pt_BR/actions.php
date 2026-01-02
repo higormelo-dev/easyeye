@@ -127,6 +127,10 @@ return [
     'active'            => 'Ativo',
     'entity'            => 'Empresa',
     'integrator'        => 'Integrador',
+    'doctor'            => 'Médico',
+    'patient'           => 'Paciente',
+    'record_advicen'    => 'Registro do conselho',
+    'record_specialty'  => 'Registro de especialidade',
     'sidemenu'          => [
         'dashboard'      => 'Painel de controle',
         'entities'       => 'Empresas',

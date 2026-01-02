@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,12 +11,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
-    use Notifiable;
     use HasUuids;
+    use Notifiable;
     use SoftDeletes;
 
     protected $primaryKey = 'id';
@@ -43,6 +43,38 @@ class User extends Authenticatable
     ];
 
     /**
+     * Roles of clients
+     *
+     * 'admin'     => 'Administrador',
+     * 'financial' => 'Financeiro',
+     * 'doctor'    => 'Médico',
+     * 'secretary' => 'Secretária',
+     * 'user'      => 'Usuário Comum',
+     */
+    public static array $rolesOfClients = [
+        'admin'     => 'Administrador',
+        'financial' => 'Financeiro',
+        'doctor'    => 'Médico',
+        'secretary' => 'Secretária',
+        'user'      => 'Usuário Comum',
+    ];
+
+    /**
+     * Roles of the management system
+     *
+     * 'admin'     => 'Administrador',
+     * 'financial' => 'Financeiro',
+     * 'support'   => 'Suporte',
+     * 'user'      => 'Usuário Comum',
+     */
+    public static array $rolesOfManager = [
+        'admin'     => 'Administrador',
+        'financial' => 'Financeiro',
+        'support'   => 'Suporte',
+        'user'      => 'Usuário Comum',
+    ];
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -52,6 +84,9 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
+            'created_at'        => 'datetime',
+            'updated_at'        => 'datetime',
+            'deleted_at'        => 'datetime',
         ];
     }
 

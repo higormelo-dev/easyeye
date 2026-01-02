@@ -123,6 +123,7 @@
 
             });
             dataTable.on('draw', function () {
+                // Editar
                 $('.btn-edit').click(function () {
                     integrator_id = $(this).data('id');
                     btn_action = 'update';

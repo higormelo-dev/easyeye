@@ -8,8 +8,8 @@ use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 
 class Covenant extends Model
 {
-    use HasUuids;
     use HasFactory;
+    use HasUuids;
     use SoftDeletes;
 
     protected $primaryKey = 'id';
@@ -26,4 +26,18 @@ class Covenant extends Model
         'table',
         'active',
     ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'created_at' => 'datetime',
+            'updated_at' => 'datetime',
+            'deleted_at' => 'datetime',
+        ];
+    }
 }

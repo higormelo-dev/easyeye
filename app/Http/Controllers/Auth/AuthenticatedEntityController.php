@@ -38,6 +38,7 @@ class AuthenticatedEntityController extends Controller
         if ($entityUser) {
             session([
                 'selected_entity_user_id'   => $entityUser->id,
+                'selected_entity_user_rule' => $entityUser->rule,
                 'selected_entity_id'        => $entityUser->entity->id,
                 'selected_entity_is_client' => $entityUser->entity->is_client,
             ]);

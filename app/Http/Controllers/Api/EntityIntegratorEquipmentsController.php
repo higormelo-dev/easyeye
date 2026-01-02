@@ -29,7 +29,7 @@ class EntityIntegratorEquipmentsController extends Controller
     {
         $integrator = $this->getAuthenticatedIntegrator();
 
-        if (!$integrator) {
+        if (! $integrator) {
             return $this->unauthorizedResponse();
         }
 
@@ -54,7 +54,7 @@ class EntityIntegratorEquipmentsController extends Controller
         try {
             $integrator = $this->getAuthenticatedIntegrator();
 
-            if (!$integrator) {
+            if (! $integrator) {
                 return $this->unauthorizedResponse();
             }
 
@@ -63,7 +63,6 @@ class EntityIntegratorEquipmentsController extends Controller
 
             return new EntityIntegratorEquipmentResource($equipment);
         } catch (\Throwable $e) {
-			dd($e);
             return $this->serverErrorResponse();
         }
     }
@@ -73,16 +72,16 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     public function show(string $id): EntityIntegratorEquipmentResource|JsonResponse
     {
-		try {
+        try {
             $integrator = $this->getAuthenticatedIntegrator();
 
-            if (!$integrator) {
+            if (! $integrator) {
                 return $this->unauthorizedResponse();
             }
 
             $equipment = $this->findEquipmentForIntegrator($integrator->id, $id);
 
-            if (!$equipment) {
+            if (! $equipment) {
                 return $this->notFoundResponse();
             }
 
@@ -100,13 +99,13 @@ class EntityIntegratorEquipmentsController extends Controller
         try {
             $integrator = $this->getAuthenticatedIntegrator();
 
-            if (!$integrator) {
+            if (! $integrator) {
                 return $this->unauthorizedResponse();
             }
 
             $equipment = $this->findEquipmentForIntegrator($integrator->id, $id);
 
-            if (!$equipment) {
+            if (! $equipment) {
                 return $this->notFoundResponse();
             }
 
@@ -128,13 +127,13 @@ class EntityIntegratorEquipmentsController extends Controller
         try {
             $integrator = $this->getAuthenticatedIntegrator();
 
-            if (!$integrator) {
+            if (! $integrator) {
                 return $this->unauthorizedResponse();
             }
 
             $equipment = $this->findEquipmentForIntegrator($integrator->id, $id);
 
-            if (!$equipment) {
+            if (! $equipment) {
                 return $this->notFoundResponse();
             }
 
@@ -142,7 +141,7 @@ class EntityIntegratorEquipmentsController extends Controller
 
             return response()->json([], HttpResponse::HTTP_NO_CONTENT);
         } catch (\Throwable $e) {
-			return $this->serverErrorResponse();
+            return $this->serverErrorResponse();
         }
     }
 

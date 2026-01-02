@@ -1,5 +1,5 @@
 {
-  "preset": "psr12",
+  "preset": "laravel",
   "rules": {
     "group_import": true,
     "single_import_per_statement": false,
