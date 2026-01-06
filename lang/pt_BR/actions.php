@@ -131,6 +131,8 @@ return [
     'patient'           => 'Paciente',
     'record_advicen'    => 'Registro do conselho',
     'record_specialty'  => 'Registro de especialidade',
+    'code'              => 'Código',
+    'cellphone'         => 'Celular',
     'sidemenu'          => [
         'dashboard'      => 'Painel de controle',
         'entities'       => 'Empresas',

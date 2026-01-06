@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\{DoctorRequest};
-use App\Http\Resources\EntityUserResource;
-use App\Models\{Doctor, EntityUser, Patient, People, User};
-use App\Services\DoctorService;
+use App\Http\Requests\PatientRequest;
+use App\Http\Resources\{PatientResource};
+use App\Models\{Covenant, IrisType, Patient, People, SkinType};
+use App\Services\PatientService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -13,21 +13,21 @@ use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
-class DoctorsController extends Controller
+class PatientsController extends Controller
 {
-    protected string $titleController = 'Médicos';
+    protected string $titleController = 'Pacientes';
 
     /**
      * Instance of the standard model.
      */
-    protected Doctor $model;
+    protected Patient $model;
 
-    protected DoctorService $doctorService;
+    protected PatientService $patientService;
 
-    public function __construct(Doctor $doctor, DoctorService $doctorService)
+    public function __construct(Patient $patient, PatientService $patientService)
     {
-        $this->model         = $doctor;
-        $this->doctorService = $doctorService;
+        $this->model          = $patient;
+        $this->patientService = $patientService;
     }
 
     /**
@@ -46,18 +46,18 @@ class DoctorsController extends Controller
                 ],
                 [
                     'label'  => $this->titleController,
-                    'url'    => route('panel.accesscontrol.users.index'),
+                    'url'    => route('panel.patients.index'),
                     'active' => false,
                 ],
                 [
-                    'label'  => __('actions.records'),
+                    'label'  => __('actions.patients'),
                     'url'    => 'javascript:void(0);',
                     'active' => true,
                 ],
             ],
         ];
 
-        return view('system.doctors.index', compact('meta'));
+        return view('system.patients.index', compact('meta'));
     }
 
     /**
@@ -69,10 +69,16 @@ class DoctorsController extends Controller
             $genders         = People::$genders;
             $maritalStatuses = People::$maritalStatuses;
             $statesOfBrazil  = People::$statesOfBrazil;
+            $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
+            $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
+            $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
 
             return view(
-                'system.doctors.form',
-                compact('genders', 'maritalStatuses', 'statesOfBrazil')
+                'system.patients.form',
+                compact(
+                    'genders', 'maritalStatuses', 'statesOfBrazil',
+                    'covenants', 'skinTypes', 'irisTypes'
+                )
             );
         } catch (\Throwable $e) {
             return $this->serverErrorResponse();
@@ -82,12 +88,23 @@ class DoctorsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(DoctorRequest $request): JsonResponse|EntityUserResource
+    public function store(PatientRequest $request): Application|RedirectResponse|Redirector|JsonResponse
     {
         try {
-            $entityUser = $this->doctorService->createDoctor($request);
+            $patient       = $this->patientService->createPatient($request);
+            $messageReturn = $this->titleController . ' cadastradp(a) com sucesso.';
 
-            return new EntityUserResource($entityUser);
+            if (request()->wantsJson()) {
+                return response()->json(
+                    [
+                        'message' => $messageReturn,
+                        'data'    => (new PatientResource($patient))['data'],
+                    ]
+                );
+            }
+
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
         } catch (\Throwable $e) {
             return $this->serverErrorResponse();
         }
@@ -100,14 +117,14 @@ class DoctorsController extends Controller
     public function show(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findDoctor($id);
+            $record = $this->findPatient($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
             return view(
-                'system.doctors.show',
+                'system.patients.show',
                 compact('record')
             );
         } catch (\Throwable $e) {
@@ -121,7 +138,7 @@ class DoctorsController extends Controller
     public function edit(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findDoctor($id);
+            $record = $this->findPatient($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -130,10 +147,21 @@ class DoctorsController extends Controller
             $genders         = People::$genders;
             $maritalStatuses = People::$maritalStatuses;
             $statesOfBrazil  = People::$statesOfBrazil;
+            $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
+            $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
+            $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
 
             return view(
-                'system.doctors.form',
-                compact('record', 'genders', 'maritalStatuses', 'statesOfBrazil')
+                'system.patients.form',
+                compact(
+                    'record',
+                    'genders',
+                    'maritalStatuses',
+                    'statesOfBrazil',
+                    'covenants',
+                    'skinTypes',
+                    'irisTypes'
+                )
             );
         } catch (\Throwable $e) {
             return $this->serverErrorResponse();
@@ -143,23 +171,22 @@ class DoctorsController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(DoctorRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
+    public function update(PatientRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
         try {
-            $record = $this->findDoctor($id);
+            $record = $this->findPatient($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
-            $updatedRecord = $this->doctorService->updateDoctor($record, $request);
-
+            $updatedRecord = $this->patientService->updatePatient($record, $request);
             $messageReturn = $this->getUpdateMessage($request);
 
             if (request()->wantsJson()) {
                 return response()->json([
                     'message' => $messageReturn,
-                    'data'    => (new EntityUserResource($updatedRecord))['data'],
+                    'data'    => (new PatientResource($updatedRecord))['data'],
                 ]);
             }
 
@@ -176,35 +203,21 @@ class DoctorsController extends Controller
     public function destroy(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findDoctor($id);
+            $record = $this->findPatient($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
             return DB::transaction(function () use ($record) {
-                $userId     = $record->entityUser->user_id;
                 $recordData = $record->toArray();
 
-                $userHasOtherEntityUsers = EntityUser::query()
-                    ->where('user_id', $userId)
-                    ->count();
-                $patientHasOtherEntityUsers = Patient::query()
+                $patientHasOtherEntities = Patient::query()
                     ->where('person_id', $record->person_id)
                     ->count();
-
-                $record->entityUser->delete();
                 $record->delete();
 
-                if ($userHasOtherEntityUsers <= 1) {
-                    $user = User::query()->find($userId);
-
-                    if ($user) {
-                        $user->delete();
-                    }
-                }
-
-                if ($patientHasOtherEntityUsers <= 1) {
+                if ($patientHasOtherEntities <= 1) {
                     $person = People::query()->find($record->person_id);
 
                     if ($person) {
@@ -232,22 +245,21 @@ class DoctorsController extends Controller
     {
         $columns = [
             0 => 'created_at',
-            1 => 'name',
-            2 => 'record',
-            3 => 'email',
-            4 => 'active',
-            5 => 'action',
+            1 => 'code',
+            2 => 'name',
+            3 => 'gender',
+            4 => 'cellphone',
+            5 => 'active',
+            6 => 'action',
         ];
 
         $totalRecords = $this->model->query()
             ->select(
-                'doctors.*', 'users.name as user_name', 'users.email',
-                'people.full_name', 'people.nickname'
+                'patients.*', 'people.full_name', 'people.gender',
+                'people.cellphone', 'people.whatsapp'
             )
-            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-            ->join('users', 'entity_users.user_id', '=', 'users.id')
-            ->join('people', 'doctors.person_id', '=', 'people.id')
-            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+            ->join('people', 'patients.person_id', '=', 'people.id')
+            ->where('patients.entity_id', session()->get('selected_entity_id'))
             ->count();
 
         $limit = $request->get('length');
@@ -258,13 +270,11 @@ class DoctorsController extends Controller
         if (empty($request->get('search')['value'])) {
             $records = $this->model->query()
                 ->select(
-                    'doctors.*', 'users.name as user_name', 'users.email',
-                    'people.full_name', 'people.nickname'
+                    'patients.*', 'people.full_name', 'people.gender',
+                    'people.cellphone', 'people.whatsapp'
                 )
-                ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->join('people', 'doctors.person_id', '=', 'people.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+                ->join('people', 'patients.person_id', '=', 'people.id')
+                ->where('patients.entity_id', session()->get('selected_entity_id'))
                 ->skip($start)
                 ->take($limit)
                 ->orderBy($order, $dir)
@@ -275,18 +285,15 @@ class DoctorsController extends Controller
             $search = $request->get('search')['value'];
             $query  = $this->model->query()
                 ->select(
-                    'doctors.*', 'users.name as user_name', 'users.email',
-                    'people.full_name', 'people.nickname'
+                    'patients.*', 'people.full_name', 'people.gender',
+                    'people.cellphone', 'people.whatsapp'
                 )
-                ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->join('people', 'doctors.person_id', '=', 'people.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+                ->join('people', 'patients.person_id', '=', 'people.id')
+                ->where('patients.entity_id', session()->get('selected_entity_id'))
                 ->where(function ($query) use ($search) {
                     $query->where('people.full_name', 'like', "%{$search}%")
                         ->orWhere('people.nickname', 'like', "%{$search}%")
-                        ->orWhere('users.email', 'like', "%{$search}%")
-                        ->orWhere('doctors.record', 'like', "%{$search}%");
+                        ->orWhere('patients.code', 'like', "%{$search}%");
                 });
 
             $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
@@ -298,9 +305,10 @@ class DoctorsController extends Controller
         if (count($records)) {
             foreach ($records as $record) {
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['name']       = $record->user_name;
-                $information['record']     = $record->record;
-                $information['email']      = $record->email;
+                $information['code']       = $record->code;
+                $information['name']       = $record->full_name;
+                $information['gender']     = $record->person->present()->getGender();
+                $information['cellphone']  = $record->person->present()->getCellphone();
                 $information['active']     = $record->active ?
                     '<span class="badge bg-success">SIM</span>' :
                     '<span class="badge bg-dark">NÃO</span>';
@@ -320,16 +328,15 @@ class DoctorsController extends Controller
     }
 
     /**
-     * Find doctor by ID
+     * Find patient by ID
      */
-    private function findDoctor(string $id): ?Doctor
+    private function findPatient(string $id): ?Patient
     {
         return $this->model->query()
-            ->with(['person', 'entityUser.user'])
-            ->whereHas('entityUser', function ($query) {
-                $query->where('entity_id', session()->get('selected_entity_id'));
-            })
-            ->find($id);
+            ->with('person')
+            ->whereHas('entity', function ($query) {
+                $query->where('entities.id', session()->get('selected_entity_id'));
+            })->find($id);
     }
 
     /**
@@ -337,7 +344,7 @@ class DoctorsController extends Controller
      */
     private function notFoundResponse(): JsonResponse
     {
-        return response()->json(['message' => 'Doctor not found.'], HttpResponse::HTTP_NOT_FOUND);
+        return response()->json(['message' => 'Patient not found.'], HttpResponse::HTTP_NOT_FOUND);
     }
     /**
      * Return server error response

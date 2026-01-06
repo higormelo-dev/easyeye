@@ -1,8 +1,9 @@
-import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_functions.js';
+import { handleAjaxError, showSuccessToast, showErrorToast, searchAddressByZipcode } from './auxiliary_functions.js';
 
 $(function () {
     let record_id, btn_action;
-    let dataTable = $('#doctor_datatable').DataTable({
+
+    let dataTable = $('#patient_datatable').DataTable({
         "retrieve": true,
         "order": [
             [0, 'desc']
@@ -19,7 +20,7 @@ $(function () {
         ],
         "pagingType": "full_numbers",
         "ajax": {
-            'url': 'ajax/datatables/doctors',
+            'url': 'ajax/datatables/patients',
             'dataType': 'json',
             'type': 'POST',
             'data': {
@@ -34,37 +35,26 @@ $(function () {
         },
         "columns": [
             {'data': 'created_at', 'searchable': false, 'orderable': true},
+            {'data': 'code'},
             {'data': 'name'},
-            {'data': 'record'},
-            {'data': 'email'},
+            {'data': 'gender', 'searchable': false, 'orderable': true},
+            {'data': 'cellphone'},
             {'data': 'active', 'searchable': false, 'orderable': true},
             {'data': 'action', 'searchable': false, 'orderable': false},
         ],
         "columnDefs": [
-            {
-                'targets': 0,
+            /*{
+                'targets': [0, 1, 2, 3, 4],
                 'className': 'text-left'
-            },
-            {
-                'targets': 1,
-                'className': 'text-left'
-            },
-            {
-                'targets': 2,
-                'className': 'text-left'
-            },
-            {
-                'targets': 3,
-                'className': 'text-left'
-            },
-            {
-                'targets': 4,
-                'className': 'text-center'
             },
             {
                 'targets': 5,
+                'className': 'text-center'
+            },
+            {
+                'targets': 6,
                 'className': 'text-end'
-            }
+            }*/
         ],
         "language": {
             "sEmptyTable": "Nenhum registro encontrado",
@@ -95,66 +85,40 @@ $(function () {
         $('.btn-edit').click(function () {
             record_id = $(this).data('id');
             btn_action = 'update';
-            $('.modal-title-default').empty();
-            $('.modal-title-default').append('Cadastrar médico');
+            $('.modal-title-default').empty().append('Cadastrar paciente');
             $('#btn-modal-default').css('display', 'block');
-            $('.modal-dialog').removeClass('modal-md')
-            $('.modal-dialog').removeClass('modal-lg')
-            $('.modal-dialog').removeClass('modal-xl')
-            $('.modal-dialog').addClass('modal-xl');
+            $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
             $('#btn-modal-default').attr('data-action', 'register');
             $('#btn-modal-default').removeAttr('data-id');
             $.ajax({
-                url: `doctors/${record_id}/edit`,
+                url: `patients/${record_id}/edit`,
                 type: 'get',
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                 },
                 beforeSend: function () {
                     $('#btn-modal-default').attr('disabled', false);
-                    $("#erro-default").removeClass('show');
-                    $("#erro-default").css('display', 'none');
+                    $("#erro-default").removeClass('show').css('display', 'none');
                     $("#erro-msg-default").empty();
                 },
                 success: function (response) {
-                    $('#retorno-default').empty();
-                    $('#retorno-default').append(response);
+                    $('#retorno-default').empty().append(response);
                     $('#modal_default').modal('show');
+                    setTimeout(function() {
+                        initModalEvents();
+                    }, 100);
                 },
-                error: function (response) {
-                    let message = response.responseJSON.message;
-                    let errors = response.responseJSON.errors;
-                    if (errors && Object.keys(errors).length) {
-                        $("#erro-default").addClass('show');
-                        $("#erro-default").css('display', 'block');
-                        $("#erro-msg-default").empty();
-                        $("#erro-msg-default").append('<strong>Erro!</strong> Preencha corretamente os campos abaixo:<br>');
-                        $.each(error, function (dataObject) {
-                            $.each(error[dataObject], function (index, value) {
-                                $("#erro-msg-default").append('- ' + value + '<br>');
-                            });
-                        });
-                    } else {
-                        $.toast({
-                            heading: 'Erro!',
-                            text: message,
-                            position: 'top-right',
-                            loaderBg: '#EF0107',
-                            icon: 'error',
-                            hideAfter: 5000
-                        });
-                    }
-                }
+                error: handleAjaxError
             });
         });
         // Visualizar
         $('.btn-show').click(function () {
             record_id = $(this).data('id');
-            $('.modal-title-default').empty().append('Visualizar médico');
+            $('.modal-title-default').empty().append('Visualizar paciente');
             $('#btn-modal-default').css('display', 'none');
             $('.modal-dialog').removeClass('modal-md modal-lg').addClass('modal-lg');
             $.ajax({
-                url: `doctors/${record_id}`,
+                url: `patients/${record_id}`,
                 success: function (data) {
                     $('#retorno-default').empty().append(data);
                     $('#modal_default').modal('show');
@@ -169,7 +133,7 @@ $(function () {
         $('.btn-active').click(function () {
             record_id = $(this).data('id');
             $.ajax({
-                url: `doctors/${record_id}`,
+                url: `patients/${record_id}`,
                 type: 'put',
                 dataType: 'json',
                 data: {
@@ -202,7 +166,7 @@ $(function () {
                 if (result.value) {
                     $.ajax({
                         method: "delete",
-                        url: `doctors/${record_id}`,
+                        url: `patients/${record_id}`,
                         dataType: 'json',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -223,22 +187,17 @@ $(function () {
     dataTable.draw();
     $('.new-register').click(function () {
         btn_action = 'store';
-        $('.modal-title-default').empty();
-        $('.modal-title-default').append('Cadastrar médico');
+        $('.modal-title-default').empty().append('Cadastrar paciente');
         $('#btn-modal-default').css('display', 'block');
-        $('.modal-dialog').removeClass('modal-md')
-        $('.modal-dialog').removeClass('modal-lg')
-        $('.modal-dialog').removeClass('modal-xl')
-        $('.modal-dialog').addClass('modal-xl');
+        $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
         $('#btn-modal-default').attr('data-action', 'register');
         $('#btn-modal-default').removeAttr('data-id');
         $.ajax({
-            url: 'doctors/create',
+            url: 'patients/create',
             type: 'get',
             beforeSend: function () {
                 $('#btn-modal-default').attr('disabled', true);
-                $("#erro-default").removeClass('show');
-                $("#erro-default").css('display', 'none');
+                $("#erro-default").removeClass('show').css('display', 'none');
                 $("#erro-msg-default").empty();
             },
             headers: {
@@ -250,6 +209,9 @@ $(function () {
             success: function (response) {
                 $('#retorno-default').empty().append(response);
                 $('#modal_default').modal('show');
+                setTimeout(function() {
+                    initModalEvents();
+                }, 100);
             },
             error: handleAjaxError
         });
@@ -257,15 +219,12 @@ $(function () {
     $('#btn-modal-default').click(function () {
         let requestType = (btn_action === 'store') ? 'post' : 'put';
         let requestURL = (btn_action === 'store') ?
-            'doctors' :
-            `doctors/${record_id}`;
+            'patients' :
+            `patients/${record_id}`;
         let requestData = {
             'name': $('input[name=full_name]').val(),
             'national_registry': $('input[name=national_registry]').val(),
             'nickname': $('input[name=nickname]').val(),
-            'record': $('input[name=record]').val(),
-            'record_specialty': $('input[name=record_specialty]').val(),
-            'color': $('input[name=color]').val(),
             'birth_date': $('input[name=birth_date]').val(),
             'gender': $('select[name=gender]').val(),
             'marital_status': $('select[name=marital_status]').val(),
@@ -286,14 +245,11 @@ $(function () {
             'district': $('input[name=district]').val(),
             'city': $('input[name=city]').val(),
             'state': $('select[name=state]').val(),
-            'observation': $('textarea[name=observation]').val(),
-            'partner': $('select[name=partner]').val()
+            'covenant_id': $('select[name=covenant_id]').val(),
+            'card_number': $('input[name=card_number]').val(),
+            'skin_id': $('select[name=skin_id]').val(),
+            'iris_id': $('select[name=iris_id]').val(),
         };
-
-        if (requestType === 'post') {
-            requestData['password'] = $('input[name=password]').val();
-            requestData['password_confirmation'] = $('input[name=password_confirmation]').val();
-        }
 
         if (requestType === 'put') {
             requestData['active'] = $('select[name=active]').val();
@@ -309,8 +265,7 @@ $(function () {
             },
             beforeSend: function () {
                 $('#btn-modal-default').attr('disabled', true);
-                $("#erro-default").removeClass('show');
-                $("#erro-default").css('display', 'none');
+                $("#erro-default").removeClass('show').css('display', 'none');
                 $("#erro-msg-default").empty();
             },
             complete: function () {
@@ -324,4 +279,20 @@ $(function () {
             error: handleAjaxError
         });
     });
+
+    function initModalEvents() {
+        $('select[name=covenant_id]').off('change').on('change', function() {
+            $('input[name=card_number]').prop('disabled', ($(this).find('option:selected').text().trim() === 'Particular')).val('');
+        });
+
+        $('input[name=zipcode]').off('blur').on('blur', function() {
+            searchAddressByZipcode($(this).val());
+        });
+
+        $('input[name=telephone]').inputmask('(99) 9999-9999');
+        $('input[name=cellphone]').inputmask('(99) 99999-9999');
+        $('input[name=zipcode]').inputmask('99999-999');
+        $('input[name=national_registry]').inputmask('999.999.999-99');
+    }
+
 });

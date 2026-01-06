@@ -378,7 +378,7 @@ class UsersController extends Controller
      */
     private function notFoundResponse(): JsonResponse
     {
-        return response()->json(['message' => 'Equipment not found.'], HttpResponse::HTTP_NOT_FOUND);
+        return response()->json(['message' => 'User not found.'], HttpResponse::HTTP_NOT_FOUND);
     }
 
     /**

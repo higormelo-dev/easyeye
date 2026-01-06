@@ -29,7 +29,7 @@ class DoctorService
     /**
      * Update existing doctor and related entities
      */
-    public function updateDoctor(Doctor $doctor, Request $request): Doctor
+    public function updateDoctor(Doctor $doctor, DoctorRequest $request): Doctor
     {
         return DB::transaction(function () use ($doctor, $request) {
             $data = [];
@@ -159,7 +159,7 @@ class DoctorService
     /**
      * Find or create doctor
      */
-    private function findOrCreateDoctor(People $person, EntityUser $entityUser, DoctorRequest $request): Doctor
+    private function findOrCreateDoctor(People $person, EntityUser $entityUser, DoctorRequest $request): void
     {
         $existingDoctor = Doctor::query()->withTrashed()
             ->where('person_id', $person->id)
@@ -174,7 +174,6 @@ class DoctorService
             'record_specialty' => $request->record_specialty,
             'color'            => $request->color,
             'partner'          => $request->partner,
-            'active'           => true,
             'observation'      => $request->observation,
         ];
 
@@ -184,11 +183,11 @@ class DoctorService
             }
             $existingDoctor->update($doctorData);
 
-            return $existingDoctor;
+            return;
         }
 
-        return Doctor::create(array_merge($doctorData, [
-            'code' => $this->generateUniqueCode($entityUser->id),
+        Doctor::create(array_merge($doctorData, [
+            'code' => $this->generateUniqueCode(),
         ]));
     }
 
@@ -282,12 +281,33 @@ class DoctorService
     /**
      * Generate unique code for doctor
      */
-    private function generateUniqueCode(int $entityUserId): string
+    private function generateUniqueCode(): string
     {
-        try {
-            return Str::upper(Str::random(6));
-        } catch (RandomException $e) {
-            return Str::upper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
+        $maxAttempts = 10;
+        $attempt     = 0;
+
+        do {
+            try {
+                $code = 'DOC' . Str::upper(Str::random(6));
+            } catch (RandomException $e) {
+                $code = 'DOC' . Str::upper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
+            }
+
+            $attempt++;
+
+            $exists = Doctor::query()->withTrashed()
+                ->where('code', $code)
+                ->whereHas('entityUser', function ($query) {
+                    $query->where('entity_id', session()->get('selected_entity_id'));
+                })
+                ->exists();
+
+        } while ($exists && $attempt < $maxAttempts);
+
+        if ($exists) {
+            $code = 'PAC' . strtoupper(substr(md5(time() . rand()), 0, 6));
         }
+
+        return $code;
     }
 }

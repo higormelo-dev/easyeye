@@ -1,6 +1,10 @@
 <?php
 
-use App\Http\Controllers\{DoctorsController, Manager\EntitiesController, ProfileController, UsersController};
+use App\Http\Controllers\{DoctorsController,
+	Manager\EntitiesController,
+	PatientsController,
+	ProfileController,
+	UsersController};
 use Illuminate\Support\Facades\{Auth, Route};
 
 Route::get('/', function () {
@@ -34,10 +38,11 @@ Route::group(
             return view('system.manager.dashboard');
         })->name('dashboard');
 
+        Route::resource('doctors', DoctorsController::class);
+        Route::resource('patients', PatientsController::class);
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
             Route::resource('users', UsersController::class);
         });
-        Route::resource('doctors', DoctorsController::class);
 
         require __DIR__ . '/manager.php';
 
@@ -49,6 +54,7 @@ Route::group(
             Route::group(['prefix' => 'datatables', 'as' => 'datatables'], function () {
                 Route::post('/users', [UsersController::class, 'ajaxDatatable'])->name('.users');
                 Route::post('/doctors', [DoctorsController::class, 'ajaxDatatable'])->name('.doctors');
+                Route::post('/patients', [PatientsController::class, 'ajaxDatatable'])->name('.patients');
                 Route::post('/entities', [EntitiesController::class, 'ajaxDatatable'])->name('.entities');
                 Route::post(
                     '/entity_integrators',

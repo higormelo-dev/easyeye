@@ -7,7 +7,7 @@
 @section('content')
     <div class="row mb-3">
         <div class="col-12">
-            @include('system.doctors.subnav')
+            @include('system.patients.subnav')
         </div>
     </div>
     <div class="row">
@@ -18,16 +18,17 @@
                     <div class="row">
                         <div class="col">
                             <div class="table-responsive">
-                                <table id="doctor_datatable" class="table table-striped">
+                                <table id="patient_datatable" class="table table-striped">
                                     <thead>
-                                    <tr>
-                                        <th>{{ __('actions.created_at') }}</th>
-                                        <th>{{ __('actions.doctor') }}</th>
-                                        <th>{{ __('actions.record_advicen') }}</th>
-                                        <th>{{ __('actions.email') }}</th>
-                                        <th class="text-center">{{ __('actions.active') }}</th>
-                                        <th class="text-center">{{ __('actions.actions') }}</th>
-                                    </tr>
+                                        <tr>
+                                            <th>{{ __('actions.created_at') }}</th>
+                                            <th>{{ __('actions.code') }}</th>
+                                            <th>{{ __('actions.patient') }}</th>
+                                             <th>{{ __('actions.gender') }}</th>
+                                            <th>{{ __('actions.cellphone') }}</th>
+                                            <th class="text-center">{{ __('actions.active') }}</th>
+                                            <th class="text-center">{{ __('actions.actions') }}</th>
+                                        </tr>
                                     </thead>
                                 </table>
                             </div>
@@ -44,5 +45,5 @@
 @endsection
 
 @section('javascript')
-    @vite(['resources/js/system/auxiliary_functions.js', 'resources/js/system/doctors.js'])
+    @vite(['resources/js/system/patients.js'])
 @endsection

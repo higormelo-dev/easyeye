@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Presenters\PeoplePresenter;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Notifications\Notifiable;
 use Laracasts\Presenter\PresentableTrait;
 
@@ -73,12 +73,12 @@ class People extends Model
     /**
      * Gender of people
      *
+     * 0 => 'FEMININO',
      * 1 => 'MASCULINO',
-     * 2 => 'FEMININO',
      */
     public static array $genders = [
+        0 => 'FEMININO',
         1 => 'MASCULINO',
-        2 => 'FEMININO',
     ];
 
     /**

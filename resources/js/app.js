@@ -1,5 +1,4 @@
 import './bootstrap';
-import './system/doctors'
 
 import Alpine from 'alpinejs';
 

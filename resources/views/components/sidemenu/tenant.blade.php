@@ -5,7 +5,7 @@
     </a>
 </li>
 <li>
-    <a class="waves-effect waves-dark" href="javascript:void(0);">
+    <a class="waves-effect waves-dark" href="{{ route('panel.patients.index') }}">
         <i class="fa fa-users"></i>
         <span class="hide-menu"> Paciente </span>
     </a>

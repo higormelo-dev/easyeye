@@ -131,6 +131,8 @@ return [
     'patient'           => 'Patient',
     'record_advicen'    => 'Record Advicen',
     'record_specialty'  => 'Record Specialty',
+    'code'              => 'Code',
+    'cellphone'         => 'Cellphone',
     'sidemenu'          => [
         'dashboard'      => 'Dashboard',
         'entities'       => 'Entities',

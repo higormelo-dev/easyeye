@@ -150,6 +150,7 @@
     <script src="{{ asset('system/plugins/datatables.net/js/jquery.dataTables.min.js') }}"></script>
     <script src="{{ asset('system/plugins/datatables.net-bs4/js/dataTables.responsive.min.js') }}"></script>
     <script src="{{ asset('system/plugins/sweetalert2/dist/sweetalert2.all.min.js') }}"></script>
+    <script src="{{ asset('system/plugins/inputmask/dist/min/jquery.inputmask.bundle.min.js') }}"></script>
     <script src="{{ asset('system/js/waves.js') }}"></script>
     <script src="{{ asset('system/js/sidebarmenu.js') }}"></script>
     <script src="{{ asset('system/js/custom.min.js') }}"></script>

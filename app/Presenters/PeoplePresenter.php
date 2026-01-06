@@ -23,7 +23,7 @@ class PeoplePresenter extends Presenter
 
     public function getGender(): string
     {
-        return $this->gender ? People::$genders[$this->gender] : '';
+        return $this->gender !== null ? People::$genders[$this->gender] : '';
     }
 
     public function getMaritalStatus(): string
