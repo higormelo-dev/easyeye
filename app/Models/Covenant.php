@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 
 class Covenant extends Model
 {
-    use HasFactory;
+	use HasFactory;
     use HasUuids;
     use SoftDeletes;
 

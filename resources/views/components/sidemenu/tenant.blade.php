@@ -32,7 +32,7 @@
         <i class="fas fa-stream"></i><span class="hide-menu">Configuração</span>
     </a>
     <ul aria-expanded="false" class="collapse">
-        <li><a href="javascript:void(0);"><span class="fa fa-list"></span> Convênio</a></li>
+        <li><a href="{{ route('panel.setting.covenants.index') }}"><span class="fa fa-list"></span> Convênio</a></li>
         <li><a href="javascript:void(0);"><span class="fa fa-list"></span> Tipo de cútis</a></li>
         <li><a href="javascript:void(0);"><span class="fa fa-eye"></span> Tipo de íris</a></li>
         <li><a href="javascript:void(0);"><span class="fa fa-comments"></span> Tipo de visita</a></li>

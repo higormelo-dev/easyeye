@@ -1,0 +1,345 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Http\Requests\CovenantRequest;
+use App\Http\Resources\CovenantResource;
+use App\Models\Covenant;
+use App\Services\CovenantService;
+use Illuminate\Contracts\View\{Factory, View};
+use Illuminate\Foundation\Application;
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Routing\Redirector;
+use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
+
+class CovenantsController extends Controller
+{
+    protected string $titleController = 'Convênios';
+
+    /**
+     * Instance of the standard model.
+     */
+    protected Covenant $model;
+
+    protected CovenantService $covenantService;
+
+    public function __construct(Covenant $covenant, CovenantService $covenantService)
+    {
+        $this->model           = $covenant;
+        $this->covenantService = $covenantService;
+    }
+
+    /**
+     * Display a listing of the resource.
+     */
+    public function index(): Factory|Application|View
+    {
+        $meta = [
+            'title'       => $this->titleController,
+            'action'      => __('actions.records'),
+            'breadcrumbs' => [
+                [
+                    'label'  => __('actions.sidemenu.dashboard'),
+                    'url'    => route('panel.dashboard'),
+                    'active' => false,
+                ],
+                [
+                    'label'  => $this->titleController,
+                    'url'    => route('panel.setting.covenants.index'),
+                    'active' => false,
+                ],
+                [
+                    'label'  => __('actions.records'),
+                    'url'    => 'javascript:void(0);',
+                    'active' => true,
+                ],
+            ],
+        ];
+
+        return view('system.covenants.index', compact('meta'));
+    }
+
+    /**
+     * Show the form for creating a new resource.
+     */
+    public function create(): Factory|Application|View|JsonResponse
+    {
+        try {
+            return view('system.covenants.form');
+        } catch (\Throwable $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(CovenantRequest $request): Application|RedirectResponse|Redirector|JsonResponse|CovenantResource
+    {
+        try {
+            $record = $this->covenantService->createCovenant($request);
+
+            $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message' => $messageReturn,
+                    'data'    => (new CovenantResource($record))['data'],
+                ]);
+            }
+
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
+        } catch (\Throwable $e) {
+            return $this->serverErrorResponse();
+        }
+
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show(string $id): Application|View|JsonResponse
+    {
+        try {
+            $record = $this->findCovenant($id);
+
+            if (! $record) {
+                return $this->notFoundResponse();
+            }
+
+            return view(
+                'system.covenants.show',
+                compact('record')
+            );
+        } catch (\Throwable $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(string $id): Application|View|JsonResponse
+    {
+        try {
+            $record = $this->findCovenant($id);
+
+            if (! $record) {
+                return $this->notFoundResponse();
+            }
+
+            return view('system.covenants.form', compact('record'));
+        } catch (\Throwable $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(CovenantRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
+    {
+        try {
+            $record = $this->findCovenant($id);
+
+            if (! $record) {
+                return $this->notFoundResponse();
+            }
+
+            $updatedRecord = $this->covenantService->updateCovenant($record, $request);
+
+            $messageReturn = $this->getUpdateMessage($request);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message' => $messageReturn,
+                    'data'    => (new CovenantResource($updatedRecord))['data'],
+                ]);
+            }
+
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
+        } catch (\Throwable $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    /**
+     * Remove the specified resource from storage.
+     */
+    public function destroy(string $id): Application|View|JsonResponse
+    {
+        try {
+            $record = $this->findCovenant($id);
+
+            if (! $record) {
+                return $this->notFoundResponse();
+            }
+
+            return DB::transaction(function () use ($record) {
+                $messageReturn = $this->titleController . ' deletado(a) com sucesso.';
+                $recordData    = $record->toArray();
+                $record->delete();
+
+                // Retornar resposta
+                if (request()->wantsJson()) {
+                    return response()->json([
+                        'message' => $messageReturn,
+                        'deleted' => $recordData,
+                    ]);
+                }
+
+                return redirect(action('\\' . static::class . '@index'))
+                    ->with('message', $messageReturn);
+            });
+        } catch (\Throwable $e) {
+            return $this->serverErrorResponse();
+        }
+    }
+
+    public function ajaxDatatable(Request $request): JsonResponse
+    {
+        $columns = [
+            0 => 'created_at',
+            1 => 'name',
+            2 => 'table',
+            3 => 'active',
+            4 => 'action',
+        ];
+
+        $totalRecords = $this->model->query()->withTrashed()
+            ->select('covenants.*')
+            ->where('covenants.entity_id', session()->get('selected_entity_id'))
+            ->count();
+
+        $limit = $request->get('length');
+        $start = $request->get('start');
+        $order = $columns[$request->get('order')[0]['column']];
+        $dir   = $request->get('order')[0]['dir'];
+
+        if (empty($request->get('search')['value'])) {
+            $records = $this->model->query()->withTrashed()
+                ->select('covenants.*')
+                ->where('covenants.entity_id', session()->get('selected_entity_id'))
+                ->skip($start)
+                ->take($limit)
+                ->orderBy($order, $dir)
+                ->get();
+
+            $totalFiltered = $totalRecords;
+        } else {
+            $search = $request->get('search')['value'];
+            $query  = $this->model->query()->withTrashed()
+                ->select('covenants.*')
+                ->where('covenants.entity_id', session()->get('selected_entity_id'))
+                ->where('covenants.name', 'like', "%{$search}%");
+
+            $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
+            $totalFiltered = $query->count();
+
+        }
+        $data = [];
+
+        if (count($records)) {
+            foreach ($records as $record) {
+                $information['created_at'] = $record->created_at->format('d/m/Y H:i');
+                $information['name']       = '<span class="badge bg-success" style="background-color: ' .
+                        $record->color . ' !important;">&nbsp;&nbsp;&nbsp;&nbsp;</span>&nbsp;&nbsp;' .
+                    $record->name;
+                $information['table']  = $record->table ? 'Sim' : 'Não';
+                $information['active'] = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
+                    '<span class="badge bg-success">SIM</span>' :
+                    '<span class="badge bg-dark">NÃO</span>');
+                $information['action'] = $this->buildActionButtons($record);
+                $data[]                = $information;
+            }
+
+        }
+
+        return response()->json(
+            [
+                'draw'            => (int) $request->get('draw'),
+                'recordsTotal'    => (int) $totalRecords,
+                'recordsFiltered' => (int) $totalFiltered,
+                'data'            => $data,
+            ]
+        );
+    }
+
+    /**
+     * Find covenant by ID
+     */
+    private function findCovenant(string $id): ?Covenant
+    {
+        return $this->model->query()
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->where('id', $id)
+            ->first();
+    }
+
+    /**
+     * Return not found response
+     */
+    private function notFoundResponse(): JsonResponse
+    {
+        return response()->json(['message' => 'Covenant not found.'], HttpResponse::HTTP_NOT_FOUND);
+    }
+    /**
+     * Return server error response
+     */
+    private function serverErrorResponse(): JsonResponse
+    {
+        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Get update message based on request type
+     */
+    private function getUpdateMessage(Request $request): string
+    {
+        if ($request->has('type_method')) {
+            return $this->titleController .
+                ($request->active ? ' desbloqueado(a) ' : ' bloqueado(a) ') . ' com sucesso.';
+        }
+
+        return $this->titleController . ' alterado(a) com sucesso.';
+    }
+
+    /**
+     * Build action buttons for datatable
+     */
+    private function buildActionButtons($record): string
+    {
+        $btnActions = '';
+
+        if (! $record->deleted_at) {
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Editar"><i class="fa fa-edit"></i></a>';
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Visualizar"><i class="fa fa-eye"></i></a>';
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
+	                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
+	                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
+	                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
+        } else {
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Restaurar"><i class="fas fa-recycle"></i></a>';
+        }
+
+        return $btnActions;
+    }
+}

@@ -3,7 +3,7 @@ import { handleAjaxError, showSuccessToast, showErrorToast, searchAddressByZipco
 $(function () {
     let record_id, btn_action;
 
-    let dataTable = $('#patient_datatable').DataTable({
+    let dataTable = $('#covenants_datatable').DataTable({
         "retrieve": true,
         "order": [
             [0, 'desc']
@@ -20,7 +20,7 @@ $(function () {
         ],
         "pagingType": "full_numbers",
         "ajax": {
-            'url': 'ajax/datatables/patients',
+            'url': '/panel/ajax/datatables/covenants',
             'dataType': 'json',
             'type': 'POST',
             'data': {
@@ -35,24 +35,22 @@ $(function () {
         },
         "columns": [
             {'data': 'created_at', 'searchable': false, 'orderable': true},
-            {'data': 'code'},
             {'data': 'name'},
-            {'data': 'gender', 'searchable': false, 'orderable': true},
-            {'data': 'cellphone'},
+            {'data': 'table', 'searchable': false, 'orderable': true},
             {'data': 'active', 'searchable': false, 'orderable': true},
             {'data': 'action', 'searchable': false, 'orderable': false},
         ],
         "columnDefs": [
             {
-                'targets': [0, 1, 2, 3, 4],
+                'targets': [0, 1, 2],
                 'className': 'text-left'
             },
             {
-                'targets': 5,
+                'targets': 3,
                 'className': 'text-center'
             },
             {
-                'targets': 6,
+                'targets': 4,
                 'className': 'text-end'
             }
         ],
@@ -85,13 +83,13 @@ $(function () {
         $('.btn-edit').click(function () {
             record_id = $(this).data('id');
             btn_action = 'update';
-            $('.modal-title-default').empty().append('Cadastrar paciente');
+            $('.modal-title-default').empty().append('Cadastrar convênio');
             $('#btn-modal-default').css('display', 'block');
             $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
             $('#btn-modal-default').attr('data-action', 'register');
             $('#btn-modal-default').removeAttr('data-id');
             $.ajax({
-                url: `patients/${record_id}/edit`,
+                url: `covenants/${record_id}/edit`,
                 type: 'get',
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -114,11 +112,11 @@ $(function () {
         // Visualizar
         $('.btn-show').click(function () {
             record_id = $(this).data('id');
-            $('.modal-title-default').empty().append('Visualizar paciente');
+            $('.modal-title-default').empty().append('Visualizar convênio');
             $('#btn-modal-default').css('display', 'none');
             $('.modal-dialog').removeClass('modal-md modal-lg').addClass('modal-lg');
             $.ajax({
-                url: `patients/${record_id}`,
+                url: `covenants/${record_id}`,
                 success: function (data) {
                     $('#retorno-default').empty().append(data);
                     $('#modal_default').modal('show');
@@ -133,7 +131,7 @@ $(function () {
         $('.btn-active').click(function () {
             record_id = $(this).data('id');
             $.ajax({
-                url: `patients/${record_id}`,
+                url: `covenants/${record_id}`,
                 type: 'put',
                 dataType: 'json',
                 data: {
@@ -166,7 +164,7 @@ $(function () {
                 if (result.value) {
                     $.ajax({
                         method: "delete",
-                        url: `patients/${record_id}`,
+                        url: `covenants/${record_id}`,
                         dataType: 'json',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -187,13 +185,13 @@ $(function () {
     dataTable.draw();
     $('.new-register').click(function () {
         btn_action = 'store';
-        $('.modal-title-default').empty().append('Cadastrar paciente');
+        $('.modal-title-default').empty().append('Cadastrar convênio');
         $('#btn-modal-default').css('display', 'block');
         $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
         $('#btn-modal-default').attr('data-action', 'register');
         $('#btn-modal-default').removeAttr('data-id');
         $.ajax({
-            url: 'patients/create',
+            url: 'covenants/create',
             type: 'get',
             beforeSend: function () {
                 $('#btn-modal-default').attr('disabled', true);
@@ -219,36 +217,12 @@ $(function () {
     $('#btn-modal-default').click(function () {
         let requestType = (btn_action === 'store') ? 'post' : 'put';
         let requestURL = (btn_action === 'store') ?
-            'patients' :
-            `patients/${record_id}`;
+            'covenants' :
+            `covenants/${record_id}`;
         let requestData = {
-            'name': $('input[name=full_name]').val(),
-            'national_registry': $('input[name=national_registry]').val(),
-            'nickname': $('input[name=nickname]').val(),
-            'birth_date': $('input[name=birth_date]').val(),
-            'gender': $('select[name=gender]').val(),
-            'marital_status': $('select[name=marital_status]').val(),
-            'email': $('input[name=email]').val(),
-            'mother_name': $('input[name=mother_name]').val(),
-            'father_name': $('input[name=father_name]').val(),
-            'state_registry': $('input[name=state_registry]').val(),
-            'state_registry_agency': $('input[name=state_registry_agency]').val(),
-            'state_registry_initial': $('select[name=state_registry_initial]').val(),
-            'state_registry_date': $('input[name=state_registry_date]').val(),
-            'telephone': $('input[name=telephone]').val(),
-            'cellphone': $('input[name=cellphone]').val(),
-            'whatsapp': $('select[name=whatsapp]').val(),
-            'zipcode': $('input[name=zipcode]').val(),
-            'address': $('input[name=address]').val(),
-            'number': $('input[name=number]').val(),
-            'complement': $('input[name=complement]').val(),
-            'district': $('input[name=district]').val(),
-            'city': $('input[name=city]').val(),
-            'state': $('select[name=state]').val(),
-            'covenant_id': $('select[name=covenant_id]').val(),
-            'card_number': $('input[name=card_number]').val(),
-            'skin_id': $('select[name=skin_id]').val(),
-            'iris_id': $('select[name=iris_id]').val(),
+            'name': $('input[name=name]').val(),
+            'color': $('input[name=color]').val(),
+            'table': $('select[name=table]').val(),
         };
 
         if (requestType === 'put') {
@@ -281,18 +255,7 @@ $(function () {
     });
 
     function initModalEvents() {
-        $('select[name=covenant_id]').off('change').on('change', function() {
-            $('input[name=card_number]').prop('disabled', ($(this).find('option:selected').text().trim() === 'Particular')).val('');
-        });
-
-        $('input[name=zipcode]').off('blur').on('blur', function() {
-            searchAddressByZipcode($(this).val());
-        });
-
-        $('input[name=telephone]').inputmask('(99) 9999-9999');
-        $('input[name=cellphone]').inputmask('(99) 99999-9999');
-        $('input[name=zipcode]').inputmask('99999-999');
-        $('input[name=national_registry]').inputmask('999.999.999-99');
+        $('.colorpicker').asColorPicker();
     }
 
 });

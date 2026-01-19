@@ -1,6 +1,7 @@
 <?php
 
-use App\Http\Controllers\{DoctorsController,
+use App\Http\Controllers\{CovenantsController,
+	DoctorsController,
 	Manager\EntitiesController,
 	PatientsController,
 	ProfileController,
@@ -43,6 +44,9 @@ Route::group(
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
             Route::resource('users', UsersController::class);
         });
+        Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
+            Route::resource('covenants', CovenantsController::class);
+        });
 
         require __DIR__ . '/manager.php';
 
@@ -56,6 +60,7 @@ Route::group(
                 Route::post('/doctors', [DoctorsController::class, 'ajaxDatatable'])->name('.doctors');
                 Route::post('/patients', [PatientsController::class, 'ajaxDatatable'])->name('.patients');
                 Route::post('/entities', [EntitiesController::class, 'ajaxDatatable'])->name('.entities');
+                Route::post('/covenants', [CovenantsController::class, 'ajaxDatatable'])->name('.covenants');
                 Route::post(
                     '/entity_integrators',
                     [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']

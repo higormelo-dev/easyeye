@@ -11,6 +11,7 @@
         <link href="{{ asset('system/plugins/toast-master/css/jquery.toast.css') }}" rel="stylesheet">
         <link href="{{ asset('system/plugins/datatables.net-bs4/css/responsive.dataTables.min.css') }}" rel="stylesheet">
         <link href="{{ asset('system/plugins/sweetalert2/dist/sweetalert2.min.css') }}" rel="stylesheet">
+        <link href="{{ asset('system/plugins/jquery-asColorPicker-master/dist/css/asColorPicker.css') }}" rel="stylesheet">
         <link href="{{ asset('system/css/style.min.css') }}" rel="stylesheet">
         <link href="{{ asset('system/css/pages/dashboard1.css') }}" rel="stylesheet">
         <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
@@ -151,6 +152,8 @@
     <script src="{{ asset('system/plugins/datatables.net-bs4/js/dataTables.responsive.min.js') }}"></script>
     <script src="{{ asset('system/plugins/sweetalert2/dist/sweetalert2.all.min.js') }}"></script>
     <script src="{{ asset('system/plugins/inputmask/dist/min/jquery.inputmask.bundle.min.js') }}"></script>
+    <script src="{{ asset('system/plugins/jquery-asColor/dist/jquery-asColor.min.js') }}"></script>
+    <script src="{{ asset('system/plugins/jquery-asColorPicker-master/dist/jquery-asColorPicker.min.js') }}"></script>
     <script src="{{ asset('system/js/waves.js') }}"></script>
     <script src="{{ asset('system/js/sidebarmenu.js') }}"></script>
     <script src="{{ asset('system/js/custom.min.js') }}"></script>

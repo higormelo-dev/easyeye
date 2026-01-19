@@ -133,6 +133,10 @@ return [
     'record_specialty'  => 'Record Specialty',
     'code'              => 'Code',
     'cellphone'         => 'Cellphone',
+    'gender'            => 'Gender',
+    'covenant'          => 'Covenant',
+    'table'             => 'Table',
+    'color'             => 'Color',
     'sidemenu'          => [
         'dashboard'      => 'Dashboard',
         'entities'       => 'Entities',

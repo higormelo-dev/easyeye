@@ -133,6 +133,10 @@ return [
     'record_specialty'  => 'Registro de especialidade',
     'code'              => 'Código',
     'cellphone'         => 'Celular',
+    'gender'            => 'Gênero',
+    'covenant'          => 'Convênio',
+    'table'             => 'Cobrança',
+    'color'             => 'Cor',
     'sidemenu'          => [
         'dashboard'      => 'Painel de controle',
         'entities'       => 'Empresas',
