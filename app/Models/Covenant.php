@@ -4,11 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class Covenant extends Model
 {
-	use HasFactory;
+    use HasFactory;
     use HasUuids;
     use SoftDeletes;
 
@@ -39,5 +39,10 @@ class Covenant extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id', 'id');
     }
 }

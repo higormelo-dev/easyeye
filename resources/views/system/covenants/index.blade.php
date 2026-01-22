@@ -7,7 +7,7 @@
 @section('content')
     <div class="row mb-3">
         <div class="col-12">
-            @include('system.doctors.subnav')
+            @include('system.covenants.subnav')
         </div>
     </div>
     <div class="row">

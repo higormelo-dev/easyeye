@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class CovenantResource extends JsonResource
+class SkinTypeResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -20,8 +20,6 @@ class CovenantResource extends JsonResource
             'attributes' => [
                 'entity_id'  => $this->entity_id,
                 'name'       => $this->name,
-                'color'      => $this->color,
-                'table'      => (bool) $this->table,
                 'active'     => (bool) $this->active,
                 'created_at' => $this->created_at,
                 'updated_at' => $this->updated_at,

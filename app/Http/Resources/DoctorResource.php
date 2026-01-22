@@ -27,6 +27,8 @@ class DoctorResource extends JsonResource
                 'observation'      => $this->observation,
                 'partner'          => (bool) $this->partner,
                 'active'           => (bool) $this->active,
+                'created_at'       => $this->created_at,
+                'updated_at'       => $this->updated_at,
             ],
             'relationships' => [
                 'entityUser' => $this->entityUser->toArray(),

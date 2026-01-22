@@ -10,6 +10,7 @@
         "alpinejs": "^3.13.10",
         "autoprefixer": "^10.4.19",
         "axios": "^1.7.4",
+        "baseline-browser-mapping": "^2.9.16",
         "browser-sync": "^3.0.3",
         "concurrently": "^9.0.1",
         "gulp": "^4.0.2",

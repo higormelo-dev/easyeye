@@ -7,7 +7,7 @@
 @section('content')
     <div class="row mb-3">
         <div class="col-12">
-            @include('system.users.subnav')
+            @include('system.skintypes.subnav')
         </div>
     </div>
     <div class="row">
@@ -18,12 +18,11 @@
                     <div class="row">
                         <div class="col">
                             <div class="table-responsive">
-                                <table id="users_datatable" class="table table-striped">
+                                <table id="skintypes_datatable" class="table table-striped">
                                     <thead>
                                     <tr>
                                         <th>{{ __('actions.created_at') }}</th>
-                                        <th>{{ __('actions.user') }}</th>
-                                        <th>{{ __('actions.email') }}</th>
+                                        <th>{{ __('actions.covenant') }}</th>
                                         <th class="text-center">{{ __('actions.active') }}</th>
                                         <th class="text-center">{{ __('actions.actions') }}</th>
                                     </tr>
@@ -43,5 +42,5 @@
 @endsection
 
 @section('javascript')
-    @vite(['resources/js/system/users.js'])
+    @vite(['resources/js/system/skintypes.js'])
 @endsection

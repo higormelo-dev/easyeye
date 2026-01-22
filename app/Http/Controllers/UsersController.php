@@ -7,9 +7,9 @@ use App\Http\Resources\EntityUserResource;
 use App\Models\{EntityUser, User};
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class UsersController extends Controller
@@ -273,7 +273,8 @@ class UsersController extends Controller
             4 => 'action',
         ];
 
-        $totalRecords = $this->model->query()->select('entity_users.*', 'users.name', 'users.email')
+        $totalRecords = $this->model->query()->withTrashed()
+            ->select('entity_users.*', 'users.name', 'users.email')
             ->join('users', 'entity_users.user_id', '=', 'users.id')
             ->where('entity_users.entity_id', session()->get('selected_entity_id'))
             ->whereNot('entity_users.rule', 'doctor')
@@ -285,7 +286,8 @@ class UsersController extends Controller
         $dir   = $request->get('order')[0]['dir'];
 
         if (empty($request->get('search')['value'])) {
-            $records = $this->model->query()->select('entity_users.*', 'users.name', 'users.email')
+            $records = $this->model->query()->withTrashed()
+                ->select('entity_users.*', 'users.name', 'users.email')
                 ->join('users', 'entity_users.user_id', '=', 'users.id')
                 ->where('entity_users.entity_id', session()->get('selected_entity_id'))
                 ->whereNot('entity_users.rule', 'doctor')
@@ -293,63 +295,35 @@ class UsersController extends Controller
                 ->take($limit)
                 ->orderBy($order, $dir)
                 ->get();
-            $totalFiltered = $this->model->query()->select('entity_users.*', 'users.name', 'users.email')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                ->whereNot('entity_users.rule', 'doctor')
-                ->count();
+
+            $totalFiltered = $totalRecords;
         } else {
-            $search  = $request->get('search')['value'];
-            $records = $this->model->query()->select('entity_users.*', 'users.name', 'users.email')
+            $search = $request->get('search')['value'];
+            $query  = $this->model->query()->withTrashed()
+                ->select('entity_users.*', 'users.name', 'users.email')
                 ->join('users', 'entity_users.user_id', '=', 'users.id')
                 ->where('entity_users.entity_id', session()->get('selected_entity_id'))
                 ->whereNot('entity_users.rule', 'doctor')
-                ->where('users.name', 'like', "%{$search}%")
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->get();
-            $totalFiltered = $this->model->query()->select('entity_users.*', 'users.name', 'users.email')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                ->whereNot('entity_users.rule', 'doctor')
-                ->where('users.name', 'like', "%{$search}%")
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->count();
+                ->where(function ($query) use ($search) {
+                    $query->whereRaw('LOWER(users.name) LIKE LOWER(?)', ["%{$search}%"])
+                        ->orWhereRaw('LOWER(users.email) LIKE LOWER(?)', ["%{$search}%"]);
+                });
+
+            $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
+            $totalFiltered = $query->count();
+
         }
         $data = [];
 
         if (count($records)) {
             foreach ($records as $record) {
-                $btnActions                = '';
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
                 $information['name']       = $record->name;
                 $information['email']      = $record->email;
                 $information['active']     = $record->active ?
                     '<span class="badge bg-success">SIM</span>' :
                     '<span class="badge bg-dark">NÃO</span>';
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Editar"><i class="fa fa-edit"></i></a>';
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Visualizar"><i class="fa fa-eye"></i></a>';
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
-                    data-name="' . $record->name . '" data-email="' . $record->email . '"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
-                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-danger btn-danger btn-xs m-1 btn-trash"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
-                $information['action'] = $btnActions;
+                $information['action'] = $this->buildActionButtons($record);
                 $data[]                = $information;
             }
 
@@ -387,5 +361,41 @@ class UsersController extends Controller
     private function serverErrorResponse(): JsonResponse
     {
         return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Build action buttons for datatable
+     */
+    private function buildActionButtons($record): string
+    {
+        $btnActions = '';
+
+        if (! $record->deleted_at && $record->entity_id === session()->get('selected_entity_id')) {
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Editar"><i class="fa fa-edit"></i></a>';
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Visualizar"><i class="fa fa-eye"></i></a>';
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
+	                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
+	                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
+	                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
+        } elseif ($record->deleted_at && $record->entity_id === session()->get('selected_entity_id')) {
+            $btnActions .= '<a href="javascript:void(0);"
+	                    class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
+	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+	                    title="Restaurar"><i class="fas fa-recycle"></i></a>';
+        }
+
+        return $btnActions;
     }
 }

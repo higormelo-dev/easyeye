@@ -24,6 +24,8 @@ class EntityIntegratorEquipmentResource extends JsonResource
                 'mac'           => $this->mac,
                 'serial_number' => $this->serial_number,
                 'active'        => (bool) $this->active,
+                'created_at'    => $this->created_at,
+                'updated_at'    => $this->updated_at,
             ],
         ];
     }

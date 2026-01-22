@@ -1,9 +1,9 @@
-import { handleAjaxError, showSuccessToast, showErrorToast, searchAddressByZipcode } from './auxiliary_functions.js';
+import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 
 $(function () {
     let record_id, btn_action;
 
-    let dataTable = $('#covenants_datatable').DataTable({
+    let covenantsDataTable = $('#covenants_datatable').DataTable({
         "retrieve": true,
         "order": [
             [0, 'desc']
@@ -78,7 +78,7 @@ $(function () {
         }
 
     });
-    dataTable.on('draw', function () {
+    covenantsDataTable.on('draw', function () {
         // Editar
         $('.btn-edit').click(function () {
             record_id = $(this).data('id');
@@ -143,7 +143,7 @@ $(function () {
                 },
                 success: function (response) {
                     showSuccessToast(response.message);
-                    dataTable.ajax.reload();
+                    covenantsDataTable.ajax.reload();
                 },
                 error: handleAjaxError
             });
@@ -171,7 +171,40 @@ $(function () {
                         },
                         success: function (response) {
                             showSuccessToast(response.message);
-                            dataTable.ajax.reload();
+                            covenantsDataTable.ajax.reload();
+                        },
+                        error: function (data) {
+                            let error = data.responseJSON;
+                            showErrorToast(error.message);
+                        }
+                    });
+                }
+            });
+        });
+        // Restaurar
+        $('.btn-restore').on('click', function () {
+            record_id = $(this).data('id');
+            Swal.fire({
+                title: 'Restaurar?',
+                text: "Você tem certeza que deseja restaurar o registro?\nEsta ação não poderá ser desfeita.",
+                type: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sim',
+                cancelButtonText: 'Não'
+            }).then((result) => {
+                if (result.value) {
+                    $.ajax({
+                        method: "get",
+                        url: `covenants/${record_id}/restore`,
+                        dataType: 'json',
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function (response) {
+                            showSuccessToast(response.message);
+                            covenantsDataTable.ajax.reload();
                         },
                         error: function (data) {
                             let error = data.responseJSON;
@@ -182,7 +215,7 @@ $(function () {
             });
         });
     });
-    dataTable.draw();
+    covenantsDataTable.draw();
     $('.new-register').click(function () {
         btn_action = 'store';
         $('.modal-title-default').empty().append('Cadastrar convênio');
@@ -248,7 +281,7 @@ $(function () {
             success: function (response) {
                 showSuccessToast(response.message);
                 $('#modal_default').modal('hide');
-                dataTable.ajax.reload();
+                covenantsDataTable.ajax.reload();
             },
             error: handleAjaxError
         });

@@ -2,7 +2,7 @@ import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_f
 
 $(function () {
     let record_id, btn_action;
-    let dataTable = $('#doctor_datatable').DataTable({
+    let doctorsDataTable = $('#doctor_datatable').DataTable({
         "retrieve": true,
         "order": [
             [0, 'desc']
@@ -90,7 +90,7 @@ $(function () {
         }
 
     });
-    dataTable.on('draw', function () {
+    doctorsDataTable.on('draw', function () {
         // Editar
         $('.btn-edit').click(function () {
             record_id = $(this).data('id');
@@ -181,7 +181,7 @@ $(function () {
                 },
                 success: function (response) {
                     showSuccessToast(response.message);
-                    dataTable.ajax.reload();
+                    doctorsDataTable.ajax.reload();
                 },
                 error: handleAjaxError
             });
@@ -209,7 +209,7 @@ $(function () {
                         },
                         success: function (response) {
                             showSuccessToast(response.message);
-                            dataTable.ajax.reload();
+                            doctorsDataTable.ajax.reload();
                         },
                         error: function (data) {
                             let error = data.responseJSON;
@@ -220,7 +220,7 @@ $(function () {
             });
         });
     });
-    dataTable.draw();
+    doctorsDataTable.draw();
     $('.new-register').click(function () {
         btn_action = 'store';
         $('.modal-title-default').empty();
@@ -319,7 +319,7 @@ $(function () {
             success: function (response) {
                 showSuccessToast(response.message);
                 $('#modal_default').modal('hide');
-                dataTable.ajax.reload();
+                doctorsDataTable.ajax.reload();
             },
             error: handleAjaxError
         });

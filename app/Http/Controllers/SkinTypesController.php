@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\CovenantRequest;
-use App\Http\Resources\CovenantResource;
-use App\Models\Covenant;
-use App\Services\CovenantService;
+use App\Http\Requests\{SkinTypeRequest};
+use App\Http\Resources\{CovenantResource, SkinTypeResource};
+use App\Models\{SkinType};
+use App\Services\SkinTypeService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -13,21 +13,21 @@ use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
-class CovenantsController extends Controller
+class SkinTypesController extends Controller
 {
-    protected string $titleController = 'Convênios';
+    protected string $titleController = 'Tipos de cútis';
 
     /**
      * Instance of the standard model.
      */
-    protected Covenant $model;
+    protected SkinType $model;
 
-    protected CovenantService $covenantService;
+    protected SkinTypeService $skinTypeService;
 
-    public function __construct(Covenant $covenant, CovenantService $covenantService)
+    public function __construct(SkinType $skinType, SkinTypeService $skinTypeService)
     {
-        $this->model           = $covenant;
-        $this->covenantService = $covenantService;
+        $this->model           = $skinType;
+        $this->skinTypeService = $skinTypeService;
     }
 
     /**
@@ -46,7 +46,7 @@ class CovenantsController extends Controller
                 ],
                 [
                     'label'  => $this->titleController,
-                    'url'    => route('panel.setting.covenants.index'),
+                    'url'    => route('panel.setting.skintypes.index'),
                     'active' => false,
                 ],
                 [
@@ -57,7 +57,7 @@ class CovenantsController extends Controller
             ],
         ];
 
-        return view('system.covenants.index', compact('meta'));
+        return view('system.skintypes.index', compact('meta'));
     }
 
     /**
@@ -66,7 +66,7 @@ class CovenantsController extends Controller
     public function create(): Factory|Application|View|JsonResponse
     {
         try {
-            return view('system.covenants.form');
+            return view('system.skintypes.form');
         } catch (\Throwable $e) {
             return $this->serverErrorResponse();
         }
@@ -75,17 +75,17 @@ class CovenantsController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(CovenantRequest $request): Application|RedirectResponse|Redirector|JsonResponse|CovenantResource
+    public function store(SkinTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|CovenantResource
     {
         try {
-            $record = $this->covenantService->createCovenant($request);
+            $record = $this->skinTypeService->create($request);
 
             $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
 
             if (request()->wantsJson()) {
                 return response()->json([
                     'message' => $messageReturn,
-                    'data'    => (new CovenantResource($record))['data'],
+                    'data'    => (new SkinTypeResource($record))['data'],
                 ]);
             }
 
@@ -103,14 +103,14 @@ class CovenantsController extends Controller
     public function show(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findSkinType($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
             return view(
-                'system.covenants.show',
+                'system.skintypes.show',
                 compact('record')
             );
         } catch (\Throwable $e) {
@@ -124,13 +124,13 @@ class CovenantsController extends Controller
     public function edit(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findSkinType($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
-            return view('system.covenants.form', compact('record'));
+            return view('system.skintypes.form', compact('record'));
         } catch (\Throwable $e) {
             return $this->serverErrorResponse();
         }
@@ -139,23 +139,23 @@ class CovenantsController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(CovenantRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
+    public function update(SkinTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findSkinType($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
-            $updatedRecord = $this->covenantService->updateCovenant($record, $request);
+            $updatedRecord = $this->skinTypeService->update($record, $request);
 
             $messageReturn = $this->getUpdateMessage($request);
 
             if (request()->wantsJson()) {
                 return response()->json([
                     'message' => $messageReturn,
-                    'data'    => (new CovenantResource($updatedRecord))['data'],
+                    'data'    => (new SkinTypeResource($updatedRecord))['data'],
                 ]);
             }
 
@@ -172,7 +172,7 @@ class CovenantsController extends Controller
     public function destroy(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findSkinType($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -205,7 +205,7 @@ class CovenantsController extends Controller
     public function restore(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findSkinType($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -237,16 +237,15 @@ class CovenantsController extends Controller
         $columns = [
             0 => 'created_at',
             1 => 'name',
-            2 => 'table',
-            3 => 'active',
-            4 => 'action',
+            2 => 'active',
+            3 => 'action',
         ];
 
         $totalRecords = $this->model->query()->withTrashed()
-            ->select('covenants.*')
-            ->where('covenants.entity_id', session()->get('selected_entity_id'))
+            ->select('skin_types.*')
+            ->where('skin_types.entity_id', session()->get('selected_entity_id'))
             ->orWhere(function ($query) {
-                $query->whereNull('covenants.entity_id')->whereNull('covenants.deleted_at');
+                $query->whereNull('skin_types.entity_id')->whereNull('skin_types.deleted_at');
             })
             ->count();
 
@@ -257,10 +256,10 @@ class CovenantsController extends Controller
 
         if (empty($request->get('search')['value'])) {
             $records = $this->model->query()->withTrashed()
-                ->select('covenants.*')
-                ->where('covenants.entity_id', session()->get('selected_entity_id'))
+                ->select('skin_types.*')
+                ->where('skin_types.entity_id', session()->get('selected_entity_id'))
                 ->orWhere(function ($query) {
-                    $query->whereNull('covenants.entity_id')->whereNull('covenants.deleted_at');
+                    $query->whereNull('skin_types.entity_id')->whereNull('skin_types.deleted_at');
                 })
                 ->skip($start)
                 ->take($limit)
@@ -271,12 +270,12 @@ class CovenantsController extends Controller
         } else {
             $search = $request->get('search')['value'];
             $query  = $this->model->query()->withTrashed()
-                ->select('covenants.*')
-                ->where('covenants.entity_id', session()->get('selected_entity_id'))
+                ->select('skin_types.*')
+                ->where('skin_types.entity_id', session()->get('selected_entity_id'))
                 ->orWhere(function ($query) {
-                    $query->whereNull('covenants.entity_id')->whereNull('covenants.deleted_at');
+                    $query->whereNull('skin_types.entity_id')->whereNull('skin_types.deleted_at');
                 })
-                ->whereRaw('LOWER(covenants.name) LIKE LOWER(?)', ["%{$search}%"]);
+                ->whereRaw('LOWER(skin_types.name) LIKE LOWER(?)', ["%{$search}%"]);
 
             $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
             $totalFiltered = $query->count();
@@ -287,11 +286,8 @@ class CovenantsController extends Controller
         if (count($records)) {
             foreach ($records as $record) {
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['name']       = '<span class="badge bg-success" style="background-color: ' .
-                        $record->color . ' !important;">&nbsp;&nbsp;&nbsp;&nbsp;</span>&nbsp;&nbsp;' .
-                    $record->name;
-                $information['table']  = $record->table ? 'Sim' : 'Não';
-                $information['active'] = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
+                $information['name']       = $record->name;
+                $information['active']     = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
                     '<span class="badge bg-success">SIM</span>' :
                     '<span class="badge bg-dark">NÃO</span>');
                 $information['action'] = $this->buildActionButtons($record);
@@ -311,9 +307,9 @@ class CovenantsController extends Controller
     }
 
     /**
-     * Find covenant by ID
+     * Find skin type by ID
      */
-    private function findCovenant(string $id): ?Covenant
+    private function findSkinType(string $id): ?SkinType
     {
         return $this->model->query()->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
@@ -326,7 +322,7 @@ class CovenantsController extends Controller
      */
     private function notFoundResponse(): JsonResponse
     {
-        return response()->json(['message' => 'Covenant not found.'], HttpResponse::HTTP_NOT_FOUND);
+        return response()->json(['message' => 'Skin type not found.'], HttpResponse::HTTP_NOT_FOUND);
     }
     /**
      * Return server error response

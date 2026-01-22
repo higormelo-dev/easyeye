@@ -324,7 +324,7 @@ class DoctorsController extends Controller
      */
     private function findDoctor(string $id): ?Doctor
     {
-        return $this->model->query()
+        return $this->model->query()->withTrashed()
             ->with(['person', 'entityUser.user'])
             ->whereHas('entityUser', function ($query) {
                 $query->where('entity_id', session()->get('selected_entity_id'));

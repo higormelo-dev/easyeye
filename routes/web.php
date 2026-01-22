@@ -2,9 +2,11 @@
 
 use App\Http\Controllers\{CovenantsController,
 	DoctorsController,
+	IrisTypesController,
 	Manager\EntitiesController,
 	PatientsController,
 	ProfileController,
+	SkinTypesController,
 	UsersController};
 use Illuminate\Support\Facades\{Auth, Route};
 
@@ -46,6 +48,14 @@ Route::group(
         });
         Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
             Route::resource('covenants', CovenantsController::class);
+            Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])
+                ->name('covenants.restore');
+            Route::resource('skintypes', SkinTypesController::class);
+            Route::get('skintypes/{skintype}/restore', [SkinTypesController::class, 'restore'])
+                ->name('skintypes.restore');
+            Route::resource('iristypes', IrisTypesController::class);
+            Route::get('iristypes/{iristype}/restore', [IrisTypesController::class, 'restore'])
+                ->name('iristypes.restore');
         });
 
         require __DIR__ . '/manager.php';
@@ -61,6 +71,8 @@ Route::group(
                 Route::post('/patients', [PatientsController::class, 'ajaxDatatable'])->name('.patients');
                 Route::post('/entities', [EntitiesController::class, 'ajaxDatatable'])->name('.entities');
                 Route::post('/covenants', [CovenantsController::class, 'ajaxDatatable'])->name('.covenants');
+                Route::post('/skintypes', [SkinTypesController::class, 'ajaxDatatable'])->name('.skintypes');
+                Route::post('/iristypes', [IrisTypesController::class, 'ajaxDatatable'])->name('.iristypes');
                 Route::post(
                     '/entity_integrators',
                     [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']
