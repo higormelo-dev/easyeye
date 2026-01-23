@@ -16,7 +16,7 @@
     <div class="row">
         {{
             html()->div([
-                html()->label('Apelido *', 'nickname')->class('form-label'),
+                html()->label('Apelido', 'nickname')->class('form-label'),
                 html()->text('nickname', $record->person->nickname ?? null)
                     ->class('form-control')
                     ->attributes([

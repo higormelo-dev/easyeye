@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\EntityUser;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class EntityUserRequest extends FormRequest
 {
@@ -43,9 +44,26 @@ class EntityUserRequest extends FormRequest
         ];
 
         if ($this->isMethod('POST')) {
-            $rules['password']              = ['required', 'string', 'min:8', 'confirmed'];
-            $rules['password_confirmation'] = ['required', 'string', 'min:8'];
-            $rules['rule']                  = [
+            $rules['password'] = [
+                'required',
+                Password::min(8)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ];
+            $rules['password_confirmation'] = [
+                'required',
+                'confirmed',
+                Password::min(8)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ];
+            $rules['rule'] = [
                 'required',
                 'string',
                 'in:admin,financial,doctor,secretary,support,user',

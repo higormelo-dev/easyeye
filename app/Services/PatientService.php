@@ -13,19 +13,19 @@ class PatientService
     /**
      * Create a new patient with all related entities
      */
-    public function createPatient(PatientRequest $request): Patient
+    public function create(PatientRequest $request): Patient
     {
         return DB::transaction(function () use ($request) {
             $person = $this->findOrCreatePerson($request);
 
-            return $this->findOrCreatePatient($person->id, $request);
+            return $this->findOrCreate($person->id, $request);
         });
     }
 
     /**
      * Update existing patient and related entities
      */
-    public function updatePatient(Patient $patient, PatientRequest $request): Patient
+    public function update(Patient $patient, PatientRequest $request): Patient
     {
         return DB::transaction(function () use ($patient, $request) {
             $data = [];
@@ -65,7 +65,7 @@ class PatientService
     /**
      * Find or create patient
      */
-    private function findOrCreatePatient(string $personId, PatientRequest $request): Patient
+    private function findOrCreate(string $personId, PatientRequest $request): Patient
     {
         $entityId              = session()->get('selected_entity_id');
         $covenant              = Covenant::query()->find($request->covenant_id);
@@ -218,7 +218,7 @@ class PatientService
         } while ($exists && $attempt < $maxAttempts);
 
         if ($exists) {
-            $code = 'PAC' . strtoupper(substr(md5(time() . rand()), 0, 6));
+            $code = 'PAC' . strtoupper(substr(md5(time() . mt_rand()), 0, 6));
         }
 
         return $code;

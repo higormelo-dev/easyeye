@@ -91,7 +91,7 @@ class PatientsController extends Controller
     public function store(PatientRequest $request): Application|RedirectResponse|Redirector|JsonResponse
     {
         try {
-            $patient       = $this->patientService->createPatient($request);
+            $patient       = $this->patientService->create($request);
             $messageReturn = $this->titleController . ' cadastradp(a) com sucesso.';
 
             if (request()->wantsJson()) {
@@ -180,7 +180,7 @@ class PatientsController extends Controller
                 return $this->notFoundResponse();
             }
 
-            $updatedRecord = $this->patientService->updatePatient($record, $request);
+            $updatedRecord = $this->patientService->update($record, $request);
             $messageReturn = $this->getUpdateMessage($request);
 
             if (request()->wantsJson()) {
@@ -219,10 +219,7 @@ class PatientsController extends Controller
 
                 if ($patientHasOtherEntities <= 1) {
                     $person = People::query()->find($record->person_id);
-
-                    if ($person) {
-                        $person->delete();
-                    }
+                    $person?->delete();
                 }
 
                 // Retornar resposta
@@ -291,9 +288,10 @@ class PatientsController extends Controller
                 ->join('people', 'patients.person_id', '=', 'people.id')
                 ->where('patients.entity_id', session()->get('selected_entity_id'))
                 ->where(function ($query) use ($search) {
-                    $query->where('people.full_name', 'like', "%{$search}%")
-                        ->orWhere('people.nickname', 'like', "%{$search}%")
-                        ->orWhere('patients.code', 'like', "%{$search}%");
+                    $query->whereRaw('LOWER(people.full_name) LIKE LOWER(?)', ["%{$search}%"])
+                        ->orWhereRaw('LOWER(patients.code) LIKE LOWER(?)', ["%{$search}%"])
+                        ->orWhereRaw('LOWER(people.nickname) LIKE LOWER(?)', ["%{$search}%"])
+                        ->orWhereRaw('LOWER(people.email) LIKE LOWER(?)', ["%{$search}%"]);
                 });
 
             $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();

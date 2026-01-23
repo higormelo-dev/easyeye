@@ -6,6 +6,7 @@ use App\Models\{Doctor};
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
 
 class DoctorRequest extends FormRequest
 {
@@ -101,11 +102,56 @@ class DoctorRequest extends FormRequest
         $rules['observation']            = ['nullable', 'string'];
         $rules['partner']                = ['nullable', 'boolean'];
 
-        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+        if ($this->isMethod('POST')) {
+            $rules['password'] = [
+                'required_without:type_method',
+                Password::min(8)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ];
+            $rules['password_confirmation'] = [
+                'required_without:type_method',
+                'confirmed',
+                Password::min(8)
+                    ->letters()
+                    ->mixedCase()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised(),
+            ];
+        } elseif ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
             $rules['active'] = ['required', 'boolean'];
         }
 
         return $rules;
+    }
+
+    /**
+     * Get the error messages for the defined validation rules.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'record.required_without'                => trans('validation.custom.generic.required'),
+            'record_specialty.required_without'      => trans('validation.custom.generic.required'),
+            'color.required_without'                 => trans('validation.custom.generic.required'),
+            'name.required_without'                  => trans('validation.custom.generic.required'),
+            'nickname.required_without'              => trans('validation.custom.generic.required'),
+            'birth_date.required_without'            => trans('validation.custom.generic.required'),
+            'gender.required_without'                => trans('validation.custom.generic.required'),
+            'marital_status.required_without'        => trans('validation.custom.generic.required'),
+            'email.required_without'                 => trans('validation.custom.generic.required'),
+            'national_registry.required_without'     => trans('validation.custom.generic.required'),
+            'cellphone.required_without'             => trans('validation.custom.generic.required'),
+            'whatsapp.required_without'              => trans('validation.custom.generic.required'),
+            'password.required_without'              => trans('validation.custom.generic.required'),
+            'password_confirmation.required_without' => trans('validation.custom.generic.required'),
+        ];
     }
 
     private function getIgnoredPersonId()
