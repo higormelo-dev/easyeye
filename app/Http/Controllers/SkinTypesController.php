@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\{SkinTypeRequest};
-use App\Http\Resources\{CovenantResource, SkinTypeResource};
+use App\Http\Resources\{SkinTypeResource};
 use App\Models\{SkinType};
 use App\Services\SkinTypeService;
 use Illuminate\Contracts\View\{Factory, View};
@@ -75,7 +75,7 @@ class SkinTypesController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(SkinTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|CovenantResource
+    public function store(SkinTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|SkinTypeResource
     {
         try {
             $record = $this->skinTypeService->create($request);

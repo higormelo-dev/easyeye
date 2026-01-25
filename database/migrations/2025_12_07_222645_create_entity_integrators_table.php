@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -27,6 +28,9 @@ return new class () extends Migration {
      */
     public function down(): void
     {
+        Schema::table('entity_integrators', function (Blueprint $table) {
+            $table->dropForeign('entity_integrators_entity_id_foreign');
+        });
         Schema::dropIfExists('entity_integrators');
     }
 };

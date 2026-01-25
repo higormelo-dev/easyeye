@@ -7,7 +7,8 @@ use App\Http\Controllers\{CovenantsController,
 	PatientsController,
 	ProfileController,
 	SkinTypesController,
-	UsersController};
+	UsersController,
+	VisitTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
 
 Route::get('/', function () {
@@ -56,6 +57,9 @@ Route::group(
             Route::resource('iristypes', IrisTypesController::class);
             Route::get('iristypes/{iristype}/restore', [IrisTypesController::class, 'restore'])
                 ->name('iristypes.restore');
+            Route::resource('visittypes', VisitTypesController::class);
+            // Route::get('visittypes/{visittype}/restore', [VisitTypesController::class, 'restore'])
+            //     ->name('visittypes.restore');
         });
 
         require __DIR__ . '/manager.php';

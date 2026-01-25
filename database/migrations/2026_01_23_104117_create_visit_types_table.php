@@ -11,16 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('procedures', function (Blueprint $table) {
+        Schema::create('visit_types', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('entity_id')
                 ->nullable()
                 ->constrained('entities')
                 ->cascadeOnDelete();
-            $table->string('code');
             $table->string('name');
-            $table->integer('nomo_binocular')->nullable();
-            $table->integer('treatment')->nullable();
             $table->boolean('active')->default(false);
             $table->softDeletes();
             $table->timestamps();
@@ -32,9 +29,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('procedures', function (Blueprint $table) {
-            $table->dropForeign('procedures_entity_id_foreign');
+        Schema::table('visit_types', function (Blueprint $table) {
+            $table->dropForeign('visit_types_entity_id_foreign');
         });
-        Schema::dropIfExists('procedures');
+        Schema::dropIfExists('visit_types');
     }
 };

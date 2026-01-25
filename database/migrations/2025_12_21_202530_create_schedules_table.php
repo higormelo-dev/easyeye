@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -40,6 +41,11 @@ return new class () extends Migration {
      */
     public function down(): void
     {
+        Schema::table('schedules', function (Blueprint $table) {
+            $table->dropForeign('schedules_doctor_id_foreign');
+            $table->dropForeign('schedules_patient_id_foreign');
+            $table->dropForeign('schedules_covenant_id_foreign');
+        });
         Schema::dropIfExists('schedules');
     }
 };

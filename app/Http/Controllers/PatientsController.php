@@ -22,12 +22,12 @@ class PatientsController extends Controller
      */
     protected Patient $model;
 
-    protected PatientService $patientService;
+    protected PatientService $service;
 
     public function __construct(Patient $patient, PatientService $patientService)
     {
-        $this->model          = $patient;
-        $this->patientService = $patientService;
+        $this->model   = $patient;
+        $this->service = $patientService;
     }
 
     /**

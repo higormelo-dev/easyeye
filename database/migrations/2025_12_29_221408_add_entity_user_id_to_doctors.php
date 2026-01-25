@@ -23,6 +23,8 @@ return new class extends Migration
                 $table->dropUnique('doctors_entity_id_code_unique');
             }
 
+            $table->dropForeign('doctors_entity_id_foreign');
+            $table->dropForeign('doctors_user_id_foreign');
             $table->dropColumn('entity_id');
             $table->dropColumn('user_id');
             $table->foreignUuid('entity_user_id')
@@ -40,6 +42,7 @@ return new class extends Migration
     {
         Schema::table('doctors', function (Blueprint $table) {
             $table->dropUnique('doctors_entity_user_id_code_unique');
+            $table->dropForeign('doctors_entity_user_id_foreign');
             $table->dropColumn('entity_user_id');
             $table->foreignUuid('entity_id')
                 ->constrained('entities')

@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -30,6 +31,9 @@ return new class () extends Migration {
      */
     public function down(): void
     {
+        Schema::table('iris_types', function (Blueprint $table) {
+            $table->dropForeign('iris_types_entity_id_foreign');
+        });
         Schema::dropIfExists('covenants');
     }
 };

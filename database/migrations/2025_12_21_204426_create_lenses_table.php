@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
@@ -16,7 +17,7 @@ return new class () extends Migration {
                 ->nullable()
                 ->constrained('entities')
                 ->cascadeOnDelete();
-	        $table->string('code');
+            $table->string('code');
             $table->string('name');
             $table->boolean('away')->default(false);
             $table->boolean('near')->default(false);
@@ -31,6 +32,9 @@ return new class () extends Migration {
      */
     public function down(): void
     {
+        Schema::table('lenses', function (Blueprint $table) {
+            $table->dropForeign('lenses_entity_id_foreign');
+        });
         Schema::dropIfExists('lenses');
     }
 };

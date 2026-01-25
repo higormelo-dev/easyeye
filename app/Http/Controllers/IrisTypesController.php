@@ -22,12 +22,12 @@ class IrisTypesController extends Controller
      */
     protected IrisType $model;
 
-    protected IrisTypeService $irisTypeService;
+    protected IrisTypeService $service;
 
     public function __construct(IrisType $irisType, IrisTypeService $irisTypeService)
     {
-        $this->model           = $irisType;
-        $this->irisTypeService = $irisTypeService;
+        $this->model   = $irisType;
+        $this->service = $irisTypeService;
     }
 
     /**
@@ -78,7 +78,7 @@ class IrisTypesController extends Controller
     public function store(IrisTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|IrisTypeResource
     {
         try {
-            $record = $this->irisTypeService->create($request);
+            $record = $this->service->create($request);
 
             $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
 
@@ -148,7 +148,7 @@ class IrisTypesController extends Controller
                 return $this->notFoundResponse();
             }
 
-            $updatedRecord = $this->irisTypeService->update($record, $request);
+            $updatedRecord = $this->service->update($record, $request);
 
             $messageReturn = $this->getUpdateMessage($request);
 

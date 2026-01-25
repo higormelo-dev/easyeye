@@ -22,12 +22,12 @@ class DoctorsController extends Controller
      */
     protected Doctor $model;
 
-    protected DoctorService $doctorService;
+    protected DoctorService $service;
 
     public function __construct(Doctor $doctor, DoctorService $doctorService)
     {
-        $this->model         = $doctor;
-        $this->doctorService = $doctorService;
+        $this->model   = $doctor;
+        $this->service = $doctorService;
     }
 
     /**
@@ -85,7 +85,7 @@ class DoctorsController extends Controller
     public function store(DoctorRequest $request): JsonResponse|EntityUserResource
     {
         try {
-            $entityUser = $this->doctorService->createDoctor($request);
+            $entityUser = $this->service->create($request);
 
             return new EntityUserResource($entityUser);
         } catch (\Throwable $e) {
@@ -152,7 +152,7 @@ class DoctorsController extends Controller
                 return $this->notFoundResponse();
             }
 
-            $updatedRecord = $this->doctorService->updateDoctor($record, $request);
+            $updatedRecord = $this->service->update($record, $request);
 
             $messageReturn = $this->getUpdateMessage($request);
 

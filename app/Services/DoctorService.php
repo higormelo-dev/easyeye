@@ -14,13 +14,13 @@ class DoctorService
     /**
      * Create a new doctor with all related entities
      */
-    public function createDoctor(DoctorRequest $request): EntityUser
+    public function create(DoctorRequest $request): EntityUser
     {
         return DB::transaction(function () use ($request) {
             $user       = $this->findOrCreateUser($request);
             $entityUser = $this->findOrCreateEntityUser($user, $request);
             $person     = $this->findOrCreatePerson($request);
-            $this->findOrCreateDoctor($person, $entityUser, $request);
+            $this->findOrCreate($person, $entityUser, $request);
 
             return $entityUser;
         });
@@ -29,7 +29,7 @@ class DoctorService
     /**
      * Update existing doctor and related entities
      */
-    public function updateDoctor(Doctor $doctor, DoctorRequest $request): Doctor
+    public function update(Doctor $doctor, DoctorRequest $request): Doctor
     {
         return DB::transaction(function () use ($doctor, $request) {
             $data = [];
@@ -59,11 +59,11 @@ class DoctorService
             }
 
             $doctor->update($data);
-            $this->updateEntityUserData($doctor->entityUser, $request);
+            $this->updateEntityUser($doctor->entityUser, $request);
 
             if (! $request->has('type_method')) {
-                $this->updatePersonData($doctor->person, $request);
-                $this->updateUserData($doctor->entityUser->user, $request);
+                $this->updatePerson($doctor->person, $request);
+                $this->updateUser($doctor->entityUser->user, $request);
             }
 
             return $doctor;
@@ -107,22 +107,22 @@ class DoctorService
      */
     private function findOrCreateEntityUser(User $user, DoctorRequest $request): EntityUser
     {
-        $existingEntityUser = EntityUser::query()->withTrashed()
+        $existingRecord = EntityUser::query()->withTrashed()
             ->where('user_id', $user->id)
             ->where('entity_id', session()->get('selected_entity_id'))
             ->first();
 
-        if ($existingEntityUser) {
-            if ($existingEntityUser->trashed()) {
-                $existingEntityUser->restore();
+        if ($existingRecord) {
+            if ($existingRecord->trashed()) {
+                $existingRecord->restore();
             }
 
-            $existingEntityUser->update([
+            $existingRecord->update([
                 'rule'   => 'doctor',
                 'active' => true,
             ]);
 
-            return $existingEntityUser;
+            return $existingRecord;
         }
 
         return EntityUser::create([
@@ -138,36 +138,36 @@ class DoctorService
      */
     private function findOrCreatePerson(DoctorRequest $request): People
     {
-        $existingPerson = People::query()->withTrashed()
+        $existingRecord = People::query()->withTrashed()
             ->where('national_registry', $request->national_registry)
             ->first();
 
-        $personData = $this->getPersonDataFromRequest($request);
+        $recordData = $this->getPersonFromRequest($request);
 
-        if ($existingPerson) {
-            if ($existingPerson->trashed()) {
-                $existingPerson->restore();
+        if ($existingRecord) {
+            if ($existingRecord->trashed()) {
+                $existingRecord->restore();
             }
-            $existingPerson->update($personData);
+            $existingRecord->update($recordData);
 
-            return $existingPerson;
+            return $existingRecord;
         }
 
-        return People::create($personData);
+        return People::create($recordData);
     }
 
     /**
      * Find or create doctor
      */
-    private function findOrCreateDoctor(People $person, EntityUser $entityUser, DoctorRequest $request): void
+    private function findOrCreate(People $person, EntityUser $entityUser, DoctorRequest $request): void
     {
-        $existingDoctor = Doctor::query()->withTrashed()
+        $existingRecord = Doctor::query()->withTrashed()
             ->where('person_id', $person->id)
             ->where('record', $request->record)
             ->where('entity_user_id', $entityUser->id)
             ->first();
 
-        $doctorData = [
+        $recordData = [
             'entity_user_id'   => $entityUser->id,
             'person_id'        => $person->id,
             'record'           => $request->record,
@@ -177,16 +177,16 @@ class DoctorService
             'observation'      => $request->observation,
         ];
 
-        if ($existingDoctor) {
-            if ($existingDoctor->trashed()) {
-                $existingDoctor->restore();
+        if ($existingRecord) {
+            if ($existingRecord->trashed()) {
+                $existingRecord->restore();
             }
-            $existingDoctor->update($doctorData);
+            $existingRecord->update($recordData);
 
             return;
         }
 
-        Doctor::create(array_merge($doctorData, [
+        Doctor::create(array_merge($recordData, [
             'code' => $this->generateUniqueCode(),
         ]));
     }
@@ -194,7 +194,7 @@ class DoctorService
     /**
      * Extract person data from request
      */
-    private function getPersonDataFromRequest(DoctorRequest $request): array
+    private function getPersonFromRequest(DoctorRequest $request): array
     {
         return [
             'full_name'              => $request->name,
@@ -227,7 +227,7 @@ class DoctorService
     /**
      * Update person data
      */
-    private function updatePersonData(People $person, Request $request): void
+    private function updatePerson(People $person, Request $request): void
     {
         $person->update([
             'full_name'              => $request->name,
@@ -260,7 +260,7 @@ class DoctorService
     /**
      * Update entity user data
      */
-    private function updateEntityUserData(EntityUser $entityUser, Request $request): void
+    private function updateEntityUser(EntityUser $entityUser, Request $request): void
     {
         $entityUser->update([
             'active' => $request->active,
@@ -270,7 +270,7 @@ class DoctorService
     /**
      * Update user data
      */
-    private function updateUserData(User $user, Request $request): void
+    private function updateUser(User $user, Request $request): void
     {
         $user->update([
             'name'  => $request->nickname,
