@@ -21,6 +21,7 @@ class EntityUser extends Model
     protected $fillable = [
         'entity_id',
         'user_id',
+        'code',
         'active',
         'rule',
     ];

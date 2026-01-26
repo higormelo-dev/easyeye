@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('entity_integrators', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('entity_id')->constrained('entities')->cascadeOnDelete();
+            $table->string('code');
             $table->string('name');
             $table->string('token')->unique();
             $table->ipAddress('ip')->nullable();
@@ -28,9 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('entity_integrators', function (Blueprint $table) {
-            $table->dropForeign('entity_integrators_entity_id_foreign');
-        });
         Schema::dropIfExists('entity_integrators');
     }
 };

@@ -31,9 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('visual_acuities', function (Blueprint $table) {
-            $table->dropForeign('visual_acuities_entity_id_foreign');
-        });
         Schema::dropIfExists('visual_acuities');
     }
 };

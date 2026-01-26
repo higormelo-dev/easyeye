@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\SkinTypeRequest;
+use App\Http\Requests\VisitTypeRequest;
 use App\Http\Resources\{SkinTypeResource, VisitTypeResource};
 use App\Models\{SkinType, VisitType};
 use App\Services\{VisitTypeService};
@@ -46,7 +46,7 @@ class VisitTypesController extends Controller
                 ],
                 [
                     'label'  => $this->titleController,
-                    'url'    => route('panel.setting.skintypes.index'),
+                    'url'    => route('panel.setting.visittypes.index'),
                     'active' => false,
                 ],
                 [
@@ -57,7 +57,7 @@ class VisitTypesController extends Controller
             ],
         ];
 
-        return view('system.skintypes.index', compact('meta'));
+        return view('system.visittypes.index', compact('meta'));
     }
 
     /**
@@ -66,16 +66,16 @@ class VisitTypesController extends Controller
     public function create(): Factory|Application|View|JsonResponse
     {
         try {
-            return view('system.skintypes.form');
+            return view('system.visittypes.form');
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(SkinTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|VisitTypeResource
+    public function store(VisitTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|VisitTypeResource
     {
         try {
             $record = $this->service->create($request);
@@ -92,7 +92,7 @@ class VisitTypesController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $messageReturn);
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
 
     }
@@ -103,18 +103,18 @@ class VisitTypesController extends Controller
     public function show(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
             return view(
-                'system.skintypes.show',
+                'system.visittypes.show',
                 compact('record')
             );
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -124,31 +124,31 @@ class VisitTypesController extends Controller
     public function edit(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
-            return view('system.skintypes.form', compact('record'));
+            return view('system.visittypes.form', compact('record'));
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(SkinTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
+    public function update(VisitTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
-            $updatedRecord = $this->skinTypeService->update($record, $request);
+            $updatedRecord = $this->service->update($record, $request);
 
             $messageReturn = $this->getUpdateMessage($request);
 
@@ -162,7 +162,7 @@ class VisitTypesController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $messageReturn);
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -172,7 +172,7 @@ class VisitTypesController extends Controller
     public function destroy(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -195,7 +195,7 @@ class VisitTypesController extends Controller
                     ->with('message', $messageReturn);
             });
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -205,7 +205,7 @@ class VisitTypesController extends Controller
     public function restore(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -228,7 +228,7 @@ class VisitTypesController extends Controller
                     ->with('message', $messageReturn);
             });
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -242,10 +242,10 @@ class VisitTypesController extends Controller
         ];
 
         $totalRecords = $this->model->query()->withTrashed()
-            ->select('skin_types.*')
-            ->where('skin_types.entity_id', session()->get('selected_entity_id'))
+            ->select('visit_types.*')
+            ->where('visit_types.entity_id', session()->get('selected_entity_id'))
             ->orWhere(function ($query) {
-                $query->whereNull('skin_types.entity_id')->whereNull('skin_types.deleted_at');
+                $query->whereNull('visit_types.entity_id')->whereNull('visit_types.deleted_at');
             })
             ->count();
 
@@ -256,10 +256,10 @@ class VisitTypesController extends Controller
 
         if (empty($request->get('search')['value'])) {
             $records = $this->model->query()->withTrashed()
-                ->select('skin_types.*')
-                ->where('skin_types.entity_id', session()->get('selected_entity_id'))
+                ->select('visit_types.*')
+                ->where('visit_types.entity_id', session()->get('selected_entity_id'))
                 ->orWhere(function ($query) {
-                    $query->whereNull('skin_types.entity_id')->whereNull('skin_types.deleted_at');
+                    $query->whereNull('visit_types.entity_id')->whereNull('visit_types.deleted_at');
                 })
                 ->skip($start)
                 ->take($limit)
@@ -270,12 +270,12 @@ class VisitTypesController extends Controller
         } else {
             $search = $request->get('search')['value'];
             $query  = $this->model->query()->withTrashed()
-                ->select('skin_types.*')
-                ->where('skin_types.entity_id', session()->get('selected_entity_id'))
+                ->select('visit_types.*')
+                ->where('visit_types.entity_id', session()->get('selected_entity_id'))
                 ->orWhere(function ($query) {
-                    $query->whereNull('skin_types.entity_id')->whereNull('skin_types.deleted_at');
+                    $query->whereNull('visit_types.entity_id')->whereNull('visit_types.deleted_at');
                 })
-                ->whereRaw('LOWER(skin_types.name) LIKE LOWER(?)', ["%{$search}%"]);
+                ->whereRaw('LOWER(visit_types.name) LIKE LOWER(?)', ["%{$search}%"]);
 
             $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
             $totalFiltered = $query->count();
@@ -309,7 +309,7 @@ class VisitTypesController extends Controller
     /**
      * Find skin type by ID
      */
-    private function findSkinType(string $id): ?SkinType
+    private function findRecord(string $id): ?VisitType
     {
         return $this->model->query()->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
@@ -327,9 +327,22 @@ class VisitTypesController extends Controller
     /**
      * Return server error response
      */
-    private function serverErrorResponse(): JsonResponse
+    private function serverErrorResponse($error): JsonResponse
     {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
+        $messages = [
+            'message' => 'An error occurred.',
+        ];
+
+        if (app()->environment('local')) {
+            $messages['debug'] = $error->getMessage();
+            $messages['file']  = $error->getFile();
+            $messages['line']  = $error->getLine();
+            $messages['trace'] = $error->getTraceAsString();
+            $messages['code']  = $error->getCode();
+            $messages['type']  = get_class($error);
+        }
+
+        return response()->json($messages, HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**

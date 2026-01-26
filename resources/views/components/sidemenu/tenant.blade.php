@@ -35,7 +35,7 @@
         <li><a href="{{ route('panel.setting.covenants.index') }}"><span class="fa fa-list"></span> Convênio</a></li>
         <li><a href="{{ route('panel.setting.skintypes.index') }}"><span class="fa fa-list"></span> Tipo de cútis</a></li>
         <li><a href="{{ route('panel.setting.iristypes.index') }}"><span class="fa fa-eye"></span> Tipo de íris</a></li>
-        <li><a href="javascript:void(0);"><span class="fa fa-comments"></span> Tipo de visita</a></li>
+        <li><a href="{{ route('panel.setting.visittypes.index') }}"><span class="fa fa-comments"></span> Tipo de visita</a></li>
         <li><a href="javascript:void(0);"><span class="fa fa-comments"></span> Tipo de adição</a></li>
         <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Tipo de cirurgia</a></li>
         <li>

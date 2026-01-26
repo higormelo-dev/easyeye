@@ -12,17 +12,23 @@ class SkinTypesSeeder extends Seeder
      */
     public function run(): void
     {
-        $skinTypes = [
-            ['name' => 'Extremamente branca', 'active' => true],
-            ['name' => 'Branca', 'active' => true],
-            ['name' => 'Morena clara', 'active' => true],
-            ['name' => 'Morena média', 'active' => true],
-            ['name' => 'Morena escura', 'active' => true],
-            ['name' => 'Negra', 'active' => true],
-        ];
+        $skinTypes = ['Extremamente branca', 'Branca', 'Morena clara', 'Morena média', 'Morena escura', 'Negra'];
+
+        $i = 1;
 
         foreach ($skinTypes as $skinType) {
-            SkinType::query()->create($skinType);
+            $name = mb_convert_case($skinType, MB_CASE_TITLE, 'UTF-8');
+
+            SkinType::query()->updateOrCreate(
+                [
+                    'name' => $name,
+                ],
+                [
+                    'code'   => 'STP-' . str_pad($i++, 10, '0', STR_PAD_LEFT),
+                    'name'   => $name,
+                    'active' => true,
+                ]
+            );
         }
     }
 }

@@ -17,6 +17,7 @@ return new class extends Migration
                 ->nullable()
                 ->constrained('entities')
                 ->cascadeOnDelete();
+            $table->string('code');
             $table->string('name');
             $table->boolean('active')->default(false);
             $table->softDeletes();
@@ -29,9 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('iris_types', function (Blueprint $table) {
-            $table->dropForeign('iris_types_entity_id_foreign');
-        });
         Schema::dropIfExists('iris_types');
     }
 };

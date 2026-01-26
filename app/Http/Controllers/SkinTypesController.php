@@ -22,12 +22,12 @@ class SkinTypesController extends Controller
      */
     protected SkinType $model;
 
-    protected SkinTypeService $skinTypeService;
+    protected SkinTypeService $service;
 
     public function __construct(SkinType $skinType, SkinTypeService $skinTypeService)
     {
-        $this->model           = $skinType;
-        $this->skinTypeService = $skinTypeService;
+        $this->model   = $skinType;
+        $this->service = $skinTypeService;
     }
 
     /**
@@ -68,7 +68,7 @@ class SkinTypesController extends Controller
         try {
             return view('system.skintypes.form');
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -78,7 +78,7 @@ class SkinTypesController extends Controller
     public function store(SkinTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|SkinTypeResource
     {
         try {
-            $record = $this->skinTypeService->create($request);
+            $record = $this->service->create($request);
 
             $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
 
@@ -92,7 +92,7 @@ class SkinTypesController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $messageReturn);
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
 
     }
@@ -103,7 +103,7 @@ class SkinTypesController extends Controller
     public function show(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -114,7 +114,7 @@ class SkinTypesController extends Controller
                 compact('record')
             );
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -124,7 +124,7 @@ class SkinTypesController extends Controller
     public function edit(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -132,7 +132,7 @@ class SkinTypesController extends Controller
 
             return view('system.skintypes.form', compact('record'));
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -142,13 +142,13 @@ class SkinTypesController extends Controller
     public function update(SkinTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
             }
 
-            $updatedRecord = $this->skinTypeService->update($record, $request);
+            $updatedRecord = $this->service->update($record, $request);
 
             $messageReturn = $this->getUpdateMessage($request);
 
@@ -162,7 +162,7 @@ class SkinTypesController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $messageReturn);
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -172,7 +172,7 @@ class SkinTypesController extends Controller
     public function destroy(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -195,7 +195,7 @@ class SkinTypesController extends Controller
                     ->with('message', $messageReturn);
             });
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -205,7 +205,7 @@ class SkinTypesController extends Controller
     public function restore(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findSkinType($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -228,7 +228,7 @@ class SkinTypesController extends Controller
                     ->with('message', $messageReturn);
             });
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -309,7 +309,7 @@ class SkinTypesController extends Controller
     /**
      * Find skin type by ID
      */
-    private function findSkinType(string $id): ?SkinType
+    private function findRecord(string $id): ?SkinType
     {
         return $this->model->query()->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
@@ -327,9 +327,22 @@ class SkinTypesController extends Controller
     /**
      * Return server error response
      */
-    private function serverErrorResponse(): JsonResponse
+    private function serverErrorResponse($error): JsonResponse
     {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
+        $messages = [
+            'message' => 'An error occurred.',
+        ];
+
+        if (app()->environment('local')) {
+            $messages['debug'] = $error->getMessage();
+            $messages['file']  = $error->getFile();
+            $messages['line']  = $error->getLine();
+            $messages['trace'] = $error->getTraceAsString();
+            $messages['code']  = $error->getCode();
+            $messages['type']  = get_class($error);
+        }
+
+        return response()->json($messages, HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**

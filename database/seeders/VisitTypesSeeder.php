@@ -23,11 +23,21 @@ class VisitTypesSeeder extends Seeder
             'Atendimento administrativo', 'Teleconsulta',
         ];
 
+        $i = 1;
+
         foreach ($visitTypes as $visitType) {
-            VisitType::query()->create([
-                'name'   => $visitType,
-                'active' => true,
-            ]);
+            $name = mb_convert_case($visitType, MB_CASE_TITLE, 'UTF-8');
+
+            VisitType::query()->updateOrCreate(
+                [
+                    'name' => $name,
+                ],
+                [
+                    'code'   => 'VTP-' . str_pad($i++, 10, '0', STR_PAD_LEFT),
+                    'name'   => $name,
+                    'active' => true,
+                ]
+            );
         }
     }
 }

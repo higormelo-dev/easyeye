@@ -12,14 +12,23 @@ class IrisTypesSeeder extends Seeder
      */
     public function run(): void
     {
-        $irisTypes = [
-            ['name' => 'Azul', 'active' => true],
-            ['name' => 'Verde', 'active' => true],
-            ['name' => 'Castanho', 'active' => true],
-        ];
+        $irisTypes = ['Azul', 'Verde', 'Castanho'];
+
+        $i = 1;
 
         foreach ($irisTypes as $irisType) {
-            IrisType::query()->create($irisType);
+            $name = mb_convert_case($irisType, MB_CASE_TITLE, 'UTF-8');
+
+            IrisType::query()->updateOrCreate(
+                [
+                    'name' => $name,
+                ],
+                [
+                    'code'   => 'ITP-' . str_pad($i++, 10, '0', STR_PAD_LEFT),
+                    'name'   => $name,
+                    'active' => true,
+                ]
+            );
         }
     }
 }

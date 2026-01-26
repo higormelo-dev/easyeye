@@ -17,7 +17,11 @@ return new class extends Migration
                 ->nullable()
                 ->constrained('entities')
                 ->cascadeOnDelete();
+            $table->string('code');
             $table->string('name');
+            $table->string('company_name')->nullable();
+            $table->string('national_registry')->nullable();
+            $table->string('ans_registry')->nullable();
             $table->string('color', 7)->nullable();
             $table->boolean('table')->default(false);
             $table->boolean('active')->default(false);
@@ -31,9 +35,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('iris_types', function (Blueprint $table) {
-            $table->dropForeign('iris_types_entity_id_foreign');
-        });
         Schema::dropIfExists('covenants');
     }
 };

@@ -16,7 +16,10 @@ class DatabaseSeeder extends Seeder
         $this->call(CovenantsSeeder::class);
         $this->call(SkinTypesSeeder::class);
         $this->call(IrisTypesSeeder::class);
-        $this->call(DataFakersSeeder::class);
         $this->call(VisitTypesSeeder::class);
+
+        if (app()->environment('local') || app()->environment('testing')) {
+            $this->call(DataFakersSeeder::class);
+        }
     }
 }

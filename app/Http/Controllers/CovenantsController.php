@@ -68,7 +68,7 @@ class CovenantsController extends Controller
         try {
             return view('system.covenants.form');
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -92,7 +92,7 @@ class CovenantsController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $messageReturn);
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
 
     }
@@ -103,7 +103,7 @@ class CovenantsController extends Controller
     public function show(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -114,7 +114,7 @@ class CovenantsController extends Controller
                 compact('record')
             );
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -124,7 +124,7 @@ class CovenantsController extends Controller
     public function edit(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -132,7 +132,7 @@ class CovenantsController extends Controller
 
             return view('system.covenants.form', compact('record'));
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -142,7 +142,7 @@ class CovenantsController extends Controller
     public function update(CovenantRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -162,7 +162,7 @@ class CovenantsController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $messageReturn);
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -172,7 +172,7 @@ class CovenantsController extends Controller
     public function destroy(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -195,7 +195,7 @@ class CovenantsController extends Controller
                     ->with('message', $messageReturn);
             });
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -205,7 +205,7 @@ class CovenantsController extends Controller
     public function restore(string $id): Application|View|JsonResponse
     {
         try {
-            $record = $this->findCovenant($id);
+            $record = $this->findRecord($id);
 
             if (! $record) {
                 return $this->notFoundResponse();
@@ -228,7 +228,7 @@ class CovenantsController extends Controller
                     ->with('message', $messageReturn);
             });
         } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+            return $this->serverErrorResponse($e);
         }
     }
 
@@ -313,7 +313,7 @@ class CovenantsController extends Controller
     /**
      * Find covenant by ID
      */
-    private function findCovenant(string $id): ?Covenant
+    private function findRecord(string $id): ?Covenant
     {
         return $this->model->query()->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
@@ -331,9 +331,22 @@ class CovenantsController extends Controller
     /**
      * Return server error response
      */
-    private function serverErrorResponse(): JsonResponse
+    private function serverErrorResponse($error): JsonResponse
     {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
+        $messages = [
+            'message' => 'An error occurred.',
+        ];
+
+        if (app()->environment('local')) {
+            $messages['debug'] = $error->getMessage();
+            $messages['file']  = $error->getFile();
+            $messages['line']  = $error->getLine();
+            $messages['trace'] = $error->getTraceAsString();
+            $messages['code']  = $error->getCode();
+            $messages['type']  = get_class($error);
+        }
+
+        return response()->json($messages, HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**
