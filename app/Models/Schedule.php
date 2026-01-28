@@ -21,6 +21,7 @@ class Schedule extends Model
         'doctor_id',
         'patient_id',
         'covenant_id',
+        'code',
         'full_name',
         'date_time',
         'telephone',

@@ -19,6 +19,7 @@ class IrisType extends Model
      */
     protected $fillable = [
         'entity_id',
+        'code',
         'name',
         'active',
     ];

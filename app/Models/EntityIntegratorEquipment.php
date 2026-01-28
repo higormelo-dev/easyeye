@@ -21,6 +21,7 @@ class EntityIntegratorEquipment extends Model
      */
     protected $fillable = [
         'integrator_id',
+        'code',
         'name',
         'ip',
         'mac',

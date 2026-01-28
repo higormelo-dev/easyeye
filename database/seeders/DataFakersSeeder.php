@@ -11,6 +11,8 @@ class DataFakersSeeder extends Seeder
 {
     /**
      * Run the database seeds.
+     *
+     * @method info(string $string)
      */
     public function run(): void
     {
@@ -51,7 +53,7 @@ class DataFakersSeeder extends Seeder
 
         // Após criar todos os vínculos, verificar entities com 2+ usuários e adicionar admin
         $entities->each(function ($entity) use (&$entityIntegratorCounter) {
-            // Inicializa contador para esta integrador se não existir
+	        // Inicializa contador para esta integrador se não existir
             if (! isset($entityIntegratorCounter[$entity->id])) {
                 $entityIntegratorCounter[$entity->id] = 1;
             }

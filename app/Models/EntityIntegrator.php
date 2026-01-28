@@ -24,6 +24,7 @@ class EntityIntegrator extends Model
      */
     protected $fillable = [
         'entity_id',
+        'code',
         'name',
         'token',
         'ip',

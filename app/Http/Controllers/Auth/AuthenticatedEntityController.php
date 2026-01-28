@@ -21,7 +21,13 @@ class AuthenticatedEntityController extends Controller
 
         if (count($entityUsers) > 1) {
             foreach ($entityUsers as $entityUser) {
-                $entities[$entityUser->id] = $entityUser->entity->name;
+                $entityUserRule = '';
+
+                if (app()->environment(['local', 'testing'])) {
+                    $entityUserRule .= $entityUser->rule === 'admin' ? '*' : '';
+                }
+
+                $entities[$entityUser->id] = trim(sprintf('%s %s', $entityUser->entity->name, $entityUserRule));
             }
         }
 
