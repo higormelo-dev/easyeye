@@ -15,27 +15,36 @@ class CheckJsonResponse
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!$request->expectsJson() && !$request->wantsJson()) {
+        if (! $request->expectsJson() && ! $request->wantsJson()) {
             return response()->json([
                 'message' => 'This endpoint only accepts JSON requests.',
             ], 406);
         }
 
         if (in_array($request->method(), ['POST', 'PUT', 'PATCH'])) {
-            if (!$this->hasValidContentType($request)) {
+            if (! $this->hasValidContentType($request)) {
                 return response()->json([
-                    'message' => 'Content-Type header must be application/json, multipart/form-data, or application/x-www-form-urlencoded.',
+                    'message' => __('http-statuses.415'),
                 ], 415);
             }
         }
 
         $response = $next($request);
 
-        // Interceptar redirecionamentos
-        if ($response->isRedirect()) {
+        // Interceptar apenas redirecionamentos reais (3xx com Location)
+        if ($response->isRedirection() && $response->headers->has('Location')) {
+            $location = $response->headers->get('Location');
+
+            if (str_contains($location, 'login')) {
+                return response()->json([
+                    'message' => __('http-statuses.401'),
+                ], 401);
+            }
+
             return response()->json([
-                'message' => 'Acesso não autorizado.',
-            ], 401);
+                'message' => __('http-statuses.500'),
+                'debug'   => app()->isLocal() ? "Unexpected redirect to: {$location}" : null,
+            ], 500);
         }
 
         return $response;

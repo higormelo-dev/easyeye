@@ -40,6 +40,10 @@ return [
             'driver'   => 'session',
             'provider' => 'users',
         ],
+        'integrator' => [
+            'driver'   => 'sanctum',
+            'provider' => 'integrators',
+        ],
     ],
 
     /*
@@ -63,6 +67,10 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model'  => env('AUTH_MODEL', App\Models\User::class),
+        ],
+        'integrators' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\EntityIntegrator::class,
         ],
 
         // 'users' => [

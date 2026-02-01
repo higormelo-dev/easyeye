@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\EntityIntegratorEquipmentRequest;
 use App\Http\Resources\EntityIntegratorEquipmentResource;
-use App\Models\{EntityIntegrator, EntityIntegratorEquipment};
+use App\Models\{EntityIntegratorEquipment};
+use App\Services\Api\EntityIntegratorEquipmentService;
 use Illuminate\Http\{JsonResponse};
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -17,9 +18,12 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     protected EntityIntegratorEquipment $model;
 
-    public function __construct(EntityIntegratorEquipment $entityIntegratorEquipment)
+    protected EntityIntegratorEquipmentService $service;
+
+    public function __construct(EntityIntegratorEquipment $entityIntegratorEquipment, EntityIntegratorEquipmentService $entityIntegratorEquipmentService)
     {
-        $this->model = $entityIntegratorEquipment;
+        $this->model   = $entityIntegratorEquipment;
+        $this->service = $entityIntegratorEquipmentService;
     }
 
     /**
@@ -27,17 +31,13 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     public function index(): JsonResponse|AnonymousResourceCollection
     {
-        $integrator = $this->getAuthenticatedIntegrator();
-
-        if (! $integrator) {
-            return $this->unauthorizedResponse();
-        }
-
+        $integrator = request()->attributes->get('integrator');
         $equipments = $this->model->query()->where('integrator_id', $integrator->id);
 
         if (request()->has('search')) {
             $equipments = $equipments->where(function ($query) {
-                $query->where('name', 'like', '%' . request()->search . '%');
+                $query->where('name', 'like', '%' . request()->search . '%')
+                    ->orWhere('code', 'like', '%' . request()->search . '%');
             });
         }
 
@@ -51,20 +51,10 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     public function store(EntityIntegratorEquipmentRequest $request): EntityIntegratorEquipmentResource|JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
 
-            if (! $integrator) {
-                return $this->unauthorizedResponse();
-            }
+        $record = $this->service->create($request);
 
-            $data      = collect($request->validated())->merge(['integrator_id' => $integrator->id, 'active' => true]);
-            $equipment = $this->model->create($data->toArray());
-
-            return new EntityIntegratorEquipmentResource($equipment);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return new EntityIntegratorEquipmentResource($record);
     }
 
     /**
@@ -72,51 +62,23 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     public function show(string $id): EntityIntegratorEquipmentResource|JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $integrator) {
-                return $this->unauthorizedResponse();
-            }
-
-            $equipment = $this->findEquipmentForIntegrator($integrator->id, $id);
-
-            if (! $equipment) {
-                return $this->notFoundResponse();
-            }
-
-            return new EntityIntegratorEquipmentResource($equipment);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return new EntityIntegratorEquipmentResource($record);
     }
 
     /**
      * Update the specified resource in storage.
+     *
+     * @throws \Throwable
      */
     public function update(EntityIntegratorEquipmentRequest $request, string $id): EntityIntegratorEquipmentResource|JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $integrator) {
-                return $this->unauthorizedResponse();
-            }
+        $updatedRecord = $this->service->update($record, $request);
 
-            $equipment = $this->findEquipmentForIntegrator($integrator->id, $id);
-
-            if (! $equipment) {
-                return $this->notFoundResponse();
-            }
-
-            $data = collect($request->validated())->merge(['integrator_id' => $integrator->id]);
-            $equipment->update($data->toArray());
-            $equipment->refresh();
-
-            return new EntityIntegratorEquipmentResource($equipment);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return new EntityIntegratorEquipmentResource($updatedRecord);
     }
 
     /**
@@ -124,70 +86,8 @@ class EntityIntegratorEquipmentsController extends Controller
      */
     public function destroy(string $id): JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $this->service->destroyById($id);
 
-            if (! $integrator) {
-                return $this->unauthorizedResponse();
-            }
-
-            $equipment = $this->findEquipmentForIntegrator($integrator->id, $id);
-
-            if (! $equipment) {
-                return $this->notFoundResponse();
-            }
-
-            $equipment->delete();
-
-            return response()->json([], HttpResponse::HTTP_NO_CONTENT);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return response()->json([], HttpResponse::HTTP_NO_CONTENT);
     }
-
-    /**
-     * Get authenticated integrator by bearer token
-     */
-    private function getAuthenticatedIntegrator(): ?EntityIntegrator
-    {
-        return EntityIntegrator::query()
-            ->where('token_session', request()->bearerToken())
-            ->first();
-    }
-
-    /**
-     * Find equipment for specific integrator
-     */
-    private function findEquipmentForIntegrator(string $integratorId, string $equipmentId): ?EntityIntegratorEquipment
-    {
-        return $this->model->query()
-            ->where('integrator_id', $integratorId)
-            ->where('id', $equipmentId)
-            ->first();
-    }
-
-    /**
-     * Return unauthorized response
-     */
-    private function unauthorizedResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Not authorized.'], HttpResponse::HTTP_UNAUTHORIZED);
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Equipment not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
-    }
-
 }

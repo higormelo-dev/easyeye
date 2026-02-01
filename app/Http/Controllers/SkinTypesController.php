@@ -332,8 +332,8 @@ class SkinTypesController extends Controller
         $messages = [
             'message' => 'An error occurred.',
         ];
-
-        if (app()->environment('local')) {
+	    
+	    if (app()->environment(['local', 'testing'])) {
             $messages['debug'] = $error->getMessage();
             $messages['file']  = $error->getFile();
             $messages['line']  = $error->getLine();

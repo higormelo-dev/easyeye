@@ -25,6 +25,37 @@ class SkinType extends Model
     ];
 
     /**
+     * Generated code for the entity_id field
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $skinType) {
+            if (empty($skinType->code)) {
+                $prefix = $skinType->entity_id ? 'ST' : 'STP';
+
+                $lastType = static::withoutGlobalScopes()
+                    ->when(
+                        $skinType->entity_id !== null,
+                        fn ($q) => $q->where('entity_id', $skinType->entity_id),
+                        fn ($q) => $q->whereNull('entity_id')
+                    )
+                    ->where('code', 'like', $prefix . '-%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+
+                if ($lastType) {
+                    $lastNumber = (int) substr($lastType->code, strlen($prefix) + 1);
+                    $newNumber  = $lastNumber + 1;
+                } else {
+                    $newNumber = 1;
+                }
+
+                $skinType->code = sprintf('%s-%010d', $prefix, $newNumber);
+            }
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

@@ -186,9 +186,7 @@ class DoctorService
             return;
         }
 
-        Doctor::create(array_merge($recordData, [
-            'code' => $this->generateUniqueCode(),
-        ]));
+        Doctor::create($recordData);
     }
 
     /**
@@ -276,38 +274,5 @@ class DoctorService
             'name'  => $request->nickname,
             'email' => $request->email,
         ]);
-    }
-
-    /**
-     * Generate unique code for doctor
-     */
-    private function generateUniqueCode(): string
-    {
-        $maxAttempts = 10;
-        $attempt     = 0;
-
-        do {
-            try {
-                $code = 'DOC' . Str::upper(Str::random(6));
-            } catch (RandomException $e) {
-                $code = 'DOC' . Str::upper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
-            }
-
-            $attempt++;
-
-            $exists = Doctor::query()->withTrashed()
-                ->where('code', $code)
-                ->whereHas('entityUser', function ($query) {
-                    $query->where('entity_id', session()->get('selected_entity_id'));
-                })
-                ->exists();
-
-        } while ($exists && $attempt < $maxAttempts);
-
-        if ($exists) {
-            $code = 'PAC' . strtoupper(substr(md5(time() . rand()), 0, 6));
-        }
-
-        return $code;
     }
 }

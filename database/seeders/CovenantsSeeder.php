@@ -7707,15 +7707,12 @@ class CovenantsSeeder extends Seeder
             ],
         ];
 
-        $i = 1;
-
         foreach ($items as $item) {
-	        Covenant::query()->updateOrCreate(
+            Covenant::query()->updateOrCreate(
                 [
                     'ans_registry' => (string) $item['registro_ans'],
                 ],
                 [
-                    'code'              => 'CVP-' . str_pad($i++, 10, '0', STR_PAD_LEFT),
                     'color'             => $this->randomHexColor(),
                     'national_registry' => (string) $item['cnpj'],
                     'ans_registry'      => (string) $item['registro_ans'],

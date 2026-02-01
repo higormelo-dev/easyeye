@@ -23,8 +23,6 @@ class VisitTypesSeeder extends Seeder
             'Atendimento administrativo', 'Teleconsulta',
         ];
 
-        $i = 1;
-
         foreach ($visitTypes as $visitType) {
             $name = mb_convert_case($visitType, MB_CASE_TITLE, 'UTF-8');
 
@@ -33,7 +31,6 @@ class VisitTypesSeeder extends Seeder
                     'name' => $name,
                 ],
                 [
-                    'code'   => 'VTP-' . str_pad($i++, 10, '0', STR_PAD_LEFT),
                     'name'   => $name,
                     'active' => true,
                 ]

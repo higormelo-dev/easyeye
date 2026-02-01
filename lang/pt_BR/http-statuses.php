@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 return [
     '0'            => 'Erro Desconhecido',
@@ -81,4 +81,8 @@ return [
     '598'          => 'Erro de tempo limite de leitura da rede',
     '599'          => 'Erro de tempo limite de conexão de rede',
     'unknownError' => 'Erro Desconhecido',
+    'custom'       => [
+        '404_model' => 'Registro não encontrado',
+        '404_route' => 'Rota não encontrada',
+    ],
 ];

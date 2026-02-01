@@ -5,11 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\PatientExamRequest;
 use App\Http\Resources\PatientExamResource;
-use App\Models\{EntityIntegrator, Patient, PatientExam};
+use App\Models\{PatientExam};
+use App\Services\Api\PatientExamService;
 use Illuminate\Http\{JsonResponse};
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Random\RandomException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class PatientExamsController extends Controller
@@ -19,9 +18,12 @@ class PatientExamsController extends Controller
      */
     protected PatientExam $model;
 
-    public function __construct(PatientExam $patientExam)
+    protected PatientExamService $service;
+
+    public function __construct(PatientExam $patientExam, PatientExamService $patientExamService)
     {
-        $this->model = $patientExam;
+        $this->model   = $patientExam;
+        $this->service = $patientExamService;
     }
 
     /**
@@ -29,29 +31,34 @@ class PatientExamsController extends Controller
      */
     public function index(string $patientId)
     {
-        $integrator = $this->getAuthenticatedIntegrator();
-
-        if (!$integrator) {
-            return $this->unauthorizedResponse();
-        }
-
-        $patient = Patient::query()->where('id', $patientId)->first();
-
-        if (!$patient) {
-            return response()->json(['message' => 'Patient not found.'], HttpResponse::HTTP_NOT_FOUND);
-        }
-
+        $integrator   = request()->attributes->get('integrator');
         $patientExams = $this->model->query()
-            ->join('patients', 'patient_exams.patient_id', '=', 'patients.id')
-            ->join('people', 'patients.person_id', '=', 'people.id')
-            ->join('entities', 'patients.entity_id', '=', 'entities.id')
-            ->where('patients.id', $patient->id)
-            ->where('patients.entity_id', $integrator->entity_id);
+            ->with('patient', 'doctor', 'schedule', 'patient.person', 'doctor.person')
+            ->whereHas('patient', function ($query) use ($integrator) {
+                $query->where('entity_id', $integrator->entity_id);
+            });
 
         if (request()->has('search')) {
-            $patientExams = $patientExams->where(function ($query) {
-                $query->where('patients.code', 'like', '%' . request()->search . '%')
-                    ->orWhere('people.name', 'like', '%' . request()->search . '%');
+            $search       = request()->search;
+            $patientExams = $patientExams->where(function ($query) use ($search) {
+                $query->whereHas('patient', function ($q) use ($search) {
+                    $q->where('code', mb_convert_case($search, MB_CASE_LOWER, 'UTF-8'))
+                        ->orWhereHas('person', function ($p) use ($search) {
+                            $p->where('name', 'like', '%' . $search . '%')
+                                ->orWhere('nickname', 'like', '%' . $search . '%');
+                        });
+                })
+                    ->orWhereHas('doctor', function ($q) use ($search) {
+                        $q->where('code', mb_convert_case($search, MB_CASE_LOWER, 'UTF-8'))
+                            ->orWhereHas('person', function ($p) use ($search) {
+                                $p->where('full_name', 'like', '%' . $search . '%')
+                                    ->orWhere('name', 'like', '%' . $search . '%')
+                                    ->orWhere('nickname', 'like', '%' . $search . '%');
+                            });
+                    })
+                    ->orWhereHas('schedule', function ($q) use ($search) {
+                        $q->where('code', mb_convert_case($search, MB_CASE_LOWER, 'UTF-8'));
+                    });
             });
         }
 
@@ -65,49 +72,9 @@ class PatientExamsController extends Controller
      */
     public function store(PatientExamRequest $request, string $patientId): PatientExamResource|JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $record = $this->service->create($request, $patientId);
 
-            if (!$integrator) {
-                return $this->unauthorizedResponse();
-            }
-
-            $data = collect($request->validated())->merge([
-                'patient_id'  => $patientId,
-                'doctor_id'   => $request->doctor_id ?? null,
-                'schedule_id' => $request->schedule_id ?? null,
-                'code'        => $this->generateUniqueExamCode($patientId),
-                'active'      => true,
-            ]);
-
-            $uuid      = Str::uuid();
-            $timestamp = time();
-            $extension = $request->file('archive')->getClientOriginalExtension();
-
-            $fileName = "{$timestamp}_{$uuid}.{$extension}";
-            $uploaded = Storage::disk('s3')
-                ->put(
-                    "{$integrator->entity_id}/{$patientId}/exams/{$fileName}",
-                    file_get_contents($request->file('archive')),
-                    'public'
-                );
-
-            if ($uploaded) {
-                $data = $data->merge([
-                    'archive' => "{$integrator->entity_id}/{$patientId}/exams/{$fileName}",
-                ]);
-                $exam = $this->model->create($data->toArray());
-
-                return new PatientExamResource($exam);
-            }
-
-            return response()->json(
-                ['message' => 'File upload failed.'],
-                HttpResponse::HTTP_INTERNAL_SERVER_ERROR
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return new PatientExamResource($record);
     }
 
     /**
@@ -118,13 +85,13 @@ class PatientExamsController extends Controller
         try {
             $integrator = $this->getAuthenticatedIntegrator();
 
-            if (!$integrator) {
+            if (! $integrator) {
                 return $this->unauthorizedResponse();
             }
 
             $exam = $this->findPatientForIntegrator($patientId, $id);
 
-            if (!$exam) {
+            if (! $exam) {
                 return $this->notFoundResponse();
             }
 
@@ -136,170 +103,25 @@ class PatientExamsController extends Controller
 
     /**
      * Update the specified resource in storage.
+     *
+     * @throws \Throwable
      */
-    public function update(PatientExamRequest $request, string $patientId, string $id): PatientExamResource|JsonResponse
+    public function update(PatientExamRequest $request, string $patientId, string $idOrCode): PatientExamResource|JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $record = $this->service->findByIdOrCode($patientId, $idOrCode);
 
-            if (!$integrator) {
-                return $this->unauthorizedResponse();
-            }
+        $updatedRecord = $this->service->update($record, $request);
 
-            $exam = $this->findPatientForIntegrator($patientId, $id);
-
-            if (!$exam) {
-                return $this->notFoundResponse();
-            }
-
-            if ($exam->archive) {
-                Storage::disk('s3')->delete($exam->archive);
-            }
-
-            $data = collect($request->validated())->merge([
-                'patient_id'  => $patientId,
-                'doctor_id'   => $request->doctor_id ?? null,
-                'schedule_id' => $request->schedule_id ?? null,
-                'code'        => $this->generateUniqueExamCode($patientId),
-                'active'      => true,
-            ]);
-            $uuid      = Str::uuid();
-            $timestamp = time();
-            $extension = $request->archive->getClientOriginalExtension();
-            $fileName  = "{$timestamp}_{$uuid}.{$extension}";
-            $uploaded  = Storage::disk('s3')
-                ->put(
-                    "{$integrator->entity_id}/{$patientId}/exams/{$fileName}",
-                    file_get_contents($request->file('archive')),
-                    'public'
-                );
-
-            if ($uploaded) {
-                $data = $data->merge([
-                    'archive' => "{$integrator->entity_id}/{$patientId}/exams/{$fileName}",
-                ]);
-                $exam->update($data->toArray());
-                $exam->refresh();
-
-                return new PatientExamResource($exam);
-            }
-
-            return response()->json(
-                ['message' => 'File upload failed.'],
-                HttpResponse::HTTP_INTERNAL_SERVER_ERROR
-            );
-        } catch (\Throwable $e) {
-            dd($e);
-
-            return $this->serverErrorResponse();
-        }
+        return new PatientExamResource($updatedRecord);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $patientId, string $id)
+    public function destroy(string $patientId, string $idOrCode): JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $this->service->destroyByIdOrCode($patientId, $idOrCode);
 
-            if (!$integrator) {
-                return $this->unauthorizedResponse();
-            }
-
-            $exam = $this->findPatientForIntegrator($patientId, $id);
-
-            if (!$exam) {
-                return $this->notFoundResponse();
-            }
-
-            if ($exam->archive !== null) {
-                Storage::disk('s3')->delete($exam->archive);
-            }
-
-            $exam->delete();
-
-            return response()->json([], HttpResponse::HTTP_NO_CONTENT);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
-    }
-
-    /**
-     * Get authenticated integrator by bearer token
-     */
-    private function getAuthenticatedIntegrator(): ?EntityIntegrator
-    {
-        return EntityIntegrator::query()
-            ->where('token_session', request()->bearerToken())
-            ->first();
-    }
-
-    /**
-     * Find patient for specific integrator
-     */
-    private function findPatientForIntegrator(string $patientId, string $id): ?PatientExam
-    {
-        return $this->model->query()
-            ->where('patient_id', $patientId)
-            ->where('id', $id)
-            ->first();
-    }
-
-    /**
-     * Generate unique exam code
-     *
-     * @throws RandomException
-     */
-    private function generateUniqueExamCode(string $patientId): string
-    {
-        $maxAttempts = 10;
-        $attempts    = 0;
-
-        do {
-            $code = 'EXAM-' . substr(str_replace('-', '', Str::uuid()), 0, 12);
-
-            $attempts++;
-
-            $exists = $this->model->query()->where('patient_id', $patientId)
-                ->where('code', $code)->exists();
-
-            if ($attempts >= $maxAttempts && $exists) {
-                $code   = 'EXAM-' . time() . '-' . random_int(1000, 9999);
-                $exists = $this->model->query()->where('patient_id', $patientId)
-                    ->where('code', $code)->exists();
-            }
-
-        } while ($exists && $attempts < $maxAttempts);
-
-        if ($exists) {
-            $code = 'EXAM-' . substr(str_replace('-', '', Str::uuid()), 0, 12);
-        }
-
-        return strtoupper($code);
-    }
-
-    /**
-     * Return unauthorized response
-     */
-    private function unauthorizedResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Not authorized.'], HttpResponse::HTTP_UNAUTHORIZED);
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Exam not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
+        return response()->json([], HttpResponse::HTTP_NO_CONTENT);
     }
 }

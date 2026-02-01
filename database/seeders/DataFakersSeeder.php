@@ -16,35 +16,27 @@ class DataFakersSeeder extends Seeder
      */
     public function run(): void
     {
-        $entityUserCounters      = [];
         $entityIntegratorCounter = [];
         $patientCounter          = [];
 
         People::factory(3000)->create();
         Entity::factory(15)
             ->sequence(fn ($attributes) => [
-                'code'      => 'ENT-' . str_pad($attributes->index + 2, 10, '0', STR_PAD_LEFT),
                 'subdomain' => Str::slug(fake()->company()) . '-' . ($attributes->index + 1),
             ])
             ->create();
         $entities = Entity::query()->whereNot('name', 'Medical Group')->get();
         $users    = User::factory(95)->create(['password' => Hash::make('123456789')]);
 
-        $users->each(function ($user) use ($entities, &$entityUserCounters) {
+        $users->each(function ($user) use ($entities) {
             // Cada usuário se vincula a 1-4 entities aleatórias
             $numberOfEntities = fake()->numberBetween(1, 4);
             $selectedEntities = $entities->random($numberOfEntities);
 
-            $selectedEntities->each(function ($entity) use ($user, &$entityUserCounters) {
-                // Inicializa contador para esta entity se não existir
-                if (! isset($entityUserCounters[$entity->id])) {
-                    $entityUserCounters[$entity->id] = 1;
-                }
-
+            $selectedEntities->each(function ($entity) use ($user) {
                 EntityUser::create([
                     'entity_id' => $entity->id,
                     'user_id'   => $user->id,
-                    'code'      => 'EU-' . str_pad($entityUserCounters[$entity->id]++, 10, '0', STR_PAD_LEFT),
                     'active'    => true,
                     'rule'      => 'user', // Inicialmente todos como user
                 ]);
@@ -52,12 +44,7 @@ class DataFakersSeeder extends Seeder
         });
 
         // Após criar todos os vínculos, verificar entities com 2+ usuários e adicionar admin
-        $entities->each(function ($entity) use (&$entityIntegratorCounter) {
-	        // Inicializa contador para esta integrador se não existir
-            if (! isset($entityIntegratorCounter[$entity->id])) {
-                $entityIntegratorCounter[$entity->id] = 1;
-            }
-
+        $entities->each(function ($entity) {
             $userCount = EntityUser::query()->where('entity_id', $entity->id)->count();
 
             if ($userCount >= 2) {
@@ -74,9 +61,6 @@ class DataFakersSeeder extends Seeder
             }
 
             EntityIntegrator::factory(10)
-                ->sequence(fn ($attributes) => [
-                    'code' => 'EI-' . str_pad($entityIntegratorCounter[$entity->id]++, 10, '0', STR_PAD_LEFT),
-                ])
                 ->create(['entity_id' => $entity->id]);
         });
 

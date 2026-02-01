@@ -309,5 +309,12 @@ return [
         'generic' => [
             'required' => 'É obrigatória a indicação de um valor para o campo :attribute.',
         ],
+        'validation_invalid'          => 'Dados de validação inválidos',
+        'entity_integrator_equipment' => [
+            'ip_unique'            => 'Este endereço IP já está sendo usado por outro equipamento.',
+            'mac_unique'           => 'Este endereço MAC já está sendo usado por outro equipamento.',
+            'name_unique'          => 'Este nome já está sendo usado por outro equipamento.',
+            'serial_number_unique' => 'Este número de série já está sendo usado por outro equipamento.',
+        ],
     ],
 ];

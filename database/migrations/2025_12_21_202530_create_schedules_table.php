@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('schedules', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('doctor_id')->constrained('doctors')->cascadeOnDelete();
+            $table->foreignUuid('entity_id')
+                ->constrained('entities')
+                ->cascadeOnDelete();
+            $table->foreignUuid('doctor_id')
+                ->constrained('doctors')
+                ->cascadeOnDelete();
             $table->foreignUuid('patient_id')
                 ->nullable()
                 ->constrained('patients')

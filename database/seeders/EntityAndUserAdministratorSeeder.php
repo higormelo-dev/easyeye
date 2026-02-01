@@ -16,7 +16,6 @@ class EntityAndUserAdministratorSeeder extends Seeder
     public function run(): void
     {
         $entity = Entity::create([
-            'code'                   => 'ENT-0000000001',
             'name'                   => 'Medical Group',
             'subdomain'              => 'medicalgroup',
             'zipcode'                => '09015620',
@@ -52,23 +51,18 @@ class EntityAndUserAdministratorSeeder extends Seeder
             'password'          => Hash::make('AX9ser4D%K'),
             'remember_token'    => Str::random(10),
         ]);
-        EntityUser::insert([
-            [
-                'id'        => Str::uuid(),
-                'code'      => 'EUP-0000000001',
-                'entity_id' => $entity->id,
-                'user_id'   => $higor->id,
-                'active'    => true,
-                'rule'      => 'admin',
-            ],
-            [
-                'id'        => Str::uuid(),
-                'code'      => 'EUP-0000000002',
-                'entity_id' => $entity->id,
-                'user_id'   => $joao->id,
-                'active'    => true,
-                'rule'      => 'admin',
-            ],
+        EntityUser::create([
+            'entity_id' => $entity->id,
+            'user_id'   => $higor->id,
+            'active'    => true,
+            'rule'      => 'admin',
+        ]);
+
+        EntityUser::create([
+            'entity_id' => $entity->id,
+            'user_id'   => $joao->id,
+            'active'    => true,
+            'rule'      => 'admin',
         ]);
     }
 }

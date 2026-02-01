@@ -19,6 +19,7 @@ class EntityIntegratorEquipmentResource extends JsonResource
             'id'         => $this->id,
             'attributes' => [
                 'integrator_id' => $this->integrator_id,
+                'code'          => $this->code,
                 'name'          => $this->name,
                 'ip'            => $this->ip,
                 'mac'           => $this->mac,

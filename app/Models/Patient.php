@@ -29,6 +29,33 @@ class Patient extends Model
     ];
 
     /**
+     * Generated code for the entity_id field
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $patient) {
+            if (blank($patient->code)) {
+                $prefix = 'PAC';
+
+                $lastPatient = static::withoutGlobalScopes()
+                    ->where('entity_id', $patient->entity_id)
+                    ->where('code', 'like', $prefix . '-%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+
+                if ($lastPatient) {
+                    $lastNumber = (int) substr($lastPatient->code, strlen($prefix) + 1);
+                    $newNumber  = $lastNumber + 1;
+                } else {
+                    $newNumber = 1;
+                }
+
+                $patient->code = sprintf('%s-%010d', $prefix, $newNumber);
+            }
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

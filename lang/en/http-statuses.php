@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 return [
     '0'            => 'Unknown Error',
@@ -81,4 +81,8 @@ return [
     '598'          => 'Network Read Timeout Error',
     '599'          => 'Network Connect Timeout Error',
     'unknownError' => 'Unknown Error',
+    'custom'       => [
+        '404_model' => 'Not found record',
+        '404_route' => 'Not found route',
+    ],
 ];

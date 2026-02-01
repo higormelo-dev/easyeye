@@ -2,13 +2,16 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\{EntityIntegrator, EntityIntegratorEquipment};
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 class EntityIntegratorEquipmentRequest extends FormRequest
 {
+    private const TABLE = 'entity_integrator_equipments';
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -24,83 +27,55 @@ class EntityIntegratorEquipmentRequest extends FormRequest
      */
     public function rules(): array
     {
-        $integrator = EntityIntegrator::query()->where('token_session', request()->bearerToken())->first();
-
-        return [
-            'name' => [
-                'required',
-                'string',
-                'max:255',
-            ],
-            'ip'  => ['required', 'ip', 'custom_unique_ip'],
-            'mac' => [
-                'required',
-                'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
-                'custom_unique_mac',
-            ],
-            'serial_number' => [
-                'required',
-                'string',
-                'max:100',
-            ],
-
+	    return [
+            'name'          => ['required', 'string', 'max:255', $this->uniqueRule('name')],
+            'ip'            => ['required', 'ip', $this->scopedUniqueRule('ip')],
+            'mac'           => ['required', 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $this->scopedUniqueRule('mac')],
+            'serial_number' => ['required', 'string', 'max:100', $this->uniqueRule('serial_number')],
         ];
     }
 
-    public function withValidator($validator): void
+    public function messages(): array
     {
-        $validator->addExtension('custom_unique_ip', function ($attribute, $value, $parameters, $validator) {
-            // Buscar integrador pelo token
-            $integrator = EntityIntegrator::query()->where('token_session', request()->bearerToken())->first();
+        $prefix = 'validation.custom.entity_integrator_equipment.';
 
-            if (!$integrator) {
-                return false;
-            }
-
-            $query = EntityIntegratorEquipment::query()->where('integrator_id', $integrator->id)
-                ->where('ip', $value);
-
-            if ($this->route('equipment')) {
-                $query->where('id', '!=', $this->route('equipment'));
-            }
-
-            return !$query->exists();
-        });
-
-        $validator->addExtension('custom_unique_mac', function ($attribute, $value, $parameters, $validator) {
-            // Buscar integrador pelo token
-            $integrator = EntityIntegrator::query()->where('token_session', request()->bearerToken())->first();
-
-            if (!$integrator) {
-                return false;
-            }
-
-            $query = EntityIntegratorEquipment::query()->where('integrator_id', $integrator->id)
-                ->where('mac', $value);
-
-            if ($this->route('equipment')) {
-                $query->where('id', '!=', $this->route('equipment'));
-            }
-
-            return !$query->exists();
-        });
-
-        $validator->addReplacer('custom_unique_ip', function ($message, $attribute, $rule, $parameters) {
-            return 'Este endereço IP já está sendo usado por outro equipamento.';
-        });
-        $validator->addReplacer('custom_unique_mac', function ($message, $attribute, $rule, $parameters) {
-            return 'Este endereço MAC já está sendo usado por outro equipamento.';
-        });
+        return [
+            'ip.unique'            => __($prefix . 'ip_unique'),
+            'mac.unique'           => __($prefix . 'mac_unique'),
+            'name.unique'          => __($prefix . 'name_unique'),
+            'serial_number.unique' => __($prefix . 'serial_number_unique'),
+        ];
     }
 
-    protected function failedValidation(Validator $validator)
+    protected function failedValidation(Validator $validator): void
     {
         throw new HttpResponseException(
             response()->json([
-                'message' => 'Dados de validação inválidos.',
+                'message' => __('validation.custom.validation_invalid'),
                 'errors'  => $validator->errors(),
             ], 422)
         );
     }
 
+    /**
+     * Regra unique global (sem escopo do integrador)
+     */
+    private function uniqueRule(string $column): Unique
+    {
+        return Rule::unique(self::TABLE, $column)
+            ->ignore($this->route('equipment'))
+            ->whereNull('deleted_at')
+            ->where('integrator_id', request()->user()->id);
+    }
+
+    /**
+     * Regra unique com escopo do integrador
+     */
+    private function scopedUniqueRule(string $column): Unique
+    {
+        return Rule::unique(self::TABLE, $column)
+            ->ignore($this->route('equipment'))
+            ->whereNull('deleted_at')
+            ->where('integrator_id', request()->user()->id);
+    }
 }

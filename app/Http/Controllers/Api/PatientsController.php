@@ -4,9 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientResource;
-use App\Models\{EntityIntegrator, Patient};
-use Illuminate\Http\{JsonResponse, Request};
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use App\Models\{Patient};
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class PatientsController extends Controller
 {
@@ -25,13 +24,8 @@ class PatientsController extends Controller
      */
     public function index()
     {
-        $integrator = $this->getAuthenticatedIntegrator();
-
-        if (!$integrator) {
-            return $this->unauthorizedResponse();
-        }
-
-        $patients = $this->model->query()
+        $integrator = request()->attributes->get('integrator');
+        $patients   = $this->model->query()
             ->with(['entity', 'person', 'covenant', 'skinType', 'irisType'])
             ->where('entity_id', $integrator->entity_id);
 
@@ -56,70 +50,18 @@ class PatientsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): PatientResource|JsonResponse
+    public function show(string $id): PatientResource
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $integrator = request()->attributes->get('integrator');
 
-            if (!$integrator) {
-                return $this->unauthorizedResponse();
-            }
+        $patient = $this->model->query()
+            ->where('entity_id', $integrator->entity_id)
+            ->where(function ($query) use ($id) {
+                $query->where('patients.id', $id)
+                    ->orWhere('patients.code', $id);
+            })
+            ->firstOrFail();
 
-            $patient = $this->findPatientForIntegrator($integrator->entity_id, $id);
-
-            if (!$patient) {
-                return $this->notFoundResponse();
-            }
-
-            return new PatientResource($patient);
-        } catch (\Throwable $e) {
-			dd($e);
-            return $this->serverErrorResponse();
-        }
-    }
-
-    /**
-     * Get authenticated integrator by bearer token
-     */
-    private function getAuthenticatedIntegrator(): ?EntityIntegrator
-    {
-        return EntityIntegrator::query()
-            ->where('token_session', request()->bearerToken())
-            ->first();
-    }
-
-    /**
-     * Find patient for specific integrator
-     */
-    private function findPatientForIntegrator(string $entityId, string $equipmentId): ?Patient
-    {
-        return $this->model->query()
-            ->where('entity_id', $entityId)
-            ->where('id', $equipmentId)
-            ->first();
-    }
-
-    /**
-     * Return unauthorized response
-     */
-    private function unauthorizedResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Not authorized.'], HttpResponse::HTTP_UNAUTHORIZED);
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Patient not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
+        return new PatientResource($patient);
     }
 }

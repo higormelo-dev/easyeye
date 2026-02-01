@@ -13,7 +13,7 @@ Route::get('/user', function (Request $request) {
 
 Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
     Route::post('auth', [EntityIntegratorsController::class, 'store'])->name('auth');
-    Route::group(['middleware' => ['api', 'auth:sanctum']], static function () {
+    Route::group(['middleware' => ['auth:integrator', 'auth.integrator']], static function () {
         Route::delete('auth', [EntityIntegratorsController::class, 'destroy'])->name('logout');
 
         Route::group(['prefix' => 'v1', 'as' => 'v1.'], function () {

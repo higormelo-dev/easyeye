@@ -32,6 +32,33 @@ class Doctor extends Model
     ];
 
     /**
+     * Generated code for the entity_id field
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $doctor) {
+            if (blank($doctor->code)) {
+                $prefix = 'DOC';
+
+                $lastType = static::withoutGlobalScopes()
+                    ->whereIn('entity_user_id', $doctor->entityUser->pluck('id'))
+                    ->where('code', 'like', $prefix . '-%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+
+                if ($lastType) {
+                    $lastNumber = (int) substr($lastType->code, strlen($prefix) + 1);
+                    $newNumber  = $lastNumber + 1;
+                } else {
+                    $newNumber = 1;
+                }
+
+                $doctor->code = sprintf('%s-%010d', $prefix, $newNumber);
+            }
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

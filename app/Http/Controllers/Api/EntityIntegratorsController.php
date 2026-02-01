@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\Api\EntityIntegratorResource;
 use App\Models\EntityIntegrator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ class EntityIntegratorsController extends Controller
             ->where('active', true)
             ->first();
 
-        if (!$record) {
+        if (! $record) {
             return response()->json(
                 ['message' => 'Integrator not found or inactive.'],
                 HttpResponse::HTTP_NOT_FOUND
@@ -49,41 +50,7 @@ class EntityIntegratorsController extends Controller
         $record->refresh();
 
         return response()->json(
-            [
-                'access_token' => $sanctumToken->plainTextToken,
-                'token_type'   => 'Bearer',
-                'expires_at'   => $expiresAt->toISOString(),
-                'integrator'   => [
-                    'id'        => $record->id,
-                    'entity_id' => $record->entity_id,
-                    'name'      => $record->name,
-                    'token'     => $record->token,
-                    'ip'        => $record->ip,
-                    'mac'       => $record->mac,
-                    'active'    => (bool) $record->active,
-                ],
-                'entity' => [
-                    'name'                   => $record->entity->name,
-                    'zipcode'                => $record->entity->zipcode,
-                    'address'                => $record->entity->address,
-                    'number'                 => $record->entity->number,
-                    'complement'             => $record->entity->complement,
-                    'district'               => $record->entity->district,
-                    'city'                   => $record->entity->city,
-                    'state'                  => $record->entity->state,
-                    'country'                => $record->entity->country,
-                    'national_registration'  => $record->entity->national_registration,
-                    'state_registration'     => $record->entity->state_registration,
-                    'municipal_registration' => $record->entity->municipal_registration,
-                    'telephone'              => $record->entity->telephone,
-                    'cellphone'              => $record->entity->cellphone,
-                    'email'                  => $record->entity->email,
-                    'website'                => $record->entity->website,
-                    // 'logo'                   => $record->entity->logo,
-                    // 'is_client' => (bool) $record->entity->is_client,
-                    // 'active'    => (bool) $record->entity->active,
-                ],
-            ],
+            new EntityIntegratorResource($record),
             HttpResponse::HTTP_OK
         );
     }

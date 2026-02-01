@@ -29,6 +29,37 @@ class Covenant extends Model
     ];
 
     /**
+     * Generated code for the entity_id field
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $covenant) {
+            if (blank($covenant->code)) {
+                $prefix = $covenant->entity_id ? 'CV' : 'CVP';
+
+                $lastType = static::withoutGlobalScopes()
+                    ->when(
+                        $covenant->entity_id !== null,
+                        fn ($q) => $q->where('entity_id', $covenant->entity_id),
+                        fn ($q) => $q->whereNull('entity_id')
+                    )
+                    ->where('code', 'like', $prefix . '-%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+
+                if ($lastType) {
+                    $lastNumber = (int) substr($lastType->code, strlen($prefix) + 1);
+                    $newNumber  = $lastNumber + 1;
+                } else {
+                    $newNumber = 1;
+                }
+
+                $covenant->code = sprintf('%s-%010d', $prefix, $newNumber);
+            }
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

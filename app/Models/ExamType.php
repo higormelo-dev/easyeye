@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\ExamCategory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
-class Schedule extends Model
+class ExamType extends Model
 {
     use HasUuids;
     use SoftDeletes;
@@ -19,17 +20,9 @@ class Schedule extends Model
      */
     protected $fillable = [
         'entity_id',
-        'doctor_id',
-        'patient_id',
-        'covenant_id',
         'code',
-        'full_name',
-        'date_time',
-        'telephone',
-        'cellphone',
-        'cellphone_whatsapp',
-        'visits',
-        'situation',
+        'name',
+        'category',
         'active',
     ];
 
@@ -38,24 +31,28 @@ class Schedule extends Model
      */
     protected static function booted(): void
     {
-        static::creating(function (self $schedule) {
-            if (blank($schedule->code)) {
-                $prefix = 'SDL';
+        static::creating(function (self $examType) {
+            if (blank($examType->code)) {
+                $prefix = $examType->entity_id ? 'ET' : 'ETP';
 
-                $lastSchedule = static::withoutGlobalScopes()
-                    ->where('entity_id', $schedule->entity_id)
+                $lastExamType = static::withoutGlobalScopes()
+                    ->when(
+                        $examType->entity_id !== null,
+                        fn ($q) => $q->where('entity_id', $examType->entity_id),
+                        fn ($q) => $q->whereNull('entity_id')
+                    )
                     ->where('code', 'like', $prefix . '-%')
                     ->orderBy('code', 'desc')
                     ->first();
 
-                if ($lastSchedule) {
-                    $lastNumber = (int) substr($lastSchedule->code, strlen($prefix) + 1);
+                if ($lastExamType) {
+                    $lastNumber = (int) substr($lastExamType->code, strlen($prefix) + 1);
                     $newNumber  = $lastNumber + 1;
                 } else {
                     $newNumber = 1;
                 }
 
-                $schedule->code = sprintf('%s-%010d', $prefix, $newNumber);
+                $examType->code = sprintf('%s-%010d', $prefix, $newNumber);
             }
         });
     }
@@ -68,10 +65,15 @@ class Schedule extends Model
     protected function casts(): array
     {
         return [
-            'date_time'  => 'datetime',
+            'category'   => ExamCategory::class,
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id');
     }
 }

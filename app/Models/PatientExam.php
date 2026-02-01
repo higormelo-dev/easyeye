@@ -35,6 +35,33 @@ class PatientExam extends Model
     protected $appends = ['archive_url'];
 
     /**
+     * Generated code for the entity_id field
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $patientExam) {
+            if (blank($patientExam->code)) {
+                $prefix = 'EXM';
+
+                $lastExam = static::withoutGlobalScopes()
+                    ->where('patient_id', $patientExam->patient_id)
+                    ->where('code', 'like', $prefix . '-%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+
+                if ($lastExam) {
+                    $lastNumber = (int) substr($lastExam->code, strlen($prefix) + 1);
+                    $newNumber  = $lastNumber + 1;
+                } else {
+                    $newNumber = 1;
+                }
+
+                $patientExam->code = sprintf('%s-%010d', $prefix, $newNumber);
+            }
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -45,11 +72,6 @@ class PatientExam extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
-    }
-
-    public function entity(): BelongsTo
-    {
-        return $this->belongsTo(Entity::class, 'entity_id');
     }
 
     public function patient(): BelongsTo

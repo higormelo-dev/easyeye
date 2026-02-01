@@ -24,7 +24,6 @@ class SkinTypesSeeder extends Seeder
                     'name' => $name,
                 ],
                 [
-                    'code'   => 'STP-' . str_pad($i++, 10, '0', STR_PAD_LEFT),
                     'name'   => $name,
                     'active' => true,
                 ]

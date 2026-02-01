@@ -35,6 +35,33 @@ class EntityIntegrator extends Model
     ];
 
     /**
+     * Generated code for the entity_id field
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (EntityIntegrator $entityIntegrator) {
+            if (blank($entityIntegrator->code)) {
+                $prefix = 'EI';
+
+                $lastEntityIntegrator = static::withoutGlobalScopes()
+                    ->where('entity_id', $entityIntegrator->entity_id)
+                    ->where('code', 'like', $prefix . '-%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+
+                if ($lastEntityIntegrator) {
+                    $lastNumber = (int) substr($lastEntityIntegrator->code, strlen($prefix) + 1);
+                    $newNumber  = $lastNumber + 1;
+                } else {
+                    $newNumber = 1;
+                }
+
+                $entityIntegrator->code = sprintf('%s-%010d', $prefix, $newNumber);
+            }
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

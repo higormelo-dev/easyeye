@@ -27,6 +27,33 @@ class EntityUser extends Model
     ];
 
     /**
+     * Generated code for the entity_id field
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $entityUser) {
+            if (blank($entityUser->code)) {
+                $prefix = $entityUser->entity->is_client ? 'EU' : 'EUP';
+
+                $lastEntityUser = static::withoutGlobalScopes()
+                    ->where('entity_id', $entityUser->entity_id)
+                    ->where('code', 'like', $prefix . '-%')
+                    ->orderBy('code', 'desc')
+                    ->first();
+
+                if ($lastEntityUser) {
+                    $lastNumber = (int) substr($lastEntityUser->code, strlen($prefix) + 1);
+                    $newNumber  = $lastNumber + 1;
+                } else {
+                    $newNumber = 1;
+                }
+
+                $entityUser->code = sprintf('%s-%010d', $prefix, $newNumber);
+            }
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

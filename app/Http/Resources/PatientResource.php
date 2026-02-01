@@ -26,20 +26,26 @@ class PatientResource extends JsonResource
                 'code'        => $this->code,
                 'card_number' => $this->card_number,
                 'active'      => (bool) $this->active,
-            ],
-            'relationships' => [
-                'entity'   => $this->entity->toArray(),
-                'person'   => $this->person->toArray(),
-                'covenant' => $this->covenant->toArray(),
+                'created_at'  => $this->created_at,
+                'updated_at'  => $this->updated_at,
             ],
         ];
 
-        if ($this->skin_id !== null) {
-            $resource['relationships']['skin_type'] = $this->skinType->toArray();
-        }
+        if (! $request->routeIs('*.index')) {
+            $resource['relationships'] = [
+                'entity'   => $this->entity->toArray(),
+                'person'   => $this->person->toArray(),
+                'covenant' => $this->covenant->toArray(),
+            ];
 
-        if ($this->iris_id !== null) {
-            $resource['relationships']['iris_type'] = $this->irisType->toArray();
+            if ($this->skin_id !== null) {
+                $resource['relationships']['skin_type'] = $this->skinType->toArray();
+            }
+
+            if ($this->iris_id !== null) {
+                $resource['relationships']['iris_type'] = $this->irisType->toArray();
+            }
+
         }
 
         return $resource;

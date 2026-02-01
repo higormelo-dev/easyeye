@@ -309,5 +309,12 @@ return [
         'generic' => [
             'required' => 'The :attribute field is required.',
         ],
+        'validation_invalid'          => 'Data is invalid.',
+        'entity_integrator_equipment' => [
+            'ip_unique'            => 'This IP address is already being used by another equipment.',
+            'mac_unique'           => 'This MAC address is already being used by another equipment.',
+            'name_unique'          => 'This name is already being used by another equipment.',
+            'serial_number_unique' => 'This serial number is already being used by another equipment.',
+        ],
     ],
 ];

@@ -5,8 +5,6 @@ namespace App\Services;
 use App\Http\Requests\PatientRequest;
 use App\Models\{Covenant, Patient, People};
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
-use Random\RandomException;
 
 class PatientService
 {
@@ -97,7 +95,6 @@ class PatientService
                 [
                     'entity_id' => $entityId,
                     'person_id' => $personId,
-                    'code'      => $this->generateUniqueCode(),
                     'active'    => true,
                 ]
             )
@@ -191,36 +188,5 @@ class PatientService
             'state'                  => $request->state,
             'country'                => $request->country,
         ]);
-    }
-
-    /**
-     * Generate unique code for patient
-     */
-    private function generateUniqueCode(): string
-    {
-        $maxAttempts = 10;
-        $attempt     = 0;
-
-        do {
-            try {
-                $code = 'PAC' . Str::upper(Str::random(6));
-            } catch (RandomException $e) {
-                $code = 'PAC' . Str::upper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
-            }
-
-            $attempt++;
-
-            $exists = Patient::query()->withTrashed()
-                ->where('code', $code)
-                ->where('entity_id', session()->get('selected_entity_id'))
-                ->exists();
-
-        } while ($exists && $attempt < $maxAttempts);
-
-        if ($exists) {
-            $code = 'PAC' . strtoupper(substr(md5(time() . mt_rand()), 0, 6));
-        }
-
-        return $code;
     }
 }
