@@ -18,20 +18,23 @@ class PatientExamResource extends JsonResource
             'type'       => 'patient_exams',
             'id'         => $this->id,
             'attributes' => [
-                'code'       => $this->code,
-                'archive'    => $this->archive_url,
-                'name'       => $this->name,
-                'active'     => (bool) $this->active,
-                'created_at' => $this->created_at,
-                'updated_at' => $this->updated_at,
+                'patient_id'  => $this->patient_id,
+                'doctor_id'   => $this->doctor_id,
+                'schedule_id' => $this->schedule_id,
+                'code'        => $this->code,
+                'archive'     => $this->archive_url,
+                'name'        => $this->name,
+                'active'      => (bool) $this->active,
+                'created_at'  => $this->created_at,
+                'updated_at'  => $this->updated_at,
             ],
         ];
 
         if (! $request->routeIs('*.index')) {
             $data['relationships'] = [
-                'patient'  => $this->patient->toArray(),
-                'doctor'   => $this->doctor ? $this->doctor->toArray() : [],
-                'schedule' => $this->schedule ? $this->schedule->toArray() : [],
+                'patient'  => $this->patient?->toArray() ?? (object) [],
+                'doctor'   => $this->doctor?->toArray() ?? (object) [],
+                'schedule' => $this->schedule?->toArray() ?? (object) [],
             ];
         }
 

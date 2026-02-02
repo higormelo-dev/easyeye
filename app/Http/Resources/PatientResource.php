@@ -33,18 +33,12 @@ class PatientResource extends JsonResource
 
         if (! $request->routeIs('*.index')) {
             $resource['relationships'] = [
-                'entity'   => $this->entity->toArray(),
-                'person'   => $this->person->toArray(),
-                'covenant' => $this->covenant->toArray(),
+                'entity'    => $this->entity->toArray(),
+                'person'    => $this->person->toArray(),
+                'covenant'  => $this->covenant->toArray(),
+                'skin_type' => $this->skinType->toArray() ?? (object) [],
+                'iris_type' => $this->irisType->toArray() ?? (object) [],
             ];
-
-            if ($this->skin_id !== null) {
-                $resource['relationships']['skin_type'] = $this->skinType->toArray();
-            }
-
-            if ($this->iris_id !== null) {
-                $resource['relationships']['iris_type'] = $this->irisType->toArray();
-            }
 
         }
 

@@ -3,7 +3,7 @@
 namespace App\Services\Api;
 
 use App\Http\Requests\Api\PatientExamRequest;
-use App\Models\PatientExam;
+use App\Models\{Doctor, PatientExam, Schedule};
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\{DB, Storage};
 use Illuminate\Support\Str;
@@ -29,11 +29,15 @@ class PatientExamService
      */
     public function update(PatientExam $patientExam, PatientExamRequest $request): PatientExam
     {
-        return DB::transaction(static function () use ($patientExam, $request) {
+        return DB::transaction(function () use ($patientExam, $request) {
             $data = $request->only(self::FILLABLE_FIELDS);
 
-            if ($request->has('active')) {
-                $data['active'] = $request->boolean('active');
+            if ($request->filled('doctor_code')) {
+                $data['doctor_id'] = $this->doctorFindByIdOrCode($request->doctor_code)?->id;
+            }
+
+            if ($request->filled('schedule_code')) {
+                $data['schedule_id'] = $this->scheduleFindByIdOrCode($request->schedule_code)?->id;
             }
 
             if ($request->hasFile('archive')) {
@@ -91,7 +95,11 @@ class PatientExamService
     public function findByIdOrCode(string $patientId, string $idOrCode): ?PatientExam
     {
         $query = PatientExam::query()
-            ->where('patient_id', $patientId);
+            ->with('patient')
+            ->whereHas('patient', function ($query) {
+                $query->where('entity_id', request()->attributes->get('integrator')->entity_id)
+                    ->whereNull('deleted_at');
+            });
 
         if (Str::isUuid($idOrCode)) {
             $query->where('id', $idOrCode);
@@ -115,18 +123,26 @@ class PatientExamService
         $archivePath = "{$integrator->entity_id}/{$patientId}/exams/{$fileName}";
         $recordData  = [
             ...$request->only(self::FILLABLE_FIELDS),
-            'active' => $request->boolean('active'),
         ];
 
+        if ($request->filled('doctor_code')) {
+            $recordData['doctor_id'] = $this->doctorFindByIdOrCode($request->doctor_code)?->id;
+        }
+
+        if ($request->filled('schedule_code')) {
+            $recordData['schedule_id'] = $this->scheduleFindByIdOrCode($request->schedule_code)?->id;
+        }
+
         $existingRecord = PatientExam::query()
-            ->withTrashed()
-            ->where('integrator_id', $integrator->id)
+            ->with('patient')
+            ->whereHas('patient', function ($query) {
+                $query->where('entity_id', request()->attributes->get('integrator')->entity_id)
+                    ->whereNull('deleted_at');
+            })
             ->where('name', $request->name)
             ->first();
 
         if ($existingRecord) {
-            $existingRecord->trashed() && $existingRecord->restore();
-
             if ($existingRecord->archive) {
                 Storage::disk('s3')->delete($existingRecord->archive);
             }
@@ -161,11 +177,54 @@ class PatientExamService
         if ($uploaded) {
             return PatientExam::create([
                 ...$recordData,
-                'archive' => $archivePath,
-                'active'  => true,
+                'patient_id' => $patientId,
+                'archive'    => $archivePath,
             ]);
         }
 
         throw new \RuntimeException('Failed to upload exam archive.');
+    }
+
+    /**
+     * Find by ID or Code including soft-deleted records
+     *
+     * @throws ModelNotFoundException
+     */
+    public function doctorFindByIdOrCode(string $idOrCode): ?Doctor
+    {
+        $integrator = request()->attributes->get('integrator');
+        $query      = Doctor::query()
+            ->with('entityUser')
+            ->whereHas('entityUser', function ($query) use ($integrator) {
+                $query->where('entity_id', $integrator->entity_id);
+            });
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->first();
+    }
+
+    /**
+     * Find by ID or Code including soft-deleted records
+     *
+     * @throws ModelNotFoundException
+     */
+    public function scheduleFindByIdOrCode(string $idOrCode): ?Schedule
+    {
+        $integrator = request()->attributes->get('integrator');
+        $query      = Schedule::query()
+            ->where('entity_id', $integrator->entity_id);
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->first();
     }
 }

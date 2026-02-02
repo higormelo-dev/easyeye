@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
-class PatientExamRequest extends FormRequest
+class ExamRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -28,14 +28,22 @@ class PatientExamRequest extends FormRequest
         $integrator = request()->attributes->get('integrator');
 
         return [
-            /*'patient_id' => [
-                'required',
+            'patient_id' => [
+                'nullable',
                 'uuid',
                 Rule::exists('patients', 'id')->where(function ($query) use ($integrator) {
                     return $query->where('entity_id', $integrator->entity_id)
                         ->whereNull('deleted_at');
                 }),
-            ],*/
+            ],
+            'patient_code' => [
+                'nullable',
+                'string',
+                Rule::exists('patients', 'code')->where(function ($query) use ($integrator) {
+                    return $query->where('entity_id', $integrator->entity_id)
+                        ->whereNull('deleted_at');
+                }),
+            ],
             'doctor_id' => [
                 'nullable',
                 'uuid',
