@@ -17,8 +17,7 @@ class EntityIntegratorFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'   => 'Equipment ' . $this->faker->unique()->country(),
-            'token'  => $this->faker->unique()->sha256(),
+            'name'   => 'Equipment ' . $this->faker->unique()->numberBetween(1, 1000000),
             'ip'     => $this->faker->unique()->ipv4(),
             'mac'    => $this->faker->unique()->macAddress(),
             'active' => $this->faker->boolean(80),

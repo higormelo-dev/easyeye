@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientResource;
 use App\Models\{Patient};
-use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class PatientsController extends Controller
 {
@@ -25,9 +24,10 @@ class PatientsController extends Controller
     public function index()
     {
         $integrator = request()->attributes->get('integrator');
-        $patients   = $this->model->query()
+
+        $patients = $this->model->query()
             ->with(['entity', 'person', 'covenant', 'skinType', 'irisType'])
-            ->where('entity_id', $integrator->entity_id);
+            ->where('entity_id', $integrator->user->entity_id);
 
         if (request()->has('search')) {
             $patients = $patients->join(
@@ -55,7 +55,7 @@ class PatientsController extends Controller
         $integrator = request()->attributes->get('integrator');
 
         $patient = $this->model->query()
-            ->where('entity_id', $integrator->entity_id)
+            ->where('entity_id', $integrator->user->entity_id)
             ->where(function ($query) use ($id) {
                 $query->where('patients.id', $id)
                     ->orWhere('patients.code', $id);

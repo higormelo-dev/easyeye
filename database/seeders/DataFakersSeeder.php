@@ -2,7 +2,16 @@
 
 namespace Database\Seeders;
 
-use App\Models\{Covenant, Entity, EntityIntegrator, EntityUser, IrisType, Patient, People, SkinType, User};
+use App\Models\{Covenant,
+    Entity,
+    EntityIntegrator,
+    EntityUser,
+    EntityUserIntegrator,
+    IrisType,
+    Patient,
+    People,
+    SkinType,
+    User};
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -16,9 +25,6 @@ class DataFakersSeeder extends Seeder
      */
     public function run(): void
     {
-        $entityIntegratorCounter = [];
-        $patientCounter          = [];
-
         People::factory(3000)->create();
         Entity::factory(15)
             ->sequence(fn ($attributes) => [
@@ -60,8 +66,14 @@ class DataFakersSeeder extends Seeder
                 }
             }
 
-            EntityIntegrator::factory(10)
-                ->create(['entity_id' => $entity->id]);
+            $entityUserIntegrator = EntityUserIntegrator::factory(5)
+                ->create(['entity_id' => $entity->id, 'password' => Hash::make('123456789')]);
+
+            $entityUserIntegrator->each(function ($entityUser) {
+                EntityIntegrator::factory(10)
+                    ->create(['entity_user_integrator_id' => $entityUser->id]);
+            });
+
         });
 
         $people    = People::all();
@@ -69,23 +81,17 @@ class DataFakersSeeder extends Seeder
         $irisTypes = IrisType::all();
         $covenants = Covenant::all();
 
-        $people->each(function ($person) use ($entities, $skinTypes, $irisTypes, $covenants, &$patientCounter) {
+        $people->each(function ($person) use ($entities, $skinTypes, $irisTypes, $covenants) {
             $numberOfEntities = fake()->numberBetween(1, 3);
             $selectedEntities = $entities->random($numberOfEntities);
 
-            $selectedEntities->each(function ($entity) use ($person, $skinTypes, $irisTypes, $covenants, &$patientCounter) {
-                // Inicializa contador para este paciente se não existir
-                if (! isset($patientCounter[$entity->id])) {
-                    $patientCounter[$entity->id] = 1;
-                }
-
+            $selectedEntities->each(function ($entity) use ($person, $skinTypes, $irisTypes, $covenants) {
                 Patient::create([
                     'entity_id'   => $entity->id,
                     'person_id'   => $person->id,
                     'covenant_id' => $covenants->isNotEmpty() ? $covenants->random()->id : null,
                     'skin_id'     => $skinTypes->random()->id,
                     'iris_id'     => $irisTypes->random()->id,
-                    'code'        => 'PAC-' . str_pad($patientCounter[$entity->id]++, 10, '0', STR_PAD_LEFT),
                     'card_number' => fake()->optional(0.6)->creditCardNumber(),
                     'active'      => fake()->boolean(90),
                 ]);

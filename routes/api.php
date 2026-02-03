@@ -13,10 +13,9 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
-    Route::post('auth', [EntityIntegratorsController::class, 'store'])->name('auth');
-    Route::group(['middleware' => ['auth:integrator', 'auth.integrator']], static function () {
-        Route::delete('auth', [EntityIntegratorsController::class, 'destroy'])->name('logout');
-
+    Route::post('signin', [EntityIntegratorsController::class, 'store'])->name('auth');
+    Route::group(['middleware' => ['auth:integrator', 'auth_with_integrator', 'token.expiration']], static function () {
+        Route::delete('signout', [EntityIntegratorsController::class, 'destroy'])->name('signout');
         Route::group(['prefix' => 'v1', 'as' => 'v1.'], function () {
             Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)->except(['create', 'edit']);
             Route::apiResource('patients', PatientsController::class)->only('index', 'show');

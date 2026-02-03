@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 
 class EntityIntegrator extends Model
@@ -23,7 +24,7 @@ class EntityIntegrator extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'entity_id',
+        'entity_user_integrator_id',
         'code',
         'name',
         'token',
@@ -35,28 +36,29 @@ class EntityIntegrator extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_user_integrator_id field
      */
     protected static function booted(): void
     {
-        static::creating(function (EntityIntegrator $entityIntegrator) {
+        static::creating(static function (self $entityIntegrator) {
             if (blank($entityIntegrator->code)) {
-                $prefix = 'EI';
+                $entityId = $entityIntegrator->user->entity_id;
 
-                $lastEntityIntegrator = static::withoutGlobalScopes()
-                    ->where('entity_id', $entityIntegrator->entity_id)
-                    ->where('code', 'like', $prefix . '-%')
-                    ->orderBy('code', 'desc')
-                    ->first();
+                DB::transaction(static function () use ($entityIntegrator, $entityId) {
+                    $prefix   = 'EI';
+                    $lastCode = static::withoutGlobalScopes()
+                        ->whereHas('user', fn ($q) => $q->where('entity_id', $entityId))
+                        ->where('code', 'like', $prefix . '-%')
+                        ->lockForUpdate() // trava as linhas
+                        ->orderByDesc('code')
+                        ->value('code');
 
-                if ($lastEntityIntegrator) {
-                    $lastNumber = (int) substr($lastEntityIntegrator->code, strlen($prefix) + 1);
-                    $newNumber  = $lastNumber + 1;
-                } else {
-                    $newNumber = 1;
-                }
+                    $lastNumber = $lastCode
+                        ? (int) substr($lastCode, strlen($prefix) + 1)
+                        : 0;
 
-                $entityIntegrator->code = sprintf('%s-%010d', $prefix, $newNumber);
+                    $entityIntegrator->code = sprintf('%s-%010d', $prefix, $lastNumber + 1);
+                });
             }
         });
     }
@@ -77,9 +79,9 @@ class EntityIntegrator extends Model
         ];
     }
 
-    public function entity(): BelongsTo
+    public function user(): BelongsTo
     {
-        return $this->belongsTo(Entity::class, 'entity_id', 'id');
+        return $this->belongsTo(EntityUserIntegrator::class, 'entity_user_integrator_id', 'id');
     }
 
     public function equipments(): HasMany

@@ -11,16 +11,19 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('entity_integrators', function (Blueprint $table) {
+        Schema::create('entity_user_integrators', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('entity_user_integrator_id')
-                ->constrained('entity_user_integrators')
+            $table->foreignUuid('entity_id')
+                ->constrained('entities')
                 ->cascadeOnDelete();
             $table->string('code');
             $table->string('name');
-            $table->ipAddress('ip')->nullable();
-            $table->macAddress('mac')->unique();
+            $table->string('email')->unique();
+            $table->timestamp('email_verified_at')->nullable();
+            $table->string('password');
             $table->boolean('active')->default(false);
+            $table->rememberToken();
+            $table->softDeletes();
             $table->timestamps();
         });
     }
@@ -30,6 +33,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('entity_integrators');
+        Schema::dropIfExists('entity_user_integrators');
     }
 };

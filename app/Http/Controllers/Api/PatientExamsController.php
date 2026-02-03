@@ -35,7 +35,7 @@ class PatientExamsController extends Controller
         $patientExams = $this->model->query()
             ->with('patient', 'doctor', 'schedule', 'patient.person', 'doctor.person')
             ->whereHas('patient', function ($query) use ($integrator) {
-                $query->where('entity_id', $integrator->entity_id);
+                $query->where('entity_id', $integrator->user->entity_id);
             });
 
         if (request()->has('search')) {
@@ -80,25 +80,11 @@ class PatientExamsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $patientId, string $id): PatientExamResource|JsonResponse
+    public function show(string $patientId, string $idOrCode): PatientExamResource|JsonResponse
     {
-        try {
-            $integrator = $this->getAuthenticatedIntegrator();
+        $record = $this->service->findByIdOrCode($patientId, $idOrCode);
 
-            if (! $integrator) {
-                return $this->unauthorizedResponse();
-            }
-
-            $exam = $this->findPatientForIntegrator($patientId, $id);
-
-            if (! $exam) {
-                return $this->notFoundResponse();
-            }
-
-            return new PatientExamResource($exam);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return new PatientExamResource($record);
     }
 
     /**

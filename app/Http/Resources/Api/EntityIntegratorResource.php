@@ -2,12 +2,17 @@
 
 namespace App\Http\Resources\Api;
 
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Laravel\Sanctum\NewAccessToken;
 
 class EntityIntegratorResource extends JsonResource
 {
+    public function __construct($resource, private ?NewAccessToken $token = null)
+    {
+        parent::__construct($resource);
+    }
+
     /**
      * Transform the resource into an array.
      *
@@ -16,43 +21,31 @@ class EntityIntegratorResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'access_token' => $this->token_session,
-            'token_type'   => 'Bearer',
-            'expires_at'   => $this->token_session_expires_at->toISOString(),
-            'integrator'   => [
-                'id'         => $this->id,
-                'entity_id'  => $this->entity_id,
-                'code'       => $this->code,
-                'name'       => $this->name,
-                'token'      => $this->token,
-                'ip'         => $this->ip,
-                'mac'        => $this->mac,
-                'active'     => (bool) $this->active,
-                'created_at' => $this->created_at,
-                'updated_at' => $this->updated_at,
+            'access_token' => $this->token?->plainTextToken,
+            'token_type'   => $this->token ? 'Bearer' : null,
+            'expires_at'   => $this->token?->accessToken->expires_at?->toISOString(),
+            'user'         => [
+                'id'                => $this->user->id,
+                'entity_id'         => $this->user->entity_id,
+                'name'              => $this->user->name,
+                'email'             => $this->user->email,
+                'email_verified_at' => $this->user->email_verified_at,
+                'active'            => (bool) $this->user->active,
+                'created_at'        => $this->user->created_at,
+                'updated_at'        => $this->user->updated_at,
             ],
-            'entity' => [
-                'code'                   => $this->entity->code,
-                'name'                   => $this->entity->name,
-                'zipcode'                => $this->entity->zipcode,
-                'address'                => $this->entity->address,
-                'number'                 => $this->entity->number,
-                'complement'             => $this->entity->complement,
-                'district'               => $this->entity->district,
-                'city'                   => $this->entity->city,
-                'state'                  => $this->entity->state,
-                'country'                => $this->entity->country,
-                'national_registration'  => $this->entity->national_registration,
-                'state_registration'     => $this->entity->state_registration,
-                'municipal_registration' => $this->entity->municipal_registration,
-                'telephone'              => $this->entity->telephone,
-                'cellphone'              => $this->entity->cellphone,
-                'email'                  => $this->entity->email,
-                'website'                => $this->entity->website,
-                'active'                 => (bool) $this->entity->active,
-                'created_at'             => $this->entity->created_at,
-                'updated_at'             => $this->entity->updated_at,
+            'integrator' => [
+                'id'                        => $this->id,
+                'entity_user_integrator_id' => $this->entity_user_integrator_id,
+                'code'                      => $this->code,
+                'name'                      => $this->name,
+                'ip'                        => $this->ip,
+                'mac'                       => $this->mac,
+                'active'                    => (bool) $this->active,
+                'created_at'                => $this->created_at,
+                'updated_at'                => $this->updated_at,
             ],
+            'entity' => $this->user->entity->toArray(),
         ];
     }
 }

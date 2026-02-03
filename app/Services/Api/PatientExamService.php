@@ -47,7 +47,7 @@ class PatientExamService
                 $file        = $request->file('archive');
                 $extension   = $file->getClientOriginalExtension();
                 $fileName    = "{$timestamp}_{$uuid}.{$extension}";
-                $archivePath = "{$integrator->entity_id}/{$patientExam->patient_id}/exams/{$fileName}";
+                $archivePath = "{$integrator->user->entity_id}/{$patientExam->patient_id}/exams/{$fileName}";
 
                 if ($patientExam->archive) {
                     Storage::disk('s3')->delete($patientExam->archive);
@@ -95,7 +95,7 @@ class PatientExamService
     public function findByIdOrCode(string $patientId, string $idOrCode): ?PatientExam
     {
         $query = PatientExam::query()
-            ->with('patient')
+            ->with('patient', '')
             ->whereHas('patient', function ($query) {
                 $query->where('entity_id', request()->attributes->get('integrator')->entity_id)
                     ->whereNull('deleted_at');
@@ -120,7 +120,7 @@ class PatientExamService
         $integrator  = request()->attributes->get('integrator');
         $extension   = $request->file('archive')->getClientOriginalExtension();
         $fileName    = "{$timestamp}_{$uuid}.{$extension}";
-        $archivePath = "{$integrator->entity_id}/{$patientId}/exams/{$fileName}";
+        $archivePath = "{$integrator->user->entity_id}/{$patientId}/exams/{$fileName}";
         $recordData  = [
             ...$request->only(self::FILLABLE_FIELDS),
         ];
@@ -196,7 +196,7 @@ class PatientExamService
         $query      = Doctor::query()
             ->with('entityUser')
             ->whereHas('entityUser', function ($query) use ($integrator) {
-                $query->where('entity_id', $integrator->entity_id);
+                $query->where('entity_id', $integrator->user->entity_id);
             });
 
         if (Str::isUuid($idOrCode)) {
@@ -217,7 +217,7 @@ class PatientExamService
     {
         $integrator = request()->attributes->get('integrator');
         $query      = Schedule::query()
-            ->where('entity_id', $integrator->entity_id);
+            ->where('entity_id', $integrator->user->entity_id);
 
         if (Str::isUuid($idOrCode)) {
             $query->where('id', $idOrCode);

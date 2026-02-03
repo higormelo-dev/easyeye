@@ -70,7 +70,7 @@ return [
         ],
         'integrators' => [
             'driver' => 'eloquent',
-            'model'  => App\Models\EntityIntegrator::class,
+            'model'  => App\Models\EntityUserIntegrator::class,
         ],
 
         // 'users' => [

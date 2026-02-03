@@ -1,6 +1,10 @@
 <?php
 
-use App\Http\Middleware\{ApiAuthenticateIntegrator, CheckJsonResponse, EnsureEntitySelected, ParseMultipartFormData};
+use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
+    ApiCheckTokenExpiration,
+    CheckJsonResponse,
+    EnsureEntitySelected,
+    ParseMultipartFormData};
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -17,8 +21,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'entity.selected' => EnsureEntitySelected::class,
-            'auth.integrator' => ApiAuthenticateIntegrator::class,
+            'entity.selected'      => EnsureEntitySelected::class,
+            'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,
+            'token.expiration'     => ApiCheckTokenExpiration::class,
         ]);
 
         $middleware->api([
