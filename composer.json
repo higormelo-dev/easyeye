@@ -7,7 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
-        "ext-calendar": "*"
+        "ext-calendar": "*",
         "laracasts/presenter": "^0.2.8",
         "laravel-lang/common": "^6.7",
         "laravel-lang/publisher": "^16.7",
@@ -16,7 +16,7 @@
         "laravel/tinker": "^2.9",
         "league/flysystem-aws-s3-v3": "^3.30",
         "predis/predis": "^3.2",
-        "spatie/laravel-html": "^3.12",
+        "spatie/laravel-html": "^3.12"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
