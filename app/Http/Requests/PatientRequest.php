@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\{Patient};
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 class PatientRequest extends FormRequest
@@ -29,11 +31,28 @@ class PatientRequest extends FormRequest
                 'uuid',
                 'exists:covenants,id',
             ],
-            'skin_id'     => 'nullable|uuid|exists:skins,id',
-            'iris_id'     => 'nullable|uuid|exists:irises,id',
+            'skin_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('skin_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'iris_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('iris_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
             'card_number' => 'nullable|string|max:255',
-
-            'full_name' => [
+            'name'        => [
                 'required_without:type_method',
                 'string',
                 'max:255',
@@ -54,7 +73,7 @@ class PatientRequest extends FormRequest
             ],
             'gender' => [
                 'required_without:type_method',
-                Rule::in([1, 2]),
+                Rule::in([0, 1]),
             ],
             'marital_status' => [
                 'required_without:type_method',
@@ -177,15 +196,15 @@ class PatientRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'covenant_id.required_without' => trans('validation.custom.generic.required'),
-            'full_name'                    => trans('validation.custom.generic.required'),
-            'birth_date'                   => trans('validation.custom.generic.required'),
-            'gender'                       => trans('validation.custom.generic.required'),
-            'marital_status'               => trans('validation.custom.generic.required'),
-            'email'                        => trans('validation.custom.generic.required'),
-            'national_registry'            => trans('validation.custom.generic.required'),
-            'cellphone'                    => trans('validation.custom.generic.required'),
-            'whatsapp'                     => trans('validation.custom.generic.required'),
+            'covenant_id.required_without'       => __('validation.custom.generic.required'),
+            'full_name.required_without'         => __('validation.custom.generic.required'),
+            'birth_date.required_without'        => __('validation.custom.generic.required'),
+            'gender.required_without'            => __('validation.custom.generic.required'),
+            'marital_status.required_without'    => __('validation.custom.generic.required'),
+            'email.required_without'             => __('validation.custom.generic.required'),
+            'national_registry.required_without' => __('validation.custom.generic.required'),
+            'cellphone.required_without'         => __('validation.custom.generic.required'),
+            'whatsapp.required_without'          => __('validation.custom.generic.required'),
         ];
     }
 
@@ -195,13 +214,22 @@ class PatientRequest extends FormRequest
             $patientId = $this->route('patient');
 
             $patient = Patient::query()
-                ->with('person')
-                ->where('patients.id', $patientId)
+                ->where('id', $patientId)
                 ->first();
 
-            return $patient && $patient->person ? $patient->person->id : null;
+            return $patient->person_id ?? null;
         }
 
         return null;
+    }
+
+    protected function failedValidation(Validator $validator): mixed
+    {
+        throw new HttpResponseException(
+            response()->json([
+                'message' => __('http-statuses.custom.422_request'),
+                'errors'  => $validator->errors(),
+            ], 422)
+        );
     }
 }

@@ -6,7 +6,7 @@ $(function () {
     let patientsDataTable = $('#patient_datatable').DataTable({
         "retrieve": true,
         "order": [
-            [0, 'desc']
+            [1, 'desc']
         ],
         "searching": true,
         "bLengthChange": true,

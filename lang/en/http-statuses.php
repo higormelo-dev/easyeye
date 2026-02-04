@@ -82,7 +82,8 @@ return [
     '599'          => 'Network Connect Timeout Error',
     'unknownError' => 'Unknown Error',
     'custom'       => [
-        '404_model' => 'Not found record',
-        '404_route' => 'Not found route',
+        '404_model'   => 'Not found record',
+        '404_route'   => 'Not found route',
+        '422_request' => 'Invalid validation data',
     ],
 ];

@@ -82,7 +82,8 @@ return [
     '599'          => 'Erro de tempo limite de conexão de rede',
     'unknownError' => 'Erro Desconhecido',
     'custom'       => [
-        '404_model' => 'Registro não encontrado',
-        '404_route' => 'Rota não encontrada',
+        '404_model'   => 'Registro não encontrado',
+        '404_route'   => 'Rota não encontrada',
+        '422_request' => 'Dados de validação inválidos',
     ],
 ];

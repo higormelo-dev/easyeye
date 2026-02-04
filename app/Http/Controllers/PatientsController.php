@@ -11,7 +11,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class PatientsController extends Controller
 {
@@ -65,24 +64,20 @@ class PatientsController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        try {
-            $genders         = People::$genders;
-            $maritalStatuses = People::$maritalStatuses;
-            $statesOfBrazil  = People::$statesOfBrazil;
-            $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
-            $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
-            $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
+        $genders         = People::$genders;
+        $maritalStatuses = People::$maritalStatuses;
+        $statesOfBrazil  = People::$statesOfBrazil;
+        $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
+        $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
+        $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
 
-            return view(
-                'system.patients.form',
-                compact(
-                    'genders', 'maritalStatuses', 'statesOfBrazil',
-                    'covenants', 'skinTypes', 'irisTypes'
-                )
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return view(
+            'system.patients.form',
+            compact(
+                'genders', 'maritalStatuses', 'statesOfBrazil',
+                'covenants', 'skinTypes', 'irisTypes'
+            )
+        );
     }
 
     /**
@@ -90,24 +85,20 @@ class PatientsController extends Controller
      */
     public function store(PatientRequest $request): Application|RedirectResponse|Redirector|JsonResponse
     {
-        try {
-            $patient       = $this->patientService->create($request);
-            $messageReturn = $this->titleController . ' cadastradp(a) com sucesso.';
+        $patient       = $this->service->create($request);
+        $messageReturn = $this->titleController . ' cadastradp(a) com sucesso.';
 
-            if (request()->wantsJson()) {
-                return response()->json(
-                    [
-                        'message' => $messageReturn,
-                        'data'    => (new PatientResource($patient))['data'],
-                    ]
-                );
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json(
+                [
+                    'message' => $messageReturn,
+                    'data'    => (new PatientResource($patient))['data'],
+                ]
+            );
         }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
 
     }
 
@@ -116,20 +107,12 @@ class PatientsController extends Controller
      */
     public function show(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findPatient($id);
+        $record = $this->service->findPatient($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view(
-                'system.patients.show',
-                compact('record')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return view(
+            'system.patients.show',
+            compact('record')
+        );
     }
 
     /**
@@ -137,35 +120,26 @@ class PatientsController extends Controller
      */
     public function edit(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findPatient($id);
+        $record          = $this->service->findPatient($id);
+        $genders         = People::$genders;
+        $maritalStatuses = People::$maritalStatuses;
+        $statesOfBrazil  = People::$statesOfBrazil;
+        $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
+        $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
+        $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $genders         = People::$genders;
-            $maritalStatuses = People::$maritalStatuses;
-            $statesOfBrazil  = People::$statesOfBrazil;
-            $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
-            $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
-            $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
-
-            return view(
-                'system.patients.form',
-                compact(
-                    'record',
-                    'genders',
-                    'maritalStatuses',
-                    'statesOfBrazil',
-                    'covenants',
-                    'skinTypes',
-                    'irisTypes'
-                )
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return view(
+            'system.patients.form',
+            compact(
+                'record',
+                'genders',
+                'maritalStatuses',
+                'statesOfBrazil',
+                'covenants',
+                'skinTypes',
+                'irisTypes'
+            )
+        );
     }
 
     /**
@@ -173,28 +147,19 @@ class PatientsController extends Controller
      */
     public function update(PatientRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
-        try {
-            $record = $this->findPatient($id);
+        $record        = $this->service->findPatient($id);
+        $updatedRecord = $this->service->update($record, $request);
+        $messageReturn = $this->getUpdateMessage($request);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $updatedRecord = $this->patientService->update($record, $request);
-            $messageReturn = $this->getUpdateMessage($request);
-
-            if (request()->wantsJson()) {
-                return response()->json([
-                    'message' => $messageReturn,
-                    'data'    => (new PatientResource($updatedRecord))['data'],
-                ]);
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new PatientResource($updatedRecord))['data'],
+            ]);
         }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
@@ -322,34 +287,6 @@ class PatientsController extends Controller
             'recordsFiltered' => (int) $totalFiltered,
             'data'            => $data,
         ]);
-
-    }
-
-    /**
-     * Find patient by ID
-     */
-    private function findPatient(string $id): ?Patient
-    {
-        return $this->model->query()
-            ->with('person')
-            ->whereHas('entity', function ($query) {
-                $query->where('entities.id', session()->get('selected_entity_id'));
-            })->find($id);
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Patient not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**

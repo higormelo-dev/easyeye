@@ -304,6 +304,9 @@ return [
         'active'                   => 'ativo',
         'observation'              => 'observação',
         'table'                    => 'cobrança',
+        'entity_id'                => 'entidade',
+        'skin_id'                  => 'tipo de cutis',
+        'iris_id'                  => 'tipo de iris',
     ],
     'custom' => [
         'generic' => [

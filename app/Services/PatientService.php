@@ -61,6 +61,18 @@ class PatientService
     }
 
     /**
+     * Find record by ID
+     */
+    public function findPatient(string $id): ?Patient
+    {
+        return Patient::query()
+            ->with('person')
+            ->whereHas('entity', function ($query) {
+                $query->where('entities.id', session()->get('selected_entity_id'));
+            })->findOrFail($id);
+    }
+
+    /**
      * Find or create patient
      */
     private function findOrCreate(string $personId, PatientRequest $request): Patient
