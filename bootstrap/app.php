@@ -58,7 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (ValidationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
-                    'message' => __('http-statuses.422'),
+                    'message' => __('validation.custom.validation_invalid.default_message'),
                     'errors'  => $e->errors(),
                 ], HttpResponse::HTTP_UNPROCESSABLE_ENTITY);
             }

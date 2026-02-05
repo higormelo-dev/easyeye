@@ -8,6 +8,7 @@ use App\Models\{EntityIntegrator, EntityUserIntegrator};
 use Carbon\Carbon;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class EntityIntegratorsController extends Controller
@@ -32,36 +33,22 @@ class EntityIntegratorsController extends Controller
             ->first();
 
         if (! $user || ! Hash::check($request->get('password'), $user->password)) {
-            return response()->json(
-                ['message' => __('auth.failed')],
-                HttpResponse::HTTP_UNAUTHORIZED
-            );
+
+            return $this->invalidResponse('auth.failed');
         }
 
         if (! $user->active) {
-            return response()->json(
-                ['message' => __('auth.inactive')],
-                HttpResponse::HTTP_UNAUTHORIZED
-            );
+            return $this->invalidResponse('auth.inactive');
         }
 
         $integrator = EntityIntegrator::query()
             ->where('entity_user_integrator_id', $user->id)
             ->where('code', $request->get('code'))
+            ->where('active', true)
             ->first();
 
         if (! $integrator) {
-            return response()->json(
-                ['message' => __('auth.integrator_invalid')],
-                HttpResponse::HTTP_UNAUTHORIZED
-            );
-        }
-
-        if (! $integrator->active) {
-            return response()->json(
-                ['message' => __('auth.integrator_inactive')],
-                HttpResponse::HTTP_UNAUTHORIZED
-            );
+            return $this->invalidResponse('auth.integrator_invalid');
         }
 
         $token = $user->createToken(
@@ -74,6 +61,55 @@ class EntityIntegratorsController extends Controller
             (new EntityIntegratorResource($integrator, $token)),
             HttpResponse::HTTP_OK
         );
+    }
+
+    public function checkToken(Request $request): JsonResponse
+    {
+        $token = $request->get('token');
+
+        if (! $token) {
+            return $this->invalidResponse('auth.token_not_provided', HttpResponse::HTTP_BAD_REQUEST);
+        }
+
+        $accessToken = PersonalAccessToken::findToken($token);
+
+        if (! $accessToken) {
+            return $this->invalidResponse('auth.token_invalid');
+        }
+
+        if ($accessToken->expires_at?->isPast()) {
+            return $this->invalidResponse('auth.token_expired');
+        }
+
+        $integratorId = $this->extractIntegratorId($accessToken->abilities);
+
+        if (! $integratorId) {
+            return $this->invalidResponse('auth.token_invalid');
+        }
+
+        $integrator = EntityIntegrator::query()
+            ->with('user.entity')
+            ->where('id', $integratorId)
+            ->where('active', true)
+            ->first();
+
+        if (! $integrator) {
+            return $this->invalidResponse('auth.integrator_inactive');
+        }
+
+        if (! $integrator->user->active) {
+            return $this->invalidResponse('auth.user_integrator_inactive');
+        }
+
+        if (! $integrator->user->entity?->active) {
+            return $this->invalidResponse('auth.entity_inactive');
+        }
+
+        return response()->json([
+            'message'    => __('auth.token_valid'),
+            'valid'      => true,
+            'expires_at' => $accessToken->expires_at,
+        ], HttpResponse::HTTP_OK);
     }
 
     /**
@@ -90,5 +126,28 @@ class EntityIntegratorsController extends Controller
         return response()->json([
             'message' => 'Token revoked successfully.',
         ], HttpResponse::HTTP_OK);
+    }
+
+    private function extractIntegratorId(array $abilities): ?string
+    {
+        foreach ($abilities as $key => $value) {
+            $ability = is_int($key) ? $value : $key;
+
+            if (str_starts_with($ability, 'integrator_id:')) {
+                $parts = explode(':', $ability, 2);
+
+                return $parts[1] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    private function invalidResponse(string $messageKey, int $status = HttpResponse::HTTP_UNAUTHORIZED): JsonResponse
+    {
+        return response()->json(
+            ['message' => __($messageKey), 'valid' => false],
+            $status
+        );
     }
 }

@@ -307,17 +307,27 @@ return [
         'entity_id'                => 'entidade',
         'skin_id'                  => 'tipo de cutis',
         'iris_id'                  => 'tipo de iris',
+        'patient_identifier'       => 'identificador do paciente',
+        'exam_identifier'          => 'identificador do exame',
+        'doctor_identifier'        => 'identificador do médico',
+        'schedule_identifier'      => 'identificador do agendamento',
     ],
     'custom' => [
         'generic' => [
             'required' => 'É obrigatória a indicação de um valor para o campo :attribute.',
         ],
-        'validation_invalid'          => 'Dados de validação inválidos',
         'entity_integrator_equipment' => [
             'ip_unique'            => 'Este endereço IP já está sendo usado por outro equipamento.',
             'mac_unique'           => 'Este endereço MAC já está sendo usado por outro equipamento.',
             'name_unique'          => 'Este nome já está sendo usado por outro equipamento.',
             'serial_number_unique' => 'Este número de série já está sendo usado por outro equipamento.',
+        ],
+        'validation_invalid' => [
+            'default_message'     => 'Dados de validação inválidos',
+            'exam_identifier'     => 'Identificador de exame inválido',
+            'patient_identifier'  => 'Identificador de paciente inválido',
+            'doctor_identifier'   => 'Identificador de médico inválido',
+            'schedule_identifier' => 'Identificador de agendamento inválido',
         ],
     ],
 ];

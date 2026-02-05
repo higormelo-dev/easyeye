@@ -309,12 +309,18 @@ return [
         'generic' => [
             'required' => 'The :attribute field is required.',
         ],
-        'validation_invalid'          => 'Data is invalid.',
         'entity_integrator_equipment' => [
             'ip_unique'            => 'This IP address is already being used by another equipment.',
             'mac_unique'           => 'This MAC address is already being used by another equipment.',
             'name_unique'          => 'This name is already being used by another equipment.',
             'serial_number_unique' => 'This serial number is already being used by another equipment.',
+        ],
+        'validation_invalid' => [
+            'default_message'     => 'Data is invalid.',
+            'exam_identifier'     => 'Exam identifier is invalid',
+            'patient_identifier'  => 'Patient identifier is invalid',
+            'doctor_identifier'   => 'Doctor identifier is invalid',
+            'schedule_identifier' => 'Schedule identifier is invalid',
         ],
     ],
 ];

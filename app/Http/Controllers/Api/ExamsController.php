@@ -55,9 +55,9 @@ class ExamsController extends Controller
         return Patient::query()
             ->where('entity_id', $integrator->entity_id)
             ->when(
-                Str::isUuid($request->patient_id),
-                fn ($q) => $q->where('id', $request->patient_id),
-                fn ($q) => $q->where('code', $request->patient_code)
+                Str::isUuid($request->patient_info),
+                fn ($q) => $q->where('id', $request->patient_info),
+                fn ($q) => $q->where('code', $request->patient_info)
             )
             ->firstOrFail();
     }
@@ -67,14 +67,15 @@ class ExamsController extends Controller
         $data = [
             ...$request->only(self::FILLABLE_FIELDS),
             'patient_id' => $patient->id,
+            'exam_id'    => $this->service->examFindByIdOrCode($request->exam_identifier)?->id,
         ];
 
-        if ($request->filled('doctor_code')) {
-            $data['doctor_id'] = $this->service->doctorFindByIdOrCode($request->doctor_code)?->id;
+        if ($request->filled('doctor_identifier')) {
+            $data['doctor_id'] = $this->service->doctorFindByIdOrCode($request->doctor_identifier)?->id;
         }
 
-        if ($request->filled('schedule_code')) {
-            $data['schedule_id'] = $this->service->scheduleFindByIdOrCode($request->schedule_code)?->id;
+        if ($request->filled('schedule_identifier')) {
+            $data['schedule_id'] = $this->service->scheduleFindByIdOrCode($request->schedule_identifier)?->id;
         }
 
         return $data;

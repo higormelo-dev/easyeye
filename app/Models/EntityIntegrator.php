@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class EntityIntegrator extends Model
@@ -27,11 +28,8 @@ class EntityIntegrator extends Model
         'entity_user_integrator_id',
         'code',
         'name',
-        'token',
         'ip',
         'mac',
-        'token_session',
-        'token_session_expires_at',
         'active',
     ];
 

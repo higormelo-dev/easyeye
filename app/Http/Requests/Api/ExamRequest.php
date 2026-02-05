@@ -2,11 +2,8 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\Doctor;
-use Illuminate\Contracts\Validation\Validator;
+use App\Models\{Doctor, ExamType, Patient, Schedule};
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Validation\Rule;
 
 class ExamRequest extends FormRequest
 {
@@ -28,73 +25,111 @@ class ExamRequest extends FormRequest
         $integrator = request()->attributes->get('integrator');
 
         return [
-            'patient_id' => [
-                'nullable',
-                'uuid',
-                Rule::exists('patients', 'id')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
-            ],
-            'patient_code' => [
-                'nullable',
-                'string',
-                Rule::exists('patients', 'code')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
-            ],
-            'doctor_id' => [
-                'nullable',
-                'uuid',
+            'patient_identifier' => [
+                'required',
                 function ($attribute, $value, $fail) use ($integrator) {
-                    $exists = Doctor::query()
-                        ->where('id', $value)
+                    $query = Patient::query()
+                        ->where('entity_id', $integrator->entity_id)
+                        ->whereNull('deleted_at');
+
+                    // Verifica se é um UUID válido
+                    $isUuid = preg_match(
+                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                        $value
+                    );
+
+                    if ($isUuid) {
+                        $query->where('id', $value);
+                    } else {
+                        $query->where('code', $value);
+                    }
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.patient_identifier'));
+                    }
+                },
+            ],
+            'exam_identifier' => [
+                'required',
+                function ($attribute, $value, $fail) use ($integrator) {
+                    $query = ExamType::query()
+                        ->where(function ($query) use ($integrator) {
+                            $query->where('entity_id', $integrator->entity_id)
+                                ->orWhereNull('entity_id');
+                        })
+                        ->whereNull('deleted_at');
+
+                    // Verifica se é um UUID válido
+                    $isUuid = preg_match(
+                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                        $value
+                    );
+
+                    if ($isUuid) {
+                        $query->where('id', $value);
+                    } else {
+                        $query->where('code', $value);
+                    }
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.exam_identifier'));
+                    }
+                },
+            ],
+            'doctor_identifier' => [
+                'nullable',
+                function ($attribute, $value, $fail) use ($integrator) {
+                    $query = Doctor::query()
+                        ->with('entityUser')
                         ->whereHas('entityUser', function ($query) use ($integrator) {
                             $query->where('entity_id', $integrator->entity_id)
                                 ->whereNull('deleted_at');
                         })
-                        ->whereNull('deleted_at')
-                        ->exists();
+                        ->whereNull('deleted_at');
 
-                    if (! $exists) {
-                        $fail('O médico selecionado é inválido.');
+                    // Verifica se é um UUID válido
+                    $isUuid = preg_match(
+                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                        $value
+                    );
+
+                    if ($isUuid) {
+                        $query->where('id', $value);
+                    } else {
+                        $query->where('code', $value);
+                    }
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.doctor_identifier'));
                     }
                 },
             ],
-            'doctor_code' => [
+            'schedule_identifier' => [
                 'nullable',
-                'string',
                 function ($attribute, $value, $fail) use ($integrator) {
-                    $exists = Doctor::query()
-                        ->where('code', $value)
-                        ->whereHas('entityUser', function ($query) use ($integrator) {
+                    $query = Schedule::query()
+                        ->where(function ($query) use ($integrator) {
                             $query->where('entity_id', $integrator->entity_id)
-                                ->whereNull('deleted_at');
+                                ->orWhereNull('entity_id');
                         })
-                        ->whereNull('deleted_at')
-                        ->exists();
+                        ->whereNull('deleted_at');
 
-                    if (! $exists) {
-                        $fail('O médico selecionado é inválido.');
+                    // Verifica se é um UUID válido
+                    $isUuid = preg_match(
+                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                        $value
+                    );
+
+                    if ($isUuid) {
+                        $query->where('id', $value);
+                    } else {
+                        $query->where('code', $value);
+                    }
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.schedule_identifier'));
                     }
                 },
-            ],
-            'schedule_id' => [
-                'nullable',
-                'uuid',
-                Rule::exists('schedules', 'id')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
-            ],
-            'schedule_code' => [
-                'nullable',
-                'string',
-                Rule::exists('schedules', 'code')->where(function ($query) use ($integrator) {
-                    return $query->where('entity_id', $integrator->entity_id)
-                        ->whereNull('deleted_at');
-                }),
             ],
             'name'    => 'nullable|string|max:255|min:3',
             'archive' => 'required|file|mimes:jpg,jpeg,png|max:10240',
@@ -128,15 +163,5 @@ class ExamRequest extends FormRequest
         }
 
         $this->merge($data);
-    }
-
-    protected function failedValidation(Validator $validator): mixed
-    {
-        throw new HttpResponseException(
-            response()->json([
-                'message' => 'Dados de validação inválidos.',
-                'errors'  => $validator->errors(),
-            ], 422)
-        );
     }
 }

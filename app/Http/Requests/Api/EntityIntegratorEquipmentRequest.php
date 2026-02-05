@@ -2,9 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
@@ -27,10 +25,14 @@ class EntityIntegratorEquipmentRequest extends FormRequest
      */
     public function rules(): array
     {
-	    return [
-            'name'          => ['required', 'string', 'max:255', $this->uniqueRule('name')],
-            'ip'            => ['required', 'ip', $this->scopedUniqueRule('ip')],
-            'mac'           => ['required', 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/', $this->scopedUniqueRule('mac')],
+        return [
+            'name' => ['required', 'string', 'max:255', $this->uniqueRule('name')],
+            'ip'   => ['required', 'ip', $this->uniqueRule('ip')],
+            'mac'  => [
+                'required',
+                'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
+                $this->uniqueRule('mac'),
+            ],
             'serial_number' => ['required', 'string', 'max:100', $this->uniqueRule('serial_number')],
         ];
     }
@@ -47,31 +49,10 @@ class EntityIntegratorEquipmentRequest extends FormRequest
         ];
     }
 
-    protected function failedValidation(Validator $validator): void
-    {
-        throw new HttpResponseException(
-            response()->json([
-                'message' => __('validation.custom.validation_invalid'),
-                'errors'  => $validator->errors(),
-            ], 422)
-        );
-    }
-
-    /**
-     * Regra unique global (sem escopo do integrador)
-     */
-    private function uniqueRule(string $column): Unique
-    {
-        return Rule::unique(self::TABLE, $column)
-            ->ignore($this->route('equipment'))
-            ->whereNull('deleted_at')
-            ->where('integrator_id', request()->user()->id);
-    }
-
     /**
      * Regra unique com escopo do integrador
      */
-    private function scopedUniqueRule(string $column): Unique
+    private function uniqueRule(string $column): Unique
     {
         return Rule::unique(self::TABLE, $column)
             ->ignore($this->route('equipment'))
