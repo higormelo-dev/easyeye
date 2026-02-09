@@ -17,7 +17,7 @@ class ApiAuthenticateWithIntegrator
     public function handle(Request $request, Closure $next): Response
     {
         $user  = $request->user();
-        $token = $request->user()?->currentAccessToken();
+        $token = $user ? $user->currentAccessToken() : null;
 
         if (! $user) {
             return response()->json(['message' => __('http-statuses.401')], 401);
@@ -25,7 +25,7 @@ class ApiAuthenticateWithIntegrator
 
         // Extrai o integrator_id das abilities do token
         $integratorId = null;
-        $abilities    = $token?->abilities ?? [];
+        $abilities    = $token ? $token->abilities : [];
 
         foreach ($abilities as $ability) {
             if (str_starts_with($ability, 'integrator_id:')) {

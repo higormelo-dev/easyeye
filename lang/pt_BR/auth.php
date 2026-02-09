@@ -19,7 +19,9 @@ return [
     'integrator_inactive'      => 'Integrador inativo',
     'entity_inactive'          => 'Empresa inativa',
     'token_valid'              => 'Token válido',
+    'token_renewed'            => 'Token renovado automaticamente',
     'token_invalid'            => 'Token inválido',
     'token_expired'            => 'Token expirado',
     'user_integrator_inactive' => 'Usuário inativo',
+    'token_expired_inactivity' => 'Token expirado por inatividade',
 ];

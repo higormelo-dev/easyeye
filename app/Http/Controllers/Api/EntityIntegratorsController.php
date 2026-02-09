@@ -77,7 +77,7 @@ class EntityIntegratorsController extends Controller
             return $this->invalidResponse('auth.token_invalid');
         }
 
-        if ($accessToken->expires_at?->isPast()) {
+        if ($accessToken->expires_at && $accessToken->expires_at->isPast()) {
             return $this->invalidResponse('auth.token_expired');
         }
 
@@ -101,14 +101,26 @@ class EntityIntegratorsController extends Controller
             return $this->invalidResponse('auth.user_integrator_inactive');
         }
 
-        if (! $integrator->user->entity?->active) {
+        if (! ($integrator->user->entity && $integrator->user->entity->active)) {
             return $this->invalidResponse('auth.entity_inactive');
         }
 
+        // Verifica se o token vai expirar em 1 dia útil e renova automaticamente
+        $renewed   = false;
+        $expiresAt = $accessToken->expires_at;
+
+        if ($expiresAt && $this->willExpireInOneBusinessDay($expiresAt)) {
+            $accessToken->expires_at = Carbon::now()->addDays(7);
+            $accessToken->save();
+            $expiresAt = $accessToken->expires_at;
+            $renewed   = true;
+        }
+
         return response()->json([
-            'message'    => __('auth.token_valid'),
+            'message'    => $renewed ? __('auth.token_renewed') : __('auth.token_valid'),
             'valid'      => true,
-            'expires_at' => $accessToken->expires_at,
+            'renewed'    => $renewed,
+            'expires_at' => $expiresAt,
         ], HttpResponse::HTTP_OK);
     }
 
@@ -149,5 +161,102 @@ class EntityIntegratorsController extends Controller
             ['message' => __($messageKey), 'valid' => false],
             $status
         );
+    }
+
+    /**
+     * Verifica se o token vai expirar em 1 dia útil.
+     */
+    private function willExpireInOneBusinessDay(Carbon $expiresAt): bool
+    {
+        $now          = Carbon::now();
+        $businessDays = $this->countBusinessDays($now, $expiresAt);
+
+        return $businessDays <= 1;
+    }
+
+    /**
+     * Conta dias úteis entre duas datas.
+     */
+    private function countBusinessDays(Carbon $start, Carbon $end): int
+    {
+        $days    = 0;
+        $current = $start->copy()->addDay();
+
+        while ($current <= $end) {
+            if ($this->isBusinessDay($current)) {
+                $days++;
+            }
+            $current->addDay();
+        }
+
+        return $days;
+    }
+
+    /**
+     * Verifica se é dia útil.
+     */
+    private function isBusinessDay(Carbon $date): bool
+    {
+        if ($date->isWeekend()) {
+            return false;
+        }
+
+        if ($this->isHoliday($date)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Verifica se é feriado nacional.
+     */
+    private function isHoliday(Carbon $date): bool
+    {
+        $year     = $date->year;
+        $holidays = $this->getHolidays($year);
+
+        return in_array($date->format('Y-m-d'), $holidays);
+    }
+
+    /**
+     * Retorna os feriados nacionais do ano.
+     */
+    private function getHolidays(int $year): array
+    {
+        // Feriados fixos
+        $holidays = [
+            "{$year}-01-01", // Confraternização Universal
+            "{$year}-04-21", // Tiradentes
+            "{$year}-05-01", // Dia do Trabalho
+            "{$year}-09-07", // Independência do Brasil
+            "{$year}-10-12", // Nossa Senhora Aparecida
+            "{$year}-11-02", // Finados
+            "{$year}-11-15", // Proclamação da República
+            "{$year}-11-20", // Consciência Nacional
+            "{$year}-12-25", // Natal
+        ];
+
+        // Feriados móveis (baseados na Páscoa)
+        $easter = $this->getEasterDate($year);
+
+        $holidays[] = $easter->copy()->subDays(48)->format('Y-m-d'); // Segunda de Carnaval
+        $holidays[] = $easter->copy()->subDays(47)->format('Y-m-d'); // Terça de Carnaval
+        $holidays[] = $easter->copy()->subDays(46)->format('Y-m-d'); // Quarta de Carnaval
+        $holidays[] = $easter->copy()->subDays(2)->format('Y-m-d');  // Sexta-feira Santa
+        $holidays[] = $easter->format('Y-m-d');                       // Páscoa
+        $holidays[] = $easter->copy()->addDays(60)->format('Y-m-d'); // Corpus Christi
+
+        return $holidays;
+    }
+
+    /**
+     * Calcula a data da Páscoa para o ano.
+     */
+    private function getEasterDate(int $year): Carbon
+    {
+        $days = easter_days($year);
+
+        return Carbon::createFromDate($year, 3, 21)->addDays($days);
     }
 }

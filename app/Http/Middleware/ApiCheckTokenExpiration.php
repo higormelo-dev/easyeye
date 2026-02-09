@@ -16,7 +16,7 @@ class ApiCheckTokenExpiration
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $token = $request->user()?->currentAccessToken();
+        $token = $request->user() ? $request->user()->currentAccessToken() : null;
 
         if (! $token) {
             return $next($request);
@@ -28,12 +28,12 @@ class ApiCheckTokenExpiration
         // Calcula dias úteis desde o último uso
         $businessDays = $this->countBusinessDays($lastUsed, $now);
 
-        // Expirou por inatividade (1 dia útil sem uso)
-        if ($businessDays > 1) {
+        // Expirou por inatividade (3 dias úteis sem uso)
+        if ($businessDays > 3) {
             $token->delete();
 
             return response()->json([
-                'message' => 'Token expirado por inatividade.',
+                'message' => __('auth.token_expired_inactivity'),
             ], Response::HTTP_UNAUTHORIZED);
         }
 
@@ -42,11 +42,28 @@ class ApiCheckTokenExpiration
             $token->delete();
 
             return response()->json([
-                'message' => 'Token expirado.',
+                'message' => __('auth.token_expired'),
             ], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Renova automaticamente se vai expirar em 1 dia útil ou menos
+        if ($token->expires_at && $this->willExpireInOneBusinessDay($token->expires_at)) {
+            $token->expires_at = Carbon::now()->addDays(7);
+            $token->save();
+        }
+
         return $next($request);
+    }
+
+    /**
+     * Verifica se o token vai expirar em 1 dia útil.
+     */
+    private function willExpireInOneBusinessDay(Carbon $expiresAt): bool
+    {
+        $now          = Carbon::now();
+        $businessDays = $this->countBusinessDays($now, $expiresAt);
+
+        return $businessDays <= 1;
     }
 
     private function countBusinessDays(Carbon $start, Carbon $end): int
