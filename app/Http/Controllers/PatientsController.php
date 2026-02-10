@@ -14,7 +14,10 @@ use Illuminate\Support\Facades\DB;
 
 class PatientsController extends Controller
 {
-    protected string $titleController = 'Pacientes';
+    /*
+     * Name of the controller
+     */
+    protected string $titleController;
 
     /**
      * Instance of the standard model.
@@ -25,8 +28,9 @@ class PatientsController extends Controller
 
     public function __construct(Patient $patient, PatientService $patientService)
     {
-        $this->model   = $patient;
-        $this->service = $patientService;
+        $this->titleController = __('actions.sidemenu.patients');
+        $this->model           = $patient;
+        $this->service         = $patientService;
     }
 
     /**
@@ -85,14 +89,14 @@ class PatientsController extends Controller
      */
     public function store(PatientRequest $request): Application|RedirectResponse|Redirector|JsonResponse
     {
-        $patient       = $this->service->create($request);
+        $record        = $this->service->create($request);
         $messageReturn = $this->titleController . ' cadastradp(a) com sucesso.';
 
         if (request()->wantsJson()) {
             return response()->json(
                 [
                     'message' => $messageReturn,
-                    'data'    => (new PatientResource($patient))['data'],
+                    'data'    => (new PatientResource($record))['data'],
                 ]
             );
         }
@@ -107,7 +111,15 @@ class PatientsController extends Controller
      */
     public function show(string $id): Application|View|JsonResponse
     {
-        $record = $this->service->findPatient($id);
+        $record = $this->service->findByIdOrCode($id);
+
+        if (request()->wantsJson()) {
+            return response()->json(
+                [
+                    'data' => (new PatientResource($record))['data'],
+                ]
+            );
+        }
 
         return view(
             'system.patients.show',
@@ -120,7 +132,7 @@ class PatientsController extends Controller
      */
     public function edit(string $id): Application|View|JsonResponse
     {
-        $record          = $this->service->findPatient($id);
+        $record          = $this->service->findByIdOrCode($id);
         $genders         = People::$genders;
         $maritalStatuses = People::$maritalStatuses;
         $statesOfBrazil  = People::$statesOfBrazil;
@@ -147,7 +159,7 @@ class PatientsController extends Controller
      */
     public function update(PatientRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
-        $record        = $this->service->findPatient($id);
+        $record        = $this->service->findByIdOrCode($id);
         $updatedRecord = $this->service->update($record, $request);
         $messageReturn = $this->getUpdateMessage($request);
 
@@ -167,40 +179,32 @@ class PatientsController extends Controller
      */
     public function destroy(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findPatient($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
+        return DB::transaction(function () use ($record) {
+            $recordData = $record->toArray();
+
+            $patientHasOtherEntities = Patient::query()
+                ->where('person_id', $record->person_id)
+                ->count();
+            $record->delete();
+
+            if ($patientHasOtherEntities <= 1) {
+                $person = People::query()->find($record->person_id);
+                $person?->delete();
             }
 
-            return DB::transaction(function () use ($record) {
-                $recordData = $record->toArray();
+            // Retornar resposta
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message' => $this->titleController . ' deletado(a) com sucesso.',
+                    'deleted' => $recordData,
+                ]);
+            }
 
-                $patientHasOtherEntities = Patient::query()
-                    ->where('person_id', $record->person_id)
-                    ->count();
-                $record->delete();
-
-                if ($patientHasOtherEntities <= 1) {
-                    $person = People::query()->find($record->person_id);
-                    $person?->delete();
-                }
-
-                // Retornar resposta
-                if (request()->wantsJson()) {
-                    return response()->json([
-                        'message' => $this->titleController . ' deletado(a) com sucesso.',
-                        'deleted' => $recordData,
-                    ]);
-                }
-
-                return redirect(action('\\' . static::class . '@index'))
-                    ->with('message', $this->titleController . ' deletado(a) com sucesso.');
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $this->titleController . ' deletado(a) com sucesso.');
+        });
     }
 
     public function ajaxDatatable(Request $request): JsonResponse

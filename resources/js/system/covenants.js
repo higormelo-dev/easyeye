@@ -35,6 +35,7 @@ $(function () {
         },
         "columns": [
             {'data': 'created_at', 'searchable': false, 'orderable': true},
+            {'data': 'code'},
             {'data': 'name'},
             {'data': 'table', 'searchable': false, 'orderable': true},
             {'data': 'active', 'searchable': false, 'orderable': true},
@@ -42,15 +43,15 @@ $(function () {
         ],
         "columnDefs": [
             {
-                'targets': [0, 1, 2],
+                'targets': [0, 1, 2, 3],
                 'className': 'text-left'
             },
             {
-                'targets': 3,
+                'targets': 4,
                 'className': 'text-center'
             },
             {
-                'targets': 4,
+                'targets': 5,
                 'className': 'text-end'
             }
         ],

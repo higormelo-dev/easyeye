@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Http\Requests\CovenantRequest;
-use App\Models\Covenant;
+use App\Models\{Covenant};
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Psr\Container\{ContainerExceptionInterface, NotFoundExceptionInterface};
 
 class CovenantService
 {
@@ -79,5 +81,24 @@ class CovenantService
             'entity_id' => session()->get('selected_entity_id'),
             'active'    => true,
         ]));
+    }
+
+    /**
+     * Find by ID or Code including soft-deleted records
+     *
+     * @return Covenant|null
+     */
+    public function findByIdOrCode(string $idOrCode): ?Covenant
+    {
+        $query = Covenant::query()
+            ->where('entity_id', session()->get('selected_entity_id'));
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->firstOrFail();
     }
 }

@@ -15,7 +15,10 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class SkinTypesController extends Controller
 {
-    protected string $titleController = 'Tipos de cútis';
+    /*
+     * Name of the controller
+     */
+    protected string $titleController;
 
     /**
      * Instance of the standard model.
@@ -26,8 +29,9 @@ class SkinTypesController extends Controller
 
     public function __construct(SkinType $skinType, SkinTypeService $skinTypeService)
     {
-        $this->model   = $skinType;
-        $this->service = $skinTypeService;
+        $this->titleController = __('actions.sidemenu.skintypes');
+        $this->model           = $skinType;
+        $this->service         = $skinTypeService;
     }
 
     /**
@@ -65,36 +69,29 @@ class SkinTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        try {
-            return view('system.skintypes.form');
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
-        }
+        return view('system.skintypes.form');
     }
 
     /**
      * Store a newly created resource in storage.
+     *
+     * @throws \Throwable
      */
     public function store(SkinTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|SkinTypeResource
     {
-        try {
-            $record = $this->service->create($request);
+        $record = $this->service->create($request);
 
-            $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
+        $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
 
-            if (request()->wantsJson()) {
-                return response()->json([
-                    'message' => $messageReturn,
-                    'data'    => (new SkinTypeResource($record))['data'],
-                ]);
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new SkinTypeResource($record))['data'],
+            ]);
         }
 
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
@@ -102,20 +99,18 @@ class SkinTypesController extends Controller
      */
     public function show(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view(
-                'system.skintypes.show',
-                compact('record')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => (new SkinTypeResource($record))['data'],
+            ]);
         }
+
+        return view(
+            'system.skintypes.show',
+            compact('record')
+        );
     }
 
     /**
@@ -123,47 +118,31 @@ class SkinTypesController extends Controller
      */
     public function edit(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view('system.skintypes.form', compact('record'));
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
-        }
+        return view('system.skintypes.form', compact('record'));
     }
 
     /**
      * Update the specified resource in storage.
+     *
+     * @throws \Throwable
      */
     public function update(SkinTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record        = $this->service->findByIdOrCode($id);
+        $updatedRecord = $this->service->update($record, $request);
+        $messageReturn = $this->getUpdateMessage($request);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $updatedRecord = $this->service->update($record, $request);
-
-            $messageReturn = $this->getUpdateMessage($request);
-
-            if (request()->wantsJson()) {
-                return response()->json([
-                    'message' => $messageReturn,
-                    'data'    => (new SkinTypeResource($updatedRecord))['data'],
-                ]);
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new SkinTypeResource($updatedRecord))['data'],
+            ]);
         }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
@@ -171,32 +150,24 @@ class SkinTypesController extends Controller
      */
     public function destroy(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
+        return DB::transaction(function () use ($record) {
+            $messageReturn = $this->titleController . ' deletado(a) com sucesso.';
+            $recordData    = $record->toArray();
+            $record->delete();
+
+            // Retornar resposta
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message' => $messageReturn,
+                    'deleted' => $recordData,
+                ]);
             }
 
-            return DB::transaction(function () use ($record) {
-                $messageReturn = $this->titleController . ' deletado(a) com sucesso.';
-                $recordData    = $record->toArray();
-                $record->delete();
-
-                // Retornar resposta
-                if (request()->wantsJson()) {
-                    return response()->json([
-                        'message' => $messageReturn,
-                        'deleted' => $recordData,
-                    ]);
-                }
-
-                return redirect(action('\\' . static::class . '@index'))
-                    ->with('message', $messageReturn);
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
-        }
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
+        });
     }
 
     /**
@@ -204,41 +175,34 @@ class SkinTypesController extends Controller
      */
     public function restore(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
+        return DB::transaction(function () use ($record) {
+            $messageReturn = $this->titleController . ' restaurado(a) com sucesso.';
+            $recordData    = $record->toArray();
+            $record->restore();
+
+            // Retornar resposta
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message'  => $messageReturn,
+                    'restored' => $recordData,
+                ]);
             }
 
-            return DB::transaction(function () use ($record) {
-                $messageReturn = $this->titleController . ' restaurado(a) com sucesso.';
-                $recordData    = $record->toArray();
-                $record->restore();
-
-                // Retornar resposta
-                if (request()->wantsJson()) {
-                    return response()->json([
-                        'message'  => $messageReturn,
-                        'restored' => $recordData,
-                    ]);
-                }
-
-                return redirect(action('\\' . static::class . '@index'))
-                    ->with('message', $messageReturn);
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
-        }
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
+        });
     }
 
     public function ajaxDatatable(Request $request): JsonResponse
     {
         $columns = [
             0 => 'created_at',
-            1 => 'name',
-            2 => 'active',
-            3 => 'action',
+            1 => 'code',
+            2 => 'name',
+            3 => 'active',
+            4 => 'action',
         ];
 
         $totalRecords = $this->model->query()->withTrashed()
@@ -286,6 +250,7 @@ class SkinTypesController extends Controller
         if (count($records)) {
             foreach ($records as $record) {
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
+                $information['code']       = $record->code;
                 $information['name']       = $record->name;
                 $information['active']     = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
                     '<span class="badge bg-success">SIM</span>' :
@@ -304,45 +269,6 @@ class SkinTypesController extends Controller
                 'data'            => $data,
             ]
         );
-    }
-
-    /**
-     * Find skin type by ID
-     */
-    private function findRecord(string $id): ?SkinType
-    {
-        return $this->model->query()->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->where('id', $id)
-            ->first();
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Skin type not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse($error): JsonResponse
-    {
-        $messages = [
-            'message' => 'An error occurred.',
-        ];
-	    
-	    if (app()->environment(['local', 'testing'])) {
-            $messages['debug'] = $error->getMessage();
-            $messages['file']  = $error->getFile();
-            $messages['line']  = $error->getLine();
-            $messages['trace'] = $error->getTraceAsString();
-            $messages['code']  = $error->getCode();
-            $messages['type']  = get_class($error);
-        }
-
-        return response()->json($messages, HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**

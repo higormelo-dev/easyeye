@@ -35,21 +35,22 @@ $(function () {
         },
         "columns": [
             {'data': 'created_at', 'searchable': false, 'orderable': true},
+            {'data': 'code'},
             {'data': 'name'},
             {'data': 'active', 'searchable': false, 'orderable': true},
             {'data': 'action', 'searchable': false, 'orderable': false},
         ],
         "columnDefs": [
             {
-                'targets': [0, 1],
+                'targets': [0, 1, 2],
                 'className': 'text-left'
             },
             {
-                'targets': 2,
+                'targets': 3,
                 'className': 'text-center'
             },
             {
-                'targets': 3,
+                'targets': 4,
                 'className': 'text-end'
             }
         ],

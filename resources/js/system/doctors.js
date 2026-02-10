@@ -42,27 +42,15 @@ $(function () {
         ],
         "columnDefs": [
             {
-                'targets': 0,
+                'targets': [0, 1, 2, 3, 4],
                 'className': 'text-left'
-            },
-            {
-                'targets': 1,
-                'className': 'text-left'
-            },
-            {
-                'targets': 2,
-                'className': 'text-left'
-            },
-            {
-                'targets': 3,
-                'className': 'text-left'
-            },
-            {
-                'targets': 4,
-                'className': 'text-center'
             },
             {
                 'targets': 5,
+                'className': 'text-center'
+            },
+            {
+                'targets': 6,
                 'className': 'text-end'
             }
         ],

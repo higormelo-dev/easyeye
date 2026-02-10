@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\{DoctorRequest};
-use App\Http\Resources\EntityUserResource;
+use App\Http\Resources\{DoctorResource, EntityUserResource};
 use App\Models\{Doctor, EntityUser, Patient, People, User};
 use App\Services\DoctorService;
 use Illuminate\Contracts\View\{Factory, View};
@@ -15,7 +15,10 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class DoctorsController extends Controller
 {
-    protected string $titleController = 'Médicos';
+    /*
+     * Name of the controller
+     */
+    protected string $titleController;
 
     /**
      * Instance of the standard model.
@@ -26,8 +29,9 @@ class DoctorsController extends Controller
 
     public function __construct(Doctor $doctor, DoctorService $doctorService)
     {
-        $this->model   = $doctor;
-        $this->service = $doctorService;
+        $this->titleController = __('actions.sidemenu.doctors');
+        $this->model           = $doctor;
+        $this->service         = $doctorService;
     }
 
     /**
@@ -65,18 +69,14 @@ class DoctorsController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        try {
-            $genders         = People::$genders;
-            $maritalStatuses = People::$maritalStatuses;
-            $statesOfBrazil  = People::$statesOfBrazil;
+        $genders         = People::$genders;
+        $maritalStatuses = People::$maritalStatuses;
+        $statesOfBrazil  = People::$statesOfBrazil;
 
-            return view(
-                'system.doctors.form',
-                compact('genders', 'maritalStatuses', 'statesOfBrazil')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+        return view(
+            'system.doctors.form',
+            compact('genders', 'maritalStatuses', 'statesOfBrazil')
+        );
     }
 
     /**
@@ -84,14 +84,9 @@ class DoctorsController extends Controller
      */
     public function store(DoctorRequest $request): JsonResponse|EntityUserResource
     {
-        try {
-            $entityUser = $this->service->create($request);
+        $entityUser = $this->service->create($request);
 
-            return new EntityUserResource($entityUser);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
-
+        return new EntityUserResource($entityUser);
     }
 
     /**
@@ -99,20 +94,18 @@ class DoctorsController extends Controller
      */
     public function show(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view(
-                'system.doctors.show',
-                compact('record')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => (new DoctorResource($record))['data'],
+            ]);
         }
+
+        return view(
+            'system.doctors.show',
+            compact('record')
+        );
     }
 
     /**
@@ -120,24 +113,24 @@ class DoctorsController extends Controller
      */
     public function edit(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        $record          = $this->service->findByIdOrCode($id);
+        $genders         = People::$genders;
+        $maritalStatuses = People::$maritalStatuses;
+        $statesOfBrazil  = People::$statesOfBrazil;
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $genders         = People::$genders;
-            $maritalStatuses = People::$maritalStatuses;
-            $statesOfBrazil  = People::$statesOfBrazil;
-
-            return view(
-                'system.doctors.form',
-                compact('record', 'genders', 'maritalStatuses', 'statesOfBrazil')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data'            => (new DoctorResource($record))['data'],
+                'genders'         => $genders,
+                'maritalStatuses' => $maritalStatuses,
+                'statesOfBrazil'  => $statesOfBrazil,
+            ]);
         }
+
+        return view(
+            'system.doctors.form',
+            compact('record', 'genders', 'maritalStatuses', 'statesOfBrazil')
+        );
     }
 
     /**
@@ -145,29 +138,20 @@ class DoctorsController extends Controller
      */
     public function update(DoctorRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        $record        = $this->service->findByIdOrCode($id);
+        $updatedRecord = $this->service->update($record, $request);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
+        $messageReturn = $this->getUpdateMessage($request);
 
-            $updatedRecord = $this->service->update($record, $request);
-
-            $messageReturn = $this->getUpdateMessage($request);
-
-            if (request()->wantsJson()) {
-                return response()->json([
-                    'message' => $messageReturn,
-                    'data'    => (new EntityUserResource($updatedRecord))['data'],
-                ]);
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new EntityUserResource($updatedRecord))['data'],
+            ]);
         }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
@@ -175,68 +159,55 @@ class DoctorsController extends Controller
      */
     public function destroy(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findDoctor($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
+        return DB::transaction(function () use ($record) {
+            $userId     = $record->entityUser->user_id;
+            $recordData = $record->toArray();
+
+            $userHasOtherEntityUsers = EntityUser::query()
+                ->where('user_id', $userId)
+                ->count();
+            $patientHasOtherEntityUsers = Patient::query()
+                ->where('person_id', $record->person_id)
+                ->count();
+
+            $record->entityUser->delete();
+            $record->delete();
+
+            if ($userHasOtherEntityUsers <= 1) {
+                $user = User::query()->find($userId);
+                $user?->delete();
             }
 
-            return DB::transaction(function () use ($record) {
-                $userId     = $record->entityUser->user_id;
-                $recordData = $record->toArray();
+            if ($patientHasOtherEntityUsers <= 1) {
+                $person = People::query()->find($record->person_id);
+                $person?->delete();
+            }
 
-                $userHasOtherEntityUsers = EntityUser::query()
-                    ->where('user_id', $userId)
-                    ->count();
-                $patientHasOtherEntityUsers = Patient::query()
-                    ->where('person_id', $record->person_id)
-                    ->count();
+            // Retornar resposta
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message' => $this->titleController . ' deletado(a) com sucesso.',
+                    'deleted' => $recordData,
+                ]);
+            }
 
-                $record->entityUser->delete();
-                $record->delete();
-
-                if ($userHasOtherEntityUsers <= 1) {
-                    $user = User::query()->find($userId);
-
-                    if ($user) {
-                        $user->delete();
-                    }
-                }
-
-                if ($patientHasOtherEntityUsers <= 1) {
-                    $person = People::query()->find($record->person_id);
-
-                    if ($person) {
-                        $person->delete();
-                    }
-                }
-
-                // Retornar resposta
-                if (request()->wantsJson()) {
-                    return response()->json([
-                        'message' => $this->titleController . ' deletado(a) com sucesso.',
-                        'deleted' => $recordData,
-                    ]);
-                }
-
-                return redirect(action('\\' . static::class . '@index'))
-                    ->with('message', $this->titleController . ' deletado(a) com sucesso.');
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $this->titleController . ' deletado(a) com sucesso.');
+        });
     }
 
     public function ajaxDatatable(Request $request): JsonResponse
     {
         $columns = [
             0 => 'created_at',
-            1 => 'name',
-            2 => 'record',
-            3 => 'email',
-            4 => 'active',
-            5 => 'action',
+            1 => 'code',
+            2 => 'name',
+            3 => 'record',
+            4 => 'email',
+            5 => 'active',
+            6 => 'action',
         ];
 
         $totalRecords = $this->model->query()
@@ -298,6 +269,7 @@ class DoctorsController extends Controller
         if (count($records)) {
             foreach ($records as $record) {
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
+                $information['code']       = $record->code;
                 $information['name']       = $record->user_name;
                 $information['record']     = $record->record;
                 $information['email']      = $record->email;
@@ -307,7 +279,6 @@ class DoctorsController extends Controller
                 $information['action'] = $this->buildActionButtons($record);
                 $data[]                = $information;
             }
-
         }
 
         return response()->json([
@@ -317,34 +288,6 @@ class DoctorsController extends Controller
             'data'            => $data,
         ]);
 
-    }
-
-    /**
-     * Find doctor by ID
-     */
-    private function findDoctor(string $id): ?Doctor
-    {
-        return $this->model->query()->withTrashed()
-            ->with(['person', 'entityUser.user'])
-            ->whereHas('entityUser', function ($query) {
-                $query->where('entity_id', session()->get('selected_entity_id'));
-            })
-            ->find($id);
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Doctor not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**

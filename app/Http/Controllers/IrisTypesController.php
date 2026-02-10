@@ -11,11 +11,13 @@ use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class IrisTypesController extends Controller
 {
-    protected string $titleController = 'Tipos de íris';
+    /*
+     * Name of the controller
+     */
+    protected string $titleController;
 
     /**
      * Instance of the standard model.
@@ -26,8 +28,9 @@ class IrisTypesController extends Controller
 
     public function __construct(IrisType $irisType, IrisTypeService $irisTypeService)
     {
-        $this->model   = $irisType;
-        $this->service = $irisTypeService;
+        $this->titleController = __('actions.sidemenu.iristypes');
+        $this->model           = $irisType;
+        $this->service         = $irisTypeService;
     }
 
     /**
@@ -65,11 +68,7 @@ class IrisTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        try {
-            return view('system.iristypes.form');
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
-        }
+        return view('system.iristypes.form');
     }
 
     /**
@@ -77,24 +76,19 @@ class IrisTypesController extends Controller
      */
     public function store(IrisTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|IrisTypeResource
     {
-        try {
-            $record = $this->service->create($request);
+        $record = $this->service->create($request);
 
-            $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
+        $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
 
-            if (request()->wantsJson()) {
-                return response()->json([
-                    'message' => $messageReturn,
-                    'data'    => (new IrisTypeResource($record))['data'],
-                ]);
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new IrisTypeResource($record))['data'],
+            ]);
         }
 
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
@@ -102,20 +96,18 @@ class IrisTypesController extends Controller
      */
     public function show(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view(
-                'system.iristypes.show',
-                compact('record')
-            );
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => (new IrisTypeResource($record))['data'],
+            ]);
         }
+
+        return view(
+            'system.iristypes.show',
+            compact('record')
+        );
     }
 
     /**
@@ -123,47 +115,37 @@ class IrisTypesController extends Controller
      */
     public function edit(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view('system.iristypes.form', compact('record'));
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => (new IrisTypeResource($record))['data'],
+            ]);
         }
+
+        return view('system.iristypes.form', compact('record'));
     }
 
     /**
      * Update the specified resource in storage.
+     *
+     * @throws \Throwable
      */
     public function update(IrisTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record        = $this->service->findByIdOrCode($id);
+        $updatedRecord = $this->service->update($record, $request);
+        $messageReturn = $this->getUpdateMessage($request);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $updatedRecord = $this->service->update($record, $request);
-
-            $messageReturn = $this->getUpdateMessage($request);
-
-            if (request()->wantsJson()) {
-                return response()->json([
-                    'message' => $messageReturn,
-                    'data'    => (new IrisTypeResource($updatedRecord))['data'],
-                ]);
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new IrisTypeResource($updatedRecord))['data'],
+            ]);
         }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
@@ -171,32 +153,24 @@ class IrisTypesController extends Controller
      */
     public function destroy(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
+        return DB::transaction(function () use ($record) {
+            $messageReturn = $this->titleController . ' deletado(a) com sucesso.';
+            $recordData    = $record->toArray();
+            $record->delete();
+
+            // Retornar resposta
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message' => $messageReturn,
+                    'deleted' => $recordData,
+                ]);
             }
 
-            return DB::transaction(function () use ($record) {
-                $messageReturn = $this->titleController . ' deletado(a) com sucesso.';
-                $recordData    = $record->toArray();
-                $record->delete();
-
-                // Retornar resposta
-                if (request()->wantsJson()) {
-                    return response()->json([
-                        'message' => $messageReturn,
-                        'deleted' => $recordData,
-                    ]);
-                }
-
-                return redirect(action('\\' . static::class . '@index'))
-                    ->with('message', $messageReturn);
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
-        }
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
+        });
     }
 
     /**
@@ -204,41 +178,34 @@ class IrisTypesController extends Controller
      */
     public function restore(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findRecord($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
+        return DB::transaction(function () use ($record) {
+            $messageReturn = $this->titleController . ' restaurado(a) com sucesso.';
+            $recordData    = $record->toArray();
+            $record->restore();
+
+            // Retornar resposta
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message'  => $messageReturn,
+                    'restored' => $recordData,
+                ]);
             }
 
-            return DB::transaction(function () use ($record) {
-                $messageReturn = $this->titleController . ' restaurado(a) com sucesso.';
-                $recordData    = $record->toArray();
-                $record->restore();
-
-                // Retornar resposta
-                if (request()->wantsJson()) {
-                    return response()->json([
-                        'message'  => $messageReturn,
-                        'restored' => $recordData,
-                    ]);
-                }
-
-                return redirect(action('\\' . static::class . '@index'))
-                    ->with('message', $messageReturn);
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse($e);
-        }
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
+        });
     }
 
     public function ajaxDatatable(Request $request): JsonResponse
     {
         $columns = [
             0 => 'created_at',
-            1 => 'name',
-            2 => 'active',
-            3 => 'action',
+            1 => 'code',
+            2 => 'name',
+            3 => 'active',
+            4 => 'action',
         ];
 
         $totalRecords = $this->model->query()->withTrashed()
@@ -286,6 +253,7 @@ class IrisTypesController extends Controller
         if (count($records)) {
             foreach ($records as $record) {
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
+                $information['code']       = $record->code;
                 $information['name']       = $record->name;
                 $information['active']     = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
                     '<span class="badge bg-success">SIM</span>' :
@@ -304,45 +272,6 @@ class IrisTypesController extends Controller
                 'data'            => $data,
             ]
         );
-    }
-
-    /**
-     * Find skin type by ID
-     */
-    private function findRecord(string $id): ?IrisType
-    {
-        return $this->model->query()->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->where('id', $id)
-            ->first();
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'Skin type not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse($error): JsonResponse
-    {
-        $messages = [
-            'message' => 'An error occurred.',
-        ];
-
-        if (app()->environment('local')) {
-            $messages['debug'] = $error->getMessage();
-            $messages['file']  = $error->getFile();
-            $messages['line']  = $error->getLine();
-            $messages['trace'] = $error->getTraceAsString();
-            $messages['code']  = $error->getCode();
-            $messages['type']  = get_class($error);
-        }
-
-        return response()->json($messages, HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
     }
 
     /**

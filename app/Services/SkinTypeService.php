@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Requests\SkinTypeRequest;
 use App\Models\SkinType;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SkinTypeService
 {
@@ -42,6 +43,23 @@ class SkinTypeService
 
             return $record;
         });
+    }
+
+    /**
+     * Find by ID or Code including soft-deleted records
+     */
+    public function findByIdOrCode(string $idOrCode): ?SkinType
+    {
+        $query = SkinType::query()
+            ->where('entity_id', session()->get('selected_entity_id'));
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**

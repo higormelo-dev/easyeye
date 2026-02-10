@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Str;
 use App\Http\Requests\{IrisTypeRequest};
 use App\Models\{IrisType};
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,23 @@ class IrisTypeService
 
             return $record;
         });
+    }
+
+    /**
+     * Find by ID or Code including soft-deleted records
+     */
+    public function findByIdOrCode(string $idOrCode): ?IrisType
+    {
+        $query = IrisType::query()
+            ->where('entity_id', session()->get('selected_entity_id'));
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Http\Requests\PatientRequest;
 use App\Models\{Covenant, Patient, People};
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class PatientService
 {
@@ -61,15 +62,23 @@ class PatientService
     }
 
     /**
-     * Find record by ID
+     * Find by ID or Code including soft-deleted records
      */
-    public function findPatient(string $id): ?Patient
+    public function findByIdOrCode(string $idOrCode): ?Patient
     {
-        return Patient::query()
+        $query = Patient::query()
             ->with('person')
             ->whereHas('entity', function ($query) {
                 $query->where('entities.id', session()->get('selected_entity_id'));
-            })->findOrFail($id);
+            });
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**

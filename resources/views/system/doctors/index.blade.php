@@ -22,6 +22,7 @@
                                     <thead>
                                     <tr>
                                         <th>{{ __('actions.created_at') }}</th>
+                                        <th>{{ __('actions.code') }}</th>
                                         <th>{{ __('actions.doctor') }}</th>
                                         <th>{{ __('actions.record_advicen') }}</th>
                                         <th>{{ __('actions.email') }}</th>

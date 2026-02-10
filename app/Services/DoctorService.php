@@ -7,7 +7,6 @@ use App\Models\{Doctor, EntityUser, People, User};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Random\RandomException;
 
 class DoctorService
 {
@@ -68,6 +67,26 @@ class DoctorService
 
             return $doctor;
         });
+    }
+
+    /**
+     * Find by ID or Code including soft-deleted records
+     */
+    public function findByIdOrCode(string $idOrCode): ?Doctor
+    {
+        $query = Doctor::query()
+            ->with('entityUser')
+            ->whereHas('entityUser', function ($query) {
+                $query->where('entity_id', session()->get('selected_entity_id'));
+            });
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->firstOrFail();
     }
 
     /**
