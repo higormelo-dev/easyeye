@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\EntityIntegrator;
 use Carbon\Carbon;
 use Closure;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -50,6 +52,38 @@ class ApiCheckTokenExpiration
         if ($token->expires_at && $this->willExpireInOneBusinessDay($token->expires_at)) {
             $token->expires_at = Carbon::now()->addDays(7);
             $token->save();
+        }
+
+        // Validação de integrador (se o token for de um integrador)
+        $integratorId = $this->extractIntegratorId($token->abilities ?? []);
+
+        if ($integratorId) {
+            $integrator = EntityIntegrator::query()
+                ->with('user.entity')
+                ->where('id', $integratorId)
+                ->where('active', true)
+                ->first();
+
+            if (! $integrator) {
+                $token->delete();
+
+                return $this->invalidResponse('auth.integrator_inactive');
+            }
+
+            if (! $integrator->user->active) {
+                $token->delete();
+
+                return $this->invalidResponse('auth.user_integrator_inactive');
+            }
+
+            if (! ($integrator->user->entity && $integrator->user->entity->active)) {
+                $token->delete();
+
+                return $this->invalidResponse('auth.entity_inactive');
+            }
+
+            // Disponibiliza o integrador para uso posterior na request
+            $request->attributes->set('integrator', $integrator);
         }
 
         return $next($request);
@@ -137,5 +171,34 @@ class ApiCheckTokenExpiration
         $days = easter_days($year);
 
         return Carbon::createFromDate($year, 3, 21)->addDays($days);
+    }
+
+    /**
+     * Extrai o ID do integrador das abilities do token.
+     */
+    private function extractIntegratorId(array $abilities): ?string
+    {
+        foreach ($abilities as $key => $value) {
+            $ability = is_int($key) ? $value : $key;
+
+            if (str_starts_with($ability, 'integrator_id:')) {
+                $parts = explode(':', $ability, 2);
+
+                return $parts[1] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Retorna resposta de erro padronizada.
+     */
+    private function invalidResponse(string $messageKey, int $status = Response::HTTP_UNAUTHORIZED): JsonResponse
+    {
+        return response()->json(
+            ['message' => __($messageKey), 'valid' => false],
+            $status
+        );
     }
 }

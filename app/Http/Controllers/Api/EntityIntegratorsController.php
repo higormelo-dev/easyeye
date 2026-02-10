@@ -78,12 +78,16 @@ class EntityIntegratorsController extends Controller
         }
 
         if ($accessToken->expires_at && $accessToken->expires_at->isPast()) {
+            $accessToken->delete();
+
             return $this->invalidResponse('auth.token_expired');
         }
 
         $integratorId = $this->extractIntegratorId($accessToken->abilities);
 
         if (! $integratorId) {
+            $accessToken->delete();
+
             return $this->invalidResponse('auth.token_invalid');
         }
 
@@ -94,14 +98,20 @@ class EntityIntegratorsController extends Controller
             ->first();
 
         if (! $integrator) {
+            $accessToken->delete();
+
             return $this->invalidResponse('auth.integrator_inactive');
         }
 
         if (! $integrator->user->active) {
+            $accessToken->delete();
+
             return $this->invalidResponse('auth.user_integrator_inactive');
         }
 
         if (! ($integrator->user->entity && $integrator->user->entity->active)) {
+            $accessToken->delete();
+
             return $this->invalidResponse('auth.entity_inactive');
         }
 
