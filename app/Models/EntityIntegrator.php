@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 class EntityIntegrator extends Model
@@ -31,6 +30,16 @@ class EntityIntegrator extends Model
         'ip',
         'mac',
         'active',
+    ];
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected array $uppercaseFields = [
+        'name',
+        'mac',
     ];
 
     /**
@@ -85,5 +94,17 @@ class EntityIntegrator extends Model
     public function equipments(): HasMany
     {
         return $this->hasMany(EntityIntegratorEquipment::class, 'id', 'integrator_id');
+    }
+
+    /**
+     * Override setAttribute to automatically uppercase specified fields.
+     */
+    public function setAttribute($key, $value): mixed
+    {
+        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
+            $value = mb_convert_case($value, MB_CASE_UPPER, 'UTF-8');
+        }
+
+        return parent::setAttribute($key, $value);
     }
 }

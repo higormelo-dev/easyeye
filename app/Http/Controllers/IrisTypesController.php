@@ -255,9 +255,13 @@ class IrisTypesController extends Controller
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
                 $information['code']       = $record->code;
                 $information['name']       = $record->name;
-                $information['active']     = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
-                    '<span class="badge bg-success">SIM</span>' :
-                    '<span class="badge bg-dark">NÃO</span>');
+                $information['active']     = $record->deleted_at ?
+	                'Deletado(a)' :
+	                (
+						$record->active ?
+							'<span class="badge bg-success">SIM</span>' :
+							'<span class="badge bg-dark">NÃO</span>'
+	                );
                 $information['action'] = $this->buildActionButtons($record);
                 $data[]                = $information;
             }

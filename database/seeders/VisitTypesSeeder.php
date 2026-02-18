@@ -27,13 +27,8 @@ class VisitTypesSeeder extends Seeder
             $name = mb_convert_case($visitType, MB_CASE_TITLE, 'UTF-8');
 
             VisitType::query()->updateOrCreate(
-                [
-                    'name' => $name,
-                ],
-                [
-                    'name'   => $name,
-                    'active' => true,
-                ]
+                ['name' => $name],
+                ['active' => true]
             );
         }
     }

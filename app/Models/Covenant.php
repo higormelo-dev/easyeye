@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class Covenant extends Model
 {
@@ -26,6 +26,16 @@ class Covenant extends Model
         'color',
         'table',
         'active',
+    ];
+
+    /**
+     * Fields that should be uppercased.
+     *
+     * @var list<string>
+     */
+    protected array $uppercaseFields = [
+        'name',
+        'color',
     ];
 
     /**
@@ -76,5 +86,17 @@ class Covenant extends Model
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'id');
+    }
+
+    /**
+     * Override setAttribute to automatically uppercase specified fields.
+     */
+    public function setAttribute($key, $value): mixed
+    {
+        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
+            $value = mb_convert_case($value, MB_CASE_UPPER, 'UTF-8');
+        }
+
+        return parent::setAttribute($key, $value);
     }
 }

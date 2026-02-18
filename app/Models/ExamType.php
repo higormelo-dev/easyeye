@@ -3,8 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ExamCategory;
+use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class ExamType extends Model
 {
@@ -75,5 +75,14 @@ class ExamType extends Model
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id');
+    }
+
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value) => $value !== null
+                ? mb_convert_case($value, MB_CASE_UPPER, 'UTF-8')
+                : null,
+        );
     }
 }

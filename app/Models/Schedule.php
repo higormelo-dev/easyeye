@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 
 class Schedule extends Model
 {
@@ -73,5 +73,34 @@ class Schedule extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id');
+    }
+
+    public function doctor(): BelongsTo
+    {
+        return $this->belongsTo(Doctor::class, 'doctor_id');
+    }
+
+    public function patient(): BelongsTo
+    {
+        return $this->belongsTo(Patient::class, 'patient_id');
+    }
+
+    public function covenant(): BelongsTo
+    {
+        return $this->belongsTo(Covenant::class, 'covenant_id');
+    }
+
+    protected function fullName(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value) => $value !== null
+                ? mb_convert_case($value, MB_CASE_UPPER, 'UTF-8')
+                : null,
+        );
     }
 }

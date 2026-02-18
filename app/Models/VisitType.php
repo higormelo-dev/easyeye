@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 
 class VisitType extends Model
 {
@@ -67,5 +67,19 @@ class VisitType extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id', 'id');
+    }
+
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value) => $value !== null
+                ? mb_convert_case($value, MB_CASE_UPPER, 'UTF-8')
+                : null,
+        );
     }
 }

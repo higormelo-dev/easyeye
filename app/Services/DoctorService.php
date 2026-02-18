@@ -126,7 +126,8 @@ class DoctorService
      */
     private function findOrCreateEntityUser(User $user, DoctorRequest $request): EntityUser
     {
-        $existingRecord = EntityUser::query()->withTrashed()
+        $existingRecord = EntityUser::query()
+            ->withTrashed()
             ->where('user_id', $user->id)
             ->where('entity_id', session()->get('selected_entity_id'))
             ->first();
@@ -157,7 +158,8 @@ class DoctorService
      */
     private function findOrCreatePerson(DoctorRequest $request): People
     {
-        $existingRecord = People::query()->withTrashed()
+        $existingRecord = People::query()
+            ->withTrashed()
             ->where('national_registry', $request->national_registry)
             ->first();
 
@@ -180,7 +182,8 @@ class DoctorService
      */
     private function findOrCreate(People $person, EntityUser $entityUser, DoctorRequest $request): void
     {
-        $existingRecord = Doctor::query()->withTrashed()
+        $existingRecord = Doctor::query()
+            ->withTrashed()
             ->where('person_id', $person->id)
             ->where('record', $request->record)
             ->where('entity_user_id', $entityUser->id)

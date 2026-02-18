@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Str;
 use App\Http\Requests\{IrisTypeRequest};
 use App\Models\{IrisType};
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class IrisTypeService
 {
@@ -51,6 +51,7 @@ class IrisTypeService
     public function findByIdOrCode(string $idOrCode): ?IrisType
     {
         $query = IrisType::query()
+            ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'));
 
         if (Str::isUuid($idOrCode)) {
@@ -67,7 +68,8 @@ class IrisTypeService
      */
     private function findOrCreate(IrisTypeRequest $request): IrisType
     {
-        $existingRecord = IrisType::query()->withTrashed()
+        $existingRecord = IrisType::query()
+            ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
             ->where('name', $request->name)
             ->first();

@@ -7708,14 +7708,13 @@ class CovenantsSeeder extends Seeder
         ];
 
         foreach ($items as $item) {
-            Covenant::query()->updateOrCreate(
+            Covenant::query()->firstOrCreate(
                 [
                     'ans_registry' => (string) $item['registro_ans'],
                 ],
                 [
                     'color'             => $this->randomHexColor(),
                     'national_registry' => (string) $item['cnpj'],
-                    'ans_registry'      => (string) $item['registro_ans'],
                     'name'              => (string) mb_convert_case(
                         ($item['nome_fantasia'] ?? $item['razao_social']),
                         MB_CASE_TITLE,

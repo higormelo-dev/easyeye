@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call(IrisTypesSeeder::class);
         $this->call(VisitTypesSeeder::class);
         $this->call(ExamTypesSeeder::class);
+        $this->call(AdditionTypesSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);

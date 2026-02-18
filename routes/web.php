@@ -1,6 +1,7 @@
 <?php
 
-use App\Http\Controllers\{CovenantsController,
+use App\Http\Controllers\{AdditionTypesController,
+	CovenantsController,
 	DoctorsController,
 	IrisTypesController,
 	Manager\EntitiesController,
@@ -60,6 +61,10 @@ Route::group(
             Route::resource('visittypes', VisitTypesController::class);
             Route::get('visittypes/{visittype}/restore', [VisitTypesController::class, 'restore'])
                 ->name('visittypes.restore');
+
+            Route::resource('additiontypes', AdditionTypesController::class);
+            Route::get('additiontypes/{additiontype}/restore', [AdditionTypesController::class, 'restore'])
+                ->name('additiontypes.restore');
         });
 
         require __DIR__ . '/manager.php';
@@ -78,6 +83,7 @@ Route::group(
                 Route::post('/skintypes', [SkinTypesController::class, 'ajaxDatatable'])->name('.skintypes');
                 Route::post('/iristypes', [IrisTypesController::class, 'ajaxDatatable'])->name('.iristypes');
                 Route::post('/visittypes', [VisitTypesController::class, 'ajaxDatatable'])->name('.visittypes');
+                Route::post('/additiontypes', [AdditionTypesController::class, 'ajaxDatatable'])->name('.additiontypes');
                 Route::post(
                     '/entity_integrators',
                     [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']

@@ -45,6 +45,33 @@ class Entity extends Model
     ];
 
     /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected array $uppercaseFields = [
+        'name',
+        'address',
+        'number',
+        'complement',
+        'district',
+        'city',
+        'state',
+        'country',
+    ];
+
+    /**
+     * The attributes that should contain only numbers.
+     *
+     * @var list<string>
+     */
+    protected array $numericOnlyFields = [
+        'national_registration',
+        'telephone',
+        'cellphone',
+    ];
+
+    /**
      * Generated code for the entity_id field
      */
     protected static function booted(): void
@@ -87,5 +114,29 @@ class Entity extends Model
     public function entityUsers(): HasMany
     {
         return $this->hasMany(EntityUser::class, 'id', 'entity_id');
+    }
+
+    /**
+     * Override setAttribute to automatically uppercase specified fields.
+     */
+    public function setAttribute($key, $value): mixed
+    {
+        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
+            $value = mb_convert_case($value, MB_CASE_UPPER, 'UTF-8');
+        }
+
+        if (is_string($value) && in_array($key, $this->numericOnlyFields, true)) {
+            $value = $this->onlyNumbers($value);
+        }
+
+        return parent::setAttribute($key, $value);
+    }
+
+    /**
+     * Remove all non-numeric characters from a string.
+     */
+    private function onlyNumbers(string $value): string
+    {
+        return preg_replace('/\D/', '', $value);
     }
 }

@@ -6,7 +6,6 @@ use App\Http\Requests\CovenantRequest;
 use App\Models\{Covenant};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Psr\Container\{ContainerExceptionInterface, NotFoundExceptionInterface};
 
 class CovenantService
 {
@@ -57,7 +56,8 @@ class CovenantService
      */
     private function findOrCreate(CovenantRequest $request): Covenant
     {
-        $existingRecord = Covenant::query()->withTrashed()
+        $existingRecord = Covenant::query()
+            ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
             ->where('name', $request->name)
             ->first();
@@ -85,12 +85,11 @@ class CovenantService
 
     /**
      * Find by ID or Code including soft-deleted records
-     *
-     * @return Covenant|null
      */
     public function findByIdOrCode(string $idOrCode): ?Covenant
     {
         $query = Covenant::query()
+            ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'));
 
         if (Str::isUuid($idOrCode)) {

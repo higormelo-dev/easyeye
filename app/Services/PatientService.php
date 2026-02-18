@@ -88,7 +88,8 @@ class PatientService
     {
         $entityId              = session()->get('selected_entity_id');
         $covenant              = Covenant::query()->find($request->covenant_id);
-        $existingPatientEntity = Patient::query()->withTrashed()
+        $existingPatientEntity = Patient::query()
+            ->withTrashed()
             ->where('entity_id', $entityId)
             ->where('person_id', $personId)
             ->first();
@@ -127,7 +128,8 @@ class PatientService
      */
     private function findOrCreatePerson(PatientRequest $request): People
     {
-        $existingPerson = People::query()->withTrashed()
+        $existingPerson = People::query()
+            ->withTrashed()
             ->where('national_registry', $request->national_registry)
             ->first();
 

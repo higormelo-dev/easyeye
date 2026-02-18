@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -93,5 +94,14 @@ class User extends Authenticatable implements MustVerifyEmail
     public function entityUsers(): HasMany
     {
         return $this->hasMany(EntityUser::class, 'user_id', 'id');
+    }
+
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value) => $value !== null
+                ? mb_convert_case($value, MB_CASE_UPPER, 'UTF-8')
+                : null,
+        );
     }
 }

@@ -14,19 +14,10 @@ class SkinTypesSeeder extends Seeder
     {
         $skinTypes = ['Extremamente branca', 'Branca', 'Morena clara', 'Morena média', 'Morena escura', 'Negra'];
 
-        $i = 1;
-
         foreach ($skinTypes as $skinType) {
-            $name = mb_convert_case($skinType, MB_CASE_TITLE, 'UTF-8');
-
-            SkinType::query()->updateOrCreate(
-                [
-                    'name' => $name,
-                ],
-                [
-                    'name'   => $name,
-                    'active' => true,
-                ]
+            SkinType::query()->firstOrCreate(
+                ['name' => $skinType],
+                ['active' => true]
             );
         }
     }

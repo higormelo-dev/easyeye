@@ -2,19 +2,19 @@
 
 namespace App\Services;
 
-use App\Http\Requests\VisitTypeRequest;
-use App\Models\VisitType;
+use App\Http\Requests\AdditionTypeRequest;
+use App\Models\AdditionType;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-class VisitTypeService
+class AdditionTypeService
 {
     /**
-     * Create a new record with all related entities
+     * Create a new covenant with all related entities
      *
      * @throws \Throwable
      */
-    public function create(VisitTypeRequest $request): VisitType
+    public function create(AdditionTypeRequest $request): AdditionType
     {
         return DB::transaction(function () use ($request) {
             return $this->findOrCreate($request);
@@ -22,11 +22,11 @@ class VisitTypeService
     }
 
     /**
-     * Update existing record and related entities
+     * Update existing covenant and related entities
      *
      * @throws \Throwable
      */
-    public function update(VisitType $record, VisitTypeRequest $request): VisitType
+    public function update(AdditionType $record, AdditionTypeRequest $request): AdditionType
     {
         return DB::transaction(function () use ($record, $request) {
             $data = [];
@@ -48,9 +48,9 @@ class VisitTypeService
     /**
      * Find by ID or Code including soft-deleted records
      */
-    public function findByIdOrCode(string $idOrCode): ?VisitType
+    public function findByIdOrCode(string $idOrCode): ?AdditionType
     {
-        $query = VisitType::query()
+        $query = AdditionType::query()
             ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'));
 
@@ -64,30 +64,30 @@ class VisitTypeService
     }
 
     /**
-     * Find or create record
+     * Find or create skin type
      */
-    private function findOrCreate(VisitTypeRequest $request): VisitType
+    private function findOrCreate(AdditionTypeRequest $request): AdditionType
     {
-        $existingRecord = VisitType::query()
+        $existingAdditionType = AdditionType::query()
             ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
             ->where('name', $request->name)
             ->first();
 
-        $recordData = [
+        $skinTypeData = [
             'name' => $request->name,
         ];
 
-        if ($existingRecord) {
-            if ($existingRecord->trashed()) {
-                $existingRecord->restore();
+        if ($existingAdditionType) {
+            if ($existingAdditionType->trashed()) {
+                $existingAdditionType->restore();
             }
-            $existingRecord->update($recordData);
+            $existingAdditionType->update($skinTypeData);
 
-            return $existingRecord;
+            return $existingAdditionType;
         }
 
-        return VisitType::create(array_merge($recordData, [
+        return AdditionType::create(array_merge($skinTypeData, [
             'entity_id' => session()->get('selected_entity_id'),
             'active'    => true,
         ]));

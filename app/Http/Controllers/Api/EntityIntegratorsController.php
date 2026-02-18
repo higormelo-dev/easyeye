@@ -152,17 +152,16 @@ class EntityIntegratorsController extends Controller
 
     private function extractIntegratorId(array $abilities): ?string
     {
-        foreach ($abilities as $key => $value) {
-            $ability = is_int($key) ? $value : $key;
+        $ability = collect($abilities)
+            ->map(fn ($value, $key) => is_int($key) ? $value : $key)
+            ->filter(fn (string $item) => str_starts_with($item, 'integrator_id:'))
+            ->first();
 
-            if (str_starts_with($ability, 'integrator_id:')) {
-                $parts = explode(':', $ability, 2);
-
-                return $parts[1] ?? null;
-            }
+        if (! $ability) {
+            return null;
         }
 
-        return null;
+        return substr($ability, strlen('integrator_id:')) ?: null;
     }
 
     private function invalidResponse(string $messageKey, int $status = HttpResponse::HTTP_UNAUTHORIZED): JsonResponse

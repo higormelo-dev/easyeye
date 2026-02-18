@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Presenters\PeoplePresenter;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Notifications\Notifiable;
 use Laracasts\Presenter\PresentableTrait;
 
@@ -18,6 +18,8 @@ class People extends Model
     use SoftDeletes;
 
     protected $primaryKey = 'id';
+
+    protected $presenter = PeoplePresenter::class;
 
     /**
      * The attributes that are mass assignable.
@@ -52,7 +54,39 @@ class People extends Model
         'photo',
     ];
 
-    protected $presenter = PeoplePresenter::class;
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected array $uppercaseFields = [
+        'full_name',
+        'nickname',
+        'mother_name',
+        'father_name',
+        'national_registry',
+        'state_registry',
+        'state_registry_agency',
+        'state_registry_initial',
+        'address',
+        'number',
+        'complement',
+        'district',
+        'city',
+        'state',
+        'country',
+    ];
+
+    /**
+     * The attributes that should contain only numbers.
+     *
+     * @var list<string>
+     */
+    protected array $numericOnlyFields = [
+        'national_registration',
+        'telephone',
+        'cellphone',
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -145,4 +179,24 @@ class People extends Model
         'SE' => 'Sergipe',
         'TO' => 'Tocantins',
     ];
+
+    /**
+     * Override setAttribute to automatically uppercase specified fields.
+     */
+    public function setAttribute($key, $value): mixed
+    {
+        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
+            $value = mb_convert_case($value, MB_CASE_UPPER, 'UTF-8');
+        }
+
+        return parent::setAttribute($key, $value);
+    }
+
+    /**
+     * Remove all non-numeric characters from a string.
+     */
+    private function onlyNumbers(string $value): string
+    {
+        return preg_replace('/\D/', '', $value);
+    }
 }

@@ -124,11 +124,10 @@ class ExamTypesSeeder extends Seeder
     private function createExamsForCategory(int $categoryId, array $exams): void
     {
         foreach ($exams as $examName) {
-            ExamType::create([
-                'name'     => $examName,
-                'category' => $categoryId,
-                'active'   => true,
-            ]);
+            ExamType::firstOrCreate(
+                ['name' => $examName, 'category' => $categoryId],
+                ['active' => true]
+            );
         }
     }
 }

@@ -2,18 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\VisitTypeRequest;
-use App\Http\Resources\{SkinTypeResource, VisitTypeResource};
-use App\Models\{VisitType};
-use App\Services\{VisitTypeService};
+use App\Http\Requests\{AdditionTypeRequest};
+use App\Http\Resources\{AdditionTypeResource};
+use App\Models\AdditionType;
+use App\Services\AdditionTypeService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
-class VisitTypesController extends Controller
+class AdditionTypesController extends Controller
 {
     /*
      * Name of the controller
@@ -23,15 +22,15 @@ class VisitTypesController extends Controller
     /**
      * Instance of the standard model.
      */
-    protected VisitType $model;
+    protected AdditionType $model;
 
-    protected VisitTypeService $service;
+    protected AdditionTypeService $service;
 
-    public function __construct(VisitType $visitType, VisitTypeService $visitTypeService)
+    public function __construct(AdditionType $additionType, AdditionTypeService $additionTypeService)
     {
         $this->titleController = __('actions.sidemenu.visittypes');
-        $this->model           = $visitType;
-        $this->service         = $visitTypeService;
+        $this->model           = $additionType;
+        $this->service         = $additionTypeService;
     }
 
     /**
@@ -50,7 +49,7 @@ class VisitTypesController extends Controller
                 ],
                 [
                     'label'  => $this->titleController,
-                    'url'    => route('panel.setting.visittypes.index'),
+                    'url'    => route('panel.setting.additiontypes.index'),
                     'active' => false,
                 ],
                 [
@@ -61,7 +60,7 @@ class VisitTypesController extends Controller
             ],
         ];
 
-        return view('system.visittypes.index', compact('meta'));
+        return view('system.additiontypes.index', compact('meta'));
     }
 
     /**
@@ -69,13 +68,13 @@ class VisitTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.visittypes.form');
+        return view('system.additiontypes.form');
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(VisitTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|VisitTypeResource
+    public function store(AdditionTypeRequest $request): Application|RedirectResponse|Redirector|JsonResponse|AdditionTypeResource
     {
         $record = $this->service->create($request);
 
@@ -84,7 +83,7 @@ class VisitTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new VisitTypeResource($record))['data'],
+                'data'    => (new AdditionTypeResource($record))['data'],
             ]);
         }
 
@@ -95,18 +94,18 @@ class VisitTypesController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): Application|View|JsonResponse
+    public function show(string $id): Application|View|JsonResponse|AdditionTypeResource
     {
         $record = $this->service->findByIdOrCode($id);
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new VisitTypeResource($record))['data'],
+                'data' => (new AdditionTypeResource($record))['data'],
             ]);
         }
 
         return view(
-            'system.visittypes.show',
+            'system.additiontypes.show',
             compact('record')
         );
     }
@@ -114,11 +113,17 @@ class VisitTypesController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id): Application|View|JsonResponse
+    public function edit(string $id): Application|View|JsonResponse|AdditionTypeResource
     {
         $record = $this->service->findByIdOrCode($id);
 
-        return view('system.visittypes.form', compact('record'));
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => (new AdditionTypeResource($record))['data'],
+            ]);
+        }
+
+        return view('system.additiontypes.form', compact('record'));
     }
 
     /**
@@ -126,7 +131,7 @@ class VisitTypesController extends Controller
      *
      * @throws \Throwable
      */
-    public function update(VisitTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
+    public function update(AdditionTypeRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
         $record        = $this->service->findByIdOrCode($id);
         $updatedRecord = $this->service->update($record, $request);
@@ -135,7 +140,7 @@ class VisitTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new SkinTypeResource($updatedRecord))['data'],
+                'data'    => (new AdditionTypeResource($updatedRecord))['data'],
             ]);
         }
 
@@ -203,11 +208,12 @@ class VisitTypesController extends Controller
             4 => 'action',
         ];
 
-        $totalRecords = $this->model->query()->withTrashed()
-            ->select('visit_types.*')
-            ->where('visit_types.entity_id', session()->get('selected_entity_id'))
+        $totalRecords = $this->model->query()
+            ->withTrashed()
+            ->select('addition_types.*')
+            ->where('addition_types.entity_id', session()->get('selected_entity_id'))
             ->orWhere(function ($query) {
-                $query->whereNull('visit_types.entity_id')->whereNull('visit_types.deleted_at');
+                $query->whereNull('addition_types.entity_id')->whereNull('addition_types.deleted_at');
             })
             ->count();
 
@@ -217,11 +223,12 @@ class VisitTypesController extends Controller
         $dir   = $request->get('order')[0]['dir'];
 
         if (empty($request->get('search')['value'])) {
-            $records = $this->model->query()->withTrashed()
-                ->select('visit_types.*')
-                ->where('visit_types.entity_id', session()->get('selected_entity_id'))
+            $records = $this->model->query()
+                ->withTrashed()
+                ->select('addition_types.*')
+                ->where('addition_types.entity_id', session()->get('selected_entity_id'))
                 ->orWhere(function ($query) {
-                    $query->whereNull('visit_types.entity_id')->whereNull('visit_types.deleted_at');
+                    $query->whereNull('addition_types.entity_id')->whereNull('addition_types.deleted_at');
                 })
                 ->skip($start)
                 ->take($limit)
@@ -231,13 +238,14 @@ class VisitTypesController extends Controller
             $totalFiltered = $totalRecords;
         } else {
             $search = $request->get('search')['value'];
-            $query  = $this->model->query()->withTrashed()
-                ->select('visit_types.*')
-                ->where('visit_types.entity_id', session()->get('selected_entity_id'))
+            $query  = $this->model->query()
+                ->withTrashed()
+                ->select('addition_types.*')
+                ->where('addition_types.entity_id', session()->get('selected_entity_id'))
                 ->orWhere(function ($query) {
-                    $query->whereNull('visit_types.entity_id')->whereNull('visit_types.deleted_at');
+                    $query->whereNull('addition_types.entity_id')->whereNull('addition_types.deleted_at');
                 })
-                ->whereRaw('LOWER(visit_types.name) LIKE LOWER(?)', ["%{$search}%"]);
+                ->whereRaw('LOWER(addition_types.name) LIKE LOWER(?)', ["%{$search}%"]);
 
             $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
             $totalFiltered = $query->count();
@@ -250,9 +258,13 @@ class VisitTypesController extends Controller
                 $information['created_at'] = $record->created_at->format('d/m/Y H:i');
                 $information['code']       = $record->code;
                 $information['name']       = $record->name;
-                $information['active']     = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
-                    '<span class="badge bg-success">SIM</span>' :
-                    '<span class="badge bg-dark">NÃO</span>');
+                $information['active']     = $record->deleted_at ?
+                    'Deletado(a)' :
+                    (
+                        $record->active ?
+                            '<span class="badge bg-success">SIM</span>' :
+                            '<span class="badge bg-dark">NÃO</span>'
+                    );
                 $information['action'] = $this->buildActionButtons($record);
                 $data[]                = $information;
             }

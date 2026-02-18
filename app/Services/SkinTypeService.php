@@ -51,6 +51,7 @@ class SkinTypeService
     public function findByIdOrCode(string $idOrCode): ?SkinType
     {
         $query = SkinType::query()
+            ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'));
 
         if (Str::isUuid($idOrCode)) {
@@ -67,7 +68,8 @@ class SkinTypeService
      */
     private function findOrCreate(SkinTypeRequest $request): SkinType
     {
-        $existingSkinType = SkinType::query()->withTrashed()
+        $existingSkinType = SkinType::query()
+            ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
             ->where('name', $request->name)
             ->first();

@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class EntityIntegratorEquipment extends Model
 {
@@ -27,6 +27,16 @@ class EntityIntegratorEquipment extends Model
         'mac',
         'serial_number',
         'active',
+    ];
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var list<string>
+     */
+    protected array $uppercaseFields = [
+        'name',
+        'mac',
     ];
 
     /**
@@ -68,5 +78,22 @@ class EntityIntegratorEquipment extends Model
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
+    }
+
+    public function integrator(): BelongsTo
+    {
+        return $this->belongsTo(EntityIntegrator::class, 'integrator_id', 'id');
+    }
+
+    /**
+     * Override setAttribute to automatically uppercase specified fields.
+     */
+    public function setAttribute($key, $value): mixed
+    {
+        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
+            $value = mb_convert_case($value, MB_CASE_UPPER, 'UTF-8');
+        }
+
+        return parent::setAttribute($key, $value);
     }
 }
