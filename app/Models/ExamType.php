@@ -72,6 +72,26 @@ class ExamType extends Model
         ];
     }
 
+    /**
+     * Categories of surgery types
+     *
+     * @var array<int, string>
+     */
+    public static array $categories = [
+        1  => 'EXAMES BÁSICOS / AVALIAÇÃO INICIAL',
+        2  => 'REFRAÇÃO E CORREÇÃO VISUAL',
+        3  => 'RETINA E VÍTREO',
+        4  => 'GLAUCOMA',
+        5  => 'CÓRNEA E SUPERFÍCIE OCULAR',
+        6  => 'CATARATA E CRISTALINO',
+        7  => 'ESTRABISMO E VISÃO BINOCULAR',
+        8  => 'OFTALMOPEDIATRIA',
+        9  => 'NEURO-OFTALMOLOGIA',
+        10 => 'TESTES FUNCIONAIS E COMPLEMENTARES',
+        11 => 'EXAMES PRÉ E PÓS-OPERATÓRIOS',
+        12 => 'OUTROS',
+    ];
+
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id');

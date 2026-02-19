@@ -70,6 +70,28 @@ class SurgeryType extends Model
         ];
     }
 
+    /**
+     * Categories of surgery types
+     *
+     * @var array<int, string>
+     */
+    public static array $categories = [
+        1  => 'CIRURGIAS DE CATARATA',
+        2  => 'CIRURGIAS REFRATIVAS',
+        3  => 'CIRURGIAS DE RETINA E VÍTREO',
+        4  => 'CIRURGIAS DE GLAUCOMA',
+        5  => 'CIRURGIAS DA CÓRNEA',
+        6  => 'CIRURGIA DE PTERÍGIO',
+        7  => 'CIRURGIAS PALPEBRAIS (OCULOPLASTIA)',
+        8  => 'CIRURGIAS DO SISTEMA LACRIMAL',
+        9  => 'CIRURGIAS DE ESTRABISMO',
+        10 => 'CIRURGIAS ORBITÁRIAS',
+        11 => 'CIRURGIAS DE TRAUMA OCULAR',
+        12 => 'CIRURGIAS DE REMOÇÃO OCULAR',
+        13 => 'PROCEDIMENTOS A LASER',
+        14 => 'CIRURGIAS DE OUTROS',
+    ];
+
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'id');
