@@ -54,8 +54,9 @@ class EntityIntegratorEquipmentService
      */
     public function findByIdOrCode(string $idOrCode): ?EntityIntegratorEquipment
     {
-        $query = EntityIntegratorEquipment::withTrashed()
-            ->where('integrator_id', request()->user()->id);
+        $integrator = request()->attributes->get('integrator');
+        $query      = EntityIntegratorEquipment::withTrashed()
+            ->where('integrator_id', $integrator->id);
 
         if (Str::isUuid($idOrCode)) {
             $query->where('id', $idOrCode);
