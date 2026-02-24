@@ -30,7 +30,7 @@ class EntityIntegratorEquipment extends Model
     ];
 
     /**
-     * The attributes that are mass assignable.
+     * The attributes that should be converted to UPPERCASE.
      *
      * @var list<string>
      */
@@ -39,6 +39,7 @@ class EntityIntegratorEquipment extends Model
         'mac',
         'serial_number',
     ];
+
 
     /**
      * Generated code for the integrator_id field
@@ -87,12 +88,12 @@ class EntityIntegratorEquipment extends Model
     }
 
     /**
-     * Override setAttribute to automatically uppercase specified fields.
+     * Override setAttribute to automatically convert specified fields to uppercase.
      */
     public function setAttribute($key, $value): mixed
     {
-        if (is_string($value) && isset($this->uppercaseFields) && in_array($key, $this->uppercaseFields, true)) {
-            $value = mb_convert_case($value, MB_CASE_UPPER, 'UTF-8');
+        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
+            $value = mb_strtoupper($value, 'UTF-8');
         }
 
         return parent::setAttribute($key, $value);
