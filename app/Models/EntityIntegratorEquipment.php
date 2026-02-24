@@ -37,6 +37,7 @@ class EntityIntegratorEquipment extends Model
     protected array $uppercaseFields = [
         'name',
         'mac',
+        'serial_number',
     ];
 
     /**
