@@ -30,54 +30,28 @@ class EntityIntegratorEquipment extends Model
         'active',
     ];
 
+
     /**
-     * The attributes that should be converted to UPPERCASE.
-     *
-     * @var list<string>
+     * Fields that should be converted to UPPERCASE before saving.
      */
-    protected array $uppercaseFields = [
-        'name',
-        'mac',
-        'serial_number',
-    ];
+    private const UPPERCASE_FIELDS = ['name', 'mac', 'serial_number'];
 
     /**
-     * Get the name attribute (uppercase).
-     */
-    protected function name(): Attribute
-    {
-        return Attribute::make(
-            set: static fn (?string $value) => $value !== null ? mb_strtoupper($value, 'UTF-8') : null,
-        );
-    }
-
-    /**
-     * Get the mac attribute (uppercase).
-     */
-    protected function mac(): Attribute
-    {
-        return Attribute::make(
-            set: static fn (?string $value) => $value !== null ? mb_strtoupper($value, 'UTF-8') : null,
-        );
-    }
-
-    /**
-     * Get the serial_number attribute (uppercase).
-     */
-    protected function serialNumber(): Attribute
-    {
-        return Attribute::make(
-            set: static fn (?string $value) => $value !== null ? mb_strtoupper($value, 'UTF-8') : null,
-        );
-    }
-
-
-    /**
-     * Generated code for the integrator_id field
+     * Boot the model and register events.
      */
     protected static function booted(): void
     {
-        static::creating(function (self $entityIntegratorEquipment) {
+        // Convert fields to uppercase before saving
+        static::saving(static function (self $model) {
+            foreach (self::UPPERCASE_FIELDS as $field) {
+                if (isset($model->attributes[$field]) && is_string($model->attributes[$field])) {
+                    $model->attributes[$field] = mb_strtoupper($model->attributes[$field], 'UTF-8');
+                }
+            }
+        });
+
+        // Generate code on creating
+        static::creating(static function (self $entityIntegratorEquipment) {
             if (blank($entityIntegratorEquipment->code)) {
                 $prefix = 'EIQ';
 
