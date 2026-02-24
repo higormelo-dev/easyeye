@@ -30,11 +30,20 @@ class EntityIntegratorEquipment extends Model
         'active',
     ];
 
-
     /**
      * Fields that should be converted to UPPERCASE before saving.
      */
     private const UPPERCASE_FIELDS = ['name', 'mac', 'serial_number'];
+
+    /**
+     * Get the mac attribute (uppercase) - PostgreSQL macaddr type stores in lowercase.
+     */
+    protected function mac(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (?string $value) => $value !== null ? mb_strtoupper($value, 'UTF-8') : null,
+        );
+    }
 
     /**
      * Boot the model and register events.
@@ -44,8 +53,10 @@ class EntityIntegratorEquipment extends Model
         // Convert fields to uppercase before saving
         static::saving(static function (self $model) {
             foreach (self::UPPERCASE_FIELDS as $field) {
-                if (isset($model->attributes[$field]) && is_string($model->attributes[$field])) {
-                    $model->attributes[$field] = mb_strtoupper($model->attributes[$field], 'UTF-8');
+                $value = $model->getRawOriginal($field) ?? $model->getAttribute($field);
+
+                if (is_string($value)) {
+                    $model->{$field} = mb_strtoupper($value, 'UTF-8');
                 }
             }
         });
