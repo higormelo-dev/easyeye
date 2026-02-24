@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
@@ -39,6 +40,36 @@ class EntityIntegratorEquipment extends Model
         'mac',
         'serial_number',
     ];
+
+    /**
+     * Get the name attribute (uppercase).
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value) => $value !== null ? mb_strtoupper($value, 'UTF-8') : null,
+        );
+    }
+
+    /**
+     * Get the mac attribute (uppercase).
+     */
+    protected function mac(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value) => $value !== null ? mb_strtoupper($value, 'UTF-8') : null,
+        );
+    }
+
+    /**
+     * Get the serial_number attribute (uppercase).
+     */
+    protected function serialNumber(): Attribute
+    {
+        return Attribute::make(
+            set: static fn (?string $value) => $value !== null ? mb_strtoupper($value, 'UTF-8') : null,
+        );
+    }
 
 
     /**
@@ -87,15 +118,4 @@ class EntityIntegratorEquipment extends Model
         return $this->belongsTo(EntityIntegrator::class, 'integrator_id', 'id');
     }
 
-    /**
-     * Override setAttribute to automatically convert specified fields to uppercase.
-     */
-    public function setAttribute($key, $value): mixed
-    {
-        if (is_string($value) && in_array($key, $this->uppercaseFields, true)) {
-            $value = mb_strtoupper($value, 'UTF-8');
-        }
-
-        return parent::setAttribute($key, $value);
-    }
 }
