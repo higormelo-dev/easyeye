@@ -89,6 +89,7 @@ $(function () {
             $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
             $('#btn-modal-default').attr('data-action', 'register');
             $('#btn-modal-default').removeAttr('data-id');
+            $("#erro-default").removeClass('show').css('display', 'none');
             $.ajax({
                 url: `covenants/${record_id}/edit`,
                 type: 'get',
@@ -116,6 +117,7 @@ $(function () {
             $('.modal-title-default').empty().append('Visualizar convênio');
             $('#btn-modal-default').css('display', 'none');
             $('.modal-dialog').removeClass('modal-md modal-lg').addClass('modal-lg');
+            $("#erro-default").removeClass('show').css('display', 'none');
             $.ajax({
                 url: `covenants/${record_id}`,
                 success: function (data) {

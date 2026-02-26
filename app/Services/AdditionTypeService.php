@@ -50,17 +50,18 @@ class AdditionTypeService
      */
     public function findByIdOrCode(string $idOrCode): ?AdditionType
     {
-        $query = AdditionType::query()
+        /** @var AdditionType $record */
+        $record = AdditionType::query()
             ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'));
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode)
+            )
+            ->firstOrFail();
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 
     /**
@@ -84,7 +85,7 @@ class AdditionTypeService
             }
             $existingAdditionType->update($skinTypeData);
 
-            return $existingAdditionType;
+            return $existingAdditionType->fresh();
         }
 
         return AdditionType::create(array_merge($skinTypeData, [

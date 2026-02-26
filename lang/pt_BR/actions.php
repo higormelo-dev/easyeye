@@ -140,6 +140,9 @@ return [
     'visittype'         => 'Tipo de visita',
     'skintype'          => 'Tipo de cútis',
     'iristype'          => 'Tipo de iris',
+    'surgerytype'       => 'Tipo de cirurgia',
+    'category'          => 'Categoria',
+    'name'              => 'Nome',
     'sidemenu'          => [
         'dashboard'      => 'Painel de controle',
         'doctors'        => 'Médicos',
@@ -151,5 +154,6 @@ return [
         'skintypes'      => 'Tipos de cútis',
         'iristypes'      => 'Tipos de iris',
         'visittypes'     => 'Tipos de visita',
+        'surgerytypes'   => 'Tipos de cirurgia',
     ],
 ];

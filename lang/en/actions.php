@@ -140,6 +140,9 @@ return [
     'visittype'         => 'Visit Type',
     'skintype'          => 'Skin Type',
     'iristype'          => 'Iris Type',
+    'surgerytype'       => 'Surgery Type',
+    'category'          => 'Category',
+	'name'              => 'Name',
     'sidemenu'          => [
         'dashboard'      => 'Dashboard',
         'doctors'        => 'Doctors',
@@ -151,5 +154,6 @@ return [
         'skintypes'      => 'Skin Types',
         'iristypes'      => 'Iris Types',
         'visittypes'     => 'Visit Types',
+        'surgerytypes'   => 'Surgery Types',
     ],
 ];

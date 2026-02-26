@@ -2,19 +2,19 @@
 
 namespace App\Services;
 
-use App\Http\Requests\{IrisTypeRequest};
-use App\Models\{IrisType};
+use App\Http\Requests\{SurgeryTypeRequest};
+use App\Models\{SurgeryType};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-class IrisTypeService
+class SurgeryTypeService
 {
     /**
-     * Create a new covenant with all related entities
+     * Create a new record with all related entities
      *
      * @throws \Throwable
      */
-    public function create(IrisTypeRequest $request): IrisType
+    public function create(SurgeryTypeRequest $request): SurgeryType
     {
         return DB::transaction(function () use ($request) {
             return $this->findOrCreate($request);
@@ -22,14 +22,18 @@ class IrisTypeService
     }
 
     /**
-     * Update existing covenant and related entities
+     * Update existing record and related entities
      *
      * @throws \Throwable
      */
-    public function update(IrisType $record, IrisTypeRequest $request): IrisType
+    public function update(SurgeryType $record, SurgeryTypeRequest $request): SurgeryType
     {
-        return DB::transaction(function () use ($record, $request) {
+        return DB::transaction(static function () use ($record, $request) {
             $data = [];
+
+            if ($request->has('category')) {
+                $data['category'] = $request->category;
+            }
 
             if ($request->has('name')) {
                 $data['name'] = $request->name;
@@ -48,10 +52,10 @@ class IrisTypeService
     /**
      * Find by ID or Code including soft-deleted records
      */
-    public function findByIdOrCode(string $idOrCode): ?IrisType
+    public function findByIdOrCode(string $idOrCode): SurgeryType
     {
-        /** @var IrisType $record */
-        $record = IrisType::query()
+        /** @var SurgeryType $record */
+        $record = SurgeryType::query()
             ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
             ->when(
@@ -65,18 +69,24 @@ class IrisTypeService
     }
 
     /**
-     * Find or create skin type
+     * Find or create record
      */
-    private function findOrCreate(IrisTypeRequest $request): IrisType
+    private function findOrCreate(SurgeryTypeRequest $request): SurgeryType
     {
-        $existingRecord = IrisType::query()
+        $existingRecord = SurgeryType::query()
             ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->where('name', $request->name)
+            ->where(
+                [
+                    ['entity_id', '=', session()->get('selected_entity_id')],
+                    ['category', '=', $request->category],
+                    ['name', '=', $request->name],
+                ]
+            )
             ->first();
 
         $recordData = [
-            'name' => $request->name,
+            'category' => $request->category,
+            'name'     => $request->name,
         ];
 
         if ($existingRecord) {
@@ -88,7 +98,7 @@ class IrisTypeService
             return $existingRecord->fresh();
         }
 
-        return IrisType::create(array_merge($recordData, [
+        return SurgeryType::create(array_merge($recordData, [
             'entity_id' => session()->get('selected_entity_id'),
             'active'    => true,
         ]));

@@ -66,19 +66,18 @@ class PatientService
      */
     public function findByIdOrCode(string $idOrCode): ?Patient
     {
-        $query = Patient::query()
-            ->with('person')
-            ->whereHas('entity', function ($query) {
-                $query->where('entities.id', session()->get('selected_entity_id'));
-            });
+        /** @var Patient $record */
+        $record = Patient::query()
+            ->withTrashed()
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode)
+            )
+            ->firstOrFail();
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 
     /**
@@ -108,7 +107,7 @@ class PatientService
 
             $existingPatientEntity->update($patientData);
 
-            return $existingPatientEntity;
+            return $existingPatientEntity->fresh();
         }
 
         return Patient::create(
@@ -141,7 +140,7 @@ class PatientService
             }
             $existingPerson->update($personData);
 
-            return $existingPerson;
+            return $existingPerson->fresh();
         }
 
         return People::create($personData);

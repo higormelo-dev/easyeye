@@ -32,7 +32,8 @@ class CovenantRequest extends FormRequest
                 Rule::unique('covenants', 'name')
                     ->ignore($this->getIgnoredCovenantId(), 'id')
                     ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
+                        $query->where('entity_id', session('selected_entity_id'))
+                            ->whereNull('deleted_at');
                     }),
             ],
             'color' => [
@@ -42,7 +43,8 @@ class CovenantRequest extends FormRequest
                 Rule::unique('covenants', 'color')
                     ->ignore($this->getIgnoredCovenantId(), 'id')
                     ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
+                        $query->where('entity_id', session('selected_entity_id'))
+                            ->whereNull('deleted_at');
                     }),
             ],
             'table' => 'required_without:type_method|integer',
@@ -77,5 +79,17 @@ class CovenantRequest extends FormRequest
         }
 
         return null;
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
     }
 }

@@ -50,17 +50,18 @@ class VisitTypeService
      */
     public function findByIdOrCode(string $idOrCode): ?VisitType
     {
-        $query = VisitType::query()
+        /** @var VisitType $record */
+        $record = VisitType::query()
             ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'));
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode)
+            )
+            ->firstOrFail();
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 
     /**

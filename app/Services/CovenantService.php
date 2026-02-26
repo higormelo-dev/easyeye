@@ -74,7 +74,7 @@ class CovenantService
             }
             $existingRecord->update($recordData);
 
-            return $existingRecord;
+            return $existingRecord->fresh();
         }
 
         return Covenant::create(array_merge($recordData, [
@@ -88,16 +88,17 @@ class CovenantService
      */
     public function findByIdOrCode(string $idOrCode): ?Covenant
     {
-        $query = Covenant::query()
+        /** @var Covenant $record */
+        $record = Covenant::query()
             ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'));
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode)
+            )
+            ->firstOrFail();
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 }

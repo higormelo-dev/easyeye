@@ -316,6 +316,9 @@ return [
         'generic' => [
             'required' => 'É obrigatória a indicação de um valor para o campo :attribute.',
         ],
+        'surgery_type' => [
+            'name_unique' => 'Já existe um :attribute com este nome nesta categoria.',
+        ],
         'entity_integrator_equipment' => [
             'ip_unique'            => 'Este endereço IP já está sendo usado por outro equipamento.',
             'mac_unique'           => 'Este endereço MAC já está sendo usado por outro equipamento.',

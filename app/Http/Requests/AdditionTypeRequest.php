@@ -31,7 +31,8 @@ class AdditionTypeRequest extends FormRequest
                 Rule::unique('addition_types', 'name')
                     ->ignore($this->getIgnoredAdditionTypeId(), 'id')
                     ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
+                        $query->where('entity_id', session('selected_entity_id'))
+                            ->whereNull('deleted_at');
                     }),
             ],
         ];
@@ -51,5 +52,17 @@ class AdditionTypeRequest extends FormRequest
         }
 
         return null;
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
     }
 }

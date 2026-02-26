@@ -50,17 +50,18 @@ class SkinTypeService
      */
     public function findByIdOrCode(string $idOrCode): ?SkinType
     {
-        $query = SkinType::query()
+        /** @var SkinType $record */
+        $record = SkinType::query()
             ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'));
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode)
+            )
+            ->firstOrFail();
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 
     /**
@@ -84,7 +85,7 @@ class SkinTypeService
             }
             $existingSkinType->update($skinTypeData);
 
-            return $existingSkinType;
+            return $existingSkinType->fresh();
         }
 
         return SkinType::create(array_merge($skinTypeData, [

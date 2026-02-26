@@ -2,16 +2,21 @@
 
 namespace App\Models;
 
+use App\Presenters\SurgeryTypePresenter;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
+use Laracasts\Presenter\PresentableTrait;
 
 class SurgeryType extends Model
 {
     use HasUuids;
+    use PresentableTrait;
     use SoftDeletes;
 
     protected $primaryKey = 'id';
+
+    protected $presenter = SurgeryTypePresenter::class;
 
     /**
      * The attributes that are mass assignable.
@@ -21,6 +26,7 @@ class SurgeryType extends Model
     protected $fillable = [
         'entity_id',
         'code',
+        'category',
         'name',
         'active',
     ];
@@ -76,6 +82,7 @@ class SurgeryType extends Model
      * @var array<int, string>
      */
     public static array $categories = [
+        0  => 'CIRURGIAS DE OUTROS',
         1  => 'CIRURGIAS DE CATARATA',
         2  => 'CIRURGIAS REFRATIVAS',
         3  => 'CIRURGIAS DE RETINA E VÍTREO',
@@ -89,7 +96,6 @@ class SurgeryType extends Model
         11 => 'CIRURGIAS DE TRAUMA OCULAR',
         12 => 'CIRURGIAS DE REMOÇÃO OCULAR',
         13 => 'PROCEDIMENTOS A LASER',
-        14 => 'CIRURGIAS DE OUTROS',
     ];
 
     public function entity(): BelongsTo

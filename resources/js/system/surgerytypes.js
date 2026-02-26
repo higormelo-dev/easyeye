@@ -3,7 +3,7 @@ import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_f
 $(function () {
     let record_id, btn_action;
 
-    let skinTypeDataTable = $('#skintypes_datatable').DataTable({
+    let surgeryTypeDataTable = $('#surgerytypes_datatable').DataTable({
         "retrieve": true,
         "order": [
             [0, 'desc']
@@ -20,7 +20,7 @@ $(function () {
         ],
         "pagingType": "full_numbers",
         "ajax": {
-            'url': '/panel/ajax/datatables/skintypes',
+            'url': '/panel/ajax/datatables/surgerytypes',
             'dataType': 'json',
             'type': 'POST',
             'data': {
@@ -36,21 +36,22 @@ $(function () {
         "columns": [
             {'data': 'created_at', 'searchable': false, 'orderable': true},
             {'data': 'code'},
+            {'data': 'category', 'searchable': false, 'orderable': true},
             {'data': 'name'},
             {'data': 'active', 'searchable': false, 'orderable': true},
             {'data': 'action', 'searchable': false, 'orderable': false},
         ],
         "columnDefs": [
             {
-                'targets': [0, 1, 2],
+                'targets': [0, 1, 2, 3],
                 'className': 'text-left'
             },
             {
-                'targets': 3,
+                'targets': 4,
                 'className': 'text-center'
             },
             {
-                'targets': 4,
+                'targets': 5,
                 'className': 'text-end'
             }
         ],
@@ -78,19 +79,19 @@ $(function () {
         }
 
     });
-    skinTypeDataTable.on('draw', function () {
+    surgeryTypeDataTable.on('draw', function () {
         // Editar
         $('.btn-edit').click(function () {
             record_id = $(this).data('id');
             btn_action = 'update';
-            $('.modal-title-default').empty().append('Cadastrar tipo de cútis');
+            $('.modal-title-default').empty().append('Cadastrar tipo de cirurgia');
             $('#btn-modal-default').css('display', 'block');
             $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
             $('#btn-modal-default').attr('data-action', 'register');
             $('#btn-modal-default').removeAttr('data-id');
             $("#erro-default").removeClass('show').css('display', 'none');
             $.ajax({
-                url: `skintypes/${record_id}/edit`,
+                url: `surgerytypes/${record_id}/edit`,
                 type: 'get',
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -113,12 +114,12 @@ $(function () {
         // Visualizar
         $('.btn-show').click(function () {
             record_id = $(this).data('id');
-            $('.modal-title-default').empty().append('Visualizar tipo de cútis');
+            $('.modal-title-default').empty().append('Visualizar tipo de cirurgia');
             $('#btn-modal-default').css('display', 'none');
             $('.modal-dialog').removeClass('modal-md modal-lg').addClass('modal-lg');
             $("#erro-default").removeClass('show').css('display', 'none');
             $.ajax({
-                url: `skintypes/${record_id}`,
+                url: `surgerytypes/${record_id}`,
                 success: function (data) {
                     $('#retorno-default').empty().append(data);
                     $('#modal_default').modal('show');
@@ -133,7 +134,7 @@ $(function () {
         $('.btn-active').click(function () {
             record_id = $(this).data('id');
             $.ajax({
-                url: `skintypes/${record_id}`,
+                url: `surgerytypes/${record_id}`,
                 type: 'put',
                 dataType: 'json',
                 data: {
@@ -145,7 +146,7 @@ $(function () {
                 },
                 success: function (response) {
                     showSuccessToast(response.message);
-                    skinTypeDataTable.ajax.reload();
+                    surgeryTypeDataTable.ajax.reload();
                 },
                 error: handleAjaxError
             });
@@ -166,14 +167,14 @@ $(function () {
                 if (result.value) {
                     $.ajax({
                         method: "delete",
-                        url: `skintypes/${record_id}`,
+                        url: `surgerytypes/${record_id}`,
                         dataType: 'json',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
                         success: function (response) {
                             showSuccessToast(response.message);
-                            skinTypeDataTable.ajax.reload();
+                            surgeryTypeDataTable.ajax.reload();
                         },
                         error: function (data) {
                             let error = data.responseJSON;
@@ -199,14 +200,14 @@ $(function () {
                 if (result.value) {
                     $.ajax({
                         method: "get",
-                        url: `skintypes/${record_id}/restore`,
+                        url: `surgerytypes/${record_id}/restore`,
                         dataType: 'json',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
                         success: function (response) {
                             showSuccessToast(response.message);
-                            skinTypeDataTable.ajax.reload();
+                            surgeryTypeDataTable.ajax.reload();
                         },
                         error: function (data) {
                             let error = data.responseJSON;
@@ -217,16 +218,16 @@ $(function () {
             });
         });
     });
-    skinTypeDataTable.draw();
+    surgeryTypeDataTable.draw();
     $('.new-register').click(function () {
         btn_action = 'store';
-        $('.modal-title-default').empty().append('Cadastrar tipo de cútis');
+        $('.modal-title-default').empty().append('Cadastrar tipo de cirurgia');
         $('#btn-modal-default').css('display', 'block');
         $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
         $('#btn-modal-default').attr('data-action', 'register');
         $('#btn-modal-default').removeAttr('data-id');
         $.ajax({
-            url: 'skintypes/create',
+            url: 'surgerytypes/create',
             type: 'get',
             beforeSend: function () {
                 $('#btn-modal-default').attr('disabled', true);
@@ -252,12 +253,11 @@ $(function () {
     $('#btn-modal-default').click(function () {
         let requestType = (btn_action === 'store') ? 'post' : 'put';
         let requestURL = (btn_action === 'store') ?
-            'skintypes' :
-            `skintypes/${record_id}`;
+            'surgerytypes' :
+            `surgerytypes/${record_id}`;
         let requestData = {
+            'category': $('select[name=category]').val(),
             'name': $('input[name=name]').val(),
-            'color': $('input[name=color]').val(),
-            'table': $('select[name=table]').val(),
         };
 
         if (requestType === 'put') {
@@ -283,7 +283,7 @@ $(function () {
             success: function (response) {
                 showSuccessToast(response.message);
                 $('#modal_default').modal('hide');
-                skinTypeDataTable.ajax.reload();
+                surgeryTypeDataTable.ajax.reload();
             },
             error: handleAjaxError
         });

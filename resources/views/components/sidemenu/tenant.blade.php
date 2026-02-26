@@ -58,7 +58,7 @@
             </a>
         </li>
         <li>
-            <a href="javascript:void(0);">
+            <a href="{{ route('panel.setting.surgerytypes.index') }}">
                 <span class="fa fa-search"></span> Tipo de cirurgia
             </a>
         </li>

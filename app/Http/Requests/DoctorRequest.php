@@ -34,7 +34,8 @@ class DoctorRequest extends FormRequest
             Rule::unique('people', 'national_registry')
                 ->ignore($this->getIgnoredPersonId(), 'id')
                 ->where(function ($query) {
-                    return $query->whereNull('deleted_at');
+                    $query->where('entity_id', session('selected_entity_id'))
+                        ->whereNull('deleted_at');
                 }),
         ];
         $rules['nickname'] = ['required_without:type_method', 'string', 'min:2', 'max:255'];
@@ -46,7 +47,8 @@ class DoctorRequest extends FormRequest
             Rule::unique('doctors', 'record')
                 ->ignore($this->route('doctor'))
                 ->where(function ($query) {
-                    return $query->whereNull('deleted_at');
+                    $query->where('entity_id', session('selected_entity_id'))
+                        ->whereNull('deleted_at');
                 }),
         ];
         $rules['record_specialty'] = [
@@ -57,7 +59,8 @@ class DoctorRequest extends FormRequest
             Rule::unique('doctors', 'record_specialty')
                 ->ignore($this->route('doctor'))
                 ->where(function ($query) {
-                    return $query->whereNull('deleted_at');
+                    $query->where('entity_id', session('selected_entity_id'))
+                        ->whereNull('deleted_at');
                 }),
         ];
         $rules['color'] = [
@@ -67,7 +70,8 @@ class DoctorRequest extends FormRequest
             Rule::unique('doctors', 'color')
                 ->ignore($this->route('doctor'))
                 ->where(function ($query) {
-                    return $query->whereNull('deleted_at');
+                    $query->where('entity_id', session('selected_entity_id'))
+                        ->whereNull('deleted_at');
                 }),
         ];
         $rules['birth_date']     = ['nullable', 'date'];
@@ -80,7 +84,8 @@ class DoctorRequest extends FormRequest
             Rule::unique('people', 'email')
                 ->ignore($this->getIgnoredPersonId(), 'id')
                 ->where(function ($query) {
-                    return $query->whereNull('deleted_at');
+                    $query->where('entity_id', session('selected_entity_id'))
+                        ->whereNull('deleted_at');
                 }),
         ];
         $rules['mother_name']            = ['nullable', 'string', 'min:2', 'max:255'];
@@ -168,5 +173,23 @@ class DoctorRequest extends FormRequest
         }
 
         return null;
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
+
+        if ($this->has('color')) {
+            $this->merge([
+                'color' => mb_strtoupper($this->input('color')),
+            ]);
+        }
     }
 }

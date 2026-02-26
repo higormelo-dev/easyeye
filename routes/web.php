@@ -1,15 +1,16 @@
 <?php
 
 use App\Http\Controllers\{AdditionTypesController,
-	CovenantsController,
-	DoctorsController,
-	IrisTypesController,
-	Manager\EntitiesController,
-	PatientsController,
-	ProfileController,
-	SkinTypesController,
-	UsersController,
-	VisitTypesController};
+    CovenantsController,
+    DoctorsController,
+    IrisTypesController,
+    Manager\EntitiesController,
+    PatientsController,
+    ProfileController,
+    SkinTypesController,
+    SurgeryTypesController,
+    UsersController,
+    VisitTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
 
 Route::get('/', function () {
@@ -61,10 +62,12 @@ Route::group(
             Route::resource('visittypes', VisitTypesController::class);
             Route::get('visittypes/{visittype}/restore', [VisitTypesController::class, 'restore'])
                 ->name('visittypes.restore');
-
             Route::resource('additiontypes', AdditionTypesController::class);
             Route::get('additiontypes/{additiontype}/restore', [AdditionTypesController::class, 'restore'])
                 ->name('additiontypes.restore');
+            Route::resource('surgerytypes', SurgeryTypesController::class);
+            Route::get('surgerytypes/{surgerytype}/restore', [SurgeryTypesController::class, 'restore'])
+                ->name('surgerytypes.restore');
         });
 
         require __DIR__ . '/manager.php';
@@ -82,8 +85,13 @@ Route::group(
                 Route::post('/covenants', [CovenantsController::class, 'ajaxDatatable'])->name('.covenants');
                 Route::post('/skintypes', [SkinTypesController::class, 'ajaxDatatable'])->name('.skintypes');
                 Route::post('/iristypes', [IrisTypesController::class, 'ajaxDatatable'])->name('.iristypes');
-                Route::post('/visittypes', [VisitTypesController::class, 'ajaxDatatable'])->name('.visittypes');
-                Route::post('/additiontypes', [AdditionTypesController::class, 'ajaxDatatable'])->name('.additiontypes');
+                Route::post('/visittypes', [VisitTypesController::class, 'ajaxDatatable'])
+                    ->name('.visittypes');
+                Route::post('/additiontypes', [AdditionTypesController::class, 'ajaxDatatable'])
+                    ->name('.additiontypes');
+                Route::post('/surgerytypes', [SurgeryTypesController::class, 'ajaxDatatable'])
+                    ->name('.surgerytypes');
+
                 Route::post(
                     '/entity_integrators',
                     [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']

@@ -74,19 +74,18 @@ class DoctorService
      */
     public function findByIdOrCode(string $idOrCode): ?Doctor
     {
-        $query = Doctor::query()
-            ->with('entityUser')
-            ->whereHas('entityUser', function ($query) {
-                $query->where('entity_id', session()->get('selected_entity_id'));
-            });
+        /** @var Doctor $record */
+        $record = Doctor::query()
+            ->withTrashed()
+            ->where('entity_id', session()->get('selected_entity_id'))
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode)
+            )
+            ->firstOrFail();
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
-
-        return $query->firstOrFail();
+        return $record;
     }
 
     /**

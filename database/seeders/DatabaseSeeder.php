@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
         $this->call(VisitTypesSeeder::class);
         $this->call(ExamTypesSeeder::class);
         $this->call(AdditionTypesSeeder::class);
+        $this->call(SurgeryTypesSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);

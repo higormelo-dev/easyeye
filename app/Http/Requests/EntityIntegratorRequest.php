@@ -31,7 +31,8 @@ class EntityIntegratorRequest extends FormRequest
                     $query = $query->where('entity_id', $this->entity);
 
                     if ($this->integrator) {
-                        $query = $query->where('id', '!=', $this->integrator);
+                        $query = $query->where('id', '!=', $this->integrator)
+                            ->whereNull('deleted_at');
                     }
 
                     return $query;
