@@ -5,7 +5,7 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class SurgeryTypeResource extends JsonResource
+class ExamTypeResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
@@ -21,7 +21,7 @@ class SurgeryTypeResource extends JsonResource
                 'entity_id'  => $this->entity_id,
                 'code'       => $this->code,
                 'name'       => $this->name,
-                'category'   => (int) $this->category,
+                'category'   => $this->category,
                 'active'     => (bool) $this->active,
                 'created_at' => $this->created_at,
                 'updated_at' => $this->updated_at,
@@ -30,7 +30,7 @@ class SurgeryTypeResource extends JsonResource
 
         if (! $request->routeIs('*.index')) {
             $data['relationships'] = [
-                'entity' => $this->entity->toArray(),
+                'entity' => $this->entity?->toArray() ?? (object) [],
             ];
         }
 

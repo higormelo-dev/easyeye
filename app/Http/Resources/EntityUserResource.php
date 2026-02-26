@@ -14,7 +14,7 @@ class EntityUserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $resource = [
+        $data = [
             'type'       => 'entity_users',
             'id'         => $this->id,
             'attributes' => [
@@ -25,17 +25,20 @@ class EntityUserResource extends JsonResource
                 'created_at' => $this->created_at,
                 'updated_at' => $this->updated_at,
             ],
-            'relationships' => [
-                'entity' => $this->entity->toArray(),
-                'user'   => $this->user->toArray(),
-            ],
         ];
 
-        if ($this->rule === 'doctor') {
-            $resource['relationships']['person'] = $this->doctor->person->toArray();
-            $resource['relationships']['doctor'] = $this->doctor->toArray();
+        if (! $request->routeIs('*.index')) {
+            $data['relationships'] = [
+                'entity' => $this->entity->toArray(),
+                'user'   => $this->user->toArray(),
+            ];
+
+            if ($this->rule === 'doctor') {
+                $data['relationships']['person'] = $this->doctor->person->toArray();
+                $data['relationships']['doctor'] = $this->doctor->toArray();
+            }
         }
 
-        return $resource;
+        return $data;
     }
 }

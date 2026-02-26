@@ -1,10 +1,13 @@
 <?php
 
-use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
+use App\Http\Controllers\Api\{
+    EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
+    ExamTypesController,
     ExamsController,
     PatientExamsController,
-    PatientsController};
+    PatientsController
+};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -18,10 +21,14 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
     Route::group(['middleware' => ['auth:integrator', 'auth_with_integrator', 'token.expiration']], static function () {
         Route::delete('signout', [EntityIntegratorsController::class, 'destroy'])->name('signout');
         Route::group(['prefix' => 'v1', 'as' => 'v1.'], function () {
-            Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)->except(['create', 'edit']);
+            Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)
+                ->except(['create', 'edit']);
             Route::apiResource('patients', PatientsController::class)->only('index', 'show');
-            Route::apiResource('patients.exams', PatientExamsController::class)->except(['create', 'edit']);
-            Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])->name('patients.exams.update');
+            Route::apiResource('patients.exams', PatientExamsController::class)
+                ->except(['create', 'edit']);
+            Route::apiResource('examtypes', ExamTypesController::class)->only('index', 'show');
+            Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])
+                ->name('patients.exams.update');
             Route::apiResource('exams', ExamsController::class)->only('store');
 
             Route::get('profile', static function (Request $request) {

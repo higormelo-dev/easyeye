@@ -14,6 +14,25 @@ class VisitTypeResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        $data = [
+            'type'       => 'doctor',
+            'id'         => $this->id,
+            'attributes' => [
+                'entity_id'  => $this->entity_id,
+                'code'       => $this->code,
+                'name'       => $this->name,
+                'active'     => (bool) $this->active,
+                'created_at' => $this->created_at,
+                'updated_at' => $this->updated_at,
+            ],
+        ];
+
+        if (! $request->routeIs('*.index')) {
+            $data['relationships'] = [
+                'entity' => $this->entity->toArray(),
+            ];
+        }
+
+        return $data;
     }
 }

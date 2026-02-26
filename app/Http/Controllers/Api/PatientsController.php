@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientResource;
 use App\Models\{Patient};
+use Illuminate\Support\Str;
 
 class PatientsController extends Controller
 {
@@ -50,16 +51,17 @@ class PatientsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): PatientResource
+    public function show(string $idOrCode): PatientResource
     {
         $integrator = request()->attributes->get('integrator');
 
         $patient = $this->model->query()
             ->where('entity_id', $integrator->user->entity_id)
-            ->where(function ($query) use ($id) {
-                $query->where('patients.id', $id)
-                    ->orWhere('patients.code', $id);
-            })
+            ->when(
+                Str::isUuid($idOrCode),
+                static fn ($q) => $q->where('id', $idOrCode),
+                static fn ($q) => $q->where('code', $idOrCode)
+            )
             ->firstOrFail();
 
         return new PatientResource($patient);
