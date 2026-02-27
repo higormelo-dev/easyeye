@@ -22,11 +22,11 @@ class PatientExamResource extends JsonResource
                 'doctor_id'   => $this->doctor_id,
                 'schedule_id' => $this->schedule_id,
                 'code'        => $this->code,
-                'archive'     => $this->archive_url,
-                'name'        => $this->name,
-                'active'      => (bool) $this->active,
-                'created_at'  => $this->created_at,
-                'updated_at'  => $this->updated_at,
+                // 'archive'     => $this->archive_url,
+                'name'       => $this->name,
+                'active'     => (bool) $this->active,
+                'created_at' => $this->created_at,
+                'updated_at' => $this->updated_at,
             ],
         ];
 
