@@ -32,11 +32,11 @@ class PatientExamsController extends Controller
     public function index(string $patientId)
     {
         $integrator   = request()->attributes->get('integrator');
-		dd($integrator->user->entity_id);
-        $patientExams = $this->model->query()
+		$patientExams = $this->model->query()
             ->with('patient', 'doctor', 'schedule', 'patient.person', 'doctor.person')
-            ->whereHas('patient', function ($query) use ($integrator) {
-                $query->where('entity_id', $integrator->user->entity_id);
+            ->whereHas('patient', function ($query) use ($integrator, $patientId) {
+                $query->where('id', $patientId)
+	                ->where('entity_id', $integrator->user->entity_id);
             });
 
         if (request()->has('search')) {
