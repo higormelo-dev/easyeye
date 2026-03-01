@@ -2,8 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\IrisType;
-use App\Models\SkinType;
+use App\Models\{IrisType};
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -25,7 +24,7 @@ class IrisTypeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => [
                 'required_without:type_method',
                 'string',
@@ -37,6 +36,12 @@ class IrisTypeRequest extends FormRequest
                     }),
             ],
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 
     private function getIgnoredIrisTypeId()
@@ -53,5 +58,17 @@ class IrisTypeRequest extends FormRequest
         }
 
         return null;
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
     }
 }

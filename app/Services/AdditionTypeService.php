@@ -75,7 +75,7 @@ class AdditionTypeService
             ->where('name', $request->name)
             ->first();
 
-        $skinTypeData = [
+        $requestData = [
             'name' => $request->name,
         ];
 
@@ -83,12 +83,12 @@ class AdditionTypeService
             if ($existingAdditionType->trashed()) {
                 $existingAdditionType->restore();
             }
-            $existingAdditionType->update($skinTypeData);
+            $existingAdditionType->update($requestData);
 
             return $existingAdditionType->fresh();
         }
 
-        return AdditionType::create(array_merge($skinTypeData, [
+        return AdditionType::create(array_merge($requestData, [
             'entity_id' => session()->get('selected_entity_id'),
             'active'    => true,
         ]));

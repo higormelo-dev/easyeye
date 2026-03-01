@@ -13,8 +13,6 @@ class EntityIntegratorEquipment extends Model
 
     protected $primaryKey = 'id';
 
-    protected $table = 'entity_integrator_equipments';
-
     /**
      * The attributes that are mass assignable.
      *

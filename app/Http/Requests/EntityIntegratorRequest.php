@@ -22,7 +22,7 @@ class EntityIntegratorRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => [
                 'required',
                 'string',
@@ -47,5 +47,29 @@ class EntityIntegratorRequest extends FormRequest
                 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
             ],
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
+
+        if ($this->has('mac')) {
+            $this->merge([
+                'mac' => mb_strtoupper($this->input('mac')),
+            ]);
+        }
     }
 }

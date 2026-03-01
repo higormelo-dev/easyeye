@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\{AdditionTypesController,
     CovenantsController,
+    CoverTestTypesController,
     DoctorsController,
     IrisTypesController,
     Manager\EntitiesController,
@@ -48,6 +49,8 @@ Route::group(
         Route::resource('patients', PatientsController::class);
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
             Route::resource('users', UsersController::class);
+            Route::get('users/{user}/restore', [UsersController::class, 'restore'])
+                ->name('users.restore');
         });
         Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
             Route::resource('covenants', CovenantsController::class);
@@ -68,6 +71,9 @@ Route::group(
             Route::resource('surgerytypes', SurgeryTypesController::class);
             Route::get('surgerytypes/{surgerytype}/restore', [SurgeryTypesController::class, 'restore'])
                 ->name('surgerytypes.restore');
+            Route::resource('covertesttypes', CoverTestTypesController::class);
+            // Route::get('covertesttypes/{covertesttype}/restore', [SurgeryTypesController::class, 'restore'])
+            //     ->name('covertesttypes.restore');
         });
 
         require __DIR__ . '/manager.php';
@@ -76,28 +82,23 @@ Route::group(
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-        Route::group(['prefix' => 'ajax', 'as' => 'ajax.'], function () {
-            Route::group(['prefix' => 'datatables', 'as' => 'datatables'], function () {
-                Route::post('/users', [UsersController::class, 'ajaxDatatable'])->name('.users');
-                Route::post('/doctors', [DoctorsController::class, 'ajaxDatatable'])->name('.doctors');
-                Route::post('/patients', [PatientsController::class, 'ajaxDatatable'])->name('.patients');
-                Route::post('/entities', [EntitiesController::class, 'ajaxDatatable'])->name('.entities');
-                Route::post('/covenants', [CovenantsController::class, 'ajaxDatatable'])->name('.covenants');
-                Route::post('/skintypes', [SkinTypesController::class, 'ajaxDatatable'])->name('.skintypes');
-                Route::post('/iristypes', [IrisTypesController::class, 'ajaxDatatable'])->name('.iristypes');
-                Route::post('/visittypes', [VisitTypesController::class, 'ajaxDatatable'])
-                    ->name('.visittypes');
-                Route::post('/additiontypes', [AdditionTypesController::class, 'ajaxDatatable'])
-                    ->name('.additiontypes');
-                Route::post('/surgerytypes', [SurgeryTypesController::class, 'ajaxDatatable'])
-                    ->name('.surgerytypes');
-
-                Route::post(
-                    '/entity_integrators',
-                    [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']
-                )->name('.integrators');
-            });
-        });
+        // Route::group(['prefix' => 'ajax', 'as' => 'ajax.'], function () {
+        //     Route::group(['prefix' => 'datatables', 'as' => 'datatables'], function () {
+        //         Route::post('/users', [UsersController::class, 'ajaxDatatable'])->name('.users');
+        //         Route::post('/entities', [EntitiesController::class, 'ajaxDatatable'])->name('.entities');
+        //         Route::post('/visittypes', [VisitTypesController::class, 'ajaxDatatable'])
+        //             ->name('.visittypes');
+        //         Route::post('/additiontypes', [AdditionTypesController::class, 'ajaxDatatable'])
+        //             ->name('.additiontypes');
+        //         Route::post('/surgerytypes', [SurgeryTypesController::class, 'ajaxDatatable'])
+        //             ->name('.surgerytypes');
+        //
+        //         Route::post(
+        //             '/entity_integrators',
+        //             [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']
+        //         )->name('.integrators');
+        //     });
+        // });
     }
 );
 

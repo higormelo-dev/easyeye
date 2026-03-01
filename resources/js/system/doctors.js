@@ -2,94 +2,25 @@ import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_f
 
 $(function () {
     let record_id, btn_action;
-    let doctorsDataTable = $('#doctor_datatable').DataTable({
-        "retrieve": true,
-        "order": [
-            [0, 'desc']
-        ],
-        "searching": true,
-        "bLengthChange": true,
-        "bPaginate": true,
-        "pageLength": 10,
-        "processing": true,
-        "serverSide": true,
-        "lengthMenu": [
-            [5, 10, 25, 50, 100],
-            [5, 10, 25, 50, 100]
-        ],
-        "pagingType": "full_numbers",
-        "ajax": {
-            'url': 'ajax/datatables/doctors',
-            'dataType': 'json',
-            'type': 'POST',
-            'data': {
-                '_token': $('meta[name="csrf-token"]').attr('content')
-            }
-        },
-        "createdRow": function (row, data, dataIndex) {
-            $(row).attr('id', data.id);
-        },
-        "drawCallback": function (settings) {
-            $('[data-bs-toggle="tooltip"]').tooltip();
-        },
-        "columns": [
-            {'data': 'created_at', 'searchable': false, 'orderable': true},
-            {'data': 'name'},
-            {'data': 'record'},
-            {'data': 'email'},
-            {'data': 'active', 'searchable': false, 'orderable': true},
-            {'data': 'action', 'searchable': false, 'orderable': false},
-        ],
-        "columnDefs": [
-            {
-                'targets': [0, 1, 2, 3, 4],
-                'className': 'text-left'
-            },
-            {
-                'targets': 5,
-                'className': 'text-center'
-            },
-            {
-                'targets': 6,
-                'className': 'text-end'
-            }
-        ],
-        "language": {
-            "sEmptyTable": "Nenhum registro encontrado",
-            "sProcessing": "A processar...",
-            "sLengthMenu": "Mostrar _MENU_ registos",
-            "sZeroRecords": "Não foram encontrados resultados",
-            "sInfo": "Mostrando de _START_ até _END_ de _TOTAL_ registos",
-            "sInfoEmpty": "Mostrando de 0 até 0 de 0 registos",
-            "sInfoFiltered": "(filtrado de _MAX_ registos no total)",
-            "sInfoPostFix": "",
-            "sSearch": "Procurar:",
-            "sUrl": "",
-            "oPaginate": {
-                "sFirst": "Primeiro",
-                "sPrevious": "Anterior",
-                "sNext": "Seguinte",
-                "sLast": "Último"
-            },
-            "oAria": {
-                "sSortAscending": ": Ordenar colunas de forma ascendente",
-                "sSortDescending": ": Ordenar colunas de forma descendente"
-            }
-        }
 
-    });
-    doctorsDataTable.on('draw', function () {
+    // Obtém traduções do Laravel
+    const trans = window.translations;
+    const entityName = trans.actions.doctor;
+
+    // Obtém a instância do DataTable já criada pelo Laravel DataTables
+    let doctorsDataTable = window.LaravelDataTables['doctors_datatable'];
+
+    // Evento de desenho da tabela - registra os handlers dos botões
+    $('#doctors_datatable').on('draw.dt', function () {
+        $('[data-bs-toggle="tooltip"]').tooltip();
+
         // Editar
-        $('.btn-edit').click(function () {
+        $('.btn-edit').off('click').on('click', function () {
             record_id = $(this).data('id');
             btn_action = 'update';
-            $('.modal-title-default').empty();
-            $('.modal-title-default').append('Cadastrar médico');
+            $('.modal-title-default').empty().append(trans.messages.edit.replace(':name', entityName));
             $('#btn-modal-default').css('display', 'block');
-            $('.modal-dialog').removeClass('modal-md')
-            $('.modal-dialog').removeClass('modal-lg')
-            $('.modal-dialog').removeClass('modal-xl')
-            $('.modal-dialog').addClass('modal-xl');
+            $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
             $('#btn-modal-default').attr('data-action', 'register');
             $('#btn-modal-default').removeAttr('data-id');
             $("#erro-default").removeClass('show').css('display', 'none');
@@ -101,45 +32,23 @@ $(function () {
                 },
                 beforeSend: function () {
                     $('#btn-modal-default').attr('disabled', false);
-                    $("#erro-default").removeClass('show');
-                    $("#erro-default").css('display', 'none');
+                    $("#erro-default").removeClass('show').css('display', 'none');
                     $("#erro-msg-default").empty();
                 },
                 success: function (response) {
-                    $('#retorno-default').empty();
-                    $('#retorno-default').append(response);
+                    $('#retorno-default').empty().append(response);
                     $('#modal_default').modal('show');
+                    setTimeout(function() {
+                        initModalEvents();
+                    }, 100);
                 },
-                error: function (response) {
-                    let message = response.responseJSON.message;
-                    let errors = response.responseJSON.errors;
-                    if (errors && Object.keys(errors).length) {
-                        $("#erro-default").addClass('show');
-                        $("#erro-default").css('display', 'block');
-                        $("#erro-msg-default").empty();
-                        $("#erro-msg-default").append('<strong>Erro!</strong> Preencha corretamente os campos abaixo:<br>');
-                        $.each(error, function (dataObject) {
-                            $.each(error[dataObject], function (index, value) {
-                                $("#erro-msg-default").append('- ' + value + '<br>');
-                            });
-                        });
-                    } else {
-                        $.toast({
-                            heading: 'Erro!',
-                            text: message,
-                            position: 'top-right',
-                            loaderBg: '#EF0107',
-                            icon: 'error',
-                            hideAfter: 5000
-                        });
-                    }
-                }
+                error: handleAjaxError
             });
         });
         // Visualizar
-        $('.btn-show').click(function () {
+        $('.btn-show').off('click').on('click', function () {
             record_id = $(this).data('id');
-            $('.modal-title-default').empty().append('Visualizar médico');
+            $('.modal-title-default').empty().append(trans.messages.view.replace(':name', entityName));
             $('#btn-modal-default').css('display', 'none');
             $('.modal-dialog').removeClass('modal-md modal-lg').addClass('modal-lg');
             $("#erro-default").removeClass('show').css('display', 'none');
@@ -156,7 +65,7 @@ $(function () {
             });
         });
         // Ativar ou inativar
-        $('.btn-active').click(function () {
+        $('.btn-active').off('click').on('click', function () {
             record_id = $(this).data('id');
             $.ajax({
                 url: `doctors/${record_id}`,
@@ -180,14 +89,14 @@ $(function () {
         $('.btn-trash').on('click', function () {
             record_id = $(this).data('id');
             Swal.fire({
-                title: 'Deletar?',
-                text: "Você tem certeza que deseja deletar o registro?\nEsta ação não poderá ser desfeita.",
+                title: trans.messages.delete_confirm_title,
+                text: trans.messages.delete_confirm_text,
                 type: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
                 cancelButtonColor: '#d33',
-                confirmButtonText: 'Sim',
-                cancelButtonText: 'Não'
+                confirmButtonText: trans.messages.confirm_yes,
+                cancelButtonText: trans.messages.confirm_no
             }).then((result) => {
                 if (result.value) {
                     $.ajax({
@@ -209,17 +118,47 @@ $(function () {
                 }
             });
         });
+        // Restaurar
+        $('.btn-restore').on('click', function () {
+            record_id = $(this).data('id');
+            Swal.fire({
+                title: trans.messages.restore_confirm_title,
+                text: trans.messages.restore_confirm_text,
+                type: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: trans.messages.confirm_yes,
+                cancelButtonText: trans.messages.confirm_no
+            }).then((result) => {
+                if (result.value) {
+                    $.ajax({
+                        method: "get",
+                        url: `doctors/${record_id}/restore`,
+                        dataType: 'json',
+                        headers: {
+                            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                        },
+                        success: function (response) {
+                            showSuccessToast(response.message);
+                            doctorsDataTable.ajax.reload();
+                        },
+                        error: function (data) {
+                            let error = data.responseJSON;
+                            showErrorToast(error.message);
+                        }
+                    });
+                }
+            });
+        });
     });
-    doctorsDataTable.draw();
-    $('.new-register').click(function () {
+
+    // Novo registro
+    $('.new-register').on('click', function () {
         btn_action = 'store';
-        $('.modal-title-default').empty();
-        $('.modal-title-default').append('Cadastrar médico');
+        $('.modal-title-default').empty().append(trans.messages.register.replace(':name', entityName));
         $('#btn-modal-default').css('display', 'block');
-        $('.modal-dialog').removeClass('modal-md')
-        $('.modal-dialog').removeClass('modal-lg')
-        $('.modal-dialog').removeClass('modal-xl')
-        $('.modal-dialog').addClass('modal-xl');
+        $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
         $('#btn-modal-default').attr('data-action', 'register');
         $('#btn-modal-default').removeAttr('data-id');
         $.ajax({
@@ -227,8 +166,7 @@ $(function () {
             type: 'get',
             beforeSend: function () {
                 $('#btn-modal-default').attr('disabled', true);
-                $("#erro-default").removeClass('show');
-                $("#erro-default").css('display', 'none');
+                $("#erro-default").removeClass('show').css('display', 'none');
                 $("#erro-msg-default").empty();
             },
             headers: {
@@ -240,6 +178,9 @@ $(function () {
             success: function (response) {
                 $('#retorno-default').empty().append(response);
                 $('#modal_default').modal('show');
+                setTimeout(function() {
+                    initModalEvents();
+                }, 100);
             },
             error: handleAjaxError
         });
@@ -250,40 +191,9 @@ $(function () {
             'doctors' :
             `doctors/${record_id}`;
         let requestData = {
-            'name': $('input[name=full_name]').val(),
-            'national_registry': $('input[name=national_registry]').val(),
-            'nickname': $('input[name=nickname]').val(),
-            'record': $('input[name=record]').val(),
-            'record_specialty': $('input[name=record_specialty]').val(),
-            'color': $('input[name=color]').val(),
-            'birth_date': $('input[name=birth_date]').val(),
-            'gender': $('select[name=gender]').val(),
-            'marital_status': $('select[name=marital_status]').val(),
-            'email': $('input[name=email]').val(),
-            'mother_name': $('input[name=mother_name]').val(),
-            'father_name': $('input[name=father_name]').val(),
-            'state_registry': $('input[name=state_registry]').val(),
-            'state_registry_agency': $('input[name=state_registry_agency]').val(),
-            'state_registry_initial': $('select[name=state_registry_initial]').val(),
-            'state_registry_date': $('input[name=state_registry_date]').val(),
-            'telephone': $('input[name=telephone]').val(),
-            'cellphone': $('input[name=cellphone]').val(),
-            'whatsapp': $('select[name=whatsapp]').val(),
-            'zipcode': $('input[name=zipcode]').val(),
-            'address': $('input[name=address]').val(),
-            'number': $('input[name=number]').val(),
-            'complement': $('input[name=complement]').val(),
-            'district': $('input[name=district]').val(),
-            'city': $('input[name=city]').val(),
-            'state': $('select[name=state]').val(),
-            'observation': $('textarea[name=observation]').val(),
-            'partner': $('select[name=partner]').val()
+            'category': $('select[name=category]').val(),
+            'name': $('input[name=name]').val(),
         };
-
-        if (requestType === 'post') {
-            requestData['password'] = $('input[name=password]').val();
-            requestData['password_confirmation'] = $('input[name=password_confirmation]').val();
-        }
 
         if (requestType === 'put') {
             requestData['active'] = $('select[name=active]').val();
@@ -299,8 +209,7 @@ $(function () {
             },
             beforeSend: function () {
                 $('#btn-modal-default').attr('disabled', true);
-                $("#erro-default").removeClass('show');
-                $("#erro-default").css('display', 'none');
+                $("#erro-default").removeClass('show').css('display', 'none');
                 $("#erro-msg-default").empty();
             },
             complete: function () {
@@ -314,4 +223,8 @@ $(function () {
             error: handleAjaxError
         });
     });
+
+    function initModalEvents() {
+        $('.colorpicker').asColorPicker();
+    }
 });

@@ -18,18 +18,7 @@
                     <div class="row">
                         <div class="col">
                             <div class="table-responsive">
-                                <table id="covenants_datatable" class="table table-striped">
-                                    <thead>
-                                    <tr>
-                                        <th>{{ __('actions.created_at') }}</th>
-                                        <th>{{ __('actions.code') }}</th>
-                                        <th>{{ __('actions.covenant') }}</th>
-                                        <th>{{ __('actions.table') }}</th>
-                                        <th class="text-center">{{ __('actions.active') }}</th>
-                                        <th class="text-center">{{ __('actions.actions') }}</th>
-                                    </tr>
-                                    </thead>
-                                </table>
+                                {{ $dataTable->table(['class' => 'table table-striped']) }}
                             </div>
                         </div>
                     </div>
@@ -44,5 +33,6 @@
 @endsection
 
 @section('javascript')
+    {{ $dataTable->scripts() }}
     @vite(['resources/js/system/covenants.js'])
 @endsection

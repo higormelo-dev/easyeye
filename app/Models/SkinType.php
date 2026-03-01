@@ -30,7 +30,7 @@ class SkinType extends Model
     protected static function booted(): void
     {
         static::creating(function (self $skinType) {
-            if (empty($skinType->code)) {
+	        if (blank($skinType->code)) {
                 $prefix = $skinType->entity_id ? 'ST' : 'STP';
 
                 $lastType = static::withoutGlobalScopes()

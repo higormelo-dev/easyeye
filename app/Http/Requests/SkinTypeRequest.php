@@ -23,7 +23,7 @@ class SkinTypeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => [
                 'required_without:type_method',
                 'string',
@@ -31,10 +31,17 @@ class SkinTypeRequest extends FormRequest
                 Rule::unique('skin_types', 'name')
                     ->ignore($this->getIgnoredSkinTypeId(), 'id')
                     ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
+                        $query->where('entity_id', session('selected_entity_id'))
+                            ->whereNull('deleted_at');
                     }),
             ],
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 
     private function getIgnoredSkinTypeId()

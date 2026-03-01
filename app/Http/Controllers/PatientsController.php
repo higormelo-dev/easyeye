@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\DataTables\PatientsDataTable;
 use App\Http\Requests\PatientRequest;
 use App\Http\Resources\{PatientResource};
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
@@ -36,7 +37,7 @@ class PatientsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): Factory|Application|View
+    public function index(PatientsDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
             'title'       => $this->titleController,
@@ -60,7 +61,7 @@ class PatientsController extends Controller
             ],
         ];
 
-        return view('system.patients.index', compact('meta'));
+        return $dataTable->render('system.patients.index', compact('meta'));
     }
 
     /**
@@ -207,92 +208,6 @@ class PatientsController extends Controller
         });
     }
 
-    public function ajaxDatatable(Request $request): JsonResponse
-    {
-        $columns = [
-            0 => 'created_at',
-            1 => 'code',
-            2 => 'name',
-            3 => 'gender',
-            4 => 'cellphone',
-            5 => 'active',
-            6 => 'action',
-        ];
-
-        $totalRecords = $this->model->query()
-            ->select(
-                'patients.*', 'people.full_name', 'people.gender',
-                'people.cellphone', 'people.whatsapp'
-            )
-            ->join('people', 'patients.person_id', '=', 'people.id')
-            ->where('patients.entity_id', session()->get('selected_entity_id'))
-            ->count();
-
-        $limit = $request->get('length');
-        $start = $request->get('start');
-        $order = $columns[$request->get('order')[0]['column']];
-        $dir   = $request->get('order')[0]['dir'];
-
-        if (empty($request->get('search')['value'])) {
-            $records = $this->model->query()
-                ->select(
-                    'patients.*', 'people.full_name', 'people.gender',
-                    'people.cellphone', 'people.whatsapp'
-                )
-                ->join('people', 'patients.person_id', '=', 'people.id')
-                ->where('patients.entity_id', session()->get('selected_entity_id'))
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->get();
-
-            $totalFiltered = $totalRecords;
-        } else {
-            $search = $request->get('search')['value'];
-            $query  = $this->model->query()
-                ->select(
-                    'patients.*', 'people.full_name', 'people.gender',
-                    'people.cellphone', 'people.whatsapp'
-                )
-                ->join('people', 'patients.person_id', '=', 'people.id')
-                ->where('patients.entity_id', session()->get('selected_entity_id'))
-                ->where(function ($query) use ($search) {
-                    $query->whereRaw('LOWER(people.full_name) LIKE LOWER(?)', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(patients.code) LIKE LOWER(?)', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(people.nickname) LIKE LOWER(?)', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(people.email) LIKE LOWER(?)', ["%{$search}%"]);
-                });
-
-            $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
-            $totalFiltered = $query->count();
-
-        }
-        $data = [];
-
-        if (count($records)) {
-            foreach ($records as $record) {
-                $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['code']       = $record->code;
-                $information['name']       = $record->full_name;
-                $information['gender']     = $record->person->present()->getGender();
-                $information['cellphone']  = $record->person->present()->getCellphone();
-                $information['active']     = $record->active ?
-                    '<span class="badge bg-success">SIM</span>' :
-                    '<span class="badge bg-dark">NÃO</span>';
-                $information['action'] = $this->buildActionButtons($record);
-                $data[]                = $information;
-            }
-
-        }
-
-        return response()->json([
-            'draw'            => (int) $request->get('draw'),
-            'recordsTotal'    => (int) $totalRecords,
-            'recordsFiltered' => (int) $totalFiltered,
-            'data'            => $data,
-        ]);
-    }
-
     /**
      * Get update message based on request type
      */
@@ -304,33 +219,5 @@ class PatientsController extends Controller
         }
 
         return $this->titleController . ' alterado(a) com sucesso.';
-    }
-
-    /**
-     * Build action buttons for datatable
-     */
-    private function buildActionButtons($record): string
-    {
-        $btnActions = '';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Editar"><i class="fa fa-edit"></i></a>';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Visualizar"><i class="fa fa-eye"></i></a>';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
-                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-        $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-danger btn-danger btn-xs m-1 btn-trash"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
-
-        return $btnActions;
     }
 }

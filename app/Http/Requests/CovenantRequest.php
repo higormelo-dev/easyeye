@@ -24,7 +24,7 @@ class CovenantRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => [
                 'required_without:type_method',
                 'string',
@@ -49,6 +49,12 @@ class CovenantRequest extends FormRequest
             ],
             'table' => 'required_without:type_method|integer',
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 
     /**

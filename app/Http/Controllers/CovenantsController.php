@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\DataTables\{CovenantsDataTable};
 use App\Http\Requests\CovenantRequest;
 use App\Http\Resources\CovenantResource;
 use App\Models\Covenant;
@@ -11,7 +12,6 @@ use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class CovenantsController extends Controller
 {
@@ -37,7 +37,7 @@ class CovenantsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): Factory|Application|View
+    public function index(CovenantsDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
             'title'       => $this->titleController,
@@ -61,7 +61,7 @@ class CovenantsController extends Controller
             ],
         ];
 
-        return view('system.covenants.index', compact('meta'));
+        return $dataTable->render('system.covenants.index', compact('meta'));
     }
 
     /**
@@ -197,86 +197,6 @@ class CovenantsController extends Controller
         });
     }
 
-    public function ajaxDatatable(Request $request): JsonResponse
-    {
-        $columns = [
-            0 => 'created_at',
-            1 => 'code',
-            2 => 'name',
-            3 => 'table',
-            4 => 'active',
-            5 => 'action',
-        ];
-
-        $totalRecords = $this->model->query()->withTrashed()
-            ->select('covenants.*')
-            ->where('covenants.entity_id', session()->get('selected_entity_id'))
-            ->orWhere(function ($query) {
-                $query->whereNull('covenants.entity_id')->whereNull('covenants.deleted_at');
-            })
-            ->count();
-
-        $limit = $request->get('length');
-        $start = $request->get('start');
-        $order = $columns[$request->get('order')[0]['column']];
-        $dir   = $request->get('order')[0]['dir'];
-
-        if (empty($request->get('search')['value'])) {
-            $records = $this->model->query()->withTrashed()
-                ->select('covenants.*')
-                ->where('covenants.entity_id', session()->get('selected_entity_id'))
-                ->orWhere(function ($query) {
-                    $query->whereNull('covenants.entity_id')->whereNull('covenants.deleted_at');
-                })
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->get();
-
-            $totalFiltered = $totalRecords;
-        } else {
-            $search = $request->get('search')['value'];
-            $query  = $this->model->query()->withTrashed()
-                ->select('covenants.*')
-                ->where('covenants.entity_id', session()->get('selected_entity_id'))
-                ->orWhere(function ($query) {
-                    $query->whereNull('covenants.entity_id')->whereNull('covenants.deleted_at');
-                })
-                ->whereRaw('LOWER(covenants.name) LIKE LOWER(?)', ["%{$search}%"]);
-
-            $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
-            $totalFiltered = $query->count();
-
-        }
-        $data = [];
-
-        if (count($records)) {
-            foreach ($records as $record) {
-                $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['code']       = $record->code;
-                $information['name']       = '<span class="badge bg-success" style="background-color: ' .
-                        $record->color . ' !important;">&nbsp;&nbsp;&nbsp;&nbsp;</span>&nbsp;&nbsp;' .
-                    $record->name;
-                $information['table']  = $record->table ? 'Sim' : 'Não';
-                $information['active'] = $record->deleted_at ? 'Deletado(a)' : ($record->active ?
-                    '<span class="badge bg-success">SIM</span>' :
-                    '<span class="badge bg-dark">NÃO</span>');
-                $information['action'] = $this->buildActionButtons($record);
-                $data[]                = $information;
-            }
-
-        }
-
-        return response()->json(
-            [
-                'draw'            => (int) $request->get('draw'),
-                'recordsTotal'    => (int) $totalRecords,
-                'recordsFiltered' => (int) $totalFiltered,
-                'data'            => $data,
-            ]
-        );
-    }
-
     /**
      * Get update message based on request type
      */
@@ -288,41 +208,5 @@ class CovenantsController extends Controller
         }
 
         return $this->titleController . ' alterado(a) com sucesso.';
-    }
-
-    /**
-     * Build action buttons for datatable
-     */
-    private function buildActionButtons($record): string
-    {
-        $btnActions = '';
-
-        if (! $record->deleted_at && $record->entity_id === session()->get('selected_entity_id')) {
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Editar"><i class="fa fa-edit"></i></a>';
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Visualizar"><i class="fa fa-eye"></i></a>';
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-	                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
-	                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
-	                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
-        } elseif ($record->deleted_at && $record->entity_id === session()->get('selected_entity_id')) {
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Restaurar"><i class="fas fa-recycle"></i></a>';
-        }
-
-        return $btnActions;
     }
 }

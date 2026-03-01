@@ -74,7 +74,9 @@
             </ul>
         </li>
         <li>
-            <a href="javascript:void(0);"><span class="fa fa-search"></span> Tipo de cover test</a>
+            <a href="{{ route('panel.setting.covertesttypes.index') }}">
+                <span class="fa fa-search"></span> Tipo de cover test
+            </a>
         </li>
         <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Tipo de visão cromática</a></li>
         <li>

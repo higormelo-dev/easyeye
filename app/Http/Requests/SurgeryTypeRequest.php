@@ -23,7 +23,7 @@ class SurgeryTypeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'category' => 'required|integer|in:0,1,2,3,4,5,6,7,8,9,10,11,12,13',
             'name'     => [
                 'required_without:type_method',
@@ -39,6 +39,12 @@ class SurgeryTypeRequest extends FormRequest
                     }),
             ],
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 
     /**

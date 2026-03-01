@@ -30,7 +30,7 @@ class VisitType extends Model
     protected static function booted(): void
     {
         static::creating(function (self $visitType) {
-            if (empty($visitType->code)) {
+	        if (blank($visitType->code)) {
                 $prefix = $visitType->entity_id ? 'VT' : 'VTP';
 
                 $lastType = static::withoutGlobalScopes()

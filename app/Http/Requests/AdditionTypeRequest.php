@@ -23,7 +23,7 @@ class AdditionTypeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'name' => [
                 'required_without:type_method',
                 'string',
@@ -36,6 +36,12 @@ class AdditionTypeRequest extends FormRequest
                     }),
             ],
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 
     private function getIgnoredAdditionTypeId()

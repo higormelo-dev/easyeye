@@ -2,16 +2,21 @@
 
 namespace App\Models;
 
+use App\Presenters\EntityUserPresenter;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laracasts\Presenter\PresentableTrait;
 
 class EntityUser extends Model
 {
     use HasUuids;
     use SoftDeletes;
+    use PresentableTrait;
 
     protected $primaryKey = 'id';
+
+    protected $presenter = EntityUserPresenter::class;
 
     /**
      * The attributes that are mass assignable.

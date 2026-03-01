@@ -2,34 +2,42 @@
 
 namespace App\Http\Controllers;
 
+use App\DataTables\UsersDataTable;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
 use App\Models\{EntityUser, User};
+use App\Services\EntityUserService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class UsersController extends Controller
 {
-    protected string $titleController = 'Usuários';
+    /*
+     * Name of the controller
+     */
+    protected string $titleController;
 
     /**
      * Instance of the standard model.
      */
     protected EntityUser $model;
 
-    public function __construct(EntityUser $entityUser)
+    protected EntityUserService $service;
+
+    public function __construct(EntityUser $entityUser, EntityUserService $entityUserService)
     {
-        $this->model = $entityUser;
+        $this->titleController = __('actions.sidemenu.user');
+        $this->model           = $entityUser;
+        $this->service         = $entityUserService;
     }
 
     /**
      * Display a listing of the resource.
      */
-    public function index(): Factory|Application|View
+    public function index(UsersDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
             'title'       => $this->titleController,
@@ -53,7 +61,7 @@ class UsersController extends Controller
             ],
         ];
 
-        return view('system.users.index', compact('meta'));
+        return $dataTable->render('system.users.index', compact('meta'));
     }
 
     /**
@@ -66,7 +74,9 @@ class UsersController extends Controller
         if (! session()->get('selected_entity_is_client')) {
             $roles = array_merge($roles, User::$rolesOfManager);
         } else {
-            $roles = array_merge($roles, User::$rolesOfClients);
+            $clientRoles = User::$rolesOfClients;
+            unset($clientRoles['doctor']);
+            $roles = array_merge($roles, $clientRoles);
         }
 
         return view('system.users.form', compact('roles'));
@@ -75,327 +85,147 @@ class UsersController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(EntityUserRequest $request)
+    public function store(EntityUserRequest $request): Application|RedirectResponse|Redirector|JsonResponse|EntityUserResource
     {
-        try {
-            return DB::transaction(function () use ($request) {
-                $existingUser = User::query()->withTrashed()
-                    ->where('email', $request->email)->first();
+        $record = $this->service->create($request);
 
-                if ($existingUser) {
-                    if ($existingUser->trashed()) {
-                        $existingUser->restore();
-                        $existingUser->update([
-                            'name'     => $request->name,
-                            'password' => $request->password,
-                        ]);
-                        $existingUser->markEmailAsVerified();
-                        $user = $existingUser;
-                    } else {
-                        $existingUser->update([
-                            'name'     => $request->name,
-                            'password' => $request->password,
-                        ]);
-                        $user = $existingUser;
-                    }
-                } else {
-                    $user = User::create($request->only(['name', 'email', 'password']));
-                    $user->markEmailAsVerified();
-                }
+        $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
 
-                $existingEntityUser = EntityUser::query()->withTrashed()
-                    ->where('user_id', $user->id)
-                    ->where('entity_id', session()->get('selected_entity_id'))
-                    ->first();
-
-                if ($existingEntityUser) {
-                    if ($existingEntityUser->trashed()) {
-                        $existingEntityUser->restore();
-                        $existingEntityUser->update([
-                            'rule'   => $request->rule,
-                            'active' => true,
-                        ]);
-                    } else {
-                        $existingEntityUser->update([
-                            'rule'   => $request->rule,
-                            'active' => true,
-                        ]);
-                    }
-                } else {
-                    $existingEntityUser = EntityUser::create([
-                        'entity_id' => session()->get('selected_entity_id'),
-                        'user_id'   => $user->id,
-                        'rule'      => $request->rule,
-                        'active'    => true,
-                    ]);
-                }
-
-                return new EntityUserResource($existingEntityUser);
-            });
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new EntityUserResource($record))['data'],
+            ]);
         }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(string $id): Application|View|JsonResponse|EntityUserResource
     {
-        try {
-            $record = $this->findEntityUser($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            return view('system.users.show', compact('record'));
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => (new EntityUserResource($record))['data'],
+            ]);
         }
+
+        return view(
+            'system.users.show',
+            compact('record')
+        );
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id)
+    public function edit(string $id): Application|View|JsonResponse|EntityUserResource
     {
-        try {
-            $record = $this->findEntityUser($id);
+        $record = $this->service->findByIdOrCode($id);
+        $roles  = ['' => 'Selecione uma opção'];
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $roles = ['' => 'Selecione uma opção'];
-
-            if (! session()->get('selected_entity_is_client')) {
-                $roles = array_merge($roles, User::$rolesOfManager);
-            } else {
-                $roles = array_merge($roles, User::$rolesOfClients);
-            }
-
-            return view('system.users.form', compact('record', 'roles'));
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (! session()->get('selected_entity_is_client')) {
+            $roles = array_merge($roles, User::$rolesOfManager);
+        } else {
+            $clientRoles = User::$rolesOfClients;
+            unset($clientRoles['doctor']);
+            $roles = array_merge($roles, $clientRoles);
         }
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => (new EntityUserResource($record))['data'],
+            ]);
+        }
+
+        return view('system.users.form', compact('record', 'roles'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(EntityUserRequest $request, string $id)
+    public function update(EntityUserRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse|EntityUserResource
     {
-        try {
-            $record = $this->findEntityUser($id);
+        $record        = $this->service->findByIdOrCode($id);
+        $updatedRecord = $this->service->update($record, $request);
+        $messageReturn = $this->getUpdateMessage($request);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $record->update($request->only(['rule', 'active']));
-            $record->user->update($request->only(['name', 'email']));
-
-            if ($request->has('type_method')) {
-                $messageReturn = $this->titleController .
-                    ($request->active ? ' desbloqueado(a) ' : ' bloqueado(a) ') . ' com sucesso.';
-
-            } else {
-                $messageReturn = $this->titleController . ' alterado(a) com sucesso.';
-            }
-
-            if (request()->wantsJson()) {
-
-                return response()->json(
-                    [
-                        'message' => $messageReturn,
-                        'data'    => (new EntityUserResource($record))['data'],
-                    ]
-                );
-            }
-
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => (new EntityUserResource($updatedRecord))['data'],
+            ]);
         }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): Application|JsonResponse|Redirector|RedirectResponse
+    public function destroy(string $id): Application|View|JsonResponse
     {
-        try {
-            $record = $this->findEntityUser($id);
+        $record = $this->service->findByIdOrCode($id);
 
-            if (! $record) {
-                return $this->notFoundResponse();
-            }
-
-            $userHasOtherEntityUsers = $this->model->query()
-                ->where('user_id', $record->user_id)
-                ->count();
+        return DB::transaction(function () use ($record) {
+            $messageReturn = $this->titleController . ' deletado(a) com sucesso.';
+            $recordData    = $record->toArray();
             $record->delete();
 
-            if ($userHasOtherEntityUsers <= 1) {
-                $user = User::query()->find($record->user_id);
-
-                if ($user) {
-                    $user->delete();
-                }
-            }
-
+            // Retornar resposta
             if (request()->wantsJson()) {
-                return response()->json(
-                    [
-                        'message' => $this->titleController . ' deletada(a) com sucesso.',
-                        'deleted' => $record->toArray(),
-                    ]
-                );
+                return response()->json([
+                    'message' => $messageReturn,
+                    'deleted' => $recordData,
+                ]);
             }
 
             return redirect(action('\\' . static::class . '@index'))
-                ->with('message-error', $this->titleController . ' deletada(a) com sucesso.');
-
-        } catch (\Throwable $e) {
-            return $this->serverErrorResponse();
-        }
+                ->with('message', $messageReturn);
+        });
     }
 
-    public function ajaxDatatable(Request $request): JsonResponse
+    /**
+     * Restore the specified resource from storage.
+     */
+    public function restore(string $id): Application|View|JsonResponse
     {
-        $columns = [
-            0 => 'created_at',
-            1 => 'name',
-            2 => 'email',
-            3 => 'active',
-            4 => 'action',
-        ];
+        $record = $this->service->findByIdOrCode($id);
 
-        $totalRecords = $this->model->query()->withTrashed()
-            ->select('entity_users.*', 'users.name', 'users.email')
-            ->join('users', 'entity_users.user_id', '=', 'users.id')
-            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-            ->whereNot('entity_users.rule', 'doctor')
-            ->count();
+        return DB::transaction(function () use ($record) {
+            $messageReturn = $this->titleController . ' restaurado(a) com sucesso.';
+            $recordData    = $record->toArray();
+            $record->restore();
 
-        $limit = $request->get('length');
-        $start = $request->get('start');
-        $order = $columns[$request->get('order')[0]['column']];
-        $dir   = $request->get('order')[0]['dir'];
-
-        if (empty($request->get('search')['value'])) {
-            $records = $this->model->query()->withTrashed()
-                ->select('entity_users.*', 'users.name', 'users.email')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                ->whereNot('entity_users.rule', 'doctor')
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->get();
-
-            $totalFiltered = $totalRecords;
-        } else {
-            $search = $request->get('search')['value'];
-            $query  = $this->model->query()->withTrashed()
-                ->select('entity_users.*', 'users.name', 'users.email')
-                ->join('users', 'entity_users.user_id', '=', 'users.id')
-                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-                ->whereNot('entity_users.rule', 'doctor')
-                ->where(function ($query) use ($search) {
-                    $query->whereRaw('LOWER(users.name) LIKE LOWER(?)', ["%{$search}%"])
-                        ->orWhereRaw('LOWER(users.email) LIKE LOWER(?)', ["%{$search}%"]);
-                });
-
-            $records       = $query->skip($start)->take($limit)->orderBy($order, $dir)->get();
-            $totalFiltered = $query->count();
-
-        }
-        $data = [];
-
-        if (count($records)) {
-            foreach ($records as $record) {
-                $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['name']       = $record->name;
-                $information['email']      = $record->email;
-                $information['active']     = $record->active ?
-                    '<span class="badge bg-success">SIM</span>' :
-                    '<span class="badge bg-dark">NÃO</span>';
-                $information['action'] = $this->buildActionButtons($record);
-                $data[]                = $information;
+            // Retornar resposta
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'message'  => $messageReturn,
+                    'restored' => $recordData,
+                ]);
             }
 
+            return redirect(action('\\' . static::class . '@index'))
+                ->with('message', $messageReturn);
+        });
+    }
+
+    /**
+     * Get update message based on request type
+     */
+    private function getUpdateMessage(Request $request): string
+    {
+        if ($request->has('type_method')) {
+            return $this->titleController .
+                ($request->active ? ' desbloqueado(a) ' : ' bloqueado(a) ') . ' com sucesso.';
         }
 
-        return response()->json(
-            [
-                'draw'            => (int) $request->get('draw'),
-                'recordsTotal'    => (int) $totalRecords,
-                'recordsFiltered' => (int) $totalFiltered,
-                'data'            => $data,
-            ]
-        );
-    }
-
-    /**
-     * Find equipment for specific integrator
-     */
-    private function findEntityUser(string $entityUserId): ?EntityUser
-    {
-        return $this->model->query()->where('id', $entityUserId)->first();
-    }
-
-    /**
-     * Return not found response
-     */
-    private function notFoundResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'User not found.'], HttpResponse::HTTP_NOT_FOUND);
-    }
-
-    /**
-     * Return server error response
-     */
-    private function serverErrorResponse(): JsonResponse
-    {
-        return response()->json(['message' => 'An error occurred.'], HttpResponse::HTTP_INTERNAL_SERVER_ERROR);
-    }
-
-    /**
-     * Build action buttons for datatable
-     */
-    private function buildActionButtons($record): string
-    {
-        $btnActions = '';
-
-        if (! $record->deleted_at && $record->entity_id === session()->get('selected_entity_id')) {
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Editar"><i class="fa fa-edit"></i></a>';
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Visualizar"><i class="fa fa-eye"></i></a>';
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-	                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
-	                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
-	                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
-        } elseif ($record->deleted_at && $record->entity_id === session()->get('selected_entity_id')) {
-            $btnActions .= '<a href="javascript:void(0);"
-	                    class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
-	                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-	                    title="Restaurar"><i class="fas fa-recycle"></i></a>';
-        }
-
-        return $btnActions;
+        return $this->titleController . ' alterado(a) com sucesso.';
     }
 }

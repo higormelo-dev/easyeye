@@ -3,9 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\{Patient};
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Validation\Rule;
 
 class PatientRequest extends FormRequest
@@ -25,7 +23,7 @@ class PatientRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'covenant_id' => [
                 'required_without:type_method',
                 'uuid',
@@ -186,6 +184,12 @@ class PatientRequest extends FormRequest
                 'max:255',
             ],
         ];
+
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $rules['active'] = ['required', 'boolean'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -223,13 +227,39 @@ class PatientRequest extends FormRequest
         return null;
     }
 
-    protected function failedValidation(Validator $validator): mixed
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
     {
-        throw new HttpResponseException(
-            response()->json([
-                'message' => __('http-statuses.custom.422_request'),
-                'errors'  => $validator->errors(),
-            ], 422)
-        );
+        if ($this->has('name')) {
+            $this->merge([
+                'name' => mb_strtoupper($this->input('name')),
+            ]);
+        }
+
+        if ($this->has('nickname')) {
+            $this->merge([
+                'nickname' => mb_strtoupper($this->input('nickname')),
+            ]);
+        }
+
+        if ($this->has('mother_name')) {
+            $this->merge([
+                'mother_name' => mb_strtoupper($this->input('mother_name')),
+            ]);
+        }
+
+        if ($this->has('father_name')) {
+            $this->merge([
+                'father_name' => mb_strtoupper($this->input('father_name')),
+            ]);
+        }
+
+        if ($this->has('national_registry')) {
+            $this->merge([
+                'national_registry' => mb_strtoupper($this->input('national_registry')),
+            ]);
+        }
     }
 }
