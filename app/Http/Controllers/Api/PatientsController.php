@@ -31,15 +31,13 @@ class PatientsController extends Controller
             ->where('entity_id', $integrator->user->entity_id);
 
         if (request()->has('search')) {
-            $patients = $patients->join(
-                'people',
-                'patients.person_id',
-                '=',
-                'people.id'
-            )->where(function ($query) {
-                $query->where('people.full_name', 'like', '%' . request()->search . '%')
-                    ->orWhere('patients.code', 'like', '%' . request()->search . '%')
-                    ->orWhere('patients.card_number', 'like', '%' . request()->search . '%');
+            $search   = request()->search;
+            $patients = $patients->where(function ($query) use ($search) {
+                $query->whereHas('person', function ($q) use ($search) {
+                    $q->whereRaw('LOWER(full_name) LIKE LOWER(?)', ["%{$search}%"]);
+                })
+                    ->orWhereRaw('LOWER(code) LIKE LOWER(?)', ["%{$search}%"])
+                    ->orWhereRaw('LOWER(card_number) LIKE LOWER(?)', ["%{$search}%"]);
             });
         }
 

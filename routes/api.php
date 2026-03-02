@@ -1,13 +1,12 @@
 <?php
 
-use App\Http\Controllers\Api\{
-    EntityIntegratorEquipmentsController,
-    EntityIntegratorsController,
-    ExamTypesController,
-    ExamsController,
-    PatientExamsController,
-    PatientsController
-};
+use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
+	EntityIntegratorsController,
+	ExamTypesController,
+	ExamsController,
+	PatientExamsController,
+	PatientsController,
+	SchedulesController};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -26,9 +25,10 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
             Route::apiResource('patients', PatientsController::class)->only('index', 'show');
             Route::apiResource('patients.exams', PatientExamsController::class)
                 ->except(['create', 'edit']);
-            Route::apiResource('examtypes', ExamTypesController::class)->only('index', 'show');
             Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])
                 ->name('patients.exams.update');
+            Route::apiResource('examtypes', ExamTypesController::class)->only('index', 'show');
+            Route::apiResource('schedules', SchedulesController::class)->only('index', 'show');
             Route::apiResource('exams', ExamsController::class)->only('store');
 
             Route::get('profile', static function (Request $request) {

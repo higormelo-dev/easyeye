@@ -22,13 +22,13 @@ class Schedule extends Model
         'doctor_id',
         'patient_id',
         'covenant_id',
+        'visit_id',
         'code',
         'full_name',
         'date_time',
         'telephone',
         'cellphone',
         'cellphone_whatsapp',
-        'visits',
         'situation',
         'active',
     ];
@@ -93,6 +93,11 @@ class Schedule extends Model
     public function covenant(): BelongsTo
     {
         return $this->belongsTo(Covenant::class, 'covenant_id');
+    }
+
+    public function visitType(): BelongsTo
+    {
+        return $this->belongsTo(VisitType::class, 'visit_id');
     }
 
     protected function fullName(): Attribute
