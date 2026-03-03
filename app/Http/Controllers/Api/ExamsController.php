@@ -34,10 +34,10 @@ class ExamsController extends Controller
     public function store(ExamRequest $request): PatientExamResource|JsonResponse
     {
         $integrator = request()->attributes->get('integrator');
-        $patient    = $this->findPatient($request, $integrator);
+		$patient    = $this->findPatient($request, $integrator);
 
         $recordData  = $this->buildRecordData($request, $patient);
-        $archivePath = $this->generateArchivePath($integrator->entity_id, $patient->id, $request->file('archive'));
+        $archivePath = $this->generateArchivePath($integrator->user->entity_id, $patient->id, $request->file('archive'));
 
         $existingRecord = $this->findExistingExam($request->name, $integrator);
 
@@ -53,11 +53,11 @@ class ExamsController extends Controller
     private function findPatient(ExamRequest $request, $integrator): Patient
     {
         return Patient::query()
-            ->where('entity_id', $integrator->entity_id)
+            ->where('entity_id', $integrator->user->entity_id)
             ->when(
-                Str::isUuid($request->patient_info),
-                fn ($q) => $q->where('id', $request->patient_info),
-                fn ($q) => $q->where('code', $request->patient_info)
+                Str::isUuid($request->patient_identifier),
+                fn ($q) => $q->where('id', $request->patient_identifier),
+                fn ($q) => $q->where('code', $request->patient_identifier)
             )
             ->firstOrFail();
     }
@@ -94,7 +94,7 @@ class ExamsController extends Controller
     {
         return PatientExam::query()
             ->with('patient')
-            ->whereHas('patient', fn ($q) => $q->where('entity_id', $integrator->entity_id)->whereNull('deleted_at'))
+            ->whereHas('patient', fn ($q) => $q->where('entity_id', $integrator->user->entity_id)->whereNull('deleted_at'))
             ->where('name', $name)
             ->first();
     }

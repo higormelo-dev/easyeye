@@ -23,13 +23,14 @@ class ExamRequest extends FormRequest
     public function rules(): array
     {
         $integrator = request()->attributes->get('integrator');
+        $entityId   = $integrator->user->entity_id;
 
         return [
             'patient_identifier' => [
                 'required',
-                function ($attribute, $value, $fail) use ($integrator) {
+                function ($attribute, $value, $fail) use ($entityId) {
                     $query = Patient::query()
-                        ->where('entity_id', $integrator->entity_id)
+                        ->where('entity_id', $entityId)
                         ->whereNull('deleted_at');
 
                     // Verifica se é um UUID válido
@@ -51,10 +52,10 @@ class ExamRequest extends FormRequest
             ],
             'exam_identifier' => [
                 'required',
-                function ($attribute, $value, $fail) use ($integrator) {
+                function ($attribute, $value, $fail) use ($entityId) {
                     $query = ExamType::query()
-                        ->where(function ($query) use ($integrator) {
-                            $query->where('entity_id', $integrator->entity_id)
+                        ->where(function ($query) use ($entityId) {
+                            $query->where('entity_id', $entityId)
                                 ->orWhereNull('entity_id');
                         })
                         ->whereNull('deleted_at');
@@ -78,14 +79,10 @@ class ExamRequest extends FormRequest
             ],
             'doctor_identifier' => [
                 'nullable',
-                function ($attribute, $value, $fail) use ($integrator) {
-                    $query = Doctor::query()
-                        ->with('entityUser')
-                        ->whereHas('entityUser', function ($query) use ($integrator) {
-                            $query->where('entity_id', $integrator->entity_id)
-                                ->whereNull('deleted_at');
-                        })
-                        ->whereNull('deleted_at');
+                function ($attribute, $value, $fail) use ($entityId) {
+                    if (empty($value)) {
+                        return;
+                    }
 
                     // Verifica se é um UUID válido
                     $isUuid = preg_match(
@@ -93,10 +90,17 @@ class ExamRequest extends FormRequest
                         $value
                     );
 
+                    $query = Doctor::query()
+                        ->whereHas('entityUser', function ($query) use ($entityId) {
+                            $query->where('entity_id', $entityId)
+                                ->whereNull('deleted_at');
+                        })
+                        ->whereNull('deleted_at');
+
                     if ($isUuid) {
                         $query->where('id', $value);
                     } else {
-                        $query->where('code', $value);
+                        $query->whereRaw('LOWER(code) = LOWER(?)', [$value]);
                     }
 
                     if (! $query->exists()) {
@@ -106,13 +110,10 @@ class ExamRequest extends FormRequest
             ],
             'schedule_identifier' => [
                 'nullable',
-                function ($attribute, $value, $fail) use ($integrator) {
-                    $query = Schedule::query()
-                        ->where(function ($query) use ($integrator) {
-                            $query->where('entity_id', $integrator->entity_id)
-                                ->orWhereNull('entity_id');
-                        })
-                        ->whereNull('deleted_at');
+                function ($attribute, $value, $fail) use ($entityId) {
+                    if (empty($value)) {
+                        return;
+                    }
 
                     // Verifica se é um UUID válido
                     $isUuid = preg_match(
@@ -120,10 +121,14 @@ class ExamRequest extends FormRequest
                         $value
                     );
 
+                    $query = Schedule::query()
+                        ->where('entity_id', $entityId)
+                        ->whereNull('deleted_at');
+
                     if ($isUuid) {
                         $query->where('id', $value);
                     } else {
-                        $query->where('code', $value);
+                        $query->whereRaw('LOWER(code) = LOWER(?)', [$value]);
                     }
 
                     if (! $query->exists()) {
@@ -157,11 +162,20 @@ class ExamRequest extends FormRequest
 
                 // Se ficou vazio, definir como null
                 $data[$key] = $cleanValue === '' ? null : $cleanValue;
+            } elseif (is_null($value)) {
+                $data[$key] = null;
             } else {
                 $data[$key] = $value;
             }
         }
 
-        $this->merge($data);
+        // Garantir que campos opcionais vazios sejam removidos do request
+        foreach (['doctor_identifier', 'schedule_identifier'] as $field) {
+            if (! isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
+                unset($data[$field]);
+            }
+        }
+
+        $this->replace($data);
     }
 }
