@@ -201,7 +201,10 @@
                 "covenant": "{{ mb_convert_case(__('actions.covenant'), MB_CASE_LOWER, 'UTF-8') }}",
                 "doctor": "{{ mb_convert_case(__('actions.doctor'), MB_CASE_LOWER, 'UTF-8') }}",
                 "patient": "{{ mb_convert_case(__('actions.patient'), MB_CASE_LOWER, 'UTF-8') }}",
-                "user": "{{ mb_convert_case(__('actions.user'), MB_CASE_LOWER, 'UTF-8') }}"
+                "user": "{{ mb_convert_case(__('actions.user'), MB_CASE_LOWER, 'UTF-8') }}",
+                "colorvisiontype": "{{ mb_convert_case(__('actions.colorvisiontype'), MB_CASE_LOWER, 'UTF-8') }}",
+                "additiontype": "{{ mb_convert_case(__('actions.additiontype'), MB_CASE_LOWER, 'UTF-8') }}",
+                "visualacuitytype": "{{ mb_convert_case(__('actions.visualacuitytype'), MB_CASE_LOWER, 'UTF-8') }}"
             }
         };
         // Alias para compatibilidade

@@ -20,7 +20,7 @@ $(function () {
             btn_action = 'update';
             $('.modal-title-default').empty().append(trans.messages.edit.replace(':name', entityName));
             $('#btn-modal-default').css('display', 'block');
-            $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
+            $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-lg');
             $('#btn-modal-default').attr('data-action', 'register');
             $('#btn-modal-default').removeAttr('data-id');
             $("#erro-default").removeClass('show').css('display', 'none');
@@ -158,7 +158,7 @@ $(function () {
         btn_action = 'store';
         $('.modal-title-default').empty().append(trans.messages.register.replace(':name', entityName));
         $('#btn-modal-default').css('display', 'block');
-        $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
+        $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-lg');
         $('#btn-modal-default').attr('data-action', 'register');
         $('#btn-modal-default').removeAttr('data-id');
         $.ajax({

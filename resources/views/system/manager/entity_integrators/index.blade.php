@@ -7,7 +7,7 @@
 @section('content')
     <div class="row mb-3">
         <div class="col-12">
-            @include('system.manager.entity_integrators.subnav')
+            @include('components.subnav')
         </div>
     </div>
     <div class="row">
@@ -272,7 +272,7 @@
                 });
             });
             dataTable.draw();
-            $('.novo-cadastro').click(function () {
+            $('.new-register').click(function () {
                 btn_action = 'store';
                 $('.modal-title-default').empty();
                 $('.modal-title-default').append('Cadastrar integrator');

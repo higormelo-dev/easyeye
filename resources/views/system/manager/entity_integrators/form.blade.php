@@ -1,9 +1,9 @@
 <fieldset>
-    <span class="badge bg-dark mb-4">* Campo obrigatório</span>
+    <span class="badge bg-dark mb-4">{{ __('forms.required_field') }}</span>
     <div class="row">
         {{
             html()->div([
-                html()->label('Nome da integração *', 'name')->class('form-label'),
+                html()->label(__('forms.integration_name') . ' *', 'name')->class('form-label'),
                 html()->text('name', $record->name ?? null)
                     ->class('form-control')
                     ->attributes([
@@ -16,7 +16,7 @@
     <div class="row">
         {{
             html()->div([
-                html()->label('IP', 'ip')->class('form-label'),
+                html()->label(__('forms.ip'), 'ip')->class('form-label'),
                 html()->text('ip', $record->ip ?? null)
                     ->class('form-control')
                     ->attributes([
@@ -28,7 +28,7 @@
         }}
         {{
             html()->div([
-                html()->label('Número MAC', 'mac')->class('form-label'),
+                html()->label(__('forms.mac'), 'mac')->class('form-label'),
                 html()->text('mac', $record->mac ?? null)
                     ->class('form-control')
                     ->attributes([

@@ -16,11 +16,6 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class SkinTypesController extends Controller
 {
-    /*
-     * Name of the controller
-     */
-    protected string $titleController;
-
     /**
      * Instance of the standard model.
      */
@@ -82,7 +77,7 @@ class SkinTypesController extends Controller
     {
         $record = $this->service->create($request);
 
-        $messageReturn = $this->titleController . ' cadastrado(a) com sucesso.';
+        $messageReturn = $this->getCreateMessage();
 
         if (request()->wantsJson()) {
             return response()->json([
@@ -154,7 +149,7 @@ class SkinTypesController extends Controller
         $record = $this->service->findByIdOrCode($id);
 
         return DB::transaction(function () use ($record) {
-            $messageReturn = $this->titleController . ' deletado(a) com sucesso.';
+            $messageReturn = $this->getDeleteMessage();
             $recordData    = $record->toArray();
             $record->delete();
 
@@ -179,7 +174,7 @@ class SkinTypesController extends Controller
         $record = $this->service->findByIdOrCode($id);
 
         return DB::transaction(function () use ($record) {
-            $messageReturn = $this->titleController . ' restaurado(a) com sucesso.';
+            $messageReturn = $this->getRestoreMessage();
             $recordData    = $record->toArray();
             $record->restore();
 
@@ -194,18 +189,5 @@ class SkinTypesController extends Controller
             return redirect(action('\\' . static::class . '@index'))
                 ->with('message', $messageReturn);
         });
-    }
-
-    /**
-     * Get update message based on request type
-     */
-    private function getUpdateMessage(Request $request): string
-    {
-        if ($request->has('type_method')) {
-            return $this->titleController .
-                ($request->active ? ' desbloqueado(a) ' : ' bloqueado(a) ') . ' com sucesso.';
-        }
-
-        return $this->titleController . ' alterado(a) com sucesso.';
     }
 }

@@ -1,9 +1,9 @@
 <fieldset>
-    <span class="badge bg-dark mb-4">* Campo obrigatório</span>
+    <span class="badge bg-dark mb-4">{{ __('forms.required_field') }}</span>
     <div class="row">
         {{
             html()->div([
-                html()->label('Nome *', 'name')->class('form-label'),
+                html()->label(__('forms.name') . ' *', 'name')->class('form-label'),
                 html()->text('name', $record->user->name ?? null)
                     ->class('form-control')
                     ->attributes([
@@ -16,7 +16,7 @@
     <div class="row">
         {{
             html()->div([
-                html()->label('E-mail *', 'email')->class('form-label'),
+                html()->label(__('forms.email') . ' *', 'email')->class('form-label'),
                 html()->email('email', $record->user->email ?? null)
                     ->class('form-control')
                     ->attributes([
@@ -30,7 +30,7 @@
         <div class="row">
             {{
                 html()->div([
-                    html()->label('Senha *', 'password')->class('form-label'),
+                    html()->label(__('forms.password') . ' *', 'password')->class('form-label'),
                     html()->password('password')
                         ->id('password')
                         ->class('form-control')
@@ -44,7 +44,7 @@
         <div class="row">
             {{
                 html()->div([
-                    html()->label('Confirmação de senha *', 'password_confirmation')->class('form-label'),
+                    html()->label(__('forms.password_confirmation') . ' *', 'password_confirmation')->class('form-label'),
                     html()->password('password_confirmation')
                         ->id('password_confirmation')
                         ->class('form-control')
@@ -59,7 +59,7 @@
     <div class="row">
         {{
             html()->div([
-                html()->label('Perfil *', 'rule')->class('form-label'),
+                html()->label(__('forms.rule') . ' *', 'rule')->class('form-label'),
                 html()->select('rule', $roles, $record->rule ?? null)
                     ->class('form-select')
                     ->attributes([
@@ -72,8 +72,8 @@
         <div class="row">
             {{
                 html()->div([
-                    html()->label('Ativo *', 'active')->class('form-label'),
-                    html()->select('active', ['' => '', true => 'Sim', false => 'Não'], $record->active ?? null)
+                    html()->label(__('forms.active') . ' *', 'active')->class('form-label'),
+                    html()->select('active', ['' => '', true => __('forms.yes'), false => __('forms.no')], $record->active ?? null)
                         ->class('form-select')
                         ->attributes([
                             'autocomplete' => 'off'

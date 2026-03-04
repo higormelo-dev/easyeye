@@ -1,9 +1,9 @@
 <fieldset>
-    <span class="badge bg-dark mb-4">* Campo obrigatório</span>
+    <span class="badge bg-dark mb-4">{{ __('forms.required_field') }}</span>
     <div class="row">
         {{
             html()->div([
-                html()->label('Nome *', 'name')->class('form-label'),
+                html()->label(__('forms.name') . ' *', 'name')->class('form-label'),
                 html()->text('name', $record->name ?? null)
                     ->class('form-control')
                     ->attributes([
@@ -14,7 +14,7 @@
         }}
         {{
             html()->div([
-                html()->label('Cor *', 'color')->class('form-label'),
+                html()->label(__('forms.color') . ' *', 'color')->class('form-label'),
 				html()->element('br'),
                 html()->text('color', $record->color ?? null)
                     ->class(['form-control', 'colorpicker'])
@@ -28,8 +28,8 @@
     <div class="row">
         {{
             html()->div([
-                html()->label('Cobrança *', 'table')->class('form-label'),
-                html()->select('table', ['' => '', true => 'Sim', false => 'Não'], $record->table ?? null)
+                html()->label(__('forms.table') . ' *', 'table')->class('form-label'),
+                html()->select('table', ['' => '', true => __('forms.yes'), false => __('forms.no')], $record->table ?? null)
                     ->class('form-select')
                     ->attributes([
                         'autocomplete' => 'off'
@@ -39,8 +39,8 @@
         @if(request()->routeIs('*.edit'))
             {{
                 html()->div([
-                    html()->label('Ativo *', 'active')->class('form-label'),
-                    html()->select('active', ['' => '', true => 'Sim', false => 'Não'], $record->active ?? null)
+                    html()->label(__('forms.active') . ' *', 'active')->class('form-label'),
+                    html()->select('active', ['' => '', true => __('forms.yes'), false => __('forms.no')], $record->active ?? null)
                         ->class('form-select')
                         ->attributes([
                             'autocomplete' => 'off'

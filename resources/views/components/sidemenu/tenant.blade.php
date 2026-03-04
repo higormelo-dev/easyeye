@@ -1,20 +1,20 @@
 <li>
     <a class="waves-effect waves-dark" href="javascript:void(0);">
         <i class="fa fa-calendar"></i>
-        <span class="hide-menu"> Agenda </span>
+        <span class="hide-menu">{{ __('actions.sidemenu.schedules') }}</span>
     </a>
 </li>
 <li>
     <a class="waves-effect waves-dark" href="{{ route('panel.patients.index') }}">
         <i class="fa fa-users"></i>
-        <span class="hide-menu"> Paciente </span>
+        <span class="hide-menu">{{ __('actions.sidemenu.patients') }}</span>
     </a>
 </li>
 <li>
     <a class="waves-effect waves-dark"
        href="{{ route('panel.doctors.index') }}">
         <i class="fa fa-user-md"></i>
-        <span class="hide-menu">Médico</span>
+        <span class="hide-menu">{{ __('actions.sidemenu.doctors') }}</span>
     </a>
 </li>
 <li>
@@ -34,32 +34,32 @@
     <ul aria-expanded="false" class="collapse">
         <li>
             <a href="{{ route('panel.setting.covenants.index') }}">
-                <span class="fa fa-list"></span> Convênio
+                <span class="fa fa-list"></span> {{ __('actions.sidemenu.covenants') }}
             </a>
         </li>
         <li>
             <a href="{{ route('panel.setting.skintypes.index') }}">
-                <span class="fa fa-list"></span> Tipo de cútis
+                <span class="fa fa-list"></span> {{ __('actions.sidemenu.skintypes') }}
             </a>
         </li>
         <li>
             <a href="{{ route('panel.setting.iristypes.index') }}">
-                <span class="fa fa-eye"></span> Tipo de íris
+                <span class="fa fa-eye"></span> {{ __('actions.sidemenu.iristypes') }}
             </a>
         </li>
         <li>
             <a href="{{ route('panel.setting.visittypes.index') }}">
-                <span class="fa fa-comments"></span> Tipo de visita
+                <span class="fa fa-comments"></span> {{ __('actions.sidemenu.visittypes') }}
             </a>
         </li>
         <li>
             <a href="{{ route('panel.setting.additiontypes.index') }}">
-                <span class="fa fa-comments"></span> Tipo de adição
+                <span class="fa fa-comments"></span> {{ __('actions.sidemenu.additiontypes') }}
             </a>
         </li>
         <li>
             <a href="{{ route('panel.setting.surgerytypes.index') }}">
-                <span class="fa fa-search"></span> Tipo de cirurgia
+                <span class="fa fa-search"></span> {{ __('actions.sidemenu.surgerytypes') }}
             </a>
         </li>
         <li>
@@ -75,12 +75,18 @@
         </li>
         <li>
             <a href="{{ route('panel.setting.covertesttypes.index') }}">
-                <span class="fa fa-search"></span> Tipo de cover test
+                <span class="fa fa-search"></span> {{ __('actions.sidemenu.colorvisiontypes') }}
             </a>
         </li>
-        <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Tipo de visão cromática</a></li>
         <li>
-            <a href="javascript:void(0);"><span class="fa fa-eye-slash"></span> Acuidade visual</a>
+            <a href="{{ route('panel.setting.colorvisiontypes.index') }}">
+                <span class="fa fa-search"></span> {{ __('actions.sidemenu.colorvisiontypes') }}
+            </a>
+        </li>
+        <li>
+            <a href="{{ route('panel.setting.visualacuitytypes.index') }}">
+                <span class="fa fa-eye-slash"></span> {{ __('actions.sidemenu.visualacuitytypes') }}
+            </a>
         </li>
         <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Lente</a></li>
         <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Procedimento</a></li>
@@ -90,7 +96,8 @@
 @if(session()->get('selected_entity_user_rule') === 'admin')
     <li>
         <a class="waves-effect waves-dark" href="{{ route('panel.accesscontrol.users.index') }}">
-            <i class="fa fa-users-cog"></i><span class="hide-menu">Usuários</span>
+            <i class="fa fa-users-cog"></i>
+            <span class="hide-menu">{{ __('actions.users') }}</span>
         </a>
     </li>
 @endif

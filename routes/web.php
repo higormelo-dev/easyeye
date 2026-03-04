@@ -1,17 +1,19 @@
 <?php
 
 use App\Http\Controllers\{AdditionTypesController,
-    CovenantsController,
-    CoverTestTypesController,
-    DoctorsController,
-    IrisTypesController,
-    Manager\EntitiesController,
-    PatientsController,
-    ProfileController,
-    SkinTypesController,
-    SurgeryTypesController,
-    UsersController,
-    VisitTypesController};
+	ColorVisionTypesController,
+	CovenantsController,
+	CoverTestTypesController,
+	DoctorsController,
+	IrisTypesController,
+	Manager\EntitiesController,
+	PatientsController,
+	ProfileController,
+	SkinTypesController,
+	SurgeryTypesController,
+	UsersController,
+	VisitTypesController,
+	VisualAcuityTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
 
 Route::get('/', function () {
@@ -72,8 +74,14 @@ Route::group(
             Route::get('surgerytypes/{surgerytype}/restore', [SurgeryTypesController::class, 'restore'])
                 ->name('surgerytypes.restore');
             Route::resource('covertesttypes', CoverTestTypesController::class);
-            // Route::get('covertesttypes/{covertesttype}/restore', [SurgeryTypesController::class, 'restore'])
-            //     ->name('covertesttypes.restore');
+            Route::get('covertesttypes/{covertesttype}/restore', [CoverTestTypesController::class, 'restore'])
+                ->name('covertesttypes.restore');
+            Route::resource('colorvisiontypes', ColorVisionTypesController::class);
+            Route::get('colorvisiontypes/{colorvisiontype}/restore', [ColorVisionTypesController::class, 'restore'])
+                ->name('colorvisiontypes.restore');
+            Route::resource('visualacuitytypes', VisualAcuityTypesController::class);
+            Route::get('visualacuitytypes/{colorvisiontype}/restore', [VisualAcuityTypesController::class, 'restore'])
+                ->name('visualacuitytypes.restore');
         });
 
         require __DIR__ . '/manager.php';
@@ -81,24 +89,6 @@ Route::group(
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-
-        // Route::group(['prefix' => 'ajax', 'as' => 'ajax.'], function () {
-        //     Route::group(['prefix' => 'datatables', 'as' => 'datatables'], function () {
-        //         Route::post('/users', [UsersController::class, 'ajaxDatatable'])->name('.users');
-        //         Route::post('/entities', [EntitiesController::class, 'ajaxDatatable'])->name('.entities');
-        //         Route::post('/visittypes', [VisitTypesController::class, 'ajaxDatatable'])
-        //             ->name('.visittypes');
-        //         Route::post('/additiontypes', [AdditionTypesController::class, 'ajaxDatatable'])
-        //             ->name('.additiontypes');
-        //         Route::post('/surgerytypes', [SurgeryTypesController::class, 'ajaxDatatable'])
-        //             ->name('.surgerytypes');
-        //
-        //         Route::post(
-        //             '/entity_integrators',
-        //             [App\Http\Controllers\Manager\EntityIntegratorsController::class, 'ajaxDatatable']
-        //         )->name('.integrators');
-        //     });
-        // });
     }
 );
 
