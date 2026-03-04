@@ -32,16 +32,10 @@ class PatientExamService
         return DB::transaction(function () use ($patientExam, $request) {
             $data = [
                 ...$request->only(self::FILLABLE_FIELDS),
-                'exam_id' => $this->examFindByIdOrCode($request->exam_identifier)?->id,
+                'exam_id'     => $this->examFindByIdOrCode($request->exam_identifier)?->id,
+                'doctor_id'   => $this->doctorFindByIdOrCode($request->doctor_identifier)?->id,
+                'schedule_id' => $this->scheduleFindByIdOrCode($request->schedule_identifier)?->id,
             ];
-
-            if ($request->filled('doctor_identifier')) {
-                $data['doctor_id'] = $this->doctorFindByIdOrCode($request->doctor_identifier)?->id;
-            }
-
-            if ($request->filled('schedule_identifier')) {
-                $data['schedule_id'] = $this->scheduleFindByIdOrCode($request->schedule_identifier)?->id;
-            }
 
             if ($request->hasFile('archive')) {
                 $uuid        = Str::uuid();
@@ -129,16 +123,10 @@ class PatientExamService
         $archivePath = "{$integrator->user->entity_id}/{$patientId}/exams/{$fileName}";
         $recordData  = [
             ...$request->only(self::FILLABLE_FIELDS),
-            'exam_id' => $this->examFindByIdOrCode($request->exam_identifier)?->id,
+            'exam_id'     => $this->examFindByIdOrCode($request->exam_identifier)?->id,
+            'doctor_id'   => $this->doctorFindByIdOrCode($request->doctor_code)?->id,
+            'schedule_id' => $this->scheduleFindByIdOrCode($request->schedule_code)?->id,
         ];
-
-        if ($request->filled('doctor_code')) {
-            $recordData['doctor_id'] = $this->doctorFindByIdOrCode($request->doctor_code)?->id;
-        }
-
-        if ($request->filled('schedule_code')) {
-            $recordData['schedule_id'] = $this->scheduleFindByIdOrCode($request->schedule_code)?->id;
-        }
 
         $existingRecord = PatientExam::query()
             ->with('patient')
