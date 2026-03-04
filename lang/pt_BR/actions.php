@@ -55,6 +55,11 @@ return [
     'localize'      => 'Localizar',
     'log_in'        => 'Conecte-se',
     'log_out'       => 'Sair',
+    'language'        => 'Idioma',
+    'language_changed' => 'Idioma alterado com sucesso.',
+    'entity_language_changed' => 'Idioma padrão da empresa alterado com sucesso.',
+    'language_reset' => 'Preferência de idioma removida. Usando o idioma da empresa.',
+    'use_entity_language' => 'Usar idioma da empresa',
     'named'         => [
         'add'       => 'Adicione :name',
         'choose'    => 'Escolha :name',

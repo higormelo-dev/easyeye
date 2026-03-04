@@ -53,6 +53,35 @@
                         </li>
                     </ul>
                     <ul class="navbar-nav my-lg-0">
+                        <!-- Seletor de Idioma -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle waves-effect waves-dark" href=""
+                               data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                <i class="ti-world"></i>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-end animated flipInY">
+                                @foreach(\App\Http\Middleware\SetLocale::getSupportedLocales() as $code => $locale)
+                                    <a href="{{ route('locale.switch', $code) }}"
+                                       class="dropdown-item {{ app()->getLocale() === $code ? 'active' : '' }}">
+                                        {{ $locale['flag'] }} {{ $locale['native'] }}
+                                        @if(app()->getLocale() === $code)
+                                            <i class="ti-check ms-2"></i>
+                                        @endif
+                                    </a>
+                                @endforeach
+                                @if(auth()->user()->locale)
+                                    <div class="dropdown-divider"></div>
+                                    <form action="{{ route('locale.user.clear') }}" method="POST" class="d-inline w-100">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="dropdown-item text-muted">
+                                            <i class="ti-reload me-1"></i> {{ __('actions.use_entity_language') }}
+                                        </button>
+                                    </form>
+                                @endif
+                            </div>
+                        </li>
+                        <!-- Fim Seletor de Idioma -->
                         <li class="nav-item dropdown u-pro">
                             <a class="nav-link dropdown-toggle waves-effect waves-dark profile-pic" href=""
                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">

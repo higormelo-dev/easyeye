@@ -42,6 +42,7 @@ class Entity extends Model
         'logo',
         'is_client',
         'active',
+        'locale',
     ];
 
     /**

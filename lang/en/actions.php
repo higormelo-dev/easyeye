@@ -55,6 +55,11 @@ return [
     'localize'      => 'Localize',
     'log_in'        => 'Log In',
     'log_out'       => 'Log Out',
+    'language'        => 'Language',
+    'language_changed' => 'Language changed successfully.',
+    'entity_language_changed' => 'Default company language changed successfully.',
+    'language_reset' => 'Language preference removed. Using company language.',
+    'use_entity_language' => 'Use company language',
     'named'         => [
         'add'       => 'Add :name',
         'choose'    => 'Choose :name',

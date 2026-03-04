@@ -4,15 +4,15 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     ApiCheckTokenExpiration,
     CheckJsonResponse,
     EnsureEntitySelected,
-    ParseMultipartFormData};
+    ParseMultipartFormData,
+    SetLocale};
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
-use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\{MethodNotAllowedHttpException, NotFoundHttpException};
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -26,6 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'entity.selected'      => EnsureEntitySelected::class,
             'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,
             'token.expiration'     => ApiCheckTokenExpiration::class,
+        ]);
+
+        // Adiciona o SetLocale ao grupo web para ser executado em todas as requisições web
+        $middleware->web(append: [
+            SetLocale::class,
         ]);
 
         $middleware->api([

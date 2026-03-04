@@ -19,6 +19,25 @@
     <body class="skin-default card-no-border">
         @include('components.preloader')
         <section id="wrapper">
+            <!-- Seletor de Idioma no topo -->
+            <div class="position-absolute top-0 end-0 m-3">
+                <div class="dropdown">
+                    <a class="btn btn-outline-light btn-sm dropdown-toggle" href="#"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="ti-world me-1"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        @foreach(\App\Http\Middleware\SetLocale::getSupportedLocales() as $code => $locale)
+                            <li>
+                                <a href="{{ route('locale.switch', $code) }}"
+                                   class="dropdown-item {{ app()->getLocale() === $code ? 'active' : '' }}">
+                                    {{ $locale['flag'] }} {{ $locale['native'] }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </div>
             <div class="login-register"
                  style="background-image:url({{ asset('system/images/background/login-register.jpg') }});">
                 <div class="login-box card">

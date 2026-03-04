@@ -332,5 +332,11 @@ return [
             'doctor_identifier'   => 'Identificador de médico inválido',
             'schedule_identifier' => 'Identificador de agendamento inválido',
         ],
+        'locale' => [
+            'unsupported' => 'Idioma não suportado.',
+        ],
+        'entity' => [
+            'not_selected' => 'Nenhuma empresa selecionada.',
+        ],
     ],
 ];

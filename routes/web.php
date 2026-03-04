@@ -6,6 +6,7 @@ use App\Http\Controllers\{AdditionTypesController,
 	CoverTestTypesController,
 	DoctorsController,
 	IrisTypesController,
+	LocaleController,
 	Manager\EntitiesController,
 	PatientsController,
 	ProfileController,
@@ -15,6 +16,15 @@ use App\Http\Controllers\{AdditionTypesController,
 	VisitTypesController,
 	VisualAcuityTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
+
+// Rota para trocar o idioma (sem autenticação necessária)
+Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
+
+// Rotas para gerenciar locale (requer autenticação)
+Route::middleware(['auth'])->group(function () {
+    Route::post('/locale/entity', [LocaleController::class, 'setEntityLocale'])->name('locale.entity');
+    Route::delete('/locale/user', [LocaleController::class, 'clearUserLocale'])->name('locale.user.clear');
+});
 
 Route::get('/', function () {
     if (Auth::check() && session()->has('selected_entity_user_id') &&
