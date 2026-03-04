@@ -233,7 +233,7 @@ class PatientExamService
         $integrator = request()->attributes->get('integrator');
         $query      = ExamType::query()
             ->where(function (Builder $query) use ($integrator) {
-                $query->where('entity_id', $integrator->entity_id)
+                $query->where('entity_id', $integrator->user->entity_id)
                     ->orWhereNull('entity_id');
             });
 

@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Database\Eloquent\{Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-class EntityUserIntegrator extends Model
+class EntityUserIntegrator extends Authenticatable
 {
     use HasApiTokens;
     use HasFactory;

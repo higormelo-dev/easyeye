@@ -114,7 +114,7 @@ class Entity extends Model
 
     public function entityUsers(): HasMany
     {
-        return $this->hasMany(EntityUser::class, 'id', 'entity_id');
+        return $this->hasMany(EntityUser::class, 'entity_id', 'id');
     }
 
     /**

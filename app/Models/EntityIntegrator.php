@@ -93,7 +93,7 @@ class EntityIntegrator extends Model
 
     public function equipments(): HasMany
     {
-        return $this->hasMany(EntityIntegratorEquipment::class, 'id', 'integrator_id');
+        return $this->hasMany(EntityIntegratorEquipment::class, 'integrator_id', 'id');
     }
 
     /**
