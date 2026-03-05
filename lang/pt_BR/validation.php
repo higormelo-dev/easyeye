@@ -332,6 +332,9 @@ return [
             'doctor_identifier'   => 'Identificador de médico inválido',
             'schedule_identifier' => 'Identificador de agendamento inválido',
         ],
+        'validation_unique' => [
+            'name_combination' => 'Já existe um exame com este nome para a combinação de exame, médico e agendamento informados.',
+        ],
         'locale' => [
             'unsupported' => 'Idioma não suportado.',
         ],

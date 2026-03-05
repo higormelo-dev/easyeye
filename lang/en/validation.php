@@ -322,5 +322,8 @@ return [
             'doctor_identifier'   => 'Doctor identifier is invalid',
             'schedule_identifier' => 'Schedule identifier is invalid',
         ],
+        'validation_unique' => [
+            'name_combination' => 'An exam with this name already exists for the given combination of exam, doctor and schedule.',
+        ],
     ],
 ];

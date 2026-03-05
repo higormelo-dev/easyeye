@@ -124,8 +124,8 @@ class PatientExamService
         $recordData  = [
             ...$request->only(self::FILLABLE_FIELDS),
             'exam_id'     => $this->examFindByIdOrCode($request->exam_identifier)?->id,
-            'doctor_id'   => $this->doctorFindByIdOrCode($request->doctor_code)?->id,
-            'schedule_id' => $this->scheduleFindByIdOrCode($request->schedule_code)?->id,
+            'doctor_id'   => $this->doctorFindByIdOrCode($request->doctor_identifier)?->id,
+            'schedule_id' => $this->scheduleFindByIdOrCode($request->schedule_identifier)?->id,
         ];
 
         $existingRecord = PatientExam::query()
