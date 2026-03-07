@@ -92,13 +92,13 @@ class PatientExamService
     public function findByIdOrCode(string $patientId, string $idOrCode): ?PatientExam
     {
         $query = PatientExam::query()
-            ->with('patient', '')
-            ->whereHas('patient', function ($query) use ($patientId) {
-                $query->where('id', $patientId)
-                    ->where(function ($query) {
-                        $query->where('entity_id', request()->attributes->get('integrator')->entity_id)
-                            ->whereNull('deleted_at');
-                    });
+            ->with('patient')
+            ->where('patient_id', $patientId)
+            ->whereHas('patient', function ($query) {
+                $query->where(function ($query) {
+                    $query->where('entity_id', request()->attributes->get('integrator')->user->entity_id)
+                        ->whereNull('deleted_at');
+                });
             });
 
         if (Str::isUuid($idOrCode)) {
@@ -130,8 +130,8 @@ class PatientExamService
 
         $existingRecord = PatientExam::query()
             ->with('patient')
-            ->whereHas('patient', function ($query) {
-                $query->where('entity_id', request()->attributes->get('integrator')->entity_id)
+            ->whereHas('patient', function ($query) use ($integrator) {
+                $query->where('entity_id', $integrator->user->entity_id)
                     ->whereNull('deleted_at');
             })
             ->where('name', $request->name)

@@ -34,7 +34,7 @@ class ExamsController extends Controller
     public function store(ExamRequest $request): PatientExamResource|JsonResponse
     {
         $integrator = request()->attributes->get('integrator');
-		$patient    = $this->findPatient($request, $integrator);
+        $patient    = $this->findPatient($request, $integrator);
 
         $recordData  = $this->buildRecordData($request, $patient);
         $archivePath = $this->generateArchivePath($integrator->user->entity_id, $patient->id, $request->file('archive'));
