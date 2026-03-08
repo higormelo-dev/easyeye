@@ -311,6 +311,7 @@ return [
         'exam_identifier'          => 'identificador do exame',
         'doctor_identifier'        => 'identificador do médico',
         'schedule_identifier'      => 'identificador do agendamento',
+        'away_or_near'             => 'longe ou perto',
     ],
     'custom' => [
         'generic' => [
@@ -342,4 +343,5 @@ return [
             'not_selected' => 'Nenhuma empresa selecionada.',
         ],
     ],
+    'at_least_one_required' => 'Pelo menos um dos campos :fields deve ser selecionado.',
 ];

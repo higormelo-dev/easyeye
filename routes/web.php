@@ -6,8 +6,9 @@ use App\Http\Controllers\{AdditionTypesController,
 	CoverTestTypesController,
 	DoctorsController,
 	IrisTypesController,
+	LensesController,
 	LocaleController,
-	Manager\EntitiesController,
+	NearPointConvergencesController,
 	PatientsController,
 	ProfileController,
 	SkinTypesController,
@@ -90,8 +91,17 @@ Route::group(
             Route::get('colorvisiontypes/{colorvisiontype}/restore', [ColorVisionTypesController::class, 'restore'])
                 ->name('colorvisiontypes.restore');
             Route::resource('visualacuitytypes', VisualAcuityTypesController::class);
-            Route::get('visualacuitytypes/{colorvisiontype}/restore', [VisualAcuityTypesController::class, 'restore'])
+            Route::get(
+                'visualacuitytypes/{colorvisiontype}/restore',
+                [VisualAcuityTypesController::class, 'restore']
+            )
                 ->name('visualacuitytypes.restore');
+            Route::resource('lenses', LensesController::class);
+            Route::get('lenses/{lens}/restore', [LensesController::class, 'restore'])
+                ->name('lenses.restore');
+            Route::resource('nearpointconvergences', NearPointConvergencesController::class);
+            Route::get('nearpointconvergences/{nearpointconvergence}/restore', [NearPointConvergencesController::class, 'restore'])
+                ->name('nearpointconvergences.restore');
         });
 
         require __DIR__ . '/manager.php';

@@ -5,13 +5,13 @@ $(function () {
 
     // Obtém traduções do Laravel
     const trans = window.translations;
-    const entityName = trans.actions.visualacuitytype;
+    const entityName = trans.actions.nearpointconvergence;
 
     // Obtém a instância do DataTable já criada pelo Laravel DataTables
-    let visualAcuityTypesDataTable = window.LaravelDataTables['visualacuitytypes_datatable'];
+    let nearPointConvergencesDataTable = window.LaravelDataTables['nearpointconvergences_datatable'];
 
     // Evento de desenho da tabela - registra os handlers dos botões
-    $('#visualacuitytypes_datatable').on('draw.dt', function () {
+    $('#nearpointconvergences_datatable').on('draw.dt', function () {
         $('[data-bs-toggle="tooltip"]').tooltip();
 
         // Editar
@@ -25,7 +25,7 @@ $(function () {
             $('#btn-modal-default').removeAttr('data-id');
             $("#erro-default").removeClass('show').css('display', 'none');
             $.ajax({
-                url: `visualacuitytypes/${record_id}/edit`,
+                url: `nearpointconvergences/${record_id}/edit`,
                 type: 'get',
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -53,7 +53,7 @@ $(function () {
             $('.modal-dialog').removeClass('modal-md modal-lg').addClass('modal-lg');
             $("#erro-default").removeClass('show').css('display', 'none');
             $.ajax({
-                url: `visualacuitytypes/${record_id}`,
+                url: `nearpointconvergences/${record_id}`,
                 success: function (data) {
                     $('#retorno-default').empty().append(data);
                     $('#modal_default').modal('show');
@@ -68,7 +68,7 @@ $(function () {
         $('.btn-active').off('click').on('click', function () {
             record_id = $(this).data('id');
             $.ajax({
-                url: `visualacuitytypes/${record_id}`,
+                url: `nearpointconvergences/${record_id}`,
                 type: 'put',
                 dataType: 'json',
                 data: {
@@ -80,7 +80,7 @@ $(function () {
                 },
                 success: function (response) {
                     showSuccessToast(response.message);
-                    visualAcuityTypesDataTable.ajax.reload();
+                    nearPointConvergencesDataTable.ajax.reload();
                 },
                 error: handleAjaxError
             });
@@ -101,14 +101,14 @@ $(function () {
                 if (result.value) {
                     $.ajax({
                         method: "delete",
-                        url: `visualacuitytypes/${record_id}`,
+                        url: `nearpointconvergences/${record_id}`,
                         dataType: 'json',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
                         success: function (response) {
                             showSuccessToast(response.message);
-                            visualAcuityTypesDataTable.ajax.reload();
+                            nearPointConvergencesDataTable.ajax.reload();
                         },
                         error: function (data) {
                             let error = data.responseJSON;
@@ -134,14 +134,14 @@ $(function () {
                 if (result.value) {
                     $.ajax({
                         method: "get",
-                        url: `visualacuitytypes/${record_id}/restore`,
+                        url: `nearpointconvergences/${record_id}/restore`,
                         dataType: 'json',
                         headers: {
                             'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
                         },
                         success: function (response) {
                             showSuccessToast(response.message);
-                            visualAcuityTypesDataTable.ajax.reload();
+                            nearPointConvergencesDataTable.ajax.reload();
                         },
                         error: function (data) {
                             let error = data.responseJSON;
@@ -162,7 +162,7 @@ $(function () {
         $('#btn-modal-default').attr('data-action', 'register');
         $('#btn-modal-default').removeAttr('data-id');
         $.ajax({
-            url: 'visualacuitytypes/create',
+            url: 'nearpointconvergences/create',
             type: 'get',
             beforeSend: function () {
                 $('#btn-modal-default').attr('disabled', true);
@@ -188,10 +188,9 @@ $(function () {
     $('#btn-modal-default').click(function () {
         let requestType = (btn_action === 'store') ? 'post' : 'put';
         let requestURL = (btn_action === 'store') ?
-            'visualacuitytypes' :
-            `visualacuitytypes/${record_id}`;
+            'nearpointconvergences' :
+            `nearpointconvergences/${record_id}`;
         let requestData = {
-            'scale': $('input[name=scale]').val(),
             'name': $('input[name=name]').val(),
         };
 
@@ -218,7 +217,7 @@ $(function () {
             success: function (response) {
                 showSuccessToast(response.message);
                 $('#modal_default').modal('hide');
-                visualAcuityTypesDataTable.ajax.reload();
+                nearPointConvergencesDataTable.ajax.reload();
             },
             error: handleAjaxError
         });

@@ -88,9 +88,17 @@
                 <span class="fa fa-eye-slash"></span> {{ __('actions.sidemenu.visualacuitytypes') }}
             </a>
         </li>
-        <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Lente</a></li>
+        <li>
+            <a href="{{ route('panel.setting.lenses.index') }}">
+                <span class="fa fa-search"></span> {{ __('actions.sidemenu.lenses') }}
+            </a>
+        </li>
         <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Procedimento</a></li>
-        <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Tipo de PPC</a></li>
+        <li>
+            <a href="{{ route('panel.setting.nearpointconvergences.index') }}">
+                <span class="fa fa-search"></span> {{ __('actions.sidemenu.nearpointconvergences') }}
+            </a>
+        </li>
     </ul>
 </li>
 @if(session()->get('selected_entity_user_rule') === 'admin')

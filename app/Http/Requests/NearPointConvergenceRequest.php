@@ -2,12 +2,11 @@
 
 namespace App\Http\Requests;
 
-use App\Models\{IrisType};
-use Illuminate\Contracts\Validation\ValidationRule;
+use App\Models\NearPointConvergence;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class IrisTypeRequest extends FormRequest
+class NearPointConvergenceRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -20,7 +19,7 @@ class IrisTypeRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, ValidationRule|array|string>
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -29,10 +28,11 @@ class IrisTypeRequest extends FormRequest
                 'required_without:type_method',
                 'string',
                 'max:255',
-                Rule::unique('iris_types', 'name')
-                    ->ignore($this->getIgnoredIrisTypeId(), 'id')
+                Rule::unique('near_point_convergences', 'name')
+                    ->ignore($this->getIgnoredAdditionTypeId(), 'id')
                     ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
+                        $query->where('entity_id', session('selected_entity_id'))
+                            ->whereNull('deleted_at');
                     }),
             ],
         ];
@@ -45,7 +45,7 @@ class IrisTypeRequest extends FormRequest
     }
 
     /**
-     * Get custom messages for validator errors.
+     * Get the error messages for the defined validation rules.
      *
      * @return array<string, string>
      */
@@ -56,17 +56,17 @@ class IrisTypeRequest extends FormRequest
         ];
     }
 
-    private function getIgnoredIrisTypeId()
+    private function getIgnoredAdditionTypeId()
     {
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $irisTypeId = $this->route('iristype');
+            $nearPointConvergenceId = $this->route('nearpointconvergence');
 
-            $IrisType = IrisType::query()
-                ->where('iris_types.entity_id', session('selected_entity_id'))
-                ->where('iris_types.id', $irisTypeId)
+            $nearPointConvergence = NearPointConvergence::query()
+                ->where('near_point_convergences.entity_id', session('selected_entity_id'))
+                ->where('near_point_convergences.id', $nearPointConvergenceId)
                 ->first();
 
-            return $IrisType->id ?? null;
+            return $nearPointConvergence->id ?? null;
         }
 
         return null;

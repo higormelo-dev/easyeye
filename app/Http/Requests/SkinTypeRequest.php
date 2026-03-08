@@ -44,6 +44,18 @@ class SkinTypeRequest extends FormRequest
         return $rules;
     }
 
+    /**
+     * Get custom messages for validator errors.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required_without' => trans('validation.custom.generic.required'),
+        ];
+    }
+
     private function getIgnoredSkinTypeId()
     {
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {

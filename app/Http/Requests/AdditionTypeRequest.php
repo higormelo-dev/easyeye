@@ -44,6 +44,18 @@ class AdditionTypeRequest extends FormRequest
         return $rules;
     }
 
+    /**
+     * Get the error messages for the defined validation rules.
+     *
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required_without' => trans('validation.custom.generic.required'),
+        ];
+    }
+
     private function getIgnoredAdditionTypeId()
     {
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {

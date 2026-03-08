@@ -89,4 +89,8 @@ return [
     'integration_name' => 'Nome da Integração',
     'ip'               => 'IP',
     'mac'              => 'Número MAC',
+
+    // Lente
+    'away' => 'Longe',
+    'near' => 'Perto',
 ];

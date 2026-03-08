@@ -2,12 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Lense extends Model
+class NearPointConvergence extends Model
 {
     use HasUuids;
     use SoftDeletes;
@@ -23,8 +21,6 @@ class Lense extends Model
         'entity_id',
         'code',
         'name',
-        'away',
-        'near',
         'active',
     ];
 
@@ -33,14 +29,14 @@ class Lense extends Model
      */
     protected static function booted(): void
     {
-        static::creating(function (self $lense) {
-            if (blank($lense->code)) {
-                $prefix = $lense->entity_id ? 'LS' : 'LSP';
+        static::creating(function (self $nearPointConvergence) {
+            if (blank($nearPointConvergence->code)) {
+                $prefix = $nearPointConvergence->entity_id ? 'NPC' : 'NPCP';
 
                 $lastType = static::withoutGlobalScopes()
                     ->when(
-                        $lense->entity_id !== null,
-                        fn ($q) => $q->where('entity_id', $lense->entity_id),
+                        $nearPointConvergence->entity_id !== null,
+                        fn ($q) => $q->where('entity_id', $nearPointConvergence->entity_id),
                         fn ($q) => $q->whereNull('entity_id')
                     )
                     ->where('code', 'like', $prefix . '-%')
@@ -54,7 +50,7 @@ class Lense extends Model
                     $newNumber = 1;
                 }
 
-                $lense->code = sprintf('%s-%010d', $prefix, $newNumber);
+                $nearPointConvergence->code = sprintf('%s-%010d', $prefix, $newNumber);
             }
         });
     }

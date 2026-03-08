@@ -2,12 +2,11 @@
 
 namespace App\Http\Requests;
 
-use App\Models\{IrisType};
-use Illuminate\Contracts\Validation\ValidationRule;
+use App\Models\Lense;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class IrisTypeRequest extends FormRequest
+class LenseRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -20,7 +19,7 @@ class IrisTypeRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, ValidationRule|array|string>
+     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -29,12 +28,26 @@ class IrisTypeRequest extends FormRequest
                 'required_without:type_method',
                 'string',
                 'max:255',
-                Rule::unique('iris_types', 'name')
-                    ->ignore($this->getIgnoredIrisTypeId(), 'id')
+                Rule::unique('lenses', 'name')
+                    ->ignore($this->getIgnoredLenseId(), 'id')
                     ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
+                        $query->where('entity_id', session('selected_entity_id'))
+                            ->whereNull('deleted_at');
                     }),
             ],
+            'away' => [
+                'required_without:type_method',
+                'boolean',
+                function ($attribute, $value, $fail) {
+                    if (! $this->input('away') && ! $this->input('near')) {
+                        $fail(
+                            __('validation.at_least_one_required',
+                                ['fields' => __('validation.attributes.away_or_near')])
+                        );
+                    }
+                },
+            ],
+            'near' => ['required_without:type_method', 'boolean'],
         ];
 
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
@@ -53,20 +66,22 @@ class IrisTypeRequest extends FormRequest
     {
         return [
             'name.required_without' => trans('validation.custom.generic.required'),
+            'away.required_without' => trans('validation.custom.generic.required'),
+            'near.required_without' => trans('validation.custom.generic.required'),
         ];
     }
 
-    private function getIgnoredIrisTypeId()
+    private function getIgnoredLenseId()
     {
         if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-            $irisTypeId = $this->route('iristype');
+            $lenseId = $this->route('lens');
 
-            $IrisType = IrisType::query()
-                ->where('iris_types.entity_id', session('selected_entity_id'))
-                ->where('iris_types.id', $irisTypeId)
+            $lense = Lense::query()
+                ->where('lenses.entity_id', session('selected_entity_id'))
+                ->where('lenses.id', $lenseId)
                 ->first();
 
-            return $IrisType->id ?? null;
+            return $lense->id ?? null;
         }
 
         return null;

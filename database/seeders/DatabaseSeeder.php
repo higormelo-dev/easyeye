@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
         $this->call(CoverTestTypesSeeder::class);
         $this->call(ColorVisionTypesSeeder::class);
         $this->call(VisualAcuityTypesSeeder::class);
+        $this->call(LensesSeeder::class);
+        $this->call(NearPointConvergencesSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);

@@ -304,6 +304,14 @@ return [
         'active'                   => 'active',
         'observation'              => 'observation',
         'table'                    => 'table',
+        'entity_id'                => 'entity',
+        'skin_id'                  => 'skin type',
+        'iris_id'                  => 'iris type',
+        'patient_identifier'       => 'patient identifier',
+        'exam_identifier'          => 'exam identifier',
+        'doctor_identifier'        => 'doctor identifier',
+        'schedule_identifier'      => 'schedule identifier',
+        'away_or_near'             => 'away or near',
     ],
     'custom' => [
         'generic' => [
@@ -326,4 +334,5 @@ return [
             'name_combination' => 'An exam with this name already exists for the given combination of exam, doctor and schedule.',
         ],
     ],
+    'at_least_one_required' => 'At least one of the fields :fields must be selected.',
 ];

@@ -24,7 +24,7 @@ class SurgeryTypeRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'category' => 'required|integer|in:0,1,2,3,4,5,6,7,8,9,10,11,12,13',
+            'category' => 'required_without:type_method|integer|in:0,1,2,3,4,5,6,7,8,9,10,11,12,13',
             'name'     => [
                 'required_without:type_method',
                 'string',
@@ -55,7 +55,9 @@ class SurgeryTypeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.unique' => __('validation.custom.surgery_type.name_unique'),
+            'category.required_without' => trans('validation.custom.generic.required'),
+            'name.required_without'     => trans('validation.custom.generic.required'),
+            'name.unique'               => __('validation.custom.surgery_type.name_unique'),
         ];
     }
 

@@ -89,4 +89,8 @@ return [
     'integration_name' => 'Integration Name',
     'ip'               => 'IP',
     'mac'              => 'MAC Address',
+
+    // Lense
+    'away' => 'Away',
+    'near' => 'Near',
 ];

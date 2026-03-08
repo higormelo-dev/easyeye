@@ -63,9 +63,8 @@ class CoverTestTypeRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required'       => __('validation.required', ['attribute' => mb_strtolower(__('actions.name'))]),
-            'name.unique'         => __('validation.unique', ['attribute' => mb_strtolower(__('actions.name'))]),
-            'abbreviation.unique' => __('validation.unique', ['attribute' => mb_strtolower(__('actions.abbreviation'))]),
+            'name.required_without'         => trans('validation.custom.generic.required'),
+            'abbreviation.required_without' => trans('validation.custom.generic.required'),
         ];
     }
 
