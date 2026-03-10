@@ -21688,3 +21688,266 @@ File: scss
     overflow: hidden; }
   .hidden-md-down {
     display: none; } }
+
+/* ============================================================================
+   Botões Menores e Discretos - Bootstrap 5.3
+   ========================================================================== */
+
+/* Botão extra small (removido no Bootstrap 5) */
+.btn-xs {
+    padding: 0.15rem 0.4rem !important;
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+    border-radius: 0.25rem !important;
+}
+
+/* Botão pequeno discreto */
+.btn-sm.btn-discrete,
+.btn-xs.btn-discrete {
+    background-color: #f8f9fa !important;
+    border-color: #dee2e6 !important;
+    color: #6c757d !important;
+    font-weight: 400 !important;
+}
+
+.btn-sm.btn-discrete:hover,
+.btn-xs.btn-discrete:hover {
+    background-color: #e9ecef !important;
+    border-color: #ced4da !important;
+    color: #495057 !important;
+}
+
+/* Reduzir ícones em botões pequenos */
+.btn-xs i,
+.btn-sm i {
+    font-size: 0.875em !important;
+}
+
+/* Ajuste do waves effect para botões pequenos */
+.btn-xs.waves-effect,
+.btn-sm.waves-effect {
+    overflow: hidden;
+}
+
+/* ============================================================================
+   DataTables Layout - Info à esquerda, Paginação à direita
+   ========================================================================== */
+
+.dataTables_wrapper .row:last-child {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-top: 1rem !important;
+}
+
+.dataTables_wrapper .dt-info {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+}
+
+.dataTables_wrapper .dt-paging {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+}
+
+@media (max-width: 576px) {
+    .dataTables_wrapper .row:last-child {
+        flex-direction: column !important;
+        gap: 1rem !important;
+    }
+    
+    .dataTables_wrapper .dt-info,
+    .dataTables_wrapper .dt-paging {
+        width: 100% !important;
+        text-align: center !important;
+    }
+}
+
+/* ============================================================================
+   DataTables Layout Fix - Versão Corrigida
+   ========================================================================== */
+
+/* Forçar flexbox no container do rodapé */
+div.dataTables_wrapper div.row:last-child {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+}
+
+/* Info à esquerda com ordem */
+.dataTables_wrapper .dt-info {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    order: 1 !important;
+}
+
+/* Paginação à direita com ordem */
+.dataTables_wrapper .dt-paging {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    margin-left: auto !important;
+    order: 2 !important;
+}
+
+/* Remover padding das colunas Bootstrap */
+.dataTables_wrapper .row:last-child > [class*="col-"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+/* Mobile responsivo */
+@media (max-width: 576px) {
+    div.dataTables_wrapper div.row:last-child {
+        flex-direction: column !important;
+        align-items: center !important;
+    }
+    
+    .dataTables_wrapper .dt-info,
+    .dataTables_wrapper .dt-paging {
+        width: 100% !important;
+        text-align: center !important;
+        margin: 0.5rem 0 !important;
+    }
+}
+
+/* ============================================================================
+   DataTables Layout Fix - SOLUÇÃO FINAL (seletores corretos para BS5)
+   ========================================================================== */
+
+/* O DataTables 2.x coloca .dt-info e .dt-paging como irmãos diretos */
+.dt-container:has(.dt-info) {
+    display: flex !important;
+    flex-wrap: wrap !important;
+}
+
+/* Tabela ocupa 100% da largura */
+.dt-container > table {
+    flex: 0 0 100% !important;
+    width: 100% !important;
+}
+
+/* Outros elementos antes da tabela também 100% */
+.dt-container > .dt-length,
+.dt-container > .dt-search,
+.dt-container > .dt-processing {
+    flex: 0 0 100% !important;
+}
+
+/* Info e paginação no mesmo nível - flexbox */
+.dt-container > .dt-info {
+    flex: 0 0 auto !important;
+    margin: 1rem 0 0 0 !important;
+    order: 1 !important;
+}
+
+.dt-container > .dt-paging {
+    flex: 0 0 auto !important;
+    margin: 1rem 0 0 auto !important;
+    order: 2 !important;
+}
+
+/* Esconder autosize */
+.dt-container > .dt-autosize {
+    flex: 0 0 100% !important;
+}
+
+/* Mobile - empilhar */
+@media (max-width: 576px) {
+    .dt-container > .dt-info,
+    .dt-container > .dt-paging {
+        flex: 0 0 100% !important;
+        text-align: center !important;
+        margin: 0.5rem 0 !important;
+    }
+}
+
+/* ============================================================================
+   DataTables - Botões de Paginação Menores
+   ========================================================================== */
+
+/* Reduzir tamanho dos botões de paginação */
+.dt-paging .pagination {
+    margin: 0 !important;
+}
+
+.dt-paging .page-link {
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.8125rem !important;
+    line-height: 1.2 !important;
+}
+
+/* Botões first/previous/next/last ainda menores */
+.dt-paging .page-link.first,
+.dt-paging .page-link.previous,
+.dt-paging .page-link.next,
+.dt-paging .page-link.last {
+    padding: 0.25rem 0.4rem !important;
+    font-size: 0.75rem !important;
+}
+
+/* Reduzir espaçamento entre botões */
+.dt-paging .page-item {
+    margin: 0 2px !important;
+}
+
+.dt-paging .page-item:first-child {
+    margin-left: 0 !important;
+}
+
+.dt-paging .page-item:last-child {
+    margin-right: 0 !important;
+}
+
+/* ============================================================================
+   Limitar caracteres com CSS - Text Truncate
+   ========================================================================== */
+
+/* Classe para truncar texto com ellipsis (...) */
+.text-truncate-custom {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+/* Larguras máximas predefinidas */
+.max-w-100 {
+    max-width: 100px !important;
+}
+
+.max-w-150 {
+    max-width: 150px !important;
+}
+
+.max-w-200 {
+    max-width: 200px !important;
+}
+
+.max-w-250 {
+    max-width: 250px !important;
+}
+
+.max-w-300 {
+    max-width: 300px !important;
+}
+
+/* Truncar nomes em células de tabela */
+.table td.truncate-name,
+.table th.truncate-name {
+    max-width: 200px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+/* Truncar em cards */
+.card-title.truncate {
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+}
+
+/* Truncar com tooltip automático */
+[data-bs-toggle="tooltip"][class*="truncate"] {
+    cursor: help;
+}

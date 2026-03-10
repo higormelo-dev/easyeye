@@ -9,9 +9,13 @@
                     @foreach($meta['breadcrumbs'] as $index => $breadcrumb)
                         <li class="breadcrumb-item {{ ($breadcrumb['active'] ?? false) ? 'active' : '' }}"
                             @if($breadcrumb['active'] ?? false) aria-current="page" @endif>
-                            <a href="{{$breadcrumb['url'] }}">
+                            @if($breadcrumb['active'] ?? false)
                                 {{ $breadcrumb['label'] ?? 'Página atual' }}
-                            </a>
+                            @else
+                                <a href="{{$breadcrumb['url'] }}" class="link-underline link-underline-opacity-0">
+                                    {{ $breadcrumb['label'] ?? 'Página atual' }}
+                                </a>
+                            @endif
                         </li>
                     @endforeach
                 </ol>

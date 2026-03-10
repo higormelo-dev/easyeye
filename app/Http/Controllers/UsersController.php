@@ -30,6 +30,63 @@ class UsersController extends Controller
     }
 
     /**
+     * Return paginated JSON for the card view.
+     */
+    public function cards(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 12;
+
+        $entityUsers = EntityUser::query()
+            ->withTrashed()
+            ->join('users', 'entity_users.user_id', '=', 'users.id')
+            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+            ->whereNot('entity_users.rule', 'doctor')
+            ->when($search, function ($q) use ($search) {
+                $lower = mb_strtolower($search, 'UTF-8');
+                $q->where(function ($inner) use ($lower) {
+                    $inner->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
+                          ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
+                });
+            })
+            ->select('entity_users.*', 'users.name', 'users.email')
+            ->orderBy('entity_users.created_at', 'desc')
+            ->paginate($perPage);
+
+        $isClient    = session()->get('selected_entity_is_client');
+        $entityId    = session()->get('selected_entity_id');
+        $rolesMap    = $isClient ? User::$rolesOfClients : User::$rolesOfManager;
+
+        $data = $entityUsers->map(function (EntityUser $eu) use ($rolesMap, $entityId) {
+            $userPhotoPath = 'system/images/users/' . $eu->user_id . '.jpg';
+
+            return [
+                'id'         => $eu->id,
+                'full_name'  => $eu->name,
+                'email'      => $eu->email,
+                'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
+                'active'     => (bool) $eu->active,
+                'deleted'    => ! is_null($eu->deleted_at),
+                'entity_id'  => $eu->entity_id,
+                'own_entity' => $eu->entity_id === $entityId,
+                'photo_url'  => file_exists(public_path($userPhotoPath))
+                    ? asset($userPhotoPath)
+                    : asset('system/images/team.png'),
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total'        => $entityUsers->total(),
+                'per_page'     => $entityUsers->perPage(),
+                'current_page' => $entityUsers->currentPage(),
+                'last_page'    => $entityUsers->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(UsersDataTable $dataTable): Factory|Application|View|JsonResponse

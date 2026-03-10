@@ -58,9 +58,12 @@ Route::group(
             return view('system.manager.dashboard');
         })->name('dashboard');
 
+        Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');
         Route::resource('doctors', DoctorsController::class);
+        Route::get('patients/cards', [PatientsController::class, 'cards'])->name('patients.cards');
         Route::resource('patients', PatientsController::class);
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
+            Route::get('users/cards', [UsersController::class, 'cards'])->name('users.cards');
             Route::resource('users', UsersController::class);
             Route::get('users/{user}/restore', [UsersController::class, 'restore'])
                 ->name('users.restore');

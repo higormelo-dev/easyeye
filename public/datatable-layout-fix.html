@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix DataTables Layout</title>
+    <style>
+        /* Solução CSS para DataTables Bootstrap 5 */
+        
+        /* Forçar layout flexbox no rodapé */
+        .dataTables_wrapper .dataTables_info,
+        .dataTables_wrapper .dataTables_paginate {
+            display: inline-block !important;
+        }
+        
+        /* Container do rodapé - flexbox */
+        .dataTables_wrapper .row:has(.dt-info) {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+        }
+        
+        /* Alternativa com seletor mais específico */
+        div.dataTables_wrapper div.row:last-child {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+        }
+        
+        /* Info à esquerda */
+        .dataTables_wrapper .dt-info {
+            flex: 0 0 auto !important;
+            margin: 0 !important;
+            order: 1;
+        }
+        
+        /* Paginação à direita */
+        .dataTables_wrapper .dt-paging {
+            flex: 0 0 auto !important;
+            margin: 0 !important;
+            margin-left: auto !important;
+            order: 2;
+        }
+        
+        /* Remover margens do Bootstrap grid */
+        .dataTables_wrapper .row > [class*="col-"] {
+            padding: 0 !important;
+        }
+        
+        /* Mobile */
+        @media (max-width: 576px) {
+            div.dataTables_wrapper div.row:last-child {
+                flex-direction: column !important;
+            }
+            
+            .dataTables_wrapper .dt-info,
+            .dataTables_wrapper .dt-paging {
+                width: 100% !important;
+                text-align: center !important;
+                margin: 0.5rem 0 !important;
+            }
+        }
+    </style>
+</head>
+<body style="padding: 20px; background: #f8f9fa;">
+    
+    <h2>Teste de Layout DataTables</h2>
+    
+    <div class="dataTables_wrapper">
+        <div class="row" style="margin-top: 1rem; background: white; padding: 1rem; border: 1px solid #dee2e6;">
+            <div class="dt-info" aria-live="polite" id="users_datatable_info" role="status">
+                Mostrando de 1 até 10 de 10 registros
+            </div>
+            <div class="dt-paging paging_full_numbers">
+                <nav aria-label="pagination">
+                    <ul class="pagination">
+                        <li class="dt-paging-button page-item disabled">
+                            <button class="page-link first" role="link" type="button">Primeiro</button>
+                        </li>
+                        <li class="dt-paging-button page-item disabled">
+                            <button class="page-link previous" role="link" type="button">Anterior</button>
+                        </li>
+                        <li class="dt-paging-button page-item active">
+                            <button class="page-link" role="link" type="button">1</button>
+                        </li>
+                        <li class="dt-paging-button page-item disabled">
+                            <button class="page-link next" role="link" type="button">Próximo</button>
+                        </li>
+                        <li class="dt-paging-button page-item disabled">
+                            <button class="page-link last" role="link" type="button">Último</button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+    
+    <p style="margin-top: 2rem; color: #666;">
+        ✅ Se a info está à esquerda e a paginação à direita, funcionou!<br>
+        ❌ Se estão empilhados, copie o CSS acima para seu projeto.
+    </p>
+    
+</body>
+</html>

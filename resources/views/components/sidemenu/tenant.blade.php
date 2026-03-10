@@ -22,7 +22,7 @@
         <i class="fas fa-cash-register"></i><span class="hide-menu">Finaceiro</span>
     </a>
     <ul aria-expanded="false" class="collapse">
-        <li><a href="javascript:void(0);">
+        <li><a href="javascript:void(0);" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-building"></span> Fluxo de caixa</a>
         </li>
     </ul>
@@ -33,32 +33,32 @@
     </a>
     <ul aria-expanded="false" class="collapse">
         <li>
-            <a href="{{ route('panel.setting.covenants.index') }}">
+            <a href="{{ route('panel.setting.covenants.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-list"></span> {{ __('actions.sidemenu.covenants') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.skintypes.index') }}">
+            <a href="{{ route('panel.setting.skintypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-list"></span> {{ __('actions.sidemenu.skintypes') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.iristypes.index') }}">
+            <a href="{{ route('panel.setting.iristypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-eye"></span> {{ __('actions.sidemenu.iristypes') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.visittypes.index') }}">
+            <a href="{{ route('panel.setting.visittypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-comments"></span> {{ __('actions.sidemenu.visittypes') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.additiontypes.index') }}">
+            <a href="{{ route('panel.setting.additiontypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-comments"></span> {{ __('actions.sidemenu.additiontypes') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.surgerytypes.index') }}">
+            <a href="{{ route('panel.setting.surgerytypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-search"></span> {{ __('actions.sidemenu.surgerytypes') }}
             </a>
         </li>
@@ -68,34 +68,40 @@
             </a>
             <ul aria-expanded="false" class="collapse">
                 <li>
-                    <a href="javascript:void(0);"><span class="fa fa-list"></span> Tipo de apresentação</a>
+                    <a href="javascript:void(0);" class="link-underline link-underline-opacity-0">
+                        <span class="fa fa-list"></span> Tipo de apresentação
+                    </a>
                 </li>
-                <li><a href="javascript:void(0);"><span class="fa fa-medkit"></span> Medicamento</a></li>
+                <li>
+                    <a href="javascript:void(0);" class="link-underline link-underline-opacity-0">
+                        <span class="fa fa-medkit"></span> Medicamento
+                    </a>
+                </li>
             </ul>
         </li>
         <li>
-            <a href="{{ route('panel.setting.covertesttypes.index') }}">
+            <a href="{{ route('panel.setting.covertesttypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-search"></span> {{ __('actions.sidemenu.colorvisiontypes') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.colorvisiontypes.index') }}">
+            <a href="{{ route('panel.setting.colorvisiontypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-search"></span> {{ __('actions.sidemenu.colorvisiontypes') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.visualacuitytypes.index') }}">
+            <a href="{{ route('panel.setting.visualacuitytypes.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-eye-slash"></span> {{ __('actions.sidemenu.visualacuitytypes') }}
             </a>
         </li>
         <li>
-            <a href="{{ route('panel.setting.lenses.index') }}">
+            <a href="{{ route('panel.setting.lenses.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-search"></span> {{ __('actions.sidemenu.lenses') }}
             </a>
         </li>
         <li><a href="javascript:void(0);"><span class="fa fa-search"></span> Procedimento</a></li>
         <li>
-            <a href="{{ route('panel.setting.nearpointconvergences.index') }}">
+            <a href="{{ route('panel.setting.nearpointconvergences.index') }}" class="link-underline link-underline-opacity-0">
                 <span class="fa fa-search"></span> {{ __('actions.sidemenu.nearpointconvergences') }}
             </a>
         </li>

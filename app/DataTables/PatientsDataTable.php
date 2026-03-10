@@ -28,6 +28,15 @@ class PatientsDataTable extends BaseDataTable
             ->editColumn('created_at', fn (Patient $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (Patient $record) => $this->formatActiveColumn($record))
             ->rawColumns(['active', 'action', 'cellphone_label'])
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->whereRaw('LOWER(people.full_name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
+            ->filterColumn('code', function ($query, $keyword) {
+                $query->whereRaw('LOWER(patients.code) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
+            ->filterColumn('cellphone_label', function ($query, $keyword) {
+                $query->whereRaw('LOWER(people.cellphone) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
             ->setRowId('id');
     }
 
@@ -66,7 +75,10 @@ class PatientsDataTable extends BaseDataTable
             ->minifiedAjax()
             ->orderBy(0, 'desc')
             ->selectStyleSingle()
-            ->parameters($this->getDefaultParameters());
+            ->parameters(array_merge($this->getDefaultParameters(), [
+                // Remove 'f' (filter/search input nativo) pois usamos busca unificada
+                'dom' => 'lrtip',
+            ]));
     }
 
     /**

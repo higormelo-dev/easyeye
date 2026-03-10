@@ -6,14 +6,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>{{ config('app.name', 'EasyEye') }}</title>
-        <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('system/images/favicon.png') }}}">
+        <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('system/images/favicon.png') }}">
+        {{-- Theme CSS (Elite Admin — not available on npm) --}}
         <link href="{{ asset('system/plugins/morrisjs/morris.css') }}" rel="stylesheet">
-        <link href="{{ asset('system/plugins/toast-master/css/jquery.toast.css') }}" rel="stylesheet">
-        <link href="{{ asset('system/plugins/datatables.net-bs4/css/responsive.dataTables.min.css') }}" rel="stylesheet">
-        <link href="{{ asset('system/plugins/sweetalert2/dist/sweetalert2.min.css') }}" rel="stylesheet">
-        <link href="{{ asset('system/plugins/jquery-asColorPicker-master/dist/css/asColorPicker.css') }}" rel="stylesheet">
         <link href="{{ asset('system/css/style.min.css') }}" rel="stylesheet">
         <link href="{{ asset('system/css/pages/dashboard1.css') }}" rel="stylesheet">
+        {{-- Vendor + App bundles (Bootstrap, DataTables, SweetAlert2, etc. via npm/Vite) --}}
+        <style>[x-cloak] { display: none !important; }</style>
+        @vite(['resources/js/vendor.js', 'resources/js/app.js'])
         <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
         <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
         <!--[if lt IE 9]>
@@ -23,6 +23,12 @@
     </head>
     <body class="skin-blue-dark fixed-layout mini-sidebar">
     @include('components.preloader')
+    @php
+        $userPhotoPath = 'system/images/users/' . auth()->id() . '.jpg';
+        $userPhotoUrl  = file_exists(public_path($userPhotoPath))
+            ? asset($userPhotoPath)
+            : asset('system/images/team.png');
+    @endphp
     <div id="main-wrapper">
         <header class="topbar">
             <nav class="navbar top-navbar navbar-expand-md navbar-dark">
@@ -83,13 +89,13 @@
                         </li>
                         <!-- Fim Seletor de Idioma -->
                         <li class="nav-item dropdown u-pro">
-                            <a class="nav-link dropdown-toggle waves-effect waves-dark profile-pic" href=""
+                            <a class="nav-link dropdown-toggle waves-effect waves-dark profile-pic link-underline link-underline-opacity-0" href=""
                                data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <img src="{{ asset('system/images/users/1.jpg') }}" alt="{{ auth()->user()->name }}"
+                                <img src="{{ $userPhotoUrl }}" alt="{{ auth()->user()->name }}"
                                      class="">
                                 <span class="hidden-md-down">
-                                            {{ auth()->user()->name }} &nbsp;<i class="fa fa-angle-down"></i>
-                                        </span>
+                                    {{ auth()->user()->name }} &nbsp;<i class="fa fa-angle-down"></i>
+                                </span>
                             </a>
                             <div class="dropdown-menu dropdown-menu-end animated flipInY">
                                 <a href="javascript:void(0)" class="dropdown-item">
@@ -117,12 +123,12 @@
                         <li class="user-pro">
                             <a class="has-arrow waves-effect waves-dark" href="javascript:void(0)"
                                aria-expanded="false">
-                                <img src="{{ asset('system/images/users/1.jpg') }}" alt="{{ auth()->user()->name }}"
+                                <img src="{{ $userPhotoUrl }}" alt="{{ auth()->user()->name }}"
                                      class="img-circle">
                                 <span class="hide-menu">{{ auth()->user()->name }}</span>
                                 <ul aria-expanded="false" class="collapse">
                                     <li>
-                                        <a href="javascript:void(0)">
+                                        <a href="javascript:void(0)" class="link-underline link-underline-opacity-0">
                                             <i class="ti-user"></i> {{ __('actions.edit_profile') }}
                                         </a>
                                     </li>
@@ -170,19 +176,16 @@
             © {{ \Carbon\Carbon::now()->year }} {{ config('app.name', 'EasyEye') }}
         </footer>
     </div>
+    {{-- jQuery must remain as a static (non-module) script so it is available
+         synchronously when sidebarmenu.js / waves.js / custom.min.js run.
+         All other libraries are loaded via the Vite vendor bundle (type="module",
+         deferred — but still executes before DOMContentLoaded). --}}
     <script src="{{ asset('system/plugins/jquery/dist/jquery.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/bootstrap/dist/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ asset('system/js/perfect-scrollbar.jquery.min.js') }}"></script>
+    {{-- Raphael + Morris need to be static: Morris accesses window.Raphael at parse-time --}}
     <script src="{{ asset('system/plugins/raphael/raphael-min.js') }}"></script>
     <script src="{{ asset('system/plugins/morrisjs/morris.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/jquery-sparkline/jquery.sparkline.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/toast-master/js/jquery.toast.js') }}"></script>
-    <script src="{{ asset('system/plugins/datatables.net/js/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/datatables.net-bs4/js/dataTables.responsive.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/sweetalert2/dist/sweetalert2.all.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/inputmask/dist/min/jquery.inputmask.bundle.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/jquery-asColor/dist/jquery-asColor.min.js') }}"></script>
-    <script src="{{ asset('system/plugins/jquery-asColorPicker-master/dist/jquery-asColorPicker.min.js') }}"></script>
+    {{-- Theme scripts that depend on window.$ / window.jQuery --}}
+    <script src="{{ asset('system/js/perfect-scrollbar.jquery.min.js') }}"></script>
     <script src="{{ asset('system/js/waves.js') }}"></script>
     <script src="{{ asset('system/js/sidebarmenu.js') }}"></script>
     <script src="{{ asset('system/js/custom.min.js') }}"></script>

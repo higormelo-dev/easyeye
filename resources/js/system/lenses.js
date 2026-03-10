@@ -91,7 +91,7 @@ $(function () {
             Swal.fire({
                 title: trans.messages.delete_confirm_title,
                 text: trans.messages.delete_confirm_text,
-                type: 'warning',
+                icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
                 cancelButtonColor: '#d33',
@@ -124,7 +124,7 @@ $(function () {
             Swal.fire({
                 title: trans.messages.restore_confirm_title,
                 text: trans.messages.restore_confirm_text,
-                type: 'warning',
+                icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#3085d6',
                 cancelButtonColor: '#d33',

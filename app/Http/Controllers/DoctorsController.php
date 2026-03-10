@@ -30,6 +30,58 @@ class DoctorsController extends Controller
     }
 
     /**
+     * Return paginated JSON for the card view.
+     */
+    public function cards(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 12;
+
+        $doctors = Doctor::query()
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->join('users', 'entity_users.user_id', '=', 'users.id')
+            ->join('people', 'doctors.person_id', '=', 'people.id')
+            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+            ->when($search, function ($q) use ($search) {
+                $lower = mb_strtolower($search, 'UTF-8');
+                $q->where(function ($inner) use ($lower) {
+                    $inner->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
+                        ->orWhereRaw('LOWER(doctors.code) LIKE ?', ["%{$lower}%"])
+                        ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
+                });
+            })
+            ->select('doctors.*', 'users.name as user_name', 'users.email', 'entity_users.user_id')
+            ->orderBy('doctors.created_at', 'desc')
+            ->paginate($perPage);
+
+        $data = $doctors->map(function (Doctor $d) {
+            $userPhotoPath = 'system/images/users/' . $d->user_id . '.jpg';
+
+            return [
+                'id'        => $d->id,
+                'full_name' => $d->user_name,
+                'code'      => $d->code,
+                'record'    => $d->record,
+                'email'     => $d->email,
+                'active'    => (bool) $d->active,
+                'photo_url' => file_exists(public_path($userPhotoPath))
+                    ? asset($userPhotoPath)
+                    : asset('system/images/team.png'),
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total'        => $doctors->total(),
+                'per_page'     => $doctors->perPage(),
+                'current_page' => $doctors->currentPage(),
+                'last_page'    => $doctors->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
      * Display a listing of the resource.
      */
     public function index(DoctorsDataTable $dataTable): Factory|Application|View|JsonResponse

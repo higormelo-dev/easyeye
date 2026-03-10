@@ -21,6 +21,12 @@ class DoctorsDataTable extends BaseDataTable
             ->addColumn('name', fn (Doctor $record) => $record->user_name)
             ->editColumn('created_at', fn (Doctor $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (Doctor $record) => $this->formatActiveColumn($record))
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->whereRaw('LOWER(people.full_name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
+            ->filterColumn('email', function ($query, $keyword) {
+                $query->whereRaw('LOWER(users.email) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
             ->rawColumns(['active', 'action'])
             ->setRowId('id');
     }
@@ -55,7 +61,9 @@ class DoctorsDataTable extends BaseDataTable
             ->minifiedAjax()
             ->orderBy(0, 'desc')
             ->selectStyleSingle()
-            ->parameters($this->getDefaultParameters());
+            ->parameters(array_merge($this->getDefaultParameters(), [
+                'dom' => 'lrtip',
+            ]));
     }
 
     /**

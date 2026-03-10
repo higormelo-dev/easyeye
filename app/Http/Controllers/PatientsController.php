@@ -11,7 +11,7 @@ use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{DB, Storage};
 
 class PatientsController extends Controller
 {
@@ -57,6 +57,63 @@ class PatientsController extends Controller
         ];
 
         return $dataTable->render('system.patients.index', compact('meta'));
+    }
+
+    /**
+     * Return paginated patients as JSON for the card view.
+     */
+    public function cards(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 12;
+
+        $patients = Patient::query()
+            ->withTrashed()
+            ->with(['person', 'covenant', 'skinType', 'irisType'])
+            ->join('people', 'patients.person_id', '=', 'people.id')
+            ->where(function ($query) {
+                $query->where('patients.entity_id', session()->get('selected_entity_id'))
+                    ->orWhere(function ($q) {
+                        $q->whereNull('patients.entity_id')
+                            ->whereNull('patients.deleted_at');
+                    });
+            })
+            ->when($search, function ($q) use ($search) {
+                $lower = mb_strtolower($search, 'UTF-8');
+                $q->where(function ($inner) use ($lower) {
+                    $inner->whereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"])
+                        ->orWhereRaw('LOWER(patients.code) LIKE ?', ["%{$lower}%"]);
+                });
+            })
+            ->select('patients.*')
+            ->orderBy('patients.created_at', 'desc')
+            ->paginate($perPage);
+
+        $data = $patients->map(fn (Patient $p) => [
+            'id'        => $p->id,
+            'full_name' => $p->person->full_name,
+            'code'      => $p->code,
+            'active'    => (bool) $p->active,
+            'age'       => $p->person->birth_date?->age
+                ? $p->person->birth_date->age . ' ' . __('actions.years')
+                : null,
+            'photo_url' => $p->photo && Storage::disk('public')->exists('images/patient/' . $p->photo)
+                ? asset('storage/images/patient/' . $p->photo)
+                : asset('system/images/team.png'),
+            'skin'     => $p->skinType?->name,
+            'iris'     => $p->irisType?->name,
+            'covenant' => $p->covenant?->name,
+        ]);
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total'        => $patients->total(),
+                'per_page'     => $patients->perPage(),
+                'current_page' => $patients->currentPage(),
+                'last_page'    => $patients->lastPage(),
+            ],
+        ]);
     }
 
     /**

@@ -24,6 +24,12 @@ class UsersDataTable extends BaseDataTable
                     ? $record->present()->getRule
                     : $record->present()->getClientRule
             )
+            ->filterColumn('name', function ($query, $keyword) {
+                $query->whereRaw('LOWER(users.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
+            ->filterColumn('email', function ($query, $keyword) {
+                $query->whereRaw('LOWER(users.email) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
             ->rawColumns(['active', 'action'])
             ->setRowId('id');
     }
@@ -52,7 +58,9 @@ class UsersDataTable extends BaseDataTable
             ->minifiedAjax()
             ->orderBy(0, 'desc')
             ->selectStyleSingle()
-            ->parameters($this->getDefaultParameters());
+            ->parameters(array_merge($this->getDefaultParameters(), [
+                'dom' => 'lrtip',
+            ]));
     }
 
     /**
