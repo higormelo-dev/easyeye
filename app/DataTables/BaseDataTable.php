@@ -69,7 +69,19 @@ abstract class BaseDataTable extends DataTable
         $btnActions = '';
         $entityId   = session()->get('selected_entity_id');
 
-        if (! $record->deleted_at && $record->entity_id === $entityId) {
+        $isGlobal = $record->entity_id === null;
+        $isOwned  = $record->entity_id === $entityId;
+
+        // Registros globais (entity_id = null): apenas visualizar
+        if (! $record->deleted_at && $isGlobal && $options['show']) {
+            $btnActions .= '<a href="javascript:void(0);"
+                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
+        }
+
+        // Registros da entidade: todos os botões
+        if (! $record->deleted_at && $isOwned) {
             if ($options['edit']) {
                 $btnActions .= '<a href="javascript:void(0);"
                     class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
@@ -99,7 +111,7 @@ abstract class BaseDataTable extends DataTable
                     data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
             }
-        } elseif ($record->deleted_at && $record->entity_id === $entityId && $options['restore']) {
+        } elseif ($record->deleted_at && $isOwned && $options['restore']) {
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"

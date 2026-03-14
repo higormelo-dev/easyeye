@@ -56,7 +56,7 @@ class SurgeryTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.surgerytypes.index', compact('meta'));
+        return $dataTable->render('system.settings.surgerytypes.index', compact('meta'));
     }
 
     /**
@@ -66,7 +66,7 @@ class SurgeryTypesController extends Controller
     {
         $categories = SurgeryType::$categories;
 
-        return view('system.surgerytypes.form', compact('categories'));
+        return view('system.settings.surgerytypes.form', compact('categories'));
     }
 
     /**
@@ -81,7 +81,7 @@ class SurgeryTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new SurgeryTypeResource($record))['data'],
+                'data'    => new SurgeryTypeResource($record),
             ]);
         }
 
@@ -98,12 +98,12 @@ class SurgeryTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new SurgeryTypeResource($record))['data'],
+                'data' => new SurgeryTypeResource($record),
             ]);
         }
 
         return view(
-            'system.surgerytypes.show',
+            'system.settings.surgerytypes.show',
             compact('record')
         );
     }
@@ -115,7 +115,7 @@ class SurgeryTypesController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        return view('system.surgerytypes.form', compact('record'));
+        return view('system.settings.surgerytypes.form', compact('record'));
     }
 
     /**
@@ -132,7 +132,7 @@ class SurgeryTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new SurgeryTypeResource($updatedRecord))['data'],
+                'data'    => new SurgeryTypeResource($updatedRecord),
             ]);
         }
 

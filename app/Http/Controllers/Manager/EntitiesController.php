@@ -2,190 +2,114 @@
 
 namespace App\Http\Controllers\Manager;
 
+use App\DataTables\EntitiesDataTable;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Manager\EntityRequest;
 use App\Models\Entity;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Http\{JsonResponse, RedirectResponse};
+use Illuminate\Routing\Redirector;
 
 class EntitiesController extends Controller
 {
-    /**
-     * @var string
-     */
     protected string $titleController = 'Empresas';
 
-    /**
-     * Instance of the standard model.
-     */
-    protected Entity $model;
-
-    public function __construct(Entity $entity)
-    {
-        $this->model = $entity;
-    }
-
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(): Factory|Application|View
+    public function index(EntitiesDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
             'title'       => $this->titleController,
             'action'      => __('actions.records'),
             'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.manager.entities.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                  'active' => false],
+                ['label' => $this->titleController,          'url' => route('panel.manager.entities.index'),     'active' => false],
+                ['label' => __('actions.records'),            'url' => 'javascript:void(0);',                     'active' => true],
             ],
         ];
 
-        return view('system.manager.entities.index', compact('meta'));
+        $storeUrl = route('panel.manager.entities.store');
+        $baseUrl  = url('panel/manager/entities');
+
+        return $dataTable->render('system.manager.entities.index', compact('meta', 'storeUrl', 'baseUrl'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(EntityRequest $request): Application|JsonResponse|Redirector|RedirectResponse
     {
-        //
-    }
+        $record = Entity::create($request->validated());
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
-    }
-
-    /**
-     * @param  Request $request
-     * @return JsonResponse
-     */
-    public function ajaxDatatable(Request $request): JsonResponse
-    {
-        $columns = [
-            0 => 'created_at',
-            1 => 'name',
-            2 => 'active',
-            3 => 'action',
-        ];
-
-        $totalRecords = $this->model->count();
-        $limit        = $request->get('length');
-        $start        = $request->get('start');
-        $order        = $columns[$request->get('order')[0]['column']];
-        $dir          = $request->get('order')[0]['dir'];
-
-        if (empty($request->get('search')['value'])) {
-            $records = $this->model->skip($start)->take($limit)
-                ->orderBy($order, $dir)->get();
-            $totalFiltered = $this->model->count();
-        } else {
-            $search  = $request->get('search')['value'];
-            $records = $this->model->where('name', 'like', "%{$search}%")
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->get();
-            $totalFiltered = $this->model->where('name', 'like', "%{$search}%")
-                ->skip($start)
-                ->take($limit)
-                ->orderBy($order, $dir)
-                ->count();
-        }
-        $data = [];
-
-        if (count($records)) {
-            foreach ($records as $record) {
-                $btnActions                = '';
-                $information['created_at'] = $record->created_at->format('d/m/Y H:i');
-                $information['name']       = $record->name;
-                $information['active']     = $record->active ?
-                    '<span class="badge bg-success">SIM</span>' :
-                    '<span class="badge bg-dark">NÃO</span>';
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Editar"><i class="fa fa-edit"></i></a>';
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Visualizar"><i class="fa fa-eye"></i></a>';
-
-                $btnActions .= '<a href="' . route('panel.manager.entities.integrators.index', $record->id) . '"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Integradores"><i class="fas fa-cogs"></i></a>';
-
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-                    data-id="' . $record->id . '" data-situation="' . (($record->active) ? 0 : 1) . '"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . (($record->active) ? 'Inativar' : 'Ativar') . '">
-                    <i class="fas ' . (($record->active) ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-danger btn-danger btn-xs m-1 btn-trash"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Deletar"><i class="fas fa-trash-alt"></i></a>';
-                $information['action'] = $btnActions;
-                $data[]                = $information;
-            }
-
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $this->titleController . ' cadastrada com sucesso.',
+                'data'    => $record->toArray(),
+            ]);
         }
 
-        return response()->json(
-            [
-                'draw'            => (int) $request->get('draw'),
-                'recordsTotal'    => (int) $totalRecords,
-                'recordsFiltered' => (int) $totalFiltered,
-                'data'            => $data,
-            ]
-        );
+        return redirect(route('panel.manager.entities.index'))
+            ->with('message', $this->titleController . ' cadastrada com sucesso.');
+    }
+
+    public function show(string $id): View|JsonResponse
+    {
+        $record = Entity::withTrashed()->findOrFail($id);
+
+        return view('system.manager.entities.show', compact('record'));
+    }
+
+    public function editData(string $id): JsonResponse
+    {
+        $record = Entity::withTrashed()->findOrFail($id);
+
+        return response()->json(['data' => [
+            'name'                   => $record->name,
+            'subdomain'              => $record->subdomain,
+            'email'                  => $record->email,
+            'telephone'              => $record->telephone,
+            'cellphone'              => $record->cellphone,
+            'national_registration'  => $record->national_registration,
+            'state_registration'     => $record->state_registration,
+            'municipal_registration' => $record->municipal_registration,
+            'website'                => $record->website,
+            'zipcode'                => $record->zipcode,
+            'address'                => $record->address,
+            'number'                 => $record->number,
+            'complement'             => $record->complement,
+            'district'               => $record->district,
+            'city'                   => $record->city,
+            'state'                  => $record->state,
+            'country'                => $record->country,
+            'active'                 => (bool) $record->active,
+        ]]);
+    }
+
+    public function update(EntityRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
+    {
+        $record = Entity::findOrFail($id);
+        $record->update($request->validated());
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'message' => $this->titleController . ' atualizada com sucesso.',
+                'data'    => $record->fresh()->toArray(),
+            ]);
+        }
+
+        return redirect(route('panel.manager.entities.index'))
+            ->with('message', $this->titleController . ' atualizada com sucesso.');
+    }
+
+    public function destroy(string $id): Application|JsonResponse|Redirector|RedirectResponse
+    {
+        $record = Entity::findOrFail($id);
+        $record->delete();
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $this->titleController . ' removida com sucesso.',
+                'deleted' => $record->toArray(),
+            ]);
+        }
+
+        return redirect(route('panel.manager.entities.index'))
+            ->with('message', $this->titleController . ' removida com sucesso.');
     }
 }

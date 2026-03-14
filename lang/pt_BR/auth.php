@@ -24,4 +24,53 @@ return [
     'token_expired'            => 'Token expirado',
     'user_integrator_inactive' => 'Usuário inativo',
     'token_expired_inactivity' => 'Token expirado por inatividade',
+    'session_expiring_title'   => 'Sessão prestes a expirar',
+    'session_expiring_html'    => 'Sua sessão irá expirar em <strong id="swal-session-countdown">2:00</strong> por inatividade.',
+    'session_stay'             => 'Continuar conectado',
+    'session_logout'           => 'Sair agora',
+
+    'register' => [
+        'title'              => 'Crie sua conta',
+        'step_personal'      => 'Seus dados',
+        'step_company'       => 'Empresa & Plano',
+        'name'               => 'Nome',
+        'email'              => 'E-mail',
+        'password'           => 'Senha',
+        'confirm_password'   => 'Confirmar senha',
+        'company_name'       => 'Nome da empresa',
+        'cnpj'               => 'CNPJ',
+        'optional'           => 'opcional',
+        'choose_plan'        => 'Escolha um plano',
+        'trial_note'         => 'Comece seu período gratuito — sem cartão de crédito.',
+        'next'               => 'Próximo',
+        'back'               => 'Voltar',
+        'create_account'     => 'Criar conta',
+        'processing'         => 'Processando...',
+        'already_registered' => 'Já tem uma conta?',
+        'log_in'             => 'Faça login',
+        'email_taken'        => 'Este e-mail já está cadastrado.',
+        'field_required'     => 'Campo obrigatório.',
+        'passwords_mismatch' => 'As senhas não conferem.',
+    ],
+
+    'forgot_password' => [
+        'title'       => 'Recuperar senha',
+        'description' => 'Esqueceu sua senha? Sem problema. Informe seu e-mail e enviaremos um link para você criar uma nova senha.',
+        'send_link'   => 'Enviar link de recuperação',
+    ],
+
+    'reset_password' => [
+        'title'            => 'Nova senha',
+        'email'            => 'E-mail',
+        'password'         => 'Nova senha',
+        'confirm_password' => 'Confirmar nova senha',
+        'submit'           => 'Redefinir senha',
+    ],
+
+    'verify_email' => [
+        'title'       => 'Verificar e-mail',
+        'description' => 'Obrigado por se cadastrar! Antes de começar, verifique seu e-mail clicando no link que enviamos. Se não recebeu, podemos reenviar.',
+        'link_sent'   => 'Um novo link de verificação foi enviado para o seu e-mail.',
+        'resend'      => 'Reenviar e-mail de verificação',
+    ],
 ];

@@ -45,3 +45,24 @@ function something()
 {
     // ..
 }
+
+/**
+ * Cria um registro EntityUser (membership) para uso nos testes de ACL.
+ * O código é gerado automaticamente pelo booted() do model.
+ */
+function createEntityUser(
+    \App\Models\Entity $entity,
+    \App\Models\User $user,
+    string $rule,
+    bool $active = true,
+    bool $isOwner = false,
+): \App\Models\EntityUser {
+    return \App\Models\EntityUser::create([
+        'entity_id' => $entity->id,
+        'user_id'   => $user->id,
+        'rule'      => $rule,
+        'active'    => $active,
+        'is_owner'  => $isOwner,
+        'joined_at' => now(),
+    ]);
+}

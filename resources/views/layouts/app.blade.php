@@ -14,6 +14,7 @@
         {{-- Vendor + App bundles (Bootstrap, DataTables, SweetAlert2, etc. via npm/Vite) --}}
         <style>[x-cloak] { display: none !important; }</style>
         @vite(['resources/js/vendor.js', 'resources/js/app.js'])
+        @stack('styles')
         <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
         <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
         <!--[if lt IE 9]>
@@ -246,6 +247,83 @@
     </script>
     @yield('javascript')
 
+    <script>
+    (function () {
+        var SESSION_LIFETIME_MS = {{ config('session.lifetime') * 60 * 1000 }};
+        var WARNING_BEFORE_MS   = 2 * 60 * 1000; // avisa 2 minutos antes
+        var warningTimer, expireTimer, warningShown = false;
+
+        function resetTimers() {
+            clearTimeout(warningTimer);
+            clearTimeout(expireTimer);
+            warningShown = false;
+
+            warningTimer = setTimeout(showWarning, SESSION_LIFETIME_MS - WARNING_BEFORE_MS);
+            expireTimer  = setTimeout(expireSession, SESSION_LIFETIME_MS);
+        }
+
+        function showWarning() {
+            if (warningShown) return;
+            warningShown = true;
+
+            var remaining = 120;
+            Swal.fire({
+                title: '{{ __("auth.session_expiring_title") }}',
+                html: '{!! __("auth.session_expiring_html") !!}',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: '{{ __("auth.session_stay") }}',
+                cancelButtonText: '{{ __("auth.session_logout") }}',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: function () {
+                    var el = document.getElementById('swal-session-countdown');
+                    var interval = setInterval(function () {
+                        remaining--;
+                        var m = Math.floor(remaining / 60);
+                        var s = remaining % 60;
+                        if (el) el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+                        if (remaining <= 0) clearInterval(interval);
+                    }, 1000);
+                    Swal.getPopup().__countdownInterval = interval;
+                },
+                willClose: function () {
+                    clearInterval(Swal.getPopup().__countdownInterval);
+                }
+            }).then(function (result) {
+                if (result.isConfirmed) {
+                    fetch('{{ route('session.ping') }}', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+                    })
+                    .then(function (r) {
+                        if (r.ok) {
+                            resetTimers();
+                        } else {
+                            expireSession();
+                        }
+                    })
+                    .catch(expireSession);
+                } else {
+                    expireSession();
+                }
+            });
+        }
+
+        function expireSession() {
+            // Recarregar a página atual: o middleware de auth armazenará a URL
+            // e redirecionará para o login. Após o login, redirect()->intended()
+            // devolve o usuário para cá.
+            window.location.reload();
+        }
+
+        ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(function (evt) {
+            document.addEventListener(evt, resetTimers, { passive: true });
+        });
+
+        resetTimers();
+    })();
+    </script>
 
     {{-- <div class="min-h-screen bg-gray-100 dark:bg-gray-900"> --}}
     {{--     @include('layouts.navigation') --}}

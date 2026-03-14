@@ -312,6 +312,9 @@ return [
         'doctor_identifier'        => 'doctor identifier',
         'schedule_identifier'      => 'schedule identifier',
         'away_or_near'             => 'away or near',
+        'doctor_id'                => 'doctor',
+        'date_time'                => 'date and time',
+        'patient_id'               => 'patient',
     ],
     'custom' => [
         'generic' => [
@@ -333,6 +336,11 @@ return [
         'validation_unique' => [
             'name_combination' => 'An exam with this name already exists for the given combination of exam, doctor and schedule.',
         ],
+        'schedule' => [
+            'doctor_not_found'       => 'The selected doctor is invalid or does not belong to this company.',
+            'doctor_datetime_unique' => 'There is already an appointment for this doctor at this time.',
+        ],
     ],
-    'at_least_one_required' => 'At least one of the fields :fields must be selected.',
+    'at_least_one_required'   => 'At least one of the fields :fields must be selected.',
+    'cnpj_already_registered' => 'This CNPJ is already registered.',
 ];

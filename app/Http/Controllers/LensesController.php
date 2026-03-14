@@ -56,7 +56,7 @@ class LensesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.lenses.index', compact('meta'));
+        return $dataTable->render('system.settings.lenses.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class LensesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.lenses.form');
+        return view('system.settings.lenses.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class LensesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new LenseResource($record))['data'],
+                'data'    => new LenseResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class LensesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new LenseResource($record))['data'],
+                'data' => new LenseResource($record),
             ]);
         }
 
         return view(
-            'system.lenses.show',
+            'system.settings.lenses.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class LensesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new LenseResource($record))['data'],
+                'data' => new LenseResource($record),
             ]);
         }
 
-        return view('system.lenses.form', compact('record'));
+        return view('system.settings.lenses.form', compact('record'));
     }
 
     /**
@@ -136,7 +136,7 @@ class LensesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new LenseResource($updatedRecord))['data'],
+                'data'    => new LenseResource($updatedRecord),
             ]);
         }
 

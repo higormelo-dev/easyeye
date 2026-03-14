@@ -2,47 +2,60 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Actions\Register\RegisterAction;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Models\Plan;
+use App\Models\SubscriptionSetting;
 use App\Models\User;
-use Illuminate\Auth\Events\Registered;
-use Illuminate\Http\{RedirectResponse, Request};
-use Illuminate\Support\Facades\{Auth, Hash};
-use Illuminate\Validation\Rules;
+use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
 {
     /**
-     * Display the registration view.
+     * Display the registration wizard view.
      */
     public function create(): View
     {
-        return view('auth.register');
+        $plans     = Plan::active()->with('features')->orderBy('sort_order')->get();
+        $trialDays = SubscriptionSetting::trialDays();
+
+        return view('auth.register', compact('plans', 'trialDays'));
     }
 
     /**
-     * Handle an incoming registration request.
-     *
-     * @throws \Illuminate\Validation\ValidationException
+     * Check if an e-mail address is available (AJAX — called by the wizard).
      */
-    public function store(Request $request): RedirectResponse
+    public function checkEmail(Request $request): JsonResponse
     {
-        $request->validate([
-            'name'     => ['required', 'string', 'max:255'],
-            'email'    => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-            'password' => ['required', 'confirmed', Rules\Password::defaults()],
+        $exists = User::where('email', $request->string('email')->lower()->toString())->exists();
+
+        return response()->json(['available' => ! $exists]);
+    }
+
+    /**
+     * Handle the registration form submission.
+     */
+    public function store(RegisterRequest $request, RegisterAction $action): JsonResponse
+    {
+        $result = $action->execute($request->validated());
+
+        Auth::login($result['user']);
+
+        $entityUser = $result['entityUser'];
+
+        session([
+            'selected_entity_user_id'   => $entityUser->id,
+            'selected_entity_user_rule' => $entityUser->rule,
+            'selected_entity_id'        => $result['entity']->id,
+            'selected_entity_is_client' => $result['entity']->is_client,
+            'user_rule'                 => $entityUser->rule,
         ]);
 
-        $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
+        return response()->json([
+            'redirect' => route('panel.dashboard', absolute: false),
         ]);
-
-        event(new Registered($user));
-
-        Auth::login($user);
-
-        return redirect(route('panel.dashboard', absolute: false));
     }
 }

@@ -1,7 +1,7 @@
 import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 
 $(function () {
-    let record_id, btn_action;
+    let record_id;
 
     const trans      = window.translations;
     const entityName = trans.actions.doctor;
@@ -23,7 +23,7 @@ $(function () {
         }
     }
 
-    // ── Handlers via delegation — funcionam na tabela E nos cards ────────────
+    window.addEventListener('doctor-saved', () => reloadCurrentView());
 
     // Visualizar
     $(document).on('click', '.btn-show', function () {
@@ -31,7 +31,7 @@ $(function () {
         $('.modal-title-default').empty().append(trans.messages.view.replace(':name', entityName));
         $('#btn-modal-default').css('display', 'none');
         $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-lg');
-        $("#erro-default").removeClass('show').css('display', 'none');
+        $('#erro-default').removeClass('show').css('display', 'none');
         $.ajax({
             url: 'doctors/' + record_id,
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
@@ -43,41 +43,20 @@ $(function () {
         });
     });
 
-    // Editar
+    // Editar — delega ao Alpine crudForm via evento nativo
     $(document).on('click', '.btn-edit', function () {
-        record_id = $(this).data('id');
-        btn_action = 'update';
-        $('.modal-title-default').empty().append(trans.messages.edit.replace(':name', entityName));
-        $('#btn-modal-default').css('display', 'block');
-        $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
-        $('#btn-modal-default').attr('data-action', 'register').removeAttr('data-id');
-        $("#erro-default").removeClass('show').css('display', 'none');
-        $.ajax({
-            url: 'doctors/' + record_id + '/edit',
-            type: 'get',
-            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
-            beforeSend: function () {
-                $('#btn-modal-default').attr('disabled', false);
-                $("#erro-default").removeClass('show').css('display', 'none');
-                $("#erro-msg-default").empty();
-            },
-            success: function (response) {
-                $('#retorno-default').empty().append(response);
-                $('#modal_default').modal('show');
-                setTimeout(initModalEvents, 100);
-            },
-            error: handleAjaxError
-        });
+        const id = $(this).data('id');
+        window.dispatchEvent(new CustomEvent('edit-doctor', { detail: { id } }));
     });
 
     // Ativar / Inativar
     $(document).on('click', '.btn-active', function () {
-        record_id = $(this).data('id');
+        record_id = $(this).attr('data-id');
         $.ajax({
             url: 'doctors/' + record_id,
             type: 'put',
             dataType: 'json',
-            data: { 'type_method': 1, 'active': $(this).data('situation') },
+            data: { 'type_method': 1, 'active': parseInt($(this).attr('data-situation'), 10) },
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (response) {
                 showSuccessToast(response.message);
@@ -91,94 +70,27 @@ $(function () {
     $(document).on('click', '.btn-trash', function () {
         record_id = $(this).data('id');
         Swal.fire({
-            title: trans.messages.delete_confirm_title,
-            text: trans.messages.delete_confirm_text,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: trans.messages.confirm_yes,
-            cancelButtonText: trans.messages.confirm_no
+            title:              trans.messages.delete_confirm_title,
+            text:               trans.messages.delete_confirm_text,
+            icon:               'warning',
+            showCancelButton:   true,
+            confirmButtonColor: '#dc3545',
+            confirmButtonText:  trans.messages.confirm_yes,
+            cancelButtonText:   trans.messages.confirm_no,
         }).then((result) => {
-            if (result.value) {
+            if (result.isConfirmed) {
                 $.ajax({
-                    method: 'delete',
-                    url: 'doctors/' + record_id,
+                    method:   'delete',
+                    url:      'doctors/' + record_id,
                     dataType: 'json',
-                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                    headers:  { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                     success: function (response) {
                         showSuccessToast(response.message);
                         reloadCurrentView();
                     },
-                    error: function (data) {
-                        showErrorToast(data.responseJSON?.message);
-                    }
+                    error: function (data) { showErrorToast(data.responseJSON?.message); }
                 });
             }
         });
     });
-
-    // ── Novo registro ─────────────────────────────────────────────────────────
-    $('.new-register').on('click', function () {
-        btn_action = 'store';
-        $('.modal-title-default').empty().append(trans.messages.register.replace(':name', entityName));
-        $('#btn-modal-default').css('display', 'block');
-        $('.modal-dialog').removeClass('modal-md modal-lg modal-xl').addClass('modal-xl');
-        $('#btn-modal-default').attr('data-action', 'register').removeAttr('data-id');
-        $.ajax({
-            url: 'doctors/create',
-            type: 'get',
-            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
-            beforeSend: function () {
-                $('#btn-modal-default').attr('disabled', true);
-                $("#erro-default").removeClass('show').css('display', 'none');
-                $("#erro-msg-default").empty();
-            },
-            complete: function () { $('#btn-modal-default').attr('disabled', false); },
-            success: function (response) {
-                $('#retorno-default').empty().append(response);
-                $('#modal_default').modal('show');
-                setTimeout(initModalEvents, 100);
-            },
-            error: handleAjaxError
-        });
-    });
-
-    // Salvar (criar ou atualizar)
-    $('#btn-modal-default').on('click', function () {
-        const requestType = btn_action === 'store' ? 'post' : 'put';
-        const requestURL  = btn_action === 'store' ? 'doctors' : 'doctors/' + record_id;
-        const requestData = {
-            category: $('select[name=category]').val(),
-            name: $('input[name=name]').val(),
-        };
-
-        if (requestType === 'put') {
-            requestData.active = $('select[name=active]').val();
-        }
-
-        $.ajax({
-            url: requestURL,
-            type: requestType,
-            dataType: 'json',
-            data: requestData,
-            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
-            beforeSend: function () {
-                $('#btn-modal-default').attr('disabled', true);
-                $("#erro-default").removeClass('show').css('display', 'none');
-                $("#erro-msg-default").empty();
-            },
-            complete: function () { $('#btn-modal-default').attr('disabled', false); },
-            success: function (response) {
-                showSuccessToast(response.message);
-                $('#modal_default').modal('hide');
-                reloadCurrentView();
-            },
-            error: handleAjaxError
-        });
-    });
-
-    function initModalEvents() {
-        $('.colorpicker').asColorPicker();
-    }
 });

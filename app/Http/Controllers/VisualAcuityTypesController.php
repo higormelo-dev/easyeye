@@ -56,7 +56,7 @@ class VisualAcuityTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.visualacuitytypes.index', compact('meta'));
+        return $dataTable->render('system.settings.visualacuitytypes.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class VisualAcuityTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.visualacuitytypes.form');
+        return view('system.settings.visualacuitytypes.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class VisualAcuityTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new VisualAcuityTypeResource($record))['data'],
+                'data'    => new VisualAcuityTypeResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class VisualAcuityTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new VisualAcuityTypeResource($record))['data'],
+                'data' => new VisualAcuityTypeResource($record),
             ]);
         }
 
         return view(
-            'system.visualacuitytypes.show',
+            'system.settings.visualacuitytypes.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class VisualAcuityTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new VisualAcuityTypeResource($record))['data'],
+                'data' => new VisualAcuityTypeResource($record),
             ]);
         }
 
-        return view('system.visualacuitytypes.form', compact('record'));
+        return view('system.settings.visualacuitytypes.form', compact('record'));
     }
 
     /**
@@ -136,7 +136,7 @@ class VisualAcuityTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new VisualAcuityTypeResource($updatedRecord))['data'],
+                'data'    => new VisualAcuityTypeResource($updatedRecord),
             ]);
         }
 

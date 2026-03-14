@@ -31,7 +31,7 @@ class AuthenticatedSessionController extends Controller
             ->where('active', true)->get();
 
         if (count($entityUsers) > 1) {
-            return redirect()->intended(route('selectentity.create', absolute: false));
+            return redirect()->route('selectentity.create');
         }
 
         if (count($entityUsers) === 1) {
@@ -42,7 +42,12 @@ class AuthenticatedSessionController extends Controller
                 'selected_entity_user_rule' => $entityUser->rule,
                 'selected_entity_id'        => $entityUser->entity->id,
                 'selected_entity_is_client' => $entityUser->entity->is_client,
+                'user_rule'                 => $entityUser->rule,
             ]);
+
+            if ($entityUser->rule === 'doctor') {
+                session(['selected_entity_doctor_id' => $entityUser->doctor->id]);
+            }
         }
 
         return redirect()->intended(route('panel.dashboard', absolute: false));

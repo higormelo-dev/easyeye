@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\DataTables\PatientsDataTable;
-use App\Http\Requests\PatientRequest;
+use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\{PatientResource};
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
 use App\Services\PatientService;
@@ -56,7 +56,16 @@ class PatientsController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.patients.index', compact('meta'));
+        $genders         = People::$genders;
+        $maritalStatuses = People::$maritalStatuses;
+        $statesOfBrazil  = People::$statesOfBrazil;
+        $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
+        $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
+        $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
+
+        return $dataTable->render('system.patients.index', compact(
+            'meta', 'genders', 'maritalStatuses', 'statesOfBrazil', 'covenants', 'skinTypes', 'irisTypes'
+        ));
     }
 
     /**
@@ -117,27 +126,6 @@ class PatientsController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create(): Factory|Application|View|JsonResponse
-    {
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
-        $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
-        $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
-        $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
-
-        return view(
-            'system.patients.form',
-            compact(
-                'genders', 'maritalStatuses', 'statesOfBrazil',
-                'covenants', 'skinTypes', 'irisTypes'
-            )
-        );
-    }
-
-    /**
      * Store a newly created resource in storage.
      */
     public function store(PatientRequest $request): Application|RedirectResponse|Redirector|JsonResponse
@@ -149,7 +137,7 @@ class PatientsController extends Controller
             return response()->json(
                 [
                     'message' => $messageReturn,
-                    'data'    => (new PatientResource($record))['data'],
+                    'data'    => new PatientResource($record),
                 ]
             );
         }
@@ -169,7 +157,7 @@ class PatientsController extends Controller
         if (request()->wantsJson()) {
             return response()->json(
                 [
-                    'data' => (new PatientResource($record))['data'],
+                    'data' => new PatientResource($record),
                 ]
             );
         }
@@ -177,33 +165,6 @@ class PatientsController extends Controller
         return view(
             'system.patients.show',
             compact('record')
-        );
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id): Application|View|JsonResponse
-    {
-        $record          = $this->service->findByIdOrCode($id);
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
-        $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
-        $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
-        $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
-
-        return view(
-            'system.patients.form',
-            compact(
-                'record',
-                'genders',
-                'maritalStatuses',
-                'statesOfBrazil',
-                'covenants',
-                'skinTypes',
-                'irisTypes'
-            )
         );
     }
 
@@ -219,12 +180,121 @@ class PatientsController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new PatientResource($updatedRecord))['data'],
+                'data'    => new PatientResource($updatedRecord),
             ]);
         }
 
         return redirect(action('\\' . static::class . '@index'))
             ->with('message', $messageReturn);
+    }
+
+    /**
+     * Search patients for the schedule quick-link (AJAX).
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $q        = $request->string('q')->trim()->value();
+        $entityId = session()->get('selected_entity_id');
+
+        if (mb_strlen($q) < 2) {
+            return response()->json([]);
+        }
+
+        $lower = mb_strtolower($q, 'UTF-8');
+
+        $patients = Patient::query()
+            ->join('people', 'patients.person_id', '=', 'people.id')
+            ->where('patients.entity_id', $entityId)
+            ->where('patients.active', true)
+            ->where(function ($inner) use ($lower) {
+                $inner->whereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(people.cellphone) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(people.telephone) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(people.national_registry) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(patients.code) LIKE ?', ["%{$lower}%"]);
+            })
+            ->select('patients.id', 'patients.code', 'people.full_name', 'people.cellphone', 'people.telephone')
+            ->orderBy('people.full_name')
+            ->limit(10)
+            ->get();
+
+        return response()->json($patients);
+    }
+
+    /**
+     * Quick-create a patient and link to schedule (AJAX).
+     */
+    public function quickStore(QuickStorePatientRequest $request): JsonResponse
+    {
+        $entityId = session()->get('selected_entity_id');
+
+        $patient = DB::transaction(function () use ($request, $entityId) {
+            $person = People::create([
+                'full_name' => $request->input('name'),
+                'cellphone' => $request->input('cellphone'),
+            ]);
+
+            return Patient::create([
+                'entity_id' => $entityId,
+                'person_id' => $person->id,
+                'active'    => true,
+            ]);
+        });
+
+        $patient->load('person');
+
+        return response()->json([
+            'patient' => [
+                'id'        => $patient->id,
+                'code'      => $patient->code,
+                'full_name' => $patient->person->full_name,
+                'cellphone' => $patient->person->cellphone ?? '',
+                'telephone' => $patient->person->telephone ?? '',
+            ],
+        ], 201);
+    }
+
+    /**
+     * Return flat JSON of a patient's data for the crudForm modal.
+     */
+    public function editData(Patient $patient): JsonResponse
+    {
+        $patient->load('person');
+        $person = $patient->person;
+
+        return response()->json([
+            'data' => [
+                'covenant_id'            => $patient->covenant_id,
+                'card_number'            => $patient->card_number,
+                'skin_id'                => $patient->skin_id,
+                'iris_id'                => $patient->iris_id,
+                'active'                 => (bool) $patient->active,
+                'name'                   => $person->full_name,
+                'nickname'               => $person->nickname,
+                'national_registry'      => $person->national_registry,
+                'birth_date'             => $person->birth_date?->format('Y-m-d'),
+                'gender'                 => $person->gender,
+                'marital_status'         => $person->marital_status,
+                'email'                  => $person->email,
+                'mother_name'            => $person->mother_name,
+                'father_name'            => $person->father_name,
+                'state_registry'         => $person->state_registry,
+                'state_registry_agency'  => $person->state_registry_agency,
+                'state_registry_initial' => $person->state_registry_initial,
+                'state_registry_date'    => $person->state_registry_date?->format('Y-m-d'),
+                'telephone'              => $person->telephone,
+                'cellphone'              => $person->cellphone,
+                'whatsapp'               => (bool) $person->whatsapp,
+                'zipcode'                => $person->zipcode,
+                'address'                => $person->address,
+                'number'                 => $person->number,
+                'complement'             => $person->complement,
+                'district'               => $person->district,
+                'city'                   => $person->city,
+                'state'                  => $person->state,
+                'country'                => $person->country,
+            ],
+        ]);
     }
 
     /**

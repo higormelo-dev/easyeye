@@ -1,43 +1,51 @@
 @extends('layouts.guest')
 
 @section('content')
-    <div class="card-body">
-        {{ html()->form('POST', route('selectentity.store'))->class(['form-horizontal', 'form-material'])->id('loginform')->open() }}
-            {{ html()->element('h3')->class('text-center mb-4')->text(__('auth.select_entity')) }}
-            @error('entity_user_id')
-                {{
-                    html()->div()
-                        ->class(['alert', 'alert-danger', 'mb-4', 'text-justify'])
-                        ->text($message)
-                }}
-            @enderror
-            {{
-	            html()->div([
-                    html()->select('entity_user_id')
-                        ->class('form-select')
-                        ->options($entities)
-                        ->value(old('entity_user_id', null))
-                        ->placeholder(__('actions.select'))
-                ])->class(['col-12', 'form-group'])
-            }}
-            {{
-                html()->div([
-                    html()->div([
-                        html()->button()->text(__('actions.select'))
-                            ->class(['btn', 'w-100', 'btn-info', 'text-white', 'text-titlecase'])
-                    ])
-                ])->class(['col-12', 'form-group', 'text-center'])
-            }}
-        {{ html()->form()->close() }}
+<div class="card-body">
 
-        {{ html()->form('POST', route('logout'))->class(['form-horizontal', 'form-material'])->open() }}
-            {{
-                html()->div()
-                    ->class(['col-12', 'text-center'])
-                    ->child(
-                        html()->submit(__('Log Out'))->class(['btn', 'btn-link', 'text-dark'])
-                    )
-            }}
-        {{ html()->form()->close() }}
-    </div>
+    <form method="POST" action="{{ route('selectentity.store') }}" class="form-horizontal form-material">
+        @csrf
+
+        {{-- Header --}}
+        <div class="text-center mb-4">
+            <img src="{{ asset('system/images/logo-icon.png') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
+            <h4 class="font-medium mb-0">{{ config('app.name') }}</h4>
+            <p class="text-muted mb-0" style="font-size:.85rem">{{ __('auth.select_entity') }}</p>
+        </div>
+
+        {{-- Erro --}}
+        @error('entity_user_id')
+            <div class="alert alert-danger mb-4" style="font-size:.85rem">{{ $message }}</div>
+        @enderror
+
+        {{-- Lista de empresas --}}
+        <div class="form-group mb-4">
+            <select name="entity_user_id" class="form-select">
+                <option value="">{{ __('actions.select') }}</option>
+                @foreach ($entities as $id => $name)
+                    <option value="{{ $id }}" {{ old('entity_user_id') == $id ? 'selected' : '' }}>
+                        {{ $name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+
+        {{-- Botão --}}
+        <div class="d-grid mb-3">
+            <button type="submit" class="btn btn-info btn-block waves-effect waves-light">
+                {{ __('actions.select') }}
+            </button>
+        </div>
+
+    </form>
+
+    {{-- Sair --}}
+    <form method="POST" action="{{ route('logout') }}" class="text-center">
+        @csrf
+        <button type="submit" class="btn btn-link text-muted" style="font-size:.85rem">
+            {{ __('auth.log_out') }}
+        </button>
+    </form>
+
+</div>
 @endsection

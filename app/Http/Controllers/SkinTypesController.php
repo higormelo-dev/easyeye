@@ -57,7 +57,7 @@ class SkinTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.skintypes.index', compact('meta'));
+        return $dataTable->render('system.settings.skintypes.index', compact('meta'));
     }
 
     /**
@@ -65,7 +65,7 @@ class SkinTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.skintypes.form');
+        return view('system.settings.skintypes.form');
     }
 
     /**
@@ -82,7 +82,7 @@ class SkinTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new SkinTypeResource($record))['data'],
+                'data'    => new SkinTypeResource($record),
             ]);
         }
 
@@ -99,12 +99,12 @@ class SkinTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new SkinTypeResource($record))['data'],
+                'data' => new SkinTypeResource($record),
             ]);
         }
 
         return view(
-            'system.skintypes.show',
+            'system.settings.skintypes.show',
             compact('record')
         );
     }
@@ -116,7 +116,7 @@ class SkinTypesController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        return view('system.skintypes.form', compact('record'));
+        return view('system.settings.skintypes.form', compact('record'));
     }
 
     /**
@@ -133,7 +133,7 @@ class SkinTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new SkinTypeResource($updatedRecord))['data'],
+                'data'    => new SkinTypeResource($updatedRecord),
             ]);
         }
 

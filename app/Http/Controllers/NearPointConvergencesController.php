@@ -56,7 +56,7 @@ class NearPointConvergencesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.nearpointconvergences.index', compact('meta'));
+        return $dataTable->render('system.settings.nearpointconvergences.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class NearPointConvergencesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.nearpointconvergences.form');
+        return view('system.settings.nearpointconvergences.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class NearPointConvergencesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new NearPointConvergenceResource($record))['data'],
+                'data'    => new NearPointConvergenceResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class NearPointConvergencesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new NearPointConvergenceResource($record))['data'],
+                'data' => new NearPointConvergenceResource($record),
             ]);
         }
 
         return view(
-            'system.nearpointconvergences.show',
+            'system.settings.nearpointconvergences.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class NearPointConvergencesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new NearPointConvergenceResource($record))['data'],
+                'data' => new NearPointConvergenceResource($record),
             ]);
         }
 
-        return view('system.nearpointconvergences.form', compact('record'));
+        return view('system.settings.nearpointconvergences.form', compact('record'));
     }
 
     /**
@@ -136,7 +136,7 @@ class NearPointConvergencesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new NearPointConvergenceResource($updatedRecord))['data'],
+                'data'    => new NearPointConvergenceResource($updatedRecord),
             ]);
         }
 

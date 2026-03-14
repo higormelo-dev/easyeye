@@ -2,99 +2,54 @@
 
 namespace App\Services;
 
-use App\Http\Requests\CoverTestTypeRequest;
 use App\Models\CoverTestType;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Http\FormRequest;
 
-class CoverTestTypeService
+class CoverTestTypeService extends BaseSettingService
 {
-    /**
-     * Create a new covenant with all related entities
-     *
-     * @throws \Throwable
-     */
-    public function create(CoverTestTypeRequest $request): CoverTestType
+    protected function modelClass(): string
     {
-        return DB::transaction(function () use ($request) {
-            return $this->findOrCreate($request);
-        });
+        return CoverTestType::class;
     }
 
-    /**
-     * Update existing covenant and related entities
-     *
-     * @throws \Throwable
-     */
-    public function update(CoverTestType $record, CoverTestTypeRequest $request): CoverTestType
+    protected function getCreateData(FormRequest $request): array
     {
-        return DB::transaction(static function () use ($record, $request) {
-            $data = [];
-
-            if ($request->has('name')) {
-                $data['name'] = $request->name;
-            }
-
-            if ($request->has('abbreviation')) {
-                $data['abbreviation'] = $request->abbreviation;
-            }
-
-            if ($request->has('active')) {
-                $data['active'] = $request->boolean('active');
-            }
-
-            $record->update($data);
-
-            return $record;
-        });
+        return ['name' => $request->name, 'abbreviation' => $request->abbreviation];
     }
 
-    /**
-     * Find by ID or Code including soft-deleted records
-     */
-    public function findByIdOrCode(string $idOrCode): ?CoverTestType
+    protected function getUpdateData(FormRequest $request): array
     {
-        /** @var CoverTestType $record */
-        $record = CoverTestType::query()
-            ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->when(
-                Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
-            )
-            ->firstOrFail();
+        $data = parent::getUpdateData($request);
 
-        return $record;
+        if ($request->has('abbreviation')) {
+            $data['abbreviation'] = $request->abbreviation;
+        }
+
+        return $data;
     }
 
-    /**
-     * Find or create skin type
-     */
-    private function findOrCreate(CoverTestTypeRequest $request): CoverTestType
+    protected function findOrCreate(FormRequest $request): Model
     {
-        $existingCoverTestType = CoverTestType::query()
+        $existing = CoverTestType::query()
             ->withTrashed()
             ->where('entity_id', session()->get('selected_entity_id'))
             ->where('abbreviation', $request->abbreviation)
             ->where('name', $request->name)
             ->first();
 
-        $requestData = [
-            'name'         => $request->name,
-            'abbreviation' => $request->abbreviation,
-        ];
+        $data = $this->getCreateData($request);
 
-        if ($existingCoverTestType) {
-            if ($existingCoverTestType->trashed()) {
-                $existingCoverTestType->restore();
+        if ($existing) {
+            if ($existing->trashed()) {
+                $existing->restore();
             }
-            $existingCoverTestType->update($requestData);
+            $existing->update($data);
 
-            return $existingCoverTestType->fresh();
+            return $existing->fresh();
         }
 
-        return CoverTestType::create(array_merge($requestData, [
+        return CoverTestType::create(array_merge($data, [
             'entity_id' => session()->get('selected_entity_id'),
             'active'    => true,
         ]));

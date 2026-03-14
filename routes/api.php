@@ -56,11 +56,9 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
             Route::apiResource('schedules', SchedulesController::class)->only('index', 'show');
             Route::apiResource('exams', ExamsController::class)->only('store');
 
-            Route::get('profile', static function (Request $request) {
-                return response()->json($request->user());
-            });
-
-            // Adicione outras rotas protegidas aqui
+            // Route::get('profile', static function (Request $request) {
+            //     return response()->json($request->user());
+            // });
         });
     });
 });

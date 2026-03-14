@@ -41,7 +41,6 @@ class Doctor extends Model
                 $prefix = 'DOC';
 
                 $lastType = static::withoutGlobalScopes()
-                    ->whereIn('entity_user_id', $doctor->entityUser->pluck('id'))
                     ->where('code', 'like', $prefix . '-%')
                     ->orderBy('code', 'desc')
                     ->first();

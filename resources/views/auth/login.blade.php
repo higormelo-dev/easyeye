@@ -1,78 +1,80 @@
 @extends('layouts.guest')
 
 @section('content')
-    <div class="card-body">
-        {{ html()->form('POST', route('login'))->class(['form-horizontal', 'form-material'])->id('loginform')->open() }}
-            {{ html()->element('h3')->class('text-center m-b-20')->text(__('auth.sign_in')) }}
-            {{
-	            html()->div([
-                    html()->text('email')->class('form-control')
-                    ->attributes(['required', 'autofocus', 'autocomplete' => 'username'])
-                    ->placeholder(__('actions.user'))
-                ])->class(['col-12', 'form-group'])
-            }}
-            {{
-                html()->div([
-                    html()->password('password')->class('form-control')
-                    ->attributes(['required'])
-                    ->placeholder(__('actions.password'))
-                ])->class(['col-12', 'form-group'])
-            }}
-            {{
-                html()->div()
-                    ->class(['form-group', 'row'])
-                    ->child(
-                        html()->div()
-                            ->class(['col-md-12'])
-                            ->child(
-                                html()->div()
-                                    ->class(['d-flex', 'no-block', 'align-items-center'])
-                                    ->children([
-                                        html()->div()
-                                            ->class(['form-check'])
-                                            ->children([
-                                                html()->checkbox('remember')
-                                                    ->class(['form-check-input'])
-                                                    ->id('customCheck1'),
-                                                html()->label(__('auth.remember_me'))
-                                                    ->class(['form-check-label'])
-                                                    ->for('customCheck1')
-                                            ]),
-                                        html()->div()
-                                            ->class(['ms-auto'])
-                                            ->child(
-                                                html()->a(route('password.request'), __('auth.forgot-password'))
-                                                    ->id('to-recover')
-                                                    ->class(['text-muted'])
-                                                    ->html('<i class="fas fa-lock m-r-5"></i> ' . __('auth.forget_password'))
-                                            )
-                                    ])
-                            )
-                    )
-            }}
-            {{
-                html()->div([
-                    html()->div([
-                        html()->button()->text(__('auth.sign_in'))
-                            ->class(['btn', 'w-100', 'btn-info', 'text-white', 'text-uppercase'])
-                    ])->class(['col-xs-12', 'p-b-20'])
-                ])->class(['col-12', 'form-group', 'text-center'])
-            }}
-            {{
-                html()->div()
-                    ->class(['form-group', 'm-b-0'])
-                    ->child(
-                        html()->div()
-                            ->class(['col-sm-12', 'text-center'])
-                            ->html(__('actions.dont_have_account') . ' ' .
-                                   html()->a(route('register'))
-                                       ->class(['text-info', 'm-l-5'])
-                                       ->child(html()->element('strong')->text(__('actions.new_account')))
-                            )
-                    )
-            }}
-        {{ html()->form()->close() }}
-    </div>
+<div class="card-body">
+    <form method="POST" action="{{ route('login') }}" class="form-horizontal form-material">
+        @csrf
+
+        {{-- Header --}}
+        <div class="text-center mb-4">
+            <a href="{{ route('register') }}">
+                <img src="{{ asset('system/images/logo-icon.png') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
+            </a>
+            <h4 class="font-medium mb-0">{{ config('app.name') }}</h4>
+            <p class="text-muted mb-0" style="font-size:.85rem">{{ __('auth.sign_in') }}</p>
+        </div>
+
+        {{-- Erro de autenticação --}}
+        @error('email')
+            <div class="alert alert-danger mb-3" style="font-size:.85rem">{{ $message }}</div>
+        @enderror
+
+        {{-- E-mail --}}
+        <div class="form-group mb-3">
+            <label class="form-label">{{ __('actions.email') }} <span class="text-danger">*</span></label>
+            <input type="email" name="email"
+                   class="form-control @error('email') is-invalid @enderror"
+                   value="{{ old('email') }}"
+                   required autofocus autocomplete="username">
+        </div>
+
+        {{-- Senha --}}
+        <div class="form-group mb-3">
+            <label class="form-label">{{ __('actions.password') }} <span class="text-danger">*</span></label>
+            <div class="input-group">
+                <input type="password" name="password" id="password"
+                       class="form-control @error('password') is-invalid @enderror"
+                       required autocomplete="current-password">
+                <button type="button" class="btn btn-outline-secondary" data-toggle-password="#password" tabindex="-1">
+                    <i class="mdi mdi-eye-off"></i>
+                </button>
+            </div>
+        </div>
+
+        {{-- Lembrar-me + Esqueceu senha --}}
+        <div class="form-group mb-4 d-flex align-items-center justify-content-between">
+            <div class="form-check">
+                <input type="checkbox" name="remember" id="remember"
+                       class="form-check-input" {{ old('remember') ? 'checked' : '' }}>
+                <label class="form-check-label" for="remember" style="font-size:.85rem">
+                    {{ __('auth.remember_me') }}
+                </label>
+            </div>
+            <a href="{{ route('password.request') }}" class="text-muted" style="font-size:.85rem">
+                {{ __('auth.forget_password') }}
+            </a>
+        </div>
+
+        {{-- Botão entrar --}}
+        <div class="d-grid mb-3">
+            <button type="submit" class="btn btn-info btn-block waves-effect waves-light">
+                {{ __('auth.sign_in') }}
+            </button>
+        </div>
+
+        {{-- Link para cadastro --}}
+        <p class="text-center text-muted" style="font-size:.85rem">
+            {{ __('actions.dont_have_account') }}
+            <a href="{{ route('register') }}">{{ __('actions.new_account') }}</a>
+        </p>
+
+    </form>
+</div>
+
+@endsection
+
+@section('javascript')
+    @vite(['resources/js/auth/login.js'])
 @endsection
 
 

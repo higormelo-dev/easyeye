@@ -6,41 +6,60 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('entities', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('code');
-            $table->string('name');
-            $table->string('subdomain')->unique();
-            $table->string('zipcode')->nullable();
-            $table->string('address')->nullable();
-            $table->string('number')->nullable();
-            $table->string('complement')->nullable();
-            $table->string('district')->nullable();
-            $table->string('city')->nullable();
-            $table->string('state')->nullable();
-            $table->string('country')->nullable();
-            $table->string('national_registration')->unique();
-            $table->string('state_registration')->nullable();
-            $table->string('municipal_registration')->nullable();
-            $table->string('telephone')->nullable();
-            $table->string('cellphone')->nullable();
-            $table->string('email')->nullable();
-            $table->string('website')->nullable();
-            $table->string('logo')->nullable();
-            $table->boolean('is_client')->default(true);
-            $table->boolean('active')->default(false);
+
+            // Identificação
+            $table->string('code', 30)->unique()
+                ->comment('Código gerado automaticamente. Ex: CL-0000000001.');
+            $table->string('name', 255);
+            $table->string('subdomain', 100)->unique()
+                ->comment('Slug usado para identificar a empresa na URL.');
+
+            // Registro fiscal
+            $table->string('national_registration', 20)->nullable()->unique()
+                ->comment('CNPJ. Nullable para empresas em configuração.');
+            $table->string('state_registration', 50)->nullable();
+            $table->string('municipal_registration', 50)->nullable();
+
+            // Endereço
+            $table->string('zipcode', 10)->nullable();
+            $table->string('address', 255)->nullable();
+            $table->string('number', 20)->nullable();
+            $table->string('complement', 100)->nullable();
+            $table->string('district', 100)->nullable();
+            $table->string('city', 100)->nullable();
+            $table->string('state', 5)->nullable()
+                ->comment('Sigla da UF (ex: SP). varchar(5) aceita siglas internacionais.');
+            $table->string('country', 5)->nullable()->default('BR');
+
+            // Contato
+            $table->string('telephone', 30)->nullable();
+            $table->string('cellphone', 30)->nullable();
+            $table->string('email', 255)->nullable();
+            $table->string('website', 255)->nullable();
+            $table->string('logo', 500)->nullable();
+
+            // Flags
+            $table->boolean('is_client')->default(true)
+                ->comment('true = empresa cliente SaaS; false = entidade interna/parceiro.');
+            $table->boolean('active')->default(false)
+                ->comment('Ativada após o primeiro acesso ou aprovação manual.');
+            $table->string('locale', 10)->default('pt_BR')
+                ->comment('Idioma padrão da empresa; pode ser sobreposto pelo locale do usuário.');
+
+            $table->softDeletes();
             $table->timestamps();
+
+            // ── Índices ───────────────────────────────────────────────────────
+            $table->index(['active', 'deleted_at']);
+            $table->index(['is_client', 'active']);
+            $table->index(['city', 'state']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('entities');

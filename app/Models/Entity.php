@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\EntityRoleService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Entity extends Model
 {
@@ -106,15 +109,108 @@ class Entity extends Model
     protected function casts(): array
     {
         return [
+            'is_client'  => 'boolean',
+            'active'     => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
         ];
     }
 
+    // -------------------------------------------------------------------------
+    // Entity-type helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return true when this entity is the SaaS owner (not a client).
+     * Determined by the is_client flag; ENT-0000000001 is always the SaaS entity.
+     */
+    public function isSaas(): bool
+    {
+        return ! $this->is_client;
+    }
+
+    /**
+     * Return true when this entity is a client (tenant) of the SaaS.
+     */
+    public function isClient(): bool
+    {
+        return (bool) $this->is_client;
+    }
+
+    /**
+     * Return the valid rule values for this entity's context.
+     * Delegates to EntityRoleService so the logic stays in one place.
+     *
+     * @return string[]
+     */
+    public function validRules(): array
+    {
+        return app(EntityRoleService::class)->validRuleValues($this);
+    }
+
+    /**
+     * Return key-value options (value => label) for this entity's valid rules,
+     * ready to be used in select inputs.
+     *
+     * @return array<string, string>
+     */
+    public function validRuleOptions(): array
+    {
+        return app(EntityRoleService::class)->validRuleOptions($this);
+    }
+
+    /**
+     * Check whether the given rule string is valid for this entity's context.
+     */
+    public function isValidRule(string $rule): bool
+    {
+        return app(EntityRoleService::class)->isValidRule($this, $rule);
+    }
+
+    /**
+     * Alias for isSaas() — true when this entity is the SaaS owner.
+     */
+    public function isManagerEntity(): bool
+    {
+        return $this->isSaas();
+    }
+
+    /**
+     * Alias for validRules() — returns the allowed rule string values for this entity.
+     *
+     * @return string[]
+     */
+    public function allowedRoles(): array
+    {
+        return $this->validRules();
+    }
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'entity_users', 'entity_id', 'user_id')
+            ->withPivot(['id', 'code', 'rule', 'is_owner', 'active', 'invited_by', 'joined_at'])
+            ->withTimestamps()
+            ->wherePivotNull('deleted_at');
+    }
+
     public function entityUsers(): HasMany
     {
         return $this->hasMany(EntityUser::class, 'entity_id', 'id');
+    }
+
+    /** Assinatura ativa da empresa (trial ou paga, sem soft-delete). */
+    public function subscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class, 'entity_id')
+            ->whereIn('status', [\App\Enums\SubscriptionStatus::Trial->value, \App\Enums\SubscriptionStatus::Active->value])
+            ->latest();
+    }
+
+    /** Histórico completo de assinaturas. */
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class, 'entity_id');
     }
 
     /**

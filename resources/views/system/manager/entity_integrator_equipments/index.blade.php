@@ -5,29 +5,45 @@
 @endsection
 
 @section('content')
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <h5 class="card-header">{{ $meta['action'] }}</h5>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col">
-                            <div class="table-responsive">
-                                <table id="record_datatable" class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>{{ __('actions.created_at') }}</th>
-                                            <th>Equipamento</th>
-                                            <th class="text-center">{{ __('actions.active') }}</th>
-                                            <th class="text-center">{{ __('actions.actions') }}</th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
+    <div class="card">
+        <h5 class="card-header">{{ $meta['action'] }}</h5>
+        <div class="card-body">
+            <div class="table-responsive">
+                {{ $dataTable->table() }}
             </div>
         </div>
     </div>
+
+@endsection
+
+@section('modals')
+    @include('components.modal_default')
+@endsection
+
+@section('javascript')
+    {{ $dataTable->scripts() }}
+    <script>
+    $(function () {
+        const baseUrl = '{{ url('panel/manager/entities/' . $entity->id . '/integrators/' . $integrator->id . '/equipments') }}';
+
+        $(document).on('click', '.btn-show', function () {
+            const id = $(this).data('id');
+            $('.modal-title-default').text('{{ __("actions.messages.view", ["name" => __("actions.equipments")]) }}');
+            $('#btn-modal-default').hide();
+            $('#erro-default').hide();
+            $.ajax({
+                url: baseUrl + '/' + id,
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                success: function (data) {
+                    $('#retorno-default').html(data);
+                    $('#modal_default').modal('show');
+                },
+                error: function (res) {
+                    if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
+                }
+            });
+        });
+    });
+    </script>
 @endsection

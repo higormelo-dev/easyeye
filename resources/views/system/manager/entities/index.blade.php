@@ -5,114 +5,160 @@
 @endsection
 
 @section('content')
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <h5 class="card-header">{{ $meta['action'] }}</h5>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col">
-                            <div class="table-responsive">
-                                <table id="record_datatable" class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>{{ __('actions.created_at') }}</th>
-                                            <th>{{ __('actions.entity') }}</th>
-                                            <th class="text-center">{{ __('actions.active') }}</th>
-                                            <th class="text-center">{{ __('actions.actions') }}</th>
-                                        </tr>
-                                    </thead>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+
+<div x-data="crudForm({
+        storeUrl:  '{{ $storeUrl }}',
+        updateUrl: null,
+        fields: {
+            name: '', subdomain: '', email: '', telephone: '', cellphone: '',
+            national_registration: '', state_registration: '', municipal_registration: '',
+            website: '', active: true,
+            zipcode: '', address: '', number: '', complement: '',
+            district: '', city: '', state: '', country: ''
+        },
+        onSuccess: () => window.dispatchEvent(new CustomEvent('entity-saved'))
+    })"
+     x-init="$nextTick(() => document.getElementById('entityModal').addEventListener('hidden.bs.modal', () => reset()))"
+     @open-create-entity.window="reset(); bootstrap.Modal.getOrCreateInstance(document.getElementById('entityModal')).show()"
+     @edit-entity.window="loadAndEdit(
+         '{{ url('panel/manager/entities') }}' + '/' + $event.detail.id + '/edit-data',
+         '{{ url('panel/manager/entities') }}' + '/' + $event.detail.id,
+         'entityModal'
+     )">
+
+    @include('system.manager.entities._form-modal')
+
+    <div class="row mb-3 align-items-center">
+        <div class="col-12 col-md-auto">
+            <button type="button" class="btn btn-info btn-sm" @click="$dispatch('open-create-entity')">
+                <i class="fa fa-plus"></i> {{ __('actions.new') }}
+            </button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h5 class="card-header">{{ $meta['action'] }}</h5>
+        <div class="card-body">
+            <div class="table-responsive">
+                {{ $dataTable->table() }}
             </div>
         </div>
     </div>
+
+</div>
+
+@endsection
+
+@section('modals')
+    @include('components.modal_default')
 @endsection
 
 @section('javascript')
+    {{ $dataTable->scripts() }}
     <script>
-        $(function () {
-            let dataTable = $('#record_datatable').DataTable({
-                "order": [
-                    [0, 'desc']
-                ],
-                "searching": true,
-                "bLengthChange": true,
-                "bPaginate": true,
-                "pageLength": 10,
-                "processing": true,
-                "serverSide": true,
-                "lengthMenu": [
-                    [5, 10, 25, 50, 100],
-                    [5, 10, 25, 50, 100]
-                ],
-                "pagingType": "full_numbers",
-                "ajax": {
-                    'url': `{{ route('panel.ajax.datatables.entities') }}`,
-                    'dataType': 'json',
-                    'type': 'POST',
-                    'data': {
-                        '_token': $('meta[name="csrf-token"]').attr('content')
-                    }
-                },
-                "createdRow": function (row, data, dataIndex) {
-                    $(row).attr('id', data.id);
-                },
-                "drawCallback": function (settings) {
-                    $('[data-bs-toggle="tooltip"]').tooltip();
-                },
-                "columns": [
-                    {'data': 'created_at', 'searchable': false, 'orderable': true},
-                    {'data': 'name'},
-                    {'data': 'active', 'searchable': false, 'orderable': true},
-                    {'data': 'action', 'searchable': false, 'orderable': false},
-                ],
-                "columnDefs": [
-                    {
-                        'targets': 0,
-                        'className': 'text-left'
-                    },
-                    {
-                        'targets': 1,
-                        'className': 'text-left'
-                    },
-                    {
-                        'targets': 2,
-                        'className': 'text-center'
-                    },
-                    {
-                        'targets': 3,
-                        'className': 'text-end'
-                    }
-                ],
-                "language": {
-                    "sEmptyTable": "Nenhum registro encontrado",
-                    "sProcessing": "A processar...",
-                    "sLengthMenu": "Mostrar _MENU_ registos",
-                    "sZeroRecords": "Não foram encontrados resultados",
-                    "sInfo": "Mostrando de _START_ até _END_ de _TOTAL_ registos",
-                    "sInfoEmpty": "Mostrando de 0 até 0 de 0 registos",
-                    "sInfoFiltered": "(filtrado de _MAX_ registos no total)",
-                    "sInfoPostFix": "",
-                    "sSearch": "Procurar:",
-                    "sUrl": "",
-                    "oPaginate": {
-                        "sFirst": "Primeiro",
-                        "sPrevious": "Anterior",
-                        "sNext": "Seguinte",
-                        "sLast": "Último"
-                    },
-                    "oAria": {
-                        "sSortAscending": ": Ordenar colunas de forma ascendente",
-                        "sSortDescending": ": Ordenar colunas de forma descendente"
-                    }
-                }
+    $(function () {
+        const baseUrl = '{{ url('panel/manager/entities') }}';
 
-            });
-            dataTable.on('draw', function () {});
+        $(document).on('click', '.btn-edit', function () {
+            window.dispatchEvent(new CustomEvent('edit-entity', { detail: { id: $(this).data('id') } }));
         });
+
+        $(document).on('click', '.btn-show', function () {
+            const id = $(this).data('id');
+            $('.modal-title-default').text('{{ __("actions.messages.view", ["name" => __("actions.entity")]) }}');
+            $('#btn-modal-default').hide();
+            $('#erro-default').hide();
+            $.ajax({
+                url: baseUrl + '/' + id,
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                success: function (data) {
+                    $('#retorno-default').html(data);
+                    $('#modal_default').modal('show');
+                },
+                error: function (res) {
+                    if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
+                }
+            });
+        });
+
+        $(document).on('click', '.btn-active', function () {
+            const id        = $(this).data('id');
+            const situation = $(this).data('situation');
+            $.ajax({
+                method: 'PUT',
+                url: baseUrl + '/' + id,
+                dataType: 'json',
+                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                data: { active: situation },
+                success: function (res) {
+                    if (window.showSuccessToast) showSuccessToast(res.message);
+                    window.dispatchEvent(new CustomEvent('entity-saved'));
+                },
+                error: function (res) {
+                    if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
+                }
+            });
+        });
+
+        $(document).on('click', '.btn-trash', function () {
+            const id = $(this).data('id');
+            Swal.fire({
+                title: 'Deletar empresa?',
+                text: 'Esta ação não poderá ser desfeita.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545',
+                confirmButtonText: 'Sim',
+                cancelButtonText: 'Não'
+            }).then(result => {
+                if (!result.isConfirmed) return;
+                $.ajax({
+                    method: 'DELETE',
+                    url: baseUrl + '/' + id,
+                    dataType: 'json',
+                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                    success: function (res) {
+                        if (window.showSuccessToast) showSuccessToast(res.message);
+                        window.dispatchEvent(new CustomEvent('entity-saved'));
+                    },
+                    error: function (res) {
+                        if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
+                    }
+                });
+            });
+        });
+
+        $(document).on('click', '.btn-restore', function () {
+            const id = $(this).data('id');
+            Swal.fire({
+                title: 'Restaurar empresa?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Sim',
+                cancelButtonText: 'Não'
+            }).then(result => {
+                if (!result.isConfirmed) return;
+                $.ajax({
+                    method: 'PUT',
+                    url: baseUrl + '/' + id + '/restore',
+                    dataType: 'json',
+                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                    success: function (res) {
+                        if (window.showSuccessToast) showSuccessToast(res.message);
+                        window.dispatchEvent(new CustomEvent('entity-saved'));
+                    },
+                    error: function (res) {
+                        if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
+                    }
+                });
+            });
+        });
+
+        window.addEventListener('entity-saved', () => {
+            if (window.LaravelDataTables && window.LaravelDataTables['entities_datatable']) {
+                window.LaravelDataTables['entities_datatable'].ajax.reload(null, false);
+            }
+        });
+    });
     </script>
 @endsection

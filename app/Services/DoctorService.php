@@ -77,11 +77,13 @@ class DoctorService
         /** @var Doctor $record */
         $record = Doctor::query()
             ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+            ->select('doctors.*')
             ->when(
                 Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
+                static fn ($q) => $q->where('doctors.id', $idOrCode),
+                static fn ($q) => $q->where('doctors.code', $idOrCode)
             )
             ->firstOrFail();
 

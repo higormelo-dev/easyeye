@@ -1,21 +1,23 @@
 <?php
 
-use App\Http\Controllers\{AdditionTypesController,
-	ColorVisionTypesController,
-	CovenantsController,
-	CoverTestTypesController,
-	DoctorsController,
-	IrisTypesController,
-	LensesController,
-	LocaleController,
-	NearPointConvergencesController,
-	PatientsController,
-	ProfileController,
-	SkinTypesController,
-	SurgeryTypesController,
-	UsersController,
-	VisitTypesController,
-	VisualAcuityTypesController};
+use App\Http\Controllers\SubscriptionExpiredController;
+use App\Http\Controllers\{DoctorsController,
+    LocaleController,
+    PatientsController,
+    ProfileController,
+    SchedulesController,
+    UsersController};
+use App\Http\Controllers\Setting\{AdditionTypesController,
+    ColorVisionTypesController,
+    CovenantsController,
+    CoverTestTypesController,
+    IrisTypesController,
+    LensesController,
+    NearPointConvergencesController,
+    SkinTypesController,
+    SurgeryTypesController,
+    VisitTypesController,
+    VisualAcuityTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
 
 // Rota para trocar o idioma (sem autenticação necessária)
@@ -44,6 +46,15 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// Página exibida quando a assinatura está inativa/expirada
+Route::get('/subscription/expired', SubscriptionExpiredController::class)
+    ->middleware(['auth', 'verified', 'entity.selected'])
+    ->name('subscription.expired');
+
+Route::post('/session/ping', function () {
+    return response()->json(['ok' => true]);
+})->middleware(['auth'])->name('session.ping');
+
 Route::group(
     ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'entity.selected'], 'as' => 'panel.'],
     function () {
@@ -59,9 +70,16 @@ Route::group(
         })->name('dashboard');
 
         Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');
+        Route::get('doctors/{doctor}/edit-data', [DoctorsController::class, 'editData'])->name('doctors.editData');
         Route::resource('doctors', DoctorsController::class);
         Route::get('patients/cards', [PatientsController::class, 'cards'])->name('patients.cards');
+        Route::get('patients/search', [PatientsController::class, 'search'])->name('patients.search');
+        Route::post('patients/quick', [PatientsController::class, 'quickStore'])->name('patients.quick');
+        Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
         Route::resource('patients', PatientsController::class);
+        Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');
+        Route::resource('schedules', SchedulesController::class);
+
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
             Route::get('users/cards', [UsersController::class, 'cards'])->name('users.cards');
             Route::resource('users', UsersController::class);

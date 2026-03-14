@@ -108,32 +108,28 @@ class DoctorsController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.doctors.index', compact('meta'));
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create(): Factory|Application|View|JsonResponse
-    {
         $genders         = People::$genders;
         $maritalStatuses = People::$maritalStatuses;
         $statesOfBrazil  = People::$statesOfBrazil;
+        $storeUrl        = route('panel.doctors.store');
+        $baseUrl         = url('panel/doctors');
 
-        return view(
-            'system.doctors.form',
-            compact('genders', 'maritalStatuses', 'statesOfBrazil')
-        );
+        return $dataTable->render('system.doctors.index', compact(
+            'meta', 'genders', 'maritalStatuses', 'statesOfBrazil', 'storeUrl', 'baseUrl'
+        ));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(DoctorRequest $request): JsonResponse|EntityUserResource
+    public function store(DoctorRequest $request): JsonResponse
     {
         $entityUser = $this->service->create($request);
 
-        return new EntityUserResource($entityUser);
+        return response()->json([
+            'message' => $this->getCreateMessage(),
+            'data'    => new EntityUserResource($entityUser),
+        ]);
     }
 
     /**
@@ -145,7 +141,7 @@ class DoctorsController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new DoctorResource($record))['data'],
+                'data' => new DoctorResource($record),
             ]);
         }
 
@@ -153,6 +149,48 @@ class DoctorsController extends Controller
             'system.doctors.show',
             compact('record')
         );
+    }
+
+    /**
+     * Return flat JSON for the crudForm edit modal.
+     */
+    public function editData(string $id): JsonResponse
+    {
+        $record = $this->service->findByIdOrCode($id);
+        $person = $record->person;
+        $user   = $record->entityUser->user;
+
+        return response()->json(['data' => [
+            'name'                   => $person->full_name,
+            'nickname'               => $person->nickname,
+            'national_registry'      => $person->national_registry,
+            'birth_date'             => $person->birth_date?->format('Y-m-d'),
+            'gender'                 => $person->gender,
+            'marital_status'         => $person->marital_status,
+            'email'                  => $user->email,
+            'mother_name'            => $person->mother_name,
+            'father_name'            => $person->father_name,
+            'state_registry'         => $person->state_registry,
+            'state_registry_agency'  => $person->state_registry_agency,
+            'state_registry_initial' => $person->state_registry_initial,
+            'state_registry_date'    => $person->state_registry_date?->format('Y-m-d'),
+            'telephone'              => $person->telephone,
+            'cellphone'              => $person->cellphone,
+            'whatsapp'               => (bool) $person->whatsapp,
+            'zipcode'                => $person->zipcode,
+            'address'                => $person->address,
+            'number'                 => $person->number,
+            'complement'             => $person->complement,
+            'district'               => $person->district,
+            'city'                   => $person->city,
+            'state'                  => $person->state,
+            'record'                 => $record->record,
+            'record_specialty'       => $record->record_specialty,
+            'color'                  => $record->color,
+            'observation'            => $record->observation,
+            'partner'                => (bool) $record->partner,
+            'active'                 => (bool) $record->active,
+        ]]);
     }
 
     /**
@@ -167,7 +205,7 @@ class DoctorsController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data'            => (new DoctorResource($record))['data'],
+                'data'            => new DoctorResource($record),
                 'genders'         => $genders,
                 'maritalStatuses' => $maritalStatuses,
                 'statesOfBrazil'  => $statesOfBrazil,
@@ -175,8 +213,8 @@ class DoctorsController extends Controller
         }
 
         return view(
-            'system.doctors.form',
-            compact('record', 'genders', 'maritalStatuses', 'statesOfBrazil')
+            'system.doctors.show',
+            compact('record')
         );
     }
 
@@ -187,13 +225,14 @@ class DoctorsController extends Controller
     {
         $record        = $this->service->findByIdOrCode($id);
         $updatedRecord = $this->service->update($record, $request);
+        $updatedRecord->refresh();
 
         $messageReturn = $this->getUpdateMessage($request);
 
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new EntityUserResource($updatedRecord))['data'],
+                'data'    => new DoctorResource($updatedRecord),
             ]);
         }
 
@@ -232,7 +271,6 @@ class DoctorsController extends Controller
                 $person?->delete();
             }
 
-            // Retornar resposta
             if (request()->wantsJson()) {
                 return response()->json([
                     'message' => $this->getDeleteMessage(),

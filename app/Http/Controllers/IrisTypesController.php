@@ -56,7 +56,7 @@ class IrisTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.iristypes.index', compact('meta'));
+        return $dataTable->render('system.settings.iristypes.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class IrisTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.iristypes.form');
+        return view('system.settings.iristypes.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class IrisTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new IrisTypeResource($record))['data'],
+                'data'    => new IrisTypeResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class IrisTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new IrisTypeResource($record))['data'],
+                'data' => new IrisTypeResource($record),
             ]);
         }
 
         return view(
-            'system.iristypes.show',
+            'system.settings.iristypes.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class IrisTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new IrisTypeResource($record))['data'],
+                'data' => new IrisTypeResource($record),
             ]);
         }
 
-        return view('system.iristypes.form', compact('record'));
+        return view('system.settings.iristypes.form', compact('record'));
     }
 
     /**
@@ -136,7 +136,7 @@ class IrisTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new IrisTypeResource($updatedRecord))['data'],
+                'data'    => new IrisTypeResource($updatedRecord),
             ]);
         }
 

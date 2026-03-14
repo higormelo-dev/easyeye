@@ -56,7 +56,7 @@ class CoverTestTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.covertesttypes.index', compact('meta'));
+        return $dataTable->render('system.settings.covertesttypes.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class CoverTestTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.covertesttypes.form');
+        return view('system.settings.covertesttypes.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class CoverTestTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new CoverTestTypeResource($record))['data'],
+                'data'    => new CoverTestTypeResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class CoverTestTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new CoverTestTypeResource($record))['data'],
+                'data' => new CoverTestTypeResource($record),
             ]);
         }
 
         return view(
-            'system.covertesttypes.show',
+            'system.settings.covertesttypes.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class CoverTestTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new CoverTestTypeResource($record))['data'],
+                'data' => new CoverTestTypeResource($record),
             ]);
         }
 
-        return view('system.covertesttypes.form', compact('record'));
+        return view('system.settings.covertesttypes.form', compact('record'));
     }
 
     /**
@@ -136,7 +136,7 @@ class CoverTestTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new CoverTestTypeResource($updatedRecord))['data'],
+                'data'    => new CoverTestTypeResource($updatedRecord),
             ]);
         }
 

@@ -312,6 +312,9 @@ return [
         'doctor_identifier'        => 'identificador do médico',
         'schedule_identifier'      => 'identificador do agendamento',
         'away_or_near'             => 'longe ou perto',
+        'doctor_id'                => 'médico',
+        'date_time'                => 'data e hora',
+        'patient_id'               => 'paciente',
     ],
     'custom' => [
         'generic' => [
@@ -342,6 +345,11 @@ return [
         'entity' => [
             'not_selected' => 'Nenhuma empresa selecionada.',
         ],
+        'schedule' => [
+            'doctor_not_found'       => 'O médico selecionado não é válido ou não pertence a esta empresa.',
+            'doctor_datetime_unique' => 'Já existe um agendamento para este médico neste horário.',
+        ],
     ],
-    'at_least_one_required' => 'Pelo menos um dos campos :fields deve ser selecionado.',
+    'at_least_one_required'   => 'Pelo menos um dos campos :fields deve ser selecionado.',
+    'cnpj_already_registered' => 'Este CNPJ já está cadastrado.',
 ];

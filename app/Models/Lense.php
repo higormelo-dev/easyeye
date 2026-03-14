@@ -2,88 +2,29 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use App\Concerns\{HasEntityCode, HasUppercaseName};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class Lense extends Model
 {
+    use HasEntityCode;
+    use HasUppercaseName;
     use HasUuids;
     use SoftDeletes;
 
-    protected $primaryKey = 'id';
+    protected string $codePrefix       = 'LS';
+    protected string $codePrefixGlobal = 'LSP';
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
-    protected $fillable = [
-        'entity_id',
-        'code',
-        'name',
-        'away',
-        'near',
-        'active',
-    ];
+    protected $fillable = ['entity_id', 'code', 'name', 'away', 'near', 'active'];
 
-    /**
-     * Generated code for the entity_id field
-     */
-    protected static function booted(): void
-    {
-        static::creating(function (self $lense) {
-            if (blank($lense->code)) {
-                $prefix = $lense->entity_id ? 'LS' : 'LSP';
-
-                $lastType = static::withoutGlobalScopes()
-                    ->when(
-                        $lense->entity_id !== null,
-                        fn ($q) => $q->where('entity_id', $lense->entity_id),
-                        fn ($q) => $q->whereNull('entity_id')
-                    )
-                    ->where('code', 'like', $prefix . '-%')
-                    ->orderBy('code', 'desc')
-                    ->first();
-
-                if ($lastType) {
-                    $lastNumber = (int) substr($lastType->code, strlen($prefix) + 1);
-                    $newNumber  = $lastNumber + 1;
-                } else {
-                    $newNumber = 1;
-                }
-
-                $lense->code = sprintf('%s-%010d', $prefix, $newNumber);
-            }
-        });
-    }
-
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
-        return [
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
-        ];
+        return ['created_at' => 'datetime', 'updated_at' => 'datetime', 'deleted_at' => 'datetime'];
     }
 
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'id');
-    }
-
-    protected function name(): Attribute
-    {
-        return Attribute::make(
-            set: static fn (?string $value) => $value !== null
-                ? mb_convert_case($value, MB_CASE_UPPER, 'UTF-8')
-                : null,
-        );
     }
 }

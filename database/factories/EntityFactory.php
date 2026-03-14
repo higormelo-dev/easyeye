@@ -29,7 +29,7 @@ class EntityFactory extends Factory
             'district'               => fake()->cityPrefix() . ' ' . fake()->citySuffix(),
             'city'                   => fake()->city(),
             'state'                  => fake()->stateAbbr(),
-            'country'                => fake()->country(),
+            'country'                => fake()->countryCode(),
             'national_registration'  => str(fake()->cnpj())->replaceMatches('/\D/', ''),
             'state_registration'     => fake()->numerify('###########'),
             'municipal_registration' => fake()->numerify('#########'),

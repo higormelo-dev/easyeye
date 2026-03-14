@@ -1,49 +1,54 @@
 @extends('layouts.guest')
 
 @section('content')
-    <div class="card-body">
-        {{ html()->form('POST', route('password.email'))->class(['form-horizontal', 'form-material'])->id('loginform')->open() }}
-            {{ html()->element('h3')->class('text-center m-b-20')->text(__('Reset Password')) }}
-            {{
-                html()->div()
-                    ->class(['alert', 'alert-info', 'text-justify'])
-                    ->children([
-						html()->element('p')->class('mb-0')
-						    ->text(__('Forgot your password? No problem. Just let us know your email address and we will email you a password reset link that will allow you to choose a new one.')),
-                    ])
-            }}
-            @error('email')
-                {{
-                    html()->div()
-                        ->class(['alert', 'alert-danger', 'mb-4', 'text-justify'])
-                        ->text($message)
-                }}
-            @enderror
-            {{
-                html()->div([
-                    html()->text('email')->class('form-control')
-                    ->value(old('email', null))
-                    ->attributes(['autofocus'])
-                    ->placeholder(__('actions.email'))
-                ])->class(['col-12', 'form-group'])
-            }}
-            {{
-                html()->div([
-                    html()->div([
-                        html()->button()->text(__('Email Password Reset Link'))
-                            ->class(['btn', 'w-100', 'btn-info', 'text-white', 'text-titlecase'])
-                    ])
-                ])->class(['col-12', 'form-group', 'text-center'])
-            }}
-            {{
-                html()->div()
-                    ->class(['col-12', 'text-center', 'm-b-0'])
-                    ->child(
-                        html()->a(route('login'))
-                           ->class(['text-dark', 'm-l-5'])
-                           ->child(html()->element('strong')->text(__('auth.back_to_login')))
-                    )
-            }}
-        {{ html()->form()->close() }}
-    </div>
+<div class="card-body">
+    <form method="POST" action="{{ route('password.email') }}" class="form-horizontal form-material">
+        @csrf
+
+        {{-- Header --}}
+        <div class="text-center mb-4">
+            <a href="{{ route('login') }}">
+                <img src="{{ asset('system/images/logo-icon.png') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
+            </a>
+            <h4 class="font-medium mb-0">{{ __('auth.forgot_password.title') }}</h4>
+        </div>
+
+        <div class="alert alert-info mb-3" style="font-size:.85rem">
+            {{ __('auth.forgot_password.description') }}
+        </div>
+
+        {{-- Status de sucesso --}}
+        @if (session('status'))
+            <div class="alert alert-success mb-3" style="font-size:.85rem">{{ session('status') }}</div>
+        @endif
+
+        {{-- Erro --}}
+        @error('email')
+            <div class="alert alert-danger mb-3" style="font-size:.85rem">{{ $message }}</div>
+        @enderror
+
+        {{-- E-mail --}}
+        <div class="form-group mb-4">
+            <label class="form-label">{{ __('actions.email') }} <span class="text-danger">*</span></label>
+            <input type="email" name="email"
+                   class="form-control @error('email') is-invalid @enderror"
+                   value="{{ old('email') }}"
+                   required autofocus autocomplete="username">
+        </div>
+
+        {{-- Botão enviar --}}
+        <div class="d-grid mb-3">
+            <button type="submit" class="btn btn-info btn-block waves-effect waves-light">
+                {{ __('auth.forgot_password.send_link') }}
+            </button>
+        </div>
+
+        <p class="text-center">
+            <a href="{{ route('login') }}" class="text-muted" style="font-size:.85rem">
+                &larr; {{ __('auth.back_to_login') }}
+            </a>
+        </p>
+
+    </form>
+</div>
 @endsection

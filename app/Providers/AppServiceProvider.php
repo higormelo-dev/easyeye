@@ -2,8 +2,10 @@
 
 namespace App\Providers;
 
+use App\Services\FeatureGateService;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 
@@ -14,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Singleton para que o cache por request funcione corretamente
+        $this->app->singleton(FeatureGateService::class);
     }
 
     /**
@@ -25,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
         if (app()->environment(['production', 'testing'])) {
             URL::forceScheme('https');
         }
+
+        Password::defaults(fn () => Password::min(8)->letters()->numbers());
 
         // Configura o Sanctum para autenticar via Bearer token
         Sanctum::authenticateAccessTokensUsing(function (PersonalAccessToken $accessToken, bool $isValid) {

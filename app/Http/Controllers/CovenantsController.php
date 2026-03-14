@@ -56,7 +56,7 @@ class CovenantsController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.covenants.index', compact('meta'));
+        return $dataTable->render('system.settings.covenants.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class CovenantsController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.covenants.form');
+        return view('system.settings.covenants.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class CovenantsController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new CovenantResource($record))['data'],
+                'data'    => new CovenantResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class CovenantsController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new CovenantResource($record))['data'],
+                'data' => new CovenantResource($record),
             ]);
         }
 
         return view(
-            'system.covenants.show',
+            'system.settings.covenants.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class CovenantsController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new CovenantResource($record))['data'],
+                'data' => new CovenantResource($record),
             ]);
         }
 
-        return view('system.covenants.form', compact('record'));
+        return view('system.settings.covenants.form', compact('record'));
     }
 
     /**
@@ -134,7 +134,7 @@ class CovenantsController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new CovenantResource($updatedRecord))['data'],
+                'data'    => new CovenantResource($updatedRecord),
             ]);
         }
 

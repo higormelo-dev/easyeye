@@ -2,13 +2,18 @@
 
 namespace App\Models;
 
+use App\Presenters\SchedulePresenter;
 use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Laracasts\Presenter\PresentableTrait;
 
 class Schedule extends Model
 {
     use HasUuids;
     use SoftDeletes;
+    use PresentableTrait;
+
+    protected $presenter = SchedulePresenter::class;
 
     protected $primaryKey = 'id';
 

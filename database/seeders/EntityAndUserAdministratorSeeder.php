@@ -5,7 +5,7 @@ namespace Database\Seeders;
 use App\Models\{Entity, EntityUser, User};
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
+// Hash não é necessário: o cast 'hashed' do model User já aplica Hash::make() automaticamente
 use Illuminate\Support\Str;
 
 class EntityAndUserAdministratorSeeder extends Seeder
@@ -25,7 +25,7 @@ class EntityAndUserAdministratorSeeder extends Seeder
             'district'               => 'Casa Branca',
             'city'                   => 'Santo André',
             'state'                  => 'SP',
-            'country'                => 'Brasil',
+            'country'                => 'BR',
             'national_registration'  => '01234567890123',
             'state_registration'     => '4567890123456',
             'municipal_registration' => '78901234567890',
@@ -41,14 +41,14 @@ class EntityAndUserAdministratorSeeder extends Seeder
             'name'              => 'Higor',
             'email'             => 'higor_ap89@icloud.com',
             'email_verified_at' => Carbon::now(),
-            'password'          => Hash::make('$2y$10$92IX'),
+            'password'          => 'Admin@2024!',   // cast 'hashed' faz o hash automaticamente
             'remember_token'    => Str::random(10),
         ]);
         $joao = User::create([
             'name'              => 'João Adachi',
             'email'             => 'joao9@adachioftalmologia.com.br',
             'email_verified_at' => Carbon::now(),
-            'password'          => Hash::make('AX9ser4D%K'),
+            'password'          => 'AX9ser4D%K',    // cast 'hashed' faz o hash automaticamente
             'remember_token'    => Str::random(10),
         ]);
         EntityUser::create([

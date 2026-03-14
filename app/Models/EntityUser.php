@@ -26,9 +26,12 @@ class EntityUser extends Model
     protected $fillable = [
         'entity_id',
         'user_id',
+        'invited_by',
         'code',
-        'active',
         'rule',
+        'is_owner',
+        'active',
+        'joined_at',
     ];
 
     /**
@@ -41,7 +44,6 @@ class EntityUser extends Model
                 $prefix = $entityUser->entity->is_client ? 'EU' : 'EUP';
 
                 $lastEntityUser = static::withoutGlobalScopes()
-                    ->where('entity_id', $entityUser->entity_id)
                     ->where('code', 'like', $prefix . '-%')
                     ->orderBy('code', 'desc')
                     ->first();
@@ -66,6 +68,9 @@ class EntityUser extends Model
     protected function casts(): array
     {
         return [
+            'is_owner'   => 'boolean',
+            'active'     => 'boolean',
+            'joined_at'  => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -80,6 +85,11 @@ class EntityUser extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
+    }
+
+    public function invitedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'invited_by', 'id');
     }
 
     public function doctor(): BelongsTo

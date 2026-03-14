@@ -2,8 +2,13 @@
 
 use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     ApiCheckTokenExpiration,
+    CheckFeature,
     CheckJsonResponse,
+    CheckSubscription,
+    EnsureEntityRole,
     EnsureEntitySelected,
+    EnsureUserBelongsToEntity,
+    HandleImpersonation,
     ParseMultipartFormData,
     SetLocale};
 use Illuminate\Auth\AuthenticationException;
@@ -23,14 +28,19 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'entity.selected'      => EnsureEntitySelected::class,
+            'entity.selected' => EnsureEntitySelected::class,
+            'entity.member'   => EnsureUserBelongsToEntity::class,
+            'entity.role'     => EnsureEntityRole::class,
+            'check.subscription'   => CheckSubscription::class,
+            'feature'              => CheckFeature::class,
             'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,
             'token.expiration'     => ApiCheckTokenExpiration::class,
         ]);
 
-        // Adiciona o SetLocale ao grupo web para ser executado em todas as requisições web
+        // Adiciona o SetLocale e HandleImpersonation ao grupo web
         $middleware->web(append: [
             SetLocale::class,
+            HandleImpersonation::class,
         ]);
 
         $middleware->api([

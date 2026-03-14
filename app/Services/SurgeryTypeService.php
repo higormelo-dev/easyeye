@@ -2,103 +2,56 @@
 
 namespace App\Services;
 
-use App\Http\Requests\{SurgeryTypeRequest};
-use App\Models\{SurgeryType};
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Models\SurgeryType;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Http\FormRequest;
 
-class SurgeryTypeService
+class SurgeryTypeService extends BaseSettingService
 {
-    /**
-     * Create a new record with all related entities
-     *
-     * @throws \Throwable
-     */
-    public function create(SurgeryTypeRequest $request): SurgeryType
+    protected function modelClass(): string
     {
-        return DB::transaction(function () use ($request) {
-            return $this->findOrCreate($request);
-        });
+        return SurgeryType::class;
     }
 
-    /**
-     * Update existing record and related entities
-     *
-     * @throws \Throwable
-     */
-    public function update(SurgeryType $record, SurgeryTypeRequest $request): SurgeryType
+    protected function getCreateData(FormRequest $request): array
     {
-        return DB::transaction(static function () use ($record, $request) {
-            $data = [];
-
-            if ($request->has('category')) {
-                $data['category'] = $request->category;
-            }
-
-            if ($request->has('name')) {
-                $data['name'] = $request->name;
-            }
-
-            if ($request->has('active')) {
-                $data['active'] = $request->boolean('active');
-            }
-
-            $record->update($data);
-
-            return $record;
-        });
+        return ['category' => $request->category, 'name' => $request->name];
     }
 
-    /**
-     * Find by ID or Code including soft-deleted records
-     */
-    public function findByIdOrCode(string $idOrCode): SurgeryType
+    protected function getUpdateData(FormRequest $request): array
     {
-        /** @var SurgeryType $record */
-        $record = SurgeryType::query()
-            ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->when(
-                Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
-            )
-            ->firstOrFail();
+        $data = parent::getUpdateData($request);
 
-        return $record;
-    }
-
-    /**
-     * Find or create record
-     */
-    private function findOrCreate(SurgeryTypeRequest $request): SurgeryType
-    {
-        $existingRecord = SurgeryType::query()
-            ->withTrashed()
-            ->where(
-                [
-                    ['entity_id', '=', session()->get('selected_entity_id')],
-                    ['category', '=', $request->category],
-                    ['name', '=', $request->name],
-                ]
-            )
-            ->first();
-
-        $recordData = [
-            'category' => $request->category,
-            'name'     => $request->name,
-        ];
-
-        if ($existingRecord) {
-            if ($existingRecord->trashed()) {
-                $existingRecord->restore();
-            }
-            $existingRecord->update($recordData);
-
-            return $existingRecord->fresh();
+        if ($request->has('category')) {
+            $data['category'] = $request->category;
         }
 
-        return SurgeryType::create(array_merge($recordData, [
+        return $data;
+    }
+
+    protected function findOrCreate(FormRequest $request): Model
+    {
+        $existing = SurgeryType::query()
+            ->withTrashed()
+            ->where([
+                ['entity_id', '=', session()->get('selected_entity_id')],
+                ['category',  '=', $request->category],
+                ['name',      '=', $request->name],
+            ])
+            ->first();
+
+        $data = $this->getCreateData($request);
+
+        if ($existing) {
+            if ($existing->trashed()) {
+                $existing->restore();
+            }
+            $existing->update($data);
+
+            return $existing->fresh();
+        }
+
+        return SurgeryType::create(array_merge($data, [
             'entity_id' => session()->get('selected_entity_id'),
             'active'    => true,
         ]));

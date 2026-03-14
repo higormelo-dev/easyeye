@@ -28,8 +28,6 @@ class EntityIntegratorRequest extends FormRequest
                 'string',
                 'max:255',
                 Rule::unique('entity_integrators')->where(function ($query) {
-                    $query = $query->where('entity_id', $this->entity);
-
                     if ($this->integrator) {
                         $query = $query->where('id', '!=', $this->integrator)
                             ->whereNull('deleted_at');

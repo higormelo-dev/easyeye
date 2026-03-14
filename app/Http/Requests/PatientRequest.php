@@ -258,8 +258,16 @@ class PatientRequest extends FormRequest
 
         if ($this->has('national_registry')) {
             $this->merge([
-                'national_registry' => mb_strtoupper($this->input('national_registry')),
+                'national_registry' => preg_replace('/\D/', '', $this->input('national_registry')),
             ]);
+        }
+
+        foreach (['telephone', 'cellphone', 'zipcode'] as $field) {
+            if ($this->has($field) && $this->input($field) !== null) {
+                $this->merge([
+                    $field => preg_replace('/\D/', '', $this->input($field)),
+                ]);
+            }
         }
     }
 }

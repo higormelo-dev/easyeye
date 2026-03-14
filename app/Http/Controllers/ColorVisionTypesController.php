@@ -56,7 +56,7 @@ class ColorVisionTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.colorvisiontypes.index', compact('meta'));
+        return $dataTable->render('system.settings.colorvisiontypes.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class ColorVisionTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.colorvisiontypes.form');
+        return view('system.settings.colorvisiontypes.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class ColorVisionTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new ColorVisionTypeResource($record))['data'],
+                'data'    => new ColorVisionTypeResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class ColorVisionTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new ColorVisionTypeResource($record))['data'],
+                'data' => new ColorVisionTypeResource($record),
             ]);
         }
 
         return view(
-            'system.colorvisiontypes.show',
+            'system.settings.colorvisiontypes.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class ColorVisionTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new ColorVisionTypeResource($record))['data'],
+                'data' => new ColorVisionTypeResource($record),
             ]);
         }
 
-        return view('system.colorvisiontypes.form', compact('record'));
+        return view('system.settings.colorvisiontypes.form', compact('record'));
     }
 
     /**
@@ -136,7 +136,7 @@ class ColorVisionTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new ColorVisionTypeResource($updatedRecord))['data'],
+                'data'    => new ColorVisionTypeResource($updatedRecord),
             ]);
         }
 

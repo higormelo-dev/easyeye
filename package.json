@@ -27,6 +27,7 @@
     },
     "dependencies": {
         "bootstrap": "^5.3.8",
+        "flatpickr": "^4.6.13",
         "datatables.net": "~2.3",
         "datatables.net-bs5": "~2.3",
         "datatables.net-responsive": "~3.0",

@@ -56,7 +56,7 @@ class VisitTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.visittypes.index', compact('meta'));
+        return $dataTable->render('system.settings.visittypes.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class VisitTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.visittypes.form');
+        return view('system.settings.visittypes.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class VisitTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new VisitTypeResource($record))['data'],
+                'data'    => new VisitTypeResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class VisitTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new VisitTypeResource($record))['data'],
+                'data' => new VisitTypeResource($record),
             ]);
         }
 
         return view(
-            'system.visittypes.show',
+            'system.settings.visittypes.show',
             compact('record')
         );
     }
@@ -113,7 +113,7 @@ class VisitTypesController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        return view('system.visittypes.form', compact('record'));
+        return view('system.settings.visittypes.form', compact('record'));
     }
 
     /**
@@ -130,7 +130,7 @@ class VisitTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new SkinTypeResource($updatedRecord))['data'],
+                'data'    => new SkinTypeResource($updatedRecord),
             ]);
         }
 

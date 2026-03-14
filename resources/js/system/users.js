@@ -72,12 +72,12 @@ $(function () {
 
     // Ativar / Inativar
     $(document).on('click', '.btn-active', function () {
-        record_id = $(this).data('id');
+        record_id = $(this).attr('data-id');
         $.ajax({
             url: 'users/' + record_id,
             type: 'put',
             dataType: 'json',
-            data: { 'type_method': 1, 'active': $(this).data('situation') },
+            data: { 'type_method': 1, 'active': parseInt($(this).attr('data-situation'), 10) },
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (response) {
                 showSuccessToast(response.message);

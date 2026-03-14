@@ -11,6 +11,8 @@ class EntityIntegratorEquipment extends Model
     use HasUuids;
     use SoftDeletes;
 
+    protected $table = 'entity_integrator_equipments';
+
     protected $primaryKey = 'id';
 
     /**

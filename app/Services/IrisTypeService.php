@@ -2,95 +2,12 @@
 
 namespace App\Services;
 
-use App\Http\Requests\{IrisTypeRequest};
-use App\Models\{IrisType};
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Models\IrisType;
 
-class IrisTypeService
+class IrisTypeService extends BaseSettingService
 {
-    /**
-     * Create a new covenant with all related entities
-     *
-     * @throws \Throwable
-     */
-    public function create(IrisTypeRequest $request): IrisType
+    protected function modelClass(): string
     {
-        return DB::transaction(function () use ($request) {
-            return $this->findOrCreate($request);
-        });
-    }
-
-    /**
-     * Update existing covenant and related entities
-     *
-     * @throws \Throwable
-     */
-    public function update(IrisType $record, IrisTypeRequest $request): IrisType
-    {
-        return DB::transaction(function () use ($record, $request) {
-            $data = [];
-
-            if ($request->has('name')) {
-                $data['name'] = $request->name;
-            }
-
-            if ($request->has('active')) {
-                $data['active'] = $request->boolean('active');
-            }
-
-            $record->update($data);
-
-            return $record;
-        });
-    }
-
-    /**
-     * Find by ID or Code including soft-deleted records
-     */
-    public function findByIdOrCode(string $idOrCode): ?IrisType
-    {
-        /** @var IrisType $record */
-        $record = IrisType::query()
-            ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->when(
-                Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
-            )
-            ->firstOrFail();
-
-        return $record;
-    }
-
-    /**
-     * Find or create skin type
-     */
-    private function findOrCreate(IrisTypeRequest $request): IrisType
-    {
-        $existingRecord = IrisType::query()
-            ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->where('name', $request->name)
-            ->first();
-
-        $recordData = [
-            'name' => $request->name,
-        ];
-
-        if ($existingRecord) {
-            if ($existingRecord->trashed()) {
-                $existingRecord->restore();
-            }
-            $existingRecord->update($recordData);
-
-            return $existingRecord->fresh();
-        }
-
-        return IrisType::create(array_merge($recordData, [
-            'entity_id' => session()->get('selected_entity_id'),
-            'active'    => true,
-        ]));
+        return IrisType::class;
     }
 }

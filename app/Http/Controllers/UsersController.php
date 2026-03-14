@@ -146,7 +146,7 @@ class UsersController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new EntityUserResource($record))['data'],
+                'data'    => new EntityUserResource($record),
             ]);
         }
 
@@ -163,7 +163,7 @@ class UsersController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new EntityUserResource($record))['data'],
+                'data' => new EntityUserResource($record),
             ]);
         }
 
@@ -191,7 +191,7 @@ class UsersController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new EntityUserResource($record))['data'],
+                'data' => new EntityUserResource($record),
             ]);
         }
 
@@ -210,7 +210,7 @@ class UsersController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new EntityUserResource($updatedRecord))['data'],
+                'data'    => new EntityUserResource($updatedRecord),
             ]);
         }
 

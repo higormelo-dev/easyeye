@@ -5,13 +5,47 @@
 @endsection
 
 @section('content')
+
+{{-- crudForm: gerencia o modal de criação/edição de paciente --}}
+<div x-data="crudForm({
+        storeUrl:  @js(route('panel.patients.store')),
+        updateUrl: @js(route('panel.patients.index')),
+        fields: {
+            covenant_id: '', card_number: '', skin_id: '', iris_id: '', active: true,
+            name: '', nickname: '', national_registry: '', birth_date: '',
+            gender: '', marital_status: '', email: '',
+            mother_name: '', father_name: '',
+            state_registry: '', state_registry_agency: '',
+            state_registry_initial: '', state_registry_date: '',
+            telephone: '', cellphone: '', whatsapp: false,
+            zipcode: '', address: '', number: '', complement: '',
+            district: '', city: '', state: '', country: ''
+        },
+        onSuccess: () => window.dispatchEvent(new CustomEvent('patient-saved'))
+    })"
+     x-init="$nextTick(() => document.getElementById('patientModal').addEventListener('hidden.bs.modal', () => reset()))"
+     @open-create-patient.window="reset(); bootstrap.Modal.getOrCreateInstance(document.getElementById('patientModal')).show()"
+     @edit-patient.window="loadAndEdit(
+         @js(url('panel/patients')) + '/' + $event.detail.id + '/edit-data',
+         @js(url('panel/patients')) + '/' + $event.detail.id,
+         'patientModal'
+     )">
+
+    @include('system.patients._form-modal')
+
+    {{-- patientViewToggle --}}
     <div x-data="patientViewToggle(@js(route('panel.patients.cards')), @js(asset('system/images/team.png')))"
-         x-init="init()">
+         x-init="init()"
+         @patient-saved.window="reloadCurrentView()">
 
         {{-- Toolbar --}}
         <div class="row mb-3 align-items-center">
             <div class="col-12 col-md-auto">
-                @include('components.subnav')
+                <button type="button"
+                        class="btn btn-info btn-sm"
+                        @click="$dispatch('open-create-patient')">
+                    <i class="fa fa-plus"></i> {{ __('actions.new') }}
+                </button>
             </div>
             <div class="col-12 col-md d-flex align-items-center gap-2 mt-2 mt-md-0 justify-content-md-end">
                 {{-- Busca unificada --}}
@@ -113,8 +147,8 @@
                                                     title="{{ __('actions.view') }}">
                                                 <i class="fa fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-warning btn-edit"
-                                                    :data-id="patient.id"
+                                            <button class="btn btn-sm btn-warning"
+                                                    @click="$dispatch('edit-patient', { id: patient.id })"
                                                     data-bs-toggle="tooltip"
                                                     title="{{ __('actions.edit') }}">
                                                 <i class="fa fa-edit"></i>
@@ -162,7 +196,10 @@
             </div>
         </div>
 
-    </div>
+    </div>{{-- /patientViewToggle --}}
+
+</div>{{-- /crudForm --}}
+
 @endsection
 
 @section('modals')

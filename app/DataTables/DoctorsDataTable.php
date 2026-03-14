@@ -39,6 +39,7 @@ class DoctorsDataTable extends BaseDataTable
         return $model->newQuery()
             ->select(
                 'doctors.*',
+                'entity_users.entity_id',
                 'users.name as user_name',
                 'users.email',
                 'people.full_name',

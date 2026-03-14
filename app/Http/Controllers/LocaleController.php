@@ -80,13 +80,13 @@ class LocaleController extends Controller
             return back()->with('error', __('http-statuses.404'));
         }
 
-        $entity->update(['locale' => $request->locale]);
+        $entity->update(['locale' => $request->get('locale')]);
 
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'message' => __('actions.entity_language_changed'),
-                'locale'  => $request->locale,
+                'locale'  => $request->get('locale'),
             ]);
         }
 

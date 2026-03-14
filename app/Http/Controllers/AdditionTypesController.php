@@ -56,7 +56,7 @@ class AdditionTypesController extends Controller
             ],
         ];
 
-        return $dataTable->render('system.additiontypes.index', compact('meta'));
+        return $dataTable->render('system.settings.additiontypes.index', compact('meta'));
     }
 
     /**
@@ -64,7 +64,7 @@ class AdditionTypesController extends Controller
      */
     public function create(): Factory|Application|View|JsonResponse
     {
-        return view('system.additiontypes.form');
+        return view('system.settings.additiontypes.form');
     }
 
     /**
@@ -79,7 +79,7 @@ class AdditionTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new AdditionTypeResource($record))['data'],
+                'data'    => new AdditionTypeResource($record),
             ]);
         }
 
@@ -96,12 +96,12 @@ class AdditionTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new AdditionTypeResource($record))['data'],
+                'data' => new AdditionTypeResource($record),
             ]);
         }
 
         return view(
-            'system.additiontypes.show',
+            'system.settings.additiontypes.show',
             compact('record')
         );
     }
@@ -115,11 +115,11 @@ class AdditionTypesController extends Controller
 
         if (request()->wantsJson()) {
             return response()->json([
-                'data' => (new AdditionTypeResource($record))['data'],
+                'data' => new AdditionTypeResource($record),
             ]);
         }
 
-        return view('system.additiontypes.form', compact('record'));
+        return view('system.settings.additiontypes.form', compact('record'));
     }
 
     /**
@@ -136,7 +136,7 @@ class AdditionTypesController extends Controller
         if (request()->wantsJson()) {
             return response()->json([
                 'message' => $messageReturn,
-                'data'    => (new AdditionTypeResource($updatedRecord))['data'],
+                'data'    => new AdditionTypeResource($updatedRecord),
             ]);
         }
 

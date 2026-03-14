@@ -2,103 +2,37 @@
 
 namespace App\Services;
 
-use App\Http\Requests\CovenantRequest;
-use App\Models\{Covenant};
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use App\Models\Covenant;
+use Illuminate\Foundation\Http\FormRequest;
 
-class CovenantService
+class CovenantService extends BaseSettingService
 {
-    /**
-     * Create a new record with all related entities
-     *
-     * @throws \Throwable
-     */
-    public function create(CovenantRequest $request): Covenant
+    protected function modelClass(): string
     {
-        return DB::transaction(function () use ($request) {
-            return $this->findOrCreate($request);
-        });
+        return Covenant::class;
     }
 
-    /**
-     * Update existing record and related entities
-     */
-    public function update(Covenant $covenant, CovenantRequest $request): Covenant
+    protected function getCreateData(FormRequest $request): array
     {
-        return DB::transaction(function () use ($covenant, $request) {
-            $data = [];
-
-            if ($request->has('name')) {
-                $data['name'] = $request->name;
-            }
-
-            if ($request->has('color')) {
-                $data['color'] = $request->color;
-            }
-
-            if ($request->has('table')) {
-                $data['table'] = $request->boolean('table');
-            }
-
-            if ($request->has('active')) {
-                $data['active'] = $request->boolean('active');
-            }
-
-            $covenant->update($data);
-
-            return $covenant;
-        });
-    }
-
-    /**
-     * Find or create record
-     */
-    private function findOrCreate(CovenantRequest $request): Covenant
-    {
-        $existingRecord = Covenant::query()
-            ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->where('name', $request->name)
-            ->first();
-
-        $recordData = [
+        return [
             'name'  => $request->name,
             'color' => $request->color,
             'table' => (bool) $request->table,
         ];
-
-        if ($existingRecord) {
-            if ($existingRecord->trashed()) {
-                $existingRecord->restore();
-            }
-            $existingRecord->update($recordData);
-
-            return $existingRecord->fresh();
-        }
-
-        return Covenant::create(array_merge($recordData, [
-            'entity_id' => session()->get('selected_entity_id'),
-            'active'    => true,
-        ]));
     }
 
-    /**
-     * Find by ID or Code including soft-deleted records
-     */
-    public function findByIdOrCode(string $idOrCode): ?Covenant
+    protected function getUpdateData(FormRequest $request): array
     {
-        /** @var Covenant $record */
-        $record = Covenant::query()
-            ->withTrashed()
-            ->where('entity_id', session()->get('selected_entity_id'))
-            ->when(
-                Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
-            )
-            ->firstOrFail();
+        $data = parent::getUpdateData($request);
 
-        return $record;
+        if ($request->has('color')) {
+            $data['color'] = $request->color;
+        }
+
+        if ($request->has('table')) {
+            $data['table'] = $request->boolean('table');
+        }
+
+        return $data;
     }
 }

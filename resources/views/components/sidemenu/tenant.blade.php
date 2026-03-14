@@ -1,5 +1,5 @@
 <li>
-    <a class="waves-effect waves-dark" href="javascript:void(0);">
+    <a class="waves-effect waves-dark" href="{{ route('panel.schedules.index') }}">
         <i class="fa fa-calendar"></i>
         <span class="hide-menu">{{ __('actions.sidemenu.schedules') }}</span>
     </a>

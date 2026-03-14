@@ -19,9 +19,11 @@ import 'datatables.net-responsive-bs5/css/responsive.bootstrap5.min.css';
 import 'sweetalert2/dist/sweetalert2.min.css';
 import 'jquery-toast-plugin/dist/jquery.toast.min.css';
 import 'jquery-asColorPicker/dist/css/asColorPicker.css';
+import 'flatpickr/dist/flatpickr.min.css';
 
 // ── Bootstrap 5 JS (no jQuery dependency) ────────────────────────────────────
-import 'bootstrap';
+import * as bootstrap from 'bootstrap';
+window.bootstrap = bootstrap;
 
 // ── DataTables + responsive extension ────────────────────────────────────────
 // These use window.jQuery (via the jquery-global.js alias in vite.config.js)
@@ -36,6 +38,12 @@ window.Swal = Swal;
 import 'jquery-toast-plugin';
 import 'jquery-sparkline';
 import 'jquery-asColorPicker';
+
+// ── Flatpickr (Alpine-friendly datepicker) ────────────────────────────────────
+import flatpickr from 'flatpickr';
+import { Portuguese } from 'flatpickr/dist/l10n/pt.js';
+flatpickr.localize(Portuguese);
+window.flatpickr = flatpickr;
 
 // ── InputMask (jQuery bridge auto-registered via side-effect import) ──────────
 import Inputmask from 'inputmask';
