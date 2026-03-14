@@ -13,7 +13,7 @@
         <link href="{{ asset('system/css/pages/dashboard1.css') }}" rel="stylesheet">
         {{-- Vendor + App bundles (Bootstrap, DataTables, SweetAlert2, etc. via npm/Vite) --}}
         <style>[x-cloak] { display: none !important; }</style>
-        @vite(['resources/js/vendor.js', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/js/vendor.js', 'resources/js/app.js'])
         @stack('styles')
         <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
         <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
@@ -59,7 +59,7 @@
                             </a>
                         </li>
                     </ul>
-                    <ul class="navbar-nav my-lg-0">
+                    <ul class="navbar-nav my-lg-0 d-flex align-items-center">
                         <!-- Seletor de Idioma -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle waves-effect waves-dark" href=""

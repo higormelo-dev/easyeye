@@ -1,1 +1,15 @@
+/* Bootstrap 5.3.8 */
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
 [x-cloak] { display: none !important; }
+
+/* Fix: remove line-height que desalinha os itens da navbar */
+.topbar .top-navbar .navbar-header {
+    background: rgba(0, 0, 0, 0);
+    line-height: normal !important;
+}
+
+/* Fix: sidebar submenus — o tema usa .in (Bootstrap 3) mas o BS5 .collapse sobrescreve */
+.sidebar-nav .collapse.in {
+    display: block !important;
+}
