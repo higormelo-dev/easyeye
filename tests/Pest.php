@@ -41,9 +41,62 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+/**
+ * Monta o contexto completo de um integrador para testes:
+ * entity → subscription (plano com features customizáveis) → integratorUser → integrator → token.
+ *
+ * Retorna: entity, integratorUser, integrator, token (plainText), headers
+ */
+function setupIntegrator(array $featureOverrides = []): array
 {
-    // ..
+    $features = array_merge([
+        \App\Enums\FeatureKey::HasApiIntegrator->value => '1',
+        \App\Enums\FeatureKey::ApiPerPageLimit->value  => '100',
+    ], $featureOverrides);
+
+    $plan = \App\Models\Plan::factory()->create();
+
+    foreach ($features as $key => $value) {
+        \App\Models\PlanFeature::create([
+            'plan_id' => $plan->id,
+            'feature' => $key,
+            'value'   => $value,
+        ]);
+    }
+
+    $entity = \App\Models\Entity::factory()->create(['is_client' => true, 'active' => true]);
+
+    \App\Models\Subscription::create([
+        'entity_id' => $entity->id,
+        'plan_id'   => $plan->id,
+        'status'    => \App\Enums\SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(),
+        'ends_at'   => now()->addMonth(),
+    ]);
+
+    $integratorUser = \App\Models\EntityUserIntegrator::factory()->create([
+        'entity_id' => $entity->id,
+        'active'    => true,
+    ]);
+
+    $integrator = \App\Models\EntityIntegrator::factory()->create([
+        'entity_user_integrator_id' => $integratorUser->id,
+        'active'                    => true,
+    ]);
+
+    $token = $integratorUser->createToken(
+        'integrator-token',
+        ['integrator_id:' . $integrator->id],
+        \Carbon\Carbon::now()->addDays(7)
+    );
+
+    return [
+        'entity'         => $entity,
+        'integratorUser' => $integratorUser,
+        'integrator'     => $integrator,
+        'token'          => $token->plainTextToken,
+        'headers'        => ['Authorization' => 'Bearer ' . $token->plainTextToken],
+    ];
 }
 
 /**

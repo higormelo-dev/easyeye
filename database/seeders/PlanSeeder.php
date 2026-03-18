@@ -25,13 +25,15 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxDoctors->value          => '2',
                     FeatureKey::HasAiExamAssistant->value  => '0',
                     FeatureKey::HasAiReportDrafting->value => '0',
+                    FeatureKey::HasApiIntegrator->value    => '0',
                     FeatureKey::AiMonthlyCredits->value    => '0',
+                    FeatureKey::ApiPerPageLimit->value     => '0',
                 ],
             ],
             [
                 'name'          => 'Pro',
                 'slug'          => 'pro',
-                'description'   => 'Para clínicas em crescimento com necessidade de IA.',
+                'description'   => 'Para clínicas em crescimento com necessidade de IA e integradores.',
                 'price'         => 249.90,
                 'billing_cycle' => BillingCycle::Monthly,
                 'active'        => true,
@@ -42,7 +44,9 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxDoctors->value          => '5',
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '0',
+                    FeatureKey::HasApiIntegrator->value    => '1',
                     FeatureKey::AiMonthlyCredits->value    => '50',
+                    FeatureKey::ApiPerPageLimit->value     => '100',
                 ],
             ],
             [
@@ -59,7 +63,9 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxDoctors->value          => '0', // ilimitado
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '1',
+                    FeatureKey::HasApiIntegrator->value    => '1',
                     FeatureKey::AiMonthlyCredits->value    => '500',
+                    FeatureKey::ApiPerPageLimit->value     => '0', // ilimitado → cap interno 1000
                 ],
             ],
         ];

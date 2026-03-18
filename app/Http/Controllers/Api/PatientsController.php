@@ -41,7 +41,7 @@ class PatientsController extends Controller
             });
         }
 
-        $patients = $patients->paginate(request()->get('per_page', 10));
+        $patients = $patients->paginate(min((int) request()->get('per_page', 10), request()->attributes->get('api_per_page_limit', 100)));
 
         return PatientResource::collection($patients);
     }
@@ -54,6 +54,7 @@ class PatientsController extends Controller
         $integrator = request()->attributes->get('integrator');
 
         $patient = $this->model->query()
+            ->with(['entity', 'person', 'covenant', 'skinType', 'irisType'])
             ->where('entity_id', $integrator->user->entity_id)
             ->when(
                 Str::isUuid($idOrCode),

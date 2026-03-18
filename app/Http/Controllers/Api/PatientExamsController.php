@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\PatientExamRequest;
 use App\Http\Resources\PatientExamResource;
-use App\Models\{PatientExam};
+use App\Models\{Patient, PatientExam};
 use App\Services\Api\PatientExamService;
 use Illuminate\Http\{JsonResponse};
 use Illuminate\Support\Facades\Storage;
@@ -31,7 +31,11 @@ class PatientExamsController extends Controller
      */
     public function index(string $patientId)
     {
-        $integrator   = request()->attributes->get('integrator');
+        $integrator = request()->attributes->get('integrator');
+
+        Patient::where('id', $patientId)
+            ->where('entity_id', $integrator->user->entity_id)
+            ->firstOrFail();
         $patientExams = $this->model->query()
             ->with('patient', 'doctor', 'schedule', 'patient.person', 'doctor.person')
             ->whereHas('patient', function ($query) use ($integrator, $patientId) {
@@ -63,7 +67,7 @@ class PatientExamsController extends Controller
             });
         }
 
-        $patientExams = $patientExams->paginate(request()->get('per_page', 10));
+        $patientExams = $patientExams->paginate(min((int) request()->get('per_page', 10), request()->attributes->get('api_per_page_limit', 100)));
 
         return PatientExamResource::collection($patientExams);
     }
@@ -75,7 +79,7 @@ class PatientExamsController extends Controller
     {
         $record = $this->service->create($request, $patientId);
 
-        return new PatientExamResource($record);
+        return (new PatientExamResource($record))->response()->setStatusCode(201);
     }
 
     /**

@@ -36,8 +36,8 @@ class PatientResource extends JsonResource
                 'entity'    => $this->entity->toArray(),
                 'person'    => $this->person->toArray(),
                 'covenant'  => $this->covenant->toArray(),
-                'skin_type' => $this->skinType->toArray() ?? (object) [],
-                'iris_type' => $this->irisType->toArray() ?? (object) [],
+                'skin_type' => $this->skinType?->toArray() ?? (object) [],
+                'iris_type' => $this->irisType?->toArray() ?? (object) [],
             ];
 
         }

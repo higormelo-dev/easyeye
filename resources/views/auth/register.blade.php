@@ -113,7 +113,7 @@
             <div class="form-group mb-3">
                 <label class="form-label">{{ __('auth.register.name') }} <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" :class="{ 'is-invalid': errors.name }"
-                       x-model="form.name" autocomplete="name" autofocus required>
+                       x-model="form.name" autocomplete="name" autofocus>
                 <span class="field-error" x-show="errors.name" x-text="firstError('name')"></span>
             </div>
 
@@ -129,7 +129,7 @@
                            }"
                            x-model="form.email"
                            @blur="checkEmailAvailability"
-                           autocomplete="username" required>
+                           autocomplete="username">
                     <span class="input-group-text bg-white">
                         <span x-show="emailChecking"><i class="fa fa-spinner fa-spin text-muted"></i></span>
                         <span x-show="emailAvailable === true && !emailChecking"><i class="fa fa-check text-success"></i></span>
@@ -145,7 +145,7 @@
                 <label class="form-label">{{ __('auth.register.password') }} <span class="text-danger">*</span></label>
                 <div class="input-group">
                     <input type="password" id="reg-password" class="form-control" :class="{ 'is-invalid': errors.password }"
-                           x-model="form.password" autocomplete="new-password" required>
+                           x-model="form.password" autocomplete="new-password">
                     <button type="button" class="btn btn-outline-secondary" data-toggle-password="#reg-password" tabindex="-1">
                         <i class="mdi mdi-eye-off"></i>
                     </button>
@@ -158,7 +158,7 @@
                 <label class="form-label">{{ __('auth.register.confirm_password') }} <span class="text-danger">*</span></label>
                 <div class="input-group">
                     <input type="password" id="reg-password-confirmation" class="form-control" :class="{ 'is-invalid': errors.password_confirmation }"
-                           x-model="form.password_confirmation" autocomplete="new-password" required>
+                           x-model="form.password_confirmation" autocomplete="new-password">
                     <button type="button" class="btn btn-outline-secondary" data-toggle-password="#reg-password-confirmation" tabindex="-1">
                         <i class="mdi mdi-eye-off"></i>
                     </button>
@@ -190,7 +190,7 @@
             <div class="form-group mb-3">
                 <label class="form-label">{{ __('auth.register.company_name') }} <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" :class="{ 'is-invalid': errors.company_name }"
-                       x-model="form.company_name" autocomplete="organization" required>
+                       x-model="form.company_name" autocomplete="organization">
                 <span class="field-error" x-show="errors.company_name" x-text="firstError('company_name')"></span>
             </div>
 

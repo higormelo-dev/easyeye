@@ -90,7 +90,7 @@ class ExamsController extends Controller
         return "{$entityId}/{$patientId}/exams/{$timestamp}_{$uuid}.{$extension}";
     }
 
-    private function findExistingExam(string $name, $integrator): ?PatientExam
+    private function findExistingExam(?string $name, $integrator): ?PatientExam
     {
         return PatientExam::query()
             ->with('patient')
@@ -101,11 +101,12 @@ class ExamsController extends Controller
 
     private function uploadArchive(string $path, $file): void
     {
-        $uploaded = Storage::disk('s3')->put(
-            $path,
-            file_get_contents($file->getRealPath()),
-            'public'
-        );
+        $stream   = fopen($file->getRealPath(), 'rb');
+        $uploaded = Storage::disk('s3')->put($path, $stream, 'public');
+
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
 
         if (! $uploaded) {
             throw new \RuntimeException('Failed to upload exam archive.');

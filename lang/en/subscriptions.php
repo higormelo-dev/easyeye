@@ -18,14 +18,14 @@ return [
     ],
 
     'expired_page' => [
-        'title'         => 'Subscription expired',
-        'heading'       => 'Your subscription is inactive',
-        'grace_period'  => 'You still have access until :date (grace period). Renew to keep your access.',
-        'last_plan'     => 'Last plan',
-        'choose_plan'   => 'Choose a plan to continue',
-        'most_popular'  => 'Most popular',
-        'unlimited'     => 'Unlimited',
-        'upgrade_cta'   => 'Get started',
+        'title'           => 'Subscription expired',
+        'heading'         => 'Your subscription is inactive',
+        'grace_period'    => 'You still have access until :date (grace period). Renew to keep your access.',
+        'last_plan'       => 'Last plan',
+        'choose_plan'     => 'Choose a plan to continue',
+        'most_popular'    => 'Most popular',
+        'unlimited'       => 'Unlimited',
+        'upgrade_cta'     => 'Get started',
         'contact_support' => 'Questions? Contact us:',
     ],
 

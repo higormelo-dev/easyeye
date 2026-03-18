@@ -1,0 +1,149 @@
+<?php
+
+use App\Models\{Doctor, People, Schedule, User, VisitType};
+
+/**
+ * Creates the minimal dependencies to produce a Schedule for the given entity.
+ */
+function makeSchedule(array $ctx, array $overrides = []): Schedule
+{
+    $user       = User::factory()->create();
+    $entityUser = createEntityUser($ctx['entity'], $user, 'doctor');
+    $person     = People::factory()->create();
+
+    $doctor = Doctor::create([
+        'entity_user_id' => $entityUser->id,
+        'person_id'      => $person->id,
+        'active'         => true,
+    ]);
+
+    $visitType = VisitType::create([
+        'name'   => 'Consulta',
+        'active' => true,
+    ]);
+
+    return Schedule::create(array_merge([
+        'entity_id'          => $ctx['entity']->id,
+        'doctor_id'          => $doctor->id,
+        'visit_id'           => $visitType->id,
+        'full_name'          => 'PATIENT TEST',
+        'date_time'          => now()->addDay(),
+        'cellphone'          => '11999990000',
+        'cellphone_whatsapp' => false,
+        'situation'          => 0,
+        'active'             => true,
+    ], $overrides));
+}
+
+describe('GET /api/integrators/v1/schedules', function () {
+    beforeEach(function () {
+        $this->ctx = setupIntegrator();
+    });
+
+    it('lists schedules for the entity', function () {
+        makeSchedule($this->ctx);
+        makeSchedule($this->ctx);
+
+        $this->getJson('/api/integrators/v1/schedules', $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2);
+    });
+
+    it('does not list schedules from another entity', function () {
+        $other = setupIntegrator();
+
+        makeSchedule($this->ctx);
+        makeSchedule($other);
+
+        $this->getJson('/api/integrators/v1/schedules', $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1);
+    });
+
+    it('searches schedules by full_name', function () {
+        makeSchedule($this->ctx, ['full_name' => 'JOAO DA SILVA']);
+        makeSchedule($this->ctx, ['full_name' => 'MARIA SOUZA']);
+
+        $response = $this->getJson(
+            '/api/integrators/v1/schedules?search=joao',
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
+    it('searches schedules by code', function () {
+        $schedule = makeSchedule($this->ctx);
+        makeSchedule($this->ctx);
+
+        $response = $this->getJson(
+            "/api/integrators/v1/schedules?search={$schedule->code}",
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
+    it('caps per_page at plan limit', function () {
+        for ($i = 0; $i < 5; $i++) {
+            makeSchedule($this->ctx);
+        }
+
+        $response = $this->getJson(
+            '/api/integrators/v1/schedules?per_page=999',
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.per_page'))->toBeLessThanOrEqual(100);
+    });
+
+    it('returns 401 without authentication', function () {
+        $this->getJson('/api/integrators/v1/schedules')
+            ->assertUnauthorized();
+    });
+});
+
+describe('GET /api/integrators/v1/schedules/{id}', function () {
+    beforeEach(function () {
+        $this->ctx      = setupIntegrator();
+        $this->schedule = makeSchedule($this->ctx);
+    });
+
+    it('shows schedule by UUID', function () {
+        $this->getJson(
+            "/api/integrators/v1/schedules/{$this->schedule->id}",
+            $this->ctx['headers']
+        )->assertOk()
+            ->assertJsonFragment(['id' => $this->schedule->id]);
+    });
+
+    it('shows schedule by code', function () {
+        $this->getJson(
+            "/api/integrators/v1/schedules/{$this->schedule->code}",
+            $this->ctx['headers']
+        )->assertOk()
+            ->assertJsonFragment(['id' => $this->schedule->id]);
+    });
+
+    it('returns 404 for non-existent schedule', function () {
+        $this->getJson(
+            '/api/integrators/v1/schedules/SDL-NAOEXISTE',
+            $this->ctx['headers']
+        )->assertNotFound();
+    });
+
+    it('returns 404 for schedule from another entity', function () {
+        $other    = setupIntegrator();
+        $schedule = makeSchedule($other);
+
+        $this->getJson(
+            "/api/integrators/v1/schedules/{$schedule->id}",
+            $this->ctx['headers']
+        )->assertNotFound();
+    });
+
+    it('returns 401 without authentication', function () {
+        $this->getJson("/api/integrators/v1/schedules/{$this->schedule->id}")
+            ->assertUnauthorized();
+    });
+});

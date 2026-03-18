@@ -36,18 +36,18 @@ class ExamTypesController extends Controller
         if (request()->has('search')) {
             $examTypes = $examTypes->where(function ($query) {
                 $query->when(
-                    is_int(request()->search),
+                    is_numeric(request()->search),
                     static fn ($q) => $q->where('category', request()->search),
                     static fn ($q) => $q->where(
-                        'surgery_types.code',
+                        'exam_types.code',
                         'like',
                         '%' . request()->search . '%'
-                    )->orWhere('surgery_types.name', 'like', '%' . request()->search . '%')
+                    )->orWhere('exam_types.name', 'like', '%' . request()->search . '%')
                 );
             });
         }
 
-        $examTypes = $examTypes->paginate(request()->get('per_page', 10));
+        $examTypes = $examTypes->paginate(min((int) request()->get('per_page', 10), request()->attributes->get('api_per_page_limit', 100)));
 
         return ExamTypeResource::collection($examTypes);
     }

@@ -18,14 +18,14 @@ return [
     ],
 
     'expired_page' => [
-        'title'         => 'Assinatura expirada',
-        'heading'       => 'Sua assinatura está inativa',
-        'grace_period'  => 'Você ainda tem acesso até :date (período de graça). Renove para não perder o acesso.',
-        'last_plan'     => 'Último plano',
-        'choose_plan'   => 'Escolha um plano para continuar',
-        'most_popular'  => 'Mais popular',
-        'unlimited'     => 'Ilimitado',
-        'upgrade_cta'   => 'Contratar',
+        'title'           => 'Assinatura expirada',
+        'heading'         => 'Sua assinatura está inativa',
+        'grace_period'    => 'Você ainda tem acesso até :date (período de graça). Renove para não perder o acesso.',
+        'last_plan'       => 'Último plano',
+        'choose_plan'     => 'Escolha um plano para continuar',
+        'most_popular'    => 'Mais popular',
+        'unlimited'       => 'Ilimitado',
+        'upgrade_cta'     => 'Contratar',
         'contact_support' => 'Dúvidas? Entre em contato:',
     ],
 
@@ -35,6 +35,9 @@ return [
         'max_doctors'            => 'Máximo de médicos',
         'has_ai_exam_assistant'  => 'Assistente de IA para exames',
         'has_ai_report_drafting' => 'Redação de laudos com IA',
+        'has_api_integrator'     => 'Acesso à API de integradores',
         'ai_monthly_credits'     => 'Créditos mensais de IA',
+        'api_per_page_limit'     => 'Limite de registros por página (API)',
+        'plan_upgrade_required'  => 'Seu plano não inclui acesso à API de integradores. Faça upgrade para continuar.',
     ],
 ];

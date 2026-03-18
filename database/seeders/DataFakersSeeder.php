@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\SubscriptionStatus;
 use App\Models\{Covenant,
     Doctor,
     Entity,
@@ -11,8 +12,10 @@ use App\Models\{Covenant,
     IrisType,
     Patient,
     People,
+    Plan,
     Schedule,
     SkinType,
+    Subscription,
     User,
     VisitType};
 use Carbon\Carbon;
@@ -38,6 +41,18 @@ class DataFakersSeeder extends Seeder
         $entities = Entity::query()->whereNot('name', 'Medical Group')->get();
         $users    = User::factory(95)->create(['password' => Hash::make('123456789')]);
 
+        // Carregar planos para distribuir entre as entidades
+        $planBasico  = Plan::where('slug', 'basico')->first();
+        $planPro     = Plan::where('slug', 'pro')->first();
+        $planPremium = Plan::where('slug', 'premium')->first();
+
+        // Distribuição: 20% Básico, 50% Pro, 30% Premium
+        $planDistribution = array_merge(
+            array_fill(0, 3, $planBasico?->id),
+            array_fill(0, 7, $planPro?->id),
+            array_fill(0, 5, $planPremium?->id),
+        );
+
         $users->each(function ($user) use ($entities) {
             // Cada usuário se vincula a 1-4 entities aleatórias
             $numberOfEntities = fake()->numberBetween(1, 4);
@@ -48,17 +63,16 @@ class DataFakersSeeder extends Seeder
                     'entity_id' => $entity->id,
                     'user_id'   => $user->id,
                     'active'    => true,
-                    'rule'      => 'user', // Inicialmente todos como user
+                    'rule'      => 'user',
                 ]);
             });
         });
 
         // Após criar todos os vínculos, verificar entities com 2+ usuários e adicionar admin
-        $entities->each(function ($entity) {
+        $entities->each(function ($entity) use ($planDistribution) {
             $userCount = EntityUser::query()->where('entity_id', $entity->id)->count();
 
             if ($userCount >= 2) {
-                // Pegar um usuário aleatório desta entity e tornar admin
                 $randomEntityUser = EntityUser::query()
                     ->where('entity_id', $entity->id)
                     ->where('rule', 'user')
@@ -70,6 +84,18 @@ class DataFakersSeeder extends Seeder
                 }
             }
 
+            // Criar subscription com plano aleatório da distribuição
+            $planId = $planDistribution[array_rand($planDistribution)];
+            if ($planId) {
+                Subscription::create([
+                    'entity_id'  => $entity->id,
+                    'plan_id'    => $planId,
+                    'status'     => SubscriptionStatus::Active,
+                    'starts_at'  => now()->subMonth(),
+                    'ends_at'    => now()->addYear(),
+                ]);
+            }
+
             $entityUserIntegrator = EntityUserIntegrator::factory(5)
                 ->create(['entity_id' => $entity->id, 'password' => Hash::make('123456789')]);
 
@@ -77,8 +103,68 @@ class DataFakersSeeder extends Seeder
                 EntityIntegrator::factory(10)
                     ->create(['entity_user_integrator_id' => $entityUser->id]);
             });
-
         });
+
+        // ── Integrador de teste com credenciais fixas ────────────────────────
+        // Entity dedicada para testes de integração
+        $testEntity = Entity::create([
+            'name'      => 'Clínica Teste Integrador',
+            'subdomain' => 'clinica-teste-integrador',
+            'city'      => 'São Paulo',
+            'state'     => 'SP',
+            'country'   => 'BR',
+            'is_client' => true,
+            'active'    => true,
+        ]);
+
+        // Subscription Pro para a entity de teste
+        Subscription::create([
+            'entity_id'  => $testEntity->id,
+            'plan_id'    => $planPro?->id,
+            'status'     => SubscriptionStatus::Active,
+            'starts_at'  => now()->subMonth(),
+            'ends_at'    => now()->addYear(),
+        ]);
+
+        // Usuário integrador com credenciais fixas
+        $testIntegratorUser = EntityUserIntegrator::create([
+            'entity_id'         => $testEntity->id,
+            'name'              => 'Integrador de Teste',
+            'email'             => 'integrador@teste.com',
+            'email_verified_at' => now(),
+            'password'          => Hash::make('Integrador@123'),
+            'active'            => true,
+        ]);
+
+        // Integradores ativos (equipamentos) com credenciais conhecidas
+        $testIntegrator = EntityIntegrator::create([
+            'entity_user_integrator_id' => $testIntegratorUser->id,
+            'name'                      => 'Equipamento Teste 01',
+            'ip'                        => '192.168.1.100',
+            'mac'                       => 'AA:BB:CC:DD:EE:01',
+            'active'                    => true,
+        ]);
+
+        EntityIntegrator::create([
+            'entity_user_integrator_id' => $testIntegratorUser->id,
+            'name'                      => 'Equipamento Teste 02',
+            'ip'                        => '192.168.1.101',
+            'mac'                       => 'AA:BB:CC:DD:EE:02',
+            'active'                    => true,
+        ]);
+
+        $this->command->info('');
+        $this->command->info('═══════════════════════════════════════════════════════');
+        $this->command->info('  INTEGRADOR DE TESTE — credenciais fixas');
+        $this->command->info('═══════════════════════════════════════════════════════');
+        $this->command->info('  POST /api/integrators/signin');
+        $this->command->info('  email    : integrador@teste.com');
+        $this->command->info('  password : Integrador@123');
+        $this->command->info('  code     : ' . $testIntegrator->code);
+        $this->command->info('  entity   : ' . $testEntity->name);
+        $this->command->info('  plano    : Pro (has_api_integrator=1, per_page max=100)');
+        $this->command->info('═══════════════════════════════════════════════════════');
+        $this->command->info('');
 
         $people    = People::all();
         $skinTypes = SkinType::all();

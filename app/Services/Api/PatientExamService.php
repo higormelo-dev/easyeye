@@ -185,8 +185,12 @@ class PatientExamService
      *
      * @throws ModelNotFoundException
      */
-    public function doctorFindByIdOrCode(string $idOrCode): ?Doctor
+    public function doctorFindByIdOrCode(?string $idOrCode): ?Doctor
     {
+        if ($idOrCode === null) {
+            return null;
+        }
+
         $integrator = request()->attributes->get('integrator');
         $query      = Doctor::query()
             ->with('entityUser')
@@ -208,8 +212,12 @@ class PatientExamService
      *
      * @throws ModelNotFoundException
      */
-    public function scheduleFindByIdOrCode(string $idOrCode): ?Schedule
+    public function scheduleFindByIdOrCode(?string $idOrCode): ?Schedule
     {
+        if ($idOrCode === null) {
+            return null;
+        }
+
         $integrator = request()->attributes->get('integrator');
         $query      = Schedule::query()
             ->where('entity_id', $integrator->user->entity_id);

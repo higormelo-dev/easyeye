@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
+    ApiCheckPlanAccess,
     ApiCheckTokenExpiration,
+    ApiTokenPreCheck,
     CheckFeature,
     CheckJsonResponse,
     CheckSubscription,
@@ -34,7 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'check.subscription'   => CheckSubscription::class,
             'feature'              => CheckFeature::class,
             'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,
+            'token.precheck'       => ApiTokenPreCheck::class,
             'token.expiration'     => ApiCheckTokenExpiration::class,
+            'api.plan'             => ApiCheckPlanAccess::class,
         ]);
 
         // Adiciona o SetLocale e HandleImpersonation ao grupo web

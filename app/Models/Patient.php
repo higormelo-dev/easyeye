@@ -4,11 +4,13 @@ namespace App\Models;
 
 use App\Presenters\PatientPresenter;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 use Laracasts\Presenter\PresentableTrait;
 
 class Patient extends Model
 {
+    use HasFactory;
     use HasUuids;
     use SoftDeletes;
     use PresentableTrait;

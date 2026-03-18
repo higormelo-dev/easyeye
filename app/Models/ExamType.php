@@ -5,9 +5,11 @@ namespace App\Models;
 use App\Enums\ExamCategory;
 use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ExamType extends Model
 {
+    use HasFactory;
     use HasUuids;
     use SoftDeletes;
 
