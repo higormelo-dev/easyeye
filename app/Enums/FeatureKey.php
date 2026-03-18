@@ -23,8 +23,8 @@ enum FeatureKey: string
     // Limites mensais de créditos IA (integer, 0 = ilimitado)
     case AiMonthlyCredits = 'ai_monthly_credits';
 
-    // Limite de registros por página na API de integradores (integer, 0 = ilimitado)
-    case ApiPerPageLimit = 'api_per_page_limit';
+    // Limite mensal de envios de exames pela API — store + update contam (integer, 0 = ilimitado)
+    case ApiMonthlyExamSends = 'api_monthly_exam_sends';
 
     public function label(): string
     {
@@ -36,7 +36,7 @@ enum FeatureKey: string
             self::HasAiReportDrafting => __('subscriptions.features.has_ai_report_drafting'),
             self::HasApiIntegrator    => __('subscriptions.features.has_api_integrator'),
             self::AiMonthlyCredits    => __('subscriptions.features.ai_monthly_credits'),
-            self::ApiPerPageLimit     => __('subscriptions.features.api_per_page_limit'),
+            self::ApiMonthlyExamSends => __('subscriptions.features.api_monthly_exam_sends'),
         };
     }
 
@@ -59,6 +59,6 @@ enum FeatureKey: string
     /** True = limite deve ser redefinido mensalmente (créditos IA). */
     public function isMonthlyReset(): bool
     {
-        return in_array($this, [self::AiMonthlyCredits]);
+        return in_array($this, [self::AiMonthlyCredits, self::ApiMonthlyExamSends]);
     }
 }

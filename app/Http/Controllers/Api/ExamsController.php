@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\FeatureKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ExamRequest;
 use App\Http\Resources\PatientExamResource;
 use App\Models\{Patient, PatientExam};
 use App\Services\Api\PatientExamService;
+use App\Services\FeatureGateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -22,8 +24,11 @@ class ExamsController extends Controller
 
     private const FILLABLE_FIELDS = ['patient_id', 'doctor_id', 'schedule_id', 'archive', 'name'];
 
-    public function __construct(PatientExam $patientExam, PatientExamService $patientExamService)
-    {
+    public function __construct(
+        PatientExam $patientExam,
+        PatientExamService $patientExamService,
+        private readonly FeatureGateService $featureGate,
+    ) {
         $this->model   = $patientExam;
         $this->service = $patientExamService;
     }
@@ -34,7 +39,11 @@ class ExamsController extends Controller
     public function store(ExamRequest $request): PatientExamResource|JsonResponse
     {
         $integrator = request()->attributes->get('integrator');
-        $patient    = $this->findPatient($request, $integrator);
+        $entityId   = $integrator->user->entity_id;
+
+        $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
+
+        $patient = $this->findPatient($request, $integrator);
 
         $recordData  = $this->buildRecordData($request, $patient);
         $archivePath = $this->generateArchivePath($integrator->user->entity_id, $patient->id, $request->file('archive'));
@@ -46,6 +55,8 @@ class ExamsController extends Controller
         } else {
             $record = $this->createNewRecord($recordData, $archivePath, $request);
         }
+
+        $this->featureGate->increment($entityId, FeatureKey::ApiMonthlyExamSends);
 
         return new PatientExamResource($record);
     }

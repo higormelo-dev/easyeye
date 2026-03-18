@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\FeatureKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\PatientExamRequest;
 use App\Http\Resources\PatientExamResource;
 use App\Models\{Patient, PatientExam};
 use App\Services\Api\PatientExamService;
+use App\Services\FeatureGateService;
 use Illuminate\Http\{JsonResponse};
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -20,8 +22,11 @@ class PatientExamsController extends Controller
 
     protected PatientExamService $service;
 
-    public function __construct(PatientExam $patientExam, PatientExamService $patientExamService)
-    {
+    public function __construct(
+        PatientExam $patientExam,
+        PatientExamService $patientExamService,
+        private readonly FeatureGateService $featureGate,
+    ) {
         $this->model   = $patientExam;
         $this->service = $patientExamService;
     }
@@ -67,7 +72,7 @@ class PatientExamsController extends Controller
             });
         }
 
-        $patientExams = $patientExams->paginate(min((int) request()->get('per_page', 10), request()->attributes->get('api_per_page_limit', 100)));
+        $patientExams = $patientExams->paginate(min((int) request()->get('per_page', 10), 10));
 
         return PatientExamResource::collection($patientExams);
     }
@@ -77,7 +82,13 @@ class PatientExamsController extends Controller
      */
     public function store(PatientExamRequest $request, string $patientId): PatientExamResource|JsonResponse
     {
+        $entityId = request()->attributes->get('integrator')->user->entity_id;
+
+        $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
+
         $record = $this->service->create($request, $patientId);
+
+        $this->featureGate->increment($entityId, FeatureKey::ApiMonthlyExamSends);
 
         return (new PatientExamResource($record))->response()->setStatusCode(201);
     }
@@ -99,9 +110,15 @@ class PatientExamsController extends Controller
      */
     public function update(PatientExamRequest $request, string $patientId, string $idOrCode): PatientExamResource|JsonResponse
     {
+        $entityId = request()->attributes->get('integrator')->user->entity_id;
+
+        $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
+
         $record = $this->service->findByIdOrCode($patientId, $idOrCode);
 
         $updatedRecord = $this->service->update($record, $request);
+
+        $this->featureGate->increment($entityId, FeatureKey::ApiMonthlyExamSends);
 
         return new PatientExamResource($updatedRecord);
     }

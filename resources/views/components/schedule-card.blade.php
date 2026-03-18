@@ -1,3 +1,5 @@
+@use(App\Enums\ScheduleSituation)
+@use(App\Enums\ClientRule)
 @props(['schedule'])
 
 @php
@@ -8,6 +10,9 @@
     $altName = $schedule->patient_id
         ? $schedule->patient->full_name
         : $schedule->full_name;
+
+    $canMarkArrived = in_array(session('user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true)
+        && $schedule->situation === ScheduleSituation::Scheduled;
 @endphp
 
 <div class="row mb-4">
@@ -37,10 +42,27 @@
                 {{ $schedule->doctor_id ? $schedule->doctor->abbreviation : 'NÃO INFORMADO' }}
             @endif
         </span>
+
+        @if($schedule->situation !== ScheduleSituation::Scheduled)
+            <div class="mt-1">
+                <span class="badge {{ $schedule->situation->badgeClass() }}">
+                    {{ $schedule->situation->label() }}
+                </span>
+            </div>
+        @endif
     </div>
 
     <div class="col-sm-3 col-md-3 col-lg-3 d-flex align-items-center justify-content-end">
         <div class="d-flex gap-1" x-data>
+            @if($canMarkArrived)
+                <button type="button"
+                        class="btn btn-warning btn-sm btn-arrived"
+                        data-id="{{ $schedule->id }}"
+                        title="Marcar chegada">
+                    <i class="fas fa-check-circle me-1"></i> Chegou
+                </button>
+            @endif
+
             {{-- Editar agendamento --}}
             <button type="button"
                     class="btn btn-secondary btn-sm"

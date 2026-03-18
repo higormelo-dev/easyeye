@@ -6,7 +6,9 @@ use App\Http\Controllers\{DoctorsController,
     PatientsController,
     ProfileController,
     SchedulesController,
-    UsersController};
+    TvController,
+    UsersController,
+    WaitingRoomController};
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
     CovenantsController,
@@ -16,9 +18,18 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     NearPointConvergencesController,
     SkinTypesController,
     SurgeryTypesController,
+    TvDisplaysController,
     VisitTypesController,
     VisualAcuityTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
+
+// Rotas públicas para display de TV (sem autenticação)
+Route::get('/tv', [TvController::class, 'entry'])->name('tv.entry');
+Route::post('/tv/request', [TvController::class, 'requestAccess'])->name('tv.request');
+Route::get('/tv/wait/{id}', [TvController::class, 'wait'])->name('tv.wait');
+Route::get('/tv/status/{id}', [TvController::class, 'pollStatus'])->name('tv.status');
+Route::get('/tv/{token}', [TvController::class, 'show'])->name('tv.show');
+Route::get('/tv/{token}/poll', [TvController::class, 'poll'])->name('tv.poll');
 
 // Rota para trocar o idioma (sem autenticação necessária)
 Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
@@ -78,7 +89,11 @@ Route::group(
         Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
         Route::resource('patients', PatientsController::class);
         Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');
+        Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
         Route::resource('schedules', SchedulesController::class);
+
+        Route::get('waiting-room', [WaitingRoomController::class, 'index'])->name('waiting-room.index');
+        Route::post('waiting-room/ajaxlist', [WaitingRoomController::class, 'ajaxList'])->name('waiting-room.ajaxlist');
 
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
             Route::get('users/cards', [UsersController::class, 'cards'])->name('users.cards');
@@ -123,6 +138,12 @@ Route::group(
             Route::resource('nearpointconvergences', NearPointConvergencesController::class);
             Route::get('nearpointconvergences/{nearpointconvergence}/restore', [NearPointConvergencesController::class, 'restore'])
                 ->name('nearpointconvergences.restore');
+            Route::prefix('tv-displays')->name('tv-displays.')->group(function () {
+                Route::get('/', [TvDisplaysController::class, 'index'])->name('index');
+                Route::post('/', [TvDisplaysController::class, 'store'])->name('store');
+                Route::post('/{tvDisplay}/approve', [TvDisplaysController::class, 'approve'])->name('approve');
+                Route::delete('/{tvDisplay}', [TvDisplaysController::class, 'destroy'])->name('destroy');
+            });
         });
 
         require __DIR__ . '/manager.php';

@@ -37,7 +37,7 @@ return [
         'has_ai_report_drafting' => 'Redação de laudos com IA',
         'has_api_integrator'     => 'Acesso à API de integradores',
         'ai_monthly_credits'     => 'Créditos mensais de IA',
-        'api_per_page_limit'     => 'Limite de registros por página (API)',
+        'api_monthly_exam_sends' => 'Envios de exames pela API (mensal)',
         'plan_upgrade_required'  => 'Seu plano não inclui acesso à API de integradores. Faça upgrade para continuar.',
     ],
 ];

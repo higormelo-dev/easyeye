@@ -4,11 +4,6 @@
 |--------------------------------------------------------------------------
 | Test Case
 |--------------------------------------------------------------------------
-|
-| The closure you provide to your test functions is always bound to a specific PHPUnit test
-| case class. By default, that class is "PHPUnit\Framework\TestCase". Of course, you may
-| need to change it using the "pest()" function to bind a different classes or traits.
-|
 */
 
 pest()->extend(Tests\TestCase::class)
@@ -19,11 +14,6 @@ pest()->extend(Tests\TestCase::class)
 |--------------------------------------------------------------------------
 | Expectations
 |--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain conditions. The
-| "expect()" function gives you access to a set of "expectations" methods that you can use
-| to assert different things. Of course, you may extend the Expectation API at any time.
-|
 */
 
 expect()->extend('toBeOne', function () {
@@ -34,11 +24,6 @@ expect()->extend('toBeOne', function () {
 |--------------------------------------------------------------------------
 | Functions
 |--------------------------------------------------------------------------
-|
-| While Pest is very powerful out-of-the-box, you may have some testing code specific to your
-| project that you don't want to repeat in every file. Here you can also expose helpers as
-| global functions to help you to reduce the number of lines of code in your test files.
-|
 */
 
 /**
@@ -51,7 +36,6 @@ function setupIntegrator(array $featureOverrides = []): array
 {
     $features = array_merge([
         \App\Enums\FeatureKey::HasApiIntegrator->value => '1',
-        \App\Enums\FeatureKey::ApiPerPageLimit->value  => '100',
     ], $featureOverrides);
 
     $plan = \App\Models\Plan::factory()->create();
@@ -118,4 +102,40 @@ function createEntityUser(
         'is_owner'  => $isOwner,
         'joined_at' => now(),
     ]);
+}
+
+/**
+ * Cria um Doctor vinculado a uma Entity para uso em testes de agendamento.
+ * Retorna o Doctor criado.
+ */
+function createDoctorForEntity(\App\Models\Entity $entity): \App\Models\Doctor
+{
+    $user    = \App\Models\User::factory()->create();
+    $people  = \App\Models\People::factory()->create();
+    $eu      = createEntityUser($entity, $user, \App\Enums\ClientRule::Doctor->value);
+
+    return \App\Models\Doctor::create([
+        'entity_user_id' => $eu->id,
+        'person_id'      => $people->id,
+        'active'         => true,
+    ]);
+}
+
+/**
+ * Cria um Schedule vinculado a uma Entity para uso em testes.
+ * Retorna ['schedule' => Schedule, 'doctor' => Doctor].
+ */
+function createScheduleForEntity(\App\Models\Entity $entity, array $attrs = []): array
+{
+    $doctor   = createDoctorForEntity($entity);
+    $schedule = \App\Models\Schedule::create(array_merge([
+        'entity_id' => $entity->id,
+        'doctor_id' => $doctor->id,
+        'full_name' => 'Paciente Teste',
+        'date_time' => now(),
+        'situation' => \App\Enums\ScheduleSituation::Scheduled->value,
+        'active'    => true,
+    ], $attrs));
+
+    return compact('schedule', 'doctor');
 }

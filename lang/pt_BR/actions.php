@@ -55,7 +55,7 @@ return [
         'already_active'   => 'Já existe uma sessão ativa. Encerre antes de iniciar uma nova.',
         'only_clients'     => 'Só é possível usar como usuários de empresas clientes.',
         'user_inactive'    => 'Não é possível usar como um usuário inativo.',
-        'banner_prefix'    => 'Você está usando o sistema como',
+        'banner_prefix'    => ':name está usando o sistema como',
         'banner_in'        => 'em',
     ],
     'import'                  => 'Importar',

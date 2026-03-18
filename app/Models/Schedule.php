@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ScheduleSituation;
 use App\Presenters\SchedulePresenter;
 use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -35,6 +36,7 @@ class Schedule extends Model
         'cellphone',
         'cellphone_whatsapp',
         'situation',
+        'arrived_at',
         'active',
     ];
 
@@ -73,6 +75,8 @@ class Schedule extends Model
     protected function casts(): array
     {
         return [
+            'situation'  => ScheduleSituation::class,
+            'arrived_at' => 'datetime',
             'date_time'  => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',

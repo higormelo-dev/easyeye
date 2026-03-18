@@ -58,6 +58,7 @@ class ImpersonateController extends Controller
             'impersonated_user_name'    => $entityUser->user->name,
             'impersonated_entity_name'  => $entity->name,
             'original_user_id'          => auth()->id(),
+            'original_user_name'        => auth()->user()->name,
             'original_entity_user_id'   => session('selected_entity_user_id'),
             'original_entity_id'        => session('selected_entity_id'),
             'original_entity_user_rule' => session('selected_entity_user_rule'),

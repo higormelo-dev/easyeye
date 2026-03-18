@@ -4,6 +4,7 @@ use App\Http\Controllers\Manager\{
     EntitiesController,
     EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
+    EntityUsersController,
     ImpersonateController,
     PlansController,
     SubscriptionsController
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     // ── Empresas ───────────────────────────────────────────────────────────
     Route::get('entities/{entity}/edit-data', [EntitiesController::class, 'editData'])->name('entities.edit-data');
+    Route::get('entities/{entity}/users', [EntityUsersController::class, 'index'])->name('entities.users');
     // Route::put('entities/{entity}/restore', [EntitiesController::class, 'restore'])->name('entities.restore');
     Route::resource('entities', EntitiesController::class)->except('create', 'edit');
 

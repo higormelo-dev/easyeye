@@ -101,6 +101,11 @@ class EntitiesDataTable extends BaseDataTable
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
+            $btnActions .= '<a href="' . route('panel.manager.entities.users', $record->id) . '"
+                class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                data-bs-toggle="tooltip" data-bs-placement="bottom"
+                title="Usuários"><i class="fas fa-users"></i></a>';
+
             $btnActions .= '<a href="' . route('panel.manager.entities.integrators.index', $record->id) . '"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"

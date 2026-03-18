@@ -22,8 +22,8 @@ return new class extends Migration
             $table->string('avatar', 500)->nullable();
 
             // Preferências
-            $table->string('locale', 10)->default('pt_BR')
-                ->comment('Idioma preferido; sobrepõe o locale da empresa.');
+            $table->string('locale', 10)->nullable()
+                ->comment('Idioma preferido; sobrepõe o locale da empresa. Nulo = usar o locale da empresa.');
 
             // Estado
             $table->boolean('active')->default(true)

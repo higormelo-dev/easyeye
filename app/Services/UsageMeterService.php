@@ -34,8 +34,9 @@ class UsageMeterService
             FeatureKey::MaxUsers         => $this->countUsers($entityId),
             FeatureKey::MaxPatients      => $this->countPatients($entityId),
             FeatureKey::MaxDoctors       => $this->countDoctors($entityId),
-            FeatureKey::AiMonthlyCredits => $this->getMonthlyUsage($entityId, $feature),
-            default                      => 0,
+            FeatureKey::AiMonthlyCredits    => $this->getMonthlyUsage($entityId, $feature),
+            FeatureKey::ApiMonthlyExamSends => $this->getMonthlyUsage($entityId, $feature),
+            default                         => 0,
         };
     }
 

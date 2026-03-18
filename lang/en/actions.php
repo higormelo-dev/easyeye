@@ -55,7 +55,7 @@ return [
         'already_active'   => 'An impersonation session is already active. End it before starting a new one.',
         'only_clients'     => 'You can only impersonate users from client entities.',
         'user_inactive'    => 'Cannot impersonate an inactive user.',
-        'banner_prefix'    => 'You are acting as',
+        'banner_prefix'    => ':name is acting as',
         'banner_in'        => 'in',
     ],
     'import'                  => 'Import',

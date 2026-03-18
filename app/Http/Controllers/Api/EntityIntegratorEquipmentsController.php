@@ -41,7 +41,7 @@ class EntityIntegratorEquipmentsController extends Controller
             });
         }
 
-        $equipments = $equipments->paginate(min((int) request()->get('per_page', 10), request()->attributes->get('api_per_page_limit', 100)));
+        $equipments = $equipments->paginate(min((int) request()->get('per_page', 10), 10));
 
         return EntityIntegratorEquipmentResource::collection($equipments);
     }

@@ -27,7 +27,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasAiReportDrafting->value => '0',
                     FeatureKey::HasApiIntegrator->value    => '0',
                     FeatureKey::AiMonthlyCredits->value    => '0',
-                    FeatureKey::ApiPerPageLimit->value     => '0',
+                    FeatureKey::ApiMonthlyExamSends->value => '0',
                 ],
             ],
             [
@@ -46,7 +46,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasAiReportDrafting->value => '0',
                     FeatureKey::HasApiIntegrator->value    => '1',
                     FeatureKey::AiMonthlyCredits->value    => '50',
-                    FeatureKey::ApiPerPageLimit->value     => '100',
+                    FeatureKey::ApiMonthlyExamSends->value => '100',
                 ],
             ],
             [
@@ -65,7 +65,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasAiReportDrafting->value => '1',
                     FeatureKey::HasApiIntegrator->value    => '1',
                     FeatureKey::AiMonthlyCredits->value    => '500',
-                    FeatureKey::ApiPerPageLimit->value     => '0', // ilimitado → cap interno 1000
+                    FeatureKey::ApiMonthlyExamSends->value => '0', // ilimitado → cap interno 1000
                 ],
             ],
         ];

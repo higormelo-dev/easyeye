@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\{ClientRule, ScheduleSituation};
 use App\Http\Requests\ScheduleRequest;
 use App\Models\{Covenant, Doctor, Schedule, VisitType};
 use App\Services\ScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Support\Facades\Cache;
 
 class SchedulesController extends Controller
 {
@@ -23,9 +25,12 @@ class SchedulesController extends Controller
 
     public function index()
     {
-        $entityId = session()->get('selected_entity_id');
+        $entityId     = session()->get('selected_entity_id');
+        $loggedDoctor = $this->loggedDoctor();
 
-        $doctors   = $this->doctorsByEntity($entityId);
+        $doctors = $loggedDoctor
+            ? collect([$loggedDoctor])
+            : $this->doctorsByEntity($entityId);
         $covenants = Covenant::where(function ($q) use ($entityId) {
             $q->where('entity_id', $entityId)->orWhereNull('entity_id');
         })->where('active', true)->orderBy('name')->get();
@@ -55,7 +60,7 @@ class SchedulesController extends Controller
             ],
         ];
 
-        return view('system.schedules.index', compact('doctors', 'covenants', 'visitTypes', 'meta'));
+        return view('system.schedules.index', compact('doctors', 'covenants', 'visitTypes', 'meta', 'loggedDoctor'));
     }
 
     /**
@@ -77,7 +82,11 @@ class SchedulesController extends Controller
             ->whereDate('schedules.date_time', $date)
             ->select('schedules.*');
 
-        if ($doctor !== 'tudo') {
+        $loggedDoctor = $this->loggedDoctor();
+
+        if ($loggedDoctor) {
+            $query->where('schedules.doctor_id', $loggedDoctor->id);
+        } elseif ($doctor !== 'tudo') {
             $query->where('schedules.doctor_id', $doctor);
         }
 
@@ -141,6 +150,43 @@ class SchedulesController extends Controller
         return response()->json([
             'message' => 'Agendamento excluído com sucesso.',
         ]);
+    }
+
+    public function updateSituation(Request $request, Schedule $schedule): JsonResponse
+    {
+        $situation = ScheduleSituation::from($request->integer('situation'));
+
+        $data = ['situation' => $situation->value];
+
+        if ($situation === ScheduleSituation::Waiting) {
+            $data['arrived_at'] = now();
+        }
+
+        $schedule->update($data);
+
+        Cache::forget("waiting_room:{$schedule->entity_id}");
+
+        return response()->json([
+            'message'   => 'Situação atualizada.',
+            'situation' => $situation->value,
+            'label'     => $situation->label(),
+        ]);
+    }
+
+    private function loggedDoctor(): ?Doctor
+    {
+        if (session('user_rule') !== ClientRule::Doctor->value) {
+            return null;
+        }
+
+        $entityUserId = session('selected_entity_user_id');
+
+        return Doctor::query()
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->join('users', 'entity_users.user_id', '=', 'users.id')
+            ->where('doctors.entity_user_id', $entityUserId)
+            ->select('doctors.*', 'users.name as user_name', 'users.id as user_id')
+            ->first();
     }
 
     private function doctorsByEntity(string $entityId)

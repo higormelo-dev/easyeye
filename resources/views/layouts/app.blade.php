@@ -102,6 +102,14 @@
                                 <a href="javascript:void(0)" class="dropdown-item">
                                     <i class="ti-user"></i> {{ __('actions.edit_profile') }}
                                 </a>
+                                @if(session()->has('impersonating'))
+                                    <div class="dropdown-divider"></div>
+                                    {!! html()->form('DELETE', route('panel.manager.impersonate.destroy'))->open() !!}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="fa fa-user-times me-2"></i>{{ __('actions.impersonate.exit') }} <small class="text-muted">({{ session('impersonating.original_user_name') }})</small>
+                                    </button>
+                                    {!! html()->form()->close() !!}
+                                @endif
                                 <div class="dropdown-divider"></div>
                                 {!! html()->form('POST', route('logout'))
                                             ->attribute('style', 'display: inline;')
@@ -167,6 +175,7 @@
             </div>
         </aside>
         <div class="page-wrapper">
+            @include('components.impersonation-banner')
             <div class="container-fluid">
                 @yield('breadcrumb')
                 @yield('content')

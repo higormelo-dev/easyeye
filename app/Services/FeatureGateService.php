@@ -108,6 +108,37 @@ class FeatureGateService
 
         $rawValue = $subscription->plan->featureValue($feature);
 
+        // ApiMonthlyExamSends depende de HasApiIntegrator estar ativo.
+        // Se o integrador estiver desativado no plano, bloqueia independente do valor configurado.
+        if ($feature === FeatureKey::ApiMonthlyExamSends) {
+            $apiEnabled = $subscription->plan->featureValue(FeatureKey::HasApiIntegrator) === '1';
+
+            if (! $apiEnabled) {
+                return new FeatureStatus(
+                    feature:     $feature,
+                    allowed:     false,
+                    isBoolean:   false,
+                    isUnlimited: false,
+                    limit:       0,
+                    used:        0,
+                    remaining:   0,
+                );
+            }
+
+            // API habilitada e limite não configurado = ilimitado
+            if ($rawValue === null) {
+                return new FeatureStatus(
+                    feature:     $feature,
+                    allowed:     true,
+                    isBoolean:   false,
+                    isUnlimited: true,
+                    limit:       0,
+                    used:        0,
+                    remaining:   PHP_INT_MAX,
+                );
+            }
+        }
+
         // Feature não configurada no plano = bloqueada
         if ($rawValue === null) {
             return new FeatureStatus(
