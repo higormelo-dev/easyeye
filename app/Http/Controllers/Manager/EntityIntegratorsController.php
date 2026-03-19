@@ -36,7 +36,7 @@ class EntityIntegratorsController extends Controller
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('actions.sidemenu.entities'), 'url' => route('panel.manager.entities.index'), 'active' => false],
-                ['label' => 'Usuários Integradores', 'url' => route('panel.manager.entities.user-integrators.index', $entityId), 'active' => false],
+                ['label' => __('actions.user_integrators'), 'url' => route('panel.manager.entities.user-integrators.index', $entityId), 'active' => false],
                 ['label' => $this->titleController, 'url' => route('panel.manager.entities.user-integrators.integrators.index', [$entityId, $userIntegrator]), 'active' => false],
                 ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
             ],

@@ -228,6 +228,10 @@
 
 @endsection
 
+@section('modals')
+    @include('components.modal_default')
+@endsection
+
 @section('javascript')
     @vite(['resources/js/system/schedules.js'])
 @endsection

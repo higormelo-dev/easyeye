@@ -2,7 +2,33 @@
 // O componente Alpine `scheduleView` está registrado globalmente em app.js.
 
 document.addEventListener('DOMContentLoaded', () => {
+    const scheduleUrl  = id => `/panel/schedules/${id}`;
     const situationUrl = id => `/panel/schedules/${id}/situation`;
+
+    document.getElementById('list-schedule')?.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-show');
+        if (!btn) return;
+
+        const id = btn.dataset.id;
+        document.querySelector('.modal-title-default').textContent = 'Visualizar Agendamento';
+        document.getElementById('btn-modal-default').style.display  = 'none';
+        document.getElementById('erro-default').style.display       = 'none';
+
+        fetch(scheduleUrl(id), {
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+            .then(res => res.text())
+            .then(html => {
+                document.getElementById('retorno-default').innerHTML = html;
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
+            })
+            .catch(() => {
+                if (window.showErrorToast) showErrorToast('Não foi possível carregar o agendamento.');
+            });
+    });
 
     document.getElementById('list-schedule')?.addEventListener('click', async (e) => {
         const btn = e.target.closest('.btn-arrived');

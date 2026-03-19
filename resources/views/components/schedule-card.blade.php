@@ -33,13 +33,13 @@
         </h4>
 
         <span class="text-muted">
-            {{ $schedule->visit_id ? $schedule->visitType->name : 'NÃO INFORMADO' }}
+            {{ $schedule->visit_id ? $schedule->visitType->name : strtoupper(__('actions.not_informed')) }}
             -
-            {{ $schedule->covenant_id ? $schedule->covenant->name : 'NÃO INFORMADO' }}
+            {{ $schedule->covenant_id ? $schedule->covenant->name : strtoupper(__('actions.not_informed')) }}
 
             @if(!session()->get('doctor_id'))
                 <br>
-                {{ $schedule->doctor_id ? $schedule->doctor->abbreviation : 'NÃO INFORMADO' }}
+                {{ $schedule->doctor_id ? $schedule->doctor->abbreviation : strtoupper(__('actions.not_informed')) }}
             @endif
         </span>
 
@@ -54,19 +54,10 @@
 
     <div class="col-sm-3 col-md-3 col-lg-3 d-flex align-items-center justify-content-end">
         <div class="d-flex gap-1" x-data>
-            @if($canMarkArrived)
-                <button type="button"
-                        class="btn btn-warning btn-sm btn-arrived"
-                        data-id="{{ $schedule->id }}"
-                        title="Marcar chegada">
-                    <i class="fas fa-check-circle me-1"></i> Chegou
-                </button>
-            @endif
-
             {{-- Editar agendamento --}}
             <button type="button"
                     class="btn btn-secondary btn-sm"
-                    title="Editar agendamento"
+                    title="{{ __('actions.named.edit', ['name' => __('actions.schedule')]) }}"
                     @click="$dispatch('edit-schedule', { id: '{{ $schedule->id }}' })">
                 <i class="fas fa-edit"></i>
             </button>
@@ -79,7 +70,7 @@
                    data-data="2"
                    data-doctor_id="{{ $schedule->doctor_id }}"
                    data-patient_id="{{ $schedule->patient_id }}"
-                   title="Alterar ficha">
+                   title="{{ __('actions.named.edit', ['name' => __('actions.patient_record')]) }}">
                     <i class="fas fa-address-card"></i>
                 </a>
             @else
@@ -90,10 +81,27 @@
                    data-full_name="{{ $schedule->full_name }}"
                    data-data="2"
                    data-doctor_id="{{ $schedule->doctor_id }}"
-                   title="Cadastrar ficha">
+                   title="{{ __('actions.register_record') }}">
                     <i class="fas fa-address-card"></i>
                 </a>
             @endif
+
+            @if($canMarkArrived)
+                <button type="button"
+                        class="btn btn-warning btn-sm btn-arrived"
+                        data-id="{{ $schedule->id }}"
+                        title="{{ __('actions.mark_arrival') }}">
+                    <i class="fas fa-check-circle me-1"></i> {{ __('actions.arrived') }}
+                </button>
+            @endif
+
+            {{-- Visualizar agendamento --}}
+            <button type="button"
+                    class="btn btn-secondary btn-sm btn-show"
+                    data-id="{{ $schedule->id }}"
+                    title="{{ __('actions.named.view', ['name' => __('actions.schedule')]) }}">
+                <i class="fas fa-eye"></i>
+            </button>
         </div>
     </div>
 </div>

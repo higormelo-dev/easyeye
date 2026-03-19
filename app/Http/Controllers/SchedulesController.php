@@ -110,13 +110,19 @@ class SchedulesController extends Controller
         return view('system.schedules.list', compact('schedules'));
     }
 
-    public function show(Schedule $schedule): JsonResponse
+    public function show(Schedule $schedule): mixed
     {
-        return response()->json([
-            'data' => array_merge($schedule->toArray(), [
-                'date_time' => $schedule->date_time->format('Y-m-d\TH:i'),
-            ]),
-        ]);
+        $schedule->load(['doctor.entityUser.user', 'patient.person', 'covenant', 'visitType']);
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'data' => array_merge($schedule->toArray(), [
+                    'date_time' => $schedule->date_time->format('Y-m-d\TH:i'),
+                ]),
+            ]);
+        }
+
+        return view('system.schedules.show', compact('schedule'));
     }
 
     public function store(ScheduleRequest $request): JsonResponse

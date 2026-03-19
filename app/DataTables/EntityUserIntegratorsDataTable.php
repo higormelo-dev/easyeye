@@ -114,7 +114,7 @@ class EntityUserIntegratorsDataTable extends BaseDataTable
             $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.index', [$this->entityId, $record->id]) . '"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="Integradores"><i class="fas fa-cogs"></i></a>';
+                title="' . __('actions.integrators') . '"><i class="fas fa-cogs"></i></a>';
 
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"

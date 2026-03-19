@@ -10,12 +10,11 @@ use Illuminate\Http\{JsonResponse, Request};
 
 class EntityUserIntegratorsController extends Controller
 {
-    protected string $titleController = 'Usuários Integradores';
-
     protected EntityUserIntegrator $model;
 
     public function __construct(EntityUserIntegrator $entityUserIntegrator)
     {
+        $this->titleController = __('actions.user_integrators');
         $this->model = $entityUserIntegrator;
     }
 
