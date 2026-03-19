@@ -16,6 +16,7 @@ export default defineConfig({
                 'resources/js/system/patients.js',
                 'resources/js/system/doctors.js',
                 'resources/js/system/users.js',
+                'resources/js/system/schedules.js',
             ],
             refresh: true,
         }),
