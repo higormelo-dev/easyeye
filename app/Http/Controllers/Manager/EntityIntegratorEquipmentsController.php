@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Manager;
 
 use App\DataTables\EntityIntegratorEquipmentsDataTable;
 use App\Http\Controllers\Controller;
-use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment};
+use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator};
 use Illuminate\Http\JsonResponse;
 
 class EntityIntegratorEquipmentsController extends Controller
@@ -21,11 +21,14 @@ class EntityIntegratorEquipmentsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(string $entityId, string $integrator, EntityIntegratorEquipmentsDataTable $dataTable): mixed
+    public function index(string $entityId, string $userIntegrator, string $integrator, EntityIntegratorEquipmentsDataTable $dataTable): mixed
     {
-        $entity          = Entity::query()->findOrFail($entityId);
-        $integratorModel = EntityIntegrator::query()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+        $integratorModel     = EntityIntegrator::query()
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
         $meta = [
@@ -34,8 +37,9 @@ class EntityIntegratorEquipmentsController extends Controller
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('actions.sidemenu.entities'), 'url' => route('panel.manager.entities.index'), 'active' => false],
-                ['label' => __('actions.integrators'), 'url' => route('panel.manager.entities.integrators.index', $entity->id), 'active' => false],
-                ['label' => $this->titleController, 'url' => route('panel.manager.entities.integrators.equipments.index', [$entity->id, $integratorModel->id]), 'active' => false],
+                ['label' => 'Usuários Integradores', 'url' => route('panel.manager.entities.user-integrators.index', $entityId), 'active' => false],
+                ['label' => __('actions.integrators'), 'url' => route('panel.manager.entities.user-integrators.integrators.index', [$entityId, $userIntegrator]), 'active' => false],
+                ['label' => $this->titleController, 'url' => route('panel.manager.entities.user-integrators.integrators.equipments.index', [$entityId, $userIntegrator, $integratorModel->id]), 'active' => false],
                 ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
@@ -43,20 +47,21 @@ class EntityIntegratorEquipmentsController extends Controller
         return $dataTable
             ->forIntegrator($integrator)
             ->render('system.manager.entity_integrator_equipments.index', [
-                'meta'       => $meta,
-                'entity'     => $entity,
-                'integrator' => $integratorModel,
+                'meta'           => $meta,
+                'entity'         => $entity,
+                'userIntegrator' => $userIntegratorModel,
+                'integrator'     => $integratorModel,
             ]);
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(string $entityId, string $integratorId, string $equipment): mixed
+    public function show(string $entityId, string $userIntegrator, string $integratorId, string $equipment): mixed
     {
         $entity     = Entity::query()->withTrashed()->findOrFail($entityId);
         $integrator = EntityIntegrator::query()->withTrashed()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+            ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integratorId);
         $record     = $this->model->query()->withTrashed()->where('integrator_id', $integrator->id)->findOrFail($equipment);
 

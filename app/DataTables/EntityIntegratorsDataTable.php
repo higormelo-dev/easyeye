@@ -11,9 +11,12 @@ class EntityIntegratorsDataTable extends BaseDataTable
 {
     protected ?string $entityId = null;
 
-    public function forEntity(string $entityId): static
+    protected ?string $userIntegratorId = null;
+
+    public function forUserIntegrator(string $entityId, string $userIntegratorId): static
     {
-        $this->entityId = $entityId;
+        $this->entityId          = $entityId;
+        $this->userIntegratorId  = $userIntegratorId;
 
         return $this;
     }
@@ -45,8 +48,8 @@ class EntityIntegratorsDataTable extends BaseDataTable
             ->withTrashed()
             ->select('entity_integrators.*');
 
-        if ($this->entityId) {
-            $query->whereHas('user', fn ($q) => $q->where('entity_id', $this->entityId));
+        if ($this->userIntegratorId) {
+            $query->where('entity_user_integrator_id', $this->userIntegratorId);
         }
 
         return $query;
@@ -106,7 +109,7 @@ class EntityIntegratorsDataTable extends BaseDataTable
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
-            $btnActions .= '<a href="' . route('panel.manager.entities.integrators.equipments.index', [$this->entityId, $record->id]) . '"
+            $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.equipments.index', [$this->entityId, $this->userIntegratorId, $record->id]) . '"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.equipments') . '"><i class="fas fa-satellite-dish"></i></a>';

@@ -25,7 +25,7 @@
     {{ $dataTable->scripts() }}
     <script>
     $(function () {
-        const baseUrl = '{{ url('panel/manager/entities/' . $entity->id . '/integrators/' . $integrator->id . '/equipments') }}';
+        const baseUrl = '{{ url('panel/manager/entities/' . $entity->id . '/user-integrators/' . $userIntegrator->id . '/integrators/' . $integrator->id . '/equipments') }}';
 
         $(document).on('click', '.btn-show', function () {
             const id = $(this).data('id');

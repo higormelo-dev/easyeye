@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Manager;
 use App\DataTables\EntityIntegratorsDataTable;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EntityIntegratorRequest;
-use App\Models\{Entity, EntityIntegrator};
+use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator};
 use Illuminate\Http\{JsonResponse, Request};
 use Random\RandomException;
 
@@ -23,9 +23,12 @@ class EntityIntegratorsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(string $entity, EntityIntegratorsDataTable $dataTable): mixed
+    public function index(string $entityId, string $userIntegrator, EntityIntegratorsDataTable $dataTable): mixed
     {
-        $entityModel = Entity::query()->findOrFail($entity);
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
 
         $meta = [
             'title'       => $this->titleController,
@@ -33,14 +36,19 @@ class EntityIntegratorsController extends Controller
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('actions.sidemenu.entities'), 'url' => route('panel.manager.entities.index'), 'active' => false],
-                ['label' => $this->titleController, 'url' => route('panel.manager.entities.integrators.index', $entity), 'active' => false],
+                ['label' => 'Usuários Integradores', 'url' => route('panel.manager.entities.user-integrators.index', $entityId), 'active' => false],
+                ['label' => $this->titleController, 'url' => route('panel.manager.entities.user-integrators.integrators.index', [$entityId, $userIntegrator]), 'active' => false],
                 ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
 
         return $dataTable
-            ->forEntity($entity)
-            ->render('system.manager.entity_integrators.index', ['meta' => $meta, 'entity' => $entityModel]);
+            ->forUserIntegrator($entityId, $userIntegrator)
+            ->render('system.manager.entity_integrators.index', [
+                'meta'           => $meta,
+                'entity'         => $entity,
+                'userIntegrator' => $userIntegratorModel,
+            ]);
     }
 
     /**
@@ -48,12 +56,17 @@ class EntityIntegratorsController extends Controller
      *
      * @throws RandomException
      */
-    public function store(EntityIntegratorRequest $request, string $entity): JsonResponse
+    public function store(EntityIntegratorRequest $request, string $entityId, string $userIntegrator): JsonResponse
     {
-        $entityModel     = Entity::query()->findOrFail($entity);
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $parameterExtras = [
-            'token'  => $this->generateUniqueToken(),
-            'active' => true,
+            'entity_user_integrator_id' => $userIntegratorModel->id,
+            'token'                     => $this->generateUniqueToken(),
+            'active'                    => true,
         ];
         $attributes        = array_merge($request->except(['_token', 'mac']), $parameterExtras);
         $attributes['mac'] = strtoupper($request->input('mac', ''));
@@ -68,11 +81,11 @@ class EntityIntegratorsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $entityId, string $integrator): mixed
+    public function show(string $entityId, string $userIntegrator, string $integrator): mixed
     {
         $entity = Entity::query()->withTrashed()->findOrFail($entityId);
         $record = $this->model->query()->withTrashed()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+            ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
 
         if (request()->wantsJson()) {
@@ -85,11 +98,10 @@ class EntityIntegratorsController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(EntityIntegratorRequest $request, string $entityId, string $integrator): JsonResponse
+    public function update(EntityIntegratorRequest $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity            = Entity::query()->findOrFail($entityId);
         $record            = $this->model->query()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+            ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
         $attributes        = $request->except(['_token', 'mac']);
         $attributes['mac'] = strtoupper($request->input('mac', ''));
@@ -104,11 +116,10 @@ class EntityIntegratorsController extends Controller
     /**
      * Return flat JSON for the crudForm edit modal.
      */
-    public function editData(string $entityId, string $integrator): JsonResponse
+    public function editData(string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity = Entity::query()->findOrFail($entityId);
         $record = $this->model->query()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+            ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
 
         return response()->json(['data' => [
@@ -122,13 +133,12 @@ class EntityIntegratorsController extends Controller
     /**
      * Toggle active status.
      */
-    public function activate(Request $request, string $entityId, string $integrator): JsonResponse
+    public function activate(Request $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity  = Entity::query()->findOrFail($entityId);
-        $record  = $this->model->query()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+        $record = $this->model->query()
+            ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
-        $active  = (bool) $request->input('active', ! $record->active);
+        $active = (bool) $request->input('active', ! $record->active);
         $record->update(['active' => $active]);
 
         return response()->json([
@@ -140,11 +150,10 @@ class EntityIntegratorsController extends Controller
     /**
      * Restore a soft-deleted record.
      */
-    public function restore(Request $request, string $entityId, string $integrator): JsonResponse
+    public function restore(Request $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity = Entity::query()->withTrashed()->findOrFail($entityId);
         $record = $this->model->query()->withTrashed()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+            ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
         $record->restore();
 
@@ -154,11 +163,10 @@ class EntityIntegratorsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $entityId, string $integrator): JsonResponse
+    public function destroy(string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $entity = Entity::query()->findOrFail($entityId);
         $record = $this->model->query()
-            ->whereHas('user', fn ($q) => $q->where('entity_id', $entity->id))
+            ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
         $record->delete();
 

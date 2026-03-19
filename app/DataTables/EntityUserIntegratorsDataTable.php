@@ -2,30 +2,39 @@
 
 namespace App\DataTables;
 
-use App\Models\Entity;
+use App\Models\EntityUserIntegrator;
 use Illuminate\Database\Eloquent\Builder;
 use Yajra\DataTables\EloquentDataTable;
 use Yajra\DataTables\Html\{Builder as HtmlBuilder, Column};
 
-class EntitiesDataTable extends BaseDataTable
+class EntityUserIntegratorsDataTable extends BaseDataTable
 {
+    protected ?string $entityId = null;
+
+    public function forEntity(string $entityId): static
+    {
+        $this->entityId = $entityId;
+
+        return $this;
+    }
+
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<Entity>  $query
+     * @param  Builder<EntityUserIntegrator>  $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (Entity $record) => $this->buildEntityActionButtons($record))
-            ->editColumn('created_at', fn (Entity $record) => $this->formatDateColumn($record->created_at))
-            ->editColumn('active', fn (Entity $record) => $this->formatActiveColumn($record))
+            ->addColumn('action', fn (EntityUserIntegrator $record) => $this->buildUserIntegratorActionButtons($record))
+            ->editColumn('created_at', fn (EntityUserIntegrator $record) => $this->formatDateColumn($record->created_at))
+            ->editColumn('active', fn (EntityUserIntegrator $record) => $this->formatActiveColumn($record))
             ->rawColumns(['active', 'action'])
             ->filterColumn('name', function ($query, $keyword) {
-                $query->whereRaw('LOWER(entities.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+                $query->whereRaw('LOWER(entity_user_integrators.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
             })
-            ->filterColumn('code', function ($query, $keyword) {
-                $query->whereRaw('LOWER(entities.code) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            ->filterColumn('email', function ($query, $keyword) {
+                $query->whereRaw('LOWER(entity_user_integrators.email) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
             })
             ->setRowId('id');
     }
@@ -33,12 +42,17 @@ class EntitiesDataTable extends BaseDataTable
     /**
      * Get the query source of dataTable.
      */
-    public function query(Entity $model): Builder
+    public function query(EntityUserIntegrator $model): Builder
     {
-        return $model->newQuery()
+        $query = $model->newQuery()
             ->withTrashed()
-            ->select('entities.*')
-            ->where('code', '!=', 'ENT-0000000001');
+            ->select('entity_user_integrators.*');
+
+        if ($this->entityId) {
+            $query->where('entity_id', $this->entityId);
+        }
+
+        return $query;
     }
 
     /**
@@ -47,7 +61,7 @@ class EntitiesDataTable extends BaseDataTable
     public function html(): HtmlBuilder
     {
         return $this->builder()
-            ->setTableId('entities_datatable')
+            ->setTableId('user_integrators_datatable')
             ->columns($this->getColumns())
             ->minifiedAjax()
             ->orderBy(0, 'desc')
@@ -64,11 +78,10 @@ class EntitiesDataTable extends BaseDataTable
             Column::make('created_at')
                 ->title(__('actions.created_at'))
                 ->searchable(false),
-            Column::make('code')
-                ->title(__('actions.code'))
-                ->searchable(true),
             Column::make('name')
-                ->title(__('actions.entity')),
+                ->title(__('actions.name')),
+            Column::make('email')
+                ->title(__('actions.email')),
             Column::make('active')
                 ->title(__('actions.active'))
                 ->searchable(false)
@@ -83,10 +96,7 @@ class EntitiesDataTable extends BaseDataTable
         ];
     }
 
-    /**
-     * Build action buttons specific to the Entities module (no entity_id scoping).
-     */
-    private function buildEntityActionButtons(Entity $record): string
+    private function buildUserIntegratorActionButtons(EntityUserIntegrator $record): string
     {
         $btnActions = '';
 
@@ -101,15 +111,10 @@ class EntitiesDataTable extends BaseDataTable
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
-            $btnActions .= '<a href="' . route('panel.manager.entities.users', $record->id) . '"
+            $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.index', [$this->entityId, $record->id]) . '"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="Usuários"><i class="fas fa-users"></i></a>';
-
-            $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.index', $record->id) . '"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
+                title="Integradores"><i class="fas fa-cogs"></i></a>';
 
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
@@ -124,6 +129,11 @@ class EntitiesDataTable extends BaseDataTable
                 title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
         } else {
             $btnActions .= '<a href="javascript:void(0);"
+                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
+
+            $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.restore') . '"><i class="fas fa-recycle"></i></a>';
@@ -137,6 +147,6 @@ class EntitiesDataTable extends BaseDataTable
      */
     protected function filename(): string
     {
-        return 'Entities_' . date('YmdHis');
+        return 'EntityUserIntegrators_' . date('YmdHis');
     }
 }

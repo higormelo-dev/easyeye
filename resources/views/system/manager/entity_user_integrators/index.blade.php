@@ -7,24 +7,24 @@
 @section('content')
 
 <div x-data="crudForm({
-        storeUrl:  '{{ route('panel.manager.entities.user-integrators.integrators.store', [$entity->id, $userIntegrator->id]) }}',
+        storeUrl:  '{{ route('panel.manager.entities.user-integrators.store', $entity->id) }}',
         updateUrl: null,
-        fields: { name: '', ip: '', mac: '', active: true },
-        onSuccess: () => window.dispatchEvent(new CustomEvent('integrator-saved'))
+        fields: { name: '', email: '', password: '', active: true },
+        onSuccess: () => window.dispatchEvent(new CustomEvent('user-integrator-saved'))
     })"
-     x-init="$nextTick(() => document.getElementById('integratorModal').addEventListener('hidden.bs.modal', () => reset()))"
-     @open-create-integrator.window="reset(); bootstrap.Modal.getOrCreateInstance(document.getElementById('integratorModal')).show()"
-     @edit-integrator.window="loadAndEdit(
-         '{{ url('panel/manager/entities/' . $entity->id . '/user-integrators/' . $userIntegrator->id . '/integrators') }}' + '/' + $event.detail.id + '/edit-data',
-         '{{ url('panel/manager/entities/' . $entity->id . '/user-integrators/' . $userIntegrator->id . '/integrators') }}' + '/' + $event.detail.id,
-         'integratorModal'
+     x-init="$nextTick(() => document.getElementById('userIntegratorModal').addEventListener('hidden.bs.modal', () => reset()))"
+     @open-create-user-integrator.window="reset(); bootstrap.Modal.getOrCreateInstance(document.getElementById('userIntegratorModal')).show()"
+     @edit-user-integrator.window="loadAndEdit(
+         '{{ url('panel/manager/entities/' . $entity->id . '/user-integrators') }}' + '/' + $event.detail.id + '/edit-data',
+         '{{ url('panel/manager/entities/' . $entity->id . '/user-integrators') }}' + '/' + $event.detail.id,
+         'userIntegratorModal'
      )">
 
-    @include('system.manager.entity_integrators._form-modal')
+    @include('system.manager.entity_user_integrators._form-modal')
 
     <div class="row mb-3 align-items-center">
         <div class="col-12 col-md-auto">
-            <button type="button" class="btn btn-info btn-sm" @click="$dispatch('open-create-integrator')">
+            <button type="button" class="btn btn-info btn-sm" @click="$dispatch('open-create-user-integrator')">
                 <i class="fa fa-plus"></i> {{ __('actions.new') }}
             </button>
         </div>
@@ -51,21 +51,21 @@
     {{ $dataTable->scripts() }}
     <script>
     $(function () {
-        const entityBaseUrl = '{{ url('panel/manager/entities/' . $entity->id . '/user-integrators/' . $userIntegrator->id . '/integrators') }}';
+        const entityBaseUrl = '{{ url('panel/manager/entities/' . $entity->id . '/user-integrators') }}';
 
-        window.addEventListener('integrator-saved', () => {
-            if (window.LaravelDataTables && window.LaravelDataTables['integrators_datatable']) {
-                window.LaravelDataTables['integrators_datatable'].ajax.reload(null, false);
+        window.addEventListener('user-integrator-saved', () => {
+            if (window.LaravelDataTables && window.LaravelDataTables['user_integrators_datatable']) {
+                window.LaravelDataTables['user_integrators_datatable'].ajax.reload(null, false);
             }
         });
 
         $(document).on('click', '.btn-edit', function () {
-            window.dispatchEvent(new CustomEvent('edit-integrator', { detail: { id: $(this).data('id') } }));
+            window.dispatchEvent(new CustomEvent('edit-user-integrator', { detail: { id: $(this).data('id') } }));
         });
 
         $(document).on('click', '.btn-show', function () {
             const id = $(this).data('id');
-            $('.modal-title-default').text('{{ __("actions.messages.view", ["name" => __("actions.integrator")]) }}');
+            $('.modal-title-default').text('{{ __("actions.messages.view", ["name" => "Usuário Integrador"]) }}');
             $('#btn-modal-default').hide();
             $('#erro-default').hide();
             $.ajax({
@@ -92,7 +92,7 @@
                 data: { active: situation },
                 success: function (res) {
                     if (window.showSuccessToast) showSuccessToast(res.message);
-                    window.dispatchEvent(new CustomEvent('integrator-saved'));
+                    window.dispatchEvent(new CustomEvent('user-integrator-saved'));
                 },
                 error: function (res) {
                     if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
@@ -119,7 +119,7 @@
                     headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                     success: function (res) {
                         if (window.showSuccessToast) showSuccessToast(res.message);
-                        window.dispatchEvent(new CustomEvent('integrator-saved'));
+                        window.dispatchEvent(new CustomEvent('user-integrator-saved'));
                     },
                     error: function (res) {
                         if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
@@ -145,7 +145,7 @@
                     headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                     success: function (res) {
                         if (window.showSuccessToast) showSuccessToast(res.message);
-                        window.dispatchEvent(new CustomEvent('integrator-saved'));
+                        window.dispatchEvent(new CustomEvent('user-integrator-saved'));
                     },
                     error: function (res) {
                         if (window.showErrorToast) showErrorToast(res.responseJSON?.message);

@@ -4,6 +4,7 @@ use App\Http\Controllers\Manager\{
     EntitiesController,
     EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
+    EntityUserIntegratorsController,
     EntityUsersController,
     ImpersonateController,
     PlansController,
@@ -15,17 +16,22 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     // ── Empresas ───────────────────────────────────────────────────────────
     Route::get('entities/{entity}/edit-data', [EntitiesController::class, 'editData'])->name('entities.edit-data');
     Route::get('entities/{entity}/users', [EntityUsersController::class, 'index'])->name('entities.users');
-    // Route::put('entities/{entity}/restore', [EntitiesController::class, 'restore'])->name('entities.restore');
     Route::resource('entities', EntitiesController::class)->except('create', 'edit');
 
-    // ── Integradores ───────────────────────────────────────────────────────
-    Route::get('entities/{entity}/integrators/{integrator}/edit-data', [EntityIntegratorsController::class, 'editData'])->name('entities.integrators.edit-data');
-    Route::patch('entities/{entity}/integrators/{integrator}/activate', [EntityIntegratorsController::class, 'activate'])->name('entities.integrators.activate');
-    Route::put('entities/{entity}/integrators/{integrator}/restore', [EntityIntegratorsController::class, 'restore'])->name('entities.integrators.restore');
-    Route::resource('entities.integrators', EntityIntegratorsController::class)->except('create', 'edit');
+    // ── Usuários Integradores ──────────────────────────────────────────────
+    Route::get('entities/{entity}/user-integrators/{userIntegrator}/edit-data', [EntityUserIntegratorsController::class, 'editData'])->name('entities.user-integrators.edit-data');
+    Route::patch('entities/{entity}/user-integrators/{userIntegrator}/activate', [EntityUserIntegratorsController::class, 'activate'])->name('entities.user-integrators.activate');
+    Route::put('entities/{entity}/user-integrators/{userIntegrator}/restore', [EntityUserIntegratorsController::class, 'restore'])->name('entities.user-integrators.restore');
+    Route::resource('entities.user-integrators', EntityUserIntegratorsController::class)->except('create', 'edit');
+
+    // ── Integradores (sob Usuário Integrador) ─────────────────────────────
+    Route::get('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/edit-data', [EntityIntegratorsController::class, 'editData'])->name('entities.user-integrators.integrators.edit-data');
+    Route::patch('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/activate', [EntityIntegratorsController::class, 'activate'])->name('entities.user-integrators.integrators.activate');
+    Route::put('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/restore', [EntityIntegratorsController::class, 'restore'])->name('entities.user-integrators.integrators.restore');
+    Route::resource('entities.user-integrators.integrators', EntityIntegratorsController::class)->except('create', 'edit');
 
     // ── Equipamentos ───────────────────────────────────────────────────────
-    Route::resource('entities.integrators.equipments', EntityIntegratorEquipmentsController::class)->only('index', 'show');
+    Route::resource('entities.user-integrators.integrators.equipments', EntityIntegratorEquipmentsController::class)->only('index', 'show');
 
     // ── Impersonação ("usar como este") ────────────────────────────────────
     Route::post('entities/{entity}/impersonate/{entityUser}', [ImpersonateController::class, 'store'])
