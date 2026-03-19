@@ -33,6 +33,9 @@ class EntityIntegratorEquipmentsDataTable extends BaseDataTable
             ->filterColumn('name', function ($query, $keyword) {
                 $query->whereRaw('LOWER(entity_integrator_equipments.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
             })
+            ->filterColumn('code', function ($query, $keyword) {
+                $query->whereRaw('LOWER(entity_integrator_equipments.code) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
+            })
             ->setRowId('id');
     }
 
@@ -75,6 +78,9 @@ class EntityIntegratorEquipmentsDataTable extends BaseDataTable
             Column::make('created_at')
                 ->title(__('actions.created_at'))
                 ->searchable(false),
+            Column::make('code')
+                ->title(__('actions.code'))
+                ->searchable(true),
             Column::make('name')
                 ->title(__('actions.name')),
             Column::make('ip')
