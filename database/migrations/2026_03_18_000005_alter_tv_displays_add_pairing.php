@@ -22,6 +22,11 @@ return new class extends Migration
     {
         Schema::table('tv_displays', function (Blueprint $table) {
             $table->dropColumn(['status', 'pin']);
+        });
+
+        DB::table('tv_displays')->whereNull('token')->update(['token' => DB::raw("gen_random_uuid()")]);
+
+        Schema::table('tv_displays', function (Blueprint $table) {
             $table->string('token', 64)->nullable(false)->change();
         });
     }

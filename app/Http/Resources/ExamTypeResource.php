@@ -21,6 +21,7 @@ class ExamTypeResource extends JsonResource
                 'entity_id'  => $this->entity_id,
                 'code'       => $this->code,
                 'name'       => $this->name,
+                'suffix'     => $this->suffix,
                 'category'   => $this->category,
                 'active'     => (bool) $this->active,
                 'created_at' => $this->created_at,

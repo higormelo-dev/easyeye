@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\HasUppercaseFields;
 use App\Enums\ExamCategory;
 use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -10,10 +11,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class ExamType extends Model
 {
     use HasFactory;
+    use HasUppercaseFields;
     use HasUuids;
     use SoftDeletes;
 
     protected $primaryKey = 'id';
+
+    protected array $uppercaseFields = ['name'];
 
     /**
      * The attributes that are mass assignable.
@@ -24,6 +28,7 @@ class ExamType extends Model
         'entity_id',
         'code',
         'name',
+        'suffix',
         'category',
         'active',
     ];
@@ -34,6 +39,10 @@ class ExamType extends Model
     protected static function booted(): void
     {
         static::creating(function (self $examType) {
+            if (blank($examType->suffix) && filled($examType->name)) {
+                $examType->suffix = self::normalizeSuffix($examType->name);
+            }
+
             if (blank($examType->code)) {
                 $prefix = $examType->entity_id ? 'ET' : 'ETP';
 
@@ -99,12 +108,27 @@ class ExamType extends Model
         return $this->belongsTo(Entity::class, 'entity_id');
     }
 
-    protected function name(): Attribute
+    protected function suffix(): Attribute
     {
         return Attribute::make(
             set: static fn (?string $value) => $value !== null
-                ? mb_convert_case($value, MB_CASE_UPPER, 'UTF-8')
+                ? self::normalizeSuffix($value)
                 : null,
         );
+    }
+
+    private static function normalizeSuffix(string $value): string
+    {
+        if (function_exists('transliterator_transliterate')) {
+            $value = transliterator_transliterate('Any-Latin; Latin-ASCII; Upper', $value);
+        } else {
+            $value = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $value) ?: $value;
+            $value = strtoupper($value);
+        }
+
+        $value = str_replace(' ', '-', $value);
+        $value = preg_replace('/[^A-Z0-9\-]/', '', $value);
+
+        return substr($value, 0, 5);
     }
 }

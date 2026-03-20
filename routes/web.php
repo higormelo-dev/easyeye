@@ -73,11 +73,31 @@ Route::group(
             return redirect()->route('panel.dashboard');
         });
         Route::get('/dashboard', function () {
-            if (session()->get('selected_entity_is_client')) {
-                return view('system.dashboard');
+            if (!session()->get('selected_entity_is_client')) {
+                return view('system.manager.dashboard');
             }
 
-            return view('system.manager.dashboard');
+            $entityId = session('selected_entity_id');
+            $today    = now()->toDateString();
+
+            $stats = [
+                'today_count'    => \App\Models\Schedule::where('entity_id', $entityId)
+                                     ->whereDate('date_time', $today)
+                                     ->count(),
+                'total_patients' => \App\Models\Patient::where('entity_id', $entityId)
+                                     ->where('active', true)
+                                     ->count(),
+                'total_doctors'  => \App\Models\Doctor::query()
+                                     ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                                     ->where('entity_users.entity_id', $entityId)
+                                     ->count(),
+                'pending_today'  => \App\Models\Schedule::where('entity_id', $entityId)
+                                     ->whereDate('date_time', $today)
+                                     ->where('situation', \App\Enums\ScheduleSituation::Scheduled->value)
+                                     ->count(),
+            ];
+
+            return view('system.dashboard', compact('stats'));
         })->name('dashboard');
 
         Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');

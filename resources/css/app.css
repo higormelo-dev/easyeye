@@ -1,15 +1,445 @@
 /* Bootstrap 5.3.8 */
 @import 'bootstrap/dist/css/bootstrap.min.css';
 
+/* ─── Design Tokens ───────────────────────────────────────────────────── */
+:root {
+    --ee-font:          'Inter', system-ui, -apple-system, sans-serif;
+    --ee-primary:       #1976d2;
+    --ee-primary-light: #e3f2fd;
+    --ee-surface:       #ffffff;
+    --ee-bg:            #f5f7fa;
+    --ee-border:        #e2e8f0;
+    --ee-text:          #1e293b;
+    --ee-text-muted:    #64748b;
+    --ee-radius:        0.625rem;
+    --ee-radius-lg:     0.875rem;
+    --ee-shadow-sm:     0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    --ee-shadow:        0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
+    --ee-shadow-lg:     0 8px 24px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.05);
+    --ee-transition:    all 0.2s ease;
+}
+
+/* ─── Typography ──────────────────────────────────────────────────────── */
+body {
+    font-family: var(--ee-font) !important;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--ee-text);
+    -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: var(--ee-font) !important;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--ee-text);
+}
+
+.card-title, .card-header h5, .card-header h4 {
+    font-family: var(--ee-font) !important;
+    font-weight: 600;
+}
+
+/* ─── Alpine cloak ────────────────────────────────────────────────────── */
 [x-cloak] { display: none !important; }
 
-/* Fix: remove line-height que desalinha os itens da navbar */
+/* ─── Layout / Page Wrapper ───────────────────────────────────────────── */
+.page-wrapper {
+    background: var(--ee-bg) !important;
+}
+
+.page-wrapper > .container-fluid {
+    padding: 1.5rem 1.75rem;
+}
+
+/* ─── Topbar fix ──────────────────────────────────────────────────────── */
 .topbar .top-navbar .navbar-header {
-    background: rgba(0, 0, 0, 0);
+    background: rgba(0,0,0,0);
     line-height: normal !important;
 }
 
-/* Fix: sidebar submenus — o tema usa .in (Bootstrap 3) mas o BS5 .collapse sobrescreve */
+.topbar .top-navbar .navbar-brand b {
+    font-family: var(--ee-font) !important;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+/* ─── Sidebar submenus (Bootstrap 3 → 5 compat) ──────────────────────── */
 .sidebar-nav .collapse.in {
     display: block !important;
+}
+
+/* ─── Cards ───────────────────────────────────────────────────────────── */
+.card {
+    border: 1px solid var(--ee-border) !important;
+    border-radius: var(--ee-radius-lg) !important;
+    box-shadow: var(--ee-shadow-sm) !important;
+    background: var(--ee-surface) !important;
+    transition: var(--ee-transition);
+}
+
+.card:hover {
+    box-shadow: var(--ee-shadow) !important;
+}
+
+.card-header {
+    border-bottom: 1px solid var(--ee-border) !important;
+    background: var(--ee-surface) !important;
+    border-radius: var(--ee-radius-lg) var(--ee-radius-lg) 0 0 !important;
+    padding: 1rem 1.25rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--ee-text);
+}
+
+.card-body {
+    padding: 1.25rem;
+}
+
+/* ─── Stat Cards (Dashboard KPIs) ────────────────────────────────────── */
+.stat-card {
+    border-radius: var(--ee-radius-lg) !important;
+    border: none !important;
+    box-shadow: var(--ee-shadow) !important;
+    overflow: hidden;
+    transition: var(--ee-transition);
+    cursor: default;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--ee-shadow-lg) !important;
+}
+
+.stat-card .stat-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+    color: var(--ee-text);
+}
+
+.stat-card .stat-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--ee-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────────────────── */
+.btn {
+    font-family: var(--ee-font) !important;
+    font-weight: 500;
+    border-radius: var(--ee-radius) !important;
+    transition: var(--ee-transition);
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+}
+
+.btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
+    border-radius: 0.5rem !important;
+}
+
+.btn-lg {
+    padding: 0.7rem 1.5rem;
+    font-size: 1rem;
+    border-radius: var(--ee-radius-lg) !important;
+}
+
+.btn-info {
+    background: var(--ee-primary) !important;
+    border-color: var(--ee-primary) !important;
+    color: #fff !important;
+}
+
+.btn-info:hover {
+    background: #1565c0 !important;
+    border-color: #1565c0 !important;
+    box-shadow: 0 4px 12px rgba(25,118,210,.35) !important;
+    transform: translateY(-1px);
+}
+
+.btn-info:active {
+    transform: translateY(0);
+    box-shadow: none !important;
+}
+
+/* ─── Forms / Inputs ──────────────────────────────────────────────────── */
+.form-control, .form-select {
+    font-family: var(--ee-font) !important;
+    font-size: 0.9rem;
+    border: 1.5px solid var(--ee-border) !important;
+    border-radius: var(--ee-radius) !important;
+    padding: 0.55rem 0.875rem;
+    transition: var(--ee-transition);
+    background: #fff !important;
+    color: var(--ee-text) !important;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--ee-primary) !important;
+    box-shadow: 0 0 0 3px rgba(25,118,210,.12) !important;
+    outline: none !important;
+}
+
+.form-label {
+    font-family: var(--ee-font) !important;
+    font-size: 0.8625rem;
+    font-weight: 500;
+    color: var(--ee-text);
+    margin-bottom: 0.35rem;
+}
+
+.input-group-text {
+    border: 1.5px solid var(--ee-border) !important;
+    border-radius: var(--ee-radius) !important;
+    background: #f8fafc !important;
+    color: var(--ee-text-muted);
+}
+
+.input-group .form-control {
+    border-left: none !important;
+}
+
+.input-group:focus-within .input-group-text {
+    border-color: var(--ee-primary) !important;
+}
+
+/* ─── Tables ──────────────────────────────────────────────────────────── */
+.table {
+    font-family: var(--ee-font) !important;
+    font-size: 0.8875rem;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table thead th {
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ee-text-muted);
+    border-bottom: 2px solid var(--ee-border) !important;
+    padding: 0.75rem 1rem;
+}
+
+.table tbody td {
+    vertical-align: middle;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f1f5f9 !important;
+    color: var(--ee-text);
+}
+
+.table-striped tbody tr:nth-of-type(odd) > * {
+    background: #fafcff !important;
+}
+
+.table-hover tbody tr:hover > * {
+    background: var(--ee-primary-light) !important;
+}
+
+/* ─── Badges ──────────────────────────────────────────────────────────── */
+.badge {
+    font-family: var(--ee-font) !important;
+    font-weight: 500;
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+    border-radius: 0.4rem;
+    letter-spacing: 0.01em;
+}
+
+/* ─── Breadcrumb ──────────────────────────────────────────────────────── */
+.breadcrumb {
+    font-family: var(--ee-font) !important;
+    background: transparent;
+    padding: 0.5rem 0;
+    margin-bottom: 1.25rem;
+    font-size: 0.8375rem;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    color: var(--ee-text-muted);
+}
+
+.breadcrumb-item a {
+    color: var(--ee-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.breadcrumb-item.active {
+    color: var(--ee-text-muted);
+    font-weight: 400;
+}
+
+/* ─── Pagination ──────────────────────────────────────────────────────── */
+.page-link {
+    font-family: var(--ee-font) !important;
+    font-size: 0.875rem;
+    border-radius: 0.5rem !important;
+    margin: 0 2px;
+    color: var(--ee-primary);
+    border: 1px solid var(--ee-border);
+}
+
+.page-item.active .page-link {
+    background: var(--ee-primary);
+    border-color: var(--ee-primary);
+}
+
+/* ─── Spinners ────────────────────────────────────────────────────────── */
+.spinner-border {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-width: 0.2em;
+}
+
+/* ─── Dropdowns ───────────────────────────────────────────────────────── */
+.dropdown-menu {
+    font-family: var(--ee-font) !important;
+    font-size: 0.875rem;
+    border: 1px solid var(--ee-border) !important;
+    border-radius: var(--ee-radius-lg) !important;
+    box-shadow: var(--ee-shadow-lg) !important;
+    padding: 0.5rem;
+}
+
+.dropdown-item {
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.875rem;
+    font-weight: 400;
+    transition: var(--ee-transition);
+}
+
+.dropdown-item:hover {
+    background: var(--ee-primary-light);
+    color: var(--ee-primary);
+}
+
+.dropdown-divider {
+    border-color: var(--ee-border);
+    margin: 0.35rem 0;
+}
+
+/* ─── Modals ──────────────────────────────────────────────────────────── */
+.modal-content {
+    font-family: var(--ee-font) !important;
+    border: none !important;
+    border-radius: var(--ee-radius-lg) !important;
+    box-shadow: var(--ee-shadow-lg) !important;
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--ee-border) !important;
+    padding: 1.1rem 1.4rem;
+    border-radius: var(--ee-radius-lg) var(--ee-radius-lg) 0 0 !important;
+}
+
+.modal-title {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.modal-footer {
+    border-top: 1px solid var(--ee-border) !important;
+    padding: 0.875rem 1.4rem;
+}
+
+/* ─── Quick Action Buttons (Dashboard) ───────────────────────────────── */
+.quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 1rem;
+    border-radius: var(--ee-radius-lg) !important;
+    border: 1.5px solid var(--ee-border) !important;
+    background: var(--ee-surface) !important;
+    color: var(--ee-text) !important;
+    font-size: 0.8375rem;
+    font-weight: 500;
+    transition: var(--ee-transition);
+    text-decoration: none;
+    min-height: 90px;
+}
+
+.quick-action-btn i {
+    font-size: 1.5rem;
+}
+
+.quick-action-btn:hover {
+    border-color: var(--ee-primary) !important;
+    background: var(--ee-primary-light) !important;
+    color: var(--ee-primary) !important;
+    transform: translateY(-2px);
+    box-shadow: var(--ee-shadow) !important;
+}
+
+/* ─── Alerts ──────────────────────────────────────────────────────────── */
+.alert {
+    font-family: var(--ee-font) !important;
+    font-size: 0.875rem;
+    border-radius: var(--ee-radius) !important;
+    border-width: 1px !important;
+    padding: 0.75rem 1rem;
+}
+
+/* ─── Welcome Banner (Dashboard) ─────────────────────────────────────── */
+.welcome-banner {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 50%, #0d47a1 100%);
+    border-radius: var(--ee-radius-lg);
+    padding: 1.5rem 2rem;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+}
+
+.welcome-banner::after {
+    content: '';
+    position: absolute;
+    right: -30px;
+    top: -30px;
+    width: 180px;
+    height: 180px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 50%;
+}
+
+.welcome-banner::before {
+    content: '';
+    position: absolute;
+    right: 60px;
+    bottom: -50px;
+    width: 120px;
+    height: 120px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 50%;
+}
+
+.welcome-banner h4 {
+    color: #fff;
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.welcome-banner p {
+    color: rgba(255,255,255,0.78);
+    font-size: 0.875rem;
+    margin: 0;
 }

@@ -7,6 +7,9 @@
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <title>{{ config('app.name', 'EasyEye') }}</title>
         <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('system/images/favicon.png') }}">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
         {{-- Theme CSS (Elite Admin — not available on npm) --}}
         <link href="{{ asset('system/plugins/morrisjs/morris.css') }}" rel="stylesheet">
         <link href="{{ asset('system/css/style.min.css') }}" rel="stylesheet">
