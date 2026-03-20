@@ -14,8 +14,9 @@ return new class extends Migration
         Schema::table('schedules', function (Blueprint $table) {
             $table->dropColumn('visits');
             $table->foreignUuid('visit_id')
+                ->nullable()
                 ->constrained('visit_types')
-                ->cascadeOnDelete()
+                ->nullOnDelete()
                 ->after('covenant_id');
         });
     }

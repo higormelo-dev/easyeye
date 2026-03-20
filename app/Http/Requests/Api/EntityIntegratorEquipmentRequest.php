@@ -58,6 +58,6 @@ class EntityIntegratorEquipmentRequest extends FormRequest
         return Rule::unique(self::TABLE, $column)
             ->ignore($this->route('equipment'))
             ->whereNull('deleted_at')
-            ->where('integrator_id', request()->user()->id);
+            ->where('integrator_id', request()->attributes->get('integrator')->id);
     }
 }

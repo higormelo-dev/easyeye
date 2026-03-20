@@ -18,6 +18,9 @@ class Entity extends Model
 
     protected $primaryKey = 'id';
 
+    /** Set to true to prevent EntityObserver from auto-starting a trial on create. */
+    public bool $skipAutoTrial = false;
+
     /**
      * The attributes that are mass assignable.
      *

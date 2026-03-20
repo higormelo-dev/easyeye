@@ -6,23 +6,16 @@ use App\Enums\FeatureKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ExamRequest;
 use App\Http\Resources\PatientExamResource;
-use App\Models\{Patient, PatientExam};
+use App\Models\PatientExam;
 use App\Services\Api\PatientExamService;
 use App\Services\FeatureGateService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class ExamsController extends Controller
 {
-    /**
-     * Instance of the standard model.
-     */
     protected PatientExam $model;
 
     protected PatientExamService $service;
-
-    private const FILLABLE_FIELDS = ['patient_id', 'doctor_id', 'schedule_id', 'archive', 'name'];
 
     public function __construct(
         PatientExam $patientExam,
@@ -43,106 +36,10 @@ class ExamsController extends Controller
 
         $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        $patient = $this->findPatient($request, $integrator);
-
-        $recordData  = $this->buildRecordData($request, $patient);
-        $archivePath = $this->generateArchivePath($integrator->user->entity_id, $patient->id, $request->file('archive'));
-
-        $existingRecord = $this->findExistingExam($request->name, $integrator);
-
-        if ($existingRecord) {
-            $record = $this->updateExistingRecord($existingRecord, $recordData, $archivePath, $request);
-        } else {
-            $record = $this->createNewRecord($recordData, $archivePath, $request);
-        }
+        $record = $this->service->createFromScheduleIdentifier($request);
 
         $this->featureGate->increment($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        return new PatientExamResource($record);
-    }
-
-    private function findPatient(ExamRequest $request, $integrator): Patient
-    {
-        return Patient::query()
-            ->where('entity_id', $integrator->user->entity_id)
-            ->when(
-                Str::isUuid($request->patient_identifier),
-                fn ($q) => $q->where('id', $request->patient_identifier),
-                fn ($q) => $q->where('code', $request->patient_identifier)
-            )
-            ->firstOrFail();
-    }
-
-    private function buildRecordData(ExamRequest $request, Patient $patient): array
-    {
-        $data = [
-            ...$request->only(self::FILLABLE_FIELDS),
-            'patient_id' => $patient->id,
-            'exam_id'    => $this->service->examFindByIdOrCode($request->exam_identifier)?->id,
-        ];
-
-        if ($request->filled('doctor_identifier')) {
-            $data['doctor_id'] = $this->service->doctorFindByIdOrCode($request->doctor_identifier)?->id;
-        }
-
-        if ($request->filled('schedule_identifier')) {
-            $data['schedule_id'] = $this->service->scheduleFindByIdOrCode($request->schedule_identifier)?->id;
-        }
-
-        return $data;
-    }
-
-    private function generateArchivePath(string $entityId, string $patientId, $file): string
-    {
-        $uuid      = Str::uuid();
-        $timestamp = time();
-        $extension = $file->getClientOriginalExtension();
-
-        return "{$entityId}/{$patientId}/exams/{$timestamp}_{$uuid}.{$extension}";
-    }
-
-    private function findExistingExam(?string $name, $integrator): ?PatientExam
-    {
-        return PatientExam::query()
-            ->with('patient')
-            ->whereHas('patient', fn ($q) => $q->where('entity_id', $integrator->user->entity_id)->whereNull('deleted_at'))
-            ->where('name', $name)
-            ->first();
-    }
-
-    private function uploadArchive(string $path, $file): void
-    {
-        $stream   = fopen($file->getRealPath(), 'rb');
-        $uploaded = Storage::disk('s3')->put($path, $stream, 'public');
-
-        if (is_resource($stream)) {
-            fclose($stream);
-        }
-
-        if (! $uploaded) {
-            throw new \RuntimeException('Failed to upload exam archive.');
-        }
-    }
-
-    private function updateExistingRecord(PatientExam $record, array $data, string $archivePath, ExamRequest $request): PatientExamResource
-    {
-        if ($record->archive) {
-            Storage::disk('s3')->delete($record->archive);
-        }
-
-        $this->uploadArchive($archivePath, $request->file('archive'));
-
-        $record->update([...$data, 'archive' => $archivePath]);
-
-        return new PatientExamResource($record->refresh());
-    }
-
-    private function createNewRecord(array $data, string $archivePath, ExamRequest $request): PatientExamResource
-    {
-        $this->uploadArchive($archivePath, $request->file('archive'));
-
-        $record = PatientExam::create([...$data, 'archive' => $archivePath]);
-
-        return new PatientExamResource($record);
+        return (new PatientExamResource($record))->response()->setStatusCode(201);
     }
 }

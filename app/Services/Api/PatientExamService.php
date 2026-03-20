@@ -2,7 +2,7 @@
 
 namespace App\Services\Api;
 
-use App\Http\Requests\Api\PatientExamRequest;
+use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
 use App\Models\{Doctor, ExamType, PatientExam, Schedule};
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
 use Illuminate\Support\Facades\{DB, Storage};
@@ -23,6 +23,31 @@ class PatientExamService
     }
 
     /**
+     * Create a new record resolving patient_id and doctor_id from the schedule
+     *
+     * @throws \Throwable
+     */
+    public function createFromScheduleIdentifier(ExamRequest $request): PatientExam
+    {
+        return DB::transaction(function () use ($request) {
+            $integrator = request()->attributes->get('integrator');
+            $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
+
+            abort_unless($schedule !== null, 422, 'Schedule not found.');
+
+            return $this->persistExam(
+                patientId:   $schedule->patient_id,
+                entityId:    $integrator->user->entity_id,
+                examId:      $this->examFindByIdOrCode($request->exam_identifier)?->id,
+                doctorId:    $schedule->doctor_id,
+                scheduleId:  $schedule->id,
+                name:        $request->name,
+                archiveFile: $request->file('archive'),
+            );
+        });
+    }
+
+    /**
      * Update existing record and related entities
      *
      * @throws \Throwable
@@ -30,11 +55,12 @@ class PatientExamService
     public function update(PatientExam $patientExam, PatientExamRequest $request): PatientExam
     {
         return DB::transaction(function () use ($patientExam, $request) {
-            $data = [
+            $schedule = $this->scheduleFindByIdOrCode($request->schedule_identifier);
+            $data     = [
                 ...$request->only(self::FILLABLE_FIELDS),
                 'exam_id'     => $this->examFindByIdOrCode($request->exam_identifier)?->id,
-                'doctor_id'   => $this->doctorFindByIdOrCode($request->doctor_identifier)?->id,
-                'schedule_id' => $this->scheduleFindByIdOrCode($request->schedule_identifier)?->id,
+                'doctor_id'   => $this->resolveDoctorId($request, $schedule),
+                'schedule_id' => $schedule?->id,
             ];
 
             if ($request->hasFile('archive')) {
@@ -85,8 +111,6 @@ class PatientExamService
     }
 
     /**
-     * Find by ID or Code including soft-deleted records
-     *
      * @throws ModelNotFoundException
      */
     public function findByIdOrCode(string $patientId, string $idOrCode): ?PatientExam
@@ -95,10 +119,8 @@ class PatientExamService
             ->with('patient')
             ->where('patient_id', $patientId)
             ->whereHas('patient', function ($query) {
-                $query->where(function ($query) {
-                    $query->where('entity_id', request()->attributes->get('integrator')->user->entity_id)
-                        ->whereNull('deleted_at');
-                });
+                $query->where('entity_id', request()->attributes->get('integrator')->user->entity_id)
+                    ->whereNull('deleted_at');
             });
 
         if (Str::isUuid($idOrCode)) {
@@ -111,30 +133,48 @@ class PatientExamService
     }
 
     /**
-     * Find or create record
+     * Find or create record (used by PatientExamsController store)
      */
     private function findOrCreate(PatientExamRequest $request, string $patientId): PatientExam
     {
+        $integrator = request()->attributes->get('integrator');
+        $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
+
+        return $this->persistExam(
+            patientId:   $patientId,
+            entityId:    $integrator->user->entity_id,
+            examId:      $this->examFindByIdOrCode($request->exam_identifier)?->id,
+            doctorId:    $this->resolveDoctorId($request, $schedule),
+            scheduleId:  $schedule?->id,
+            name:        $request->name,
+            archiveFile: $request->file('archive'),
+        );
+    }
+
+    /**
+     * Core upsert logic: upload archive and find-or-create the PatientExam record.
+     */
+    private function persistExam(
+        string $patientId,
+        string $entityId,
+        ?string $examId,
+        ?string $doctorId,
+        ?string $scheduleId,
+        ?string $name,
+        mixed $archiveFile,
+    ): PatientExam {
         $uuid        = Str::uuid();
         $timestamp   = time();
-        $integrator  = request()->attributes->get('integrator');
-        $extension   = $request->file('archive')->getClientOriginalExtension();
+        $extension   = $archiveFile->getClientOriginalExtension();
         $fileName    = "{$timestamp}_{$uuid}.{$extension}";
-        $archivePath = "{$integrator->user->entity_id}/{$patientId}/exams/{$fileName}";
-        $recordData  = [
-            ...$request->only(self::FILLABLE_FIELDS),
-            'exam_id'     => $this->examFindByIdOrCode($request->exam_identifier)?->id,
-            'doctor_id'   => $this->doctorFindByIdOrCode($request->doctor_identifier)?->id,
-            'schedule_id' => $this->scheduleFindByIdOrCode($request->schedule_identifier)?->id,
-        ];
+        $archivePath = "{$entityId}/{$patientId}/exams/{$fileName}";
 
         $existingRecord = PatientExam::query()
             ->with('patient')
-            ->whereHas('patient', function ($query) use ($integrator) {
-                $query->where('entity_id', $integrator->user->entity_id)
-                    ->whereNull('deleted_at');
+            ->whereHas('patient', function ($query) use ($entityId) {
+                $query->where('entity_id', $entityId)->whereNull('deleted_at');
             })
-            ->where('name', $request->name)
+            ->where('name', $name)
             ->first();
 
         if ($existingRecord) {
@@ -143,37 +183,35 @@ class PatientExamService
             }
 
             $uploaded = Storage::disk('s3')
-                ->put(
-                    $archivePath,
-                    file_get_contents($request->file('archive')),
-                    'public'
-                );
+                ->put($archivePath, file_get_contents($archiveFile), 'public');
 
             if ($uploaded) {
                 $existingRecord->update([
-                    ...$recordData,
-                    'archive' => $archivePath,
+                    'patient_id'  => $patientId,
+                    'exam_id'     => $examId,
+                    'doctor_id'   => $doctorId,
+                    'schedule_id' => $scheduleId,
+                    'name'        => $name,
+                    'archive'     => $archivePath,
                 ]);
 
                 return $existingRecord->refresh();
-
             }
 
             throw new \RuntimeException('Failed to upload exam archive.');
         }
 
         $uploaded = Storage::disk('s3')
-            ->put(
-                $archivePath,
-                file_get_contents($request->file('archive')),
-                'public'
-            );
+            ->put($archivePath, file_get_contents($archiveFile), 'public');
 
         if ($uploaded) {
             return PatientExam::create([
-                ...$recordData,
-                'patient_id' => $patientId,
-                'archive'    => $archivePath,
+                'patient_id'  => $patientId,
+                'exam_id'     => $examId,
+                'doctor_id'   => $doctorId,
+                'schedule_id' => $scheduleId,
+                'name'        => $name,
+                'archive'     => $archivePath,
             ]);
         }
 
@@ -181,10 +219,18 @@ class PatientExamService
     }
 
     /**
-     * Find by ID or Code including soft-deleted records
-     *
-     * @throws ModelNotFoundException
+     * Resolve o doctor_id: prioriza doctor_identifier do request;
+     * caso ausente, usa o doctor_id do schedule (se houver).
      */
+    private function resolveDoctorId(PatientExamRequest $request, ?Schedule $schedule): ?string
+    {
+        if ($request->filled('doctor_identifier')) {
+            return $this->doctorFindByIdOrCode($request->doctor_identifier)?->id;
+        }
+
+        return $schedule?->doctor_id;
+    }
+
     public function doctorFindByIdOrCode(?string $idOrCode): ?Doctor
     {
         if ($idOrCode === null) {
@@ -207,11 +253,6 @@ class PatientExamService
         return $query->first();
     }
 
-    /**
-     * Find by ID or Code including soft-deleted records
-     *
-     * @throws ModelNotFoundException
-     */
     public function scheduleFindByIdOrCode(?string $idOrCode): ?Schedule
     {
         if ($idOrCode === null) {
@@ -231,11 +272,6 @@ class PatientExamService
         return $query->first();
     }
 
-    /**
-     * Find by ID or Code including soft-deleted records
-     *
-     * @throws ModelNotFoundException
-     */
     public function examFindByIdOrCode(string $idOrCode): ?ExamType
     {
         $integrator = request()->attributes->get('integrator');

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ScheduleSituation;
 use App\Models\{Doctor, People, Schedule, User, VisitType};
 
 /**
@@ -30,7 +31,7 @@ function makeSchedule(array $ctx, array $overrides = []): Schedule
         'date_time'          => now()->addDay(),
         'cellphone'          => '11999990000',
         'cellphone_whatsapp' => false,
-        'situation'          => 0,
+        'situation'          => ScheduleSituation::Scheduled->value,
         'active'             => true,
     ], $overrides));
 }

@@ -10,7 +10,7 @@ use App\Models\{Patient, PatientExam};
 use App\Services\Api\PatientExamService;
 use App\Services\FeatureGateService;
 use Illuminate\Http\{JsonResponse};
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class PatientExamsController extends Controller
@@ -34,17 +34,16 @@ class PatientExamsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(string $patientId)
+    public function index(string $patientIdOrCode)
     {
         $integrator = request()->attributes->get('integrator');
 
-        Patient::where('id', $patientId)
-            ->where('entity_id', $integrator->user->entity_id)
-            ->firstOrFail();
+        $patient = $this->resolvePatient($patientIdOrCode, $integrator->user->entity_id);
+
         $patientExams = $this->model->query()
             ->with('patient', 'doctor', 'schedule', 'patient.person', 'doctor.person')
-            ->whereHas('patient', function ($query) use ($integrator, $patientId) {
-                $query->where('id', $patientId)
+            ->whereHas('patient', function ($query) use ($integrator, $patient) {
+                $query->where('id', $patient->id)
                     ->where('entity_id', $integrator->user->entity_id);
             });
 
@@ -82,7 +81,10 @@ class PatientExamsController extends Controller
      */
     public function store(PatientExamRequest $request, string $patientId): PatientExamResource|JsonResponse
     {
-        $entityId = request()->attributes->get('integrator')->user->entity_id;
+        abort_unless(Str::isUuid($patientId), 404);
+
+        $integrator = request()->attributes->get('integrator');
+        $entityId   = $integrator->user->entity_id;
 
         $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
@@ -96,9 +98,13 @@ class PatientExamsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $patientId, string $idOrCode): PatientExamResource|JsonResponse
+    public function show(string $patientIdOrCode, string $idOrCode): PatientExamResource|JsonResponse
     {
-        $record = $this->service->findByIdOrCode($patientId, $idOrCode);
+        $entityId = request()->attributes->get('integrator')->user->entity_id;
+
+        $patient = $this->resolvePatient($patientIdOrCode, $entityId);
+
+        $record = $this->service->findByIdOrCode($patient->id, $idOrCode);
 
         return new PatientExamResource($record);
     }
@@ -110,7 +116,10 @@ class PatientExamsController extends Controller
      */
     public function update(PatientExamRequest $request, string $patientId, string $idOrCode): PatientExamResource|JsonResponse
     {
-        $entityId = request()->attributes->get('integrator')->user->entity_id;
+        abort_unless(Str::isUuid($patientId), 404);
+
+        $integrator = request()->attributes->get('integrator');
+        $entityId   = $integrator->user->entity_id;
 
         $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
@@ -126,10 +135,27 @@ class PatientExamsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $patientId, string $idOrCode): JsonResponse
+    public function destroy(string $patientIdOrCode, string $idOrCode): JsonResponse
     {
-        $this->service->destroyByIdOrCode($patientId, $idOrCode);
+        $entityId = request()->attributes->get('integrator')->user->entity_id;
+
+        $patient = $this->resolvePatient($patientIdOrCode, $entityId);
+
+        $this->service->destroyByIdOrCode($patient->id, $idOrCode);
 
         return response()->json([], HttpResponse::HTTP_NO_CONTENT);
+    }
+
+    private function resolvePatient(string $idOrCode, string $entityId): Patient
+    {
+        $query = Patient::where('entity_id', $entityId);
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->firstOrFail();
     }
 }

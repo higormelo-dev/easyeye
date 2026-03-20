@@ -22,6 +22,7 @@ class EntityIntegratorEquipmentFactory extends Factory
             'name'          => fake()->words(2, true),
             'ip'            => fake()->unique()->ipv4(),
             'mac'           => fake()->unique()->macAddress(),
+            'serial_number' => fake()->unique()->bothify('SN-####-???'),
             'active'        => true,
         ];
     }

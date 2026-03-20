@@ -2,9 +2,8 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\{Doctor, ExamType, PatientExam, Schedule};
+use App\Models\{ExamType, PatientExam, Schedule};
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Str;
 
 class PatientExamRequest extends FormRequest
 {
@@ -54,38 +53,8 @@ class PatientExamRequest extends FormRequest
                     }
                 },
             ],
-            'doctor_identifier' => [
-                'nullable',
-                function ($attribute, $value, $fail) use ($entityId) {
-                    // Ignorar valores vazios, null, ou strings com apenas espaços/hífens
-                    if ($value === null || $value === '' || (is_string($value) && trim(trim($value), '-') === '')) {
-                        return;
-                    }
-
-                    // Verifica se é um UUID válido
-                    $isUuid = preg_match(
-                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
-                        $value
-                    );
-
-                    $query = Doctor::query()
-                        ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                        ->where('entity_users.entity_id', $entityId)
-                        ->whereNull('doctors.deleted_at')
-                        ->whereNull('entity_users.deleted_at')
-                        ->when($isUuid, function ($query) use ($value) {
-                            $query->where('doctors.id', $value);
-                        }, function ($query) use ($value) {
-                            $query->whereRaw('LOWER(doctors.code) = LOWER(?)', [$value]);
-                        });
-
-                    if (! $query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.doctor_identifier'));
-                    }
-                },
-            ],
             'schedule_identifier' => [
-                'nullable',
+                'required',
                 function ($attribute, $value, $fail) use ($entityId) {
                     // Ignorar valores vazios, null, ou strings com apenas espaços/hífens
                     if ($value === null || $value === '' || (is_string($value) && trim(trim($value), '-') === '')) {
@@ -114,7 +83,7 @@ class PatientExamRequest extends FormRequest
                 },
             ],
             'name' => [
-                'nullable',
+                'required',
                 'string',
                 'max:255',
                 'min:3',
@@ -124,92 +93,13 @@ class PatientExamRequest extends FormRequest
                         return;
                     }
 
-                    // Obter os valores dos identificadores
-                    $examIdentifier     = $this->input('exam_identifier');
-                    $doctorIdentifier   = $this->input('doctor_identifier');
-                    $scheduleIdentifier = $this->input('schedule_identifier');
-
-                    // Resolver exam_id a partir do exam_identifier
-                    $examId = null;
-                    if ($examIdentifier) {
-                        $isUuid    = Str::isUuid($examIdentifier);
-                        $examQuery = ExamType::query()
-                            ->where(function ($query) use ($entityId) {
-                                $query->where('entity_id', $entityId)
-                                    ->orWhereNull('entity_id');
-                            })
-                            ->whereNull('deleted_at');
-
-                        if ($isUuid) {
-                            $examQuery->where('id', $examIdentifier);
-                        } else {
-                            $examQuery->whereRaw('LOWER(code) = LOWER(?)', [$examIdentifier]);
-                        }
-
-                        $examId = $examQuery->value('id');
-                    }
-
-                    // Resolver doctor_id a partir do doctor_identifier
-                    $doctorId = null;
-                    if ($doctorIdentifier && trim(trim($doctorIdentifier), '-') !== '') {
-                        $isUuid      = Str::isUuid($doctorIdentifier);
-                        $doctorQuery = Doctor::query()
-                            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                            ->where('entity_users.entity_id', $entityId)
-                            ->whereNull('doctors.deleted_at')
-                            ->whereNull('entity_users.deleted_at');
-
-                        if ($isUuid) {
-                            $doctorQuery->where('doctors.id', $doctorIdentifier);
-                        } else {
-                            $doctorQuery->whereRaw('LOWER(doctors.code) = LOWER(?)', [$doctorIdentifier]);
-                        }
-
-                        $doctorId = $doctorQuery->value('doctors.id');
-                    }
-
-                    // Resolver schedule_id a partir do schedule_identifier
-                    $scheduleId = null;
-                    if ($scheduleIdentifier && trim(trim($scheduleIdentifier), '-') !== '') {
-                        $isUuid        = Str::isUuid($scheduleIdentifier);
-                        $scheduleQuery = Schedule::query()
-                            ->where('entity_id', $entityId)
-                            ->whereNull('deleted_at');
-
-                        if ($isUuid) {
-                            $scheduleQuery->where('id', $scheduleIdentifier);
-                        } else {
-                            $scheduleQuery->whereRaw('LOWER(code) = LOWER(?)', [$scheduleIdentifier]);
-                        }
-
-                        $scheduleId = $scheduleQuery->value('id');
-                    }
-
-                    // Verificar se já existe um registro com a mesma combinação
+                    // name é único por entidade — mesma lógica da service (busca só por name)
                     $existsQuery = PatientExam::query()
                         ->whereHas('patient', function ($query) use ($entityId) {
                             $query->where('entity_id', $entityId)
                                 ->whereNull('deleted_at');
                         })
                         ->whereRaw('LOWER(name) = LOWER(?)', [$value]);
-
-                    if ($examId) {
-                        $existsQuery->where('exam_id', $examId);
-                    } else {
-                        $existsQuery->whereNull('exam_id');
-                    }
-
-                    if ($doctorId) {
-                        $existsQuery->where('doctor_id', $doctorId);
-                    } else {
-                        $existsQuery->whereNull('doctor_id');
-                    }
-
-                    if ($scheduleId) {
-                        $existsQuery->where('schedule_id', $scheduleId);
-                    } else {
-                        $existsQuery->whereNull('schedule_id');
-                    }
 
                     // Se estiver atualizando, ignorar o registro atual
                     $patientExamId = $this->route('idOrCode');
@@ -255,7 +145,7 @@ class PatientExamRequest extends FormRequest
         }
 
         // Garantir que campos opcionais vazios sejam removidos do request
-        foreach (['doctor_identifier', 'schedule_identifier'] as $field) {
+        foreach (['schedule_identifier'] as $field) {
             if (! isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
                 unset($data[$field]);
             }

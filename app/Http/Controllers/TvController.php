@@ -6,6 +6,7 @@ use App\Enums\ScheduleSituation;
 use App\Models\{Entity, Schedule, TvDisplay};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class TvController extends Controller
 {
@@ -54,6 +55,8 @@ class TvController extends Controller
      */
     public function wait(string $id)
     {
+        abort_unless(Str::isUuid($id), 404);
+
         $tv = TvDisplay::where('id', $id)
             ->where('status', TvDisplay::STATUS_PENDING)
             ->firstOrFail();
@@ -66,6 +69,10 @@ class TvController extends Controller
      */
     public function pollStatus(string $id): JsonResponse
     {
+        if (! Str::isUuid($id)) {
+            return response()->json(['status' => 'not_found'], 404);
+        }
+
         $tv = TvDisplay::find($id);
 
         if (! $tv) {

@@ -55,7 +55,7 @@ class EntityIntegratorEquipment extends Model
         // Convert fields to uppercase before saving
         static::saving(static function (self $model) {
             foreach (self::UPPERCASE_FIELDS as $field) {
-                $value = $model->getRawOriginal($field) ?? $model->getAttribute($field);
+                $value = $model->getAttribute($field);
 
                 if (is_string($value)) {
                     $model->{$field} = mb_strtoupper($value, 'UTF-8');

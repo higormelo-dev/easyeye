@@ -1,27 +1,37 @@
-<x-guest-layout>
-    <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-        {{ __('This is a secure area of the application. Please confirm your password before continuing.') }}
-    </div>
+@extends('layouts.guest')
 
-    <form method="POST" action="{{ route('password.confirm') }}">
+@section('content')
+<div class="card-body">
+    <form method="POST" action="{{ route('password.confirm') }}" class="form-horizontal form-material">
         @csrf
 
-        <!-- Password -->
-        <div>
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        {{-- Header --}}
+        <div class="text-center mb-4">
+            <img src="{{ asset('system/images/logo-icon.png') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
+            <h4 class="font-medium mb-0">{{ __('Área Segura') }}</h4>
+            <p class="text-muted mb-0" style="font-size:.85rem">{{ __('Por favor, confirme sua senha antes de continuar.') }}</p>
         </div>
 
-        <div class="flex justify-end mt-4">
-            <x-primary-button>
-                {{ __('Confirm') }}
-            </x-primary-button>
+        {{-- Erro --}}
+        @error('password')
+            <div class="alert alert-danger mb-3" style="font-size:.85rem">{{ $message }}</div>
+        @enderror
+
+        {{-- Senha --}}
+        <div class="form-group mb-4">
+            <label class="form-label">{{ __('Senha') }} <span class="text-danger">*</span></label>
+            <input type="password" name="password"
+                   class="form-control @error('password') is-invalid @enderror"
+                   required autocomplete="current-password">
         </div>
+
+        {{-- Botão confirmar --}}
+        <div class="d-grid mb-3">
+            <button type="submit" class="btn btn-info btn-block waves-effect waves-light">
+                {{ __('Confirmar') }}
+            </button>
+        </div>
+
     </form>
-</x-guest-layout>
+</div>
+@endsection

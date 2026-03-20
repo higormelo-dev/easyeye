@@ -10,20 +10,22 @@ class CreateEntityAction
     public function execute(array $data): Entity
     {
         /*
-         * withoutObservers() suprime o EntityObserver::created() que criaria
-         * um trial automático. O StartTrialAction cuidará disso com o plano
-         * escolhido pelo usuário no wizard.
+         * skipAutoTrial suprime o EntityObserver::created() que criaria um trial
+         * automático. O StartTrialAction cuidará disso com o plano escolhido pelo usuário.
          */
-        return Entity::withoutObservers(function () use ($data) {
-            return Entity::create([
-                'name'                  => $data['company_name'],
-                'subdomain'             => $this->generateSubdomain($data['company_name']),
-                'national_registration' => $data['company_cnpj'] ?? null,
-                'email'                 => $data['email'],
-                'is_client'             => true,
-                'active'                => true,
-            ]);
-        });
+        $entity = new Entity([
+            'name'                  => $data['company_name'],
+            'subdomain'             => $this->generateSubdomain($data['company_name']),
+            'national_registration' => $data['company_cnpj'] ?? null,
+            'email'                 => $data['email'],
+            'is_client'             => true,
+            'active'                => true,
+        ]);
+
+        $entity->skipAutoTrial = true;
+        $entity->save();
+
+        return $entity;
     }
 
     private function generateSubdomain(string $companyName): string

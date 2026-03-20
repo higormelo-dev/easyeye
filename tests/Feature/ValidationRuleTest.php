@@ -8,25 +8,19 @@ use Tests\TestCase;
 
 class ValidationRuleTest extends TestCase
 {
-    public function test_exists_rule_closure_receives_something()
+    public function test_exists_rule_where_stores_closure_for_later_evaluation()
     {
         $rule = Rule::exists('skin_types', 'id');
-        
-        $receivedObject = null;
-        // In Laravel 11, Rule::exists() returns Exists object.
-        // If we call ->where() on it, does it call the closure immediately?
-        // Let's check how Exists::where is implemented in this version.
-        
-        try {
-            $rule->where(function ($query) use (&$receivedObject) {
-                $receivedObject = $query;
-                $query->orWhereNull('test');
-            });
-        } catch (\Throwable $e) {
-            echo "\nCaught: " . get_class($e) . ": " . $e->getMessage() . "\n";
-        }
 
-        $this->assertInstanceOf(\Illuminate\Validation\Rules\Exists::class, $receivedObject);
+        // In Laravel 11, Rule::exists()->where(callable) stores the closure
+        // for later evaluation during validation — it does NOT call the closure immediately.
+        // The return value is the Exists rule instance itself (for chaining).
+        $result = $rule->where(function ($query) {
+            $query->whereNull('entity_id');
+        });
+
+        // where() returns the Exists rule for chaining
+        $this->assertInstanceOf(\Illuminate\Validation\Rules\Exists::class, $result);
     }
 
     public function test_exists_rule_issue_reproduction()

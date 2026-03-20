@@ -19,7 +19,7 @@ class ExamTypeTest extends TestCase
             'active'   => true,
         ]);
 
-        $this->assertEquals('ETP-00001', $examType1->code);
+        $this->assertEquals('ETP-0000000001', $examType1->code);
 
         $examType2 = ExamType::create([
             'name'     => 'Exam 2',
@@ -27,7 +27,7 @@ class ExamTypeTest extends TestCase
             'active'   => true,
         ]);
 
-        $this->assertEquals('ETP-00002', $examType2->code);
+        $this->assertEquals('ETP-0000000002', $examType2->code);
     }
 
     public function test_it_does_not_overwrite_existing_code(): void
@@ -45,7 +45,7 @@ class ExamTypeTest extends TestCase
     public function test_it_increments_from_last_etp_code(): void
     {
         ExamType::create([
-            'code'     => 'ETP-00010',
+            'code'     => 'ETP-0000000010',
             'name'     => 'Exam 10',
             'category' => 1,
             'active'   => true,
@@ -57,7 +57,7 @@ class ExamTypeTest extends TestCase
             'active'   => true,
         ]);
 
-        $this->assertEquals('ETP-00011', $nextExamType->code);
+        $this->assertEquals('ETP-0000000011', $nextExamType->code);
     }
 
     public function test_it_casts_category_to_enum(): void

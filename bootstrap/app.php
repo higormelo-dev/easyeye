@@ -14,12 +14,13 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     ParseMultipartFormData,
     SetLocale};
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
-use Symfony\Component\HttpKernel\Exception\{MethodNotAllowedHttpException, NotFoundHttpException};
+use Symfony\Component\HttpKernel\Exception\{HttpException, MethodNotAllowedHttpException, NotFoundHttpException};
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -51,6 +52,10 @@ return Application::configure(basePath: dirname(__DIR__))
             CheckJsonResponse::class,
             ParseMultipartFormData::class,
         ]);
+
+        // Garante que token.precheck rode ANTES de auth:sanctum,
+        // que tem prioridade via AuthenticatesRequests.
+        $middleware->prependToPriorityList(AuthenticatesRequests::class, ApiTokenPreCheck::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (AuthenticationException $e, $request) {
@@ -88,6 +93,14 @@ return Application::configure(basePath: dirname(__DIR__))
                 return response()->json([
                     'message' => __('http-statuses.405'),
                 ], HttpResponse::HTTP_METHOD_NOT_ALLOWED);
+            }
+        });
+
+        $exceptions->render(function (HttpException $e, $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error',
+                ], $e->getStatusCode());
             }
         });
 

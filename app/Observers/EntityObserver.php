@@ -17,7 +17,7 @@ class EntityObserver
      */
     public function created(Entity $entity): void
     {
-        if (! $entity->is_client) {
+        if (! $entity->is_client || $entity->skipAutoTrial) {
             return;
         }
 

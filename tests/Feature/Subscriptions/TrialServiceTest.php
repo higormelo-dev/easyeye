@@ -38,7 +38,7 @@ test('trial dura o número de dias configurado', function () {
     $entity = Entity::factory()->create(['is_client' => true]);
     $sub    = Subscription::forEntity($entity->id)->first();
 
-    expect($sub->trial_ends_at->diffInDays(now()))->toBeBetween(13, 14);
+    expect(now()->diffInDays($sub->trial_ends_at))->toBeBetween(13, 14);
 });
 
 test('trial manual pode ser iniciado pelo admin', function () {
@@ -49,7 +49,7 @@ test('trial manual pode ser iniciado pelo admin', function () {
     $sub = $service->startManualTrial($entity, $this->plan, 30);
 
     expect($sub->status)->toBe(SubscriptionStatus::Trial);
-    expect($sub->trial_ends_at->diffInDays(now()))->toBeBetween(29, 30);
+    expect(now()->diffInDays($sub->trial_ends_at))->toBeBetween(29, 30);
 });
 
 test('trials vencidos são expirados pelo scheduler', function () {

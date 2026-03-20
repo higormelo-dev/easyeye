@@ -3,7 +3,7 @@
 use App\Models\User;
 
 test('login screen can be rendered', function () {
-    $response = $this->get('/login');
+    $response = $this->withoutVite()->get('/login');
 
     $response->assertStatus(200);
 });

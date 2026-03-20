@@ -43,8 +43,10 @@ class EntityIntegratorEquipmentService
 
     public function destroyById(string $id): bool
     {
+        $integrator = request()->attributes->get('integrator');
+
         return EntityIntegratorEquipment::withTrashed()
-            ->where('integrator_id', request()->user()->id)
+            ->where('integrator_id', $integrator->id)
             ->findOrFail($id)
             ->delete();
     }

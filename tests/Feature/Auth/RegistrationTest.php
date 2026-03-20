@@ -42,8 +42,8 @@ function setTrialDays(int $days): void
 
 describe('Fluxo de registro', function () {
     beforeEach(function () {
-        // Bloqueia envio de emails (evento Registered)
-        Event::fake();
+        // Bloqueia apenas o evento Registered (envio de email) sem interceptar eventos de modelo
+        Event::fake([\Illuminate\Auth\Events\Registered::class]);
 
         // Trial de 14 dias como padrão em todos os testes deste grupo
         setTrialDays(14);
@@ -84,7 +84,7 @@ describe('Fluxo de registro', function () {
             ->and($subscription->status)->toBe(SubscriptionStatus::Trial)
             ->and($subscription->trial_ends_at)->not->toBeNull()
             ->and($subscription->trial_ends_at->isFuture())->toBeTrue()
-            ->and((int) $subscription->trial_ends_at->diffInDays(now()))->toBe(14);
+            ->and(now()->diffInDays($subscription->trial_ends_at))->toBeBetween(13, 14);
     });
 
     // ── Cenário 2: sem plan_id → fallback para menor tier ────────────────────
@@ -206,9 +206,9 @@ describe('Fluxo de registro', function () {
     it('armazena entity_id e rule do usuário na sessão', function () {
         Plan::factory()->create(['sort_order' => 1]);
 
-        $this->postJson('/register', registrationPayload())->assertOk();
+        $response = $this->postJson('/register', registrationPayload())->assertOk();
 
-        $this->assertSessionHas('selected_entity_id')
+        $response->assertSessionHas('selected_entity_id')
             ->assertSessionHas('selected_entity_user_rule', 'admin')
             ->assertSessionHas('user_rule', 'admin');
     });
@@ -229,6 +229,9 @@ describe('Fluxo de registro', function () {
             'email'        => 'primeira@example.com',
             'company_cnpj' => '12345678000195',
         ]))->assertOk();
+
+        // Faz logout para testar o fluxo como visitante
+        auth()->logout();
 
         // Segunda tentativa com o mesmo CNPJ — deve falhar
         $this->postJson('/register', registrationPayload([

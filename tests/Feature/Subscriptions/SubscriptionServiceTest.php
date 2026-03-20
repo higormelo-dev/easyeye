@@ -25,13 +25,13 @@ test('ativa assinatura mensal corretamente', function () {
 
     expect($sub->status)->toBe(SubscriptionStatus::Active);
     expect($sub->ends_at)->not->toBeNull();
-    expect($sub->ends_at->diffInDays(now()))->toBeBetween(28, 31);
+    expect(now()->diffInDays($sub->ends_at))->toBeBetween(28, 31);
 });
 
 test('ativa assinatura anual corretamente', function () {
     $sub = $this->service->activate($this->entity, $this->plan, BillingCycle::Yearly);
 
-    expect($sub->ends_at->diffInDays(now()))->toBeBetween(364, 366);
+    expect(now()->diffInDays($sub->ends_at))->toBeBetween(364, 366);
 });
 
 test('assinatura lifetime tem ends_at nulo', function () {

@@ -7,7 +7,8 @@ test('profile page is displayed', function () {
 
     $response = $this
         ->actingAs($user)
-        ->get('/profile');
+        ->withoutVite()
+        ->get('/panel/profile');
 
     $response->assertOk();
 });
@@ -17,18 +18,19 @@ test('profile information can be updated', function () {
 
     $response = $this
         ->actingAs($user)
-        ->patch('/profile', [
+        ->patch('/panel/profile', [
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect('/profile');
+        ->assertRedirect('/panel/profile');
 
     $user->refresh();
 
-    $this->assertSame('Test User', $user->name);
+    // User::name is uppercased via Attribute cast
+    $this->assertSame('TEST USER', $user->name);
     $this->assertSame('test@example.com', $user->email);
     $this->assertNull($user->email_verified_at);
 });
@@ -38,14 +40,14 @@ test('email verification status is unchanged when the email address is unchanged
 
     $response = $this
         ->actingAs($user)
-        ->patch('/profile', [
+        ->patch('/panel/profile', [
             'name' => 'Test User',
             'email' => $user->email,
         ]);
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect('/profile');
+        ->assertRedirect('/panel/profile');
 
     $this->assertNotNull($user->refresh()->email_verified_at);
 });
@@ -55,7 +57,7 @@ test('user can delete their account', function () {
 
     $response = $this
         ->actingAs($user)
-        ->delete('/profile', [
+        ->delete('/panel/profile', [
             'password' => 'password',
         ]);
 
@@ -64,7 +66,8 @@ test('user can delete their account', function () {
         ->assertRedirect('/');
 
     $this->assertGuest();
-    $this->assertNull($user->fresh());
+    // User uses SoftDeletes — assertSoftDeleted is the correct assertion
+    $this->assertSoftDeleted($user);
 });
 
 test('correct password must be provided to delete account', function () {
@@ -72,14 +75,14 @@ test('correct password must be provided to delete account', function () {
 
     $response = $this
         ->actingAs($user)
-        ->from('/profile')
-        ->delete('/profile', [
+        ->from('/panel/profile')
+        ->delete('/panel/profile', [
             'password' => 'wrong-password',
         ]);
 
     $response
         ->assertSessionHasErrorsIn('userDeletion', 'password')
-        ->assertRedirect('/profile');
+        ->assertRedirect('/panel/profile');
 
     $this->assertNotNull($user->fresh());
 });

@@ -35,9 +35,10 @@ class EntityIntegratorEquipmentsController extends Controller
         $equipments = $this->model->query()->where('integrator_id', $integrator->id);
 
         if (request()->has('search')) {
-            $equipments = $equipments->where(function ($query) {
-                $query->where('name', 'like', '%' . request()->search . '%')
-                    ->orWhere('code', 'like', '%' . request()->search . '%');
+            $search     = mb_strtoupper(request()->search, 'UTF-8');
+            $equipments = $equipments->where(function ($query) use ($search) {
+                $query->where('name', 'like', '%' . $search . '%')
+                    ->orWhere('code', 'like', '%' . $search . '%');
             });
         }
 
