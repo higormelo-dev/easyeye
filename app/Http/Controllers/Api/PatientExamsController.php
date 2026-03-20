@@ -86,6 +86,11 @@ class PatientExamsController extends Controller
         $integrator = request()->attributes->get('integrator');
         $entityId   = $integrator->user->entity_id;
 
+        abort_unless(
+            Patient::where('id', $patientId)->where('entity_id', $entityId)->exists(),
+            404
+        );
+
         $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
         $record = $this->service->create($request, $patientId);
@@ -120,6 +125,11 @@ class PatientExamsController extends Controller
 
         $integrator = request()->attributes->get('integrator');
         $entityId   = $integrator->user->entity_id;
+
+        abort_unless(
+            Patient::where('id', $patientId)->where('entity_id', $entityId)->exists(),
+            404
+        );
 
         $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 

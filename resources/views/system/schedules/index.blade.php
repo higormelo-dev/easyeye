@@ -234,6 +234,34 @@
 
 @section('javascript')
     @vite(['resources/js/system/schedules.js'])
+    <script>
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.copy-btn');
+        if (!btn) return;
+
+        var text = btn.dataset.copy;
+        var icon = btn.querySelector('i');
+
+        function showCheck() {
+            icon.classList.replace('fa-copy', 'fa-check');
+            setTimeout(function () { icon.classList.replace('fa-check', 'fa-copy'); }, 1500);
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(showCheck);
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.cssText = 'position:fixed;opacity:0';
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showCheck();
+        }
+    });
+    </script>
 @endsection
 
 @push('styles')

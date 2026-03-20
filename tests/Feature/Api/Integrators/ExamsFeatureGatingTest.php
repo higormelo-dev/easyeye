@@ -11,16 +11,17 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
     });
 
     it('permite envio quando limite não está configurado no plano (ilimitado)', function () {
-        // HasApiIntegrator ativo, sem ApiMonthlyExamSends definido → ilimitado
         $ctx      = setupIntegrator([FeatureKey::HasApiIntegrator->value => '1']);
         $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
+        $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
         $this->postJson('/api/integrators/v1/exams', [
-            'patient_identifier' => $patient->id,
-            'exam_identifier'    => $examType->code,
-            'archive'            => UploadedFile::fake()->image('exam.jpg'),
-        ], $ctx['headers'])->assertOk();
+            'exam_identifier'     => $examType->code,
+            'schedule_identifier' => $schedCtx['schedule']->code,
+            'archive'             => UploadedFile::fake()->image('exam.jpg'),
+            'name'                => 'Exame Ilimitado',
+        ], $ctx['headers'])->assertCreated();
     });
 
     it('permite envio quando limite está em 0 (ilimitado)', function () {
@@ -30,12 +31,14 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
         ]);
         $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
+        $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
         $this->postJson('/api/integrators/v1/exams', [
-            'patient_identifier' => $patient->id,
-            'exam_identifier'    => $examType->code,
-            'archive'            => UploadedFile::fake()->image('exam.jpg'),
-        ], $ctx['headers'])->assertOk();
+            'exam_identifier'     => $examType->code,
+            'schedule_identifier' => $schedCtx['schedule']->code,
+            'archive'             => UploadedFile::fake()->image('exam.jpg'),
+            'name'                => 'Exame Zero Limite',
+        ], $ctx['headers'])->assertCreated();
     });
 
     it('bloqueia com 403 ao atingir o limite mensal de envios', function () {
@@ -45,19 +48,20 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
         ]);
         $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
+        $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
         $payload = fn (string $name) => [
-            'patient_identifier' => $patient->id,
-            'exam_identifier'    => $examType->code,
-            'archive'            => UploadedFile::fake()->image("{$name}.jpg"),
-            'name'               => $name,
+            'exam_identifier'     => $examType->code,
+            'schedule_identifier' => $schedCtx['schedule']->code,
+            'archive'             => UploadedFile::fake()->image("{$name}.jpg"),
+            'name'                => $name,
         ];
 
         // 1º envio → OK
-        $this->postJson('/api/integrators/v1/exams', $payload('Exame 1'), $ctx['headers'])->assertOk();
+        $this->postJson('/api/integrators/v1/exams', $payload('Exame 1'), $ctx['headers'])->assertCreated();
 
         // 2º envio → OK (dentro do limite)
-        $this->postJson('/api/integrators/v1/exams', $payload('Exame 2'), $ctx['headers'])->assertOk();
+        $this->postJson('/api/integrators/v1/exams', $payload('Exame 2'), $ctx['headers'])->assertCreated();
 
         // 3º envio → 403 (limite esgotado)
         $this->postJson('/api/integrators/v1/exams', $payload('Exame 3'), $ctx['headers'])
@@ -72,14 +76,15 @@ describe('POST /api/integrators/v1/exams — feature gating ApiMonthlyExamSends'
         ]);
         $patient  = Patient::factory()->create(['entity_id' => $ctx['entity']->id]);
         $examType = ExamType::factory()->create(['entity_id' => null]);
+        $schedCtx = createScheduleForEntity($ctx['entity'], ['patient_id' => $patient->id]);
 
         foreach (range(1, 3) as $i) {
             $this->postJson('/api/integrators/v1/exams', [
-                'patient_identifier' => $patient->id,
-                'exam_identifier'    => $examType->code,
-                'archive'            => UploadedFile::fake()->image("exam{$i}.jpg"),
-                'name'               => "Exame {$i}",
-            ], $ctx['headers'])->assertOk();
+                'exam_identifier'     => $examType->code,
+                'schedule_identifier' => $schedCtx['schedule']->code,
+                'archive'             => UploadedFile::fake()->image("exam{$i}.jpg"),
+                'name'                => "Exame {$i}",
+            ], $ctx['headers'])->assertCreated();
         }
 
         $gate   = app(\App\Services\FeatureGateService::class);

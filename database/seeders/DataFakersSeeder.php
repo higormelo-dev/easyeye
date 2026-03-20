@@ -282,8 +282,8 @@ class DataFakersSeeder extends Seeder
                 Doctor::create([
                     'entity_user_id'   => $entityUserDoctor->id,
                     'person_id'        => $person->id,
-                    'record'           => fake()->unique()->numerify('CRM-######'),
-                    'record_specialty' => fake()->optional(0.7)->numerify('RQE-#####'),
+                    'record'           => fake()->unique()->numerify('######'),
+                    'record_specialty' => fake()->optional(0.7)->numerify('#####'),
                     'color'            => fake()->hexColor(),
                     'partner'          => fake()->boolean(20),
                     'active'           => fake()->boolean(90),

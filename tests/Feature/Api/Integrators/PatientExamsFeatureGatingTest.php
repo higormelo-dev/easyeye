@@ -16,6 +16,9 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
         ]);
         $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
+
+        $schedCtx       = createScheduleForEntity($this->ctx['entity']);
+        $this->schedule = $schedCtx['schedule'];
     });
 
     it('store bloqueia com 403 ao atingir o limite', function () {
@@ -27,8 +30,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('exam.jpg'),
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Bloqueado',
             ],
             $this->ctx['headers']
         )->assertForbidden()->assertJsonStructure(['message', 'feature']);
@@ -39,9 +44,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
             $this->postJson(
                 "/api/integrators/v1/patients/{$this->patient->id}/exams",
                 [
-                    'exam_identifier' => $this->examType->code,
-                    'archive'         => UploadedFile::fake()->image("e{$i}.jpg"),
-                    'name'            => "Exame Store {$i}",
+                    'exam_identifier'     => $this->examType->code,
+                    'schedule_identifier' => $this->schedule->code,
+                    'archive'             => UploadedFile::fake()->image("e{$i}.jpg"),
+                    'name'                => "Exame Store {$i}",
                 ],
                 $this->ctx['headers']
             )->assertCreated();
@@ -56,6 +62,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
     it('update bloqueia com 403 ao atingir o limite', function () {
         $exam = PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
+            'name'       => 'Exame Para Atualizar',
             'archive'    => 'path/old.jpg',
         ]);
 
@@ -66,8 +73,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
         $this->patchJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$exam->id}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('new.jpg'),
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('new.jpg'),
+                'name'                => 'Exame Para Atualizar',
             ],
             $this->ctx['headers']
         )->assertForbidden();
@@ -76,15 +85,17 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
     it('update incrementa o contador após atualização bem-sucedida', function () {
         $exam = PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
+            'name'       => 'Exame Original',
             'archive'    => 'path/old.jpg',
         ]);
 
         $this->patchJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$exam->id}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('updated.jpg'),
-                'name'            => 'Exame Atualizado',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Exame Atualizado',
             ],
             $this->ctx['headers']
         )->assertOk();
@@ -100,9 +111,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('e1.jpg'),
-                'name'            => 'Exame Compartilhado',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('e1.jpg'),
+                'name'                => 'Exame Compartilhado',
             ],
             $this->ctx['headers']
         )->assertCreated();
@@ -113,8 +125,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
         $this->patchJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$exam->id}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('e1_v2.jpg'),
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('e1_v2.jpg'),
+                'name'                => 'Exame Compartilhado',
             ],
             $this->ctx['headers']
         )->assertOk();
@@ -123,9 +137,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('e2.jpg'),
-                'name'            => 'Exame 3',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('e2.jpg'),
+                'name'                => 'Exame 3',
             ],
             $this->ctx['headers']
         )->assertCreated();
@@ -134,9 +149,10 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('e3.jpg'),
-                'name'            => 'Exame 4',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('e3.jpg'),
+                'name'                => 'Exame 4',
             ],
             $this->ctx['headers']
         )->assertForbidden();

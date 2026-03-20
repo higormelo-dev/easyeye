@@ -102,9 +102,18 @@ class PatientExamRequest extends FormRequest
                         ->whereRaw('LOWER(name) = LOWER(?)', [$value]);
 
                     // Se estiver atualizando, ignorar o registro atual
-                    $patientExamId = $this->route('idOrCode');
-                    if ($patientExamId) {
-                        $existsQuery->where('id', '!=', $patientExamId);
+                    // O parâmetro de rota é {exam} (apiResource e rota POST customizada)
+                    $examParam = $this->route('exam');
+                    if ($examParam) {
+                        $isUuidParam = (bool) preg_match(
+                            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                            (string) $examParam
+                        );
+                        if ($isUuidParam) {
+                            $existsQuery->where('id', '!=', $examParam);
+                        } else {
+                            $existsQuery->where('code', '!=', $examParam);
+                        }
                     }
 
                     if ($existsQuery->exists()) {

@@ -4,14 +4,30 @@
             <tbody>
                 <tr>
                     <th width="30%">{{ __('actions.code') }}</th>
-                    <td>{{ $schedule->code }}</td>
+                    <td>
+                        {{ $schedule->code }}
+                        <button type="button"
+                                class="btn btn-link btn-sm p-0 ms-1 text-muted copy-btn"
+                                data-copy="{{ $schedule->code }}"
+                                title="Copiar código">
+                            <i class="fas fa-copy fa-xs"></i>
+                        </button>
+                    </td>
                 </tr>
                 <tr>
                     <th>{{ __('actions.patient') }}</th>
                     <td>
                         @if($schedule->patient_id && $schedule->patient)
                             {{ $schedule->patient->person->full_name }}
-                            <small class="text-muted">({{ $schedule->patient->present()->getCode }})</small>
+                            <small class="text-muted">
+                                ({{ $schedule->patient->present()->getCode }})
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 ms-1 text-muted copy-btn"
+                                        data-copy="{{ $schedule->patient->present()->getCode }}"
+                                        title="Copiar código do paciente">
+                                    <i class="fas fa-copy fa-xs"></i>
+                                </button>
+                            </small>
                         @else
                             {{ $schedule->full_name }}
                         @endif
@@ -22,7 +38,15 @@
                     <td>
                         @if($schedule->doctor)
                             {{ $schedule->doctor->entityUser->user->name }}
-                            <small class="text-muted">{{ $schedule->doctor->code }}</small>
+                            <small class="text-muted">
+                                ({{ $schedule->doctor->code }})
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 ms-1 text-muted copy-btn"
+                                        data-copy="{{ $schedule->doctor->code }}"
+                                        title="Copiar código do médico">
+                                    <i class="fas fa-copy fa-xs"></i>
+                                </button>
+                            </small>
                             @if($schedule->doctor->record)
                                 <br>
                                 CRM {{ $schedule->doctor->record }}
@@ -83,3 +107,4 @@
         </table>
     </div>
 </fieldset>
+

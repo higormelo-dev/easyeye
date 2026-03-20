@@ -4,6 +4,9 @@ use App\Models\{ExamType, Patient, PatientExam};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
+// ---------------------------------------------------------------------------
+// GET /api/integrators/v1/patients/{patient}/exams
+// ---------------------------------------------------------------------------
 describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
     beforeEach(function () {
         $this->ctx     = setupIntegrator();
@@ -22,6 +25,16 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
         PatientExam::factory(2)->create(['patient_id' => $this->patient->id]);
 
         $this->getJson("/api/integrators/v1/patients/{$this->patient->code}/exams", $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2);
+    });
+
+    it('does not return exams from other patients in the same entity', function () {
+        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        PatientExam::factory(2)->create(['patient_id' => $this->patient->id]);
+        PatientExam::factory(3)->create(['patient_id' => $otherPatient->id]);
+
+        $this->getJson("/api/integrators/v1/patients/{$this->patient->id}/exams", $this->ctx['headers'])
             ->assertOk()
             ->assertJsonPath('meta.total', 2);
     });
@@ -57,8 +70,6 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
     it('returns 404 when patient code belongs to another entity', function () {
         $other = setupIntegrator();
-        // Cria 2 pacientes no outro contexto; o segundo terá PAC-0000000002,
-        // código que não existe no contexto atual (que só tem PAC-0000000001).
         Patient::factory()->create(['entity_id' => $other['entity']->id]);
         $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
 
@@ -72,89 +83,192 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
     });
 });
 
+// ---------------------------------------------------------------------------
+// POST /api/integrators/v1/patients/{patient}/exams
+// ---------------------------------------------------------------------------
 describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
     beforeEach(function () {
         Storage::fake('s3');
 
         $this->ctx      = setupIntegrator();
         $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
-        $this->examType = ExamType::factory()->create(['entity_id' => null]); // global
+        $this->examType = ExamType::factory()->create(['entity_id' => null]);
+
+        $schedCtx       = createScheduleForEntity($this->ctx['entity']);
+        $this->schedule = $schedCtx['schedule'];
+        $this->doctor   = $schedCtx['doctor'];
     });
 
-    it('creates a patient exam using patient UUID', function () {
-        $file = UploadedFile::fake()->image('exam.jpg');
-
+    it('creates a patient exam and returns 201', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => $file,
-                'name'            => 'Exame Fundoscopia 01',
+                'exam_identifier'      => $this->examType->code,
+                'schedule_identifier'  => $this->schedule->code,
+                'archive'              => UploadedFile::fake()->image('exam.jpg'),
+                'name'                 => 'Exame Fundoscopia 01',
             ],
             $this->ctx['headers']
         )->assertCreated()
             ->assertJsonFragment(['name' => 'Exame Fundoscopia 01']);
 
-        Storage::disk('s3')->assertExists(
-            PatientExam::where('name', 'Exame Fundoscopia 01')->first()->archive
-        );
-    });
-
-    it('creates a patient exam using patient code', function () {
-        $file = UploadedFile::fake()->image('exam.jpg');
-
-        $this->postJson(
-            "/api/integrators/v1/patients/{$this->patient->code}/exams",
-            [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => $file,
-                'name'            => 'Exame Via Código',
-            ],
-            $this->ctx['headers']
-        )->assertCreated()
-            ->assertJsonFragment(['name' => 'Exame Via Código']);
-
-        $exam = PatientExam::where('name', 'Exame Via Código')->first();
+        $exam = PatientExam::where('name', 'Exame Fundoscopia 01')->first();
+        expect($exam)->not->toBeNull();
         expect($exam->patient_id)->toBe($this->patient->id);
         Storage::disk('s3')->assertExists($exam->archive);
     });
 
-    it('creates exam using exam_identifier as UUID', function () {
+    it('resolves doctor_id from schedule', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier' => $this->examType->id,
-                'archive'         => UploadedFile::fake()->image('exam.jpg'),
-                'name'            => 'Exame Por UUID',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->id,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Com Médico',
+            ],
+            $this->ctx['headers']
+        )->assertCreated();
+
+        $exam = PatientExam::where('name', 'Exame Com Médico')->first();
+        expect($exam->doctor_id)->toBe($this->doctor->id);
+        expect($exam->schedule_id)->toBe($this->schedule->id);
+    });
+
+    it('accepts exam_identifier as UUID', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->id,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Por UUID',
             ],
             $this->ctx['headers']
         )->assertCreated()
             ->assertJsonFragment(['name' => 'Exame Por UUID']);
     });
 
-    it('returns 404 when patient code belongs to another entity', function () {
-        $other = setupIntegrator();
-        Patient::factory()->create(['entity_id' => $other['entity']->id]);
-        $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
-
+    it('returns 404 when patient is identified by code (UUID required)', function () {
         $this->postJson(
-            "/api/integrators/v1/patients/{$foreignPatient->code}/exams",
+            "/api/integrators/v1/patients/{$this->patient->code}/exams",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('exam.jpg'),
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Via Código',
             ],
             $this->ctx['headers']
         )->assertNotFound();
     });
 
-    it('returns 422 when exam_identifier does not exist', function () {
-        $file = UploadedFile::fake()->image('exam.jpg');
+    it('returns 404 for patient UUID from another entity', function () {
+        $other   = setupIntegrator();
+        $patient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Outra Entidade',
+            ],
+            $this->ctx['headers']
+        )->assertNotFound();
+    });
+
+    it('returns 422 when name already exists in the entity', function () {
+        PatientExam::factory()->create([
+            'patient_id' => $this->patient->id,
+            'name'       => 'Exame Repetido',
+            'archive'    => 'old/path/exam.jpg',
+        ]);
 
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier' => 'CODIGO-INEXISTENTE',
-                'archive'         => $file,
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Repetido',
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
+    it('allows same name in different entities', function () {
+        $other        = setupIntegrator();
+        $otherPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+
+        PatientExam::factory()->create([
+            'patient_id' => $otherPatient->id,
+            'name'       => 'Exame Único',
+            'archive'    => 'other/exam.jpg',
+        ]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Único',
+            ],
+            $this->ctx['headers']
+        )->assertCreated();
+    });
+
+    it('returns 422 when exam_identifier does not exist', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => 'CODIGO-INEXISTENTE',
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Inválido',
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
+    it('returns 422 when schedule_identifier does not exist', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => 'SDL-INEXISTENTE',
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Sem Schedule',
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
+    it('returns 422 when schedule_identifier belongs to another entity', function () {
+        $other         = setupIntegrator();
+        $otherSchedCtx = createScheduleForEntity($other['entity']);
+
+        // Usa UUID (globalmente único) para evitar colisão de códigos entre entities
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $otherSchedCtx['schedule']->id,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Schedule Errado',
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
+    it('returns 422 when name is missing', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
             ],
             $this->ctx['headers']
         )->assertUnprocessable();
@@ -163,7 +277,11 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
     it('returns 422 when archive is missing', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
-            ['exam_identifier' => $this->examType->code],
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'name'                => 'Exame Sem Arquivo',
+            ],
             $this->ctx['headers']
         )->assertUnprocessable();
     });
@@ -171,12 +289,36 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
     it('returns 422 when exam_identifier is missing', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
-            ['archive' => UploadedFile::fake()->image('exam.jpg')],
+            [
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Sem Tipo',
+            ],
             $this->ctx['headers']
         )->assertUnprocessable();
     });
+
+    it('returns 422 when schedule_identifier is missing', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier' => $this->examType->code,
+                'archive'         => UploadedFile::fake()->image('exam.jpg'),
+                'name'            => 'Exame Sem Schedule',
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
+    it('returns 401 without authentication', function () {
+        $this->postJson("/api/integrators/v1/patients/{$this->patient->id}/exams", [])
+            ->assertUnauthorized();
+    });
 });
 
+// ---------------------------------------------------------------------------
+// GET /api/integrators/v1/patients/{patient}/exams/{exam}
+// ---------------------------------------------------------------------------
 describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () {
     beforeEach(function () {
         $this->ctx     = setupIntegrator();
@@ -223,6 +365,16 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
         )->assertNotFound();
     });
 
+    it('returns 404 when exam belongs to another patient', function () {
+        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherExam    = PatientExam::factory()->create(['patient_id' => $otherPatient->id]);
+
+        $this->getJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$otherExam->id}",
+            $this->ctx['headers']
+        )->assertNotFound();
+    });
+
     it('returns 404 when patient code belongs to another entity', function () {
         $other = setupIntegrator();
         Patient::factory()->create(['entity_id' => $other['entity']->id]);
@@ -235,7 +387,10 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
     });
 });
 
-describe('PUT /api/integrators/v1/patients/{patient}/exams/{exam}', function () {
+// ---------------------------------------------------------------------------
+// POST /api/integrators/v1/patients/{patient}/exams/{exam}  (update)
+// ---------------------------------------------------------------------------
+describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', function () {
     beforeEach(function () {
         Storage::fake('s3');
 
@@ -244,47 +399,56 @@ describe('PUT /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
         $this->examType = ExamType::factory()->create(['entity_id' => null]);
         $this->exam     = PatientExam::factory()->create([
             'patient_id' => $this->patient->id,
+            'name'       => 'Exame Original',
             'archive'    => 'old/path/exam.jpg',
         ]);
+
+        $schedCtx       = createScheduleForEntity($this->ctx['entity']);
+        $this->schedule = $schedCtx['schedule'];
+        $this->doctor   = $schedCtx['doctor'];
     });
 
     it('updates exam using patient UUID and exam UUID', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('updated.jpg'),
-                'name'            => 'Exame Atualizado',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Exame Atualizado',
             ],
             $this->ctx['headers']
         )->assertOk()
             ->assertJsonFragment(['name' => 'Exame Atualizado']);
     });
 
-    it('updates exam using patient code and exam UUID', function () {
+    it('updates exam using patient UUID and exam code', function () {
         $this->postJson(
-            "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->id}",
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->code}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('updated.jpg'),
-                'name'            => 'Atualizado Via Código',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Atualizado UUID+Código',
             ],
             $this->ctx['headers']
         )->assertOk()
-            ->assertJsonFragment(['name' => 'Atualizado Via Código']);
+            ->assertJsonFragment(['name' => 'Atualizado UUID+Código']);
     });
 
-    it('updates exam using patient code and exam code', function () {
+    it('resolves doctor_id from schedule on update', function () {
         $this->postJson(
-            "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->code}",
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('updated.jpg'),
-                'name'            => 'Atualizado Código+Código',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->id,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Exame Médico Atualizado',
             ],
             $this->ctx['headers']
-        )->assertOk()
-            ->assertJsonFragment(['name' => 'Atualizado Código+Código']);
+        )->assertOk();
+
+        expect(PatientExam::find($this->exam->id)->doctor_id)->toBe($this->doctor->id);
     });
 
     it('replaces old archive on S3 when updating', function () {
@@ -293,34 +457,84 @@ describe('PUT /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('new.jpg'),
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('new.jpg'),
+                'name'                => 'Exame Original',
             ],
             $this->ctx['headers']
         )->assertOk();
 
         Storage::disk('s3')->assertMissing('old/path/exam.jpg');
-        Storage::disk('s3')->assertExists(
-            PatientExam::find($this->exam->id)->archive
-        );
+        Storage::disk('s3')->assertExists(PatientExam::find($this->exam->id)->archive);
     });
 
-    it('returns 404 when patient code belongs to another entity', function () {
+    it('returns 404 when patient is identified by code (UUID required)', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Via Código',
+            ],
+            $this->ctx['headers']
+        )->assertNotFound();
+    });
+
+    it('returns 422 when name conflicts with another exam in the entity', function () {
+        PatientExam::factory()->create([
+            'patient_id' => $this->patient->id,
+            'name'       => 'Nome Já Existente',
+            'archive'    => 'other/exam.jpg',
+        ]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Nome Já Existente',
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
+    it('allows updating name to the same value (no self-conflict)', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Original',
+            ],
+            $this->ctx['headers']
+        )->assertOk();
+    });
+
+    it('returns 404 when patient from another entity', function () {
         $other = setupIntegrator();
         Patient::factory()->create(['entity_id' => $other['entity']->id]);
         $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
 
         $this->postJson(
-            "/api/integrators/v1/patients/{$foreignPatient->code}/exams/{$this->exam->id}",
+            "/api/integrators/v1/patients/{$foreignPatient->id}/exams/{$this->exam->id}",
             [
-                'exam_identifier' => $this->examType->code,
-                'archive'         => UploadedFile::fake()->image('exam.jpg'),
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Outra Entidade',
             ],
             $this->ctx['headers']
         )->assertNotFound();
     });
 });
 
+// ---------------------------------------------------------------------------
+// DELETE /api/integrators/v1/patients/{patient}/exams/{exam}
+// ---------------------------------------------------------------------------
 describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function () {
     beforeEach(function () {
         $this->ctx     = setupIntegrator();
@@ -386,5 +600,11 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
             [],
             $this->ctx['headers']
         )->assertNotFound();
+    });
+
+    it('returns 401 without authentication', function () {
+        $this->deleteJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}"
+        )->assertUnauthorized();
     });
 });
