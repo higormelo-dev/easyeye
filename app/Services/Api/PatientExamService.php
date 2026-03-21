@@ -3,14 +3,14 @@
 namespace App\Services\Api;
 
 use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
-use App\Models\{Doctor, ExamType, PatientExam, Schedule};
+use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, PatientExam, Schedule};
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
 use Illuminate\Support\Facades\{DB, Storage};
 use Illuminate\Support\Str;
 
 class PatientExamService
 {
-    private const FILLABLE_FIELDS = ['patient_id', 'exam_id', 'doctor_id', 'schedule_id', 'archive', 'name'];
+    private const FILLABLE_FIELDS = ['patient_id', 'exam_id', 'doctor_id', 'schedule_id', 'entity_integrator_equipment_id', 'archive', 'name'];
 
     /**
      * Create a new record with all related entities
@@ -36,12 +36,13 @@ class PatientExamService
             abort_unless($schedule !== null, 422, 'Schedule not found.');
 
             return $this->persistExam(
-                patientId:   $schedule->patient_id,
-                entityId:    $integrator->user->entity_id,
-                examId:      $this->examFindByIdOrCode($request->exam_identifier)?->id,
-                doctorId:    $schedule->doctor_id,
-                scheduleId:  $schedule->id,
-                name:        $request->name,
+                patientId: $schedule->patient_id,
+                entityId: $integrator->user->entity_id,
+                examId: $this->examFindByIdOrCode($request->exam_identifier)?->id,
+                doctorId: $schedule->doctor_id,
+                scheduleId: $schedule->id,
+                equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
+                name: $request->name,
                 archiveFile: $request->file('archive'),
             );
         });
@@ -58,9 +59,10 @@ class PatientExamService
             $schedule = $this->scheduleFindByIdOrCode($request->schedule_identifier);
             $data     = [
                 ...$request->only(self::FILLABLE_FIELDS),
-                'exam_id'     => $this->examFindByIdOrCode($request->exam_identifier)?->id,
-                'doctor_id'   => $this->resolveDoctorId($request, $schedule),
-                'schedule_id' => $schedule?->id,
+                'exam_id'                        => $this->examFindByIdOrCode($request->exam_identifier)?->id,
+                'entity_integrator_equipment_id' => $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
+                'doctor_id'                      => $this->resolveDoctorId($request, $schedule),
+                'schedule_id'                    => $schedule?->id,
             ];
 
             if ($request->hasFile('archive')) {
@@ -141,12 +143,13 @@ class PatientExamService
         $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
 
         return $this->persistExam(
-            patientId:   $patientId,
-            entityId:    $integrator->user->entity_id,
-            examId:      $this->examFindByIdOrCode($request->exam_identifier)?->id,
-            doctorId:    $this->resolveDoctorId($request, $schedule),
-            scheduleId:  $schedule?->id,
-            name:        $request->name,
+            patientId: $patientId,
+            entityId: $integrator->user->entity_id,
+            examId: $this->examFindByIdOrCode($request->exam_identifier)?->id,
+            doctorId: $this->resolveDoctorId($request, $schedule),
+            scheduleId: $schedule?->id,
+            equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
+            name: $request->name,
             archiveFile: $request->file('archive'),
         );
     }
@@ -160,6 +163,7 @@ class PatientExamService
         ?string $examId,
         ?string $doctorId,
         ?string $scheduleId,
+        ?string $equipmentId,
         ?string $name,
         mixed $archiveFile,
     ): PatientExam {
@@ -187,12 +191,13 @@ class PatientExamService
 
             if ($uploaded) {
                 $existingRecord->update([
-                    'patient_id'  => $patientId,
-                    'exam_id'     => $examId,
-                    'doctor_id'   => $doctorId,
-                    'schedule_id' => $scheduleId,
-                    'name'        => $name,
-                    'archive'     => $archivePath,
+                    'patient_id'                     => $patientId,
+                    'exam_id'                        => $examId,
+                    'doctor_id'                      => $doctorId,
+                    'schedule_id'                    => $scheduleId,
+                    'entity_integrator_equipment_id' => $equipmentId,
+                    'name'                           => $name,
+                    'archive'                        => $archivePath,
                 ]);
 
                 return $existingRecord->refresh();
@@ -206,12 +211,13 @@ class PatientExamService
 
         if ($uploaded) {
             return PatientExam::create([
-                'patient_id'  => $patientId,
-                'exam_id'     => $examId,
-                'doctor_id'   => $doctorId,
-                'schedule_id' => $scheduleId,
-                'name'        => $name,
-                'archive'     => $archivePath,
+                'patient_id'                     => $patientId,
+                'exam_id'                        => $examId,
+                'doctor_id'                      => $doctorId,
+                'schedule_id'                    => $scheduleId,
+                'entity_integrator_equipment_id' => $equipmentId,
+                'name'                           => $name,
+                'archive'                        => $archivePath,
             ]);
         }
 
@@ -279,6 +285,27 @@ class PatientExamService
             ->where(function (Builder $query) use ($integrator) {
                 $query->where('entity_id', $integrator->user->entity_id)
                     ->orWhereNull('entity_id');
+            });
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } else {
+            $query->where('code', $idOrCode);
+        }
+
+        return $query->first();
+    }
+
+    public function equipmentFindByIdOrCode(string $idOrCode): ?EntityIntegratorEquipment
+    {
+        $integrator = request()->attributes->get('integrator');
+        $query      = EntityIntegratorEquipment::query()
+            ->where(function (Builder $query) use ($integrator) {
+                $query->whereHas('integrator', fn (Builder $q) => $q
+                    ->whereHas('user', fn (Builder $q2) => $q2
+                        ->where('entity_id', $integrator->user->entity_id)
+                    )
+                )->orWhereNull('integrator_id');
             });
 
         if (Str::isUuid($idOrCode)) {

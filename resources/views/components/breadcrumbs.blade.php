@@ -13,7 +13,9 @@
                         @if($breadcrumb['active'] ?? false)
                             {{ $breadcrumb['label'] ?? 'Página atual' }}
                         @else
-                            <a href="{{ $breadcrumb['url'] }}">{{ $breadcrumb['label'] ?? 'Página atual' }}</a>
+                            <a href="{{ $breadcrumb['url'] }}" class="link-secondary link-underline link-underline-opacity-0">
+                                {{ $breadcrumb['label'] ?? 'Página atual' }}
+                            </a>
                         @endif
                     </li>
                 @endforeach

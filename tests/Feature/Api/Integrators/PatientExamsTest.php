@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\{ExamType, Patient, PatientExam};
+use App\Models\{EntityIntegratorEquipment, ExamType, Patient, PatientExam};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -308,6 +308,59 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
             ],
             $this->ctx['headers']
         )->assertUnprocessable();
+    });
+
+    it('creates exam with equipment_id and returns it in response', function () {
+        $equipment = EntityIntegratorEquipment::factory()->create([
+            'integrator_id' => $this->ctx['integrator']->id,
+        ]);
+
+        $response = $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'                => $this->examType->code,
+                'schedule_identifier'            => $this->schedule->code,
+                'archive'                        => UploadedFile::fake()->image('exam.jpg'),
+                'name'                           => 'Exame Com Equipamento',
+                'entity_integrator_equipment_id' => $equipment->id,
+            ],
+            $this->ctx['headers']
+        )->assertCreated();
+
+        expect($response->json('data.attributes.entity_integrator_equipment_id'))
+            ->toBe($equipment->id);
+    });
+
+    it('returns 422 when equipment belongs to another integrator', function () {
+        $other          = setupIntegrator();
+        $otherEquipment = EntityIntegratorEquipment::factory()->create([
+            'integrator_id' => $other['integrator']->id,
+        ]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'                => $this->examType->code,
+                'schedule_identifier'            => $this->schedule->code,
+                'archive'                        => UploadedFile::fake()->image('exam.jpg'),
+                'name'                           => 'Exame Equipamento Errado',
+                'entity_integrator_equipment_id' => $otherEquipment->id,
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
+    it('creates exam without equipment_id (optional field)', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Sem Equipamento',
+            ],
+            $this->ctx['headers']
+        )->assertCreated();
     });
 
     it('returns 401 without authentication', function () {

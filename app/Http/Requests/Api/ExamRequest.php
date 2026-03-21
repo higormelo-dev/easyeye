@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\{ExamType, PatientExam, Schedule};
+use App\Models\{EntityIntegratorEquipment, ExamType, PatientExam, Schedule};
 use Illuminate\Foundation\Http\FormRequest;
 
 class ExamRequest extends FormRequest
@@ -72,6 +72,29 @@ class ExamRequest extends FormRequest
 
                     if (! $query->exists()) {
                         $fail(__('validation.custom.validation_invalid.schedule_identifier'));
+                    }
+                },
+            ],
+            'equipment_identifier' => [
+                'required',
+                function ($attribute, $value, $fail) use ($integrator) {
+                    $isUuid = preg_match(
+                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                        $value
+                    );
+
+                    $query = EntityIntegratorEquipment::query()
+                        ->where('integrator_id', $integrator->id)
+                        ->whereNull('deleted_at');
+
+                    if ($isUuid) {
+                        $query->where('id', $value);
+                    } else {
+                        $query->where('code', $value);
+                    }
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.equipment_identifier'));
                     }
                 },
             ],

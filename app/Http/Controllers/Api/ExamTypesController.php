@@ -9,9 +9,6 @@ use Illuminate\Support\Str;
 
 class ExamTypesController extends Controller
 {
-    /**
-     * Instance of the standard model.
-     */
     protected ExamType $model;
 
     public function __construct(ExamType $examType)

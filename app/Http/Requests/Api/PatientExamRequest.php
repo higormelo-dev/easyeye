@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api;
 
 use App\Models\{ExamType, PatientExam, Schedule};
+use App\Models\EntityIntegratorEquipment;
 use Illuminate\Foundation\Http\FormRequest;
 
 class PatientExamRequest extends FormRequest
@@ -104,11 +105,13 @@ class PatientExamRequest extends FormRequest
                     // Se estiver atualizando, ignorar o registro atual
                     // O parâmetro de rota é {exam} (apiResource e rota POST customizada)
                     $examParam = $this->route('exam');
+
                     if ($examParam) {
                         $isUuidParam = (bool) preg_match(
                             '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
                             (string) $examParam
                         );
+
                         if ($isUuidParam) {
                             $existsQuery->where('id', '!=', $examParam);
                         } else {
@@ -121,7 +124,30 @@ class PatientExamRequest extends FormRequest
                     }
                 },
             ],
-            'archive' => 'required|file|mimes:jpg,jpeg,png|max:10240',
+            'archive'              => 'required|file|mimes:jpg,jpeg,png|max:10240',
+            'equipment_identifier' => [
+                'required',
+                function ($attribute, $value, $fail) use ($integrator) {
+                    $isUuid = preg_match(
+                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                        $value
+                    );
+
+                    $query = EntityIntegratorEquipment::query()
+                        ->where('integrator_id', $integrator->id)
+                        ->whereNull('deleted_at');
+
+                    if ($isUuid) {
+                        $query->where('id', $value);
+                    } else {
+                        $query->where('code', $value);
+                    }
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.equipment_identifier'));
+                    }
+                },
+            ],
         ];
     }
 

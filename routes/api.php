@@ -22,7 +22,7 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
                 ->except(['create', 'edit']);
             Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])
                 ->name('patients.exams.update');
-            Route::apiResource('examtypes', ExamTypesController::class)->only('index', 'show');
+            Route::apiResource('examtypes', ExamTypesController::class)->only(['index', 'show']);
             Route::apiResource('schedules', SchedulesController::class)->only('index', 'show');
             Route::apiResource('exams', ExamsController::class)->only('store');
 

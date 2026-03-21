@@ -25,6 +25,7 @@ class PatientExam extends Model
         'patient_id',
         'doctor_id',
         'schedule_id',
+        'entity_integrator_equipment_id',
         'exam_id',
         'code',
         'archive',
@@ -95,6 +96,11 @@ class PatientExam extends Model
     public function examType(): BelongsTo
     {
         return $this->belongsTo(ExamType::class, 'exam_id');
+    }
+
+    public function equipment(): BelongsTo
+    {
+        return $this->belongsTo(EntityIntegratorEquipment::class, 'entity_integrator_equipment_id');
     }
 
     public function archiveUrl(): Attribute

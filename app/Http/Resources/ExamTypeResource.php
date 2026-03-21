@@ -15,7 +15,7 @@ class ExamTypeResource extends JsonResource
     public function toArray(Request $request): array
     {
         $data = [
-            'type'       => 'doctor',
+            'type'       => 'exam_type',
             'id'         => $this->id,
             'attributes' => [
                 'entity_id'  => $this->entity_id,

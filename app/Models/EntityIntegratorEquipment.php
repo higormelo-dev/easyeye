@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
 
 class EntityIntegratorEquipment extends Model
 {
@@ -105,4 +105,8 @@ class EntityIntegratorEquipment extends Model
         return $this->belongsTo(EntityIntegrator::class, 'integrator_id', 'id');
     }
 
+    public function patientExams(): HasMany
+    {
+        return $this->hasMany(PatientExam::class, 'entity_integrator_equipment_id');
+    }
 }

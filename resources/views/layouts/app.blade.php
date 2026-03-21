@@ -14,6 +14,8 @@
         <link href="{{ asset('system/plugins/morrisjs/morris.css') }}" rel="stylesheet">
         <link href="{{ asset('system/css/style.min.css') }}" rel="stylesheet">
         <link href="{{ asset('system/css/pages/dashboard1.css') }}" rel="stylesheet">
+        <link href="{{ asset('system/icons/font-awesome/css/all.min.css') }}" rel="stylesheet">
+        <link href="{{ asset('system/icons/font-awesome/css/v4-shims.min.css') }}" rel="stylesheet">
         {{-- Vendor + App bundles (Bootstrap, DataTables, SweetAlert2, etc. via npm/Vite) --}}
         <style>[x-cloak] { display: none !important; }</style>
         @vite(['resources/css/app.css', 'resources/js/vendor.js', 'resources/js/app.js'])
@@ -25,7 +27,7 @@
         <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
         <![endif]-->
     </head>
-    <body class="skin-blue-dark fixed-layout mini-sidebar">
+    <body class="skin-blue-dark fixed-layout mini-sidebar @stack('body-class')">
     @include('components.preloader')
     @php
         $userPhotoPath = 'system/images/users/' . auth()->id() . '.jpg';
