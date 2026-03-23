@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\SubscriptionExpiredController;
 use App\Http\Controllers\{DoctorsController,
     LocaleController,
     PatientsController,
@@ -9,6 +8,7 @@ use App\Http\Controllers\{DoctorsController,
     TvController,
     UsersController,
     WaitingRoomController};
+use App\Http\Controllers\{MedicalRecordsController, SubscriptionExpiredController};
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
     CovenantsController,
@@ -73,28 +73,32 @@ Route::group(
             return redirect()->route('panel.dashboard');
         });
         Route::get('/dashboard', function () {
-            if (!session()->get('selected_entity_is_client')) {
+            if (! session()->get('selected_entity_is_client')) {
                 return view('system.manager.dashboard');
+            }
+
+            if (session('user_rule') === \App\Enums\ClientRule::Doctor->value) {
+                return redirect()->route('panel.waiting-room.index');
             }
 
             $entityId = session('selected_entity_id');
             $today    = now()->toDateString();
 
             $stats = [
-                'today_count'    => \App\Models\Schedule::where('entity_id', $entityId)
-                                     ->whereDate('date_time', $today)
-                                     ->count(),
+                'today_count' => \App\Models\Schedule::where('entity_id', $entityId)
+                    ->whereDate('date_time', $today)
+                    ->count(),
                 'total_patients' => \App\Models\Patient::where('entity_id', $entityId)
-                                     ->where('active', true)
-                                     ->count(),
-                'total_doctors'  => \App\Models\Doctor::query()
-                                     ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                                     ->where('entity_users.entity_id', $entityId)
-                                     ->count(),
-                'pending_today'  => \App\Models\Schedule::where('entity_id', $entityId)
-                                     ->whereDate('date_time', $today)
-                                     ->where('situation', \App\Enums\ScheduleSituation::Scheduled->value)
-                                     ->count(),
+                    ->where('active', true)
+                    ->count(),
+                'total_doctors' => \App\Models\Doctor::query()
+                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                    ->where('entity_users.entity_id', $entityId)
+                    ->count(),
+                'pending_today' => \App\Models\Schedule::where('entity_id', $entityId)
+                    ->whereDate('date_time', $today)
+                    ->where('situation', \App\Enums\ScheduleSituation::Scheduled->value)
+                    ->count(),
             ];
 
             return view('system.dashboard', compact('stats'));
@@ -108,8 +112,14 @@ Route::group(
         Route::post('patients/quick', [PatientsController::class, 'quickStore'])->name('patients.quick');
         Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
         Route::resource('patients', PatientsController::class);
+        Route::get('patients/{patient}/medicalrecords/ajaxlist',
+            [MedicalRecordsController::class, 'ajaxList'])->name('patients.medicalrecords.ajaxlist');
+        Route::resource('patients.medicalrecords', MedicalRecordsController::class)
+            ->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
         Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');
         Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
+        Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
+        Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
         Route::resource('schedules', SchedulesController::class);
 
         Route::get('waiting-room', [WaitingRoomController::class, 'index'])->name('waiting-room.index');

@@ -30,6 +30,7 @@ class EntityUsersDataTable extends BaseDataTable
                 ? '<span class="badge bg-light text-dark border">' . ucfirst($record->rule) . '</span>'
                 : '-')
             ->editColumn('active', fn (EntityUser $record) => $this->formatEntityUserStatus($record))
+            ->editColumn('created_at', fn (EntityUser $record) => $record->created_at?->format('d/m/Y H:i'))
             ->addColumn('action', fn (EntityUser $record) => $this->buildEntityUserActionButtons($record))
             ->rawColumns(['rule', 'active', 'action'])
             ->filterColumn('name', function ($query, $keyword) {
@@ -78,6 +79,11 @@ class EntityUsersDataTable extends BaseDataTable
     public function getColumns(): array
     {
         return [
+            Column::make('created_at')
+                ->title(__('actions.created_at'))
+                ->searchable(false),
+            Column::make('code')
+                ->title(__('actions.code')),
             Column::make('name')
                 ->title(__('actions.name')),
             Column::make('email')

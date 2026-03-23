@@ -38,6 +38,8 @@ class EntitiesDataTable extends BaseDataTable
         return $model->newQuery()
             ->withTrashed()
             ->select('entities.*')
+            ->selectRaw('(SELECT COUNT(*) FROM entity_users WHERE entity_users.entity_id = entities.id AND entity_users.deleted_at IS NULL) as entity_users_count')
+            ->selectRaw('(SELECT COUNT(*) FROM entity_user_integrators WHERE entity_user_integrators.entity_id = entities.id AND entity_user_integrators.deleted_at IS NULL) as entity_user_integrators_count')
             ->where('code', '!=', 'ENT-0000000001');
     }
 
@@ -101,15 +103,31 @@ class EntitiesDataTable extends BaseDataTable
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
-            $btnActions .= '<a href="' . route('panel.manager.entities.users', $record->id) . '"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="Usuários"><i class="fas fa-users"></i></a>';
+            if ($record->entity_users_count > 0) {
+                $btnActions .= '<a href="' . route('panel.manager.entities.users', $record->id) . '"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="Usuários"><i class="fas fa-users"></i></a>';
+            } else {
+                $btnActions .= '<a href="javascript:void(0);"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 disabled"
+                    aria-disabled="true" tabindex="-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="Usuários"><i class="fas fa-users"></i></a>';
+            }
 
-            $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.index', $record->id) . '"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
+            if ($record->entity_user_integrators_count > 0) {
+                $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.index', $record->id) . '"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
+            } else {
+                $btnActions .= '<a href="javascript:void(0);"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 disabled"
+                    aria-disabled="true" tabindex="-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
+            }
 
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"

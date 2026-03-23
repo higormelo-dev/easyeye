@@ -132,18 +132,18 @@ class DataFakersSeeder extends Seeder
                         'grace_period_ends_at' => now()->addDays(fake()->numberBetween(1, 3)),
                     ],
                     SubscriptionStatus::Expired => [
-                        'entity_id'  => $entity->id,
-                        'plan_id'    => $planId,
-                        'status'     => SubscriptionStatus::Expired,
-                        'starts_at'  => now()->subYear(),
-                        'ends_at'    => now()->subMonths(fake()->numberBetween(1, 6)),
+                        'entity_id' => $entity->id,
+                        'plan_id'   => $planId,
+                        'status'    => SubscriptionStatus::Expired,
+                        'starts_at' => now()->subYear(),
+                        'ends_at'   => now()->subMonths(fake()->numberBetween(1, 6)),
                     ],
                     default => [ // Active
-                        'entity_id'  => $entity->id,
-                        'plan_id'    => $planId,
-                        'status'     => SubscriptionStatus::Active,
-                        'starts_at'  => now()->subMonth(),
-                        'ends_at'    => now()->addYear(),
+                        'entity_id' => $entity->id,
+                        'plan_id'   => $planId,
+                        'status'    => SubscriptionStatus::Active,
+                        'starts_at' => now()->subMonth(),
+                        'ends_at'   => now()->addYear(),
                     ],
                 };
 
@@ -166,6 +166,7 @@ class DataFakersSeeder extends Seeder
 
             // TVs da sala de espera: 1-3 por entity (mix de estados)
             $tvCount = fake()->numberBetween(1, 3);
+
             for ($i = 0; $i < $tvCount; $i++) {
                 $isPending = fake()->boolean(25); // ~25% pendente, ~75% ativa
                 TvDisplay::create([
@@ -191,11 +192,11 @@ class DataFakersSeeder extends Seeder
         ]);
 
         Subscription::create([
-            'entity_id'  => $testEntity->id,
-            'plan_id'    => $planPro?->id,
-            'status'     => SubscriptionStatus::Active,
-            'starts_at'  => now()->subMonth(),
-            'ends_at'    => now()->addYear(),
+            'entity_id' => $testEntity->id,
+            'plan_id'   => $planPro?->id,
+            'status'    => SubscriptionStatus::Active,
+            'starts_at' => now()->subMonth(),
+            'ends_at'   => now()->addYear(),
         ]);
 
         $testIntegratorUser = EntityUserIntegrator::create([
@@ -321,6 +322,7 @@ class DataFakersSeeder extends Seeder
 
         // Inicializa contadores de código por entity antes do loop (evita queries repetidas)
         $entityIds = $entityUsers->pluck('entity_id')->unique();
+
         foreach ($entityIds as $entityId) {
             $lastSchedule = Schedule::where('entity_id', $entityId)
                 ->where('code', 'like', 'SDL-%')
@@ -331,75 +333,70 @@ class DataFakersSeeder extends Seeder
                 : 0;
         }
 
-        // Janela temporal: 15 dias passados até 15 dias futuros
-        $startDate      = Carbon::now()->subDays(15);
-        $daysToGenerate = 30;
-        $currentDay     = 0;
-        $date           = $startDate->copy();
+        // Janela temporal: início do mês corrente até agora
+        $startDate = Carbon::now()->startOfMonth()->startOfDay();
+        $date      = $startDate->copy();
 
         // Coleta de agendamentos Attended para gerar PatientExams posteriormente
         $attendedForExams = [];
 
-        while ($currentDay < $daysToGenerate) {
-            if ($date->isWeekday()) {
-                $currentDay++;
-                $usedPatientsPerDay = [];
-                $isPast             = $date->copy()->endOfDay()->isPast();
+        while ($date->lte(Carbon::now())) {
+            $usedPatientsPerDay = [];
+            $isPast             = $date->copy()->endOfDay()->isPast();
 
-                foreach ($doctors as $doctor) {
-                    $entityUser = $entityUsers->get($doctor->entity_user_id);
+            foreach ($doctors as $doctor) {
+                $entityUser = $entityUsers->get($doctor->entity_user_id);
 
-                    if (! $entityUser) {
-                        continue;
+                if (! $entityUser) {
+                    continue;
+                }
+
+                $entityId = $entityUser->entity_id;
+
+                if (! isset($usedPatientsPerDay[$entityId])) {
+                    $usedPatientsPerDay[$entityId] = [];
+                }
+
+                if (! isset($codeCounter[$entityId])) {
+                    $codeCounter[$entityId] = 0;
+                }
+
+                $patientsOfEntity   = $allPatients->get($entityId, collect());
+                $covenantsOfEntity  = $covenantsByEntity->get($entityId, collect())->merge($globalCovenants);
+                $visitTypesOfEntity = $visitTypesByEntity->get($entityId, collect())->merge($globalVisitTypes);
+
+                if ($patientsOfEntity->isEmpty() || $covenantsOfEntity->isEmpty() || $visitTypesOfEntity->isEmpty()) {
+                    continue;
+                }
+
+                $availablePatients = $patientsOfEntity->filter(
+                    fn ($patient) => ! in_array($patient->id, $usedPatientsPerDay[$entityId])
+                );
+
+                if ($availablePatients->isEmpty()) {
+                    continue;
+                }
+
+                $morningSlots   = $this->generateTimeSlots($date, 8, 12, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast);
+                $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast);
+
+                foreach (array_merge($morningSlots, $afternoonSlots) as $slot) {
+                    $schedulesBatch[] = $slot;
+
+                    // Seleciona 30% dos Attended passados para geração de exames
+                    if ($isPast && $slot['situation'] === ScheduleSituation::Attended->value && fake()->boolean(30)) {
+                        $attendedForExams[] = [
+                            'id'         => $slot['id'],
+                            'patient_id' => $slot['patient_id'],
+                            'doctor_id'  => $slot['doctor_id'],
+                            'entity_id'  => $slot['entity_id'],
+                        ];
                     }
+                }
 
-                    $entityId = $entityUser->entity_id;
-
-                    if (! isset($usedPatientsPerDay[$entityId])) {
-                        $usedPatientsPerDay[$entityId] = [];
-                    }
-
-                    if (! isset($codeCounter[$entityId])) {
-                        $codeCounter[$entityId] = 0;
-                    }
-
-                    $patientsOfEntity   = $allPatients->get($entityId, collect());
-                    $covenantsOfEntity  = $covenantsByEntity->get($entityId, collect())->merge($globalCovenants);
-                    $visitTypesOfEntity = $visitTypesByEntity->get($entityId, collect())->merge($globalVisitTypes);
-
-                    if ($patientsOfEntity->isEmpty() || $covenantsOfEntity->isEmpty() || $visitTypesOfEntity->isEmpty()) {
-                        continue;
-                    }
-
-                    $availablePatients = $patientsOfEntity->filter(
-                        fn ($patient) => ! in_array($patient->id, $usedPatientsPerDay[$entityId])
-                    );
-
-                    if ($availablePatients->isEmpty()) {
-                        continue;
-                    }
-
-                    $morningSlots   = $this->generateTimeSlots($date, 8, 12, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast);
-                    $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast);
-
-                    foreach (array_merge($morningSlots, $afternoonSlots) as $slot) {
-                        $schedulesBatch[] = $slot;
-
-                        // Seleciona 30% dos Attended passados para geração de exames
-                        if ($isPast && $slot['situation'] === ScheduleSituation::Attended->value && fake()->boolean(30)) {
-                            $attendedForExams[] = [
-                                'id'         => $slot['id'],
-                                'patient_id' => $slot['patient_id'],
-                                'doctor_id'  => $slot['doctor_id'],
-                                'entity_id'  => $slot['entity_id'],
-                            ];
-                        }
-                    }
-
-                    if (count($schedulesBatch) >= $batchSize) {
-                        Schedule::insert($schedulesBatch);
-                        $schedulesBatch = [];
-                    }
+                if (count($schedulesBatch) >= $batchSize) {
+                    Schedule::insert($schedulesBatch);
+                    $schedulesBatch = [];
                 }
             }
 
@@ -465,7 +462,7 @@ class DataFakersSeeder extends Seeder
                 break;
             }
 
-            $patient = $availablePatients[array_rand($availablePatients)];
+            $patient                         = $availablePatients[array_rand($availablePatients)];
             $usedPatientsPerDay[$entityId][] = $patient->id;
 
             $covenant  = $covenants->random();
@@ -479,6 +476,7 @@ class DataFakersSeeder extends Seeder
 
             // arrived_at: preenchido para pacientes que chegaram à clínica
             $arrivedAt = null;
+
             if ($isPast && in_array($situation, [
                 ScheduleSituation::Waiting->value,
                 ScheduleSituation::InProgress->value,

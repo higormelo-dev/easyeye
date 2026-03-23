@@ -24,6 +24,7 @@
             telephone:           '',
             cellphone:           '',
             cellphone_whatsapp:  false,
+            notes:               '',
             covenant_id:         '',
             visit_id:            '',
             situation:           1
@@ -160,54 +161,54 @@
 
                                 {{-- TUDO --}}
                                 <button type="button"
-                                        class="flex-fill btn btn-sm rounded-0 text-center border-0"
-                                        style="padding:.6rem .25rem .5rem;background:#fff;color:#6c757d;"
+                                        class="flex-fill btn btn-sm rounded-0 text-center border-0 p-3"
+                                        style="padding:.6rem .25rem .5rem;background:#fff;color:#6c757d;border-color:#e2e8f0!important;"
                                         :style="bout == 1 ? 'background:#6c757d;color:#fff;' : 'background:#fff;color:#6c757d;'"
                                         @click="setBout(1)"
                                         title="Exibir todos os horários">
                                     <i class="fas fa-th d-block" style="font-size:1.1rem;"></i>
                                     <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">TUDO</span>
-                                    <span class="d-block mt-1" style="height:4px;background:transparent;"
-                                          :style="bout == 1 ? 'background:rgba(255,255,255,.5);' : 'background:transparent;'"></span>
+                                    <span class="d-block mt-1"
+                                          :style="{ height: '4px', background: bout == 1 ? 'rgba(255,255,255,.5)' : '#6c757d' }"></span>
                                 </button>
 
                                 {{-- MANHÃ --}}
                                 <button type="button"
-                                        class="flex-fill btn btn-sm rounded-0 text-center border-0 border-start"
+                                        class="flex-fill btn btn-sm rounded-0 text-center border-0 p-3 border-start"
                                         style="padding:.6rem .25rem .5rem;background:#fff;color:#b07a10;border-color:#e2e8f0!important;"
                                         :style="bout == 2 ? 'background:#f5a623;color:#fff;' : 'background:#fff;color:#b07a10;'"
                                         @click="setBout(2)"
                                         title="Manhã">
                                     <i class="fas fa-sun d-block" style="font-size:1.1rem;"></i>
                                     <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">MANHÃ</span>
-                                    <span class="d-block mt-1" style="height:4px;background:#f5a623;"
-                                          :style="bout == 2 ? 'background:rgba(255,255,255,.5);' : 'background:#f5a623;'"></span>
+                                    <span class="d-block mt-1"
+                                          :style="{ height: '4px', background: bout == 2 ? 'rgba(255,255,255,.5)' : '#f5a623' }"></span>
                                 </button>
 
                                 {{-- TARDE --}}
                                 <button type="button"
-                                        class="flex-fill btn btn-sm rounded-0 text-center border-0 border-start"
+                                        class="flex-fill btn btn-sm rounded-0 text-center border-0 p-3 border-start"
                                         style="padding:.6rem .25rem .5rem;background:#fff;color:#1565c0;border-color:#e2e8f0!important;"
                                         :style="bout == 3 ? 'background:#1976d2;color:#fff;' : 'background:#fff;color:#1565c0;'"
                                         @click="setBout(3)"
                                         title="Tarde">
                                     <i class="fas fa-cloud-sun d-block" style="font-size:1.1rem;"></i>
                                     <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">TARDE</span>
-                                    <span class="d-block mt-1" style="height:4px;background:#1976d2;"
-                                          :style="bout == 3 ? 'background:rgba(255,255,255,.5);' : 'background:#1976d2;'"></span>
+                                    <span class="d-block mt-1"
+                                          :style="{ height: '4px', background: bout == 3 ? 'rgba(255,255,255,.5)' : '#1976d2' }"></span>
                                 </button>
 
                                 {{-- NOITE --}}
                                 <button type="button"
-                                        class="flex-fill btn btn-sm rounded-0 text-center border-0 border-start"
+                                        class="flex-fill btn btn-sm rounded-0 text-center border-0 p-3 border-start"
                                         style="padding:.6rem .25rem .5rem;background:#fff;color:#495057;border-color:#e2e8f0!important;"
                                         :style="bout == 4 ? 'background:#343a40;color:#fff;' : 'background:#fff;color:#495057;'"
                                         @click="setBout(4)"
                                         title="Noite">
                                     <i class="fas fa-moon d-block" style="font-size:1.1rem;"></i>
                                     <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">NOITE</span>
-                                    <span class="d-block mt-1" style="height:4px;background:#adb5bd;"
-                                          :style="bout == 4 ? 'background:rgba(255,255,255,.5);' : 'background:#adb5bd;'"></span>
+                                    <span class="d-block mt-1"
+                                          :style="{ height: '4px', background: bout == 4 ? 'rgba(255,255,255,.5)' : '#adb5bd' }"></span>
                                 </button>
 
                             </div>
@@ -251,10 +252,18 @@
 
 @section('modals')
     @include('components.modal_default')
+    @include('system.schedules._reschedule-modal')
+    @include('system.schedules._patient-modal')
 @endsection
 
 @section('javascript')
     @vite(['resources/js/system/schedules.js'])
+    <script>
+    window.schedulesLang = {
+        rescheduleSuccess:  @js(__('actions.reschedule_success')),
+        rescheduleErrorDate: @js(__('actions.reschedule_error_date')),
+    };
+    </script>
     <script>
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.copy-btn');

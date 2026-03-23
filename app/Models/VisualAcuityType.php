@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Concerns\{HasEntityCode, HasUppercaseName};
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class VisualAcuityType extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasEntityCode;
     use HasUppercaseName;
     use HasUuids;

@@ -49,7 +49,8 @@ class EntityIntegratorsDataTable extends BaseDataTable
     {
         $query = $model->newQuery()
             ->withTrashed()
-            ->select('entity_integrators.*');
+            ->select('entity_integrators.*')
+            ->selectRaw('(SELECT COUNT(*) FROM entity_integrator_equipments WHERE entity_integrator_equipments.entity_integrator_id = entity_integrators.id AND entity_integrator_equipments.deleted_at IS NULL) as equipments_count');
 
         if ($this->userIntegratorId) {
             $query->where('entity_user_integrator_id', $this->userIntegratorId);
@@ -115,10 +116,18 @@ class EntityIntegratorsDataTable extends BaseDataTable
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
-            $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.equipments.index', [$this->entityId, $this->userIntegratorId, $record->id]) . '"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.equipments') . '"><i class="fas fa-satellite-dish"></i></a>';
+            if ($record->equipments_count > 0) {
+                $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.equipments.index', [$this->entityId, $this->userIntegratorId, $record->id]) . '"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="' . __('actions.equipments') . '"><i class="fas fa-satellite-dish"></i></a>';
+            } else {
+                $btnActions .= '<a href="javascript:void(0);"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 disabled"
+                    aria-disabled="true" tabindex="-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="' . __('actions.equipments') . '"><i class="fas fa-satellite-dish"></i></a>';
+            }
 
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"

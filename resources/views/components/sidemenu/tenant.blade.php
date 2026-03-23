@@ -6,7 +6,7 @@
     </a>
 </li>
 
-@if(in_array(session('user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value, ClientRule::Doctor->value], true))
+@if(in_array(session('user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true))
     <li>
         <a class="waves-effect waves-dark" href="{{ route('panel.waiting-room.index') }}">
             <i class="fas fa-hourglass-half"></i>

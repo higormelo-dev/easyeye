@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Presenters\PeoplePresenter;
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
@@ -11,6 +12,8 @@ use Laracasts\Presenter\PresentableTrait;
 
 class People extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasFactory;
     use HasUuids;
     use Notifiable;

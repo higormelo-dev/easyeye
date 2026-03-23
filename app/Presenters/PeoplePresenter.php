@@ -21,14 +21,43 @@ class PeoplePresenter extends Presenter
         return $this->birth_date ? $this->birth_date->format('d/m/Y') : '';
     }
 
+    public function getAge(): string
+    {
+        if (! $this->birth_date) {
+            return __('actions.age.not_informed');
+        }
+
+        $age = $this->birth_date->diff(now());
+
+        if ($age->y > 1) {
+            $months = $age->m > 0
+                ? ', ' . trans_choice('actions.age.month', $age->m)
+                : '';
+
+            return trans_choice('actions.age.year', $age->y) . $months;
+        }
+
+        if ($age->m > 0) {
+            return trans_choice('actions.age.month', $age->m);
+        }
+
+        return trans_choice('actions.age.day', max($age->d, 1));
+    }
+
     public function getGender(): string
     {
-        return $this->gender !== null ? People::$genders[$this->gender] : '';
+        return match ($this->gender) {
+            0       => __('actions.female'),
+            1       => __('actions.male'),
+            default => '',
+        };
     }
 
     public function getMaritalStatus(): string
     {
-        return $this->marital_status ? People::$maritalStatuses[$this->marital_status] : '';
+        return $this->marital_status
+            ? __('actions.marital_status.' . $this->marital_status)
+            : '';
     }
 
     public function getStateRegistryDate(): string

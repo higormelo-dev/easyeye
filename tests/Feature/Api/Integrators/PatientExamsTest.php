@@ -318,11 +318,11 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         $response = $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier'                => $this->examType->code,
-                'schedule_identifier'            => $this->schedule->code,
-                'archive'                        => UploadedFile::fake()->image('exam.jpg'),
-                'name'                           => 'Exame Com Equipamento',
-                'entity_integrator_equipment_id' => $equipment->id,
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Com Equipamento',
+                'equipment_identifier' => $equipment->id,
             ],
             $this->ctx['headers']
         )->assertCreated();
@@ -340,11 +340,11 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier'                => $this->examType->code,
-                'schedule_identifier'            => $this->schedule->code,
-                'archive'                        => UploadedFile::fake()->image('exam.jpg'),
-                'name'                           => 'Exame Equipamento Errado',
-                'entity_integrator_equipment_id' => $otherEquipment->id,
+                'exam_identifier'      => $this->examType->code,
+                'schedule_identifier'  => $this->schedule->code,
+                'archive'              => UploadedFile::fake()->image('exam.jpg'),
+                'name'                 => 'Exame Equipamento Errado',
+                'equipment_identifier' => $otherEquipment->id,
             ],
             $this->ctx['headers']
         )->assertUnprocessable();

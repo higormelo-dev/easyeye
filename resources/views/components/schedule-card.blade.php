@@ -1,9 +1,10 @@
 @use(App\Enums\ScheduleSituation)
+@use(App\Enums\PatientMood)
 @use(App\Enums\ClientRule)
 @props(['schedule'])
 
 @php
-    $photo = $schedule->patient_id && $schedule->patient->photo
+    $photo = $schedule->patient_id && $schedule->patient?->photo
         ? asset('storage/images/patient/' . $schedule->patient->photo)
         : asset('system/images/team.png');
 
@@ -11,97 +12,238 @@
         ? $schedule->patient->full_name
         : $schedule->full_name;
 
-    $canMarkArrived = in_array(session('user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true)
-        && $schedule->situation === ScheduleSituation::Scheduled;
+    $userRule    = session('user_rule');
+    $isStaff     = in_array($userRule, [ClientRule::Admin->value, ClientRule::Secretary->value], true);
+    $situation   = $schedule->situation;
+    $isTerminal  = $situation->isTerminal();
+    $doctorColor = $schedule->doctor->color ?: '#6c757d';
 @endphp
 
-<div class="row mb-4">
-    <div class="col-sm-2 col-md-2 col-lg-1 col-xl-1 d-flex align-items-center justify-content-center">
-        <img src="{{ $photo }}"
-             alt="{{ $altName }}"
-             class="media-object img-circle w-50"
-             style="border: 2px solid {{ $schedule->doctor->color }};">
-    </div>
+<div class="card mb-2 border schedule-card{{ $isTerminal ? ' opacity-65 bg-light' : '' }}"
+     style="border-left-color: {{ $doctorColor }} !important;">
+    <div class="card-body py-2 px-3">
+        <div class="d-flex align-items-center gap-3">
 
-    <div class="col-sm-7 col-md-7 col-lg-8 col-xl-8 d-flex flex-column">
-        <h4 class="m-b-0" style="color: {{ $schedule->doctor->color }};">
-            {{ request()->get('search') ? $schedule->present()->getDateTime : $schedule->present()->getTime }}
-            - {{ $schedule->full_name }}
-            @if($schedule->patient_id)
-                - {{ $schedule->patient->present()->getCode }}
-            @endif
-        </h4>
-
-        <span class="text-muted">
-            {{ $schedule->visit_id ? $schedule->visitType->name : strtoupper(__('actions.not_informed')) }}
-            -
-            {{ $schedule->covenant_id ? $schedule->covenant->name : strtoupper(__('actions.not_informed')) }}
-
-            @if(!session()->get('doctor_id'))
-                <br>
-                {{ $schedule->doctor_id ? $schedule->doctor->abbreviation : strtoupper(__('actions.not_informed')) }}
-            @endif
-        </span>
-
-        @if($schedule->situation !== ScheduleSituation::Scheduled)
-            <div class="mt-1">
-                <span class="badge {{ $schedule->situation->badgeClass() }}">
-                    {{ $schedule->situation->label() }}
-                </span>
+            {{-- Foto (só md+) --}}
+            <div class="d-none d-md-block flex-shrink-0">
+                <img src="{{ $photo }}"
+                     alt="{{ $altName }}"
+                     class="rounded-circle"
+                     width="46" height="46"
+                     style="object-fit:cover;border:2px solid {{ $doctorColor }};">
             </div>
-        @endif
-    </div>
 
-    <div class="col-sm-3 col-md-3 col-lg-3 d-flex align-items-center justify-content-end">
-        <div class="d-flex gap-1" x-data>
-            {{-- Editar agendamento --}}
-            <button type="button"
-                    class="btn btn-secondary btn-sm"
-                    title="{{ __('actions.named.edit', ['name' => __('actions.schedule')]) }}"
-                    @click="$dispatch('edit-schedule', { id: '{{ $schedule->id }}' })">
-                <i class="fas fa-edit"></i>
-            </button>
+            {{-- Informações --}}
+            <div class="flex-grow-1 schedule-card-info">
 
-            @if($schedule->patient_id)
-                {{-- Ir para ficha do paciente --}}
-                <a href="javascript:;"
-                   class="btn btn-secondary btn-sm btn-edit_patient"
-                   data-id="{{ $schedule->id }}"
-                   data-data="2"
-                   data-doctor_id="{{ $schedule->doctor_id }}"
-                   data-patient_id="{{ $schedule->patient_id }}"
-                   title="{{ __('actions.named.edit', ['name' => __('actions.patient_record')]) }}">
-                    <i class="fas fa-address-card"></i>
-                </a>
-            @else
-                {{-- Cadastrar ficha --}}
-                <a href="javascript:;"
-                   class="btn btn-secondary btn-sm btn-arrives1"
-                   data-id="{{ $schedule->id }}"
-                   data-full_name="{{ $schedule->full_name }}"
-                   data-data="2"
-                   data-doctor_id="{{ $schedule->doctor_id }}"
-                   title="{{ __('actions.register_record') }}">
-                    <i class="fas fa-address-card"></i>
-                </a>
-            @endif
+                {{-- Linha 1: horário + nome + código --}}
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <strong class="fs-6" style="color:{{ $doctorColor }};">
+                        {{ request()->get('search') ? $schedule->present()->getDateTime : $schedule->present()->getTime }}
+                    </strong>
+                    <span class="fw-semibold">{{ $schedule->full_name }}</span>
+                    @if($schedule->patient_id)
+                        <small class="text-muted">({{ $schedule->patient->present()->getCode }})</small>
+                    @endif
+                </div>
 
-            @if($canMarkArrived)
+                {{-- Linha 2: badges de estado --}}
+                <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
+
+                    {{-- Badge situação --}}
+                    <span class="badge {{ $situation->badgeClass() }}">
+                        <i class="fas {{ $situation->icon() }} me-1"></i>{{ $situation->label() }}
+                    </span>
+
+                    {{-- Confirmado --}}
+                    @if($schedule->confirmed_at)
+                        <span class="badge bg-info text-dark"
+                              title="Confirmado em {{ $schedule->confirmed_at->format('d/m H:i') }}">
+                            <i class="fas fa-check-circle"></i>
+                        </span>
+                    @endif
+
+                    {{-- Observações --}}
+                    @if($schedule->notes)
+                        <span class="badge bg-light text-secondary border"
+                              title="{{ $schedule->notes }}">
+                            <i class="fas fa-sticky-note"></i>
+                        </span>
+                    @endif
+
+                    {{-- Humor do paciente --}}
+                    @if($schedule->patient_mood)
+                        <span class="badge {{ $schedule->patient_mood->badgeClass() }}"
+                              title="{{ $schedule->patient_mood->label() }}">
+                            <i class="fas {{ $schedule->patient_mood->icon() }}"></i>
+                        </span>
+                    @endif
+
+                    {{-- Timer de espera --}}
+                    @if($situation === ScheduleSituation::Waiting && $schedule->arrived_at)
+                        <span class="badge waiting-timer"
+                              data-arrived="{{ $schedule->arrived_at->toIso8601String() }}">
+                            <i class="fas fa-clock me-1"></i><span class="timer-text">...</span>
+                        </span>
+                    @endif
+
+                </div>
+
+                {{-- Linha 3: metadados --}}
+                <div class="text-muted small mt-1">
+                    {{ $schedule->visit_id ? $schedule->visitType->name : strtoupper(__('actions.not_informed')) }}
+                    &mdash;
+                    {{ $schedule->covenant_id ? $schedule->covenant->name : strtoupper(__('actions.not_informed')) }}
+                    @if(! session()->get('doctor_id'))
+                        &mdash; {{ $schedule->doctor->abbreviation }}
+                    @endif
+                </div>
+
+            </div>
+
+            {{-- Ações --}}
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+
+                {{-- ── Dropdown de situação (fa-list-ul) ── --}}
+                @if(! $isTerminal && $isStaff && count($situation->allowedTransitions()) > 0)
+                    <div class="btn-group">
+                        <button type="button"
+                                class="btn btn-secondary btn-sm dropdown-toggle"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                title="{{ __('actions.change_situation') }}">
+                            <i class="fas fa-list-ul"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            @foreach($situation->allowedTransitions() as $toValue)
+                                @php $toSituation = ScheduleSituation::from($toValue); @endphp
+                                @if($toSituation === ScheduleSituation::Cancelled)
+                                    <li>
+                                        <button type="button"
+                                                class="dropdown-item btn-cancel"
+                                                data-id="{{ $schedule->id }}">
+                                            <i class="fas fa-circle {{ $toSituation->circleClass() }} me-2"></i>
+                                            {{ strtoupper($toSituation->label()) }}
+                                        </button>
+                                    </li>
+                                @else
+                                    <li>
+                                        <button type="button"
+                                                class="dropdown-item btn-situation"
+                                                data-id="{{ $schedule->id }}"
+                                                data-to="{{ $toValue }}">
+                                            <i class="fas fa-circle {{ $toSituation->circleClass() }} me-2"></i>
+                                            {{ strtoupper($toSituation->label()) }}
+                                        </button>
+                                    </li>
+                                @endif
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                {{-- ── Dropdown de humor do paciente (fa-smile) ── --}}
+                @if(! $isTerminal && $isStaff && $schedule->patient_id)
+                    <div class="dropdown">
+                        <button type="button"
+                                class="btn btn-secondary btn-sm dropdown-toggle"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                title="{{ __('actions.patient_mood_label') }}">
+                            @if($schedule->patient_mood)
+                                <i class="fas {{ $schedule->patient_mood->icon() }}"></i>
+                            @else
+                                <i class="fas fa-theater-masks"></i>
+                            @endif
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li>
+                                <button type="button"
+                                        class="dropdown-item btn-mood"
+                                        data-id="{{ $schedule->id }}"
+                                        data-mood="">
+                                    <i class="fas fa-times text-muted me-2"></i> {{ __('actions.clear') }}
+                                </button>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
+                            @foreach(PatientMood::cases() as $mood)
+                                <li>
+                                    <button type="button"
+                                            class="dropdown-item btn-mood{{ $schedule->patient_mood === $mood ? ' fw-bold' : '' }}"
+                                            data-id="{{ $schedule->id }}"
+                                            data-mood="{{ $mood->value }}">
+                                        <i class="fas {{ $mood->icon() }} {{ $mood->textClass() }} me-2"></i>
+                                        {{ $mood->label() }}
+                                    </button>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                {{-- Separador visual --}}
+                @if(! $isTerminal)
+                    <div class="vr mx-1 d-none d-sm-block"></div>
+                @endif
+
+                {{-- ── Navegação ── --}}
+
+                @if(! $isTerminal)
+                    <button type="button"
+                            class="btn btn-secondary btn-sm"
+                            title="{{ __('actions.named.edit', ['name' => __('actions.schedule')]) }}"
+                            @click="$dispatch('edit-schedule', { id: '{{ $schedule->id }}' })"
+                            x-data>
+                        <i class="fas fa-edit"></i>
+                    </button>
+                @endif
+
+                @if($schedule->patient_id)
+                    <button type="button"
+                            class="btn btn-secondary btn-sm btn-patient"
+                            data-id="{{ $schedule->patient_id }}"
+                            title="{{ __('actions.named.edit', ['name' => __('actions.patient_record')]) }}">
+                        <i class="fas fa-address-card"></i>
+                    </button>
+                    <a href="{{ route('panel.patients.medicalrecords.index', $schedule->patient_id) }}"
+                       class="btn btn-secondary btn-sm"
+                       title="{{ __('actions.medical_records') }}">
+                        <i class="fas fa-file-medical"></i>
+                    </a>
+                @endif
+
                 <button type="button"
-                        class="btn btn-warning btn-sm btn-arrived"
+                        class="btn btn-secondary btn-sm btn-show"
                         data-id="{{ $schedule->id }}"
-                        title="{{ __('actions.mark_arrival') }}">
-                    <i class="fas fa-check-circle me-1"></i> {{ __('actions.arrived') }}
+                        title="{{ __('actions.named.view', ['name' => __('actions.schedule')]) }}">
+                    <i class="fas fa-eye"></i>
                 </button>
-            @endif
 
-            {{-- Visualizar agendamento --}}
-            <button type="button"
-                    class="btn btn-secondary btn-sm btn-show"
-                    data-id="{{ $schedule->id }}"
-                    title="{{ __('actions.named.view', ['name' => __('actions.schedule')]) }}">
-                <i class="fas fa-eye"></i>
-            </button>
+                {{-- ── Dropdown ⋮ (Reagendar) ── --}}
+                @if(! $isTerminal && $isStaff)
+                    <div class="dropdown">
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                data-bs-toggle="dropdown"
+                                aria-expanded="false"
+                                title="{{ __('actions.more_options') }}">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                            <li>
+                                <button type="button"
+                                        class="dropdown-item btn-reschedule"
+                                        data-id="{{ $schedule->id }}"
+                                        data-doctor_id="{{ $schedule->doctor_id }}"
+                                        data-doctors="{{ json_encode($schedule->doctor ? [['id' => $schedule->doctor_id, 'name' => $schedule->doctor->abbreviation]] : []) }}">
+                                    <i class="fas fa-calendar-alt me-2 text-secondary"></i>{{ __('actions.reschedule_action') }}
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                @endif
+
+            </div>
         </div>
     </div>
 </div>

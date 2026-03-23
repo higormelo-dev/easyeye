@@ -1,1 +1,43 @@
+/* ── schedule-card ──────────────────────────────────────────────────── */
 
+.schedule-card-info {
+    min-width: 0;
+}
+
+.opacity-65 {
+    opacity: 0.65;
+}
+
+/* Cores customizadas para círculos de situação */
+.text-purple { color: #7c3aed !important; }
+.text-orange  { color: #ea580c !important; }
+
+/* Borda esquerda grossa (cor do médico), demais bordas finas */
+.schedule-card {
+    border-left-width: 8px !important;
+}
+
+/* Botões de ação do schedule-card: tamanho e espaçamento uniformes */
+.schedule-card .btn-sm {
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Remove a seta do dropdown-toggle quando é botão de ícone */
+.schedule-card .dropdown-toggle::after {
+    display: none;
+}
+
+/* Timer pulsante quando espera >= 30 min */
+@keyframes schedule-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.45; }
+}
+
+.waiting-timer-urgent {
+    animation: schedule-pulse 1.4s ease-in-out infinite;
+}

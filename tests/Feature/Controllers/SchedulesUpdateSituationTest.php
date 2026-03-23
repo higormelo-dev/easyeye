@@ -35,15 +35,15 @@ describe('PATCH /panel/schedules/{schedule}/situation', function () {
     });
 
     it('resposta contém label da situação', function () {
-        patchSituation($this, $this->schedule, ScheduleSituation::InProgress->value)
+        patchSituation($this, $this->schedule, ScheduleSituation::Confirmed->value)
             ->assertOk()
-            ->assertJsonFragment(['label' => ScheduleSituation::InProgress->label()]);
+            ->assertJsonFragment(['label' => ScheduleSituation::Confirmed->label()]);
     });
 
     it('persiste nova situação no banco', function () {
-        patchSituation($this, $this->schedule, ScheduleSituation::InProgress->value)->assertOk();
+        patchSituation($this, $this->schedule, ScheduleSituation::Confirmed->value)->assertOk();
 
-        expect($this->schedule->fresh()->situation)->toBe(ScheduleSituation::InProgress);
+        expect($this->schedule->fresh()->situation)->toBe(ScheduleSituation::Confirmed);
     });
 
     // ── arrived_at ────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ describe('PATCH /panel/schedules/{schedule}/situation', function () {
     it('não define arrived_at para situações diferentes de Waiting', function () {
         $this->schedule->update(['arrived_at' => null]);
 
-        patchSituation($this, $this->schedule, ScheduleSituation::InProgress->value)->assertOk();
+        patchSituation($this, $this->schedule, ScheduleSituation::Confirmed->value)->assertOk();
 
         expect($this->schedule->fresh()->arrived_at)->toBeNull();
     });

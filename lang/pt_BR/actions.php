@@ -14,6 +14,7 @@ return [
     'associate'               => 'Associado',
     'attach'                  => 'Anexar',
     'browse'                  => 'Navegar',
+    'back'                    => 'Voltar',
     'cancel'                  => 'Cancelar',
     'choose'                  => 'Escolher',
     'choose_file'             => 'Escolher arquivo',
@@ -257,6 +258,53 @@ return [
             'sSortDescending' => ': Ordenar colunas de forma descendente',
         ],
     ],
+    // Situações do agendamento
+    'situation_scheduled'  => 'Agendado',
+    'situation_confirmed'  => 'Confirmado',
+    'situation_waiting'    => 'Aguardando',
+    'situation_dilating'   => 'Dilatando',
+    'situation_exam'       => 'Em exame',
+    'situation_inprogress' => 'Em consulta',
+    'situation_attended'   => 'Atendido',
+    'situation_noshow'     => 'Faltou',
+    'situation_cancelled'  => 'Cancelado',
+
+    // Humor do paciente
+    'mood_happy'   => 'Tranquilo',
+    'mood_anxious' => 'Ansioso',
+    'mood_nervous' => 'Agitado',
+    'mood_angry'   => 'Irritado',
+
+    // Card de agendamento
+    'change_situation'      => 'Alterar situação',
+    'patient_mood_label'    => 'Humor do paciente',
+    'more_options'          => 'Mais opções',
+    'reschedule_action'     => 'Reagendar',
+    'clear'                 => 'Limpar',
+    'reschedule_success'    => 'Reagendamento realizado com sucesso.',
+    'reschedule_error_date' => 'A data e hora são obrigatórias.',
+
+    // Idade
+    'age' => [
+        'label'        => 'Idade',
+        'not_informed' => 'Não informado',
+        'year'         => '{1} 1 Ano|[2,*] :count Anos',
+        'month'        => '{1} 1 Mês|[2,*] :count Meses',
+        'day'          => '[0,1] 1 Dia|[2,*] :count Dias',
+    ],
+
+    // Estado civil
+    'marital_status' => [
+        1 => 'Solteiro(a)',
+        2 => 'Casado(a)',
+        3 => 'Divorciado(a)',
+        4 => 'Viúvo(a)',
+        5 => 'União Estável',
+        6 => 'Separado(a) Judicialmente',
+        7 => 'Marital',
+        8 => 'Outro',
+    ],
+
     'messages' => [
         'register'              => 'Cadastrar :name',
         'edit'                  => 'Editar :name',

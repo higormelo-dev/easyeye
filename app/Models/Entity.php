@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\EntityRoleService;
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Entity extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;

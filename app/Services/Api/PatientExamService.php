@@ -296,8 +296,12 @@ class PatientExamService
         return $query->first();
     }
 
-    public function equipmentFindByIdOrCode(string $idOrCode): ?EntityIntegratorEquipment
+    public function equipmentFindByIdOrCode(?string $idOrCode): ?EntityIntegratorEquipment
     {
+        if ($idOrCode === null) {
+            return null;
+        }
+
         $integrator = request()->attributes->get('integrator');
         $query      = EntityIntegratorEquipment::query()
             ->where(function (Builder $query) use ($integrator) {

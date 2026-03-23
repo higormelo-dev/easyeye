@@ -91,10 +91,12 @@ class ScheduleRequest extends FormRequest
                     }
                 },
             ],
-            'telephone'          => ['nullable', 'string', 'max:20'],
-            'cellphone'          => ['nullable', 'string', 'max:20'],
-            'cellphone_whatsapp' => ['nullable', 'boolean'],
-            'situation'          => ['nullable', 'integer'],
+            'telephone'           => ['nullable', 'string', 'max:20'],
+            'cellphone'           => ['nullable', 'string', 'max:20'],
+            'cellphone_whatsapp'  => ['nullable', 'boolean'],
+            'situation'           => ['nullable', 'integer'],
+            'notes'               => ['nullable', 'string', 'max:2000'],
+            'cancellation_reason' => ['nullable', 'string', 'max:2000'],
         ];
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany,
 
 class EntityIntegratorEquipment extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;

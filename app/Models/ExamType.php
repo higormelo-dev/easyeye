@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Concerns\HasUppercaseFields;
 use App\Enums\ExamCategory;
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ExamType extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasFactory;
     use HasUppercaseFields;
     use HasUuids;

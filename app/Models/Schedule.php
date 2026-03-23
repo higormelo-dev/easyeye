@@ -2,14 +2,17 @@
 
 namespace App\Models;
 
-use App\Enums\ScheduleSituation;
+use App\Enums\{PatientMood, ScheduleSituation};
 use App\Presenters\SchedulePresenter;
-use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, SoftDeletes};
+use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Laracasts\Presenter\PresentableTrait;
 
 class Schedule extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasUuids;
     use SoftDeletes;
     use PresentableTrait;
@@ -35,8 +38,12 @@ class Schedule extends Model
         'telephone',
         'cellphone',
         'cellphone_whatsapp',
+        'notes',
+        'cancellation_reason',
         'situation',
         'arrived_at',
+        'confirmed_at',
+        'patient_mood',
         'active',
     ];
 
@@ -75,12 +82,14 @@ class Schedule extends Model
     protected function casts(): array
     {
         return [
-            'situation'  => ScheduleSituation::class,
-            'arrived_at' => 'datetime',
-            'date_time'  => 'datetime',
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
+            'situation'    => ScheduleSituation::class,
+            'patient_mood' => PatientMood::class,
+            'arrived_at'  => 'datetime',
+            'confirmed_at' => 'datetime',
+            'date_time'   => 'datetime',
+            'created_at'  => 'datetime',
+            'updated_at'  => 'datetime',
+            'deleted_at'  => 'datetime',
         ];
     }
 
@@ -107,6 +116,11 @@ class Schedule extends Model
     public function visitType(): BelongsTo
     {
         return $this->belongsTo(VisitType::class, 'visit_id');
+    }
+
+    public function situationLogs(): HasMany
+    {
+        return $this->hasMany(ScheduleSituationLog::class)->orderBy('created_at');
     }
 
     protected function fullName(): Attribute

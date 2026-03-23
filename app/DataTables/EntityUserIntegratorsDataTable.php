@@ -46,7 +46,8 @@ class EntityUserIntegratorsDataTable extends BaseDataTable
     {
         $query = $model->newQuery()
             ->withTrashed()
-            ->select('entity_user_integrators.*');
+            ->select('entity_user_integrators.*')
+            ->selectRaw('(SELECT COUNT(*) FROM entity_integrators WHERE entity_integrators.entity_user_integrator_id = entity_user_integrators.id AND entity_integrators.deleted_at IS NULL) as integrators_count');
 
         if ($this->entityId) {
             $query->where('entity_id', $this->entityId);
@@ -75,6 +76,9 @@ class EntityUserIntegratorsDataTable extends BaseDataTable
     public function getColumns(): array
     {
         return [
+            Column::make('code')
+                ->title(__('actions.code'))
+                ->searchable(false),
             Column::make('created_at')
                 ->title(__('actions.created_at'))
                 ->searchable(false),
@@ -111,10 +115,18 @@ class EntityUserIntegratorsDataTable extends BaseDataTable
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
-            $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.index', [$this->entityId, $record->id]) . '"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.integrators') . '"><i class="fas fa-cogs"></i></a>';
+            if ($record->integrators_count > 0) {
+                $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.index', [$this->entityId, $record->id]) . '"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="' . __('actions.integrators') . '"><i class="fas fa-cogs"></i></a>';
+            } else {
+                $btnActions .= '<a href="javascript:void(0);"
+                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 disabled"
+                    aria-disabled="true" tabindex="-1"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom"
+                    title="' . __('actions.integrators') . '"><i class="fas fa-cogs"></i></a>';
+            }
 
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"

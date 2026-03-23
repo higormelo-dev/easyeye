@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, ScheduleSituation};
+use App\Enums\{ClientRule, PatientMood, ScheduleSituation};
 use App\Http\Requests\ScheduleRequest;
-use App\Models\{Covenant, Doctor, Schedule, VisitType};
+use App\Models\{Covenant, Doctor, IrisType, People, Schedule, ScheduleSituationLog, SkinType, VisitType};
 use App\Services\ScheduleService;
 use Carbon\Carbon;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 
 class SchedulesController extends Controller
 {
@@ -38,6 +39,14 @@ class SchedulesController extends Controller
             $q->where('entity_id', $entityId)->orWhereNull('entity_id');
         })->where('active', true)->orderBy('name')->get();
 
+        // Lookups para o modal de edição da ficha do paciente
+        $genders          = People::$genders;
+        $maritalStatuses  = People::$maritalStatuses;
+        $statesOfBrazil   = People::$statesOfBrazil;
+        $skinTypes        = SkinType::all()->pluck('name', 'id')->toArray();
+        $irisTypes        = IrisType::all()->pluck('name', 'id')->toArray();
+        $patientCovenants = Covenant::orderBy('name')->get()->pluck('name', 'id')->toArray();
+
         $meta = [
             'title'       => $this->titleController,
             'action'      => __('actions.records'),
@@ -60,7 +69,11 @@ class SchedulesController extends Controller
             ],
         ];
 
-        return view('system.schedules.index', compact('doctors', 'covenants', 'visitTypes', 'meta', 'loggedDoctor'));
+        return view('system.schedules.index', compact(
+            'doctors', 'covenants', 'visitTypes', 'meta', 'loggedDoctor',
+            'genders', 'maritalStatuses', 'statesOfBrazil',
+            'skinTypes', 'irisTypes', 'patientCovenants'
+        ));
     }
 
     /**
@@ -112,7 +125,7 @@ class SchedulesController extends Controller
 
     public function show(Schedule $schedule): mixed
     {
-        $schedule->load(['doctor.entityUser.user', 'patient.person', 'covenant', 'visitType']);
+        $schedule->load(['doctor.entityUser.user', 'patient.person', 'covenant', 'visitType', 'situationLogs.entityUser.user']);
 
         if (request()->wantsJson()) {
             return response()->json([
@@ -161,6 +174,15 @@ class SchedulesController extends Controller
     public function updateSituation(Request $request, Schedule $schedule): JsonResponse
     {
         $situation = ScheduleSituation::from($request->integer('situation'));
+        $notes     = $request->string('notes')->trim()->value() ?: null;
+
+        if ($schedule->situation->isTerminal()) {
+            return response()->json(['message' => 'Agendamento já finalizado e não pode ser alterado.'], 422);
+        }
+
+        if (! in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
+            return response()->json(['message' => 'Transição de situação não permitida.'], 422);
+        }
 
         $data = ['situation' => $situation->value];
 
@@ -168,7 +190,26 @@ class SchedulesController extends Controller
             $data['arrived_at'] = now();
         }
 
+        if ($situation === ScheduleSituation::Confirmed) {
+            $data['confirmed_at'] = now();
+        }
+
+        if ($situation === ScheduleSituation::Cancelled && $notes) {
+            $data['cancellation_reason'] = $notes;
+        }
+
+        $fromSituation = $schedule->situation;
+
         $schedule->update($data);
+
+        ScheduleSituationLog::create([
+            'schedule_id'    => $schedule->id,
+            'entity_user_id' => session('selected_entity_user_id'),
+            'from_situation' => $fromSituation->value,
+            'to_situation'   => $situation->value,
+            'notes'          => $notes,
+            'created_at'     => now(),
+        ]);
 
         Cache::forget("waiting_room:{$schedule->entity_id}");
 
@@ -176,7 +217,70 @@ class SchedulesController extends Controller
             'message'   => 'Situação atualizada.',
             'situation' => $situation->value,
             'label'     => $situation->label(),
+            'badge'     => $situation->badgeClass(),
         ]);
+    }
+
+    public function reschedule(Request $request, Schedule $schedule): JsonResponse
+    {
+        $request->validate([
+            'date_time' => ['required', 'date'],
+            'doctor_id' => ['nullable', 'uuid'],
+        ]);
+
+        $entityId = session()->get('selected_entity_id');
+        $doctorId = $request->input('doctor_id') ?: $schedule->doctor_id;
+
+        $newSchedule = $this->model->create([
+            'entity_id'          => $entityId,
+            'doctor_id'          => $doctorId,
+            'patient_id'         => $schedule->patient_id,
+            'covenant_id'        => $schedule->covenant_id,
+            'visit_id'           => $schedule->visit_id,
+            'full_name'          => $schedule->full_name,
+            'date_time'          => Carbon::parse($request->input('date_time')),
+            'telephone'          => $schedule->telephone,
+            'cellphone'          => $schedule->cellphone,
+            'cellphone_whatsapp' => $schedule->cellphone_whatsapp,
+            'notes'              => $schedule->notes,
+            'situation'          => ScheduleSituation::Scheduled->value,
+            'active'             => true,
+        ]);
+
+        $cancelNote = 'Reagendado para ' . $newSchedule->code;
+        $fromSituation = $schedule->situation;
+
+        $schedule->update([
+            'situation'           => ScheduleSituation::Cancelled->value,
+            'cancellation_reason' => $cancelNote,
+        ]);
+
+        ScheduleSituationLog::create([
+            'schedule_id'    => $schedule->id,
+            'entity_user_id' => session('selected_entity_user_id'),
+            'from_situation' => $fromSituation->value,
+            'to_situation'   => ScheduleSituation::Cancelled->value,
+            'notes'          => $cancelNote,
+            'created_at'     => now(),
+        ]);
+
+        Cache::forget("waiting_room:{$schedule->entity_id}");
+
+        return response()->json([
+            'message'      => 'Reagendamento realizado com sucesso.',
+            'new_schedule' => $newSchedule,
+        ], 201);
+    }
+
+    public function updateMood(Request $request, Schedule $schedule): JsonResponse
+    {
+        $request->validate([
+            'mood' => ['nullable', Rule::enum(PatientMood::class)],
+        ]);
+
+        $schedule->update(['patient_mood' => $request->input('mood')]);
+
+        return response()->json(['message' => 'Humor atualizado.']);
     }
 
     private function loggedDoctor(): ?Doctor

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Presenters\PatientPresenter;
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
@@ -10,6 +11,8 @@ use Laracasts\Presenter\PresentableTrait;
 
 class Patient extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;

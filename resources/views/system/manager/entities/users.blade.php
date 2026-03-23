@@ -6,6 +6,14 @@
 
 @section('content')
 
+<div class="row mb-3 align-items-center">
+    <div class="col-12 col-md-auto">
+        <a href="{{ route('panel.manager.entities.index') }}" class="btn btn-secondary btn-sm">
+            <i class="fas fa-arrow-left"></i> {{ __('actions.back') }}
+        </a>
+    </div>
+</div>
+
 <div class="card">
     <h5 class="card-header">{{ $meta['action'] }}</h5>
     <div class="card-body">

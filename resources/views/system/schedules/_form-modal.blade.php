@@ -185,19 +185,28 @@
             </div>
 
             {{-- Celular --}}
-            <div class="col-md-5">
+            <div class="col-md-6">
                 <label class="form-label">Celular</label>
                 <input type="text" class="form-control" x-model="form.cellphone" x-mask-br="'cel'" maxlength="15" placeholder="(00) 00000-0000">
             </div>
 
             {{-- WhatsApp --}}
-            <div class="col-md-1 d-flex align-items-end">
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="checkbox" x-model="form.cellphone_whatsapp" id="whatsapp">
-                    <label class="form-check-label" for="whatsapp">
-                        <i class="fab fa-whatsapp text-success fs-5"></i>
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="scheduleWhatsapp" x-model="form.cellphone_whatsapp">
+                    <label class="form-check-label" for="scheduleWhatsapp">
+                        <i class="fab fa-whatsapp text-success"></i> Celular é WhatsApp
                     </label>
                 </div>
+            </div>
+
+            {{-- Observações --}}
+            <div class="col-md-12">
+                <label class="form-label">Observações</label>
+                <textarea class="form-control"
+                          x-model="form.notes"
+                          rows="2"
+                          placeholder="Informações adicionais sobre o agendamento..."></textarea>
             </div>
 
         </div>

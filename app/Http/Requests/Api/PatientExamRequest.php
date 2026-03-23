@@ -126,8 +126,12 @@ class PatientExamRequest extends FormRequest
             ],
             'archive'              => 'required|file|mimes:jpg,jpeg,png|max:10240',
             'equipment_identifier' => [
-                'required',
+                'nullable',
                 function ($attribute, $value, $fail) use ($integrator) {
+                    if ($value === null) {
+                        return;
+                    }
+
                     $isUuid = preg_match(
                         '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
                         $value

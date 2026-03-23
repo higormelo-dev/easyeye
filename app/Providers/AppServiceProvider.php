@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\AuditService;
 use App\Services\FeatureGateService;
+use App\Services\VersionService;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -18,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // Singleton para que o cache por request funcione corretamente
         $this->app->singleton(FeatureGateService::class);
+        $this->app->singleton(AuditService::class);
+        $this->app->singleton(VersionService::class);
     }
 
     /**

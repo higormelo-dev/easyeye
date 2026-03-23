@@ -3,17 +3,21 @@
 namespace App\Models;
 
 use App\Concerns\{HasEntityCode, HasUppercaseName};
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class AdditionType extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasEntityCode;
     use HasUppercaseName;
     use HasUuids;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'AT';
+    protected string $codePrefix = 'AT';
+
     protected string $codePrefixGlobal = 'ATP';
 
     protected $fillable = ['entity_id', 'code', 'name', 'active'];

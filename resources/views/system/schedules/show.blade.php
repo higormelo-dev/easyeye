@@ -99,6 +99,24 @@
                         <td>{{ $schedule->arrived_at->format('d/m/Y H:i') }}</td>
                     </tr>
                 @endif
+                @if($schedule->confirmed_at)
+                    <tr>
+                        <th>Confirmado em</th>
+                        <td>{{ $schedule->confirmed_at->format('d/m/Y H:i') }}</td>
+                    </tr>
+                @endif
+                @if($schedule->notes)
+                    <tr>
+                        <th>Observações</th>
+                        <td>{{ $schedule->notes }}</td>
+                    </tr>
+                @endif
+                @if($schedule->cancellation_reason)
+                    <tr>
+                        <th>Motivo do cancelamento</th>
+                        <td class="text-danger">{{ $schedule->cancellation_reason }}</td>
+                    </tr>
+                @endif
                 <tr>
                     <th>{{ __('actions.created_at') }}</th>
                     <td>{{ $schedule->created_at->format('d/m/Y H:i') }}</td>
@@ -106,5 +124,47 @@
             </tbody>
         </table>
     </div>
+
+    {{-- Histórico de situações --}}
+    @if($schedule->situationLogs->isNotEmpty())
+        <hr>
+        <h6 class="fw-semibold mb-2"><i class="fas fa-history me-1"></i>Histórico</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead class="table-light">
+                    <tr>
+                        <th>De</th>
+                        <th>Para</th>
+                        <th>Por</th>
+                        <th>Quando</th>
+                        <th>Obs.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($schedule->situationLogs as $log)
+                        <tr>
+                            <td>
+                                @if($log->from_situation)
+                                    <span class="badge {{ $log->from_situation->badgeClass() }}">
+                                        {{ $log->from_situation->label() }}
+                                    </span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                <span class="badge {{ $log->to_situation->badgeClass() }}">
+                                    {{ $log->to_situation->label() }}
+                                </span>
+                            </td>
+                            <td class="small">{{ $log->entityUser?->user?->name ?? '—' }}</td>
+                            <td class="small text-nowrap">{{ $log->created_at->format('d/m/Y H:i') }}</td>
+                            <td class="small text-muted">{{ $log->notes ?? '—' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 </fieldset>
 

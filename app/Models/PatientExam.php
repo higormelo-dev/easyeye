@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Storage;
 
 class PatientExam extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasFactory;
     use HasUuids;
 

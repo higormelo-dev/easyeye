@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Presenters\EntityUserPresenter;
+use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,6 +11,8 @@ use Laracasts\Presenter\PresentableTrait;
 
 class EntityUser extends Model
 {
+    use HasAuditColumns;
+    use Auditable;
     use HasUuids;
     use SoftDeletes;
     use PresentableTrait;

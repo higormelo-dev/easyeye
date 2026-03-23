@@ -24,9 +24,14 @@
 
     <div class="row mb-3 align-items-center">
         <div class="col-12 col-md-auto">
+            <div class="btn-group" role="group">
+            <a href="{{ route('panel.manager.entities.index') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> {{ __('actions.back') }}
+            </a>
             <button type="button" class="btn btn-info btn-sm" @click="$dispatch('open-create-user-integrator')">
                 <i class="fa fa-plus"></i> {{ __('actions.new') }}
             </button>
+            </div>
         </div>
     </div>
 

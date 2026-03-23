@@ -12,9 +12,15 @@
 
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('panel.dashboard')" :active="request()->routeIs('dashboard')">
-                        {{ __('Dashboard') }}
-                    </x-nav-link>
+                    @if(session('user_rule') === 'doctor')
+                        <x-nav-link :href="route('panel.waiting-room.index')" :active="request()->routeIs('panel.waiting-room.index')">
+                            {{ __('Sala de Espera') }}
+                        </x-nav-link>
+                    @else
+                        <x-nav-link :href="route('panel.dashboard')" :active="request()->routeIs('panel.dashboard')">
+                            {{ __('Dashboard') }}
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -67,9 +73,15 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('panel.dashboard')" :active="request()->routeIs('dashboard')">
-                {{ __('Dashboard') }}
-            </x-responsive-nav-link>
+            @if(session('user_rule') === 'doctor')
+                <x-responsive-nav-link :href="route('panel.waiting-room.index')" :active="request()->routeIs('panel.waiting-room.index')">
+                    {{ __('Sala de Espera') }}
+                </x-responsive-nav-link>
+            @else
+                <x-responsive-nav-link :href="route('panel.dashboard')" :active="request()->routeIs('panel.dashboard')">
+                    {{ __('Dashboard') }}
+                </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->

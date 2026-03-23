@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\{Entity, EntityUser, User};
+use App\Support\AuditContext;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 // Hash não é necessário: o cast 'hashed' do model User já aplica Hash::make() automaticamente
@@ -15,6 +16,25 @@ class EntityAndUserAdministratorSeeder extends Seeder
      */
     public function run(): void
     {
+        // Cria o $higor primeiro e faz login para que auth()->id()
+        // esteja disponível nos traits HasAuditColumns e Auditable
+        // em todos os registros criados na sequência.
+        $higor = User::create([
+            'name'              => 'Higor',
+            'email'             => 'higor_ap89@icloud.com',
+            'email_verified_at' => Carbon::now(),
+            'password'          => 'Admin@2024!',
+            'remember_token'    => Str::random(10),
+        ]);
+
+        // Define o user_id global para o trait HasAuditColumns,
+        // pois auth()->id() é null em contexto de console/seeder.
+        AuditContext::setUserId($higor->id);
+
+        // Retroage o vínculo no próprio $higor, criado antes do forceUserId
+        $higor->created_by = $higor->id;
+        $higor->saveQuietly();
+
         $entity = Entity::create([
             'name'                   => 'Medical Group',
             'subdomain'              => 'medicalgroup',
@@ -36,13 +56,6 @@ class EntityAndUserAdministratorSeeder extends Seeder
             'logo'                   => null,
             'is_client'              => false,
             'active'                 => true,
-        ]);
-        $higor = User::create([
-            'name'              => 'Higor',
-            'email'             => 'higor_ap89@icloud.com',
-            'email_verified_at' => Carbon::now(),
-            'password'          => 'Admin@2024!',   // cast 'hashed' faz o hash automaticamente
-            'remember_token'    => Str::random(10),
         ]);
         $joao = User::create([
             'name'              => 'João Adachi',

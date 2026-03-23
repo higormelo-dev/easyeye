@@ -14,6 +14,7 @@ return [
     'associate'               => 'Associate',
     'attach'                  => 'Attach',
     'browse'                  => 'Browse',
+    'back'                    => 'Back',
     'cancel'                  => 'Cancel',
     'choose'                  => 'Choose',
     'choose_file'             => 'Choose File',
@@ -257,6 +258,53 @@ return [
             'sSortDescending' => ': activate to sort column descending',
         ],
     ],
+    // Schedule situations
+    'situation_scheduled'  => 'Scheduled',
+    'situation_confirmed'  => 'Confirmed',
+    'situation_waiting'    => 'Waiting',
+    'situation_dilating'   => 'Dilating',
+    'situation_exam'       => 'In Exam',
+    'situation_inprogress' => 'In Consultation',
+    'situation_attended'   => 'Attended',
+    'situation_noshow'     => 'No Show',
+    'situation_cancelled'  => 'Cancelled',
+
+    // Patient mood
+    'mood_happy'   => 'Calm',
+    'mood_anxious' => 'Anxious',
+    'mood_nervous' => 'Agitated',
+    'mood_angry'   => 'Irritated',
+
+    // Schedule card actions
+    'change_situation'      => 'Change status',
+    'patient_mood_label'    => 'Patient mood',
+    'more_options'          => 'More options',
+    'reschedule_action'     => 'Reschedule',
+    'clear'                 => 'Clear',
+    'reschedule_success'    => 'Reschedule completed successfully.',
+    'reschedule_error_date' => 'Date and time are required.',
+
+    // Age
+    'age' => [
+        'label'        => 'Age',
+        'not_informed' => 'NOT INFORMED',
+        'year'         => '{1} 1 YEAR|[2,*] :count YEARS',
+        'month'        => '{1} 1 MONTH|[2,*] :count MONTHS',
+        'day'          => '[0,1] 1 DAY|[2,*] :count DAYS',
+    ],
+
+    // Marital status
+    'marital_status' => [
+        1 => 'Single',
+        2 => 'Married',
+        3 => 'Divorced',
+        4 => 'Widowed',
+        5 => 'Stable Union',
+        6 => 'Legally Separated',
+        7 => 'Marital',
+        8 => 'Other',
+    ],
+
     'messages' => [
         'register'              => 'Register :name',
         'edit'                  => 'Edit :name',
