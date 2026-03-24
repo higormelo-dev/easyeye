@@ -32,6 +32,7 @@
 /* ─── Layout / Page Wrapper ───────────────────────────────────────────── */
 .page-dashboard .page-wrapper {
     background: var(--ee-bg) !important;
+    min-height: auto !important;
 }
 
 .page-dashboard .page-wrapper > .container-fluid {
@@ -196,4 +197,239 @@
     color: rgba(255,255,255,0.78);
     font-size: 0.875rem;
     margin: 0;
+}
+
+/* ─── Banner Buttons ──────────────────────────────────────────────────── */
+.btn-banner {
+    background: rgba(255,255,255,.18) !important;
+    border: 1.5px solid rgba(255,255,255,.70) !important;
+    color: #fff !important;
+    backdrop-filter: blur(4px);
+    font-weight: 600;
+    text-shadow: 0 1px 3px rgba(0,0,0,.25);
+}
+
+.btn-banner:hover {
+    background: rgba(255,255,255,.30) !important;
+    border-color: #fff !important;
+    color: #fff !important;
+}
+
+.btn-banner-solid {
+    background: #fff !important;
+    border-color: #fff !important;
+    color: #1565c0 !important;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    box-shadow: 0 2px 10px rgba(0,0,0,.20);
+}
+
+.btn-banner-solid:hover {
+    background: #e8f0fe !important;
+    border-color: #e8f0fe !important;
+    color: #0d47a1 !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,.22);
+}
+
+/* ─── Module Shortcuts ────────────────────────────────────────────────── */
+.module-shortcut {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 1rem;
+    border-radius: var(--ee-radius-lg) !important;
+    border: 1.5px solid var(--ee-border) !important;
+    background: var(--ee-surface) !important;
+    color: var(--ee-text) !important;
+    font-size: 0.8375rem;
+    font-weight: 500;
+    transition: var(--ee-transition);
+    text-decoration: none;
+    min-height: 90px;
+    cursor: pointer;
+}
+
+.module-shortcut i {
+    font-size: 1.6rem;
+}
+
+/* ─── Pastilha de ícone dentro do module-shortcut ─────────────────────── */
+.module-shortcut .ms-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+    transition: var(--ee-transition);
+}
+
+.module-shortcut:hover .ms-icon {
+    transform: scale(1.1);
+}
+
+.module-shortcut:hover {
+    border-color: var(--ee-primary) !important;
+    background: var(--ee-primary-light) !important;
+    transform: translateY(-2px);
+    box-shadow: var(--ee-shadow) !important;
+    text-decoration: none;
+}
+
+.module-shortcut.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.module-shortcut.disabled i {
+    color: #94a3b8 !important;
+}
+
+/* ─── Badge "Em breve" ────────────────────────────────────────────────── */
+.badge-soon {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.1rem 0.5rem;
+    line-height: 1.4;
+    pointer-events: none;
+}
+
+/* ─── Schedule Table ──────────────────────────────────────────────────── */
+.schedule-table thead th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ee-text-muted);
+    border-bottom: 1px solid var(--ee-border) !important;
+    padding: 0.75rem 1rem;
+    background: #f8fafc;
+}
+
+.schedule-table tbody td {
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid #f1f5f9 !important;
+    vertical-align: middle;
+    font-size: 0.875rem;
+}
+
+.schedule-table tbody tr:last-child td {
+    border-bottom: none !important;
+}
+
+/* ─── Patient Initial Avatar ─────────────────────────────────────────── */
+.patient-initial {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+/* ─── Day Summary Stats ───────────────────────────────────────────────── */
+.day-summary-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    padding: 0.625rem 0.875rem;
+    border-left: 4px solid transparent;
+    border-radius: 0 var(--ee-radius) var(--ee-radius) 0;
+    background: #f8fafc;
+}
+
+.day-summary-stat .ds-value {
+    font-size: 1.625rem;
+    font-weight: 700;
+    line-height: 1;
+    min-width: 2.5rem;
+}
+
+.day-summary-stat .ds-label {
+    font-size: 0.8125rem;
+    color: var(--ee-text-muted);
+    font-weight: 500;
+}
+
+/* ─── Stat Card Mock (KPIs futuros) ──────────────────────────────────── */
+.stat-card-mock {
+    opacity: 0.72;
+}
+
+.stat-card-mock:hover {
+    opacity: 1;
+    cursor: default;
+}
+
+.stat-value-mock {
+    font-size: 1.5rem;
+    color: var(--ee-text-muted) !important;
+}
+
+.stat-badge-soon {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fde68a;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    margin-top: 0.2rem;
+    line-height: 1.4;
+}
+
+/* ─── Demo Buttons ────────────────────────────────────────────────────── */
+.btn-demo-seed {
+    background: #fef9c3;
+    border: 1px solid #fde68a;
+    color: #92400e;
+    font-size: 0.8125rem;
+}
+
+.btn-demo-reset {
+    background: #fff;
+    border: 1px solid #fde68a;
+    color: #b45309;
+    font-size: 0.8125rem;
+}
+
+/* ─── Demo / Test Block ───────────────────────────────────────────────── */
+.demo-block {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-left: 4px solid #f59e0b;
+    border-radius: var(--ee-radius-lg);
+    padding: 1rem 1.25rem;
+}
+
+.demo-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: #fef3c7;
+    color: #d97706;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
 }

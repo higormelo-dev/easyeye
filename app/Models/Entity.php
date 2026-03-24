@@ -52,6 +52,7 @@ class Entity extends Model
         'is_client',
         'active',
         'locale',
+        'schedule_interval',
     ];
 
     /**
@@ -115,11 +116,12 @@ class Entity extends Model
     protected function casts(): array
     {
         return [
-            'is_client'  => 'boolean',
-            'active'     => 'boolean',
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
+            'is_client'         => 'boolean',
+            'active'            => 'boolean',
+            'schedule_interval' => 'integer',
+            'created_at'        => 'datetime',
+            'updated_at'        => 'datetime',
+            'deleted_at'        => 'datetime',
         ];
     }
 

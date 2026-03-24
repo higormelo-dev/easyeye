@@ -5,9 +5,7 @@ use App\Http\Controllers\{DoctorsController,
     PatientsController,
     ProfileController,
     SchedulesController,
-    TvController,
-    UsersController,
-    WaitingRoomController};
+    UsersController};
 use App\Http\Controllers\{MedicalRecordsController, SubscriptionExpiredController};
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
@@ -18,18 +16,9 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     NearPointConvergencesController,
     SkinTypesController,
     SurgeryTypesController,
-    TvDisplaysController,
     VisitTypesController,
     VisualAcuityTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
-
-// Rotas públicas para display de TV (sem autenticação)
-Route::get('/tv', [TvController::class, 'entry'])->name('tv.entry');
-Route::post('/tv/request', [TvController::class, 'requestAccess'])->name('tv.request');
-Route::get('/tv/wait/{id}', [TvController::class, 'wait'])->name('tv.wait');
-Route::get('/tv/status/{id}', [TvController::class, 'pollStatus'])->name('tv.status');
-Route::get('/tv/{token}', [TvController::class, 'show'])->name('tv.show');
-Route::get('/tv/{token}/poll', [TvController::class, 'poll'])->name('tv.poll');
 
 // Rota para trocar o idioma (sem autenticação necessária)
 Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
@@ -77,28 +66,48 @@ Route::group(
                 return view('system.manager.dashboard');
             }
 
-            if (session('user_rule') === \App\Enums\ClientRule::Doctor->value) {
-                return redirect()->route('panel.waiting-room.index');
-            }
-
-            $entityId = session('selected_entity_id');
-            $today    = now()->toDateString();
+            $entityId   = session('selected_entity_id');
+            $today      = now()->toDateString();
+            $doneValues = [
+                \App\Enums\ScheduleSituation::Attended->value,
+                \App\Enums\ScheduleSituation::NoShow->value,
+                \App\Enums\ScheduleSituation::Cancelled->value,
+            ];
 
             $stats = [
-                'today_count' => \App\Models\Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->count(),
+                'entity_name'    => \App\Models\Entity::find($entityId)?->name ?? config('app.name'),
                 'total_patients' => \App\Models\Patient::where('entity_id', $entityId)
                     ->where('active', true)
+                    ->count(),
+                'today_count' => \App\Models\Schedule::where('entity_id', $entityId)
+                    ->whereDate('date_time', $today)
                     ->count(),
                 'total_doctors' => \App\Models\Doctor::query()
                     ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
                     ->where('entity_users.entity_id', $entityId)
+                    ->where('doctors.active', true)
                     ->count(),
                 'pending_today' => \App\Models\Schedule::where('entity_id', $entityId)
                     ->whereDate('date_time', $today)
-                    ->where('situation', \App\Enums\ScheduleSituation::Scheduled->value)
+                    ->whereNotIn('situation', $doneValues)
                     ->count(),
+                'attended_today' => \App\Models\Schedule::where('entity_id', $entityId)
+                    ->whereDate('date_time', $today)
+                    ->where('situation', \App\Enums\ScheduleSituation::Attended->value)
+                    ->count(),
+                'cancelled_today' => \App\Models\Schedule::where('entity_id', $entityId)
+                    ->whereDate('date_time', $today)
+                    ->whereIn('situation', [
+                        \App\Enums\ScheduleSituation::NoShow->value,
+                        \App\Enums\ScheduleSituation::Cancelled->value,
+                    ])
+                    ->count(),
+                'recent_patients' => \App\Models\Patient::with('person')
+                    ->where('entity_id', $entityId)
+                    ->where('active', true)
+                    ->orderByDesc('created_at')
+                    ->limit(8)
+                    ->get(),
             ];
 
             return view('system.dashboard', compact('stats'));
@@ -121,9 +130,6 @@ Route::group(
         Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
         Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
         Route::resource('schedules', SchedulesController::class);
-
-        Route::get('waiting-room', [WaitingRoomController::class, 'index'])->name('waiting-room.index');
-        Route::post('waiting-room/ajaxlist', [WaitingRoomController::class, 'ajaxList'])->name('waiting-room.ajaxlist');
 
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
             Route::get('users/cards', [UsersController::class, 'cards'])->name('users.cards');
@@ -168,12 +174,6 @@ Route::group(
             Route::resource('nearpointconvergences', NearPointConvergencesController::class);
             Route::get('nearpointconvergences/{nearpointconvergence}/restore', [NearPointConvergencesController::class, 'restore'])
                 ->name('nearpointconvergences.restore');
-            Route::prefix('tv-displays')->name('tv-displays.')->group(function () {
-                Route::get('/', [TvDisplaysController::class, 'index'])->name('index');
-                Route::post('/', [TvDisplaysController::class, 'store'])->name('store');
-                Route::post('/{tvDisplay}/approve', [TvDisplaysController::class, 'approve'])->name('approve');
-                Route::delete('/{tvDisplay}', [TvDisplaysController::class, 'destroy'])->name('destroy');
-            });
         });
 
         require __DIR__ . '/manager.php';

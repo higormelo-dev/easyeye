@@ -125,6 +125,7 @@ class PatientExamRequest extends FormRequest
                 },
             ],
             'archive'              => 'required|file|mimes:jpg,jpeg,png|max:10240',
+            'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
             'equipment_identifier' => [
                 'nullable',
                 function ($attribute, $value, $fail) use ($integrator) {
@@ -164,6 +165,12 @@ class PatientExamRequest extends FormRequest
             if ($key === 'archive') {
                 // Não mexer no arquivo
                 $data[$key] = $value;
+
+                continue;
+            }
+
+            if ($key === 'laterality' && is_numeric($value)) {
+                $data[$key] = (int) $value;
 
                 continue;
             }

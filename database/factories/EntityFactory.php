@@ -40,6 +40,7 @@ class EntityFactory extends Factory
             'logo'                   => null,
             'is_client'              => true,
             'active'                 => true,
+            'schedule_interval'      => fake()->randomElement([15, 20, 30]),
         ];
     }
 }

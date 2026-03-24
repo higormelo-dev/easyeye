@@ -33,6 +33,7 @@ class PatientExam extends Model
         'code',
         'archive',
         'name',
+        'laterality',
         'active',
     ];
 
@@ -76,6 +77,7 @@ class PatientExam extends Model
     protected function casts(): array
     {
         return [
+            'laterality' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

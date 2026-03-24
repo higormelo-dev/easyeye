@@ -245,6 +245,36 @@ describe('POST /api/integrators/v1/exams', function () {
         )->assertUnprocessable();
     });
 
+    it('stores laterality when provided', function () {
+        $response = $this->postJson(
+            '/api/integrators/v1/exams',
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Lateralidade Direita',
+                'laterality'          => 2,
+            ],
+            $this->ctx['headers']
+        )->assertCreated();
+
+        expect($response->json('data.attributes.laterality'))->toBe(2);
+    });
+
+    it('returns 422 when laterality is invalid', function () {
+        $this->postJson(
+            '/api/integrators/v1/exams',
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Lateralidade Inválida',
+                'laterality'          => 9,
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
     it('returns 401 without authentication', function () {
         $this->postJson('/api/integrators/v1/exams', [])->assertUnauthorized();
     });

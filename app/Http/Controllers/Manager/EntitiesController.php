@@ -77,6 +77,7 @@ class EntitiesController extends Controller
             'city'                   => $record->city,
             'state'                  => $record->state,
             'country'                => $record->country,
+            'schedule_interval'      => $record->schedule_interval,
             'active'                 => (bool) $record->active,
         ]]);
     }

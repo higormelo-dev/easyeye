@@ -363,6 +363,52 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         )->assertCreated();
     });
 
+    it('stores laterality when provided', function () {
+        $response = $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Lateralidade Esquerda',
+                'laterality'          => 1,
+            ],
+            $this->ctx['headers']
+        )->assertCreated();
+
+        expect($response->json('data.attributes.laterality'))->toBe(1);
+        expect(PatientExam::where('name', 'Exame Lateralidade Esquerda')->first()->laterality)->toBe(1);
+    });
+
+    it('stores null laterality when not provided', function () {
+        $response = $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Sem Lateralidade',
+            ],
+            $this->ctx['headers']
+        )->assertCreated();
+
+        expect($response->json('data.attributes.laterality'))->toBeNull();
+    });
+
+    it('returns 422 when laterality is invalid', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Lateralidade Inválida',
+                'laterality'          => 3,
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
+    });
+
     it('returns 401 without authentication', function () {
         $this->postJson("/api/integrators/v1/patients/{$this->patient->id}/exams", [])
             ->assertUnauthorized();
@@ -565,6 +611,36 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
             ],
             $this->ctx['headers']
         )->assertOk();
+    });
+
+    it('updates laterality on update', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Original',
+                'laterality'          => 2,
+            ],
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect(PatientExam::find($this->exam->id)->laterality)->toBe(2);
+    });
+
+    it('returns 422 when laterality is invalid on update', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Original',
+                'laterality'          => 9,
+            ],
+            $this->ctx['headers']
+        )->assertUnprocessable();
     });
 
     it('returns 404 when patient from another entity', function () {

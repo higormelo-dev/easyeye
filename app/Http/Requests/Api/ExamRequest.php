@@ -75,6 +75,7 @@ class ExamRequest extends FormRequest
                     }
                 },
             ],
+            'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
             'equipment_identifier' => [
                 'nullable',
                 function ($attribute, $value, $fail) use ($integrator) {
@@ -136,6 +137,12 @@ class ExamRequest extends FormRequest
         foreach ($this->all() as $key => $value) {
             if ($key === 'archive') {
                 $data[$key] = $value;
+
+                continue;
+            }
+
+            if ($key === 'laterality' && is_numeric($value)) {
+                $data[$key] = (int) $value;
 
                 continue;
             }

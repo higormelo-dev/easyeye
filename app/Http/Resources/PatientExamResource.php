@@ -25,6 +25,7 @@ class PatientExamResource extends JsonResource
                 'code'                           => $this->code,
                 'archive'                        => $this->archive_url,
                 'name'                           => $this->name,
+                'laterality'                     => $this->laterality,
                 'active'                         => (bool) $this->active,
                 'created_at'                     => $this->created_at,
                 'updated_at'                     => $this->updated_at,

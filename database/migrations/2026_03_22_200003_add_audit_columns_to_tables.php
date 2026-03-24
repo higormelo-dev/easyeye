@@ -44,9 +44,6 @@ return new class extends Migration
         'plan_features',
         'subscriptions',
         'feature_usages',
-
-        // Outros
-        'tv_displays',
     ];
 
     public function up(): void

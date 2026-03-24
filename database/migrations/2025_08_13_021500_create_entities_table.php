@@ -62,6 +62,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::dropIfExists('tv_displays'); // resíduo removido; evita FK block no PostgreSQL
         Schema::dropIfExists('entities');
     }
 };

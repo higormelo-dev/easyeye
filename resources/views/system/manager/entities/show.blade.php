@@ -51,6 +51,10 @@
                     <th>{{ __('actions.municipal_registration') }}</th>
                     <td>{{ $record->municipal_registration ?: '-' }}</td>
                 </tr>
+                <tr>
+                    <th>Intervalo de Consulta</th>
+                    <td>{{ $record->schedule_interval }} minutos</td>
+                </tr>
 
                 <tr><th class="bg-light" colspan="2"><small class="text-muted">{{ __('forms.address') }}</small></th></tr>
                 <tr>

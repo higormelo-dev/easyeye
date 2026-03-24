@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 
 class PatientExamService
 {
-    private const FILLABLE_FIELDS = ['patient_id', 'exam_id', 'doctor_id', 'schedule_id', 'entity_integrator_equipment_id', 'archive', 'name'];
+    private const FILLABLE_FIELDS = ['patient_id', 'exam_id', 'doctor_id', 'schedule_id', 'entity_integrator_equipment_id', 'archive', 'name', 'laterality'];
 
     /**
      * Create a new record with all related entities
@@ -44,6 +44,7 @@ class PatientExamService
                 equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
                 name: $request->name,
                 archiveFile: $request->file('archive'),
+                laterality: $request->laterality !== null ? (int) $request->laterality : null,
             );
         });
     }
@@ -151,6 +152,7 @@ class PatientExamService
             equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
             name: $request->name,
             archiveFile: $request->file('archive'),
+            laterality: $request->laterality !== null ? (int) $request->laterality : null,
         );
     }
 
@@ -166,6 +168,7 @@ class PatientExamService
         ?string $equipmentId,
         ?string $name,
         mixed $archiveFile,
+        ?int $laterality = null,
     ): PatientExam {
         $uuid        = Str::uuid();
         $timestamp   = time();
@@ -197,6 +200,7 @@ class PatientExamService
                     'schedule_id'                    => $scheduleId,
                     'entity_integrator_equipment_id' => $equipmentId,
                     'name'                           => $name,
+                    'laterality'                     => $laterality,
                     'archive'                        => $archivePath,
                 ]);
 
@@ -217,6 +221,7 @@ class PatientExamService
                 'schedule_id'                    => $scheduleId,
                 'entity_integrator_equipment_id' => $equipmentId,
                 'name'                           => $name,
+                'laterality'                     => $laterality,
                 'archive'                        => $archivePath,
             ]);
         }

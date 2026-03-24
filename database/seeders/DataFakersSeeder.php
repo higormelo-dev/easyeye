@@ -19,7 +19,6 @@ use App\Models\{Covenant,
     Schedule,
     SkinType,
     Subscription,
-    TvDisplay,
     User,
     VisitType};
 use Carbon\Carbon;
@@ -164,20 +163,6 @@ class DataFakersSeeder extends Seeder
                 });
             });
 
-            // TVs da sala de espera: 1-3 por entity (mix de estados)
-            $tvCount = fake()->numberBetween(1, 3);
-
-            for ($i = 0; $i < $tvCount; $i++) {
-                $isPending = fake()->boolean(25); // ~25% pendente, ~75% ativa
-                TvDisplay::create([
-                    'entity_id' => $entity->id,
-                    'name'      => 'TV Sala ' . ($i + 1),
-                    'status'    => $isPending ? TvDisplay::STATUS_PENDING : TvDisplay::STATUS_ACTIVE,
-                    'token'     => $isPending ? null : TvDisplay::generateToken(),
-                    'pin'       => $isPending ? TvDisplay::generatePin() : null,
-                    'active'    => ! $isPending,
-                ]);
-            }
         });
 
         // ── Integrador de teste com credenciais fixas ────────────────────────
@@ -224,6 +209,83 @@ class DataFakersSeeder extends Seeder
             'active'                    => true,
         ]);
 
+        // ── Usuários fixos da Clínica Teste Integrador ───────────────────────
+
+        // Admin
+        $testAdminPerson = People::create([
+            'full_name' => 'ADMIN CLÍNICA TESTE',
+            'email'     => 'admin@clinicateste.com',
+            'cellphone' => '',
+        ]);
+        $testAdminUser = User::create([
+            'name'              => $testAdminPerson->full_name,
+            'email'             => 'admin@clinicateste.com',
+            'email_verified_at' => now(),
+            'password'          => Hash::make('Admin@123'),
+        ]);
+        EntityUser::create([
+            'entity_id' => $testEntity->id,
+            'user_id'   => $testAdminUser->id,
+            'rule'      => 'admin',
+            'active'    => true,
+        ]);
+
+        // Dra. Ana Lima
+        $testAnaPersona = People::create([
+            'full_name' => 'DRA. ANA LIMA',
+            'email'     => 'dra.ana@clinicateste.com',
+            'cellphone' => '',
+        ]);
+        $testAnaUser = User::create([
+            'name'              => $testAnaPersona->full_name,
+            'email'             => 'dra.ana@clinicateste.com',
+            'email_verified_at' => now(),
+            'password'          => Hash::make('Medico@123'),
+        ]);
+        $testAnaEntityUser = EntityUser::create([
+            'entity_id' => $testEntity->id,
+            'user_id'   => $testAnaUser->id,
+            'rule'      => 'doctor',
+            'active'    => true,
+        ]);
+        Doctor::create([
+            'entity_user_id'   => $testAnaEntityUser->id,
+            'person_id'        => $testAnaPersona->id,
+            'record'           => '123456',
+            'record_specialty' => '12345',
+            'color'            => '#e91e63',
+            'partner'          => false,
+            'active'           => true,
+        ]);
+
+        // Dr. Carlos Souza
+        $testCarlosPerson = People::create([
+            'full_name' => 'DR. CARLOS SOUZA',
+            'email'     => 'dr.carlos@clinicateste.com',
+            'cellphone' => '',
+        ]);
+        $testCarlosUser = User::create([
+            'name'              => $testCarlosPerson->full_name,
+            'email'             => 'dr.carlos@clinicateste.com',
+            'email_verified_at' => now(),
+            'password'          => Hash::make('Medico@123'),
+        ]);
+        $testCarlosEntityUser = EntityUser::create([
+            'entity_id' => $testEntity->id,
+            'user_id'   => $testCarlosUser->id,
+            'rule'      => 'doctor',
+            'active'    => true,
+        ]);
+        Doctor::create([
+            'entity_user_id'   => $testCarlosEntityUser->id,
+            'person_id'        => $testCarlosPerson->id,
+            'record'           => '654321',
+            'record_specialty' => '54321',
+            'color'            => '#1976d2',
+            'partner'          => false,
+            'active'           => true,
+        ]);
+
         $this->command->info('');
         $this->command->info('═══════════════════════════════════════════════════════');
         $this->command->info('  INTEGRADOR DE TESTE — credenciais fixas');
@@ -234,6 +296,21 @@ class DataFakersSeeder extends Seeder
         $this->command->info('  code     : ' . $testIntegrator->code);
         $this->command->info('  entity   : ' . $testEntity->name);
         $this->command->info('  plano    : Pro (has_api_integrator=1, api_monthly_exam_sends=100)');
+        $this->command->info('═══════════════════════════════════════════════════════');
+        $this->command->info('');
+        $this->command->info('═══════════════════════════════════════════════════════');
+        $this->command->info('  CLÍNICA TESTE — credenciais fixas');
+        $this->command->info('═══════════════════════════════════════════════════════');
+        $this->command->info('  ADMIN');
+        $this->command->info('  email   : admin@clinicateste.com');
+        $this->command->info('  password: Admin@123');
+        $this->command->info('───────────────────────────────────────────────────────');
+        $this->command->info('  MÉDICO 1 — Dra. Ana Lima');
+        $this->command->info('  email   : dra.ana@clinicateste.com');
+        $this->command->info('  password: Medico@123');
+        $this->command->info('  MÉDICO 2 — Dr. Carlos Souza');
+        $this->command->info('  email   : dr.carlos@clinicateste.com');
+        $this->command->info('  password: Medico@123');
         $this->command->info('═══════════════════════════════════════════════════════');
         $this->command->info('');
 
@@ -266,8 +343,12 @@ class DataFakersSeeder extends Seeder
         $doctorCount = 250;
 
         for ($i = 0; $i < $doctorCount; $i++) {
-            $userDoctor = User::factory()->create(['password' => Hash::make('123456789')]);
             $person     = People::factory()->create();
+            $userDoctor = User::factory()->create([
+                'name'     => $person->full_name,
+                'email'    => $person->email,
+                'password' => Hash::make('123456789'),
+            ]);
 
             $numberOfEntities = fake()->numberBetween(1, 6);
             $selectedEntities = $entities->random($numberOfEntities);
@@ -299,7 +380,7 @@ class DataFakersSeeder extends Seeder
     }
 
     /**
-     * Criar schedules cobrindo 15 dias passados e 15 dias futuros (dias úteis).
+     * Criar schedules cobrindo 1 mês passado e 3 meses futuros (segunda a domingo).
      * Situações realistas: passados → Attended/NoShow/Cancelled; futuros → Scheduled/Cancelled.
      * PatientExams são gerados para 30% dos agendamentos já Attended.
      */
@@ -312,6 +393,7 @@ class DataFakersSeeder extends Seeder
 
         // Cache em memória para evitar queries repetidas durante o loop
         $entityUsers        = EntityUser::all()->keyBy('id');
+        $entitiesById       = Entity::all()->keyBy('id');
         $allPatients        = Patient::with('person')->get()->groupBy('entity_id');
         $allCovenants       = Covenant::all();
         $globalCovenants    = $allCovenants->whereNull('entity_id');
@@ -333,14 +415,15 @@ class DataFakersSeeder extends Seeder
                 : 0;
         }
 
-        // Janela temporal: início do mês corrente até agora
-        $startDate = Carbon::now()->startOfMonth()->startOfDay();
+        // Janela temporal: 1 mês passado até 3 meses futuros (todos os dias)
+        $startDate = Carbon::now()->subMonth()->startOfDay();
+        $endDate   = Carbon::now()->addMonths(3)->endOfDay();
         $date      = $startDate->copy();
 
         // Coleta de agendamentos Attended para gerar PatientExams posteriormente
         $attendedForExams = [];
 
-        while ($date->lte(Carbon::now())) {
+        while ($date->lte($endDate)) {
             $usedPatientsPerDay = [];
             $isPast             = $date->copy()->endOfDay()->isPast();
 
@@ -377,8 +460,9 @@ class DataFakersSeeder extends Seeder
                     continue;
                 }
 
-                $morningSlots   = $this->generateTimeSlots($date, 8, 12, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast);
-                $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast);
+                $interval       = $entitiesById->get($entityId)?->schedule_interval ?? 15;
+                $morningSlots   = $this->generateTimeSlots($date, 8, 12, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast, $interval);
+                $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast, $interval);
 
                 foreach (array_merge($morningSlots, $afternoonSlots) as $slot) {
                     $schedulesBatch[] = $slot;
@@ -427,6 +511,7 @@ class DataFakersSeeder extends Seeder
         array &$codeCounter,
         array &$usedPatientsPerDay,
         bool $isPast = false,
+        int $intervalMinutes = 15,
     ): array {
         $schedules   = [];
         $currentTime = $date->copy()->setTime($startHour, 0, 0);
@@ -507,7 +592,7 @@ class DataFakersSeeder extends Seeder
                 'updated_at'         => $now,
             ];
 
-            $currentTime->addMinutes(fake()->numberBetween(20, 30));
+            $currentTime->addMinutes($intervalMinutes);
         }
 
         return $schedules;
@@ -547,6 +632,7 @@ class DataFakersSeeder extends Seeder
                     'exam_id'     => $examTypesOfEntity->random()->id,
                     'archive'     => 'exams/fake-' . Str::uuid() . '.jpg',
                     'name'        => fake()->optional(0.5)->sentence(3),
+                    'laterality'  => fake()->randomElement([null, null, 0, 1, 2]),
                     'active'      => true,
                 ]);
             }

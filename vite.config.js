@@ -30,7 +30,6 @@ export default defineConfig({
                 'resources/js/system/surgerytypes.js',
                 'resources/js/system/covertesttypes.js',
                 'resources/js/system/visualacuitytypes.js',
-                'resources/js/system/tv-displays.js',
                 'resources/js/auth/password-toggle.js',
             ],
             refresh: true,

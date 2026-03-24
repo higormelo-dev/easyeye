@@ -12,7 +12,7 @@
         fields: {
             name: '', subdomain: '', email: '', telephone: '', cellphone: '',
             national_registration: '', state_registration: '', municipal_registration: '',
-            website: '', active: true,
+            website: '', schedule_interval: 15, active: true,
             zipcode: '', address: '', number: '', complement: '',
             district: '', city: '', state: '', country: ''
         },

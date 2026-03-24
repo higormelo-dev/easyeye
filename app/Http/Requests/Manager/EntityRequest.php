@@ -37,6 +37,7 @@ class EntityRequest extends FormRequest
             'city'                  => ['nullable', 'string', 'max:100'],
             'state'                 => ['nullable', 'string', 'max:2'],
             'country'               => ['nullable', 'string', 'max:50'],
+            'schedule_interval'     => ['integer', 'in:15,20,30'],
             'active'                => ['boolean'],
         ];
     }

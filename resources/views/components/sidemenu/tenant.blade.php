@@ -6,14 +6,6 @@
     </a>
 </li>
 
-@if(in_array(session('user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true))
-    <li>
-        <a class="waves-effect waves-dark" href="{{ route('panel.waiting-room.index') }}">
-            <i class="fas fa-hourglass-half"></i>
-            <span class="hide-menu">Sala de espera</span>
-        </a>
-    </li>
-@endif
 <li>
     <a class="waves-effect waves-dark" href="{{ route('panel.patients.index') }}">
         <i class="fa fa-users"></i>
@@ -127,11 +119,6 @@
                 <a href="{{ route('panel.setting.nearpointconvergences.index') }}"
                    class="link-underline link-underline-opacity-0">
                     <span class="fa fa-search"></span> {{ __('actions.sidemenu.nearpointconvergences') }}
-                </a>
-            </li>
-            <li>
-                <a href="{{ route('panel.setting.tv-displays.index') }}" class="link-underline link-underline-opacity-0">
-                    <span class="fas fa-tv"></span> Displays de TV
                 </a>
             </li>
         </ul>

@@ -13,8 +13,8 @@
                 <!-- Navigation Links -->
                 <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
                     @if(session('user_rule') === 'doctor')
-                        <x-nav-link :href="route('panel.waiting-room.index')" :active="request()->routeIs('panel.waiting-room.index')">
-                            {{ __('Sala de Espera') }}
+                        <x-nav-link :href="route('panel.schedules.index')" :active="request()->routeIs('panel.schedules.*')">
+                            {{ __('Agenda') }}
                         </x-nav-link>
                     @else
                         <x-nav-link :href="route('panel.dashboard')" :active="request()->routeIs('panel.dashboard')">
@@ -74,8 +74,8 @@
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
             @if(session('user_rule') === 'doctor')
-                <x-responsive-nav-link :href="route('panel.waiting-room.index')" :active="request()->routeIs('panel.waiting-room.index')">
-                    {{ __('Sala de Espera') }}
+                <x-responsive-nav-link :href="route('panel.schedules.index')" :active="request()->routeIs('panel.schedules.*')">
+                    {{ __('Agenda') }}
                 </x-responsive-nav-link>
             @else
                 <x-responsive-nav-link :href="route('panel.dashboard')" :active="request()->routeIs('panel.dashboard')">

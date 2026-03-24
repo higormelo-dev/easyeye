@@ -165,19 +165,11 @@
                                 </ul>
                             </a>
                         </li>
-                        @if(session('user_rule') === \App\Enums\ClientRule::Doctor->value)
-                            <li>
-                                <a class="waves-effect waves-dark" href="{{ route('panel.waiting-room.index') }}">
-                                    <i class="fas fa-hourglass-half"></i><span class="hide-menu">Sala de espera</span>
-                                </a>
-                            </li>
-                        @else
-                            <li>
-                                <a class="waves-effect waves-dark" href="{{ route('panel.dashboard') }}">
-                                    <i class="icon-speedometer"></i><span class="hide-menu">Dashboard</span>
-                                </a>
-                            </li>
-                        @endif
+                        <li>
+                            <a class="waves-effect waves-dark" href="{{ route('panel.dashboard') }}">
+                                <i class="icon-speedometer"></i><span class="hide-menu">Dashboard</span>
+                            </a>
+                        </li>
                         @if(!session()->get('selected_entity_is_client'))
                             @include('components.sidemenu.manager')
                         @else
