@@ -25,6 +25,13 @@ export default ({ storeUrl, updateUrl = null, deleteUrl = null, fields = {}, onS
         this._updateUrl = editUrl;
         this.editing    = true;
         this.errors     = {};
+
+        // Notify slotPicker so it can pre-select the correct date/slot
+        this.$nextTick(() => {
+            window.dispatchEvent(new CustomEvent('schedule-edit-init', {
+                detail: { date_time: this.form.date_time ?? '' },
+            }));
+        });
     },
 
     // ── Carrega dados para edição via AJAX e abre o modal ────────────────────

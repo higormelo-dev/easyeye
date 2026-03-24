@@ -31,6 +31,9 @@ Alpine.data('datatableManager', datatableManager);
 import registerWizard from './components/registerWizard';
 Alpine.data('registerWizard', registerWizard);
 
+import slotPicker from './components/slotPicker';
+Alpine.data('slotPicker', slotPicker);
+
 window.Alpine = Alpine;
 
 Alpine.start();

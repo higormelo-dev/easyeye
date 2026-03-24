@@ -2,24 +2,20 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ScheduleService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class ScheduleRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
         return true;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
     public function rules(): array
@@ -29,7 +25,7 @@ class ScheduleRequest extends FormRequest
                 'required',
                 'uuid',
                 function ($attribute, $value, $fail) {
-                    $exists = DB::table('doctors')
+                    $exists = \Illuminate\Support\Facades\DB::table('doctors')
                         ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
                         ->where('doctors.id', $value)
                         ->where('entity_users.entity_id', session()->get('selected_entity_id'))
@@ -76,18 +72,24 @@ class ScheduleRequest extends FormRequest
                 'required',
                 'date',
                 function ($attribute, $value, $fail) {
-                    $dt    = Carbon::parse($value);
-                    $query = DB::table('schedules')
-                        ->where('doctor_id', $this->input('doctor_id'))
-                        ->where('date_time', $dt->format('Y-m-d H:i:s'))
-                        ->whereNull('deleted_at');
+                    $doctorId = $this->input('doctor_id');
 
-                    if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
-                        $query->where('id', '!=', $this->route('schedule'));
+                    if (! $doctorId || ! Str::isUuid($doctorId)) {
+                        return; // doctor_id validation will already report the error
                     }
 
-                    if ($query->exists()) {
-                        $fail(__('validation.custom.schedule.doctor_datetime_unique'));
+                    $excludeId = ($this->isMethod('PUT') || $this->isMethod('PATCH'))
+                        ? $this->route('schedule')
+                        : null;
+
+                    $errors = app(ScheduleService::class)->validateSlot(
+                        $doctorId,
+                        Carbon::parse($value),
+                        $excludeId
+                    );
+
+                    if (! empty($errors)) {
+                        $fail($errors[0]);
                     }
                 },
             ],

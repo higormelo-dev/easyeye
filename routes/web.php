@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\{DoctorsController,
+    DoctorWorkScheduleController,
     LocaleController,
     PatientsController,
     ProfileController,
@@ -115,6 +116,11 @@ Route::group(
 
         Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');
         Route::get('doctors/{doctor}/edit-data', [DoctorsController::class, 'editData'])->name('doctors.editData');
+        Route::get('doctors/{doctor}/work-schedule/data', [DoctorWorkScheduleController::class, 'data'])->name('doctors.work-schedule.data');
+        Route::get('doctors/{doctor}/work-schedule', [DoctorWorkScheduleController::class, 'index'])->name('doctors.work-schedule.index');
+        Route::put('doctors/{doctor}/work-schedule', [DoctorWorkScheduleController::class, 'sync'])->name('doctors.work-schedule.sync');
+        Route::post('doctors/{doctor}/blocks', [DoctorWorkScheduleController::class, 'storeBlock'])->name('doctors.blocks.store');
+        Route::delete('doctors/{doctor}/blocks/{block}', [DoctorWorkScheduleController::class, 'destroyBlock'])->name('doctors.blocks.destroy');
         Route::resource('doctors', DoctorsController::class);
         Route::get('patients/cards', [PatientsController::class, 'cards'])->name('patients.cards');
         Route::get('patients/search', [PatientsController::class, 'search'])->name('patients.search');
@@ -129,6 +135,7 @@ Route::group(
         Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
         Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
         Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
+        Route::get('schedules/slots', [SchedulesController::class, 'slots'])->name('schedules.slots');
         Route::resource('schedules', SchedulesController::class);
 
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {

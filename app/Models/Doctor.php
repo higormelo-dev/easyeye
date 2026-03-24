@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
 
 class Doctor extends Model
 {
@@ -32,6 +32,7 @@ class Doctor extends Model
         'partner',
         'active',
         'observation',
+        'schedule_interval',
     ];
 
     /**
@@ -68,9 +69,10 @@ class Doctor extends Model
     protected function casts(): array
     {
         return [
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
+            'schedule_interval' => 'integer',
+            'created_at'        => 'datetime',
+            'updated_at'        => 'datetime',
+            'deleted_at'        => 'datetime',
         ];
     }
 
@@ -82,5 +84,28 @@ class Doctor extends Model
     public function person(): BelongsTo
     {
         return $this->belongsTo(People::class, 'person_id', 'id');
+    }
+
+    public function workSchedules(): HasMany
+    {
+        return $this->hasMany(DoctorWorkSchedule::class)->orderBy('day_of_week')->orderBy('starts_at');
+    }
+
+    public function scheduleBlocks(): HasMany
+    {
+        return $this->hasMany(ScheduleBlock::class)->orderBy('starts_at');
+    }
+
+    /**
+     * Returns the effective consultation interval in minutes.
+     * Falls back to entity setting, then to 15 minutes.
+     */
+    public function effectiveInterval(): int
+    {
+        if ($this->schedule_interval !== null) {
+            return $this->schedule_interval;
+        }
+
+        return $this->entityUser->entity->schedule_interval ?? 15;
     }
 }

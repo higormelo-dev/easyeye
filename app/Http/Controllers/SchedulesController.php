@@ -7,9 +7,11 @@ use App\Http\Requests\ScheduleRequest;
 use App\Models\{Covenant, Doctor, IrisType, People, Schedule, ScheduleSituationLog, SkinType, VisitType};
 use App\Services\ScheduleService;
 use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class SchedulesController extends Controller
 {
@@ -125,6 +127,8 @@ class SchedulesController extends Controller
 
     public function show(Schedule $schedule): mixed
     {
+        $this->authorizeSchedule($schedule);
+
         $schedule->load(['doctor.entityUser.user', 'patient.person', 'covenant', 'visitType', 'situationLogs.entityUser.user']);
 
         if (request()->wantsJson()) {
@@ -142,9 +146,16 @@ class SchedulesController extends Controller
     {
         $entityId = session()->get('selected_entity_id');
 
-        $schedule = $this->model->create(
-            array_merge($request->validated(), ['entity_id' => $entityId])
-        );
+        try {
+            $schedule = $this->model->create(
+                array_merge($request->validated(), ['entity_id' => $entityId])
+            );
+        } catch (UniqueConstraintViolationException) {
+            // Race condition: two requests passed validation simultaneously
+            throw ValidationException::withMessages([
+                'date_time' => [__('validation.custom.schedule.doctor_datetime_unique')],
+            ]);
+        }
 
         return response()->json([
             'message' => 'Agendamento criado com sucesso.',
@@ -154,7 +165,15 @@ class SchedulesController extends Controller
 
     public function update(ScheduleRequest $request, Schedule $schedule): JsonResponse
     {
-        $schedule->update($request->validated());
+        $this->authorizeSchedule($schedule);
+
+        try {
+            $schedule->update($request->validated());
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'date_time' => [__('validation.custom.schedule.doctor_datetime_unique')],
+            ]);
+        }
 
         return response()->json([
             'message' => 'Agendamento atualizado com sucesso.',
@@ -164,6 +183,8 @@ class SchedulesController extends Controller
 
     public function destroy(Schedule $schedule): JsonResponse
     {
+        $this->authorizeSchedule($schedule);
+
         $schedule->delete();
 
         return response()->json([
@@ -173,6 +194,8 @@ class SchedulesController extends Controller
 
     public function updateSituation(Request $request, Schedule $schedule): JsonResponse
     {
+        $this->authorizeSchedule($schedule);
+
         $situation = ScheduleSituation::from($request->integer('situation'));
         $notes     = $request->string('notes')->trim()->value() ?: null;
 
@@ -223,6 +246,8 @@ class SchedulesController extends Controller
 
     public function reschedule(Request $request, Schedule $schedule): JsonResponse
     {
+        $this->authorizeSchedule($schedule);
+
         $request->validate([
             'date_time' => ['required', 'date'],
             'doctor_id' => ['nullable', 'uuid'],
@@ -230,6 +255,13 @@ class SchedulesController extends Controller
 
         $entityId = session()->get('selected_entity_id');
         $doctorId = $request->input('doctor_id') ?: $schedule->doctor_id;
+        $dateTime = Carbon::parse($request->input('date_time'));
+
+        $errors = $this->service->validateSlot($doctorId, $dateTime);
+
+        if (! empty($errors)) {
+            return response()->json(['message' => $errors[0]], 422);
+        }
 
         $newSchedule = $this->model->create([
             'entity_id'          => $entityId,
@@ -238,7 +270,7 @@ class SchedulesController extends Controller
             'covenant_id'        => $schedule->covenant_id,
             'visit_id'           => $schedule->visit_id,
             'full_name'          => $schedule->full_name,
-            'date_time'          => Carbon::parse($request->input('date_time')),
+            'date_time'          => $dateTime,
             'telephone'          => $schedule->telephone,
             'cellphone'          => $schedule->cellphone,
             'cellphone_whatsapp' => $schedule->cellphone_whatsapp,
@@ -274,6 +306,8 @@ class SchedulesController extends Controller
 
     public function updateMood(Request $request, Schedule $schedule): JsonResponse
     {
+        $this->authorizeSchedule($schedule);
+
         $request->validate([
             'mood' => ['nullable', Rule::enum(PatientMood::class)],
         ]);
@@ -281,6 +315,52 @@ class SchedulesController extends Controller
         $schedule->update(['patient_mood' => $request->input('mood')]);
 
         return response()->json(['message' => 'Humor atualizado.']);
+    }
+
+    public function slots(Request $request): JsonResponse
+    {
+        $request->validate([
+            'doctor_id' => ['required', 'uuid'],
+            'date'      => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        $entityId = session()->get('selected_entity_id');
+        $doctorId = $request->input('doctor_id');
+
+        $doctor = Doctor::query()
+            ->with('entityUser.entity')
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->where('doctors.id', $doctorId)
+            ->where('entity_users.entity_id', $entityId)
+            ->whereNull('doctors.deleted_at')
+            ->select('doctors.*')
+            ->first();
+
+        if (! $doctor) {
+            return response()->json(['has_schedule' => false, 'interval' => 15, 'slots' => []]);
+        }
+
+        $date        = Carbon::parse($request->input('date'));
+        $slots       = $this->service->getAvailableSlots($doctor, $date);
+        $hasSchedule = ! empty($slots) || \App\Models\DoctorWorkSchedule::where('doctor_id', $doctorId)->exists();
+
+        return response()->json([
+            'has_schedule' => $hasSchedule,
+            'interval'     => $doctor->effectiveInterval(),
+            'slots'        => $slots,
+        ]);
+    }
+
+    /**
+     * Abort with 403 if the schedule does not belong to the current session entity.
+     */
+    private function authorizeSchedule(Schedule $schedule): void
+    {
+        abort_if(
+            $schedule->entity_id !== session()->get('selected_entity_id'),
+            403,
+            'Acesso não autorizado a este agendamento.'
+        );
     }
 
     private function loggedDoctor(): ?Doctor

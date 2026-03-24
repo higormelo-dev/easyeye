@@ -66,6 +66,12 @@ $(function () {
         });
     });
 
+    // Escala de Atendimento
+    $(document).on('click', '.btn-work-schedule', function () {
+        const id = $(this).data('id');
+        window.dispatchEvent(new CustomEvent('open-work-schedule', { detail: { doctorId: id } }));
+    });
+
     // Deletar
     $(document).on('click', '.btn-trash', function () {
         record_id = $(this).data('id');

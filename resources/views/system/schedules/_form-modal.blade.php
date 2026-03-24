@@ -31,13 +31,86 @@
             </div>
 
             {{-- Data e Hora --}}
-            <div class="col-md-6">
+            {{--
+                x-modelable="doctorId" + x-model="form.doctor_id":
+                  crudForm.form.doctor_id ──► slotPicker.doctorId (two-way via x-modelable)
+                @slot-selected: slotPicker dispatches this event → pai seta form.date_time
+            --}}
+            <div class="col-md-6"
+                 x-data="slotPicker(@js(route('panel.schedules.slots')))"
+                 x-modelable="doctorId"
+                 x-model="form.doctor_id">
+
                 <label class="form-label">Data e Hora <span class="text-danger">*</span></label>
-                <input type="datetime-local"
-                       class="form-control"
-                       :class="{ 'is-invalid': hasError('date_time') }"
-                       x-model="form.date_time">
-                <div class="invalid-feedback" x-text="firstError('date_time')"></div>
+
+                {{-- Seletor de data --}}
+                <input type="date"
+                       class="form-control mb-2"
+                       x-model="selectedDate"
+                       :disabled="! doctorId"
+                       :min="new Date().toISOString().substring(0, 10)">
+
+                {{-- Carregando --}}
+                <div x-show="loadingSlots" x-cloak class="text-muted small py-1">
+                    <span class="spinner-border spinner-border-sm me-1"></span> Carregando horários…
+                </div>
+
+                {{-- Grid de slots (médico com escala) --}}
+                <template x-if="! loadingSlots && hasSchedule && slots.length > 0">
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        <template x-for="slot in slots" :key="slot.datetime">
+                            <button type="button"
+                                    class="btn btn-xs px-2 py-1"
+                                    style="font-size:.78rem; min-width:52px;"
+                                    :class="{
+                                        'btn-primary':   isSelected(slot),
+                                        'btn-outline-primary':   ! isSelected(slot) && slot.available,
+                                        'btn-outline-secondary opacity-50 text-decoration-line-through': ! slot.available
+                                    }"
+                                    :disabled="! slot.available"
+                                    @click="selectSlot(slot)"
+                                    x-text="slot.time">
+                            </button>
+                        </template>
+                    </div>
+                </template>
+
+                {{-- Médico não atende neste dia --}}
+                <template x-if="! loadingSlots && hasSchedule && slots.length === 0 && selectedDate">
+                    <p class="text-muted small mt-1 mb-0">
+                        <i class="fas fa-calendar-times me-1"></i> Médico não atende neste dia.
+                    </p>
+                </template>
+
+                {{-- Fallback: médico sem escala configurada — slots gerados pelo intervalo (07:00–19:00) --}}
+                <template x-if="! loadingSlots && ! hasSchedule && selectedDate">
+                    <div>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                            <template x-for="slot in generateDefaultTimes()" :key="slot.datetime">
+                                <button type="button"
+                                        class="btn btn-xs px-2 py-1"
+                                        style="font-size:.78rem; min-width:52px;"
+                                        :class="selectedDatetime === slot.datetime
+                                            ? 'btn-primary'
+                                            : 'btn-outline-primary'"
+                                        @click="selectedDatetime = slot.datetime; $dispatch('slot-selected', { datetime: slot.datetime })"
+                                        x-text="slot.time">
+                                </button>
+                            </template>
+                        </div>
+                        <small class="text-muted mt-2 d-block">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Intervalo de <span x-text="interval"></span> min (sem escala definida)
+                        </small>
+                    </div>
+                </template>
+
+            </div>
+            {{-- Erro de data_time fora do x-data do slotPicker → escopo do crudForm --}}
+            <div class="col-12 mt-n2 pb-0"
+                 x-show="hasError('date_time')"
+                 x-cloak>
+                <div class="invalid-feedback d-block" x-text="firstError('date_time')"></div>
             </div>
 
             {{-- Paciente (busca + cadastro rápido) --}}

@@ -17,7 +17,7 @@ class DoctorsDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (Doctor $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (Doctor $record) => $this->buildDoctorActionButtons($record))
             ->addColumn('name', fn (Doctor $record) => $record->user_name)
             ->editColumn('created_at', fn (Doctor $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (Doctor $record) => $this->formatActiveColumn($record))
@@ -108,5 +108,32 @@ class DoctorsDataTable extends BaseDataTable
     protected function filename(): string
     {
         return 'Doctors_' . date('YmdHis');
+    }
+
+    /**
+     * Build action buttons for the doctors DataTable, including the work-schedule link.
+     */
+    private function buildDoctorActionButtons(Doctor $record): string
+    {
+        $entityId = session()->get('selected_entity_id');
+        $isOwned  = $record->entity_id === $entityId;
+
+        // Build without the delete button so we can append it last
+        $buttons = $this->buildActionButtons($record, ['delete' => false]);
+
+        if (! $record->deleted_at && $isOwned) {
+            $buttons .= '<button type="button"
+                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-work-schedule"
+                data-id="' . $record->id . '"
+                data-bs-toggle="tooltip" data-bs-placement="bottom"
+                title="Escala de Atendimento"><i class="fas fa-clock"></i></button>';
+
+            $buttons .= '<a href="javascript:void(0);"
+                class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
+                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
+        }
+
+        return $buttons;
     }
 }

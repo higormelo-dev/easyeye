@@ -115,7 +115,7 @@
                                             <span x-text="doctor.email ?? '{{ __('actions.not_informed') }}'"></span>
                                         </address>
                                         <hr class="my-2">
-                                        <div class="d-flex gap-1">
+                                        <div class="d-flex gap-1 flex-wrap">
                                             <button class="btn btn-sm btn-warning btn-edit" :data-id="doctor.id"
                                                     data-bs-toggle="tooltip" title="{{ __('actions.edit') }}">
                                                 <i class="fa fa-edit"></i>
@@ -123,6 +123,11 @@
                                             <button class="btn btn-sm btn-info btn-show" :data-id="doctor.id"
                                                     data-bs-toggle="tooltip" title="{{ __('actions.view') }}">
                                                 <i class="fa fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info btn-work-schedule"
+                                                    :data-id="doctor.id"
+                                                    data-bs-toggle="tooltip" title="Escala de Atendimento">
+                                                <i class="fas fa-clock"></i>
                                             </button>
                                             <button class="btn btn-sm btn-secondary btn-active"
                                                     :data-id="doctor.id" :data-situation="doctor.active ? 0 : 1"
@@ -175,9 +180,151 @@
 
 @section('modals')
     @include('components.modal_default')
+    @include('system.doctors._work-schedule-modal')
 @endsection
 
 @section('javascript')
     {{ $dataTable->scripts() }}
     @vite(['resources/js/system/doctors.js'])
+    <script>
+    function workScheduleModalData() {
+        return {
+            loading:       false,
+            saving:        false,
+            saveError:     '',
+            saveSuccess:   false,
+            doctorName:    '',
+            doctorRecord:  '',
+            doctorColor:   '#6c757d',
+            doctorPhoto:   '',
+            days:          [],
+            interval:      null,
+            entityInterval: null,
+            syncUrl:       '',
+            storeBlockUrl: '',
+            destroyBlockBase: '',
+            blocks:        [],
+            showBlockForm: false,
+            storingBlock:  false,
+            blockForm:     { type: 'absence', starts_at: '', ends_at: '', reason: '' },
+            blockErrors:   {},
+
+            init() {
+                this.$el.addEventListener('show.bs.modal', () => {});
+                window.addEventListener('open-work-schedule', (e) => {
+                    this.openFor(e.detail.doctorId);
+                });
+            },
+
+            openFor(doctorId) {
+                this.loading     = true;
+                this.saveError   = '';
+                this.saveSuccess = false;
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('workScheduleModal')).show();
+
+                fetch(`/panel/doctors/${doctorId}/work-schedule/data`, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    this.doctorName      = data.doctor.name;
+                    this.doctorRecord    = data.doctor.record;
+                    this.doctorColor     = data.doctor.color;
+                    this.doctorPhoto     = data.doctor.photo_url;
+                    this.days            = data.days;
+                    this.interval        = data.interval;
+                    this.entityInterval  = data.entity_interval;
+                    this.syncUrl         = data.sync_url;
+                    this.storeBlockUrl   = data.store_block_url;
+                    this.destroyBlockBase = data.destroy_block_base;
+                    this.blocks          = data.blocks;
+                    this.showBlockForm   = false;
+                    this.loading         = false;
+                })
+                .catch(() => {
+                    this.loading   = false;
+                    this.saveError = 'Erro ao carregar dados.';
+                });
+            },
+
+            addRange(dayIndex) {
+                if (! this.days[dayIndex].active) {
+                    this.days[dayIndex].active = true;
+                }
+                this.days[dayIndex].ranges.push({ starts_at: '08:00', ends_at: '12:00' });
+            },
+
+            removeRange(dayIndex, rangeIndex) {
+                this.days[dayIndex].ranges.splice(rangeIndex, 1);
+            },
+
+            save() {
+                this.saving      = true;
+                this.saveError   = '';
+                this.saveSuccess = false;
+
+                fetch(this.syncUrl, {
+                    method:  'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept':       'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify({ schedule_interval: this.interval, days: this.days }),
+                })
+                .then(async r => {
+                    const json = await r.json();
+                    if (! r.ok) throw json;
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('workScheduleModal')).hide();
+                })
+                .catch(err => {
+                    this.saveError = err?.message ?? 'Erro ao salvar escala.';
+                })
+                .finally(() => { this.saving = false; });
+            },
+
+            storeBlock() {
+                this.storingBlock = true;
+                this.blockErrors  = {};
+
+                fetch(this.storeBlockUrl, {
+                    method:  'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept':       'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify(this.blockForm),
+                })
+                .then(async r => {
+                    const json = await r.json();
+                    if (! r.ok) {
+                        this.blockErrors = json.errors ?? {};
+                        throw json;
+                    }
+                    this.blocks.push(json.data);
+                    this.blockForm     = { type: 'absence', starts_at: '', ends_at: '', reason: '' };
+                    this.showBlockForm = false;
+                })
+                .catch(() => {})
+                .finally(() => { this.storingBlock = false; });
+            },
+
+            destroyBlock(blockId) {
+                fetch(`${this.destroyBlockBase}/${blockId}`, {
+                    method:  'DELETE',
+                    headers: {
+                        'Accept':       'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                })
+                .then(r => {
+                    if (r.ok) {
+                        this.blocks = this.blocks.filter(b => b.id !== blockId);
+                    }
+                });
+            },
+        };
+    }
+    </script>
 @endsection

@@ -37,7 +37,8 @@
          @js(url('panel/schedules')) + '/' + $event.detail.id,
          @js(url('panel/schedules')) + '/' + $event.detail.id,
          'scheduleModal'
-     )">
+     )"
+         x-on:slot-selected.window="form.date_time = $event.detail.datetime">
 
         @include('system.schedules._form-modal')
 

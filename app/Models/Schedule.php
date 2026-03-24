@@ -93,6 +93,22 @@ class Schedule extends Model
         ];
     }
 
+    /**
+     * Scope route model binding to the current entity (tenant guard).
+     * Prevents users of one clinic from accessing another clinic's schedules
+     * via URL manipulation.
+     */
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        $query = static::where($field ?? $this->getRouteKeyName(), $value);
+
+        if ($entityId = session('selected_entity_id')) {
+            $query->where('entity_id', $entityId);
+        }
+
+        return $query->firstOrFail();
+    }
+
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id');
