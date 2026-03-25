@@ -4,31 +4,31 @@
             <tbody>
                 @if($record->deleted_at)
                     <tr>
-                        <th class="text-center bg-light" colspan="2">Usuário inativo (Deletado)</th>
+                        <th class="text-center bg-light" colspan="2">{{ __('actions.deleted_record') }}</th>
                     </tr>
                 @endif
                 <tr>
-                    <th width="20%">Nome completo</th>
+                    <th width="20%">{{ __('forms.full_name') }}</th>
                     <td>{{ $record->person->full_name }}</td>
                 </tr>
                 <tr>
-                    <th width="20%">Nome abreviado</th>
+                    <th width="20%">{{ __('forms.display_name') }}</th>
                     <td>{{ $record->entityUser->user->name }}</td>
                 </tr>
                 <tr>
-                    <th>CPF</th>
+                    <th>{{ __('forms.national_registry') }}</th>
                     <td>{{ $record->person->present()->getNationalRegistry }}</td>
                 </tr>
                 <tr>
-                    <th>Número CRM</th>
+                    <th>{{ __('forms.record') }}</th>
                     <td>{{ $record->record }}</td>
                 </tr>
                 <tr>
-                    <th>Número RQE</th>
+                    <th>{{ __('forms.record_specialty') }}</th>
                     <td>{{ $record->record_specialty }}</td>
                 </tr>
                 <tr>
-                    <th>Cor</th>
+                    <th>{{ __('forms.color') }}</th>
                     <td>
                         <span class="badge" style="background-color: {{ $record->color }} !important;">
                             &nbsp;&nbsp;&nbsp;
@@ -36,100 +36,100 @@
                     </td>
                 </tr>
                 <tr>
-                    <th>Data de nascimento</th>
+                    <th>{{ __('forms.birth_date') }}</th>
                     <td>{{ $record->person->present()->getBirthDate }}</td>
                 </tr>
                 <tr>
-                    <th>Sexo</th>
+                    <th>{{ __('forms.gender') }}</th>
                     <td>{{ $record->person->present()->getGender }}</td>
                 </tr>
                 <tr>
-                    <th>Estado civil</th>
+                    <th>{{ __('forms.marital_status') }}</th>
                     <td>{{ $record->person->present()->getMaritalStatus }}</td>
                 </tr>
                 <tr>
-                    <th>E-mail</th>
+                    <th>{{ __('forms.email') }}</th>
                     <td>{{ $record->entityUser->user->email }}</td>
                 </tr>
                 <tr>
-                    <th>Nome da mãe</th>
+                    <th>{{ __('forms.mother_name') }}</th>
                     <td>{{ $record->person->mother_name }}</td>
                 </tr>
                 <tr>
-                    <th>Nome do pai</th>
+                    <th>{{ __('forms.father_name') }}</th>
                     <td>{{ $record->person->father_name }}</td>
                 </tr>
                 <tr>
-                    <th>Nome do pai</th>
+                    <th>{{ __('forms.state_registry') }}</th>
                     <td>{{ $record->person->state_registry }}</td>
                 </tr>
                 <tr>
-                    <th>Órgão emissor do RG</th>
+                    <th>{{ __('forms.state_registry_agency') }}</th>
                     <td>{{ $record->person->state_registry_agency }}</td>
                 </tr>
                 <tr>
-                    <th>Estado do RG</th>
+                    <th>{{ __('forms.state_registry_initial') }}</th>
                     <td>{{ $record->person->state_registry_initial }}</td>
                 </tr>
                 <tr>
-                    <th>Data de emissão do RG</th>
+                    <th>{{ __('forms.state_registry_date') }}</th>
                     <td>{{ $record->person->present()->getStateRegistryDate }}</td>
                 </tr>
                 <tr>
-                    <th>Telefone</th>
+                    <th>{{ __('forms.telephone') }}</th>
                     <td>{{ $record->person->present()->getTelephone }}</td>
                 </tr>
                 <tr>
-                    <th>Celular</th>
+                    <th>{{ __('forms.cellphone') }}</th>
                     <td>{{ $record->person->present()->getCellphone }}</td>
                 </tr>
                 <tr>
-                    <th>CEP</th>
+                    <th>{{ __('forms.zipcode') }}</th>
                     <td>{{ $record->person->present()->getZipcode }}</td>
                 </tr>
                 <tr>
-                    <th>Logradouro</th>
+                    <th>{{ __('forms.address') }}</th>
                     <td>{{ $record->person->address }}</td>
                 </tr>
                 <tr>
-                    <th>Número</th>
+                    <th>{{ __('forms.number') }}</th>
                     <td>{{ $record->person->number }}</td>
                 </tr>
                 <tr>
-                    <th>Complemento</th>
+                    <th>{{ __('forms.complement') }}</th>
                     <td>{{ $record->person->complement }}</td>
                 </tr>
                 <tr>
-                    <th>Bairro</th>
+                    <th>{{ __('forms.district') }}</th>
                     <td>{{ $record->person->district }}</td>
                 </tr>
                 <tr>
-                    <th>Cidade</th>
+                    <th>{{ __('forms.city') }}</th>
                     <td>{{ $record->person->city }}</td>
                 </tr>
                 <tr>
-                    <th>Estado</th>
+                    <th>{{ __('forms.state') }}</th>
                     <td>{{ $record->person->state }}</td>
                 </tr>
                 <tr>
-                    <th>Observação</th>
+                    <th>{{ __('forms.observation') }}</th>
                     <td>{{ $record->observation }}</td>
                 </tr>
                 <tr>
-                    <th>Parceiro</th>
-                    <td>{{ $record->partner ? 'Sim' : 'Não' }}</td>
+                    <th>{{ __('forms.partner') }}</th>
+                    <td>{{ $record->partner ? __('forms.yes') : __('forms.no') }}</td>
                 </tr>
                 <tr>
-                    <th>Ativo</th>
-                    <td>{{ $record->active ? 'Sim' : 'Não' }}</td>
+                    <th>{{ __('actions.active') }}</th>
+                    <td>{{ $record->active ? __('forms.yes') : __('forms.no') }}</td>
                 </tr>
                 <tr>
-                    <th>Data de criação</th>
+                    <th>{{ __('actions.created_at') }}</th>
                     <td>{{ $record->created_at->format('d/m/Y H:i') }}</td>
                 </tr>
                 @if($record->deleted_at)
                     <tr>
-                        <th>Data de inativação</th>
+                        <th>{{ __('actions.deleted_at') }}</th>
                         <td>{{ $record->deleted_at->format('d/m/Y H:i') }}</td>
                     </tr>
                 @endif

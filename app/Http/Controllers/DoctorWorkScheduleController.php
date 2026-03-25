@@ -21,15 +21,7 @@ class DoctorWorkScheduleController extends Controller
             ->get()
             ->groupBy('day_of_week');
 
-        $dayNames = [
-            0 => 'Domingo',
-            1 => 'Segunda-feira',
-            2 => 'Terça-feira',
-            3 => 'Quarta-feira',
-            4 => 'Quinta-feira',
-            5 => 'Sexta-feira',
-            6 => 'Sábado',
-        ];
+        $dayNames = __('actions.weekdays');
 
         $days = [];
         for ($i = 0; $i <= 6; $i++) {
@@ -99,15 +91,7 @@ class DoctorWorkScheduleController extends Controller
             ->get()
             ->groupBy('day_of_week');
 
-        $dayNames = [
-            0 => 'Domingo',
-            1 => 'Segunda-feira',
-            2 => 'Terça-feira',
-            3 => 'Quarta-feira',
-            4 => 'Quinta-feira',
-            5 => 'Sexta-feira',
-            6 => 'Sábado',
-        ];
+        $dayNames = __('actions.weekdays');
 
         $days = [];
         for ($i = 0; $i <= 6; $i++) {
@@ -135,11 +119,11 @@ class DoctorWorkScheduleController extends Controller
         $interval = $doctor->schedule_interval;
 
         $meta = [
-            'title'       => 'Escala de Atendimento',
+            'title'       => __('actions.work_schedule'),
             'breadcrumbs' => [
-                ['label' => 'Dashboard', 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Médicos', 'url' => route('panel.doctors.index'), 'active' => false],
-                ['label' => 'Escala de Atendimento', 'url' => 'javascript:void(0);', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.doctors'), 'url' => route('panel.doctors.index'), 'active' => false],
+                ['label' => __('actions.work_schedule'), 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
 
@@ -188,7 +172,7 @@ class DoctorWorkScheduleController extends Controller
             }
         });
 
-        return response()->json(['message' => 'Escala salva com sucesso.']);
+        return response()->json(['message' => __('actions.work_schedule_saved')]);
     }
 
     /**
@@ -208,7 +192,7 @@ class DoctorWorkScheduleController extends Controller
         $block = ScheduleBlock::create(array_merge($validated, ['doctor_id' => $doctor->id]));
 
         return response()->json([
-            'message' => 'Bloqueio criado com sucesso.',
+            'message' => __('actions.block_created'),
             'data'    => [
                 'id'         => $block->id,
                 'starts_at'  => $block->starts_at->format('d/m/Y H:i'),
@@ -232,7 +216,7 @@ class DoctorWorkScheduleController extends Controller
 
         $block->delete();
 
-        return response()->json(['message' => 'Bloqueio removido.']);
+        return response()->json(['message' => __('actions.block_deleted')]);
     }
 
     /**

@@ -126,7 +126,7 @@ class DoctorsDataTable extends BaseDataTable
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-work-schedule"
                 data-id="' . $record->id . '"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="Escala de Atendimento"><i class="fas fa-clock"></i></button>';
+                title="' . __('actions.work_schedule') . '"><i class="fas fa-clock"></i></button>';
 
             $buttons .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"

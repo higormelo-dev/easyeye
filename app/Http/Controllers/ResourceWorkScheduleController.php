@@ -21,10 +21,7 @@ class ResourceWorkScheduleController extends Controller
             ->get()
             ->groupBy('day_of_week');
 
-        $dayNames = [
-            0 => 'Domingo', 1 => 'Segunda-feira', 2 => 'Terça-feira',
-            3 => 'Quarta-feira', 4 => 'Quinta-feira', 5 => 'Sexta-feira', 6 => 'Sábado',
-        ];
+        $dayNames = __('actions.weekdays');
 
         $days = [];
         for ($i = 0; $i <= 6; $i++) {
@@ -111,7 +108,7 @@ class ResourceWorkScheduleController extends Controller
             }
         });
 
-        return response()->json(['message' => 'Disponibilidade salva com sucesso.']);
+        return response()->json(['message' => __('actions.resource_schedule_saved')]);
     }
 
     /**
@@ -131,7 +128,7 @@ class ResourceWorkScheduleController extends Controller
         $block = ResourceBlock::create(array_merge($validated, ['resource_id' => $resource->id]));
 
         return response()->json([
-            'message' => 'Bloqueio criado com sucesso.',
+            'message' => __('actions.block_created'),
             'data'    => [
                 'id'         => $block->id,
                 'starts_at'  => $block->starts_at->format('d/m/Y H:i'),
@@ -155,7 +152,7 @@ class ResourceWorkScheduleController extends Controller
 
         $block->delete();
 
-        return response()->json(['message' => 'Bloqueio removido.']);
+        return response()->json(['message' => __('actions.block_deleted')]);
     }
 
     /**

@@ -126,7 +126,7 @@
                                             </button>
                                             <button class="btn btn-sm btn-outline-info btn-work-schedule"
                                                     :data-id="doctor.id"
-                                                    data-bs-toggle="tooltip" title="Escala de Atendimento">
+                                                    data-bs-toggle="tooltip" title="{{ __('actions.work_schedule') }}">
                                                 <i class="fas fa-clock"></i>
                                             </button>
                                             <button class="btn btn-sm btn-secondary btn-active"
@@ -187,6 +187,12 @@
     {{ $dataTable->scripts() }}
     @vite(['resources/js/system/doctors.js'])
     <script>
+    window.doctorsLang = {
+        workScheduleLoadError: @js(__('actions.work_schedule_load_error')),
+        workScheduleSaveError: @js(__('actions.work_schedule_save_error')),
+    };
+    </script>
+    <script>
     function workScheduleModalData() {
         return {
             loading:       false,
@@ -243,7 +249,7 @@
                 })
                 .catch(() => {
                     this.loading   = false;
-                    this.saveError = 'Erro ao carregar dados.';
+                    this.saveError = window.doctorsLang.workScheduleLoadError;
                 });
             },
 
@@ -278,7 +284,7 @@
                     bootstrap.Modal.getOrCreateInstance(document.getElementById('workScheduleModal')).hide();
                 })
                 .catch(err => {
-                    this.saveError = err?.message ?? 'Erro ao salvar escala.';
+                    this.saveError = err?.message ?? window.doctorsLang.workScheduleSaveError;
                 })
                 .finally(() => { this.saving = false; });
             },

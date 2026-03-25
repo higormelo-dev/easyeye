@@ -1,4 +1,4 @@
-<x-crud-modal id="patientModal" title="Paciente">
+<x-crud-modal id="patientModal" title="{{ __('actions.patient') }}">
     <x-slot:body>
         {{-- Abas de navegação --}}
         <ul class="nav nav-tabs mb-3" id="patientModalTabs" role="tablist">
@@ -6,28 +6,28 @@
                 <button class="nav-link active" id="tab-pessoal-btn"
                         data-bs-toggle="tab" data-bs-target="#tab-pessoal"
                         type="button" role="tab">
-                    <i class="fa fa-user me-1"></i> Dados Pessoais
+                    <i class="fa fa-user me-1"></i> {{ __('forms.tab_personal') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="tab-contato-btn"
                         data-bs-toggle="tab" data-bs-target="#tab-contato"
                         type="button" role="tab">
-                    <i class="fa fa-phone me-1"></i> Contato
+                    <i class="fa fa-phone me-1"></i> {{ __('forms.tab_contact') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="tab-clinico-btn"
                         data-bs-toggle="tab" data-bs-target="#tab-clinico"
                         type="button" role="tab">
-                    <i class="fa fa-stethoscope me-1"></i> Clínico
+                    <i class="fa fa-stethoscope me-1"></i> {{ __('forms.tab_clinical') }}
                 </button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="tab-endereco-btn"
                         data-bs-toggle="tab" data-bs-target="#tab-endereco"
                         type="button" role="tab">
-                    <i class="fa fa-map-marker me-1"></i> Endereço
+                    <i class="fa fa-map-marker me-1"></i> {{ __('forms.tab_address') }}
                 </button>
             </li>
         </ul>
@@ -67,7 +67,7 @@
                     <div class="col-md-4">
                         <label class="form-label">{{ __('forms.gender') }} <span class="text-danger">*</span></label>
                         <select class="form-select" :class="{ 'is-invalid': hasError('gender') }" x-model="form.gender">
-                            <option value="">Selecione...</option>
+                            <option value="">{{ __('forms.select') }}...</option>
                             @foreach($genders as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
@@ -78,7 +78,7 @@
                     <div class="col-md-4">
                         <label class="form-label">{{ __('forms.marital_status') }} <span class="text-danger">*</span></label>
                         <select class="form-select" :class="{ 'is-invalid': hasError('marital_status') }" x-model="form.marital_status">
-                            <option value="">Selecione...</option>
+                            <option value="">{{ __('forms.select') }}...</option>
                             @foreach($maritalStatuses as $value => $label)
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
@@ -152,7 +152,7 @@
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" id="whatsappCheck" x-model="form.whatsapp">
                             <label class="form-check-label" for="whatsappCheck">
-                                <i class="fab fa-whatsapp text-success"></i> Celular é WhatsApp
+                                <i class="fab fa-whatsapp text-success"></i> {{ __('forms.is_whatsapp') }}
                             </label>
                         </div>
                     </div>
@@ -167,7 +167,7 @@
                     <div class="col-md-6">
                         <label class="form-label">{{ __('forms.covenant_id') }} <span class="text-danger">*</span></label>
                         <select class="form-select" :class="{ 'is-invalid': hasError('covenant_id') }" x-model="form.covenant_id">
-                            <option value="">Selecione...</option>
+                            <option value="">{{ __('forms.select') }}...</option>
                             @foreach($covenants as $id => $name)
                                 <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
@@ -183,7 +183,7 @@
                     <div class="col-md-6">
                         <label class="form-label">{{ __('forms.skin_id') }}</label>
                         <select class="form-select" x-model="form.skin_id">
-                            <option value="">Selecione...</option>
+                            <option value="">{{ __('forms.select') }}...</option>
                             @foreach($skinTypes as $id => $name)
                                 <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach
@@ -193,7 +193,7 @@
                     <div class="col-md-6">
                         <label class="form-label">{{ __('forms.iris_id') }}</label>
                         <select class="form-select" x-model="form.iris_id">
-                            <option value="">Selecione...</option>
+                            <option value="">{{ __('forms.select') }}...</option>
                             @foreach($irisTypes as $id => $name)
                                 <option value="{{ $id }}">{{ $name }}</option>
                             @endforeach

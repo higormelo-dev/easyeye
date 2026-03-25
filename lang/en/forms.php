@@ -5,6 +5,14 @@ declare(strict_types = 1);
 return [
     'required_field' => '* Required field',
 
+    // Tabs
+    'tab_personal'     => 'Personal',
+    'tab_professional' => 'Professional',
+    'tab_clinical'     => 'Clinical',
+    'tab_contact'      => 'Contact',
+    'tab_address'      => 'Address',
+    'select'           => 'Select',
+
     // Common labels
     'name'                  => 'Name',
     'abbreviation'          => 'Abbreviation',
@@ -17,6 +25,9 @@ return [
     'email'                 => 'E-mail',
     'password'              => 'Password',
     'password_confirmation' => 'Password Confirmation',
+
+    // General
+    'display_name' => 'Display Name',
 
     // Personal data
     'full_name'      => 'Full Name',

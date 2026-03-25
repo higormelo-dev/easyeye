@@ -17,19 +17,19 @@
                          width="30" height="30"
                          style="object-fit:cover; border:2px solid #dee2e6;">
                     <h5 class="modal-title mb-0 fw-semibold fs-6" id="workScheduleModalLabel">
-                        Escala de Atendimento
+                        {{ __('actions.work_schedule') }}
                         <span x-show="doctorName" x-cloak class="fw-normal text-muted">
                             — <span x-text="doctorName"></span>
                         </span>
                     </h5>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('actions.close') }}"></button>
             </div>
 
             {{-- ── Loading ── --}}
             <div x-show="loading" x-cloak class="modal-body text-center py-5">
                 <div class="spinner-border text-secondary" role="status"></div>
-                <p class="mt-2 text-muted small">Carregando escala...</p>
+                <p class="mt-2 text-muted small">{{ __('actions.loading') }}…</p>
             </div>
 
             {{-- ── Body ── --}}
@@ -57,7 +57,7 @@
                         <div class="d-flex align-items-center gap-2 mb-4 px-3 py-2 rounded-3"
                              style="background:#f8f9fa;">
                             <i class="fas fa-info-circle text-secondary flex-shrink-0"></i>
-                            <span class="small text-secondary fw-medium flex-shrink-0">Intervalo entre consultas:</span>
+                            <span class="small text-secondary fw-medium flex-shrink-0">{{ __('actions.work_schedule_interval') }}:</span>
                             <select class="form-select form-select-sm flex-shrink-0"
                                     style="max-width:85px;"
                                     x-model.number="interval">
@@ -68,8 +68,8 @@
                             </select>
                             <span class="text-muted small">
                                 min
-                                <span x-show="entityInterval" x-cloak>
-                                    (padrão da clinica: <span x-text="entityInterval"></span> min)
+                                <span x-show="entityInterval" x-cloak
+                                      x-text="'{{ str_replace(':value', '\' + entityInterval + \'', __('actions.work_schedule_interval_hint')) }}'">
                                 </span>
                             </span>
                         </div>
@@ -101,7 +101,7 @@
                                             style="font-size:.78rem; white-space:nowrap;"
                                             @click="addRange(dayIndex)">
                                         <i class="fas fa-plus me-1" style="font-size:.7rem;"></i>
-                                        Adicionar horário
+                                        {{ __('actions.work_schedule_add_range') }}
                                     </button>
                                 </div>
 
@@ -109,12 +109,12 @@
                                 <div x-show="day.active" class="px-3 pb-3 pt-1 bg-white">
                                     <template x-for="(range, rangeIndex) in day.ranges" :key="rangeIndex">
                                         <div class="d-flex align-items-center gap-2 mt-2">
-                                            <span class="text-muted small flex-shrink-0">De</span>
+                                            <span class="text-muted small flex-shrink-0">{{ __('actions.work_schedule_time_from') }}</span>
                                             <input type="time"
                                                    class="form-control form-control-sm"
                                                    style="max-width:120px;"
                                                    x-model="range.starts_at">
-                                            <span class="text-muted small flex-shrink-0">até</span>
+                                            <span class="text-muted small flex-shrink-0">{{ __('actions.work_schedule_time_until') }}</span>
                                             <input type="time"
                                                    class="form-control form-control-sm"
                                                    style="max-width:120px;"
@@ -131,7 +131,7 @@
 
                                 {{-- Dia inativo --}}
                                 <div x-show="!day.active" class="px-3 pb-2 pt-0" style="background:#f8f9fa;">
-                                    <small class="text-muted">Não atende neste dia.</small>
+                                    <small class="text-muted">{{ __('actions.work_schedule_day_off') }}</small>
                                 </div>
 
                             </div>
@@ -144,13 +144,13 @@
 
                         <div class="d-flex align-items-center justify-content-between mb-3">
                             <strong class="text-dark" style="font-size:.9rem;">
-                                Bloqueios / Ausências
+                                {{ __('actions.work_schedule_blocks') }}
                             </strong>
                             <button type="button"
                                     class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center rounded-circle flex-shrink-0"
                                     style="width:28px; height:28px; padding:0;"
                                     @click="showBlockForm = !showBlockForm"
-                                    :title="showBlockForm ? 'Cancelar' : 'Adicionar bloqueio'">
+                                    :title="showBlockForm ? '{{ __('actions.cancel') }}' : '{{ __('actions.block_add') }}'">
                                 <i :class="showBlockForm ? 'fas fa-times' : 'fas fa-plus'"
                                    style="font-size:.72rem;"></i>
                             </button>
@@ -163,15 +163,15 @@
                             <div class="row g-2">
                                 <div class="col-12">
                                     <select class="form-select form-select-sm" x-model="blockForm.type">
-                                        <option value="absence">Ausência</option>
-                                        <option value="holiday">Feriado</option>
-                                        <option value="meeting">Reunião / Compromisso</option>
-                                        <option value="other">Outro</option>
+                                        <option value="absence">{{ __('actions.block_type_absence') }}</option>
+                                        <option value="holiday">{{ __('actions.block_type_holiday') }}</option>
+                                        <option value="meeting">{{ __('actions.block_type_meeting') }}</option>
+                                        <option value="other">{{ __('actions.block_type_other') }}</option>
                                     </select>
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small mb-1">
-                                        Início <span class="text-danger">*</span>
+                                        {{ __('actions.starts_at') }} <span class="text-danger">*</span>
                                     </label>
                                     <input type="datetime-local"
                                            class="form-control form-control-sm"
@@ -181,7 +181,7 @@
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small mb-1">
-                                        Fim <span class="text-danger">*</span>
+                                        {{ __('actions.ends_at') }} <span class="text-danger">*</span>
                                     </label>
                                     <input type="datetime-local"
                                            class="form-control form-control-sm"
@@ -193,7 +193,7 @@
                                     <input type="text"
                                            class="form-control form-control-sm"
                                            x-model="blockForm.reason"
-                                           placeholder="Motivo (opcional)">
+                                           placeholder="{{ __('actions.block_reason_placeholder') }}">
                                 </div>
                                 <div class="col-12">
                                     <button type="button"
@@ -202,7 +202,7 @@
                                             :disabled="storingBlock">
                                         <span x-show="storingBlock"
                                               class="spinner-border spinner-border-sm me-1"></span>
-                                        Adicionar Bloqueio
+                                        {{ __('actions.block_add') }}
                                     </button>
                                 </div>
                             </div>
@@ -216,7 +216,7 @@
                                  style="width:48px; height:48px;">
                                 <i class="fas fa-check fa-lg"></i>
                             </div>
-                            <p class="text-muted small mb-0">Nenhum bloqueio futuro.</p>
+                            <p class="text-muted small mb-0">{{ __('actions.work_schedule_no_blocks') }}</p>
                         </div>
 
                         {{-- Lista de bloqueios --}}
@@ -256,19 +256,19 @@
                       class="text-danger small me-auto"
                       x-text="saveError"></span>
                 <span x-show="saveSuccess" x-cloak class="text-success small me-auto">
-                    <i class="fas fa-check-circle me-1"></i> Escala salva com sucesso.
+                    <i class="fas fa-check-circle me-1"></i> {{ __('actions.work_schedule_saved') }}
                 </span>
                 <button type="button"
                         class="btn btn-outline-secondary"
                         data-bs-dismiss="modal">
-                    Cancelar
+                    {{ __('actions.cancel') }}
                 </button>
                 <button type="button"
                         class="btn btn-info text-white px-4"
                         @click="save()"
                         :disabled="saving">
                     <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
-                    Salvar Escala
+                    {{ __('actions.work_schedule_save') }}
                 </button>
             </div>
 

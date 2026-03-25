@@ -41,7 +41,7 @@ class ScheduleService
         // 2 ── Work schedule ─────────────────────────────────────────────────
         if (! $this->isWithinWorkSchedule($doctorId, $dateTime)) {
             $dayName  = $this->dayName($dateTime->dayOfWeek);
-            $errors[] = "Horário fora da escala de atendimento do médico ({$dayName} às {$dateTime->format('H:i')}).";
+            $errors[] = __('actions.work_schedule_outside', ['day' => $dayName, 'time' => $dateTime->format('H:i')]);
 
             // No point checking alignment when the day/time is already outside schedule
             return $errors;
@@ -51,12 +51,12 @@ class ScheduleService
         if (! $this->isIntervalAligned($doctorId, $dateTime)) {
             $doctor   = Doctor::find($doctorId);
             $interval = $doctor ? $doctor->effectiveInterval() : 15;
-            $errors[] = "Horário não corresponde a um slot válido. O intervalo do médico é de {$interval} minutos.";
+            $errors[] = __('actions.work_schedule_interval_error', ['interval' => $interval]);
         }
 
         // 4 ── Schedule block ────────────────────────────────────────────────
         if ($this->isBlocked($doctorId, $dateTime)) {
-            $errors[] = 'Médico está bloqueado neste horário (ausência, feriado ou compromisso agendado).';
+            $errors[] = __('actions.work_schedule_blocked');
         }
 
         // 5 ── Resource conflicts ─────────────────────────────────────────────
@@ -68,20 +68,20 @@ class ScheduleService
             }
 
             if ($this->isResourceDoubleBooked($resourceId, $dateTime, $excludeScheduleId)) {
-                $errors[] = "Recurso \"{$resource->name}\" já está ocupado neste horário.";
+                $errors[] = __('actions.resource_double_booked', ['name' => $resource->name]);
 
                 continue;
             }
 
             if (! $this->isResourceWithinSchedule($resourceId, $dateTime)) {
                 $dayName  = $this->dayName($dateTime->dayOfWeek);
-                $errors[] = "Recurso \"{$resource->name}\" não está disponível ({$dayName} às {$dateTime->format('H:i')}).";
+                $errors[] = __('actions.resource_unavailable', ['name' => $resource->name, 'day' => $dayName, 'time' => $dateTime->format('H:i')]);
 
                 continue;
             }
 
             if ($this->isResourceBlocked($resourceId, $dateTime)) {
-                $errors[] = "Recurso \"{$resource->name}\" está bloqueado neste horário.";
+                $errors[] = __('actions.resource_blocked', ['name' => $resource->name]);
             }
         }
 
@@ -467,14 +467,6 @@ class ScheduleService
 
     private function dayName(int $dayOfWeek): string
     {
-        return match ($dayOfWeek) {
-            0 => 'Domingo',
-            1 => 'Segunda-feira',
-            2 => 'Terça-feira',
-            3 => 'Quarta-feira',
-            4 => 'Quinta-feira',
-            5 => 'Sexta-feira',
-            6 => 'Sábado',
-        };
+        return __('actions.weekdays')[$dayOfWeek] ?? '?';
     }
 }
