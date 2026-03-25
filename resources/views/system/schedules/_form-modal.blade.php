@@ -34,10 +34,11 @@
             {{--
                 x-modelable="doctorId" + x-model="form.doctor_id":
                   crudForm.form.doctor_id ──► slotPicker.doctorId (two-way via x-modelable)
-                @slot-selected: slotPicker dispatches this event → pai seta form.date_time
+                slot-selected: slotPicker dispatches this event → crudForm sets form.date_time (index.blade.php)
+                resources-loaded: slotPicker dispatches → bubbles to crudForm → sets form.resources_available
             --}}
             <div class="col-md-6"
-                 x-data="slotPicker(@js(route('panel.schedules.slots')))"
+                 x-data="slotPicker(@js(route('panel.schedules.slots')), @js(route('panel.schedules.resources')))"
                  x-modelable="doctorId"
                  x-model="form.doctor_id">
 
@@ -93,7 +94,7 @@
                                         :class="selectedDatetime === slot.datetime
                                             ? 'btn-primary'
                                             : 'btn-outline-primary'"
-                                        @click="selectedDatetime = slot.datetime; $dispatch('slot-selected', { datetime: slot.datetime })"
+                                        @click="selectedDatetime = slot.datetime; $dispatch('slot-selected', { datetime: slot.datetime }); loadResources(slot.datetime)"
                                         x-text="slot.time">
                                 </button>
                             </template>
@@ -106,7 +107,7 @@
                 </template>
 
             </div>
-            {{-- Erro de data_time fora do x-data do slotPicker → escopo do crudForm --}}
+            {{-- Erro de data_time — escopo do crudForm --}}
             <div class="col-12 mt-n2 pb-0"
                  x-show="hasError('date_time')"
                  x-cloak>
@@ -229,6 +230,50 @@
                 <div class="invalid-feedback" x-text="firstError('full_name')"></div>
             </div>
 
+            {{-- Recursos (salas/equipamentos) — aparece após selecionar horário --}}
+            {{-- resources_available é populado pelo handler x-on:resources-loaded no div do crudForm (index.blade.php) --}}
+            <div class="col-12"
+                 x-show="form.date_time"
+                 x-cloak>
+
+                <label class="form-label small fw-semibold">
+                    <i class="fas fa-door-open me-1 text-secondary"></i>
+                    Recursos (Sala / Equipamento)
+                    <span class="text-muted fw-normal ms-1">— opcional</span>
+                </label>
+
+                {{-- Nenhum recurso cadastrado --}}
+                <div x-show="form.resources_available.length === 0 && form.date_time"
+                     class="text-muted small">
+                    <i class="fas fa-info-circle me-1"></i> Nenhum recurso cadastrado na clínica.
+                </div>
+
+                {{-- Lista de recursos com disponibilidade --}}
+                <div class="d-flex flex-wrap gap-2 mt-1">
+                    <template x-for="resource in form.resources_available" :key="resource.id">
+                        <label class="d-flex align-items-center gap-1 px-2 py-1 rounded border"
+                               style="cursor:pointer; font-size:.82rem;"
+                               :class="{
+                                   'border-success bg-success bg-opacity-10': resource.available && form.resource_ids?.includes(resource.id),
+                                   'border-secondary': resource.available && ! form.resource_ids?.includes(resource.id),
+                                   'border-danger bg-danger bg-opacity-10 opacity-60': ! resource.available
+                               }">
+                            <input type="checkbox"
+                                   class="form-check-input mt-0 flex-shrink-0"
+                                   :value="resource.id"
+                                   :disabled="! resource.available"
+                                   x-model="form.resource_ids">
+                            <span x-text="resource.name"></span>
+                            <span class="badge ms-1"
+                                  :class="resource.available ? 'bg-success' : 'bg-danger'"
+                                  x-text="resource.available ? 'Livre' : 'Ocupado'"
+                                  style="font-size:.68rem;"></span>
+                        </label>
+                    </template>
+                </div>
+
+            </div>
+
             {{-- Convênio --}}
             <div class="col-md-6">
                 <label class="form-label">Convênio</label>
@@ -280,6 +325,38 @@
                           x-model="form.notes"
                           rows="2"
                           placeholder="Informações adicionais sobre o agendamento..."></textarea>
+            </div>
+
+            {{-- Recorrência --}}
+            <div class="col-12">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="schedRecurrence" x-model="form.use_recurrence">
+                    <label class="form-check-label" for="schedRecurrence">
+                        <i class="fas fa-redo me-1 text-secondary"></i> Repetir agendamento
+                    </label>
+                </div>
+                <div x-show="form.use_recurrence" x-cloak class="row g-2 mt-1 ps-1">
+                    <div class="col-md-5">
+                        <label class="form-label small mb-1">Frequência</label>
+                        <select class="form-select form-select-sm" x-model="form.recurrence_type">
+                            <option value="weekly">Semanal</option>
+                            <option value="monthly">Mensal</option>
+                        </select>
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label small mb-1">Repetir até <span class="text-danger">*</span></label>
+                        <input type="date"
+                               class="form-control form-control-sm"
+                               x-model="form.recurrence_until"
+                               :min="form.date_time ? form.date_time.substring(0, 10) : ''">
+                    </div>
+                    <div class="col-12">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Slots já ocupados serão automaticamente ignorados.
+                        </small>
+                    </div>
+                </div>
             </div>
 
         </div>

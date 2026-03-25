@@ -5,7 +5,7 @@ namespace App\Models;
 use App\Enums\{PatientMood, ScheduleSituation};
 use App\Presenters\SchedulePresenter;
 use App\Traits\{Auditable, HasAuditColumns};
-use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, Relations\BelongsToMany, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Laracasts\Presenter\PresentableTrait;
 
@@ -45,6 +45,9 @@ class Schedule extends Model
         'confirmed_at',
         'patient_mood',
         'active',
+        'recurrence_group_id',
+        'recurrence_type',
+        'recurrence_until',
     ];
 
     /**
@@ -137,6 +140,11 @@ class Schedule extends Model
     public function situationLogs(): HasMany
     {
         return $this->hasMany(ScheduleSituationLog::class)->orderBy('created_at');
+    }
+
+    public function resources(): BelongsToMany
+    {
+        return $this->belongsToMany(ClinicResource::class, 'schedule_resources');
     }
 
     protected function fullName(): Attribute

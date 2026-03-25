@@ -3,10 +3,15 @@
 use App\Http\Controllers\{DoctorsController,
     DoctorWorkScheduleController,
     LocaleController,
+    NoticesController,
     PatientsController,
     ProfileController,
+    ReportsController,
+    ResourceWorkScheduleController,
+    ScheduleEventsController,
     SchedulesController,
-    UsersController};
+    UsersController,
+    WaitingListController};
 use App\Http\Controllers\{MedicalRecordsController, SubscriptionExpiredController};
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
@@ -15,6 +20,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     IrisTypesController,
     LensesController,
     NearPointConvergencesController,
+    ResourcesController,
     SkinTypesController,
     SurgeryTypesController,
     VisitTypesController,
@@ -132,11 +138,40 @@ Route::group(
         Route::resource('patients.medicalrecords', MedicalRecordsController::class)
             ->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
         Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');
+        Route::post('schedules/bulk-update', [SchedulesController::class, 'bulkUpdate'])->name('schedules.bulk-update');
+        Route::post('schedules/bulk-reschedule', [SchedulesController::class, 'bulkReschedule'])->name('schedules.bulk-reschedule');
         Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
         Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
         Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
         Route::get('schedules/slots', [SchedulesController::class, 'slots'])->name('schedules.slots');
+        Route::get('schedules/resources', [SchedulesController::class, 'resources'])->name('schedules.resources');
         Route::resource('schedules', SchedulesController::class);
+
+        Route::patch('waiting-list/reorder', [WaitingListController::class, 'reorder'])->name('waiting-list.reorder');
+        Route::get('waiting-list', [WaitingListController::class, 'index'])->name('waiting-list.index');
+        Route::post('waiting-list', [WaitingListController::class, 'store'])->name('waiting-list.store');
+        Route::delete('waiting-list/{waitingList}', [WaitingListController::class, 'destroy'])->name('waiting-list.destroy');
+
+        // ── Mural de recados ──────────────────────────────────────────────────
+        Route::get('notices', [NoticesController::class, 'index'])->name('notices.index');
+        Route::post('notices', [NoticesController::class, 'store'])->name('notices.store');
+        Route::post('notices/{notice}/read', [NoticesController::class, 'markRead'])->name('notices.read');
+        Route::delete('notices/{notice}', [NoticesController::class, 'destroy'])->name('notices.destroy');
+
+        // ── Compromissos não-clínicos ─────────────────────────────────────────
+        Route::post('schedule-events', [ScheduleEventsController::class, 'store'])->name('schedule-events.store');
+        Route::put('schedule-events/{scheduleEvent}', [ScheduleEventsController::class, 'update'])->name('schedule-events.update');
+        Route::delete('schedule-events/{scheduleEvent}', [ScheduleEventsController::class, 'destroy'])->name('schedule-events.destroy');
+
+        // ── Relatórios ────────────────────────────────────────────────────────
+        Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
+        Route::get('reports/schedules', [ReportsController::class, 'schedules'])->name('reports.schedules');
+        Route::get('reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('reports.absenteeism');
+
+        Route::get('resources/{resource}/work-schedule/data', [ResourceWorkScheduleController::class, 'data'])->name('resources.work-schedule.data');
+        Route::put('resources/{resource}/work-schedule', [ResourceWorkScheduleController::class, 'sync'])->name('resources.work-schedule.sync');
+        Route::post('resources/{resource}/blocks', [ResourceWorkScheduleController::class, 'storeBlock'])->name('resources.blocks.store');
+        Route::delete('resources/{resource}/blocks/{block}', [ResourceWorkScheduleController::class, 'destroyBlock'])->name('resources.blocks.destroy');
 
         Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
             Route::get('users/cards', [UsersController::class, 'cards'])->name('users.cards');
@@ -181,6 +216,9 @@ Route::group(
             Route::resource('nearpointconvergences', NearPointConvergencesController::class);
             Route::get('nearpointconvergences/{nearpointconvergence}/restore', [NearPointConvergencesController::class, 'restore'])
                 ->name('nearpointconvergences.restore');
+            Route::resource('resources', ResourcesController::class);
+            Route::get('resources/{resource}/restore', [ResourcesController::class, 'restore'])
+                ->name('resources.restore');
         });
 
         require __DIR__ . '/manager.php';

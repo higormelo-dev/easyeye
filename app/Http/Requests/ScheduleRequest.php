@@ -85,7 +85,8 @@ class ScheduleRequest extends FormRequest
                     $errors = app(ScheduleService::class)->validateSlot(
                         $doctorId,
                         Carbon::parse($value),
-                        $excludeId
+                        $excludeId,
+                        (array) $this->input('resource_ids', [])
                     );
 
                     if (! empty($errors)) {
@@ -99,6 +100,18 @@ class ScheduleRequest extends FormRequest
             'situation'           => ['nullable', 'integer'],
             'notes'               => ['nullable', 'string', 'max:2000'],
             'cancellation_reason' => ['nullable', 'string', 'max:2000'],
+            'waiting_list_id' => ['nullable', 'uuid', 'exists:waiting_list,id'],
+            'recurrence_type'  => ['nullable', 'string', 'in:weekly,monthly'],
+            'recurrence_until' => ['nullable', 'date', 'after:date_time'],
+            'resource_ids'        => ['nullable', 'array'],
+            'resource_ids.*'      => [
+                'uuid',
+                Rule::exists('clinic_resources', 'id')->where(function ($query) {
+                    $query->where('entity_id', session()->get('selected_entity_id'))
+                        ->where('active', true)
+                        ->whereNull('deleted_at');
+                }),
+            ],
         ];
     }
 

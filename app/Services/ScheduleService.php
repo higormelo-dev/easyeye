@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Enums\ScheduleSituation;
-use App\Models\{Doctor, DoctorWorkSchedule, Schedule, ScheduleBlock};
+use App\Models\{ClinicResource, Doctor, DoctorWorkSchedule, ResourceBlock, ResourceWorkSchedule, Schedule, ScheduleBlock, ScheduleSituationLog};
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{Cache, DB};
 
 class ScheduleService
 {
@@ -26,7 +26,10 @@ class ScheduleService
      * @param  string|null  $excludeScheduleId  UUID of the record being updated (skips self-conflict)
      * @return string[]
      */
-    public function validateSlot(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId = null): array
+    /**
+     * @param  string[]  $resourceIds
+     */
+    public function validateSlot(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId = null, array $resourceIds = []): array
     {
         $errors = [];
 
@@ -56,7 +59,112 @@ class ScheduleService
             $errors[] = 'Médico está bloqueado neste horário (ausência, feriado ou compromisso agendado).';
         }
 
+        // 5 ── Resource conflicts ─────────────────────────────────────────────
+        foreach ($resourceIds as $resourceId) {
+            $resource = ClinicResource::find($resourceId);
+
+            if (! $resource) {
+                continue;
+            }
+
+            if ($this->isResourceDoubleBooked($resourceId, $dateTime, $excludeScheduleId)) {
+                $errors[] = "Recurso \"{$resource->name}\" já está ocupado neste horário.";
+
+                continue;
+            }
+
+            if (! $this->isResourceWithinSchedule($resourceId, $dateTime)) {
+                $dayName  = $this->dayName($dateTime->dayOfWeek);
+                $errors[] = "Recurso \"{$resource->name}\" não está disponível ({$dayName} às {$dateTime->format('H:i')}).";
+
+                continue;
+            }
+
+            if ($this->isResourceBlocked($resourceId, $dateTime)) {
+                $errors[] = "Recurso \"{$resource->name}\" está bloqueado neste horário.";
+            }
+        }
+
         return $errors;
+    }
+
+    /**
+     * Checks if a resource is already reserved at the given datetime (by an active schedule).
+     */
+    public function isResourceDoubleBooked(string $resourceId, Carbon $dateTime, ?string $excludeScheduleId): bool
+    {
+        $query = DB::table('schedule_resources')
+            ->join('schedules', 'schedules.id', '=', 'schedule_resources.schedule_id')
+            ->where('schedule_resources.resource_id', $resourceId)
+            ->where('schedules.date_time', $dateTime->format('Y-m-d H:i:s'))
+            ->whereNull('schedules.deleted_at')
+            ->whereNotIn('schedules.situation', $this->terminalSituationValues());
+
+        if ($excludeScheduleId) {
+            $query->where('schedules.id', '!=', $excludeScheduleId);
+        }
+
+        return $query->exists();
+    }
+
+    /**
+     * Checks if a datetime falls within the resource's defined work schedule.
+     * Returns true (no restriction) when the resource has no schedule configured.
+     */
+    public function isResourceWithinSchedule(string $resourceId, Carbon $dateTime): bool
+    {
+        $hasAny = ResourceWorkSchedule::where('resource_id', $resourceId)->exists();
+
+        if (! $hasAny) {
+            return true;
+        }
+
+        $time = $dateTime->format('H:i:s');
+
+        return ResourceWorkSchedule::where('resource_id', $resourceId)
+            ->where('day_of_week', $dateTime->dayOfWeek)
+            ->where('starts_at', '<=', $time)
+            ->where('ends_at', '>', $time)
+            ->exists();
+    }
+
+    /**
+     * Checks if the resource is blocked at the given datetime.
+     */
+    public function isResourceBlocked(string $resourceId, Carbon $dateTime): bool
+    {
+        return ResourceBlock::where('resource_id', $resourceId)
+            ->where('starts_at', '<=', $dateTime->toDateTimeString())
+            ->where('ends_at', '>', $dateTime->toDateTimeString())
+            ->exists();
+    }
+
+    /**
+     * Returns the availability status of all active resources for a given datetime.
+     *
+     * @return array<int, array{id: string, name: string, type: string, type_label: string, available: bool}>
+     */
+    public function getResourceAvailability(string $entityId, Carbon $dateTime, ?string $excludeScheduleId = null): array
+    {
+        $resources = ClinicResource::where('entity_id', $entityId)
+            ->where('active', true)
+            ->orderBy('type')
+            ->orderBy('name')
+            ->get();
+
+        return $resources->map(function (ClinicResource $resource) use ($dateTime, $excludeScheduleId) {
+            $available = ! $this->isResourceDoubleBooked($resource->id, $dateTime, $excludeScheduleId)
+                && $this->isResourceWithinSchedule($resource->id, $dateTime)
+                && ! $this->isResourceBlocked($resource->id, $dateTime);
+
+            return [
+                'id'         => $resource->id,
+                'name'       => $resource->name,
+                'type'       => $resource->type,
+                'type_label' => $resource->typeLabel(),
+                'available'  => $available,
+            ];
+        })->toArray();
     }
 
     /**
@@ -191,16 +299,164 @@ class ScheduleService
         return $slots;
     }
 
+    /**
+     * Moves multiple schedules to a new date, keeping individual times unless a
+     * specific time override is provided.
+     *
+     * Silently skips terminal schedules or those that fail slot validation
+     * (double-booking, outside work schedule, block, etc.).
+     *
+     * @param  string[]    $ids
+     * @param  string      $newDate  Format: Y-m-d
+     * @param  string|null $newTime  Format: H:i — if null, each schedule keeps its original time
+     * @return array{ updated: int, skipped: int }
+     */
+    public function bulkReschedule(
+        array $ids,
+        string $newDate,
+        ?string $newTime,
+        string $entityId,
+        string $entityUserId,
+    ): array {
+        $updated    = 0;
+        $skipped    = 0;
+        $updatedIds = [];
+
+        foreach ($ids as $id) {
+            $schedule = Schedule::where('id', $id)
+                ->where('entity_id', $entityId)
+                ->first();
+
+            if (! $schedule || $schedule->situation->isTerminal()) {
+                $skipped++;
+                continue;
+            }
+
+            $time        = $newTime ?? Carbon::parse($schedule->date_time)->format('H:i');
+            $newDateTime = Carbon::parse("{$newDate} {$time}");
+
+            // Skip if the slot is already taken or outside the doctor's schedule
+            $errors = $this->validateSlot(
+                $schedule->doctor_id,
+                $newDateTime,
+                $schedule->id,  // exclude self to allow same-day same-time move
+            );
+
+            if (! empty($errors)) {
+                $skipped++;
+                continue;
+            }
+
+            $schedule->update(['date_time' => $newDateTime]);
+            $updatedIds[] = $id;
+            $updated++;
+        }
+
+        if ($updated > 0) {
+            Cache::forget("waiting_room:{$entityId}");
+        }
+
+        return ['updated' => $updated, 'skipped' => $skipped, 'updated_ids' => $updatedIds];
+    }
+
+    /**
+     * Applies a situation transition to multiple schedules belonging to the entity.
+     *
+     * Silently skips schedules that are terminal or whose current situation does
+     * not allow the requested transition (partial success — never throws).
+     *
+     * Writes a ScheduleSituationLog entry for every record actually updated.
+     *
+     * @param  string[]  $ids
+     * @return array{ updated: int, skipped: int }
+     */
+    public function bulkUpdateSituation(
+        array $ids,
+        ScheduleSituation $situation,
+        string $entityId,
+        string $entityUserId,
+        ?string $notes = null,
+    ): array {
+        $updated    = 0;
+        $skipped    = 0;
+        $updatedIds = [];
+
+        foreach ($ids as $id) {
+            $schedule = Schedule::where('id', $id)
+                ->where('entity_id', $entityId)
+                ->first();
+
+            if (! $schedule) {
+                $skipped++;
+                continue;
+            }
+
+            if ($schedule->situation->isTerminal()) {
+                $skipped++;
+                continue;
+            }
+
+            if (! in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
+                $skipped++;
+                continue;
+            }
+
+            $data = ['situation' => $situation->value];
+
+            if ($situation === ScheduleSituation::Waiting) {
+                $data['arrived_at'] = now();
+            }
+
+            if ($situation === ScheduleSituation::Confirmed) {
+                $data['confirmed_at'] = now();
+            }
+
+            if ($situation === ScheduleSituation::Cancelled && $notes) {
+                $data['cancellation_reason'] = $notes;
+            }
+
+            $fromSituation = $schedule->situation;
+            $schedule->update($data);
+
+            ScheduleSituationLog::create([
+                'schedule_id'    => $schedule->id,
+                'entity_user_id' => $entityUserId,
+                'from_situation' => $fromSituation->value,
+                'to_situation'   => $situation->value,
+                'notes'          => $notes,
+                'created_at'     => now(),
+            ]);
+
+            $updatedIds[] = $schedule->id;
+            $updated++;
+        }
+
+        if ($updated > 0) {
+            Cache::forget("waiting_room:{$entityId}");
+        }
+
+        return ['updated' => $updated, 'skipped' => $skipped, 'updated_ids' => $updatedIds];
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    private function terminalSituationValues(): array
+    {
+        return array_map(
+            fn (ScheduleSituation $s) => $s->value,
+            array_filter(ScheduleSituation::cases(), fn ($s) => $s->isTerminal())
+        );
+    }
 
     private function isDoubleBooked(string $doctorId, Carbon $dateTime, ?string $excludeScheduleId): bool
     {
         $query = DB::table('schedules')
             ->where('doctor_id', $doctorId)
             ->where('date_time', $dateTime->format('Y-m-d H:i:s'))
-            ->whereNull('deleted_at');
+            ->whereNull('deleted_at')
+            ->whereNotIn('situation', $this->terminalSituationValues());
 
         if ($excludeScheduleId) {
             $query->where('id', '!=', $excludeScheduleId);

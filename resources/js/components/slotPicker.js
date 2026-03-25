@@ -14,7 +14,7 @@
  *        x-model="form.doctor_id"
  *        @slot-selected.window="form.date_time = $event.detail.datetime">
  */
-export default (apiUrl) => ({
+export default (apiUrl, resourcesApiUrl) => ({
     doctorId:         '',   // bound from parent via x-modelable + x-model
     selectedDate:     '',
     selectedDatetime: '',   // local selection state (replaces $parent.form.date_time reads)
@@ -24,6 +24,10 @@ export default (apiUrl) => ({
     interval:         15,   // effective interval in minutes (doctor → entity → 15)
     _prevDoctorId:    null,
     _editInitHandler: null,
+
+    // Resources
+    resources:        [],
+    loadingResources: false,
 
     init() {
         // Listen for edit-mode init event (dispatched by crudForm.fill())
@@ -41,11 +45,19 @@ export default (apiUrl) => ({
 
         // Fetch slots whenever the selected date changes
         this.$watch('selectedDate', () => this.fetchSlots());
+
+        // Polling: re-fetch slots every 15s to reflect availability changes from other sessions
+        this._pollInterval = setInterval(() => {
+            if (this.selectedDate && this.doctorId) this.fetchSlots();
+        }, 15000);
     },
 
     destroy() {
         if (this._editInitHandler) {
             window.removeEventListener('schedule-edit-init', this._editInitHandler);
+        }
+        if (this._pollInterval) {
+            clearInterval(this._pollInterval);
         }
     },
 
@@ -106,10 +118,45 @@ export default (apiUrl) => ({
         if (! slot.available) return;
         this.selectedDatetime = slot.datetime;
         this.$dispatch('slot-selected', { datetime: slot.datetime });
+        this.loadResources(slot.datetime);
     },
 
     isSelected(slot) {
         return slot.datetime === this.selectedDatetime;
+    },
+
+    /**
+     * Loads availability of clinic resources for the selected datetime.
+     * Dispatches 'resources-loaded' so the parent form can react.
+     */
+    async loadResources(datetime) {
+        if (! resourcesApiUrl || ! datetime) {
+            this.resources = [];
+            return;
+        }
+
+        this.loadingResources = true;
+        this.resources        = [];
+
+        try {
+            const url = `${resourcesApiUrl}?date_time=${encodeURIComponent(datetime)}`;
+            const res = await fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+            });
+
+            if (! res.ok) return;
+
+            const data     = await res.json();
+            this.resources = data.data ?? [];
+            this.$dispatch('resources-loaded', { resources: this.resources });
+        } catch {
+            this.resources = [];
+        } finally {
+            this.loadingResources = false;
+        }
     },
 
     /**

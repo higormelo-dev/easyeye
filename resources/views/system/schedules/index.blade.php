@@ -27,7 +27,13 @@
             notes:               '',
             covenant_id:         '',
             visit_id:            '',
-            situation:           1
+            situation:           1,
+            resource_ids:        [],
+            resources_available: [],
+            waiting_list_id:     '',
+            use_recurrence:      false,
+            recurrence_type:     'weekly',
+            recurrence_until:    ''
         },
         onSuccess: () => $dispatch('schedule-saved')
     })"
@@ -38,7 +44,22 @@
          @js(url('panel/schedules')) + '/' + $event.detail.id,
          'scheduleModal'
      )"
-         x-on:slot-selected.window="form.date_time = $event.detail.datetime">
+         x-on:slot-selected.window="form.date_time = $event.detail.datetime"
+         x-on:resources-loaded="form.resource_ids = []; form.resources_available = $event.detail.resources"
+         x-on:prefill-from-waiting.window="
+             reset();
+             form.doctor_id          = $event.detail.doctor_id           ?? '';
+             form.patient_id         = $event.detail.patient_id          ?? '';
+             form.full_name          = $event.detail.full_name           ?? '';
+             form.telephone          = $event.detail.telephone           ?? '';
+             form.cellphone          = $event.detail.cellphone           ?? '';
+             form.cellphone_whatsapp = $event.detail.cellphone_whatsapp  ?? false;
+             form.covenant_id        = $event.detail.covenant_id         ?? '';
+             form.visit_id           = $event.detail.visit_id            ?? '';
+             form.notes              = $event.detail.notes               ?? '';
+             form.waiting_list_id    = $event.detail.id;
+             $nextTick(() => bootstrap.Modal.getOrCreateInstance(document.getElementById('scheduleModal')).show())
+         ">
 
         @include('system.schedules._form-modal')
 
@@ -49,20 +70,108 @@
             @js(session('selected_entity_doctor_id', 'tudo'))
          )"
              x-init="init()"
-             @schedule-saved.window="fetchList()">
+             @schedule-saved.window="fetchList()"
+             @waiting-list-saved.window="fetchWaiting(); showWaitingPanel = true">
 
             {{-- ── Toolbar ─────────────────────────────────────────────────────── --}}
-            <div class="row mb-3 align-items-center">
-                <div class="col-12 col-md-auto">
+            <div class="row mb-3 align-items-center g-2">
+
+                {{-- Botão Novo + Lista de Espera (sempre à esquerda) --}}
+                <div class="col-12 col-md-auto d-flex align-items-center gap-2">
                     <button type="button"
                             class="btn btn-info btn-sm"
                             data-bs-toggle="modal"
                             data-bs-target="#scheduleModal">
                         <i class="fa fa-plus"></i> {{ __('actions.new') }}
                     </button>
+                    @if(session()->get('selected_entity_user_rule') !== 'doctor')
+                        <button type="button"
+                                class="btn btn-warning btn-sm position-relative"
+                                @click="toggleWaitingPanel()"
+                                title="Lista de espera">
+                            <i class="fas fa-hourglass-half me-1"></i> Lista de Espera
+                            <span x-show="waitingCount > 0" x-cloak
+                                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                                  x-text="waitingCount"></span>
+                        </button>
+                        <button type="button"
+                                class="btn btn-outline-warning btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#waitingListModal"
+                                title="Adicionar à lista de espera">
+                            <i class="fas fa-plus me-1"></i> Fila
+                        </button>
+                    @endif
                 </div>
-                <div class="col-12 col-md d-flex align-items-center gap-2 mt-2 mt-md-0 justify-content-md-end">
-                    <div class="input-group input-group-sm flex-grow-1" style="max-width: 320px;">
+
+                {{-- Lado direito: busca (normal) ou controles de bulk (seleção) --}}
+                <div class="col-12 col-md d-flex align-items-center gap-2 mt-2 mt-md-0 justify-content-md-end flex-wrap">
+
+                    {{-- Modo normal: busca + botão Selecionar --}}
+                    @if(session()->get('selected_entity_user_rule') !== 'doctor')
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                                x-show="! selectionMode"
+                                @click="toggleSelectionMode()"
+                                title="Selecionar agendamentos para ação em massa">
+                            <i class="fas fa-check-square me-1"></i> Selecionar
+                        </button>
+                    @endif
+
+                    {{-- Modo seleção: controles de bulk substituem a busca --}}
+                    <div class="d-flex align-items-center gap-2 flex-wrap"
+                         x-show="selectionMode"
+                         x-cloak>
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                @click="clearSelection()"
+                                title="Sair do modo de seleção">
+                            <i class="fas fa-times me-1"></i> Cancelar
+                        </button>
+                        <button type="button"
+                                class="btn btn-outline-secondary btn-sm"
+                                @click="toggleSelectAll()"
+                                title="Selecionar / desselecionar todos">
+                            <i class="fas me-1" :class="isAllSelected() ? 'fa-check-square' : 'fa-square'"></i>
+                            Todos
+                        </button>
+                        <span class="text-muted small fw-semibold"
+                              x-text="selectedIds.length + ' selecionado(s)'"></span>
+                        <div class="vr"></div>
+                        <button type="button"
+                                id="btn-bulk-confirm"
+                                class="btn btn-info btn-sm"
+                                :disabled="selectedIds.length === 0"
+                                title="Confirmar agendamentos selecionados">
+                            <i class="fas fa-check-circle me-1"></i> Confirmar
+                        </button>
+                        <button type="button"
+                                id="btn-bulk-noshow"
+                                class="btn btn-warning btn-sm text-dark"
+                                :disabled="selectedIds.length === 0"
+                                title="Marcar como Faltou">
+                            <i class="fas fa-user-times me-1"></i> Faltou
+                        </button>
+                        <button type="button"
+                                id="btn-bulk-cancel"
+                                class="btn btn-danger btn-sm"
+                                :disabled="selectedIds.length === 0"
+                                title="Cancelar agendamentos selecionados">
+                            <i class="fas fa-ban me-1"></i> Cancelar
+                        </button>
+                        <button type="button"
+                                id="btn-bulk-reschedule"
+                                class="btn btn-secondary btn-sm"
+                                :disabled="selectedIds.length === 0"
+                                title="Alterar data dos agendamentos selecionados">
+                            <i class="fas fa-calendar-alt me-1"></i> Alterar Data
+                        </button>
+                    </div>
+
+                    {{-- Campo de busca (oculto no modo seleção) --}}
+                    <div class="input-group input-group-sm flex-grow-1"
+                         style="max-width: 320px;"
+                         x-show="! selectionMode">
                         <span class="input-group-text"><i class="fa fa-search"></i></span>
                         <input type="text"
                                class="form-control"
@@ -76,7 +185,9 @@
                             <i class="fa fa-times"></i>
                         </button>
                     </div>
+
                 </div>
+
             </div>
 
             {{-- ── Painel lateral + Grade principal ─────────────────────────── --}}
@@ -225,6 +336,106 @@
 
                         <div class="card-body">
 
+                            {{-- ── Mural de Recados ──────────────────────────────── --}}
+                        @include('system.schedules._notices-panel')
+
+                        {{-- ── Painel Lista de Espera (aparece antes da lista) ── --}}
+                            <div x-show="showWaitingPanel" x-cloak class="mb-3 border border-warning rounded">
+                                <div class="d-flex align-items-center justify-content-between px-3 py-2 bg-warning rounded-top">
+                                    <span class="fw-semibold">
+                                        <i class="fas fa-hourglass-half me-2"></i> Lista de Espera
+                                        <span class="badge bg-dark ms-2" x-text="waitingCount"></span>
+                                    </span>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <button type="button"
+                                                class="btn btn-sm btn-dark"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#waitingListModal">
+                                            <i class="fas fa-plus me-1"></i> Adicionar
+                                        </button>
+                                        <button type="button" class="btn-close" @click="toggleWaitingPanel()"></button>
+                                    </div>
+                                </div>
+
+                                <template x-if="waitingEntries.length === 0">
+                                    <p class="text-muted text-center py-3 mb-0 small">
+                                        <i class="fas fa-check-circle me-1"></i> Nenhum paciente na lista de espera.
+                                    </p>
+                                </template>
+
+                                <div class="list-group list-group-flush rounded-bottom">
+                                    <template x-for="(entry, index) in waitingEntries" :key="entry.id">
+                                        <div class="list-group-item px-2 py-2">
+                                            <div class="d-flex align-items-center gap-2">
+
+                                                <span class="badge bg-secondary rounded-pill flex-shrink-0"
+                                                      x-text="index + 1"
+                                                      style="min-width:1.6rem;"></span>
+
+                                                <div class="d-flex flex-column flex-shrink-0" style="gap:0;">
+                                                    <button type="button"
+                                                            class="btn p-0 lh-1 border-0 text-muted"
+                                                            style="font-size:.75rem;"
+                                                            @click="moveWaiting(index, -1)"
+                                                            :disabled="index === 0">
+                                                        <i class="fas fa-caret-up"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn p-0 lh-1 border-0 text-muted"
+                                                            style="font-size:.75rem;"
+                                                            @click="moveWaiting(index, 1)"
+                                                            :disabled="index === waitingEntries.length - 1">
+                                                        <i class="fas fa-caret-down"></i>
+                                                    </button>
+                                                </div>
+
+                                                <div class="flex-grow-1 min-w-0">
+                                                    <div class="fw-semibold text-truncate small" x-text="entry.full_name"></div>
+                                                    <div class="text-muted" style="font-size:.75rem;">
+                                                        <span x-text="entry.doctor_name"></span>
+                                                        <template x-if="entry.covenant_name">
+                                                            <span> &middot; <span x-text="entry.covenant_name"></span></span>
+                                                        </template>
+                                                        <template x-if="entry.visit_name">
+                                                            <span> &middot; <span x-text="entry.visit_name"></span></span>
+                                                        </template>
+                                                    </div>
+                                                    <div x-show="entry.preferred_date_from"
+                                                         class="text-muted" style="font-size:.7rem;">
+                                                        <i class="fas fa-calendar me-1"></i>
+                                                        <span x-text="entry.preferred_date_from"></span>
+                                                        <template x-if="entry.preferred_date_until">
+                                                            <span> até <span x-text="entry.preferred_date_until"></span></span>
+                                                        </template>
+                                                    </div>
+                                                    <template x-if="entry.notes">
+                                                        <p class="mb-0 mt-1 text-muted fst-italic"
+                                                           style="font-size:.7rem;"
+                                                           x-text="entry.notes"></p>
+                                                    </template>
+                                                </div>
+
+                                                <div class="d-flex gap-1 flex-shrink-0">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-info"
+                                                            @click="scheduleFromWaiting(entry)"
+                                                            title="Agendar este paciente">
+                                                        <i class="fas fa-calendar-plus"></i>
+                                                    </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-danger"
+                                                            @click="removeWaiting(entry.id)"
+                                                            title="Remover da lista">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+
                             {{-- Spinner ------------------------------------------- --}}
                             <div x-show="loading" x-cloak class="text-center py-4">
                                 <div class="spinner-border text-info" role="status">
@@ -234,13 +445,14 @@
 
                             {{-- Lista -------------------------------------------- --}}
                             <div x-show="!loading">
-                                <div id="list-schedule">
+                                <div id="list-schedule"
+                                     :class="{ 'selection-mode': selectionMode }">
                                     @include('system.schedules.list')
                                 </div>
                             </div>
 
-                        </div>
-                    </div>
+                        </div>{{-- /card-body --}}
+                    </div>{{-- /card --}}
                 </div>{{-- /col principal --}}
 
             </div>{{-- /row --}}
@@ -255,6 +467,7 @@
     @include('components.modal_default')
     @include('system.schedules._reschedule-modal')
     @include('system.schedules._patient-modal')
+    @include('system.schedules._waiting-list-modal')
 @endsection
 
 @section('javascript')
@@ -297,6 +510,17 @@
 
 @push('styles')
     <style>
+        /* Checkboxes de seleção em massa — ocultos por padrão */
+        .schedule-select-cb { display: none; }
+        #list-schedule.selection-mode .schedule-select-cb { display: flex; align-items: center; }
+
+        /* Card selecionado */
+        #list-schedule.selection-mode .schedule-card { cursor: pointer; }
+        #list-schedule.selection-mode .schedule-card:has(.schedule-checkbox:checked) {
+            background-color: #e8f4ff !important;
+            border-color: #0d6efd !important;
+        }
+
         /* Flatpickr inline — ocupa toda a largura da coluna */
         .schedule-calendar-wrap .flatpickr-calendar {
             width: 100% !important;

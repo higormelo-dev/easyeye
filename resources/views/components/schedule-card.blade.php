@@ -20,9 +20,20 @@
 @endphp
 
 <div class="card mb-2 border schedule-card{{ $isTerminal ? ' opacity-65 bg-light' : '' }}"
+     data-schedule-id="{{ $schedule->id }}"
      style="border-left-color: {{ $doctorColor }} !important;">
     <div class="card-body py-2 px-3">
         <div class="d-flex align-items-center gap-3">
+
+            {{-- Checkbox de seleção em massa (visível apenas em .selection-mode) --}}
+            @if($isStaff)
+                <div class="schedule-select-cb flex-shrink-0">
+                    <input type="checkbox"
+                           class="form-check-input schedule-checkbox"
+                           data-id="{{ $schedule->id }}"
+                           style="width:1.2rem;height:1.2rem;cursor:pointer;">
+                </div>
+            @endif
 
             {{-- Foto (só md+) --}}
             <div class="d-none d-md-block flex-shrink-0">

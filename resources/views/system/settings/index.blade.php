@@ -52,6 +52,10 @@
 
 @endsection
 
+@section('modals')
+    @includeIf('system.settings._partials.' . $viewSlot . '.modals')
+@endsection
+
 @section('javascript')
     {{ $dataTable->scripts() }}
     @vite([$jsFile])

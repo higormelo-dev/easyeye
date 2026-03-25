@@ -20,6 +20,16 @@ export default (ajaxUrl, csrfToken, initialDoctor) => ({
     loading: false,
     _fp: null,
 
+    // ── Seleção em massa ────────────────────────────────────────────────
+    selectionMode: false,
+    selectedIds:   [],
+
+    // ── Lista de espera ─────────────────────────────────────────────────
+    waitingEntries:   [],
+    waitingCount:     0,
+    showWaitingPanel: false,
+    _waitingUrl:      '/panel/waiting-list',
+
     init() {
         this._fp = flatpickr(this.$refs.calendarPicker, {
             inline: true,
@@ -31,12 +41,20 @@ export default (ajaxUrl, csrfToken, initialDoctor) => ({
             },
         });
 
+        // Expõe a instância para o schedules.js (event delegation vanilla)
+        window.scheduleViewComponent = this;
+
+        // Atualiza lista de espera após salvar um agendamento
+        window.addEventListener('schedule-saved', () => this.fetchWaiting());
+
         this.fetchList();
+        this.fetchWaiting();
     },
 
     setDoctor(id) {
         this.doctor = id;
         this.fetchList();
+        this.fetchWaiting();
     },
 
     setBout(value) {
@@ -67,11 +85,138 @@ export default (ajaxUrl, csrfToken, initialDoctor) => ({
             })
             .then(html => {
                 document.getElementById('list-schedule').innerHTML = html;
+                this._syncCheckboxes();
             })
             .catch(err => {
                 const msg = err?.message ?? 'Erro ao carregar agendamentos.';
                 Swal.fire('Erro!', msg, 'error');
             })
             .finally(() => { this.loading = false; });
+    },
+
+    // ── Lista de espera ─────────────────────────────────────────────────
+
+    fetchWaiting() {
+        const doctor = this.doctor === 'tudo' ? '' : this.doctor;
+        const url    = doctor
+            ? `${this._waitingUrl}?doctor_id=${encodeURIComponent(doctor)}`
+            : this._waitingUrl;
+
+        fetch(url, {
+            headers: {
+                'X-CSRF-TOKEN':     csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept':           'application/json',
+            },
+        })
+            .then(r => r.json())
+            .then(data => {
+                this.waitingEntries = data.data ?? [];
+                this.waitingCount   = data.count ?? 0;
+            })
+            .catch(() => {});
+    },
+
+    toggleWaitingPanel() {
+        this.showWaitingPanel = ! this.showWaitingPanel;
+    },
+
+    /**
+     * Pre-fills the crudForm schedule modal with data from a waiting list entry
+     * and opens the modal so the user can pick a date/time.
+     */
+    scheduleFromWaiting(entry) {
+        window.dispatchEvent(new CustomEvent('prefill-from-waiting', { detail: entry }));
+    },
+
+    /**
+     * Removes an entry from the waiting list immediately (optimistic UI).
+     */
+    removeWaiting(id) {
+        fetch(`${this._waitingUrl}/${id}`, {
+            method:  'DELETE',
+            headers: {
+                'X-CSRF-TOKEN':     csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept':           'application/json',
+            },
+        })
+            .then(r => r.json())
+            .then(() => {
+                this.waitingEntries = this.waitingEntries.filter(e => e.id !== id);
+                this.waitingCount   = this.waitingEntries.length;
+                if (window.showSuccessToast) showSuccessToast('Removido da lista de espera.');
+            })
+            .catch(() => {
+                if (window.showErrorToast) showErrorToast('Erro ao remover da lista.');
+            });
+    },
+
+    /**
+     * Sends the updated order to the backend after drag-and-drop or arrow buttons.
+     */
+    reorderWaiting() {
+        const ids = this.waitingEntries.map(e => e.id);
+
+        fetch(`${this._waitingUrl}/reorder`, {
+            method:  'PATCH',
+            headers: {
+                'X-CSRF-TOKEN':     csrfToken,
+                'Content-Type':     'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept':           'application/json',
+            },
+            body: JSON.stringify({ ids }),
+        }).catch(() => {});
+    },
+
+    moveWaiting(index, direction) {
+        const target = index + direction;
+        if (target < 0 || target >= this.waitingEntries.length) return;
+
+        const entries = [...this.waitingEntries];
+        [entries[index], entries[target]] = [entries[target], entries[index]];
+        this.waitingEntries = entries;
+
+        this.reorderWaiting();
+    },
+
+    // ── Seleção em massa ────────────────────────────────────────────────
+
+    toggleSelectionMode() {
+        this.selectionMode = ! this.selectionMode;
+        if (! this.selectionMode) this.selectedIds = [];
+        this._syncCheckboxes();
+    },
+
+    clearSelection() {
+        this.selectionMode = false;
+        this.selectedIds   = [];
+        this._syncCheckboxes();
+    },
+
+    toggleSelect(id) {
+        const idx = this.selectedIds.indexOf(id);
+        if (idx === -1) this.selectedIds.push(id);
+        else            this.selectedIds.splice(idx, 1);
+    },
+
+    toggleSelectAll() {
+        const all = [...document.querySelectorAll('#list-schedule .schedule-checkbox')]
+            .map(el => el.dataset.id);
+
+        this.selectedIds = this.selectedIds.length === all.length ? [] : all;
+        this._syncCheckboxes();
+    },
+
+    isAllSelected() {
+        const all = document.querySelectorAll('#list-schedule .schedule-checkbox');
+        return all.length > 0 && this.selectedIds.length === all.length;
+    },
+
+    _syncCheckboxes() {
+        document.querySelectorAll('#list-schedule .schedule-checkbox').forEach(el => {
+            el.checked = this.selectedIds.includes(el.dataset.id);
+        });
     },
 });
