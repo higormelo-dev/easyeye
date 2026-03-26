@@ -248,7 +248,7 @@ class DataFakersSeeder extends Seeder
             'rule'      => 'doctor',
             'active'    => true,
         ]);
-        Doctor::create([
+        $testAnaDoctor = Doctor::create([
             'entity_user_id'   => $testAnaEntityUser->id,
             'person_id'        => $testAnaPersona->id,
             'record'           => '123456',
@@ -276,7 +276,7 @@ class DataFakersSeeder extends Seeder
             'rule'      => 'doctor',
             'active'    => true,
         ]);
-        Doctor::create([
+        $testCarlosDoctor = Doctor::create([
             'entity_user_id'   => $testCarlosEntityUser->id,
             'person_id'        => $testCarlosPerson->id,
             'record'           => '654321',
@@ -285,6 +285,27 @@ class DataFakersSeeder extends Seeder
             'partner'          => false,
             'active'           => true,
         ]);
+
+        // Secretária
+        $testSecretaryPerson = People::create([
+            'full_name' => 'SECRETÁRIA CLÍNICA TESTE',
+            'email'     => 'secretaria@clinicateste.com',
+            'cellphone' => '',
+        ]);
+        $testSecretaryUser = User::create([
+            'name'              => $testSecretaryPerson->full_name,
+            'email'             => 'secretaria@clinicateste.com',
+            'email_verified_at' => now(),
+            'password'          => Hash::make('Secretaria@123'),
+        ]);
+        EntityUser::create([
+            'entity_id' => $testEntity->id,
+            'user_id'   => $testSecretaryUser->id,
+            'rule'      => 'secretary',
+            'active'    => true,
+        ]);
+
+        $this->createTestEntityData($testEntity, $testAnaDoctor, $testCarlosDoctor);
 
         $this->command->info('');
         $this->command->info('═══════════════════════════════════════════════════════');
@@ -311,6 +332,10 @@ class DataFakersSeeder extends Seeder
         $this->command->info('  MÉDICO 2 — Dr. Carlos Souza');
         $this->command->info('  email   : dr.carlos@clinicateste.com');
         $this->command->info('  password: Medico@123');
+        $this->command->info('───────────────────────────────────────────────────────');
+        $this->command->info('  SECRETÁRIA');
+        $this->command->info('  email   : secretaria@clinicateste.com');
+        $this->command->info('  password: Secretaria@123');
         $this->command->info('═══════════════════════════════════════════════════════');
         $this->command->info('');
 
@@ -637,5 +662,109 @@ class DataFakersSeeder extends Seeder
                 ]);
             }
         }
+    }
+
+    /**
+     * Criar pacientes, agendamentos e exames para a entidade de teste do integrador.
+     * Cobre 14 dias passados + hoje + 14 dias futuros com os 2 médicos fixos.
+     */
+    private function createTestEntityData(Entity $entity, Doctor $drAna, Doctor $drCarlos): void
+    {
+        $this->command->info('⏳ Criando dados de teste para Clínica Teste Integrador...');
+
+        $skinTypes  = SkinType::all();
+        $irisTypes  = IrisType::all();
+        $covenants  = Covenant::all();
+        $visitTypes = VisitType::all();
+
+        // ── 20 pacientes ────────────────────────────────────────────────────
+        $patients = collect();
+
+        for ($i = 0; $i < 20; $i++) {
+            $person = People::factory()->create();
+            $patients->push(Patient::create([
+                'entity_id'   => $entity->id,
+                'person_id'   => $person->id,
+                'covenant_id' => $covenants->isNotEmpty() ? $covenants->random()->id : null,
+                'skin_id'     => $skinTypes->random()->id,
+                'iris_id'     => $irisTypes->random()->id,
+                'card_number' => fake()->optional(0.6)->creditCardNumber(),
+                'active'      => true,
+            ]));
+        }
+
+        // ── Schedules: 14 dias passados + hoje + 14 dias futuros ────────────
+        $doctors          = [$drAna, $drCarlos];
+        $attendedForExams = [];
+        $startDate        = Carbon::now()->subDays(14)->startOfDay();
+        $endDate          = Carbon::now()->addDays(14)->endOfDay();
+        $date             = $startDate->copy();
+
+        while ($date->lte($endDate)) {
+            $isPast = $date->copy()->endOfDay()->isPast();
+
+            $situationPool = $isPast
+                ? [
+                    ScheduleSituation::Attended->value,
+                    ScheduleSituation::Attended->value,
+                    ScheduleSituation::Attended->value,
+                    ScheduleSituation::NoShow->value,
+                    ScheduleSituation::Cancelled->value,
+                ]
+                : [
+                    ScheduleSituation::Scheduled->value,
+                    ScheduleSituation::Scheduled->value,
+                    ScheduleSituation::Scheduled->value,
+                    ScheduleSituation::Scheduled->value,
+                    ScheduleSituation::Cancelled->value,
+                ];
+
+            foreach ($doctors as $doctor) {
+                $usedPatientIds     = [];
+                $currentTime        = $date->copy()->setTime(8, 0);
+                $appointmentsPerDay = fake()->numberBetween(3, 6);
+
+                for ($i = 0; $i < $appointmentsPerDay; $i++) {
+                    $available = $patients->whereNotIn('id', $usedPatientIds);
+
+                    if ($available->isEmpty()) {
+                        break;
+                    }
+
+                    $patient          = $available->random();
+                    $usedPatientIds[] = $patient->id;
+                    $situation        = $situationPool[array_rand($situationPool)];
+
+                    // Schedule::create() dispara o observer → auto-gera SDL-* code
+                    $schedule = Schedule::create([
+                        'entity_id'   => $entity->id,
+                        'doctor_id'   => $doctor->id,
+                        'patient_id'  => $patient->id,
+                        'covenant_id' => $covenants->isNotEmpty() ? $covenants->random()->id : null,
+                        'visit_id'    => $visitTypes->isNotEmpty() ? $visitTypes->random()->id : null,
+                        'full_name'   => $patient->person?->full_name ?? fake()->name(),
+                        'date_time'   => $currentTime->copy()->toDateTimeString(),
+                        'cellphone'   => fake()->numerify('###########'),
+                        'situation'   => $situation,
+                        'active'      => true,
+                    ]);
+
+                    if ($isPast && $situation === ScheduleSituation::Attended->value && fake()->boolean(40)) {
+                        $attendedForExams[] = [
+                            'id'         => $schedule->id,
+                            'patient_id' => $patient->id,
+                            'doctor_id'  => $doctor->id,
+                            'entity_id'  => $entity->id,
+                        ];
+                    }
+
+                    $currentTime->addMinutes(30);
+                }
+            }
+
+            $date->addDay();
+        }
+
+        $this->createPatientExams($attendedForExams);
     }
 }
