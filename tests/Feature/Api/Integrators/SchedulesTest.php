@@ -28,7 +28,7 @@ function makeSchedule(array $ctx, array $overrides = []): Schedule
         'doctor_id'          => $doctor->id,
         'visit_id'           => $visitType->id,
         'full_name'          => 'PATIENT TEST',
-        'date_time'          => now()->addDay(),
+        'date_time'          => now(),
         'cellphone'          => '11999990000',
         'cellphone_whatsapp' => false,
         'situation'          => ScheduleSituation::Scheduled->value,
@@ -100,7 +100,7 @@ describe('GET /api/integrators/v1/schedules', function () {
             'doctor_id'          => $doctor->id,
             'visit_id'           => $visitType->id,
             'full_name'          => 'PACIENTE QUALQUER',
-            'date_time'          => now()->addDay(),
+            'date_time'          => now(),
             'cellphone'          => '11999990000',
             'cellphone_whatsapp' => false,
             'situation'          => ScheduleSituation::Scheduled->value,
@@ -115,6 +115,31 @@ describe('GET /api/integrators/v1/schedules', function () {
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
+    });
+
+    it('returns only today\'s schedules by default', function () {
+        makeSchedule($this->ctx);
+        makeSchedule($this->ctx, ['date_time' => now()->addDays(3)]);
+
+        $response = $this->getJson('/api/integrators/v1/schedules', $this->ctx['headers'])
+            ->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
+    it('filters schedules by a specific date', function () {
+        makeSchedule($this->ctx);
+        makeSchedule($this->ctx, ['date_time' => now()->addDays(5)]);
+        makeSchedule($this->ctx, ['date_time' => now()->addDays(5)]);
+
+        $targetDate = now()->addDays(5)->toDateString();
+
+        $response = $this->getJson(
+            "/api/integrators/v1/schedules?date={$targetDate}",
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(2);
     });
 
     it('caps per_page at plan limit', function () {

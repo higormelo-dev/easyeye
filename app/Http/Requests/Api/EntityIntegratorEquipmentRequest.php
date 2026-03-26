@@ -59,12 +59,12 @@ class EntityIntegratorEquipmentRequest extends FormRequest
     {
         $param    = $this->route('equipment');
         $ignoreId = match (true) {
-            $param === null            => null,
-            Str::isUuid((string) $param)     => $param,
-            ctype_digit((string) $param)     => EntityIntegratorEquipment::where(
+            $param === null              => null,
+            Str::isUuid((string) $param) => $param,
+            ctype_digit((string) $param) => EntityIntegratorEquipment::where(
                 'code', sprintf('EIQ-%010d', (int) $param)
             )->value('id'),
-            default                    => EntityIntegratorEquipment::where('code', $param)->value('id'),
+            default => EntityIntegratorEquipment::where('code', $param)->value('id'),
         };
 
         return Rule::unique(self::TABLE, $column)

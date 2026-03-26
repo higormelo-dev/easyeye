@@ -5,6 +5,7 @@ namespace App\Http\Requests\Api;
 use App\Models\{ExamType, PatientExam, Schedule};
 use App\Models\EntityIntegratorEquipment;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 
 class PatientExamRequest extends FormRequest
 {
@@ -37,17 +38,12 @@ class PatientExamRequest extends FormRequest
                         })
                         ->whereNull('deleted_at');
 
-                    // Verifica se é um UUID válido
-                    $isUuid = preg_match(
-                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
-                        $value
-                    );
-
-                    if ($isUuid) {
-                        $query->where('id', $value);
-                    } else {
-                        $query->where('code', $value);
-                    }
+                    [$column, $lookupValue] = match (true) {
+                        Str::isUuid($value) => ['id',   $value],
+                        ctype_digit($value) => ['code', sprintf('ETP-%010d', (int) $value)],
+                        default             => ['code', $value],
+                    };
+                    $query->where($column, $lookupValue);
 
                     if (! $query->exists()) {
                         $fail(__('validation.custom.validation_invalid.exam_identifier'));
@@ -62,20 +58,16 @@ class PatientExamRequest extends FormRequest
                         return;
                     }
 
-                    // Verifica se é um UUID válido
-                    $isUuid = preg_match(
-                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
-                        $value
-                    );
+                    [$column, $lookupValue] = match (true) {
+                        Str::isUuid($value) => ['id',   $value],
+                        ctype_digit($value) => ['code', sprintf('SDL-%010d', (int) $value)],
+                        default             => ['code', $value],
+                    };
 
                     $exists = Schedule::query()
                         ->where('entity_id', $entityId)
                         ->whereNull('deleted_at')
-                        ->when($isUuid, function ($query) use ($value) {
-                            $query->where('id', $value);
-                        }, function ($query) use ($value) {
-                            $query->whereRaw('LOWER(code) = LOWER(?)', [$value]);
-                        })
+                        ->where($column, $lookupValue)
                         ->exists();
 
                     if (! $exists) {
@@ -107,16 +99,12 @@ class PatientExamRequest extends FormRequest
                     $examParam = $this->route('exam');
 
                     if ($examParam) {
-                        $isUuidParam = (bool) preg_match(
-                            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
-                            (string) $examParam
-                        );
-
-                        if ($isUuidParam) {
-                            $existsQuery->where('id', '!=', $examParam);
-                        } else {
-                            $existsQuery->where('code', '!=', $examParam);
-                        }
+                        [$ignoreCol, $ignoreVal] = match (true) {
+                            Str::isUuid((string) $examParam) => ['id',   $examParam],
+                            ctype_digit((string) $examParam) => ['code', sprintf('EXM-%010d', (int) $examParam)],
+                            default                          => ['code', $examParam],
+                        };
+                        $existsQuery->where($ignoreCol, '!=', $ignoreVal);
                     }
 
                     if ($existsQuery->exists()) {
@@ -133,20 +121,16 @@ class PatientExamRequest extends FormRequest
                         return;
                     }
 
-                    $isUuid = preg_match(
-                        '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
-                        $value
-                    );
-
                     $query = EntityIntegratorEquipment::query()
                         ->where('integrator_id', $integrator->id)
                         ->whereNull('deleted_at');
 
-                    if ($isUuid) {
-                        $query->where('id', $value);
-                    } else {
-                        $query->where('code', $value);
-                    }
+                    [$column, $lookupValue] = match (true) {
+                        Str::isUuid($value) => ['id',   $value],
+                        ctype_digit($value) => ['code', sprintf('EIQ-%010d', (int) $value)],
+                        default             => ['code', $value],
+                    };
+                    $query->where($column, $lookupValue);
 
                     if (! $query->exists()) {
                         $fail(__('validation.custom.validation_invalid.equipment_identifier'));
