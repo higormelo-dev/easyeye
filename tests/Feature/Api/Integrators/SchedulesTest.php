@@ -85,6 +85,38 @@ describe('GET /api/integrators/v1/schedules', function () {
         expect($response->json('meta.total'))->toBe(1);
     });
 
+    it('searches schedules by doctor name', function () {
+        $user       = User::factory()->create();
+        $entityUser = createEntityUser($this->ctx['entity'], $user, 'doctor');
+        $person     = People::factory()->create(['full_name' => 'DR ANTONIO CARLOS']);
+        $doctor     = Doctor::create([
+            'entity_user_id' => $entityUser->id,
+            'person_id'      => $person->id,
+            'active'         => true,
+        ]);
+        $visitType = VisitType::create(['name' => 'Consulta', 'active' => true]);
+        Schedule::create([
+            'entity_id'          => $this->ctx['entity']->id,
+            'doctor_id'          => $doctor->id,
+            'visit_id'           => $visitType->id,
+            'full_name'          => 'PACIENTE QUALQUER',
+            'date_time'          => now()->addDay(),
+            'cellphone'          => '11999990000',
+            'cellphone_whatsapp' => false,
+            'situation'          => ScheduleSituation::Scheduled->value,
+            'active'             => true,
+        ]);
+
+        makeSchedule($this->ctx); // decoy with random doctor name
+
+        $response = $this->getJson(
+            '/api/integrators/v1/schedules?search=antonio',
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
     it('caps per_page at plan limit', function () {
         for ($i = 0; $i < 5; $i++) {
             makeSchedule($this->ctx);
@@ -121,6 +153,16 @@ describe('GET /api/integrators/v1/schedules/{id}', function () {
     it('shows schedule by code', function () {
         $this->getJson(
             "/api/integrators/v1/schedules/{$this->schedule->code}",
+            $this->ctx['headers']
+        )->assertOk()
+            ->assertJsonFragment(['id' => $this->schedule->id]);
+    });
+
+    it('shows schedule by integer number', function () {
+        $numericPart = (int) substr($this->schedule->code, 4); // remove 'SDL-'
+
+        $this->getJson(
+            "/api/integrators/v1/schedules/{$numericPart}",
             $this->ctx['headers']
         )->assertOk()
             ->assertJsonFragment(['id' => $this->schedule->id]);

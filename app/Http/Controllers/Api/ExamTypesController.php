@@ -56,17 +56,19 @@ class ExamTypesController extends Controller
     {
         $integrator = request()->attributes->get('integrator');
 
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('ETP-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
+
         $examType = $this->model->query()
             ->with('entity')
-            ->where(function ($query) use ($integrator) {
-                $query->whereNull('entity_id')
+            ->where(function ($q) use ($integrator) {
+                $q->whereNull('entity_id')
                     ->orWhere('entity_id', $integrator->user->entity_id);
             })
-            ->when(
-                Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
-            )
+            ->where($column, $value)
             ->firstOrFail();
 
         return new ExamTypeResource($examType);

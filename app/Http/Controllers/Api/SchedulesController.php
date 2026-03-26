@@ -35,21 +35,21 @@ class SchedulesController extends Controller
             $schedules = $schedules->where(function ($query) use ($search) {
                 $query->whereHas('patient', function ($q) use ($search) {
                     $q->whereHas('person', function ($qq) use ($search) {
-                        $qq->whereRaw('LOWER(full_name) LIKE LOWER(?)', ["%{$search}%"])
-                            ->orWhereRaw('LOWER(nickname) LIKE LOWER(?)', ["%{$search}%"]);
+                        $qq->where('full_name', 'ilike', '%' . $search . '%')
+                            ->orWhere('nickname', 'ilike', '%' . $search . '%');
                     });
                 })
                     ->orWhereHas('doctor', function ($q) use ($search) {
                         $q->whereHas('person', function ($qq) use ($search) {
-                            $qq->whereRaw('LOWER(full_name) LIKE LOWER(?)', ["%{$search}%"])
-                                ->orWhereRaw('LOWER(nickname) LIKE LOWER(?)', ["%{$search}%"]);
+                            $qq->where('full_name', 'ilike', '%' . $search . '%')
+                                ->orWhere('nickname', 'ilike', '%' . $search . '%');
                         });
                     })
                     ->orWhereHas('covenant', function ($q) use ($search) {
-                        $q->whereRaw('LOWER(name) LIKE LOWER(?)', ["%{$search}%"]);
+                        $q->where('name', 'ilike', '%' . $search . '%');
                     })
-                    ->orWhereRaw('LOWER(code) LIKE LOWER(?)', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(full_name) LIKE LOWER(?)', ["%{$search}%"]);
+                    ->orWhere('code', 'ilike', '%' . $search . '%')
+                    ->orWhere('full_name', 'ilike', '%' . $search . '%');
             });
         }
 
@@ -65,16 +65,18 @@ class SchedulesController extends Controller
     {
         $integrator = request()->attributes->get('integrator');
 
-        $patient = $this->model->query()
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('SDL-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
+
+        $schedule = $this->model->query()
             ->with(['doctor', 'patient', 'covenant', 'visitType'])
             ->where('entity_id', $integrator->user->entity_id)
-            ->when(
-                Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
-            )
+            ->where($column, $value)
             ->firstOrFail();
 
-        return new ScheduleResource($patient);
+        return new ScheduleResource($schedule);
     }
 }

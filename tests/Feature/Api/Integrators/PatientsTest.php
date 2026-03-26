@@ -40,6 +40,18 @@ describe('GET /api/integrators/v1/patients', function () {
         expect($response->json('meta.total'))->toBe(1);
     });
 
+    it('filters patients by code search', function () {
+        $target = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+
+        $response = $this->getJson(
+            "/api/integrators/v1/patients?search={$target->code}",
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
     it('filters patients by card_number search', function () {
         Patient::factory()->create([
             'entity_id'   => $this->ctx['entity']->id,
@@ -82,6 +94,14 @@ describe('GET /api/integrators/v1/patients/{id}', function () {
 
     it('shows patient by code', function () {
         $this->getJson("/api/integrators/v1/patients/{$this->patient->code}", $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonFragment(['id' => $this->patient->id]);
+    });
+
+    it('shows patient by integer number', function () {
+        $numericPart = (int) substr($this->patient->code, 4); // remove 'PAC-'
+
+        $this->getJson("/api/integrators/v1/patients/{$numericPart}", $this->ctx['headers'])
             ->assertOk()
             ->assertJsonFragment(['id' => $this->patient->id]);
     });

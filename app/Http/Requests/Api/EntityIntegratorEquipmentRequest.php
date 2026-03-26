@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Models\EntityIntegratorEquipment;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 
@@ -55,8 +57,18 @@ class EntityIntegratorEquipmentRequest extends FormRequest
      */
     private function uniqueRule(string $column): Unique
     {
+        $param    = $this->route('equipment');
+        $ignoreId = match (true) {
+            $param === null            => null,
+            Str::isUuid((string) $param)     => $param,
+            ctype_digit((string) $param)     => EntityIntegratorEquipment::where(
+                'code', sprintf('EIQ-%010d', (int) $param)
+            )->value('id'),
+            default                    => EntityIntegratorEquipment::where('code', $param)->value('id'),
+        };
+
         return Rule::unique(self::TABLE, $column)
-            ->ignore($this->route('equipment'))
+            ->ignore($ignoreId)
             ->whereNull('deleted_at')
             ->where('integrator_id', request()->attributes->get('integrator')->id);
     }

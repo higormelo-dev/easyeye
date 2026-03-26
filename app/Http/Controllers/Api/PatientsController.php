@@ -34,10 +34,10 @@ class PatientsController extends Controller
             $search   = request()->search;
             $patients = $patients->where(function ($query) use ($search) {
                 $query->whereHas('person', function ($q) use ($search) {
-                    $q->whereRaw('LOWER(full_name) LIKE LOWER(?)', ["%{$search}%"]);
+                    $q->where('full_name', 'ilike', '%' . $search . '%');
                 })
-                    ->orWhereRaw('LOWER(code) LIKE LOWER(?)', ["%{$search}%"])
-                    ->orWhereRaw('LOWER(card_number) LIKE LOWER(?)', ["%{$search}%"]);
+                    ->orWhere('code', 'ilike', '%' . $search . '%')
+                    ->orWhere('card_number', 'ilike', '%' . $search . '%');
             });
         }
 
@@ -53,14 +53,16 @@ class PatientsController extends Controller
     {
         $integrator = request()->attributes->get('integrator');
 
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
+
         $patient = $this->model->query()
             ->with(['entity', 'person', 'covenant', 'skinType', 'irisType'])
             ->where('entity_id', $integrator->user->entity_id)
-            ->when(
-                Str::isUuid($idOrCode),
-                static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
-            )
+            ->where($column, $value)
             ->firstOrFail();
 
         return new PatientResource($patient);

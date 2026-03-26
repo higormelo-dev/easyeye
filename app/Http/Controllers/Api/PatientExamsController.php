@@ -51,14 +51,14 @@ class PatientExamsController extends Controller
             $search       = request()->search;
             $patientExams = $patientExams->where(function ($query) use ($search) {
                 $query->whereHas('patient', function ($q) use ($search) {
-                    $q->where('code', mb_convert_case($search, MB_CASE_LOWER, 'UTF-8'))
+                    $q->where('code', 'like', '%' . $search . '%')
                         ->orWhereHas('person', function ($p) use ($search) {
                             $p->where('name', 'like', '%' . $search . '%')
                                 ->orWhere('nickname', 'like', '%' . $search . '%');
                         });
                 })
                     ->orWhereHas('doctor', function ($q) use ($search) {
-                        $q->where('code', mb_convert_case($search, MB_CASE_LOWER, 'UTF-8'))
+                        $q->where('code', 'like', '%' . $search . '%')
                             ->orWhereHas('person', function ($p) use ($search) {
                                 $p->where('full_name', 'like', '%' . $search . '%')
                                     ->orWhere('name', 'like', '%' . $search . '%')
@@ -66,7 +66,7 @@ class PatientExamsController extends Controller
                             });
                     })
                     ->orWhereHas('schedule', function ($q) use ($search) {
-                        $q->where('code', mb_convert_case($search, MB_CASE_LOWER, 'UTF-8'));
+                        $q->where('code', 'like', '%' . $search . '%');
                     });
             });
         }
@@ -158,14 +158,14 @@ class PatientExamsController extends Controller
 
     private function resolvePatient(string $idOrCode, string $entityId): Patient
     {
-        $query = Patient::where('entity_id', $entityId);
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
-
-        return $query->firstOrFail();
+        return Patient::where('entity_id', $entityId)
+            ->where($column, $value)
+            ->firstOrFail();
     }
 }

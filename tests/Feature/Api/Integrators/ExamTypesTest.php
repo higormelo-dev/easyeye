@@ -98,6 +98,16 @@ describe('GET /api/integrators/v1/examtypes/{id}', function () {
             ->assertJsonFragment(['id' => $this->examType->id]);
     });
 
+    it('shows global exam type by integer number', function () {
+        $numericPart = (int) substr($this->examType->code, strrpos($this->examType->code, '-') + 1);
+
+        $this->getJson(
+            "/api/integrators/v1/examtypes/{$numericPart}",
+            $this->ctx['headers']
+        )->assertOk()
+            ->assertJsonFragment(['id' => $this->examType->id]);
+    });
+
     it('shows entity-specific exam type', function () {
         $entityExam = ExamType::factory()->create(['entity_id' => $this->ctx['entity']->id]);
 

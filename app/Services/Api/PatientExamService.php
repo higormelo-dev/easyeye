@@ -104,13 +104,13 @@ class PatientExamService
         $query = PatientExam::query()
             ->where('patient_id', $patientId);
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('EXM-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        return $query->firstOrFail()->delete();
+        return $query->where($column, $value)->firstOrFail()->delete();
     }
 
     /**
@@ -126,13 +126,13 @@ class PatientExamService
                     ->whereNull('deleted_at');
             });
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('EXM-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        return $query->firstOrFail();
+        return $query->where($column, $value)->firstOrFail();
     }
 
     /**
@@ -255,13 +255,13 @@ class PatientExamService
                 $query->where('entity_id', $integrator->user->entity_id);
             });
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('DOC-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        return $query->first();
+        return $query->where($column, $value)->first();
     }
 
     public function scheduleFindByIdOrCode(?string $idOrCode): ?Schedule
@@ -274,13 +274,13 @@ class PatientExamService
         $query      = Schedule::query()
             ->where('entity_id', $integrator->user->entity_id);
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('SDL-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        return $query->first();
+        return $query->where($column, $value)->first();
     }
 
     public function examFindByIdOrCode(string $idOrCode): ?ExamType
@@ -292,13 +292,13 @@ class PatientExamService
                     ->orWhereNull('entity_id');
             });
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('ETP-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        return $query->first();
+        return $query->where($column, $value)->first();
     }
 
     public function equipmentFindByIdOrCode(?string $idOrCode): ?EntityIntegratorEquipment
@@ -317,12 +317,12 @@ class PatientExamService
                 )->orWhereNull('integrator_id');
             });
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('EIQ-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        return $query->first();
+        return $query->where($column, $value)->first();
     }
 }

@@ -136,6 +136,14 @@ describe('GET /api/integrators/v1/equipments/{id}', function () {
             ->assertJsonFragment(['id' => $this->equipment->id]);
     });
 
+    it('shows equipment by integer number', function () {
+        $numericPart = (int) substr($this->equipment->code, 4); // remove 'EIQ-'
+
+        $this->getJson("/api/integrators/v1/equipments/{$numericPart}", $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonFragment(['id' => $this->equipment->id]);
+    });
+
     it('returns 404 for non-existent equipment', function () {
         $this->getJson('/api/integrators/v1/equipments/EIQ-NAOEXISTE', $this->ctx['headers'])
             ->assertNotFound();
@@ -159,6 +167,19 @@ describe('PUT /api/integrators/v1/equipments/{id}', function () {
         ], $this->ctx['headers'])
             ->assertOk()
             ->assertJsonFragment(['name' => 'NOME ATUALIZADO']);
+    });
+
+    it('updates equipment by integer number', function () {
+        $numericPart = (int) substr($this->equipment->code, 4); // remove 'EIQ-'
+
+        $this->putJson("/api/integrators/v1/equipments/{$numericPart}", [
+            'name'          => 'Atualizado Por Número',
+            'ip'            => '10.0.0.99',
+            'mac'           => $this->equipment->mac,
+            'serial_number' => $this->equipment->serial_number,
+        ], $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'ATUALIZADO POR NÚMERO']);
     });
 });
 

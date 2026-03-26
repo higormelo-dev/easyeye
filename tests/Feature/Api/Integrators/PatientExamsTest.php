@@ -29,6 +29,16 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
             ->assertJsonPath('meta.total', 2);
     });
 
+    it('lists exams for a patient using integer number', function () {
+        PatientExam::factory(2)->create(['patient_id' => $this->patient->id]);
+
+        $numericPart = (int) substr($this->patient->code, 4); // remove 'PAC-'
+
+        $this->getJson("/api/integrators/v1/patients/{$numericPart}/exams", $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2);
+    });
+
     it('does not return exams from other patients in the same entity', function () {
         $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
         PatientExam::factory(2)->create(['patient_id' => $this->patient->id]);
@@ -37,6 +47,49 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
         $this->getJson("/api/integrators/v1/patients/{$this->patient->id}/exams", $this->ctx['headers'])
             ->assertOk()
             ->assertJsonPath('meta.total', 2);
+    });
+
+    it('searches exams by patient code', function () {
+        PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+
+        $response = $this->getJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams?search={$this->patient->code}",
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
+    it('searches exams by schedule code', function () {
+        $schedCtx = createScheduleForEntity($this->ctx['entity']);
+        PatientExam::factory()->create([
+            'patient_id'  => $this->patient->id,
+            'schedule_id' => $schedCtx['schedule']->id,
+        ]);
+        PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+
+        $response = $this->getJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams?search={$schedCtx['schedule']->code}",
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
+    it('searches exams by doctor code', function () {
+        $schedCtx = createScheduleForEntity($this->ctx['entity']);
+        PatientExam::factory()->create([
+            'patient_id' => $this->patient->id,
+            'doctor_id'  => $schedCtx['doctor']->id,
+        ]);
+        PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+
+        $response = $this->getJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams?search={$schedCtx['doctor']->code}",
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
     });
 
     it('returns empty result when search has no matches', function () {
@@ -449,6 +502,16 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
             ->assertJsonFragment(['id' => $this->exam->id]);
     });
 
+    it('shows exam by patient integer number and exam UUID', function () {
+        $numericPart = (int) substr($this->patient->code, 4); // remove 'PAC-'
+
+        $this->getJson(
+            "/api/integrators/v1/patients/{$numericPart}/exams/{$this->exam->id}",
+            $this->ctx['headers']
+        )->assertOk()
+            ->assertJsonFragment(['id' => $this->exam->id]);
+    });
+
     it('shows exam by patient code and exam code', function () {
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->code}",
@@ -684,6 +747,18 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
     it('deletes a patient exam using patient code and exam UUID', function () {
         $this->deleteJson(
             "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->id}",
+            [],
+            $this->ctx['headers']
+        )->assertNoContent();
+
+        expect(PatientExam::find($this->exam->id))->toBeNull();
+    });
+
+    it('deletes a patient exam using patient integer number and exam UUID', function () {
+        $numericPart = (int) substr($this->patient->code, 4); // remove 'PAC-'
+
+        $this->deleteJson(
+            "/api/integrators/v1/patients/{$numericPart}/exams/{$this->exam->id}",
             [],
             $this->ctx['headers']
         )->assertNoContent();

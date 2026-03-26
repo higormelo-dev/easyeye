@@ -60,13 +60,13 @@ class EntityIntegratorEquipmentService
         $query      = EntityIntegratorEquipment::withTrashed()
             ->where('integrator_id', $integrator->id);
 
-        if (Str::isUuid($idOrCode)) {
-            $query->where('id', $idOrCode);
-        } else {
-            $query->where('code', $idOrCode);
-        }
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('EIQ-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
 
-        return $query->firstOrFail();
+        return $query->where($column, $value)->firstOrFail();
     }
 
     /**
