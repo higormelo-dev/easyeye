@@ -1,8 +1,6 @@
 @extends('layouts.app')
 
 @push('styles')
-    <link href="{{ asset('system/icons/font-awesome/css/all.min.css') }}" rel="stylesheet">
-    <link href="{{ asset('system/icons/font-awesome/css/v4-shims.min.css') }}" rel="stylesheet">
 @endpush
 
 @section('breadcrumb')
@@ -79,7 +77,7 @@
                 {{-- Botão Novo + Lista de Espera (sempre à esquerda) --}}
                 <div class="col-12 col-md-auto d-flex align-items-center gap-2">
                     <button type="button"
-                            class="btn btn-info btn-sm"
+                            class="btn btn-primary btn-sm"
                             data-bs-toggle="modal"
                             data-bs-target="#scheduleModal">
                         <i class="fa fa-plus"></i> {{ __('actions.new') }}

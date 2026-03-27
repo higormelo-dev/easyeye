@@ -218,7 +218,7 @@
                     </button>
                     <a href="{{ route('panel.patients.medicalrecords.index', $schedule->patient_id) }}"
                        class="btn btn-secondary btn-sm"
-                       title="{{ __('actions.medical_records') }}">
+                       title="{{ __('actions.medical_records.title') }}">
                         <i class="fas fa-file-medical"></i>
                     </a>
                 @endif

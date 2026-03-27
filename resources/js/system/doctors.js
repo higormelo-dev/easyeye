@@ -1,3 +1,4 @@
+import "jquery";
 import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 
 $(function () {
@@ -9,7 +10,9 @@ $(function () {
     let doctorsDataTable = window.LaravelDataTables?.['doctors_datatable'];
 
     $('#doctors_datatable').on('draw.dt', function () {
-        $('[data-bs-toggle="tooltip"]').tooltip();
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
         doctorsDataTable = doctorsDataTable ?? window.LaravelDataTables?.['doctors_datatable'];
         doctorsDataTable?.columns.adjust();
     });
@@ -37,7 +40,7 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (data) {
                 $('#retorno-default').empty().append(data);
-                $('#modal_default').modal('show');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
             },
             error: handleAjaxError
         });

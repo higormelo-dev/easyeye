@@ -62,9 +62,7 @@ class DoctorsDataTable extends BaseDataTable
             ->minifiedAjax()
             ->orderBy(0, 'desc')
             ->selectStyleSingle()
-            ->parameters(array_merge($this->getDefaultParameters(), [
-                'dom' => 'lrtip',
-            ]));
+            ->parameters($this->getDefaultParameters());
     }
 
     /**
@@ -111,29 +109,60 @@ class DoctorsDataTable extends BaseDataTable
     }
 
     /**
-     * Build action buttons for the doctors DataTable, including the work-schedule link.
+     * Override: action buttons no estilo dropdown Tabler (igual ao template Preclinic).
      */
     private function buildDoctorActionButtons(Doctor $record): string
     {
         $entityId = session()->get('selected_entity_id');
         $isOwned  = $record->entity_id === $entityId;
 
-        // Build without the delete button so we can append it last
-        $buttons = $this->buildActionButtons($record, ['delete' => false]);
-
-        if (! $record->deleted_at && $isOwned) {
-            $buttons .= '<button type="button"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-work-schedule"
-                data-id="' . $record->id . '"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.work_schedule') . '"><i class="fas fa-clock"></i></button>';
-
-            $buttons .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
+        if ($record->deleted_at && $isOwned) {
+            return '<a href="javascript:void(0);" class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
+                title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        return $buttons;
+        if (! $isOwned) {
+            return '';
+        }
+
+        $activeSituation = $record->active ? 0 : 1;
+        $activeIcon      = $record->active ? 'ti-lock-open' : 'ti-lock';
+        $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
+
+        return '
+<div class="d-flex align-items-center gap-1">
+    <a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+       title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>
+    <a href="javascript:void(0);" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots-vertical"></i></a>
+    <ul class="dropdown-menu p-2">
+        <li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
+            <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>
+        <li><a class="dropdown-item btn-work-schedule" href="javascript:void(0);" data-id="' . $record->id . '">
+            <i class="ti ti-calendar me-1"></i>' . __('actions.work_schedule') . '</a></li>
+        <li><a class="dropdown-item btn-active" href="javascript:void(0);"
+               data-id="' . $record->id . '" data-situation="' . $activeSituation . '">
+            <i class="ti ' . $activeIcon . ' me-1"></i>' . $activeTitle . '</a></li>
+        <li><a class="dropdown-item btn-trash text-danger" href="javascript:void(0);"
+               data-id="' . $record->id . '">
+            <i class="ti ti-trash me-1"></i>' . __('actions.delete') . '</a></li>
+    </ul>
+</div>';
+    }
+
+    /**
+     * Override: badge-soft para coluna de status (estilo Preclinic).
+     */
+    protected function formatActiveColumn(mixed $record): string
+    {
+        if ($record->deleted_at) {
+            return '<span class="badge badge-soft-secondary rounded fs-13 fw-medium">' . __('actions.delete') . '</span>';
+        }
+
+        return $record->active
+            ? '<span class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium">' . __('actions.yes') . '</span>'
+            : '<span class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium">' . __('actions.no') . '</span>';
     }
 }

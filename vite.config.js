@@ -6,6 +6,7 @@ export default defineConfig({
     plugins: [
         laravel({
             input: [
+                'resources/css/vendor.css',
                 'resources/css/app.css',
                 'resources/css/dashboard.css',
                 'resources/js/vendor.js',
@@ -37,9 +38,8 @@ export default defineConfig({
     ],
     resolve: {
         alias: {
-            // Re-use the global jQuery loaded via static <script> tag.
-            // Prevents duplicate jQuery instances between npm packages and the
-            // template scripts (sidebarmenu, waves, custom) that rely on window.$.
+            // Single jQuery instance for all npm packages and template scripts.
+            // jquery-global.js imports from the npm package and exposes window.$ / window.jQuery.
             jquery: path.resolve('./resources/js/jquery-global.js'),
         },
     },

@@ -1,3 +1,4 @@
+import "jquery";
 import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 
 $(function () {
@@ -13,7 +14,9 @@ $(function () {
     // columns.adjust() aqui garante que a tabela já está visível e com dados
     // renderizados — resolve o problema de colunas bagunçadas ao voltar da view cards.
     $('#patients_datatable').on('draw.dt', function () {
-        $('[data-bs-toggle="tooltip"]').tooltip();
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
         patientsDataTable = patientsDataTable ?? window.LaravelDataTables?.['patients_datatable'];
         patientsDataTable?.columns.adjust();
     });
@@ -50,7 +53,7 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (data) {
                 $('#retorno-default').empty().append(data);
-                $('#modal_default').modal('show');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
             },
             error: handleAjaxError
         });

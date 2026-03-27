@@ -16,8 +16,21 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $user = $request->user();
+        $userPhotoPath = 'system/images/users/' . $user->id . '.jpg';
+
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user'         => $user,
+            'userPhotoUrl' => file_exists(public_path($userPhotoPath))
+                ? asset($userPhotoPath) . '?v=' . filemtime(public_path($userPhotoPath))
+                : asset('system/images/team.png'),
+            'meta' => [
+                'title'       => __('actions.edit_profile'),
+                'breadcrumbs' => [
+                    ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                    ['label' => __('actions.edit_profile'), 'url' => 'javascript:void(0);', 'active' => true],
+                ],
+            ],
         ]);
     }
 
@@ -26,13 +39,21 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $request->user()->fill($request->safe()->only(['name', 'email']));
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
         }
 
         $request->user()->save();
+
+        if ($request->hasFile('photo')) {
+            $dir = public_path('system/images/users');
+            if (! is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            $request->file('photo')->move($dir, $request->user()->id . '.jpg');
+        }
 
         return Redirect::route('panel.profile.edit')->with('status', 'profile-updated');
     }

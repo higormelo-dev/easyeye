@@ -1,3 +1,4 @@
+import "jquery";
 import { initSettingDatatable } from './setting.js';
 import { showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 

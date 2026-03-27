@@ -1,3 +1,4 @@
+import "jquery";
 export function handleAjaxError(response) {
     let message = response.responseJSON?.message || 'Erro desconhecido';
     let errors = response.responseJSON?.errors;

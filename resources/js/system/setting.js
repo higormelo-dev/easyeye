@@ -1,3 +1,4 @@
+import "jquery";
 import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 
 /**
@@ -9,7 +10,9 @@ export function initSettingDatatable({ tableId, prefix }) {
     let dt = window.LaravelDataTables?.[tableId];
 
     $(`#${tableId}`).on('draw.dt', function () {
-        $('[data-bs-toggle="tooltip"]').tooltip();
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
         dt = dt ?? window.LaravelDataTables?.[tableId];
     });
 

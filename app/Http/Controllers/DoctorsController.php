@@ -87,7 +87,11 @@ class DoctorsController extends Controller
     public function index(DoctorsDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
-            'title'       => $this->titleController,
+            'title'         => $this->titleController,
+            'total_doctors' => Doctor::query()
+                ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+                ->where('entity_users.entity_id', session('selected_entity_id'))
+                ->count(),
             'action'      => __('actions.records'),
             'breadcrumbs' => [
                 [

@@ -17,10 +17,12 @@
     </div>
 
     <div class="card">
-        <h5 class="card-header">{{ $meta['action'] }}</h5>
+        <div class="card-header">
+            <h4 class="card-title mb-0">{{ $meta['action'] }}</h4>
+        </div>
         <div class="card-body">
             <div class="table-responsive">
-                {{ $dataTable->table() }}
+                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
             </div>
         </div>
     </div>

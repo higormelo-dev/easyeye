@@ -3,21 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Enums\{ClientRule, ScheduleSituation};
-use App\Models\{Covenant, Doctor, Schedule, VisitType};
+use App\Models\{Covenant, Doctor, Schedule};
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ReportsController extends Controller
 {
     public function index()
     {
         $meta = [
-            'title'       => 'Relatórios',
-            'action'      => 'Relatórios',
+            'title'       => __('actions.sidemenu.reports'),
+            'action'      => __('actions.sidemenu.dashboard'),
             'breadcrumbs' => [
-                ['label' => 'Dashboard', 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Relatórios', 'url' => route('panel.reports.index'), 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => true],
             ],
         ];
 
@@ -54,11 +53,11 @@ class ReportsController extends Controller
         }
 
         $request->validate([
-            'date_from'  => ['required', 'date'],
-            'date_until' => ['required', 'date', 'after_or_equal:date_from'],
-            'doctor_id'  => ['nullable', 'uuid'],
-            'covenant_id'=> ['nullable', 'uuid'],
-            'situation'  => ['nullable', 'integer'],
+            'date_from'   => ['required', 'date'],
+            'date_until'  => ['required', 'date', 'after_or_equal:date_from'],
+            'doctor_id'   => ['nullable', 'uuid'],
+            'covenant_id' => ['nullable', 'uuid'],
+            'situation'   => ['nullable', 'integer'],
         ]);
 
         $entityId  = session('selected_entity_id');
@@ -83,6 +82,7 @@ class ReportsController extends Controller
         }
 
         $loggedDoctor = $this->loggedDoctor();
+
         if ($loggedDoctor) {
             $query->where('doctor_id', $loggedDoctor->id);
         }
@@ -163,6 +163,7 @@ class ReportsController extends Controller
         }
 
         $loggedDoctor = $this->loggedDoctor();
+
         if ($loggedDoctor) {
             $query->where('doctor_id', $loggedDoctor->id);
         }
@@ -176,10 +177,10 @@ class ReportsController extends Controller
             ->count();
 
         $summary = [
-            'total_absent'   => $schedules->count(),
-            'noshow'         => $schedules->where('situation', ScheduleSituation::NoShow)->count(),
-            'cancelled'      => $schedules->where('situation', ScheduleSituation::Cancelled)->count(),
-            'total_period'   => $totalInPeriod,
+            'total_absent'     => $schedules->count(),
+            'noshow'           => $schedules->where('situation', ScheduleSituation::NoShow)->count(),
+            'cancelled'        => $schedules->where('situation', ScheduleSituation::Cancelled)->count(),
+            'total_period'     => $totalInPeriod,
             'absenteeism_rate' => $totalInPeriod > 0
                 ? round(($schedules->count() / $totalInPeriod) * 100, 1)
                 : 0,

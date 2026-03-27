@@ -6,6 +6,7 @@
 
 @section('content')
 
+{{-- crudForm: gerencia o modal de criação/edição de médico --}}
 <div x-data="crudForm({
         storeUrl:  @js($storeUrl),
         updateUrl: @js(route('panel.doctors.index')),
@@ -31,78 +32,126 @@
 
     @include('system.doctors._form-modal')
 
+    {{-- doctorViewToggle --}}
     <div x-data="doctorViewToggle(@js(route('panel.doctors.cards')), @js(asset('system/images/team.png')))"
-         x-init="init()"
-         @doctor-saved.window="reloadCurrentView()">
+         x-init="init()">
 
-        <div class="row mb-3 align-items-center">
-            <div class="col-12 col-md-auto">
-                <button type="button" class="btn btn-info btn-sm" @click="$dispatch('open-create-doctor')">
-                    <i class="fa fa-plus"></i> {{ __('actions.new') }}
+        {{-- ══ Page Header ══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-1 border-bottom">
+            <div class="flex-grow-1">
+                <h4 class="fw-bold mb-0">
+                    {{ $meta['title'] }}
+                    <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
+                        {{ __('actions.total') }}: {{ $meta['total_doctors'] }}
+                    </span>
+                </h4>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                {{-- Toggle tabela / cards --}}
+                <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
+                            :class="view === 'table' ? 'bg-light' : 'bg-white'"
+                            x-on:click="setView('table')"
+                            title="{{ __('actions.table_view') }}">
+                        <i class="ti ti-list fs-14 text-body"></i>
+                    </button>
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
+                            :class="view === 'cards' ? 'bg-light' : 'bg-white'"
+                            x-on:click="setView('cards')"
+                            title="{{ __('actions.card_view') }}">
+                        <i class="ti ti-layout-grid fs-14 text-body"></i>
+                    </button>
+                </div>
+                {{-- Novo Médico --}}
+                <button type="button"
+                        class="btn btn-primary fs-13 btn-md"
+                        @click="$dispatch('open-create-doctor')">
+                    <i class="ti ti-plus me-1"></i>{{ __('actions.new') }}
                 </button>
             </div>
-            <div class="col-12 col-md d-flex align-items-center gap-2 mt-2 mt-md-0 justify-content-md-end">
-                <div class="input-group input-group-sm flex-grow-1" style="max-width: 320px;">
-                    <span class="input-group-text"><i class="fa fa-search"></i></span>
-                    <input type="text" class="form-control" placeholder="{{ __('actions.search') }}..."
-                        x-model="search" x-on:input.debounce.400ms="performSearch()">
-                    <button class="btn btn-outline-secondary" type="button" x-show="search" x-on:click="clearSearch()">
-                        <i class="fa fa-times"></i>
-                    </button>
-                </div>
-                <div class="btn-group btn-group-sm flex-shrink-0" role="group">
-                    <button type="button" class="btn"
-                        :class="view === 'table' ? 'btn-primary' : 'btn-outline-secondary'"
-                        x-on:click="setView('table')" title="{{ __('actions.table_view') }}">
-                        <i class="fa fa-list"></i>
-                    </button>
-                    <button type="button" class="btn"
-                        :class="view === 'cards' ? 'btn-primary' : 'btn-outline-secondary'"
-                        x-on:click="setView('cards')" title="{{ __('actions.card_view') }}">
-                        <i class="fa fa-th-large"></i>
-                    </button>
-                </div>
-            </div>
         </div>
+        {{-- ══ /Page Header ═════════════════════════════════════════════════════ --}}
 
-        <div x-show="view === 'table'">
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <h5 class="card-header">{{ $meta['action'] }}</h5>
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col">
-                                    {{ $dataTable->table(['class' => 'table table-striped']) }}
-                                </div>
+        {{-- ══ Filter Bar ═══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-center justify-content-between flex-wrap mb-3">
+            <div class="search-set">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <div class="table-search d-flex align-items-center mb-0">
+                        <div class="search-input">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white">
+                                    <i class="ti ti-search fs-12"></i>
+                                </span>
+                                <input type="text"
+                                       class="form-control border-start-0"
+                                       placeholder="{{ __('actions.search') }}..."
+                                       x-model="search"
+                                       x-on:input.debounce.400ms="performSearch()">
+                                <button class="btn btn-outline-secondary border-start-0" type="button"
+                                        x-show="search"
+                                        x-on:click="clearSearch()">
+                                    <i class="ti ti-x fs-12"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+            <div class="d-flex table-dropdown right-content align-items-center flex-wrap row-gap-3">
+                <div class="dropdown">
+                    <a href="javascript:void(0);"
+                       class="dropdown-toggle btn bg-white btn-md d-inline-flex align-items-center fw-normal rounded border text-dark px-2 py-1 fs-14"
+                       data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="me-1">{{ __('actions.sort_by') }}:</span> {{ __('actions.recent') }}
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end p-2">
+                        <li><a href="javascript:void(0);" class="dropdown-item rounded-1">{{ __('actions.recent') }}</a></li>
+                        <li><a href="javascript:void(0);" class="dropdown-item rounded-1">{{ __('actions.oldest') }}</a></li>
+                    </ul>
+                </div>
+            </div>
         </div>
+        {{-- ══ /Filter Bar ══════════════════════════════════════════════════════ --}}
 
+        {{-- ══ DataTable View ═══════════════════════════════════════════════════ --}}
+        <div x-show="view === 'table'">
+            <div class="table-responsive">
+                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
+            </div>
+        </div>
+        {{-- ══ /DataTable View ══════════════════════════════════════════════════ --}}
+
+        {{-- ══ Cards View ═══════════════════════════════════════════════════════ --}}
         <div x-show="view === 'cards'" x-cloak>
+
+            {{-- Loading --}}
             <div x-show="loading" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">{{ __('actions.loading') }}...</span>
                 </div>
             </div>
+
+            {{-- Cards Grid --}}
             <div x-show="!loading">
                 <div class="row" x-show="doctors.length > 0">
                     <template x-for="doctor in doctors" :key="doctor.id">
-                        <div class="col-xs-12 col-sm-6 col-md-6 col-lg-6 col-xl-6 mb-3">
+                        <div class="col-xs-12 col-sm-4 col-md-4 col-lg-4 col-xl-4 mb-3">
                             <div class="card card-body h-100">
                                 <div class="row align-items-center">
                                     <div class="col-md-4 col-lg-3 text-center">
-                                        <img :src="doctor.photo_url" :alt="doctor.full_name"
+                                        <img :src="doctor.photo_url"
+                                             :alt="doctor.full_name"
                                              class="img-fluid rounded-circle"
                                              x-on:error="$el.src = fallbackPhoto">
                                     </div>
                                     <div class="col-md-8 col-lg-9">
                                         <h5 class="mb-1" x-text="doctor.full_name"></h5>
                                         <div class="mb-2">
-                                            <span :class="doctor.active ? 'badge bg-success' : 'badge bg-secondary'"
+                                            <span :class="doctor.active
+                                                    ? 'badge badge-soft-success rounded text-success border border-success fs-13 fw-medium'
+                                                    : 'badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium'"
                                                   x-text="doctor.active ? '{{ __('actions.active') }}' : '{{ __('actions.inactive') }}'">
                                             </span>
                                         </div>
@@ -115,30 +164,41 @@
                                             <span x-text="doctor.email ?? '{{ __('actions.not_informed') }}'"></span>
                                         </address>
                                         <hr class="my-2">
-                                        <div class="d-flex gap-1 flex-wrap">
-                                            <button class="btn btn-sm btn-warning btn-edit" :data-id="doctor.id"
-                                                    data-bs-toggle="tooltip" title="{{ __('actions.edit') }}">
-                                                <i class="fa fa-edit"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-info btn-show" :data-id="doctor.id"
-                                                    data-bs-toggle="tooltip" title="{{ __('actions.view') }}">
-                                                <i class="fa fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-info btn-work-schedule"
-                                                    :data-id="doctor.id"
-                                                    data-bs-toggle="tooltip" title="{{ __('actions.work_schedule') }}">
-                                                <i class="fas fa-clock"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-secondary btn-active"
-                                                    :data-id="doctor.id" :data-situation="doctor.active ? 0 : 1"
-                                                    data-bs-toggle="tooltip"
-                                                    :title="doctor.active ? '{{ __('actions.disable') }}' : '{{ __('actions.enable') }}'">
-                                                <i :class="doctor.active ? 'fas fa-lock-open' : 'fas fa-unlock'"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-danger btn-trash" :data-id="doctor.id"
-                                                    data-bs-toggle="tooltip" title="{{ __('actions.delete') }}">
-                                                <i class="fa fa-trash"></i>
-                                            </button>
+                                        <div class="d-flex align-items-center gap-1">
+                                            <a href="javascript:void(0);"
+                                               class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                               :data-id="doctor.id"
+                                               data-bs-toggle="tooltip"
+                                               title="{{ __('actions.view') }}">
+                                                <i class="ti ti-eye"></i>
+                                            </a>
+                                            <a href="javascript:void(0);"
+                                               class="btn-work-schedule shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                               :data-id="doctor.id"
+                                               data-bs-toggle="tooltip"
+                                               title="{{ __('actions.work_schedule') }}">
+                                                <i class="ti ti-calendar"></i>
+                                            </a>
+                                            <a href="javascript:void(0);"
+                                               class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                               data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="ti ti-dots-vertical"></i>
+                                            </a>
+                                            <ul class="dropdown-menu p-2">
+                                                <li>
+                                                    <a class="dropdown-item" href="javascript:void(0);"
+                                                       @click="$dispatch('edit-doctor', { id: doctor.id })">
+                                                        <i class="ti ti-edit me-1"></i>{{ __('actions.edit') }}
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item btn-trash text-danger"
+                                                       href="javascript:void(0);"
+                                                       :data-id="doctor.id">
+                                                        <i class="ti ti-trash me-1"></i>{{ __('actions.delete') }}
+                                                    </a>
+                                                </li>
+                                            </ul>
                                         </div>
                                     </div>
                                 </div>
@@ -146,35 +206,40 @@
                         </div>
                     </template>
                 </div>
+
+                {{-- Empty state --}}
                 <div x-show="doctors.length === 0 && !loading" class="text-center py-5 text-muted">
-                    <i class="fa fa-user-md fa-3x mb-3"></i>
+                    <i class="ti ti-stethoscope fs-1 mb-3 d-block"></i>
                     <p>{{ __('actions.no_records') }}</p>
                 </div>
+
+                {{-- Pagination --}}
                 <nav x-show="meta.last_page > 1" class="d-flex justify-content-center mt-3">
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item" :class="{ 'disabled': meta.current_page === 1 }">
-                            <button class="page-link" x-on:click="fetchCards(meta.current_page - 1)">
-                                <i class="fa fa-chevron-left"></i>
+                            <button class="page-link" @click="fetchCards(meta.current_page - 1)">
+                                <i class="ti ti-arrow-left text-body"></i>
                             </button>
                         </li>
                         <template x-for="page in meta.last_page" :key="page">
                             <li class="page-item" :class="{ 'active': page === meta.current_page }">
-                                <button class="page-link" x-text="page" x-on:click="fetchCards(page)"></button>
+                                <button class="page-link" x-text="page" @click="fetchCards(page)"></button>
                             </li>
                         </template>
                         <li class="page-item" :class="{ 'disabled': meta.current_page === meta.last_page }">
-                            <button class="page-link" x-on:click="fetchCards(meta.current_page + 1)">
-                                <i class="fa fa-chevron-right"></i>
+                            <button class="page-link" @click="fetchCards(meta.current_page + 1)">
+                                <i class="ti ti-arrow-right"></i>
                             </button>
                         </li>
                     </ul>
                 </nav>
             </div>
         </div>
+        {{-- ══ /Cards View ══════════════════════════════════════════════════════ --}}
 
-    </div>
+    </div>{{-- /doctorViewToggle --}}
 
-</div>
+</div>{{-- /crudForm --}}
 
 @endsection
 

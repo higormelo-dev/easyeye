@@ -22,33 +22,58 @@
 
     @include('system.settings._form-modal')
 
-    <div class="row mb-3 align-items-center">
-        <div class="col-12 col-md-auto">
-            <button type="button"
-                    class="btn btn-info btn-sm"
-                    @click="$dispatch('open-create-setting')">
-                <i class="fa fa-plus"></i> {{ __('actions.new') }}
-            </button>
-        </div>
-    </div>
+    <div x-data="{ search: '' }">
 
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <h5 class="card-header">{{ $meta['action'] }}</h5>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col">
-                            <div class="table-responsive">
-                                {{ $dataTable->table(['class' => 'table table-striped']) }}
-                            </div>
+        {{-- ══ Page Header ══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-1 border-bottom">
+            <div class="flex-grow-1">
+                <h4 class="fw-bold mb-0">{{ $meta['title'] }}</h4>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <button type="button"
+                        class="btn btn-primary fs-13 btn-md"
+                        @click="$dispatch('open-create-setting')">
+                    <i class="ti ti-plus me-1"></i>{{ __('actions.new') }}
+                </button>
+            </div>
+        </div>
+        {{-- ══ /Page Header ═════════════════════════════════════════════════════ --}}
+
+        {{-- ══ Filter Bar ═══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-center justify-content-between flex-wrap mb-3">
+            <div class="search-set">
+                <div class="table-search d-flex align-items-center mb-0">
+                    <div class="search-input">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-white">
+                                <i class="ti ti-search fs-12"></i>
+                            </span>
+                            <input type="text"
+                                   class="form-control border-start-0"
+                                   placeholder="{{ __('actions.search') }}..."
+                                   x-model="search"
+                                   x-on:input.debounce.400ms="Object.values(window.LaravelDataTables ?? {})[0]?.search(search).draw()">
+                            <button class="btn btn-outline-secondary border-start-0" type="button"
+                                    x-show="search"
+                                    x-on:click="search = ''; Object.values(window.LaravelDataTables ?? {})[0]?.search('').draw()">
+                                <i class="ti ti-x fs-12"></i>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-</div>
+        {{-- ══ /Filter Bar ══════════════════════════════════════════════════════ --}}
+
+        {{-- ══ DataTable ════════════════════════════════════════════════════════ --}}
+        <div class="table-responsive">
+            {{ $dataTable->table(['class' => 'table table-nowrap']) }}
+        </div>
+        {{-- ══ /DataTable ═══════════════════════════════════════════════════════ --}}
+
+    </div>{{-- /search wrapper --}}
+
+</div>{{-- /crudForm --}}
 
 @endsection
 

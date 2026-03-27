@@ -1,3 +1,46 @@
+/* ── datatable table-nowrap ──────────────────────────────────────────── */
+
+.table-nowrap td,
+.table-nowrap th {
+    white-space: nowrap;
+}
+
+/* ── profile-container ───────────────────────────────────────────────── */
+
+.profile-container {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    border: 3px solid var(--bs-border-color, #dee2e6);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    display: inline-block;
+}
+
+.profile-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.profile-container .overlay-btn {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.50);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.profile-container:hover .overlay-btn {
+    opacity: 1;
+}
+
 /* ── schedule-card ──────────────────────────────────────────────────── */
 
 .schedule-card-info {
@@ -30,6 +73,60 @@
 /* Remove a seta do dropdown-toggle quando é botão de ícone */
 .schedule-card .dropdown-toggle::after {
     display: none;
+}
+
+/* ── medical-records timeline ────────────────────────────────────────── */
+
+.patient-info-sticky {
+    position: sticky;
+    top: 1rem;
+}
+
+/* Badge do médico com sombra e borda branca */
+.timeline > li > .timeline-badge {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    border: 2px solid #fff;
+}
+
+/* Animação de entrada dos itens ao serem appendados */
+.timeline > li {
+    animation: mrFadeInUp 0.25s ease both;
+}
+
+@keyframes mrFadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsivo mobile: timeline single-column à direita do eixo */
+@media (max-width: 767px) {
+    .timeline::before { left: 24px; }
+
+    .timeline > li > .timeline-panel {
+        width: calc(100% - 70px);
+        float: right;
+    }
+
+    .timeline > li > .timeline-badge {
+        left: 24px;
+        margin-left: -20px;
+    }
+
+    .timeline > li.timeline-inverted > .timeline-panel { float: right; }
+
+    .timeline > li.timeline-inverted > .timeline-panel::before {
+        right: auto;
+        left: -8px;
+        border-right-width: 8px;
+        border-left-width: 0;
+    }
+
+    .timeline > li.timeline-inverted > .timeline-panel::after {
+        right: auto;
+        left: -7px;
+        border-right-width: 7px;
+        border-left-width: 0;
+    }
 }
 
 /* Timer pulsante quando espera >= 30 min */

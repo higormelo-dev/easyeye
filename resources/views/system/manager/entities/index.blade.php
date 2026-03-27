@@ -30,17 +30,19 @@
 
     <div class="row mb-3 align-items-center">
         <div class="col-12 col-md-auto">
-            <button type="button" class="btn btn-info btn-sm" @click="$dispatch('open-create-entity')">
+            <button type="button" class="btn btn-primary btn-sm" @click="$dispatch('open-create-entity')">
                 <i class="fa fa-plus"></i> {{ __('actions.new') }}
             </button>
         </div>
     </div>
 
     <div class="card">
-        <h5 class="card-header">{{ $meta['action'] }}</h5>
+        <div class="card-header">
+            <h4 class="card-title mb-0">{{ $meta['action'] }}</h4>
+        </div>
         <div class="card-body">
             <div class="table-responsive">
-                {{ $dataTable->table() }}
+                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
             </div>
         </div>
     </div>

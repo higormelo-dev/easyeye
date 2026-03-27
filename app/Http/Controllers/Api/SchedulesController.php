@@ -30,7 +30,7 @@ class SchedulesController extends Controller
             ->with(['doctor', 'patient', 'covenant', 'visitType'])
             ->where('entity_id', $integrator->user->entity_id);
 
-        $date      = request()->has('date')
+        $date = request()->has('date')
             ? \Carbon\Carbon::parse(request()->date)->toDateString()
             : now()->toDateString();
 

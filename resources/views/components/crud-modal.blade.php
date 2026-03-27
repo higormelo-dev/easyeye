@@ -35,7 +35,7 @@
             </div>
 
             <div class="modal-footer">
-                <button type="button" class="btn waves-effect waves-light btn-outline-secondary" data-bs-dismiss="modal">
+                <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">
                     <i class="fas fa-times me-1"></i> {{ __('actions.cancel') }}
                 </button>
                 <button type="button"

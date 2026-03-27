@@ -52,12 +52,12 @@
             <div class="row">
                 <div class="col-12">
                     <div class="card">
-                        <h5 class="card-header">{{ $meta['action'] }}</h5>
+                        <div class="card-header">
+                            <h4 class="card-title mb-0">{{ $meta['action'] }}</h4>
+                        </div>
                         <div class="card-body">
-                            <div class="row">
-                                <div class="col">
-                                    {{ $dataTable->table(['class' => 'table table-striped']) }}
-                                </div>
+                            <div class="table-responsive">
+                                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
                             </div>
                         </div>
                     </div>
@@ -110,19 +110,19 @@
                                         <div class="d-flex gap-1">
                                             <template x-if="!user.deleted && user.own_entity">
                                                 <div class="d-flex gap-1">
-                                                    <button class="btn btn-sm btn-info btn-show"
+                                                    <button class="btn btn-sm btn-light btn-show"
                                                             :data-id="user.id"
                                                             data-bs-toggle="tooltip"
                                                             title="{{ __('actions.view') }}">
                                                         <i class="fa fa-eye"></i>
                                                     </button>
-                                                    <button class="btn btn-sm btn-warning btn-edit"
+                                                    <button class="btn btn-sm btn-light btn-edit"
                                                             :data-id="user.id"
                                                             data-bs-toggle="tooltip"
                                                             title="{{ __('actions.edit') }}">
                                                         <i class="fa fa-edit"></i>
                                                     </button>
-                                                    <button class="btn btn-sm btn-secondary btn-active"
+                                                    <button class="btn btn-sm btn-light btn-active"
                                                             :data-id="user.id"
                                                             :data-situation="user.active ? 0 : 1"
                                                             data-bs-toggle="tooltip"
@@ -138,7 +138,7 @@
                                                 </div>
                                             </template>
                                             <template x-if="user.deleted && user.own_entity">
-                                                <button class="btn btn-sm btn-warning btn-restore"
+                                                <button class="btn btn-sm btn-light btn-restore"
                                                         :data-id="user.id"
                                                         data-bs-toggle="tooltip"
                                                         title="{{ __('actions.restore') }}">

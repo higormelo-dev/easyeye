@@ -4,87 +4,180 @@
     @include('components.breadcrumbs')
 @endsection
 
-
 @section('content')
-<div class="row g-3">
 
-    {{-- Coluna esquerda: info do paciente + ações --}}
-    <div class="col-2">
-        @include('system.medical_records._patient-info')
+{{-- ── Subnav ──────────────────────────────────────────────────────────── --}}
+<div class="row mb-3 align-items-center">
+    <div class="col-12 col-md-auto">
+        <div class="btn-group" role="group">
+            <a href="{{ route('panel.patients.index') }}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i>{{ __('actions.sidemenu.patients') }}
+            </a>
+            <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-plus me-1"></i>{{ __('actions.new') }}
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3"
+     x-data="medicalRecordsList(@js(route('panel.patients.medicalrecords.ajaxlist', $patient)), @js(url('panel/patients/' . $patient->id . '/medicalrecords')))"
+     x-init="init()"
+     x-on:show-record.window="openDetail($event.detail.id)">
+
+    {{-- ── Coluna lateral: info do paciente ─────────────────────────────── --}}
+    <div class="col-12 col-md-3">
+        <div class="patient-info-sticky">
+            @include('system.medical_records._patient-info')
+        </div>
     </div>
 
-    {{-- Coluna direita: timeline --}}
-    <div class="col">
-
-        {{-- x-on:show-record.window (forma longa) evita que o Blade interprete @show como diretiva --}}
-        <div x-data="medicalRecordsList(@js(route('panel.patients.medicalrecords.ajaxlist', $patient)), @js(url('panel/patients/' . $patient->id . '/medicalrecords')))"
-             x-init="init()"
-             x-on:show-record.window="openDetail($event.detail.id)">
-
-            {{-- Card principal --}}
-            <div class="card">
-                <h5 class="card-header">{{ $meta['action'] }}</h5>
-                <div class="card-body">
-
-                    {{-- Spinner --}}
-                    <div x-show="loading" x-cloak class="text-center py-5">
-                        <div class="spinner-border text-info" role="status">
-                            <span class="visually-hidden">Carregando…</span>
-                        </div>
-                    </div>
-
-                    {{-- Timeline --}}
-                    <div x-show="!loading" id="records-list"></div>
-
-                </div>
+    {{-- ── Coluna principal: timeline ────────────────────────────────────── --}}
+    <div class="col-12 col-md-9">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-file-medical me-2 text-info"></i>
+                    {{ __('actions.medical_records.title') }}
+                </h5>
             </div>
+            <div class="card-body">
 
-            {{-- Offcanvas de detalhe --}}
-            <div class="offcanvas offcanvas-end" tabindex="-1" id="recordDetailOffcanvas" style="width:540px;">
-                <div class="offcanvas-header border-bottom">
-                    <h5 class="offcanvas-title">
-                        <i class="fas fa-file-medical me-2 text-info"></i>Prontuário
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
-                </div>
-                <div class="offcanvas-body" id="record-detail-body">
-                    <div class="text-center py-4">
-                        <div class="spinner-border text-secondary" role="status"></div>
+                {{-- Spinner de carregamento inicial --}}
+                <div x-show="loading" x-cloak class="text-center py-5">
+                    <div class="spinner-border text-info" role="status">
+                        <span class="visually-hidden">{{ __('actions.medical_records.loading_more') }}</span>
                     </div>
                 </div>
-            </div>
 
+                {{-- Empty state --}}
+                <div x-show="isEmpty" x-cloak class="text-center py-5 text-muted">
+                    <i class="fas fa-file-medical fa-3x mb-3 d-block opacity-25"></i>
+                    <p class="mb-3">{{ __('actions.medical_records.no_records') }}</p>
+                    <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}"
+                       class="btn btn-primary btn-sm">
+                        <i class="fas fa-plus me-1"></i>{{ __('actions.new') }}
+                    </a>
+                </div>
+
+                {{-- Timeline --}}
+                <div x-show="!loading">
+                    <ul class="timeline" id="timeline-list"></ul>
+
+                    {{-- Sentinel: IntersectionObserver ancora aqui para disparar próxima página --}}
+                    <div id="timeline-sentinel" style="height:1px;"></div>
+
+                    {{-- Loading more --}}
+                    <div x-show="loadingMore" class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                        <span class="ms-2 text-muted small">{{ __('actions.medical_records.loading_more') }}</span>
+                    </div>
+
+                    {{-- Fim da lista --}}
+                    <div x-show="!hasMore && !isEmpty" x-cloak class="text-center py-3 text-muted small">
+                        <i class="fas fa-check-circle me-1 text-success"></i>
+                        {{ __('actions.medical_records.end_of_list') }}
+                    </div>
+                </div>
+
+            </div>
         </div>
+    </div>
 
+    {{-- ── Offcanvas de detalhe ──────────────────────────────────────────── --}}
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="recordDetailOffcanvas" style="width:560px;">
+        <div class="offcanvas-header border-bottom">
+            <h5 class="offcanvas-title">
+                <i class="fas fa-file-medical me-2 text-info"></i>
+                {{ __('actions.medical_records.offcanvas_title') }}
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+        </div>
+        <div class="offcanvas-body" id="record-detail-body">
+            <div class="text-center py-4">
+                <div class="spinner-border text-secondary" role="status"></div>
+            </div>
+        </div>
     </div>
 
 </div>
 @endsection
 
 @section('javascript')
+@if(session('message'))
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.$ && typeof $.toast === 'function') {
+        $.toast({
+            heading: '{{ __("actions.done") }}',
+            text: '{{ addslashes(session("message")) }}',
+            position: 'top-right',
+            loaderBg: '#006A4E',
+            icon: 'success',
+            hideAfter: 3500,
+            stack: 6
+        });
+    }
+});
+</script>
+@endif
 <script>
 function medicalRecordsList(ajaxUrl, baseUrl) {
     return {
-        loading: false,
+        loading:     false,
+        loadingMore: false,
+        hasMore:     true,
+        nextPage:    1,
+        isEmpty:     false,
+        observer:    null,
 
         init() {
-            this.fetchList(1);
+            this.fetchPage(1);
         },
 
-        fetchList(page) {
-            this.loading = true;
+        fetchPage(page) {
+            if (page === 1) {
+                this.loading = true;
+            } else {
+                this.loadingMore = true;
+            }
+
             const url = new URL(ajaxUrl);
             url.searchParams.set('page', page);
 
             fetch(url)
-                .then(r => r.text())
-                .then(html => {
-                    document.getElementById('records-list').innerHTML = html;
-                    this.loading = false;
-                    document.querySelectorAll('[data-page]').forEach(el => {
-                        el.addEventListener('click', () => this.fetchList(parseInt(el.dataset.page)));
-                    });
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('timeline-list')
+                        .insertAdjacentHTML('beforeend', data.html);
+
+                    this.hasMore     = data.has_more;
+                    this.nextPage    = data.next_page;
+                    this.isEmpty     = (page === 1 && data.total === 0);
+                    this.loading     = false;
+                    this.loadingMore = false;
+
+                    if (this.hasMore && !this.observer) {
+                        this.setupObserver();
+                    }
+                    if (!this.hasMore && this.observer) {
+                        this.observer.disconnect();
+                        this.observer = null;
+                    }
                 });
+        },
+
+        setupObserver() {
+            const sentinel = document.getElementById('timeline-sentinel');
+            if (!sentinel) return;
+
+            this.observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting && !this.loadingMore && this.hasMore) {
+                    this.fetchPage(this.nextPage);
+                }
+            }, { rootMargin: '200px' });
+
+            this.observer.observe(sentinel);
         },
 
         openDetail(id) {
@@ -105,55 +198,58 @@ function medicalRecordsList(ajaxUrl, baseUrl) {
 }
 
 function buildDetailHtml(r) {
-    const yn = v => v
-        ? '<span class="badge bg-danger">SIM</span>'
-        : '<span class="badge bg-secondary">NÃO</span>';
-    const ni = v => v || '<span class="text-muted">Não informado</span>';
+    const L   = r.labels;
+    const yn  = (v) => v
+        ? `<span class="badge bg-danger">${L.yes}</span>`
+        : `<span class="badge bg-secondary">${L.no}</span>`;
+    const ni  = (v) => v || `<span class="text-muted">${L.not_informed}</span>`;
 
     return `
         <p class="text-muted small mb-1">${r.code} &mdash; ${r.created_at_formatted}</p>
         <h6 class="mb-3">${r.doctor_name}</h6>
         <hr>
 
-        <h6 class="text-secondary small text-uppercase mb-2">Queixa principal</h6>
-        <div class="mb-4 p-3 bg-light rounded">${r.main_complaint ?? '<span class="text-muted">—</span>'}</div>
+        <h6 class="text-secondary small text-uppercase mb-2">${L.complaint}</h6>
+        <div class="mb-4 p-3 bg-light rounded">
+            ${r.main_complaint ? r.main_complaint : `<span class="text-muted">—</span>`}
+        </div>
 
-        <h6 class="text-secondary small text-uppercase mb-2">Histórico</h6>
+        <h6 class="text-secondary small text-uppercase mb-2">${L.history}</h6>
         <div class="row row-cols-3 g-2 mb-4">
             <div class="col">
                 <div class="border rounded p-2 text-center small">
-                    <div class="text-muted mb-1">Diabético</div>${yn(r.diabetic)}
-                    <div class="text-muted mt-1" style="font-size:.7rem;">Familiar: ${yn(r.diabetic_family)}</div>
+                    <div class="text-muted mb-1">${L.diabetic}</div>${yn(r.diabetic)}
+                    <div class="text-muted mt-1" style="font-size:.7rem;">${L.family}: ${yn(r.diabetic_family)}</div>
                 </div>
             </div>
             <div class="col">
                 <div class="border rounded p-2 text-center small">
-                    <div class="text-muted mb-1">Hipertenso</div>${yn(r.hypertensive)}
-                    <div class="text-muted mt-1" style="font-size:.7rem;">Familiar: ${yn(r.hypertensive_family)}</div>
+                    <div class="text-muted mb-1">${L.hypertensive}</div>${yn(r.hypertensive)}
+                    <div class="text-muted mt-1" style="font-size:.7rem;">${L.family}: ${yn(r.hypertensive_family)}</div>
                 </div>
             </div>
             <div class="col">
                 <div class="border rounded p-2 text-center small">
-                    <div class="text-muted mb-1">Glaucomatoso</div>${yn(r.glaucomatous)}
-                    <div class="text-muted mt-1" style="font-size:.7rem;">Familiar: ${yn(r.glaucomatous_family)}</div>
+                    <div class="text-muted mb-1">${L.glaucomatous}</div>${yn(r.glaucomatous)}
+                    <div class="text-muted mt-1" style="font-size:.7rem;">${L.family}: ${yn(r.glaucomatous_family)}</div>
                 </div>
             </div>
         </div>
 
-        <h6 class="text-secondary small text-uppercase mb-2">Tonometria</h6>
+        <h6 class="text-secondary small text-uppercase mb-2">${L.tonometry}</h6>
         <p class="small mb-4">
             <strong>OD:</strong> ${ni(r.tonometer_right)} &nbsp;
             <strong>OE:</strong> ${ni(r.tonometer_left)} &nbsp;
-            <strong>Hora:</strong> ${ni(r.tonometer_time)}
+            <strong>H:</strong> ${ni(r.tonometer_time)}
         </p>
 
         ${r.observation_general ? `
-        <h6 class="text-secondary small text-uppercase mb-2">Observação geral</h6>
+        <h6 class="text-secondary small text-uppercase mb-2">${L.general_obs}</h6>
         <p class="small mb-4">${r.observation_general}</p>
         ` : ''}
 
         ${r.observation_of_lenses ? `
-        <h6 class="text-secondary small text-uppercase mb-2">Observação de lentes</h6>
+        <h6 class="text-secondary small text-uppercase mb-2">${L.lenses_obs}</h6>
         <p class="small mb-4">${r.observation_of_lenses}</p>
         ` : ''}
     `;

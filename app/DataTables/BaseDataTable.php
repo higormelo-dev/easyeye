@@ -22,8 +22,8 @@ abstract class BaseDataTable extends DataTable
             'sSearch'       => __('actions.datatable.sSearch'),
             'oPaginate'     => [
                 'sFirst'    => __('actions.datatable.oPaginate.sFirst'),
-                'sPrevious' => __('actions.datatable.oPaginate.sPrevious'),
-                'sNext'     => __('actions.datatable.oPaginate.sNext'),
+                'sPrevious' => '<i class="ti ti-arrow-left text-body"></i>',
+                'sNext'     => '<i class="ti ti-arrow-right"></i>',
                 'sLast'     => __('actions.datatable.oPaginate.sLast'),
             ],
             'oAria' => [
@@ -45,94 +45,80 @@ abstract class BaseDataTable extends DataTable
             'responsive' => true,
             'pageLength' => 10,
             'lengthMenu' => [[5, 10, 25, 50, 100], [5, 10, 25, 50, 100]],
-            'pagingType' => 'full_numbers',
+            'pagingType' => 'simple_numbers',
+            'dom'        => 'rt<"d-flex justify-content-between align-items-center mt-3"lp>',
         ];
     }
 
     /**
-     * Build action buttons for datatable.
+     * Build action buttons for datatable (Preclinic dropdown style).
      *
      * @param  mixed  $record  The model record
-     * @param  array  $options  Options for buttons (edit, show, active, delete, restore)
+     * @param  array  $options  Options for buttons (edit, active, delete, restore)
      */
     protected function buildActionButtons(mixed $record, array $options = []): string
     {
         $defaults = [
             'edit'    => true,
-            'show'    => true,
             'active'  => true,
             'delete'  => true,
             'restore' => true,
         ];
 
-        $options    = array_merge($defaults, $options);
-        $btnActions = '';
-        $entityId   = session()->get('selected_entity_id');
-
-        $isGlobal = $record->entity_id === null;
+        $options  = array_merge($defaults, $options);
+        $entityId = session()->get('selected_entity_id');
         $isOwned  = $record->entity_id === $entityId;
 
-        // Registros globais (entity_id = null): apenas visualizar
-        if (! $record->deleted_at && $isGlobal && $options['show']) {
-            $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+        if ($record->deleted_at && $isOwned && $options['restore']) {
+            return '<a href="javascript:void(0);" class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
+                title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        // Registros da entidade: todos os botões
-        if (! $record->deleted_at && $isOwned) {
-            if ($options['edit']) {
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>';
-            }
-
-            if ($options['show']) {
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
-            }
-
-            if ($options['active']) {
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
-                    data-id="' . $record->id . '" data-situation="' . ($record->active ? 0 : 1) . '"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . ($record->active ? __('actions.disable') : __('actions.enable')) . '">
-                    <i class="fas ' . ($record->active ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-            }
-
-            if ($options['delete']) {
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
-                    data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
-            }
-        } elseif ($record->deleted_at && $isOwned && $options['restore']) {
-            $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
-                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.restore') . '"><i class="fas fa-recycle"></i></a>';
+        if (! $isOwned || $record->deleted_at) {
+            return '';
         }
 
-        return $btnActions;
+        $activeSituation = $record->active ? 0 : 1;
+        $activeIcon      = $record->active ? 'ti-lock-open' : 'ti-lock';
+        $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
+
+        $items = '';
+        if ($options['edit']) {
+            $items .= '<li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
+                <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>';
+        }
+        if ($options['active']) {
+            $items .= '<li><a class="dropdown-item btn-active" href="javascript:void(0);"
+                data-id="' . $record->id . '" data-situation="' . $activeSituation . '">
+                <i class="ti ' . $activeIcon . ' me-1"></i>' . $activeTitle . '</a></li>';
+        }
+        if ($options['delete']) {
+            $items .= '<li><a class="dropdown-item btn-trash text-danger" href="javascript:void(0);"
+                data-id="' . $record->id . '">
+                <i class="ti ti-trash me-1"></i>' . __('actions.delete') . '</a></li>';
+        }
+
+        return '
+<div class="d-flex align-items-center justify-content-end gap-1">
+    <a href="javascript:void(0);" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots-vertical"></i></a>
+    <ul class="dropdown-menu p-2">' . $items . '</ul>
+</div>';
     }
 
     /**
-     * Format active column with badge.
+     * Format active column with badge (Preclinic badge-soft style).
      */
     protected function formatActiveColumn(mixed $record): string
     {
         if ($record->deleted_at) {
-            return '<span class="badge bg-secondary text-dark">' . __('actions.delete') . '</span>';
+            return '<span class="badge badge-soft-secondary rounded fs-13 fw-medium">' . __('actions.delete') . '</span>';
         }
 
         return $record->active
-            ? '<span class="badge bg-success">' . __('actions.yes') . '</span>'
-            : '<span class="badge bg-dark">' . __('actions.no') . '</span>';
+            ? '<span class="badge badge-soft-success rounded text-success border border-success fs-13 fw-medium">' . __('actions.yes') . '</span>'
+            : '<span class="badge badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium">' . __('actions.no') . '</span>';
     }
 
     /**

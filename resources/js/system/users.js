@@ -1,3 +1,4 @@
+import "jquery";
 import { handleAjaxError, showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 
 $(function () {
@@ -9,7 +10,9 @@ $(function () {
     let usersDataTable = window.LaravelDataTables?.['users_datatable'];
 
     $('#users_datatable').on('draw.dt', function () {
-        $('[data-bs-toggle="tooltip"]').tooltip();
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            bootstrap.Tooltip.getOrCreateInstance(el);
+        });
         usersDataTable = usersDataTable ?? window.LaravelDataTables?.['users_datatable'];
         usersDataTable?.columns.adjust();
     });
@@ -37,7 +40,7 @@ $(function () {
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (data) {
                 $('#retorno-default').empty().append(data);
-                $('#modal_default').modal('show');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
             },
             error: handleAjaxError
         });
@@ -63,7 +66,7 @@ $(function () {
             },
             success: function (response) {
                 $('#retorno-default').empty().append(response);
-                $('#modal_default').modal('show');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
                 setTimeout(initModalEvents, 100);
             },
             error: handleAjaxError
@@ -168,7 +171,7 @@ $(function () {
             complete: function () { $('#btn-modal-default').attr('disabled', false); },
             success: function (response) {
                 $('#retorno-default').empty().append(response);
-                $('#modal_default').modal('show');
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
                 setTimeout(initModalEvents, 100);
             },
             error: handleAjaxError
