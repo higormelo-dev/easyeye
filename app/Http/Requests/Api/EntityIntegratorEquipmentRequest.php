@@ -29,8 +29,7 @@ class EntityIntegratorEquipmentRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255', $this->uniqueRule('name')],
-            // 'ip'   => ['required', 'ip', $this->uniqueRule('ip')],
-            'ip'  => ['required', 'ip'],
+            'ip' => ['required', 'ip', $this->uniqueRule('ip')],
             'mac' => [
                 'required',
                 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',

@@ -70,7 +70,11 @@ class EntityIntegratorEquipmentService
     }
 
     /**
-     * Find or create record
+     * Find or create record.
+     *
+     * Deduplication is based on hardware identity (ip, mac, serial_number).
+     * If any of these match a soft-deleted record for the same integrator,
+     * it is restored and updated instead of creating a duplicate.
      */
     private function findOrCreate(EntityIntegratorEquipmentRequest $request): EntityIntegratorEquipment
     {
@@ -82,7 +86,11 @@ class EntityIntegratorEquipmentService
 
         $existingRecord = EntityIntegratorEquipment::withTrashed()
             ->where('integrator_id', $integrator->id)
-            ->where('name', $request->name)
+            ->where(function ($query) use ($request) {
+                $query->where('ip', $request->input('ip'))
+                    ->orWhere('mac', mb_strtoupper($request->mac, 'UTF-8'))
+                    ->orWhere('serial_number', mb_strtoupper($request->serial_number, 'UTF-8'));
+            })
             ->first();
 
         if ($existingRecord) {
