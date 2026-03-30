@@ -246,6 +246,13 @@ return [
         'reports'               => 'Relatórios',
         'resources'             => 'Recursos',
     ],
+    'reports' => [
+        'schedules'         => 'Relatório de Produção',
+        'schedules_label'   => 'Produção',
+        'absenteeism'       => 'Relatório de Absenteísmo',
+        'absenteeism_label' => 'Absenteísmo',
+    ],
+
     'datatable' => [
         'sEmptyTable'   => 'Nenhum registro encontrado',
         'sProcessing'   => 'Processando...',

@@ -37,12 +37,12 @@ class ReportsController extends Controller
         $situations = ScheduleSituation::cases();
 
         $meta = [
-            'title'       => 'Relatórios',
-            'action'      => 'Relatório de Produção',
+            'title'       => __('actions.sidemenu.reports'),
+            'action'      => __('actions.reports.schedules'),
             'breadcrumbs' => [
-                ['label' => 'Dashboard', 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Relatórios', 'url' => route('panel.reports.index'), 'active' => false],
-                ['label' => 'Produção', 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
+                ['label' => __('actions.reports.schedules_label'), 'url' => 'javascript:void(0)', 'active' => true],
             ],
         ];
 
@@ -126,12 +126,12 @@ class ReportsController extends Controller
         $doctors  = $this->doctorsByEntity($entityId);
 
         $meta = [
-            'title'       => 'Relatórios',
-            'action'      => 'Relatório de Absenteísmo',
+            'title'       => __('actions.sidemenu.reports'),
+            'action'      => __('actions.reports.absenteeism'),
             'breadcrumbs' => [
-                ['label' => 'Dashboard', 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Relatórios', 'url' => route('panel.reports.index'), 'active' => false],
-                ['label' => 'Absenteísmo', 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
+                ['label' => __('actions.reports.absenteeism_label'), 'url' => 'javascript:void(0)', 'active' => true],
             ],
         ];
 

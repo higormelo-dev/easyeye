@@ -246,6 +246,14 @@ return [
         'reports'               => 'Reports',
         'resources'             => 'Resources',
     ],
+
+    'reports' => [
+        'schedules'         => 'Production Report',
+        'schedules_label'   => 'Production',
+        'absenteeism'       => 'Absenteeism Report',
+        'absenteeism_label' => 'Absenteeism',
+    ],
+
     'datatable' => [
         'sEmptyTable'   => 'No records found',
         'sProcessing'   => 'Processing...',
