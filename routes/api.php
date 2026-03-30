@@ -21,7 +21,7 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
             Route::apiResource('patients.exams', PatientExamsController::class)
                 ->except(['create', 'edit']);
             Route::post('patients/{patient}/exams/{exam}', [PatientExamsController::class, 'update'])
-                ->name('patients.exams.update');
+                ->name('patients.exams.update_multipart');
             Route::apiResource('examtypes', ExamTypesController::class)->only(['index', 'show']);
             Route::apiResource('schedules', SchedulesController::class)->only('index', 'show');
             Route::apiResource('exams', ExamsController::class)->only('store');
