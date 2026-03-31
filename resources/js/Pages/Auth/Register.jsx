@@ -6,7 +6,7 @@ export default function Register({ plans, trialDays }) {
     const { errors } = usePage().props;
     const [form, setForm] = useState({
         name: '', email: '', password: '', password_confirmation: '',
-        entity_name: '', plan_id: '',
+        company_name: '', plan_id: '',
     });
     const [processing, setProcessing] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
@@ -44,12 +44,12 @@ export default function Register({ plans, trialDays }) {
                     <label className="form-label">Nome da Clínica</label>
                     <input
                         type="text"
-                        className={`form-control${errors?.entity_name ? ' is-invalid' : ''}`}
-                        value={form.entity_name}
-                        onChange={(e) => setForm({ ...form, entity_name: e.target.value })}
+                        className={`form-control${errors?.company_name ? ' is-invalid' : ''}`}
+                        value={form.company_name}
+                        onChange={(e) => setForm({ ...form, company_name: e.target.value })}
                         required
                     />
-                    {errors?.entity_name && <div className="invalid-feedback">{errors.entity_name}</div>}
+                    {errors?.company_name && <div className="invalid-feedback">{errors.company_name}</div>}
                 </div>
 
                 <div className="mb-3">

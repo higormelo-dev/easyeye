@@ -46,5 +46,10 @@ class ClinicResourceRequest extends FormRequest
         if ($this->has('name')) {
             $this->merge(['name' => mb_strtoupper($this->input('name'))]);
         }
+
+        // Default para o formulário React simplificado (SettingsCrud)
+        if (! $this->has('type') || ! $this->input('type')) {
+            $this->merge(['type' => 'room']);
+        }
     }
 }

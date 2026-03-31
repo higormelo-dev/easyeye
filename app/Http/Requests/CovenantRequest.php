@@ -97,5 +97,14 @@ class CovenantRequest extends FormRequest
                 'name' => mb_strtoupper($this->input('name')),
             ]);
         }
+
+        // Defaults para o formulário React simplificado (SettingsCrud sem color/table)
+        if (! $this->has('color') || ! $this->input('color')) {
+            $this->merge(['color' => sprintf('#%06x', random_int(0, 0xFFFFFF))]);
+        }
+
+        if (! $this->has('table') || $this->input('table') === null) {
+            $this->merge(['table' => 0]);
+        }
     }
 }

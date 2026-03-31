@@ -8,7 +8,7 @@ use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\Plan;
 use App\Models\SubscriptionSetting;
 use App\Models\User;
-use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,12 +18,12 @@ class RegisteredUserController extends Controller
     /**
      * Display the registration wizard view.
      */
-    public function create(): View
+    public function create(): Response
     {
         $plans     = Plan::active()->with('features')->orderBy('sort_order')->get();
         $trialDays = SubscriptionSetting::trialDays();
 
-        return view('auth.register', compact('plans', 'trialDays'));
+        return Inertia::render('Auth/Register', compact('plans', 'trialDays'));
     }
 
     /**
@@ -38,8 +38,10 @@ class RegisteredUserController extends Controller
 
     /**
      * Handle the registration form submission.
+     * - JSON (wantsJson): retorna redirect URL para AJAX/testes legados
+     * - Inertia / browser: retorna redirect HTTP para Inertia seguir
      */
-    public function store(RegisterRequest $request, RegisterAction $action): JsonResponse
+    public function store(RegisterRequest $request, RegisterAction $action): RedirectResponse|JsonResponse
     {
         $result = $action->execute($request->validated());
 
@@ -55,8 +57,12 @@ class RegisteredUserController extends Controller
             'user_rule'                 => $entityUser->rule,
         ]);
 
-        return response()->json([
-            'redirect' => route('panel.dashboard', absolute: false),
-        ]);
+        if ($request->wantsJson()) {
+            return response()->json([
+                'redirect' => route('panel.dashboard', absolute: false),
+            ]);
+        }
+
+        return redirect()->route('panel.dashboard');
     }
 }

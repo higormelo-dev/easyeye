@@ -48,11 +48,12 @@ class HandleInertiaRequests extends Middleware
                 ? session('entity')->only('id', 'name', 'code')
                 : null,
 
-            // Flash messages do Laravel (success, error, warning)
+            // Flash messages do Laravel (success, error, warning, status)
             'flash' => fn () => [
                 'success' => $request->session()->get('success'),
                 'error'   => $request->session()->get('error'),
                 'warning' => $request->session()->get('warning'),
+                'status'  => $request->session()->get('status'),
             ],
 
             // Locale atual para i18n no React

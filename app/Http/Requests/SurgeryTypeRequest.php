@@ -91,5 +91,10 @@ class SurgeryTypeRequest extends FormRequest
                 'name' => mb_strtoupper($this->input('name')),
             ]);
         }
+
+        // Default para o formulário React simplificado (SettingsCrud sem campo category)
+        if (! $this->has('category') || $this->input('category') === null) {
+            $this->merge(['category' => 0]);
+        }
     }
 }

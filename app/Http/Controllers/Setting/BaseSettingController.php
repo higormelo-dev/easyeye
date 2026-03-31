@@ -90,7 +90,7 @@ abstract class BaseSettingController extends Controller
                 return response()->json(['message' => $message, 'deleted' => $recordData]);
             }
 
-            return redirect(action('\\' . static::class . '@index'))->with('message', $message);
+            return redirect(action('\\' . static::class . '@index'))->with('success', $message);
         });
     }
 
@@ -107,7 +107,7 @@ abstract class BaseSettingController extends Controller
                 return response()->json(['message' => $message, 'restored' => $recordData]);
             }
 
-            return redirect(action('\\' . static::class . '@index'))->with('message', $message);
+            return redirect(action('\\' . static::class . '@index'))->with('success', $message);
         });
     }
 
@@ -120,7 +120,7 @@ abstract class BaseSettingController extends Controller
             return response()->json(['message' => $messageReturn, 'data' => new $this->resourceClass($record)]);
         }
 
-        return redirect(action('\\' . static::class . '@index'))->with('message', $messageReturn);
+        return redirect(action('\\' . static::class . '@index'))->with('success', $messageReturn);
     }
 
     protected function genericUpdate(FormRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
@@ -133,7 +133,7 @@ abstract class BaseSettingController extends Controller
             return response()->json(['message' => $messageReturn, 'data' => new $this->resourceClass($updated)]);
         }
 
-        return redirect(action('\\' . static::class . '@index'))->with('message', $messageReturn);
+        return redirect(action('\\' . static::class . '@index'))->with('success', $messageReturn);
     }
 
     protected function viewData(): array

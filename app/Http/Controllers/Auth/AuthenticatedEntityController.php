@@ -12,27 +12,23 @@ use Inertia\Response;
 class AuthenticatedEntityController extends Controller
 {
     /**
-     * Display the login view.
+     * Display the entity selection view.
      */
-    public function create(): View
+    public function create(): Response
     {
-        $entities    = [];
         $entityUsers = Auth::user()->entityUsers->where('active', true);
         $entityUsers->load('entity');
 
-        if (count($entityUsers) > 1) {
-            foreach ($entityUsers as $entityUser) {
-                $entityUserRule = '';
+        $entities = $entityUsers->map(function ($entityUser) {
+            return [
+                'id'         => $entityUser->id,
+                'name'       => $entityUser->entity->name,
+                'code'       => $entityUser->entity->code,
+                'rule_label' => $entityUser->rule,
+            ];
+        })->values()->toArray();
 
-                if (app()->environment(['local', 'testing'])) {
-                    $entityUserRule .= $entityUser->rule === 'admin' ? '*' : '';
-                }
-
-                $entities[$entityUser->id] = trim(sprintf('%s %s', $entityUser->entity->name, $entityUserRule));
-            }
-        }
-
-        return view('auth.select-entity', compact('entities'));
+        return Inertia::render('Auth/SelectEntity', compact('entities'));
     }
 
     /**
