@@ -12,6 +12,7 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     EnsureUserBelongsToEntity,
     HandleImpersonation,
     ParseMultipartFormData,
+    RequireTermsAcceptance,
     SetLocale};
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -40,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'token.precheck'       => ApiTokenPreCheck::class,
             'token.expiration'     => ApiCheckTokenExpiration::class,
             'api.plan'             => ApiCheckPlanAccess::class,
+            'terms.accepted'       => RequireTermsAcceptance::class,
         ]);
 
         // Adiciona o SetLocale e HandleImpersonation ao grupo web

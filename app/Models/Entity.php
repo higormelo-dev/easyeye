@@ -53,6 +53,9 @@ class Entity extends Model
         'active',
         'locale',
         'schedule_interval',
+        // Campos de atribuição de aquisição (CAC)
+        'partner_id',
+        'referral_code_id',
     ];
 
     /**
@@ -219,6 +222,34 @@ class Entity extends Model
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class, 'entity_id');
+    }
+
+    // -------------------------------------------------------------------------
+    // CAC: Programa de Indicação + Parceiros + Activation Tracking
+    // -------------------------------------------------------------------------
+
+    /** Parceiro/revendedor responsável pela aquisição desta clínica */
+    public function partner(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Partner::class, 'partner_id');
+    }
+
+    /** Código de indicação usado no cadastro desta clínica */
+    public function referralCode(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ReferralCode::class, 'referral_code_id');
+    }
+
+    /** Códigos de indicação gerados por esta clínica para indicar outras */
+    public function referralCodes(): HasMany
+    {
+        return $this->hasMany(ReferralCode::class, 'entity_id');
+    }
+
+    /** Marcos de ativação completados por esta clínica */
+    public function activations(): HasMany
+    {
+        return $this->hasMany(EntityActivation::class, 'entity_id');
     }
 
     /**

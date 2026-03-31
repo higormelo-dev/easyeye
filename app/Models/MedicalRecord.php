@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Traits\{Auditable, HasAuditColumns, Versionable};
+use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Factories\HasFactory, Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +13,7 @@ class MedicalRecord extends Model
     use HasAuditColumns;
     use Auditable;
     use Versionable;
+    use Signable;
     use HasUuids;
     use SoftDeletes;
 
@@ -65,6 +66,11 @@ class MedicalRecord extends Model
         'fundoscopy_left',
         'observation_general',
         'observation_of_lenses',
+        // Campos de assinatura — CFM Res. 2.227/2018
+        'signed_by',
+        'signed_at',
+        'signature_hash',
+        'is_locked',
     ];
 
     /**
@@ -104,6 +110,8 @@ class MedicalRecord extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
+            'signed_at'  => 'datetime',
+            'is_locked'  => 'boolean',
         ];
     }
 
