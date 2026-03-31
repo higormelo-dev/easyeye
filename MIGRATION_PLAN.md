@@ -513,40 +513,220 @@ O pacote `@easyeye/api` é usado tanto no Web (Inertia) quanto nos apps. Se voc�
 
 ## 9. Mapa de Dependências (Antes vs Depois)
 
-### ANTES (Stack Atual)
+> **Status:** Phase 4 concluída em 2026-03-31. O estado "DEPOIS" abaixo é a realidade atual do projeto.
+
+---
+
+### 9.1 Arquitetura de Camadas
+
+#### ANTES (Stack Original — Phases 0–3 início)
 ```
-┌─────────────────────────────────┐
-│        Browser (Web)            │
-│  Blade + Alpine + jQuery        │
-│  DataTables + Bootstrap 5       │
-│  ┌───────────────────────────┐  │
-│  │ JavaScript Vanilla (.js)  │  │
-│  │ 18 arquivos em /system/   │  │
-│  └───────────────────────────┘  │
-└──────────────┬──────────────────┘
-               │ Full Page Reload
-┌──────────────▼──────────────────┐
-│     Laravel 11 (Backend)        │
-│  Controllers → return view()    │
-│  Blade Templates (HTML)         │
-└─────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        Browser (Web)                             │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  Blade Templates (.blade.php) — HTML renderizado no server │  │
+│  │  Alpine.js — reatividade inline (x-data, x-show, x-model) │  │
+│  │  jQuery — DOM, AJAX, eventos                               │  │
+│  │  DataTables (4 pkgs) — tabelas com sort/filter/pagination  │  │
+│  │  Bootstrap 5 + Tailwind CSS — dois sistemas de estilo      │  │
+│  │  morris.js + raphael — gráficos SVG legados                │  │
+│  │  18+ arquivos JS em /resources/js/system/                  │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │ Full Page Reload (HTTP GET/POST)
+                           │ (toda navegação recarrega a página inteira)
+┌──────────────────────────▼───────────────────────────────────────┐
+│                  Laravel 11 (Backend)                            │
+│                                                                  │
+│  Controllers → return view('system.module.page', compact(...))   │
+│  Blade Templates → HTML gerado no servidor e enviado completo    │
+│  Session Flash → back()->with('success', ...) + @if($flash)      │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
-### DEPOIS (Stack Migrada)
+#### DEPOIS (Stack Atual — Phase 4 Completa, 2026-03-31)
 ```
-┌─────────────────────┐  ┌──────────────────────┐  ┌───────────────┐
-│  Web (React+Inertia) │  │  Doctor App (Expo)   │  │ Patient App   │
-│  Preclinic Template  │  │  React Native        │  │ (Expo)        │
-│  SPA-like experience │  │  iPad/Desktop        │  │ iOS/Android   │
-└──────────┬───────────┘  └──────────┬───────────┘  └───────┬───────┘
-           │ Inertia XHR             │ REST API              │ REST API
-           │ (sem CORS, com sessão)  │ (Bearer Token)        │ (Bearer)
-┌──────────▼─────────────────────────▼──────────────────────▼───────┐
-│                    Laravel 11 (Backend)                            │
-│              Controllers → Inertia::render() ou JSON              │
-│              Services → Lógica de Negócios (intocada)             │
-│              API /integrators → Integração Equipamentos           │
-└───────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                        Browser (Web)                             │
+│                                                                  │
+│  ┌────────────────────────────────────────────────────────────┐  │
+│  │  React 19 — componentes com estado (useState, useEffect)   │  │
+│  │  Inertia.js v3 — SPA-like sem CORS, sem API REST própria   │  │
+│  │  Preclinic Template — Bootstrap 5 (sidebar + dark mode)    │  │
+│  │  AuthenticatedLayout.jsx — wrapper universal do painel     │  │
+│  │  GuestLayout.jsx — wrapper para páginas de auth            │  │
+│  │  1 entry point: resources/js/app.jsx (Vite)                │  │
+│  └────────────────────────────────────────────────────────────┘  │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │ Inertia XHR (navegação SPA-like)
+                           │ JSON parcial — só props mudam por visita
+┌──────────────────────────▼───────────────────────────────────────┐
+│                  Laravel 11 (Backend)                            │
+│                                                                  │
+│  Controllers → Inertia::render('Module/Page', [props])           │
+│  HandleInertiaRequests → shared props globais em toda página     │
+│  Session Flash → ->with('success',...) lido por Toast.jsx        │
+│  API /integrators/* → Bearer Token (Sanctum) para Java desktop   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### FUTURO — Phase 5 (React Native / Expo)
+```
+┌───────────────────────┐   ┌───────────────────────┐   ┌──────────────────────────────┐
+│   Web (React+Inertia) │   │  Doctor App (Expo)     │   │  Patient App (Expo)          │
+│   Preclinic Template  │   │  React Native          │   │  React Native                │
+│   Bootstrap 5         │   │  iPad / Desktop        │   │  iOS / Android               │
+│   SPA-like (Inertia)  │   │  agenda + prontuário   │   │  receitas + laudos           │
+└──────────┬────────────┘   └───────────┬────────────┘   └────────────┬─────────────────┘
+           │ Inertia XHR               │ REST API                    │ REST API
+           │ (sem CORS, com sessão)    │ Bearer Token                │ Bearer Token
+           │                           │ @easyeye/api pkg            │ @easyeye/api pkg
+┌──────────▼───────────────────────────▼─────────────────────────────▼─────────────────┐
+│                              Laravel 11 (Backend)                                      │
+│                                                                                        │
+│   Controllers → Inertia::render()  |  JSON (API mobile)                               │
+│   Services → Lógica de Negócios (intocada em todos os clientes)                       │
+│   API /integrators/* → Equipamentos de diagnóstico (Java desktop)                     │
+│   API /api/* (v2) → Futuros clientes mobile autenticados via Sanctum                  │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 9.2 Entradas do Vite (Build)
+
+| | ANTES (Phase 1–3) | DEPOIS (Phase 4) |
+|---|---|---|
+| **Total de entradas** | 23 arquivos | **2 arquivos** |
+| **CSS** | `vendor.css`, `app.css`, `dashboard.css` | `resources/css/app.css` |
+| **JS Principal** | `vendor.js`, `app.js` | `resources/js/app.jsx` |
+| **JS por módulo** | `system/patients.js`, `system/doctors.js`, `system/users.js`, `system/schedules.js`, `system/setting.js`, `system/skintypes.js`, `system/iristypes.js`, `system/visittypes.js`, `system/additiontypes.js`, `system/colorvisiontypes.js`, `system/nearpointconvergences.js`, `system/covenants.js`, `system/lenses.js`, `system/surgerytypes.js`, `system/covertesttypes.js`, `system/visualacuitytypes.js` | — removidos |
+| **JS Auth** | `auth/login.js`, `auth/register.js`, `auth/reset-password.js`, `auth/password-toggle.js` | — removidos |
+| **Alias jQuery** | `jquery: ./resources/js/jquery-global.js` | — removido |
+
+---
+
+### 9.3 Pacotes npm — Removidos vs Mantidos
+
+#### Removidos na Phase 4
+
+| Pacote | Categoria | Substituto React |
+|---|---|---|
+| `jquery` | DOM / AJAX | React state + Inertia `router` |
+| `jquery-asColorPicker` | UI Plugin | — (não utilizado no React) |
+| `jquery-sparkline` | Gráficos inline | — (não utilizado no React) |
+| `jquery-toast-plugin` | Notificações | `Toast.jsx` nativo (flash props) |
+| `datatables.net` | Tabelas | `DataTable.jsx` customizado |
+| `datatables.net-bs5` | Tabelas Bootstrap | `DataTable.jsx` customizado |
+| `datatables.net-responsive` | Tabelas responsivas | `DataTable.jsx` customizado |
+| `datatables.net-responsive-bs5` | Tabelas responsivas | `DataTable.jsx` customizado |
+| `morris.js` | Gráficos SVG | — (não portado na Phase 4) |
+| `raphael` | Dependência do morris | — (não portado na Phase 4) |
+| `alpinejs` | Reatividade inline | React `useState` / `useEffect` |
+| `gulp` + 5 plugins | Build legado | Vite (já era o padrão) |
+| `browser-sync` | Dev server legado | Vite HMR nativo |
+| `tailwindcss` | CSS utility | Bootstrap 5 (Preclinic template) |
+| `@tailwindcss/forms` | CSS utility | Bootstrap 5 |
+| `autoprefixer` | PostCSS plugin | — (Vite cobre nativamente) |
+| `postcss` | CSS processor | — (Vite cobre nativamente) |
+| `sass` | CSS preprocessor | — (Vite cobre nativamente) |
+
+**Total removido: 18 pacotes** (10 dependencies + 8 devDependencies)
+
+#### Mantidos (package.json atual)
+
+| Pacote | Motivo |
+|---|---|
+| `react` + `react-dom` | Core do frontend |
+| `@inertiajs/react` | Bridge Laravel ↔ React |
+| `@vitejs/plugin-react` | Vite Fast Refresh |
+| `vite` + `laravel-vite-plugin` | Build moderno |
+| `bootstrap` | Preclinic template (Bootstrap 5) |
+| `flatpickr` | Datepicker (usado em WorkSchedule e Agendamentos) |
+| `sweetalert2` | Confirmações (substituível por `ConfirmDialog.jsx`) |
+| `feather-icons` | Ícones no template |
+| `@fortawesome/fontawesome-free` | Ícones (fa-check-circle, fa-times-circle) |
+| `@tabler/icons-webfont` | Ícones do Preclinic |
+| `inputmask` | Máscaras de telefone/CPF/CNPJ |
+| `simplebar` | Scrollbar customizada na sidebar |
+| `perfect-scrollbar` | Scrollbar do template |
+| `qrcode` | Geração de QR Code (integradores) |
+| `axios` | HTTP client para chamadas API |
+| `concurrently` | Dev: rodar server + queue + vite em paralelo |
+
+---
+
+### 9.4 Controllers — Padrão de Retorno
+
+| Módulo | ANTES | DEPOIS |
+|---|---|---|
+| Auth (Login, Register...) | `return view('auth.*')` | `return Inertia::render('Auth/*')` |
+| Dashboard | `return view('system.dashboard')` | `return Inertia::render('Dashboard/Index')` |
+| Settings (12 tipos) | `return view('system.setting.*')` | `return Inertia::render('Settings/*')` via `BaseSettingController` |
+| Doctors Index/Show | `return view('system.doctors.*')` | `return Inertia::render('Doctors/*')` |
+| Doctors WorkSchedule | `return view('system.doctors.work-schedule')` | `return Inertia::render('Doctors/WorkSchedule')` ← Phase 4 |
+| Patients Index/Show | `return view('system.patients.*')` | `return Inertia::render('Patients/*')` |
+| Users Index/Show | `return view('system.users.*')` | `return Inertia::render('Users/*')` |
+| Schedules Index/Show | `return view('system.schedules.*')` | `return Inertia::render('Schedules/*')` |
+| Medical Records | `return view('system.medical_records.*')` | `return Inertia::render('MedicalRecords/*')` |
+| Manager (SaaS) | `return view('manager.*')` | `return Inertia::render('Manager/*')` |
+| Reports (3 rotas) | `return view('system.reports.*')` | `return Inertia::render('Reports/*')` ← Phase 4 |
+| Profile Edit | `return view('profile.edit')` | `return Inertia::render('Profile/Edit')` ← Phase 4 |
+| Subscription Expired | `return view('subscription.expired')` | `return Inertia::render('Subscription/Expired')` ← Phase 4 |
+| **Blade residual** | — | `app.blade.php` (root Inertia) + `welcome.blade.php` (landing pública) |
+
+---
+
+### 9.5 Páginas React — Inventário Completo (Phase 4 Final)
+
+```
+resources/js/Pages/
+├── Auth/
+│   ├── Login.jsx
+│   ├── Register.jsx
+│   ├── ForgotPassword.jsx
+│   ├── ResetPassword.jsx
+│   └── SelectEntity.jsx
+├── Dashboard/
+│   └── Index.jsx
+├── Settings/
+│   ├── SkinTypes.jsx          IrisTypes.jsx       VisitTypes.jsx
+│   ├── AdditionTypes.jsx      ColorVisionTypes.jsx CoverTestTypes.jsx
+│   ├── VisualAcuityTypes.jsx  SurgeryTypes.jsx     Lenses.jsx
+│   ├── NearPointConvergences.jsx  Covenants.jsx    Resources.jsx
+├── Doctors/
+│   ├── Index.jsx
+│   ├── Show.jsx
+│   └── WorkSchedule.jsx       ← Phase 4
+├── Patients/
+│   ├── Index.jsx
+│   └── Show.jsx
+├── Users/
+│   ├── Index.jsx
+│   └── Show.jsx
+├── Schedules/
+│   ├── Index.jsx
+│   └── Show.jsx
+├── MedicalRecords/
+│   ├── Index.jsx
+│   └── Create.jsx
+├── Reports/
+│   ├── Index.jsx              ← Phase 4
+│   ├── Schedules.jsx          ← Phase 4
+│   └── Absenteeism.jsx        ← Phase 4
+├── Profile/
+│   └── Edit.jsx               ← Phase 4
+├── Subscription/
+│   └── Expired.jsx            ← Phase 4
+└── Manager/
+    ├── Dashboard.jsx
+    ├── Entities/Index.jsx
+    ├── Entities/Show.jsx
+    ├── Subscriptions/Index.jsx
+    └── Plans/Index.jsx
+
+Total: 37 páginas React  |  0 Blade pages no painel autenticado
 ```
 
 ---

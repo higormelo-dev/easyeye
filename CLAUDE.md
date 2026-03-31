@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Medicare** is a multi-tenant SaaS platform for managing ophthalmology clinics, built with Laravel 11. The frontend is in the final stages of a **hybrid migration** from legacy Blade + Alpine.js + jQuery towards a modern **React 19 + Inertia.js** SPA architecture, utilizing the "Preclinic" template. Phase 3 (Settings, Schedules, Medical Records) is complete.
+**Medicare** is a multi-tenant SaaS platform for managing ophthalmology clinics, built with Laravel 11. The frontend completed **Phase 4** of a full migration from Blade + Alpine.js + jQuery to **React 19 + Inertia.js**, using the "Preclinic" template. **Every authenticated panel screen is now 100% React/Inertia.** All legacy jQuery, Alpine.js, DataTables, morris.js, raphael, and Gulp tooling have been removed. Phase 5 (React Native mobile apps) is next.
 
 ## Common Commands
 
 ```bash
 # Development
 composer dev          # Start all dev services (server, queue, logs, vite) concurrently
-npm run dev           # Vite dev server only (compile both legacy and React configs)
-npm run build         # Production asset build (handles both paths)
+npm run dev           # Vite dev server (compiles app.css + app.jsx)
+npm run build         # Production asset build
 
 # Database
 php artisan migrate
@@ -77,7 +77,7 @@ State management uses PHP 8.1 backed enums in `app/Enums/`:
 **Core**
 - `SubscriptionStatus` — `Trial`, `Active`, `Cancelled`, `Expired`
 - `ScheduleSituation` — `Scheduled`, `InProgress`, `Completed`, `Cancelled`
-- `FeatureKey` — Feature flag identifiers for plan gating
+- `FeatureKey` — Feature flag identifiers for plan gating; has `label()` and `isBoolean()` methods
 - `EntityGate` — Permission gate identifiers
 - `BillingCycle` — `Monthly`, `Yearly`, `Lifetime`
 - `ExamCategory` — Exam classification types
@@ -159,13 +159,29 @@ Todos os observers são registrados em `AppServiceProvider::boot()`.
 
 **Auto-generated codes**: Entities, patients, and schedules get sequential human-readable codes (`ENT-0000000001`, `PAC-0000000001`, `SDL-0000000001`) via model `booted()` hooks.
 
-**Frontend Inertia Migration Pattern**: New and refactored UI components should use React and Inertia (`Inertia::render('Path/To/ReactComponent')`). For legacy routes, use `view('path.to.blade')`. The app utilizes `HandleInertiaRequests` middleware to securely pass standard session info: auth, feature flags, global flash messages.
+**Frontend Inertia Pattern (único padrão — Phase 4 completa)**: Todos os controllers do painel retornam `Inertia::render('Module/Page', [props])`. O middleware `HandleInertiaRequests` compartilha props globais para toda página React:
+- `auth.user` — `{id, name, email}` of the authenticated user
+- `entity` — `{id, name, code}` of the active clinic (may be `null` if `session('entity')` not set)
+- `flash` — `{success, error, warning, status}` — use sempre `->with('success', $msg)` em redirects
+- `isClient` — `true` = clinic user; `false` = SaaS manager panel
+- `userRule` — role string of the user in the active entity
+- `locale`, `appName`
 
-**React CRUD & Global Components**: Modules like `SettingsCrud.jsx` unify lookups. Global UI patterns include `Toast.jsx` for flash notifications and `ConfirmDialog.jsx` (triggered via local state `confirmState`) to replace browser alerts in `Patients`, `Doctors`, `Users`, and `Settings`.
+**Flash padrão em redirects**: Usar sempre `->with('success', $message)`. A key `flash.status` é reservada para o ForgotPassword (link enviado).
+
+**Settings CRUD Pattern**: `Setting\BaseSettingController` handles Inertia rendering for all 12 setting types via `$this->inertiaPage` property. Each type has a dedicated `Pages/Settings/{Type}.jsx` file with a default export that wraps `SettingsCrud.jsx`. `SettingsCrud` handles inline modal create/edit.
+
+**Auth Pages Pattern**: All auth pages (Login, Register, ForgotPassword, ResetPassword, SelectEntity) are React. Controllers return `Inertia::render('Auth/PageName', props)`. `RegisteredUserController::store()` uses dual-path: `wantsJson()` → JSON `{redirect}` (for tests/AJAX); otherwise → `redirect()` (for Inertia).
+
+**Profile Update Pattern**: `ProfileController::update()` usa PATCH com method-spoofing (`_method: 'patch'`) para suportar upload de foto via FormData. `PasswordController::update()` usa `validate()` simples (sem error bags) e redireciona para `panel.profile.edit` com `flash.success`.
+
+**Reports Filter Pattern**: Relatórios usam `router.get()` do Inertia para aplicar filtros via GET params (`preserveState: true`). O controller retorna `results: null` quando sem filtros, e o array serializado quando filtrado. O `userRule` no shared props controla se o filtro de médico é exibido (oculto para `role=doctor`).
+
+**Subscription Expired Pattern**: `SubscriptionExpiredController` serializa `FeatureKey::cases()` com `label()` e `isBoolean()` para enviar planos ao React sem depender de chamadas PHP no template. Redireciona para dashboard se a assinatura ainda estiver ativa.
+
+**React CRUD & Global Components**: `SettingsCrud.jsx` — generic name+active CRUD with inline modal. `Toast.jsx` / `FlashMessages.jsx` — flash notifications. `ConfirmDialog.jsx` (via `confirmState` local state) — replaces browser confirm(). `CardGrid` + AJAX — paginated card listing. `DataTable` inline — server-side table for Manager screens.
 
 **Medical Records (Timeline)**: Index and Create forms are native React, using JSON arrays instead of rendered HTML to avoid `dangerouslySetInnerHTML`.
-
-**Presenter Pattern**: (Legacy) `SchedulePresenter` formatting is being replaced by React component logic.
 
 **Soft deletes**: `User`, `Entity`, `EntityUser`, `Partner`, integrations, and equipment support soft delete + restore. Controllers include `restore()` methods and routes like `/setting/{resource}/restore`.
 
@@ -179,25 +195,55 @@ Todos os observers são registrados em `AppServiceProvider::boot()`.
 
 **Observer silencioso**: Todos os observers de compliance e CAC capturam `\Throwable` e fazem `Log::warning/error` sem propagar a exceção — a operação principal nunca é bloqueada por um erro de rastreamento.
 
-### Frontend Stack (Hybrid Migration State)
+### Frontend Stack (Phase 4 Complete — 100% React/Inertia)
 
-Currently transitioning towards React, but both stacks coexist:
-
-**New Stack:**
+**Stack ativo — use para todo trabalho novo:**
 - **React 19** via **Inertia.js (v3)**
-- **Preclinic Template Style**: Uses imported Bootstrap/SCSS design structure wrapper in an `AuthenticatedLayout.jsx`.
-- **Vite** entry point: `resources/js/app.jsx`
-- Main directory for components: `resources/js/Pages/` and `resources/js/Components/`
+- **Preclinic Template**: Bootstrap 5, wrapped em `AuthenticatedLayout.jsx` (sidebar + header) e `GuestLayout.jsx` (auth pages)
+- **Vite** com apenas 2 entradas: `resources/css/app.css` + `resources/js/app.jsx`
+- Pages: `resources/js/Pages/` | Shared components: `resources/js/Components/`
+- Layouts: `resources/js/Layouts/`
 
-**Legacy Stack:**
-- **Blade** templates with **Alpine.js** for reactivity
-- **Bootstrap 5** + **Tailwind CSS** (both present)
-- **Vite** bundles: `resources/js/vendor.js` (jQuery + libs), legacy CSS globals
-- Key JS libraries being phased out: DataTables, FlatPickr, jQuery toast
+**Blade residual (não tocar):**
+- `resources/views/app.blade.php` — Inertia root template (carrega `app.css` + `app.jsx`)
+- `resources/views/welcome.blade.php` — Landing page pública (sem React)
+
+**Removido na Phase 4 (18 pacotes):**
+
+| Pacote | Categoria |
+|---|---|
+| `jquery`, `jquery-asColorPicker`, `jquery-sparkline`, `jquery-toast-plugin` | jQuery ecosystem |
+| `datatables.net`, `datatables.net-bs5`, `datatables.net-responsive`, `datatables.net-responsive-bs5` | DataTables |
+| `morris.js`, `raphael` | Gráficos SVG legados |
+| `alpinejs` | Reatividade inline |
+| `gulp` + 5 plugins (`gulp-clean-css`, `gulp-npm-dist`, `gulp-rename`, `gulp-sass`, `gulp-uglify`) | Build legado |
+| `browser-sync` | Dev server legado |
+| `tailwindcss`, `@tailwindcss/forms`, `autoprefixer`, `postcss`, `sass` | CSS pipeline alternativo |
+
+**Vite: 23 entradas → 2** (Phase 4). De 21 arquivos JS por módulo + 3 CSS para apenas `resources/css/app.css` + `resources/js/app.jsx`.
+
+**Mapa completo de páginas React (Phases 1–4) — 37 páginas | 0 Blade no painel:**
+
+| Módulo | Páginas React |
+|--------|--------------|
+| Auth | `Auth/Login`, `Auth/Register`, `Auth/ForgotPassword`, `Auth/ResetPassword`, `Auth/SelectEntity` |
+| Dashboard | `Dashboard/Index` |
+| Settings (12 tipos) | `Settings/SkinTypes`, `IrisTypes`, `VisitTypes`, `AdditionTypes`, `ColorVisionTypes`, `CoverTestTypes`, `VisualAcuityTypes`, `SurgeryTypes`, `Lenses`, `NearPointConvergences`, `Covenants`, `Resources` |
+| Doctors | `Doctors/Index`, `Doctors/Show`, `Doctors/WorkSchedule` |
+| Patients | `Patients/Index`, `Patients/Show` |
+| Users/ACL | `Users/Index`, `Users/Show` |
+| Schedules | `Schedules/Index`, `Schedules/Show` |
+| Medical Records | `MedicalRecords/Index`, `MedicalRecords/Create` |
+| Reports | `Reports/Index`, `Reports/Schedules`, `Reports/Absenteeism` |
+| Profile | `Profile/Edit` |
+| Subscription | `Subscription/Expired` |
+| Manager | `Manager/Dashboard`, `Manager/Entities/Index`, `Manager/Entities/Show`, `Manager/Subscriptions/Index`, `Manager/Plans/Index` |
 
 ### Testing
 
-Tests use **Pest 4** in `tests/Feature/` and `tests/Unit/`. Key test areas: subscriptions, ACL/roles, feature gates, usage metering, API integrator flows, exam limits, TV pairing.
+Tests use **Pest 4** in `tests/Feature/` and `tests/Unit/`. Key test areas: subscriptions, ACL/roles, feature gates, usage metering, API integrator flows, exam limits.
+
+> **Known pre-existing failure**: `UsageMeterServiceTest` has 4 failing tests due to state isolation issues — unrelated to the React migration.
 
 ## Environment
 

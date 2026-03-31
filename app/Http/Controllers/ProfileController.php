@@ -7,30 +7,26 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\View\View;
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class ProfileController extends Controller
 {
     /**
      * Display the user's profile form.
      */
-    public function edit(Request $request): View
+    public function edit(Request $request): InertiaResponse
     {
-        $user = $request->user();
+        $user          = $request->user();
         $userPhotoPath = 'system/images/users/' . $user->id . '.jpg';
 
-        return view('profile.edit', [
-            'user'         => $user,
-            'userPhotoUrl' => file_exists(public_path($userPhotoPath))
+        return Inertia::render('Profile/Edit', [
+            'mustVerifyEmail' => $user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail
+                && ! $user->hasVerifiedEmail(),
+            'userPhotoUrl'   => file_exists(public_path($userPhotoPath))
                 ? asset($userPhotoPath) . '?v=' . filemtime(public_path($userPhotoPath))
                 : asset('system/images/team.png'),
-            'meta' => [
-                'title'       => __('actions.edit_profile'),
-                'breadcrumbs' => [
-                    ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                    ['label' => __('actions.edit_profile'), 'url' => 'javascript:void(0);', 'active' => true],
-                ],
-            ],
+            'profileUrl'     => route('panel.profile.update'),
+            'passwordUrl'    => route('password.update'),
         ]);
     }
 
@@ -55,7 +51,7 @@ class ProfileController extends Controller
             $request->file('photo')->move($dir, $request->user()->id . '.jpg');
         }
 
-        return Redirect::route('panel.profile.edit')->with('status', 'profile-updated');
+        return Redirect::route('panel.profile.edit')->with('success', __('actions.profile.saved'));
     }
 
     /**

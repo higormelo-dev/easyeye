@@ -38,32 +38,77 @@ O **EasyEye** é uma plataforma SaaS multi-tenant focada na vertical de oftalmol
 - **Billing por Uso (Meters):** Planos controlam limites de envios de API (exames) e uso de créditos mensais de IA.
 - **Sistema de Parcerias e Indicações:** Clínicas geram códigos de indicação para descontos. Revendedores recebem comissionamento nativo mensurado por marcos de Ativação (`ActivationSteps`).
 
-### 4.5 Modernização de Interface (Phase 3 Complete)
-- **Nova Arquitetura Frontend:** Migração bem-sucedida do layout legado (Blade/jQuery) para **React 19** e **Inertia.js**, adotando o visual premium do template **Preclinic**.
-- **Marcos Alcançados:**
-  - **Dashboard & Auth:** Interface principal e fluxos de login 100% em React.
-  - **Settings (Configurações):** Todos os módulos de parametrização clínica (Convênios, Especialidades, etc.) unificados em um componente `SettingsCrud` reativo.
-  - **Agendamentos:** Listagem diária refatorada para JSON puro, eliminando `dangerouslySetInnerHTML`.
-  - **Prontuário Eletrônico:** Timeline nativa em React e formulário de criação otimizado para alta performance clínica.
-  - **Componentes Globais:** Implementação de `Toast` para notificações e `ConfirmDialog` para substituição de modais nativos do navegador.
-- **Benefícios:** Aumento na percepção de valor (UI "Wow"), interfaces dinâmicas, preparação para React Native/Expo, e prontidão para a remoção completa de dependências legadas (jQuery/DataTables).
+### 4.5 Modernização de Interface (Phase 4 Completa — 2026-03-31)
+
+**Status atual:** Frontend 100% React 19 + Inertia.js. Nenhuma Blade page no painel autenticado. **18 pacotes legados removidos** (jQuery ×4, DataTables ×4, Alpine.js, morris.js, raphael, Gulp ×5, Tailwind CSS pipeline ×4). Entradas Vite reduzidas de 23 para 2. Blade residual: `app.blade.php` (root Inertia) + `welcome.blade.php` (landing pública). Documentação do mapa de dependências antes/depois em `MIGRATION_PLAN.md` §9.
+
+#### Arquitetura implementada
+- **React 19** via **Inertia.js (v3)** — navegação SPA-like sem full-page reload
+- **Template Preclinic** — UI premium com Bootstrap 5, sidebar responsiva, dark/light mode
+- **Vite** — build reduzido de 23 entradas para 2: `app.css` + `app.jsx`
+- **`AuthenticatedLayout.jsx`** — wrapper universal do painel (sidebar + header + menu condicional por `isClient`)
+- **`GuestLayout.jsx`** — wrapper para páginas de autenticação
+- **`HandleInertiaRequests`** — shared props globais: `auth`, `entity`, `flash`, `isClient`, `userRule`, `locale`, `appName`
+
+#### Telas migradas — mapa completo (37 páginas React)
+
+| Módulo | Páginas React | Fase |
+|--------|--------------|------|
+| Auth | Login, Register, ForgotPassword, ResetPassword, SelectEntity | Phase 1–2 |
+| Dashboard | Dashboard clínico + Manager SaaS | Phase 3 |
+| Settings (12 módulos) | SkinTypes, IrisTypes, VisitTypes, AdditionTypes, ColorVisionTypes, CoverTestTypes, VisualAcuityTypes, SurgeryTypes, Lenses, NearPointConvergences, Covenants, Resources | Phase 3 |
+| Médicos | Index (cards + busca AJAX), Show (perfil), WorkSchedule (escala + bloqueios) | Phase 3–4 |
+| Pacientes | Index (cards + busca AJAX), Show (perfil + histórico de prontuários) | Phase 3 |
+| Usuários/ACL | Index, Show | Phase 3 |
+| Agendamentos | Index (lista diária com situação inline + bulk-actions), Show | Phase 3 |
+| Prontuário Eletrônico | Index (timeline), Create (formulário clínico) | Phase 3 |
+| Manager (SaaS Admin) | Dashboard, Entities/Index, Entities/Show, Subscriptions/Index, Plans/Index | Phase 3 |
+| Relatórios | Index (hub), Schedules (produção + filtros), Absenteeism (faltas + filtros) | Phase 4 |
+| Perfil do Usuário | Edit (foto + dados pessoais + troca de senha) | Phase 4 |
+| Assinatura Expirada | Expired (banner de aviso + cards de upgrade de plano) | Phase 4 |
+
+#### Componentes globais implementados
+
+| Componente | Localização | Função |
+|---|---|---|
+| `AuthenticatedLayout.jsx` | `Layouts/` | Sidebar + header, dark mode toggle, menu por role |
+| `GuestLayout.jsx` | `Layouts/` | Wrapper centralizado para auth pages |
+| `SettingsCrud.jsx` | `Components/UI/` | CRUD genérico (name + active) com modal inline |
+| `Toast.jsx` | `Components/UI/` | Notificações flash automáticas (`flash.success/error/warning`) |
+| `FlashMessages.jsx` | `Components/UI/` | Exibição de flash inline em páginas |
+| `ConfirmDialog.jsx` | `Components/UI/` | Confirmação de exclusão (substitui `window.confirm()`) |
+| `CardGrid.jsx` | `Components/UI/` | Listagem em cards com paginação AJAX |
+| `DataTable.jsx` | `Components/UI/` | Tabela server-side para Manager |
+| `Pagination.jsx`, `Badge.jsx`, `PageHeader.jsx`, `FormInput.jsx`, `PersonForm.jsx`, `Modal.jsx` | `Components/UI/` | Primitivos reutilizáveis |
+
+#### Infraestrutura de controllers
+- **`BaseSettingController`** — abstrato; subclasses declaram apenas `$inertiaPage` e `$resourceClass`; cobre os 12 tipos de configuração
+- **`ProfileController`** — upload de foto via method-spoofing PATCH com FormData
+- **`PasswordController`** — validação simples sem error bags; redireciona para `profile.edit` com `flash.success`
+- **`ReportsController`** — serializa dados com eager loading `doctor.entityUser.user`; `results: null` quando sem filtros
+- **`SubscriptionExpiredController`** — serializa `FeatureKey::cases()` com `label()` e `isBoolean()` para o frontend
 
 ---
 
 ## 5. Roadmap e Funcionalidades Futuras (V2 e V3)
 
-### 5.1 Foco em Produtividade com Inteligência Artificial (V2)
+### 5.1 Phase 5 — Apps Mobile (React Native / Expo)
+- **App do Médico:** Agenda do dia, visualização de prontuários e exames no iPad/tablet via Expo.
+- **App do Paciente:** Receitas de óculos, laudos, histórico de consultas — iOS/Android.
+- **Monorepo Turborepo:** Pacotes `@easyeye/api` e `@easyeye/shared` reutilizados entre web e mobile.
+- **Arquitetura multi-cliente:** Web (React+Inertia via sessão) + Doctor App (Expo via Bearer Token) + Patient App (Expo via Bearer Token) — todos consumindo o mesmo Laravel 11. Detalhes em `MIGRATION_PLAN.md` §9.1.
+
+### 5.2 Foco em Produtividade com Inteligência Artificial (V2)
 - **Transcrição de Evolução por Voz (Voice-to-Text):** O médico dita a evolução e a IA resume e preenche os campos do prontuário de forma estruturada. (Consumindo a cota `AiMonthlyCredits`).
 - **Pré-Análise de Imagens Diagnósticas:** IA capaz de identificar anomalias primárias em fotos de retina ou topografias, agindo como segunda opinião.
 - **Agendamento via WhatsApp Bot AI:** Integração direta com a agenda do EasyEye, permitindo que o paciente marque, reagende e confirme presença 24/7 de forma conversacional.
 
-### 5.2 Faturamento e Financeiro (V3)
+### 5.3 Faturamento e Financeiro (V3)
 - **Faturamento TISS (Integração de Convênios):** Geração de guias TISS/TUSS em lote para minimizar glosas com planos de saúde.
 - **Conciliação Bancária e Split de Pagamentos:** Divisão automática dos honorários entre a clínica e os oftalmologistas associados nas consultas particulares.
 
-### 5.3 Mobile e Engajamento (V4)
-- **App Médico e Paciente (React Native):** Utilização do core de componentes React da web para acelerar o desenvolvimento de aplicativos móveis nativos via Expo.
-- **Portal do Paciente:** Acesso web/mobile simples para o paciente acessar suas receitas de óculos atualizadas, declarações e laudos de exames diagnosticados pelas máquinas.
+### 5.4 Portal do Paciente (V4)
+- **Portal do Paciente:** Acesso web/mobile simples para o paciente acessar suas receitas de óculos, declarações e laudos.
 
 ## 6. Métricas de Sucesso (KPIs)
 - **Ativação (Activation Rate):** Tempo médio desde a criação do Trial até o envio do 1º exame via Integrador.

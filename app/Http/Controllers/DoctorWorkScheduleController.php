@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\{Doctor, DoctorWorkSchedule, ScheduleBlock};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\DB;
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class DoctorWorkScheduleController extends Controller
 {
@@ -81,7 +82,7 @@ class DoctorWorkScheduleController extends Controller
     /**
      * Show the work schedule management page for a doctor.
      */
-    public function index(string $doctorId): mixed
+    public function index(string $doctorId): InertiaResponse
     {
         $doctor = $this->findDoctor($doctorId);
 
@@ -97,7 +98,7 @@ class DoctorWorkScheduleController extends Controller
         for ($i = 0; $i <= 6; $i++) {
             $ranges = $existingByDay->get($i, collect())
                 ->map(fn ($s) => [
-                    'starts_at' => substr($s->starts_at, 0, 5), // HH:MM
+                    'starts_at' => substr($s->starts_at, 0, 5),
                     'ends_at'   => substr($s->ends_at, 0, 5),
                 ])
                 ->values()
@@ -111,23 +112,42 @@ class DoctorWorkScheduleController extends Controller
             ];
         }
 
+        $userId    = $doctor->entityUser->user_id;
+        $photoPath = 'system/images/users/' . $userId . '.jpg';
+        $photoUrl  = file_exists(public_path($photoPath))
+            ? asset($photoPath)
+            : asset('system/images/team.png');
+
         $blocks = ScheduleBlock::where('doctor_id', $doctor->id)
             ->where('ends_at', '>=', now())
             ->orderBy('starts_at')
-            ->get();
+            ->get()
+            ->map(fn ($b) => [
+                'id'         => $b->id,
+                'starts_at'  => $b->starts_at->format('d/m/Y H:i'),
+                'ends_at'    => $b->ends_at->format('d/m/Y H:i'),
+                'reason'     => $b->reason,
+                'type_label' => $b->typeLabel(),
+            ])
+            ->values();
 
-        $interval = $doctor->schedule_interval;
-
-        $meta = [
-            'title'       => __('actions.work_schedule'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.doctors'), 'url' => route('panel.doctors.index'), 'active' => false],
-                ['label' => __('actions.work_schedule'), 'url' => 'javascript:void(0);', 'active' => true],
+        return Inertia::render('Doctors/WorkSchedule', [
+            'doctor' => [
+                'id'        => $doctor->id,
+                'name'      => $doctor->entityUser->user->name,
+                'record'    => $doctor->record,
+                'color'     => $doctor->color ?: '#6c757d',
+                'code'      => $doctor->code,
+                'photo_url' => $photoUrl,
             ],
-        ];
-
-        return view('system.doctors.work-schedule', compact('doctor', 'days', 'blocks', 'interval', 'meta'));
+            'days'               => $days,
+            'interval'           => $doctor->schedule_interval,
+            'entity_interval'    => $doctor->entityUser->entity->schedule_interval ?? 15,
+            'blocks'             => $blocks,
+            'sync_url'           => url("panel/doctors/{$doctor->id}/work-schedule"),
+            'store_block_url'    => url("panel/doctors/{$doctor->id}/blocks"),
+            'destroy_block_base' => url("panel/doctors/{$doctor->id}/blocks"),
+        ]);
     }
 
     /**

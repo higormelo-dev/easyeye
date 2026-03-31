@@ -1,6 +1,6 @@
 # Technical Specifications Document (SPECS)
 **Produto:** EasyEye (Medicare)
-**Arquitetura:** Laravel 11 (PHP 8.4) + Alpine.js + Integrador Java Local
+**Arquitetura:** Laravel 11 (PHP 8.4) + React 19 + Inertia.js + Integrador Java Local
 
 ---
 
@@ -9,8 +9,8 @@
 - **Linguagem:** PHP 8.4
 - **Banco de Dados (Dev):** SQLite (Suporte robusto a MySQL/PostgreSQL para Prod).
 - **Cache, Sessões e Filas:** Redis
-- **Frontend (Inertia/React):** React 19, Inertia.js (v3), Vite, baseado no template premium Preclinic.
-- **Frontend (Legado):** Blade Templates, Alpine.js, Bootstrap 5, jQuery (em fase final de substituição).
+- **Frontend:** React 19, Inertia.js (v3), Vite, Bootstrap 5, template Preclinic. **100% React/Inertia** — Phase 4 concluída em 2026-03-31. 18 pacotes legados removidos (jQuery ×4, DataTables ×4, Alpine.js, morris.js, raphael, Gulp ×5, Tailwind CSS pipeline ×4). Blade residual: apenas `app.blade.php` (Inertia root) e `welcome.blade.php` (landing pública).
+- **Build:** Vite com 2 entradas — `resources/css/app.css` + `resources/js/app.jsx` (reduzido de 23 entradas na Phase 4). Ver mapa completo antes/depois em `MIGRATION_PLAN.md` §9.
 - **Serviço de Background:** Laravel Queue Workers nativos para assincronicidade (envio de e-mails, comissões de parceiros, webhooks).
 
 ## 2. Arquitetura de Multi-Tenancy
@@ -20,13 +20,33 @@ O sistema opera através de **Session-based Multi-tenancy** garantindo total iso
 3. O Middleware `EnsureEntitySelected` intercepta o request, injeta a entidade logada na sessão e obriga que as buscas via repositório/models (nos Services) venham com escopo (Tenant Guard).
 
 ## 3. Padrões de Design de Código
+
+### Backend
 - **Service Layer Pattern:** Nenhum controlador ("Thin Controller") detém lógica de negócios. Todos os fluxos pesados ficam dentro de `app/Services/` (Ex: `PatientExamService::createFromScheduleIdentifier()`).
 - **Repositories (via Model queries):** O Eloquent ORM é manipulado estritamente pelas classes de Service para acesso e persistência.
 - **Observer Pattern Silencioso:** Acoplamento fraco para efeitos colaterais. Auditorias (AuditContext), Criação de Trial Automático e Tracking de Ativação (CAC/Growth) operam via Observers do Eloquent (`creating/created`). Exceções não críticas nos observers são controladas (Logs de erro silenciados) para não quebrar a transação de negócio primária.
 - **Action/Job Pattern:** Ações assíncronas encapsuladas sob Jobs quando necessário.
-- **Frontend Inertia Pattern:** Controllers retornam `Inertia::render()`. Componentes `SettingsCrud` unificam configurações. Listagens (Schedules, MedicalRecords) usam JSON puro mapeado para cards React para máxima reatividade.
-- **Global UX Components:** Componentes `Toast.jsx` (hook useToast) e `ConfirmDialog.jsx` padronizam notificações e confirmações de exclusão via Inertia flash-responses.
-- **Presenter Pattern:** `SchedulePresenter` e `PatientPresenter` ainda servem o legado, mas lógicas visuais (badges, status) foram migradas para componentes React puros.
+
+### Frontend Inertia (padrão único)
+- **Frontend Inertia Pattern:** Todos os controllers do painel retornam `Inertia::render('Module/Page', [props])`. Shared data global via `HandleInertiaRequests::share()` injeta `auth`, `entity`, `flash`, `isClient`, `userRule`, `locale`, `appName` em todas as páginas React.
+- **BaseSettingController Pattern:** Controlador abstrato em `App\Http\Controllers\Setting\` que centraliza a lógica Inertia para todos os 12 tipos de configuração. Cada subclasse declara apenas `$inertiaPage` (nome da página React) e `$resourceClass` (API Resource). O método `index()` renderiza `Settings/{$inertiaPage}` com todos os registros da entidade.
+- **Auth Pages Pattern:** Todos os controllers de Auth (`AuthenticatedSessionController`, `RegisteredUserController`, `PasswordResetLinkController`, `NewPasswordController`, `AuthenticatedEntityController`) retornam `Inertia::render('Auth/PageName')`. `RegisteredUserController::store()` usa dual-path: `wantsJson()` → JSON `{redirect}` (compatibilidade com testes); browser/Inertia → `redirect()`.
+- **Settings SettingsCrud Pattern:** `SettingsCrud.jsx` é o componente genérico para todos os settings — lista registros, abre modal inline para criar/editar (só campos `name` e `active`), confirm dialog para excluir/restaurar. Para settings com campos extras (`Covenants`, `SurgeryTypes`, `Resources`), os FormRequests aplicam defaults via `prepareForValidation()`.
+- **Profile Update Pattern:** `ProfileController::update()` aceita PATCH via method-spoofing (`_method: 'patch'` no FormData do `useForm`) para suportar upload de foto. `PasswordController::update()` usa `validate()` simples (não `validateWithBag`) e redireciona para `panel.profile.edit` com `flash.success`.
+- **Reports Filter Pattern:** Relatórios enviam filtros via `router.get()` do Inertia (GET params, `preserveState: true`). Controller retorna `results: null` sem filtros ativos; retorna array serializado quando filtrado. Filtro de médico é ocultado pelo frontend quando `userRule === 'doctor'`.
+- **Subscription Expired Pattern:** `SubscriptionExpiredController` serializa `FeatureKey::cases()` chamando `label()` e `isBoolean()` no servidor, enviando planos como array JSON puro ao React. Redireciona para dashboard se assinatura ativa.
+- **Global UX Components:** `Toast.jsx` e `ConfirmDialog.jsx` padronizam notificações e confirmações. `CardGrid.jsx` e `DataTable.jsx` padronizam listagens.
+
+### Convenção de flash em redirects
+```php
+// ✅ Correto — lido pelo Toast.jsx e FlashMessages.jsx
+return redirect()->route('...')->with('success', $message);
+return redirect()->route('...')->with('error', $message);
+return redirect()->route('...')->with('warning', $message);
+
+// ✅ Reservado — ForgotPassword (link enviado)
+return back()->with('status', 'verification-link-sent');
+```
 
 ## 4. Integração Cloud <-> Hardware (Arquitetura)
 O ponto nevrálgico técnico da aplicação é a API de integração (`/api/integrators/*`) que conversa com o Desktop App em Java alocado na rede local da clínica.
@@ -50,7 +70,80 @@ A infraestrutura garante imunidade a nível jurídico no trato de PHI (Protected
 - **Growth/CAC:** `partners`, `referral_codes`, `entity_activations`.
 - **Compliance:** `data_access_logs`, `patient_consents`, `term_versions`.
 
-## 7. Próximos Passos de Arquitetura (Engenharia V2)
-- **Object Storage (S3/R2):** Atualizar o Filesystem do `PatientExamService` para garantir que o blob de Imagens gigantescas (ex: OCT de retina) vá para provedores focados em *Cold Storage* sem estourar discos do servidor Web.
-- **WebSocket (Pusher/Reverb):** Emissão de eventos em tempo real para as estações da recepção (Broadcasting) avisando quando o integrador fez o push de um exame pronto com sucesso, ou na atualização tática de "Próxima Senha de Fila".
-- **LLM API Clients:** Classes dedicadas para fazer o wrap das Requests aos endpoints do OpenAI (ou Claude) nas features de resumo e speech-to-text.
+## 7. Arquitetura Frontend React/Inertia (Phase 4 — Estado Atual)
+
+### Estrutura de diretórios React (37 páginas | 0 Blade no painel)
+```
+resources/js/
+├── app.jsx                          ← Entry point Inertia (resolvePageComponent)
+├── Layouts/
+│   ├── AuthenticatedLayout.jsx      ← Sidebar + Header (menu condicional por isClient)
+│   └── GuestLayout.jsx              ← Wrapper auth (logo + card centralizado)
+├── Components/
+│   └── UI/
+│       ├── SettingsCrud.jsx         ← CRUD genérico com modal inline
+│       ├── Toast.jsx                ← Notificações flash automáticas
+│       ├── FlashMessages.jsx        ← Flash inline em páginas
+│       ├── ConfirmDialog.jsx        ← Confirmação de exclusão
+│       ├── CardGrid.jsx             ← Listagem em cards com paginação AJAX
+│       ├── DataTable.jsx            ← Tabela server-side (Manager)
+│       ├── Modal.jsx, Badge.jsx, Pagination.jsx
+│       ├── PageHeader.jsx, FormInput.jsx, PersonForm.jsx
+├── Pages/
+│   ├── Auth/                        ← Login, Register, ForgotPassword, ResetPassword, SelectEntity (5)
+│   ├── Dashboard/Index.jsx          (1)
+│   ├── Settings/                    ← SkinTypes, IrisTypes, VisitTypes, AdditionTypes,
+│   │                                   ColorVisionTypes, CoverTestTypes, VisualAcuityTypes,
+│   │                                   SurgeryTypes, Lenses, NearPointConvergences,
+│   │                                   Covenants, Resources (12)
+│   ├── Doctors/                     ← Index.jsx, Show.jsx, WorkSchedule.jsx (3)
+│   ├── Patients/                    ← Index.jsx, Show.jsx (2)
+│   ├── Users/                       ← Index.jsx, Show.jsx (2)
+│   ├── Schedules/                   ← Index.jsx, Show.jsx (2)
+│   ├── MedicalRecords/              ← Index.jsx, Create.jsx (2)
+│   ├── Reports/                     ← Index.jsx, Schedules.jsx, Absenteeism.jsx (3) ← Phase 4
+│   ├── Profile/                     ← Edit.jsx (1) ← Phase 4
+│   ├── Subscription/                ← Expired.jsx (1) ← Phase 4
+│   └── Manager/                     ← Dashboard.jsx, Entities/Index.jsx, Entities/Show.jsx,
+│                                       Subscriptions/Index.jsx, Plans/Index.jsx (5)
+```
+
+### Shared props (HandleInertiaRequests)
+| Prop | Tipo | Fonte | Uso |
+|------|------|-------|-----|
+| `auth.user` | `{id, name, email}` | `$request->user()` | Avatar, saudação, forms de perfil |
+| `entity` | `{id, name, code}` ou `null` | `session('entity')` | Cabeçalho da clínica |
+| `flash.success` | `string\|null` | `session('success')` | Toast verde pós-action |
+| `flash.error` | `string\|null` | `session('error')` | Toast vermelho |
+| `flash.warning` | `string\|null` | `session('warning')` | Toast amarelo |
+| `flash.status` | `string\|null` | `session('status')` | ForgotPassword: link enviado |
+| `isClient` | `bool` | `session('selected_entity_is_client')` | Menu condicional sidebar |
+| `userRule` | `string` | `session('selected_entity_user_rule')` | RBAC no frontend (ex: ocultar filtros) |
+| `locale` | `string` | `app()->getLocale()` | i18n |
+| `appName` | `string` | `config('app.name')` | Títulos de página |
+
+### Convenção de useForm com upload de arquivo
+```jsx
+// ✅ Correto para PATCH com arquivo (method spoofing via FormData)
+const form = useForm({ _method: 'patch', name: '', email: '', photo: null });
+form.post('/panel/profile', { forceFormData: true });
+
+// ✅ Correto para PUT sem arquivo
+const form = useForm({ current_password: '', password: '', password_confirmation: '' });
+form.put('/auth/password');
+```
+
+### Convenção de filtros nos relatórios
+```jsx
+// ✅ Aplicar filtros via Inertia GET (mantém estado)
+router.get('/panel/reports/schedules', params, { preserveState: true });
+
+// ✅ Limpar filtros
+router.get('/panel/reports/schedules', {});
+```
+
+## 8. Próximos Passos de Arquitetura (Phase 5 em diante)
+- **Phase 5 — Apps Mobile (React Native / Expo):** App do Médico e App do Paciente em monorepo Turborepo. Pacote `@easyeye/api` compartilhado entre web e mobile para chamadas Axios ao backend Laravel.
+- **Object Storage (S3/R2):** Atualizar o Filesystem do `PatientExamService` para garantir que blobs de imagens grandes (ex: OCT de retina) vão para provedores focados em *Cold Storage*.
+- **WebSocket (Pusher/Reverb):** Emissão de eventos em tempo real para as estações da recepção (Broadcasting) avisando quando o integrador fez push de um exame, ou na atualização de fila.
+- **LLM API Clients:** Classes dedicadas para wrap das Requests ao OpenAI (ou Claude) nas features de resumo de prontuário e speech-to-text.
