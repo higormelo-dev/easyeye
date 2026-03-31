@@ -2,40 +2,80 @@
 
 namespace App\Http\Controllers\Manager;
 
-use App\DataTables\PlansDataTable;
 use App\Enums\BillingCycle;
 use App\Enums\FeatureKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\PlanRequest;
 use App\Models\Plan;
 use App\Models\PlanFeature;
-use Illuminate\Contracts\View\{Factory, View};
-use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Str;
+use Inertia\Inertia;
 
 class PlansController extends Controller
 {
     protected string $titleController = 'Planos';
 
-    public function index(PlansDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(): \Inertia\Response
     {
-        $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => $this->titleController, 'url' => route('panel.manager.plans.index'), 'active' => false],
-                ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
+        $features = collect(FeatureKey::cases())->map(fn ($f) => [
+            'key'        => $f->value,
+            'label'      => $f->label(),
+            'is_boolean' => $f->isBoolean(),
+            'is_numeric' => $f->isNumeric(),
+        ]);
+
+        $billingCycles = collect(BillingCycle::cases())->map(fn ($c) => [
+            'value' => $c->value,
+            'label' => $c->label(),
+        ]);
+
+        return Inertia::render('Manager/Plans/Index', [
+            'featureKeys'   => $features,
+            'billingCycles' => $billingCycles,
+        ]);
+    }
+
+    public function list(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 15;
+
+        $plans = Plan::query()
+            ->with('features')
+            ->when($search, function ($q) use ($search) {
+                $lower = mb_strtolower($search, 'UTF-8');
+                $q->where(function ($inner) use ($lower) {
+                    $inner->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
+                          ->orWhereRaw('LOWER(description) LIKE ?', ["%{$lower}%"]);
+                });
+            })
+            ->orderBy('sort_order')
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        $data = $plans->map(fn (Plan $p) => [
+            'id'            => $p->id,
+            'name'          => $p->name,
+            'slug'          => $p->slug,
+            'description'   => $p->description,
+            'price'         => $p->price,
+            'billing_cycle' => $p->billing_cycle->value,
+            'billing_label' => $p->billing_cycle->label(),
+            'sort_order'    => $p->sort_order,
+            'active'        => (bool) $p->active,
+            'features'      => $p->features->pluck('value', 'feature')->toArray(),
+        ]);
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total'        => $plans->total(),
+                'per_page'     => $plans->perPage(),
+                'current_page' => $plans->currentPage(),
+                'last_page'    => $plans->lastPage(),
             ],
-        ];
-
-        $features      = FeatureKey::cases();
-        $billingCycles = BillingCycle::cases();
-        $storeUrl      = route('panel.manager.plans.store');
-        $baseUrl       = url('panel/manager/plans');
-
-        return $dataTable->render('system.manager.plans.index', compact('meta', 'features', 'billingCycles', 'storeUrl', 'baseUrl'));
+        ]);
     }
 
     public function store(PlanRequest $request): JsonResponse
@@ -58,7 +98,7 @@ class PlansController extends Controller
         ], 201);
     }
 
-    public function show(Plan $plan): \Illuminate\View\View|JsonResponse
+    public function show(Plan $plan): \Inertia\Response|JsonResponse
     {
         $plan->load('features');
         $featuresMap = $plan->features()->pluck('value', 'feature')->toArray();
@@ -76,13 +116,15 @@ class PlansController extends Controller
             ]]);
         }
 
-        return view('system.manager.plans.show', compact('plan', 'featuresMap'));
+        return Inertia::render('Manager/Plans/Show', [
+            'plan'        => $plan,
+            'featuresMap' => $featuresMap,
+        ]);
     }
 
     public function update(PlanRequest $request, Plan $plan): JsonResponse
     {
-        // Toggle rápido de active (vindo do btn-active da DataTable)
-        if ($request->has('active') && $request->keys() === ['active']) {
+        if ($request->has('active') && count($request->keys()) === 1) {
             $plan->update(['active' => $request->boolean('active')]);
 
             return response()->json(['message' => 'Status do plano atualizado.']);

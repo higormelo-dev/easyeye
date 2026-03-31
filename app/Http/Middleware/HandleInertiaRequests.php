@@ -60,6 +60,12 @@ class HandleInertiaRequests extends Middleware
 
             // Nome da aplicação
             'appName' => config('app.name', 'EasyEye'),
+
+            // Flag: true = clínica cliente; false = painel SaaS manager
+            'isClient' => fn () => (bool) session('selected_entity_is_client'),
+
+            // Papel do usuário na entidade atual (admin, doctor, secretary, etc.)
+            'userRule' => fn () => session('selected_entity_user_rule'),
         ];
     }
 }

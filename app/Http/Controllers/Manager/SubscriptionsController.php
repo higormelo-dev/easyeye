@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Manager;
 
-use App\DataTables\SubscriptionsDataTable;
 use App\Enums\BillingCycle;
 use App\Enums\SubscriptionStatus;
 use App\Http\Controllers\Controller;
@@ -13,10 +12,9 @@ use App\Models\Subscription;
 use App\Models\SubscriptionSetting;
 use App\Services\SubscriptionService;
 use App\Services\TrialService;
-use Illuminate\Contracts\View\{Factory, View};
-use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
 
 class SubscriptionsController extends Controller
 {
@@ -25,31 +23,77 @@ class SubscriptionsController extends Controller
         private readonly TrialService $trialService,
     ) {}
 
-    public function index(SubscriptionsDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(): \Inertia\Response
     {
-        $meta = [
-            'title'       => 'Assinaturas',
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Assinaturas', 'url' => route('panel.manager.subscriptions.index'), 'active' => false],
-                ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
-            ],
-        ];
+        $plans = Plan::active()->orderBy('sort_order')->get(['id', 'name', 'billing_cycle']);
 
-        $plans         = Plan::active()->orderBy('sort_order')->get();
-        $billingCycles = BillingCycle::cases();
-        $statuses      = SubscriptionStatus::cases();
-        $trialDays     = SubscriptionSetting::trialDays();
-        $graceDays     = SubscriptionSetting::gracePeriodDays();
-        $baseUrl       = url('panel/manager/subscriptions');
+        $billingCycles = collect(BillingCycle::cases())->map(fn ($c) => [
+            'value' => $c->value,
+            'label' => $c->label(),
+        ]);
 
-        return $dataTable->render('system.manager.subscriptions.index', compact(
-            'meta', 'plans', 'billingCycles', 'statuses', 'trialDays', 'graceDays', 'baseUrl'
-        ));
+        $statuses = collect(SubscriptionStatus::cases())->map(fn ($s) => [
+            'value' => $s->value,
+            'label' => $s->label(),
+            'badge' => $s->badgeClass(),
+        ]);
+
+        return Inertia::render('Manager/Subscriptions/Index', [
+            'plans'         => $plans,
+            'billingCycles' => $billingCycles,
+            'statuses'      => $statuses,
+            'trialDays'     => SubscriptionSetting::trialDays(),
+            'graceDays'     => SubscriptionSetting::gracePeriodDays(),
+        ]);
     }
 
-    public function show(Subscription $subscription): \Illuminate\View\View|JsonResponse
+    public function list(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $status  = $request->string('status')->trim()->value();
+        $perPage = 15;
+
+        $subscriptions = Subscription::query()
+            ->with(['entity', 'plan'])
+            ->when($search, function ($q) use ($search) {
+                $lower = mb_strtolower($search, 'UTF-8');
+                $q->whereHas('entity', function ($eq) use ($lower) {
+                    $eq->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
+                       ->orWhereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+                });
+            })
+            ->when($status, fn ($q) => $q->where('status', $status))
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        $data = $subscriptions->map(fn (Subscription $s) => [
+            'id'            => $s->id,
+            'entity_id'     => $s->entity_id,
+            'entity_name'   => $s->entity?->name,
+            'entity_code'   => $s->entity?->code,
+            'entity_active' => (bool) $s->entity?->active,
+            'plan_id'       => $s->plan_id,
+            'plan_name'     => $s->plan?->name ?? '—',
+            'status'        => $s->status->value,
+            'status_label'  => $s->status->label(),
+            'status_badge'  => $s->status->badgeClass(),
+            'starts_at'     => $s->starts_at?->format('d/m/Y'),
+            'ends_at'       => $s->ends_at?->format('d/m/Y'),
+            'trial_ends_at' => $s->trial_ends_at?->format('d/m/Y'),
+        ]);
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total'        => $subscriptions->total(),
+                'per_page'     => $subscriptions->perPage(),
+                'current_page' => $subscriptions->currentPage(),
+                'last_page'    => $subscriptions->lastPage(),
+            ],
+        ]);
+    }
+
+    public function show(Subscription $subscription): \Inertia\Response|JsonResponse
     {
         $subscription->load('entity', 'plan');
 
@@ -63,7 +107,9 @@ class SubscriptionsController extends Controller
             ]]);
         }
 
-        return view('system.manager.subscriptions.show', compact('subscription'));
+        return Inertia::render('Manager/Subscriptions/Show', [
+            'subscription' => $subscription,
+        ]);
     }
 
     public function update(SubscriptionRequest $request, Subscription $subscription): JsonResponse

@@ -14,8 +14,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     // ── Empresas ───────────────────────────────────────────────────────────
+    Route::get('entities/list', [EntitiesController::class, 'list'])->name('entities.list');
     Route::get('entities/{entity}/edit-data', [EntitiesController::class, 'editData'])->name('entities.edit-data');
     Route::get('entities/{entity}/users', [EntityUsersController::class, 'index'])->name('entities.users');
+    Route::put('entities/{entity}/restore', [EntitiesController::class, 'restore'])->name('entities.restore');
     Route::resource('entities', EntitiesController::class)->except('create', 'edit');
 
     // ── Usuários Integradores ──────────────────────────────────────────────
@@ -40,9 +42,11 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
         ->name('impersonate.destroy');
 
     // ── Planos ─────────────────────────────────────────────────────────────
+    Route::get('plans/list', [PlansController::class, 'list'])->name('plans.list');
     Route::resource('plans', PlansController::class)->except('create', 'edit');
 
     // ── Assinaturas ────────────────────────────────────────────────────────
+    Route::get('subscriptions/list', [SubscriptionsController::class, 'list'])->name('subscriptions.list');
     Route::post('subscriptions/activate', [SubscriptionsController::class, 'activate'])->name('subscriptions.activate');
     Route::post('subscriptions/trial', [SubscriptionsController::class, 'startTrial'])->name('subscriptions.trial');
     Route::post('subscriptions/cancel', [SubscriptionsController::class, 'cancel'])->name('subscriptions.cancel');

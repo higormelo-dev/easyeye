@@ -2,35 +2,62 @@
 
 namespace App\Http\Controllers\Manager;
 
-use App\DataTables\EntitiesDataTable;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\EntityRequest;
 use App\Models\Entity;
-use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, RedirectResponse};
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
+use Inertia\Inertia;
 
 class EntitiesController extends Controller
 {
     protected string $titleController = 'Empresas';
 
-    public function index(EntitiesDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(): \Inertia\Response
     {
-        $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                  'active' => false],
-                ['label' => $this->titleController,          'url' => route('panel.manager.entities.index'),     'active' => false],
-                ['label' => __('actions.records'),            'url' => 'javascript:void(0);',                     'active' => true],
+        return Inertia::render('Manager/Entities/Index');
+    }
+
+    public function list(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 15;
+
+        $entities = Entity::withTrashed()
+            ->when($search, function ($q) use ($search) {
+                $lower = mb_strtolower($search, 'UTF-8');
+                $q->where(function ($inner) use ($lower) {
+                    $inner->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
+                          ->orWhereRaw('LOWER(code) LIKE ?', ["%{$lower}%"])
+                          ->orWhereRaw('LOWER(email) LIKE ?', ["%{$lower}%"])
+                          ->orWhereRaw('LOWER(city) LIKE ?', ["%{$lower}%"]);
+                });
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        $data = $entities->map(fn (Entity $e) => [
+            'id'        => $e->id,
+            'code'      => $e->code,
+            'name'      => $e->name,
+            'email'     => $e->email,
+            'city'      => $e->city,
+            'state'     => $e->state,
+            'active'    => (bool) $e->active,
+            'deleted'   => ! is_null($e->deleted_at),
+            'is_client' => (bool) $e->is_client,
+        ]);
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total'        => $entities->total(),
+                'per_page'     => $entities->perPage(),
+                'current_page' => $entities->currentPage(),
+                'last_page'    => $entities->lastPage(),
             ],
-        ];
-
-        $storeUrl = route('panel.manager.entities.store');
-        $baseUrl  = url('panel/manager/entities');
-
-        return $dataTable->render('system.manager.entities.index', compact('meta', 'storeUrl', 'baseUrl'));
+        ]);
     }
 
     public function store(EntityRequest $request): Application|JsonResponse|Redirector|RedirectResponse
@@ -48,11 +75,18 @@ class EntitiesController extends Controller
             ->with('message', $this->titleController . ' cadastrada com sucesso.');
     }
 
-    public function show(string $id): View|JsonResponse
+    public function show(string $id): \Inertia\Response|JsonResponse
     {
         $record = Entity::withTrashed()->findOrFail($id);
+        $record->loadCount(['entityUsers', 'patients', 'schedules']);
 
-        return view('system.manager.entities.show', compact('record'));
+        if (request()->wantsJson()) {
+            return response()->json(['data' => $record]);
+        }
+
+        return Inertia::render('Manager/Entities/Show', [
+            'record' => $record,
+        ]);
     }
 
     public function editData(string $id): JsonResponse
@@ -112,5 +146,16 @@ class EntitiesController extends Controller
 
         return redirect(route('panel.manager.entities.index'))
             ->with('message', $this->titleController . ' removida com sucesso.');
+    }
+
+    public function restore(string $id): JsonResponse
+    {
+        $record = Entity::withTrashed()->findOrFail($id);
+        $record->restore();
+
+        return response()->json([
+            'message'  => $this->titleController . ' restaurada com sucesso.',
+            'restored' => $record->fresh()->toArray(),
+        ]);
     }
 }

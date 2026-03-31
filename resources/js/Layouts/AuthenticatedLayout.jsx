@@ -11,7 +11,7 @@ import { Head, Link, usePage, router } from '@inertiajs/react';
 import Toast from '@/Components/UI/Toast';
 
 export default function AuthenticatedLayout({ children, title }) {
-    const { auth, entity, flash, locale, appName } = usePage().props;
+    const { auth, entity, flash, locale, appName, isClient, userRule } = usePage().props;
     const [miniSidebar, setMiniSidebar] = useState(false);
     const [mobileSidebar, setMobileSidebar] = useState(false);
 
@@ -160,45 +160,79 @@ export default function AuthenticatedLayout({ children, title }) {
                                                 label="Dashboard"
                                                 currentUrl={currentUrl}
                                             />
-                                            <SidebarItem
-                                                href="/panel/schedules"
-                                                icon="ti ti-calendar"
-                                                label="Agendamentos"
-                                                currentUrl={currentUrl}
-                                            />
-                                            <SidebarItem
-                                                href="/panel/patients"
-                                                icon="ti ti-users"
-                                                label="Pacientes"
-                                                currentUrl={currentUrl}
-                                            />
-                                            <SidebarItem
-                                                href="/panel/doctors"
-                                                icon="ti ti-stethoscope"
-                                                label="Médicos"
-                                                currentUrl={currentUrl}
-                                            />
-                                            <SidebarItem
-                                                href="/panel/reports"
-                                                icon="ti ti-chart-bar"
-                                                label="Relatórios"
-                                                currentUrl={currentUrl}
-                                            />
 
-                                            <li className="menu-title"><span>Configurações</span></li>
-                                            <SidebarItem
-                                                href="/panel/users"
-                                                icon="ti ti-user-cog"
-                                                label="Usuários"
-                                                currentUrl={currentUrl}
-                                            />
-                                            <SidebarItem
-                                                href="/panel/setting"
-                                                icon="ti ti-settings"
-                                                label="Configurações"
-                                                currentUrl={currentUrl}
-                                                matchPrefix
-                                            />
+                                            {/* ── Menu Manager (SaaS Admin) ── */}
+                                            {!isClient && (
+                                                <>
+                                                    <li className="menu-title"><span>Administração</span></li>
+                                                    <SidebarItem
+                                                        href="/panel/manager/entities"
+                                                        icon="ti ti-building"
+                                                        label="Empresas"
+                                                        currentUrl={currentUrl}
+                                                        matchPrefix
+                                                    />
+                                                    <SidebarItem
+                                                        href="/panel/manager/subscriptions"
+                                                        icon="ti ti-credit-card"
+                                                        label="Assinaturas"
+                                                        currentUrl={currentUrl}
+                                                        matchPrefix
+                                                    />
+                                                    <SidebarItem
+                                                        href="/panel/manager/plans"
+                                                        icon="ti ti-package"
+                                                        label="Planos"
+                                                        currentUrl={currentUrl}
+                                                        matchPrefix
+                                                    />
+                                                </>
+                                            )}
+
+                                            {/* ── Menu Clínica ── */}
+                                            {isClient && (
+                                                <>
+                                                    <SidebarItem
+                                                        href="/panel/schedules"
+                                                        icon="ti ti-calendar"
+                                                        label="Agendamentos"
+                                                        currentUrl={currentUrl}
+                                                    />
+                                                    <SidebarItem
+                                                        href="/panel/patients"
+                                                        icon="ti ti-users"
+                                                        label="Pacientes"
+                                                        currentUrl={currentUrl}
+                                                    />
+                                                    <SidebarItem
+                                                        href="/panel/doctors"
+                                                        icon="ti ti-stethoscope"
+                                                        label="Médicos"
+                                                        currentUrl={currentUrl}
+                                                    />
+                                                    <SidebarItem
+                                                        href="/panel/reports"
+                                                        icon="ti ti-chart-bar"
+                                                        label="Relatórios"
+                                                        currentUrl={currentUrl}
+                                                    />
+                                                    <li className="menu-title"><span>Configurações</span></li>
+                                                    <SidebarItem
+                                                        href="/panel/accesscontrol/users"
+                                                        icon="ti ti-user-cog"
+                                                        label="Usuários"
+                                                        currentUrl={currentUrl}
+                                                        matchPrefix
+                                                    />
+                                                    <SidebarItem
+                                                        href="/panel/setting"
+                                                        icon="ti ti-settings"
+                                                        label="Configurações"
+                                                        currentUrl={currentUrl}
+                                                        matchPrefix
+                                                    />
+                                                </>
+                                            )}
                                         </ul>
                                     </li>
                                 </ul>
