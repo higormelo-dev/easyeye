@@ -3,7 +3,7 @@
 namespace App\Services\Api;
 
 use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
-use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, PatientExam, Schedule};
+use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
 use Illuminate\Support\Facades\{DB, Storage};
 use Illuminate\Support\Str;
@@ -31,16 +31,39 @@ class PatientExamService
     {
         return DB::transaction(function () use ($request) {
             $integrator = request()->attributes->get('integrator');
+            $entityId   = $integrator->user->entity_id;
             $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
 
-            abort_unless($schedule !== null, 422, 'Schedule not found.');
+            if ($schedule) {
+                // Fluxo original: schedule_identifier informado
+                $patientId  = $schedule->patient_id;
+                $doctorId   = $schedule->doctor_id;
+                $scheduleId = $schedule->id;
+            } else {
+                // Fluxo alternativo: resolve pelo patient_identifier
+                $patient = $this->patientFindByIdOrCode($request->patient_identifier, $entityId);
+                abort_unless($patient !== null, 422, 'Patient not found.');
+
+                $patientId = $patient->id;
+
+                // Tenta vincular ao agendamento mais recente do dia para esse paciente
+                $todaySchedule = Schedule::where('entity_id', $entityId)
+                    ->where('patient_id', $patientId)
+                    ->whereDate('date_time', now()->toDateString())
+                    ->whereNull('deleted_at')
+                    ->orderByDesc('date_time')
+                    ->first();
+
+                $doctorId   = $todaySchedule?->doctor_id;
+                $scheduleId = $todaySchedule?->id;
+            }
 
             return $this->persistExam(
-                patientId: $schedule->patient_id,
-                entityId: $integrator->user->entity_id,
+                patientId: $patientId,
+                entityId: $entityId,
                 examId: $this->examFindByIdOrCode($request->exam_identifier)?->id,
-                doctorId: $schedule->doctor_id,
-                scheduleId: $schedule->id,
+                doctorId: $doctorId,
+                scheduleId: $scheduleId,
                 equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
                 name: $request->name,
                 archiveFile: $request->file('archive'),
@@ -324,5 +347,22 @@ class PatientExamService
         };
 
         return $query->where($column, $value)->first();
+    }
+
+    public function patientFindByIdOrCode(?string $idOrCode, string $entityId): ?Patient
+    {
+        if ($idOrCode === null) {
+            return null;
+        }
+
+        [$column, $value] = match (true) {
+            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
+            default                => ['code', $idOrCode],
+        };
+
+        return Patient::where('entity_id', $entityId)
+            ->where($column, $value)
+            ->first();
     }
 }

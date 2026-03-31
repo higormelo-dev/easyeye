@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\{EntityIntegratorEquipment, ExamType, PatientExam, Schedule};
+use App\Models\{EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
@@ -49,9 +49,36 @@ class ExamRequest extends FormRequest
                     }
                 },
             ],
-            'schedule_identifier' => [
-                'required',
+            'patient_identifier' => [
+                'required_without:schedule_identifier',
                 function ($attribute, $value, $fail) use ($entityId) {
+                    if ($value === null) {
+                        return;
+                    }
+
+                    $query = Patient::query()
+                        ->where('entity_id', $entityId)
+                        ->whereNull('deleted_at');
+
+                    [$column, $lookupValue] = match (true) {
+                        Str::isUuid($value) => ['id',   $value],
+                        ctype_digit($value) => ['code', sprintf('PAC-%010d', (int) $value)],
+                        default             => ['code', $value],
+                    };
+                    $query->where($column, $lookupValue);
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.patient_identifier'));
+                    }
+                },
+            ],
+            'schedule_identifier' => [
+                'required_without:patient_identifier',
+                function ($attribute, $value, $fail) use ($entityId) {
+                    if ($value === null) {
+                        return;
+                    }
+
                     $query = Schedule::query()
                         ->where('entity_id', $entityId)
                         ->whereNull('deleted_at');
