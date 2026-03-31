@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Medicare** is a multi-tenant SaaS platform for managing ophthalmology clinics, built with Laravel 11 + Blade + Alpine.js.
+**Medicare** is a multi-tenant SaaS platform for managing ophthalmology clinics, built with Laravel 11. The frontend is currently undergoing a **hybrid migration** from legacy Blade + Alpine.js + jQuery towards a modern **React + Inertia.js** SPA architecture, utilizing the "Preclinic" React template for UI components.
 
 ## Common Commands
 
 ```bash
 # Development
 composer dev          # Start all dev services (server, queue, logs, vite) concurrently
-npm run dev           # Vite dev server only
-npm run build         # Production asset build
+npm run dev           # Vite dev server only (compile both legacy and React configs)
+npm run build         # Production asset build (handles both paths)
 
 # Database
 php artisan migrate
@@ -160,7 +160,11 @@ Todos os observers são registrados em `AppServiceProvider::boot()`.
 
 **Auto-generated codes**: Entities, patients, and schedules get sequential human-readable codes (`ENT-0000000001`, `PAC-0000000001`, `SDL-0000000001`) via model `booted()` hooks.
 
-**Presenter pattern**: `SchedulePresenter` and `PatientPresenter` (via `laracasts/presenter`) handle display formatting in views.
+**Frontend Inertia Migration Pattern**: New and refactored UI components should use React and Inertia (`Inertia::render('Path/To/ReactComponent')`). For legacy routes, use `view('path.to.blade')`. The app utilizes `HandleInertiaRequests` middleware to securely pass standard session info: auth, feature flags, global flash messages.
+
+**React CRUD Components**: Instead of generic server-rendered tables, standard settings use reusable React components such as `SettingsCrud.jsx` that manage local states (`search`, `showModal`, `editing`) and utilize `router` from `@inertiajs/react` for async XHR request updates.
+
+**Presenter pattern**: `SchedulePresenter` and `PatientPresenter` (via `laracasts/presenter`) handle display formatting in views. (Note: Primarily used by legacy Blade views; formatting logic will be increasingly moved to the frontend).
 
 **Soft deletes**: `User`, `Entity`, `EntityUser`, `Partner`, integrations, and equipment support soft delete + restore. Controllers include `restore()` methods and routes like `/setting/{resource}/restore`.
 
@@ -174,12 +178,21 @@ Todos os observers são registrados em `AppServiceProvider::boot()`.
 
 **Observer silencioso**: Todos os observers de compliance e CAC capturam `\Throwable` e fazem `Log::warning/error` sem propagar a exceção — a operação principal nunca é bloqueada por um erro de rastreamento.
 
-### Frontend Stack
+### Frontend Stack (Hybrid Migration State)
 
+Currently transitioning towards React, but both stacks coexist:
+
+**New Stack:**
+- **React 18** via **Inertia.js (v3)**
+- **Preclinic Template Style**: Uses imported Bootstrap/SCSS design structure wrapper in an `AuthenticatedLayout.jsx`.
+- **Vite** entry point: `resources/js/app.jsx`
+- Main directory for components: `resources/js/Pages/` and `resources/js/Components/`
+
+**Legacy Stack:**
 - **Blade** templates with **Alpine.js** for reactivity
 - **Bootstrap 5** + **Tailwind CSS** (both present)
-- **Vite** bundles: `resources/js/vendor.js` (jQuery + libs), `resources/js/app.js` (global), plus per-module files in `resources/js/system/`
-- Key JS libraries: DataTables, FlatPickr, SweetAlert2, jQuery toast, QRCode (TV pairing)
+- **Vite** bundles: `resources/js/vendor.js` (jQuery + libs), legacy CSS globals
+- Key JS libraries being phased out: DataTables, FlatPickr, jQuery toast
 
 ### Testing
 

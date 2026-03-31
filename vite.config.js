@@ -1,11 +1,13 @@
 import path from 'path';
 import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
     plugins: [
         laravel({
             input: [
+                // === Legado (Blade) — manter até migração completa ===
                 'resources/css/vendor.css',
                 'resources/css/app.css',
                 'resources/css/dashboard.css',
@@ -32,14 +34,18 @@ export default defineConfig({
                 'resources/js/system/covertesttypes.js',
                 'resources/js/system/visualacuitytypes.js',
                 'resources/js/auth/password-toggle.js',
+
+                // === React / Inertia — novo entry point ===
+                'resources/js/app.jsx',
             ],
             refresh: true,
         }),
+        react(),
     ],
     resolve: {
         alias: {
+            '@': path.resolve('./resources/js'),
             // Single jQuery instance for all npm packages and template scripts.
-            // jquery-global.js imports from the npm package and exposes window.$ / window.jQuery.
             jquery: path.resolve('./resources/js/jquery-global.js'),
         },
     },

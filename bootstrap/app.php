@@ -11,6 +11,7 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     EnsureEntitySelected,
     EnsureUserBelongsToEntity,
     HandleImpersonation,
+    HandleInertiaRequests,
     ParseMultipartFormData,
     RequireTermsAcceptance,
     SetLocale};
@@ -44,10 +45,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'terms.accepted'       => RequireTermsAcceptance::class,
         ]);
 
-        // Adiciona o SetLocale e HandleImpersonation ao grupo web
+        // Adiciona o SetLocale, HandleImpersonation e Inertia ao grupo web
         $middleware->web(append: [
             SetLocale::class,
             HandleImpersonation::class,
+            HandleInertiaRequests::class,
         ]);
 
         $middleware->api([

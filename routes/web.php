@@ -26,6 +26,10 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisitTypesController,
     VisualAcuityTypesController};
 use Illuminate\Support\Facades\{Auth, Route};
+use Inertia\Inertia;
+
+// ═══════════════════ REACT / INERTIA TEST (remover após validação) ═══════════════════
+Route::get('/react-test', fn () => Inertia::render('Test'))->name('react.test');
 
 // Rota para trocar o idioma (sem autenticação necessária)
 Route::get('/locale/{locale}', [LocaleController::class, 'switch'])->name('locale.switch');
@@ -117,7 +121,15 @@ Route::group(
                     ->get(),
             ];
 
-            return view('system.dashboard', compact('stats'));
+            $hour     = now()->hour;
+            $greeting = ($hour < 12 ? 'Bom dia' : ($hour < 18 ? 'Boa tarde' : 'Boa noite'))
+                . ', ' . explode(' ', auth()->user()->name)[0] . '!';
+
+            return Inertia::render('Dashboard/Index', [
+                'stats'    => $stats,
+                'greeting' => $greeting,
+                'userRole' => session('selected_entity_user_rule'),
+            ]);
         })->name('dashboard');
 
         Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');

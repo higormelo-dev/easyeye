@@ -38,6 +38,10 @@ O **EasyEye** é uma plataforma SaaS multi-tenant focada na vertical de oftalmol
 - **Billing por Uso (Meters):** Planos controlam limites de envios de API (exames) e uso de créditos mensais de IA.
 - **Sistema de Parcerias e Indicações:** Clínicas geram códigos de indicação para descontos. Revendedores recebem comissionamento nativo mensurado por marcos de Ativação (`ActivationSteps`).
 
+### 4.5 Modernização de Interface (Em Andamento)
+- **Nova Arquitetura Frontend:** Migração progressiva do layout legado (Blade/jQuery) para uma arquitetura moderna baseada em **React** e **Inertia.js**, adotando o visual premium do template **Preclinic**.
+- **Benefícios da Mudança:** Aumento na percepção de valor (UI "Wow"), interfaces dinâmicas, preparação de componentes para posterior reaproveitamento em React Native/Expo, e eliminação de dependências pesadas (jQuery, DataTables). Experiência Single Page Application (SPA).
+
 ---
 
 ## 5. Roadmap e Funcionalidades Futuras (V2 e V3)
@@ -51,7 +55,8 @@ O **EasyEye** é uma plataforma SaaS multi-tenant focada na vertical de oftalmol
 - **Faturamento TISS (Integração de Convênios):** Geração de guias TISS/TUSS em lote para minimizar glosas com planos de saúde.
 - **Conciliação Bancária e Split de Pagamentos:** Divisão automática dos honorários entre a clínica e os oftalmologistas associados nas consultas particulares.
 
-### 5.3 Engajamento do Paciente
+### 5.3 Mobile e Engajamento (V4)
+- **App Médico e Paciente (React Native):** Utilização do core de componentes React da web para acelerar o desenvolvimento de aplicativos móveis nativos via Expo.
 - **Portal do Paciente:** Acesso web/mobile simples para o paciente acessar suas receitas de óculos atualizadas, declarações e laudos de exames diagnosticados pelas máquinas.
 
 ## 6. Métricas de Sucesso (KPIs)

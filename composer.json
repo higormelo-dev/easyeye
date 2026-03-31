@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "ext-calendar": "*",
+        "inertiajs/inertia-laravel": "^3.0",
         "laracasts/presenter": "^0.2.8",
         "laravel-lang/common": "^6.7",
         "laravel-lang/publisher": "^16.7",

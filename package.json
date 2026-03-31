@@ -27,7 +27,9 @@
     },
     "dependencies": {
         "@fortawesome/fontawesome-free": "^7.2.0",
+        "@inertiajs/react": "^3.0.0",
         "@tabler/icons-webfont": "^3.41.0",
+        "@vitejs/plugin-react": "^4.7.0",
         "bootstrap": "^5.3.8",
         "datatables.net": "~2.3",
         "datatables.net-bs5": "~2.3",
@@ -44,6 +46,8 @@
         "perfect-scrollbar": "^1.5.5",
         "qrcode": "^1.5.4",
         "raphael": "^2.3.0",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4",
         "simplebar": "^6.3.3",
         "sweetalert2": "^11.15.3"
     }
