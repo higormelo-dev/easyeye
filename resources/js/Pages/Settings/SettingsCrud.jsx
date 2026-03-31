@@ -12,6 +12,7 @@
 import { useState, useCallback } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import ConfirmDialog from '@/Components/UI/ConfirmDialog';
 
 export default function SettingsCrud({ title, records, baseUrl, columns }) {
     const { flash } = usePage().props;
@@ -21,6 +22,7 @@ export default function SettingsCrud({ title, records, baseUrl, columns }) {
     const [form, setForm] = useState({ name: '', active: true });
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState({});
+    const [confirmState, setConfirmState] = useState({ show: false, action: null, message: '', title: '', variant: 'danger' });
 
     // Filtro local de busca
     const filtered = records.filter((r) => {
@@ -67,18 +69,22 @@ export default function SettingsCrud({ title, records, baseUrl, columns }) {
     };
 
     const handleDelete = useCallback((record) => {
-        if (!confirm(`Deseja realmente excluir "${record.name}"?`)) return;
-
-        router.delete(`${baseUrl}/${record.id}`, {
-            preserveScroll: true,
+        setConfirmState({
+            show: true,
+            title: 'Excluir Registro',
+            message: `Deseja realmente excluir "${record.name}"? Esta ação removerá o registro.`,
+            variant: 'danger',
+            action: () => router.delete(`${baseUrl}/${record.id}`, { preserveScroll: true })
         });
     }, [baseUrl]);
 
     const handleRestore = useCallback((record) => {
-        if (!confirm(`Deseja restaurar "${record.name}"?`)) return;
-
-        router.get(`${baseUrl}/${record.id}/restore`, {}, {
-            preserveScroll: true,
+        setConfirmState({
+            show: true,
+            title: 'Restaurar Registro',
+            message: `Deseja restaurar "${record.name}"? Ele voltará a aparecer nas listas.`,
+            variant: 'success',
+            action: () => router.get(`${baseUrl}/${record.id}/restore`, {}, { preserveScroll: true })
         });
     }, [baseUrl]);
 
@@ -278,6 +284,15 @@ export default function SettingsCrud({ title, records, baseUrl, columns }) {
                     </div>
                 </div>
             )}
+            
+            <ConfirmDialog
+                show={confirmState.show}
+                onClose={() => setConfirmState((s) => ({ ...s, show: false }))}
+                onConfirm={confirmState.action}
+                title={confirmState.title}
+                message={confirmState.message}
+                variant={confirmState.variant}
+            />
         </AuthenticatedLayout>
     );
 }

@@ -18,6 +18,7 @@ class ColorVisionTypesController extends BaseSettingController
         $this->routePrefix     = 'panel.setting.colorvisiontypes';
         $this->jsFile          = 'resources/js/system/colorvisiontypes.js';
         $this->baseUrl         = url('panel/setting/colorvisiontypes');
+        $this->inertiaPage     = 'ColorVisionTypes';
     }
 
     public function store(ColorVisionTypeRequest $request) { return $this->genericStore($request); }

@@ -20,6 +20,7 @@ class SurgeryTypesController extends BaseSettingController
         $this->jsFile          = 'resources/js/system/surgerytypes.js';
         $this->viewSlot        = 'surgerytypes';
         $this->baseUrl         = url('panel/setting/surgerytypes');
+        $this->inertiaPage     = 'SurgeryTypes';
         $this->crudFields      = ['name' => '', 'category' => '', 'active' => true];
     }
 

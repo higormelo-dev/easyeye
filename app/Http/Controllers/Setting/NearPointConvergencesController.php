@@ -18,6 +18,7 @@ class NearPointConvergencesController extends BaseSettingController
         $this->routePrefix     = 'panel.setting.nearpointconvergences';
         $this->jsFile          = 'resources/js/system/nearpointconvergences.js';
         $this->baseUrl         = url('panel/setting/nearpointconvergences');
+        $this->inertiaPage     = 'NearPointConvergences';
     }
 
     public function store(NearPointConvergenceRequest $request) { return $this->genericStore($request); }

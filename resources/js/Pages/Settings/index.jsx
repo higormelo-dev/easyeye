@@ -48,3 +48,7 @@ export function NearPointConvergences({ records }) {
 export function Covenants({ records }) {
     return <SettingsCrud title="Convênios" records={records} baseUrl="/panel/setting/covenants" />;
 }
+
+export function Resources({ records }) {
+    return <SettingsCrud title="Recursos da Clínica" records={records} baseUrl="/panel/setting/resources" />;
+}

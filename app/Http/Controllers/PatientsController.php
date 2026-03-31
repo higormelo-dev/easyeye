@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\DataTables\PatientsDataTable;
 use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\{PatientResource};
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
 use App\Services\PatientService;
-use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\{DB, Storage};
+use Inertia\Inertia;
 
 class PatientsController extends Controller
 {
@@ -32,41 +31,17 @@ class PatientsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(PatientsDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(): \Inertia\Response
     {
-        $meta = [
-            'title'          => $this->titleController,
+        return Inertia::render('Patients/Index', [
             'total_patients' => Patient::where('entity_id', session('selected_entity_id'))->count(),
-            'action'         => __('actions.records'),
-            'breadcrumbs'    => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.patients.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.patients'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
-
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
-        $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
-        $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
-        $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
-
-        return $dataTable->render('system.patients.index', compact(
-            'meta', 'genders', 'maritalStatuses', 'statesOfBrazil', 'covenants', 'skinTypes', 'irisTypes'
-        ));
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+            'covenants'       => Covenant::all()->pluck('name', 'id')->toArray(),
+            'skinTypes'       => SkinType::all()->pluck('name', 'id')->toArray(),
+            'irisTypes'       => IrisType::all()->pluck('name', 'id')->toArray(),
+        ]);
     }
 
     /**
@@ -151,22 +126,21 @@ class PatientsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): Application|View|JsonResponse
+    public function show(string $id): Application|\Inertia\Response|JsonResponse
     {
         $record = $this->service->findByIdOrCode($id);
 
         if (request()->wantsJson()) {
-            return response()->json(
-                [
-                    'data' => new PatientResource($record),
-                ]
-            );
+            return response()->json([
+                'data' => new PatientResource($record),
+            ]);
         }
 
-        return view(
-            'system.patients.show',
-            compact('record')
-        );
+        $record->load(['person', 'covenant', 'skinType', 'irisType']);
+
+        return Inertia::render('Patients/Show', [
+            'record' => $record,
+        ]);
     }
 
     /**

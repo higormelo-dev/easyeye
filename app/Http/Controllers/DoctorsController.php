@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\DataTables\DoctorsDataTable;
 use App\Http\Requests\{DoctorRequest};
 use App\Http\Resources\{DoctorResource, EntityUserResource};
 use App\Models\{Doctor, EntityUser, Patient, People, User};
 use App\Services\DoctorService;
-use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class DoctorsController extends Controller
 {
@@ -84,43 +83,19 @@ class DoctorsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(DoctorsDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(): \Inertia\Response
     {
-        $meta = [
-            'title'         => $this->titleController,
-            'total_doctors' => Doctor::query()
-                ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                ->where('entity_users.entity_id', session('selected_entity_id'))
-                ->count(),
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.accesscontrol.users.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
+        $totalDoctors = Doctor::query()
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->where('entity_users.entity_id', session('selected_entity_id'))
+            ->count();
 
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
-        $storeUrl        = route('panel.doctors.store');
-        $baseUrl         = url('panel/doctors');
-
-        return $dataTable->render('system.doctors.index', compact(
-            'meta', 'genders', 'maritalStatuses', 'statesOfBrazil', 'storeUrl', 'baseUrl'
-        ));
+        return Inertia::render('Doctors/Index', [
+            'total_doctors'   => $totalDoctors,
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+        ]);
     }
 
     /**
@@ -139,7 +114,7 @@ class DoctorsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): Application|View|JsonResponse
+    public function show(string $id): Application|\Inertia\Response|JsonResponse
     {
         $record = $this->service->findByIdOrCode($id);
 
@@ -149,10 +124,11 @@ class DoctorsController extends Controller
             ]);
         }
 
-        return view(
-            'system.doctors.show',
-            compact('record')
-        );
+        $record->load(['person', 'entityUser.user']);
+
+        return Inertia::render('Doctors/Show', [
+            'record' => $record,
+        ]);
     }
 
     /**
@@ -200,26 +176,16 @@ class DoctorsController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(string $id): Application|View|JsonResponse
+    public function edit(string $id): JsonResponse
     {
-        $record          = $this->service->findByIdOrCode($id);
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
+        $record = $this->service->findByIdOrCode($id);
 
-        if (request()->wantsJson()) {
-            return response()->json([
-                'data'            => new DoctorResource($record),
-                'genders'         => $genders,
-                'maritalStatuses' => $maritalStatuses,
-                'statesOfBrazil'  => $statesOfBrazil,
-            ]);
-        }
-
-        return view(
-            'system.doctors.show',
-            compact('record')
-        );
+        return response()->json([
+            'data'            => new DoctorResource($record),
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+        ]);
     }
 
     /**

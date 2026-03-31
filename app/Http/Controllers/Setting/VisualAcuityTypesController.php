@@ -19,6 +19,7 @@ class VisualAcuityTypesController extends BaseSettingController
         $this->jsFile          = 'resources/js/system/visualacuitytypes.js';
         $this->viewSlot        = 'visualacuitytypes';
         $this->baseUrl         = url('panel/setting/visualacuitytypes');
+        $this->inertiaPage     = 'VisualAcuityTypes';
         $this->crudFields      = ['name' => '', 'scale' => 0, 'active' => true];
     }
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Medicare** is a multi-tenant SaaS platform for managing ophthalmology clinics, built with Laravel 11. The frontend is currently undergoing a **hybrid migration** from legacy Blade + Alpine.js + jQuery towards a modern **React + Inertia.js** SPA architecture, utilizing the "Preclinic" React template for UI components.
+**Medicare** is a multi-tenant SaaS platform for managing ophthalmology clinics, built with Laravel 11. The frontend is in the final stages of a **hybrid migration** from legacy Blade + Alpine.js + jQuery towards a modern **React 19 + Inertia.js** SPA architecture, utilizing the "Preclinic" template. Phase 3 (Settings, Schedules, Medical Records) is complete.
 
 ## Common Commands
 
@@ -44,8 +44,7 @@ Key entity-scoped middleware stack: `auth → verified → EnsureEntitySelected 
 | `/panel/` | `web.php` | Authenticated clinic management |
 | `/panel/manager/` | `manager.php` | SaaS owner admin |
 | `/api/integrators/` | `api.php` | External equipment integrator API |
-| `/tv/` | `web.php` | Waiting room TV display (public) |
-| `/auth/` | `auth.php` | Authentication |
+| `/auth/` | `auth.php` | Authentication (Login, Register - React/Inertia) |
 
 ### Service Layer
 
@@ -162,9 +161,11 @@ Todos os observers são registrados em `AppServiceProvider::boot()`.
 
 **Frontend Inertia Migration Pattern**: New and refactored UI components should use React and Inertia (`Inertia::render('Path/To/ReactComponent')`). For legacy routes, use `view('path.to.blade')`. The app utilizes `HandleInertiaRequests` middleware to securely pass standard session info: auth, feature flags, global flash messages.
 
-**React CRUD Components**: Instead of generic server-rendered tables, standard settings use reusable React components such as `SettingsCrud.jsx` that manage local states (`search`, `showModal`, `editing`) and utilize `router` from `@inertiajs/react` for async XHR request updates.
+**React CRUD & Global Components**: Modules like `SettingsCrud.jsx` unify lookups. Global UI patterns include `Toast.jsx` for flash notifications and `ConfirmDialog.jsx` (triggered via local state `confirmState`) to replace browser alerts in `Patients`, `Doctors`, `Users`, and `Settings`.
 
-**Presenter pattern**: `SchedulePresenter` and `PatientPresenter` (via `laracasts/presenter`) handle display formatting in views. (Note: Primarily used by legacy Blade views; formatting logic will be increasingly moved to the frontend).
+**Medical Records (Timeline)**: Index and Create forms are native React, using JSON arrays instead of rendered HTML to avoid `dangerouslySetInnerHTML`.
+
+**Presenter Pattern**: (Legacy) `SchedulePresenter` formatting is being replaced by React component logic.
 
 **Soft deletes**: `User`, `Entity`, `EntityUser`, `Partner`, integrations, and equipment support soft delete + restore. Controllers include `restore()` methods and routes like `/setting/{resource}/restore`.
 
@@ -183,7 +184,7 @@ Todos os observers são registrados em `AppServiceProvider::boot()`.
 Currently transitioning towards React, but both stacks coexist:
 
 **New Stack:**
-- **React 18** via **Inertia.js (v3)**
+- **React 19** via **Inertia.js (v3)**
 - **Preclinic Template Style**: Uses imported Bootstrap/SCSS design structure wrapper in an `AuthenticatedLayout.jsx`.
 - **Vite** entry point: `resources/js/app.jsx`
 - Main directory for components: `resources/js/Pages/` and `resources/js/Components/`

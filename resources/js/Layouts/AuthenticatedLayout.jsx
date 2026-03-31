@@ -8,6 +8,7 @@
  */
 import { useState, useEffect } from 'react';
 import { Head, Link, usePage, router } from '@inertiajs/react';
+import Toast from '@/Components/UI/Toast';
 
 export default function AuthenticatedLayout({ children, title }) {
     const { auth, entity, flash, locale, appName } = usePage().props;
@@ -15,15 +16,7 @@ export default function AuthenticatedLayout({ children, title }) {
     const [mobileSidebar, setMobileSidebar] = useState(false);
 
     // Flash messages como toast
-    useEffect(() => {
-        if (flash?.success) {
-            // Futuramente integrar com react-hot-toast ou SweetAlert2
-            console.log('[Flash Success]', flash.success);
-        }
-        if (flash?.error) {
-            console.error('[Flash Error]', flash.error);
-        }
-    }, [flash]);
+    // The Toast component will handle the flash rendering automatically based on usePage().props.flash
 
     const toggleSidebar = () => setMiniSidebar(!miniSidebar);
     const toggleMobileSidebar = () => setMobileSidebar(!mobileSidebar);
@@ -227,6 +220,8 @@ export default function AuthenticatedLayout({ children, title }) {
                     onClick={toggleMobileSidebar}
                 ></div>
             </div>
+            
+            <Toast flash={flash} />
         </>
     );
 }

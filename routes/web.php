@@ -62,6 +62,7 @@ Route::get('/subscription/expired', SubscriptionExpiredController::class)
     ->middleware(['auth', 'verified', 'entity.selected'])
     ->name('subscription.expired');
 
+
 Route::post('/session/ping', function () {
     return response()->json(['ok' => true]);
 })->middleware(['auth'])->name('session.ping');
@@ -74,7 +75,7 @@ Route::group(
         });
         Route::get('/dashboard', function () {
             if (! session()->get('selected_entity_is_client')) {
-                return view('system.manager.dashboard');
+                return Inertia::render('Manager/Dashboard');
             }
 
             $entityId   = session('selected_entity_id');

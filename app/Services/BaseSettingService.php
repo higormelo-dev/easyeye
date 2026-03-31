@@ -25,6 +25,19 @@ abstract class BaseSettingService
         });
     }
 
+    public function all(): \Illuminate\Database\Eloquent\Collection
+    {
+        $class = $this->modelClass();
+
+        return $class::query()
+            ->withTrashed()
+            ->where(fn ($q) => $q
+                ->where('entity_id', session()->get('selected_entity_id'))
+                ->orWhereNull('entity_id')
+            )
+            ->get();
+    }
+
     public function findByIdOrCode(string $idOrCode): Model
     {
         $class = $this->modelClass();

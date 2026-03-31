@@ -19,6 +19,7 @@ class CovenantsController extends BaseSettingController
         $this->jsFile          = 'resources/js/system/covenants.js';
         $this->viewSlot        = 'covenants';
         $this->baseUrl         = url('panel/setting/covenants');
+        $this->inertiaPage     = 'Covenants';
         $this->crudFields      = ['name' => '', 'color' => '#3699ff', 'table' => false, 'active' => true];
     }
 

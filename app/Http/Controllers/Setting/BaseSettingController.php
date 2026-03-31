@@ -11,6 +11,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\{JsonResponse, RedirectResponse};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 abstract class BaseSettingController extends Controller
 {
@@ -30,15 +31,23 @@ abstract class BaseSettingController extends Controller
 
     protected string $baseUrl = '';
 
-    public function index(): Factory|Application|View|JsonResponse
-    {
-        $meta = $this->buildMeta();
+    protected string $inertiaPage = '';
 
-        return $this->dataTable->render('system.settings.index', array_merge(
-            compact('meta'),
-            $this->viewData(),
-            ['jsFile' => $this->jsFile]
-        ));
+    public function index(): Factory|Application|View|JsonResponse|\Inertia\Response
+    {
+        if (request()->wantsJson() && !request()->hasHeader('X-Inertia')) {
+            $meta = $this->buildMeta();
+
+            return $this->dataTable->render('system.settings.index', array_merge(
+                compact('meta'),
+                $this->viewData(),
+                ['jsFile' => $this->jsFile]
+            ));
+        }
+
+        return Inertia::render('Settings/' . $this->inertiaPage, [
+            'records' => $this->resourceClass::collection($this->service->all()),
+        ]);
     }
 
     public function create(): Factory|Application|View

@@ -5,47 +5,22 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreMedicalRecordRequest;
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Lense,
                 MedicalRecord, NearPointConvergence, Patient, VisualAcuityType};
-use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Inertia\Inertia;
 
 class MedicalRecordsController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index(Patient $patient): Factory|Application|View
+    public function index(Patient $patient): \Inertia\Response
     {
-        $meta = [
-            'title'       => __('actions.sidemenu.medical_records'),
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.sidemenu.patients'),
-                    'url'    => route('panel.patients.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $patient->person->full_name ?? $patient->code,
-                    'url'    => 'javascript:void(0);',
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.medical_records.title'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
-
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
 
-        return view('system.medical_records.index', compact('meta', 'patient'));
+        return Inertia::render('MedicalRecords/Index', [
+            'patient' => $patient,
+        ]);
     }
 
     /**
@@ -58,10 +33,32 @@ class MedicalRecordsController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate($request->integer('per_page', 10));
 
-        $html = view('system.medical_records._items', compact('records', 'patient'))->render();
+        $items = $records->map(function ($record) {
+            $userId    = $record->doctor?->entityUser?->user_id;
+            $photoPath = 'system/images/users/' . $userId . '.jpg';
+            $photoUrl  = asset($photoPath);
+            if (!$userId || !file_exists(public_path($photoPath))) {
+                $photoUrl = asset('system/images/team.png');
+            }
+
+            return [
+                'id'                   => $record->id,
+                'code'                 => $record->code,
+                'created_at_formatted' => $record->created_at?->format('d/m/Y H:i') ?? '—',
+                'doctor_name'          => $record->doctor?->person?->full_name ?? __('actions.medical_records.not_informed'),
+                'doctor_color'         => $record->doctor?->color ?: '#6c757d',
+                'doctor_photo'         => $photoUrl,
+                'diabetic'             => (bool) $record->diabetic,
+                'hypertensive'         => (bool) $record->hypertensive,
+                'glaucomatous'         => (bool) $record->glaucomatous,
+                'main_complaint'       => \Illuminate\Support\Str::limit(strip_tags((string)$record->main_complaint), 150),
+                'tonometer_right'      => $record->tonometer_right,
+                'tonometer_left'       => $record->tonometer_left,
+            ];
+        });
 
         return response()->json([
-            'html'      => $html,
+            'data'      => $items,
             'has_more'  => $records->hasMorePages(),
             'next_page' => $records->currentPage() + 1,
             'total'     => $records->total(),
@@ -71,7 +68,7 @@ class MedicalRecordsController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Patient $patient): Factory|Application|View
+    public function create(Patient $patient): \Inertia\Response
     {
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
         $entityId = session('selected_entity_id');
@@ -91,18 +88,8 @@ class MedicalRecordsController extends Controller
         $additionTypes     = AdditionType::where('entity_id', $entityId)->where('active', true)->orderBy('name')->get();
         $lenses            = Lense::where('entity_id', $entityId)->where('active', true)->orderBy('name')->get();
 
-        $meta = [
-            'title'       => __('actions.medical_records.create'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                                     'active' => false],
-                ['label' => __('actions.sidemenu.patients'),  'url' => route('panel.patients.index'),                                'active' => false],
-                ['label' => $patient->person->full_name ?? $patient->code, 'url' => route('panel.patients.medicalrecords.index', $patient), 'active' => false],
-                ['label' => __('actions.medical_records.create'), 'url' => 'javascript:void(0);',                                   'active' => true],
-            ],
-        ];
-
-        return view('system.medical_records.create', compact(
-            'meta', 'patient', 'doctors',
+        return Inertia::render('MedicalRecords/Create', compact(
+            'patient', 'doctors',
             'visualAcuityTypes', 'colorVisionTypes', 'coverTestTypes',
             'nearPointTypes', 'additionTypes', 'lenses'
         ));

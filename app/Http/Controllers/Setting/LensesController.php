@@ -19,6 +19,7 @@ class LensesController extends BaseSettingController
         $this->jsFile          = 'resources/js/system/lenses.js';
         $this->viewSlot        = 'lenses';
         $this->baseUrl         = url('panel/setting/lenses');
+        $this->inertiaPage     = 'Lenses';
         $this->crudFields      = ['name' => '', 'away' => false, 'near' => false, 'active' => true];
     }
 

@@ -19,6 +19,7 @@ class CoverTestTypesController extends BaseSettingController
         $this->jsFile          = 'resources/js/system/covertesttypes.js';
         $this->viewSlot        = 'covertesttypes';
         $this->baseUrl         = url('panel/setting/covertesttypes');
+        $this->inertiaPage     = 'CoverTestTypes';
         $this->crudFields      = ['name' => '', 'abbreviation' => '', 'active' => true];
     }
 

@@ -18,6 +18,7 @@ class VisitTypesController extends BaseSettingController
         $this->routePrefix     = 'panel.setting.visittypes';
         $this->jsFile          = 'resources/js/system/visittypes.js';
         $this->baseUrl         = url('panel/setting/visittypes');
+        $this->inertiaPage     = 'VisitTypes';
     }
 
     public function store(VisitTypeRequest $request) { return $this->genericStore($request); }

@@ -18,6 +18,7 @@ class SkinTypesController extends BaseSettingController
         $this->routePrefix     = 'panel.setting.skintypes';
         $this->jsFile          = 'resources/js/system/skintypes.js';
         $this->baseUrl         = url('panel/setting/skintypes');
+        $this->inertiaPage     = 'SkinTypes';
     }
 
     public function store(SkinTypeRequest $request) { return $this->genericStore($request); }

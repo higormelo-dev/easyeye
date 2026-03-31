@@ -18,6 +18,7 @@ class AdditionTypesController extends BaseSettingController
         $this->routePrefix     = 'panel.setting.additiontypes';
         $this->jsFile          = 'resources/js/system/additiontypes.js';
         $this->baseUrl         = url('panel/setting/additiontypes');
+        $this->inertiaPage     = 'AdditionTypes';
     }
 
     public function store(AdditionTypeRequest $request) { return $this->genericStore($request); }

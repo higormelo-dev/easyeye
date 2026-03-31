@@ -9,8 +9,8 @@
 - **Linguagem:** PHP 8.4
 - **Banco de Dados (Dev):** SQLite (Suporte robusto a MySQL/PostgreSQL para Prod).
 - **Cache, Sessões e Filas:** Redis
-- **Frontend (Novo - Em Migração):** React 18, Inertia.js (v3), Vite, baseado no template premium Preclinic.
-- **Frontend (Legado):** Blade Templates, Alpine.js, Bootstrap 5, jQuery (sendo gradualmente substituídos).
+- **Frontend (Inertia/React):** React 19, Inertia.js (v3), Vite, baseado no template premium Preclinic.
+- **Frontend (Legado):** Blade Templates, Alpine.js, Bootstrap 5, jQuery (em fase final de substituição).
 - **Serviço de Background:** Laravel Queue Workers nativos para assincronicidade (envio de e-mails, comissões de parceiros, webhooks).
 
 ## 2. Arquitetura de Multi-Tenancy
@@ -24,8 +24,9 @@ O sistema opera através de **Session-based Multi-tenancy** garantindo total iso
 - **Repositories (via Model queries):** O Eloquent ORM é manipulado estritamente pelas classes de Service para acesso e persistência.
 - **Observer Pattern Silencioso:** Acoplamento fraco para efeitos colaterais. Auditorias (AuditContext), Criação de Trial Automático e Tracking de Ativação (CAC/Growth) operam via Observers do Eloquent (`creating/created`). Exceções não críticas nos observers são controladas (Logs de erro silenciados) para não quebrar a transação de negócio primária.
 - **Action/Job Pattern:** Ações assíncronas encapsuladas sob Jobs quando necessário.
-- **Frontend Inertia Pattern:** Novo padrão em transição onde os Controllers retornam `Inertia::render()` ao invés de views Blade. Componentes encapsulados de React substituem lógicas extensas antes dependentes de jQuery + DataTables (ex.: uso de um `SettingsCrud` unificado em React conectando as API calls base para configurações).
-- **Presenters:** Utilização da biblioteca `laracasts/presenter` para separar lógicas visuais (formatações financeiras, horários amigáveis) diretamente da camada do Model (usado largamente no legado, agora as formatações também migram para responsabilidade do Front de forma nativa).
+- **Frontend Inertia Pattern:** Controllers retornam `Inertia::render()`. Componentes `SettingsCrud` unificam configurações. Listagens (Schedules, MedicalRecords) usam JSON puro mapeado para cards React para máxima reatividade.
+- **Global UX Components:** Componentes `Toast.jsx` (hook useToast) e `ConfirmDialog.jsx` padronizam notificações e confirmações de exclusão via Inertia flash-responses.
+- **Presenter Pattern:** `SchedulePresenter` e `PatientPresenter` ainda servem o legado, mas lógicas visuais (badges, status) foram migradas para componentes React puros.
 
 ## 4. Integração Cloud <-> Hardware (Arquitetura)
 O ponto nevrálgico técnico da aplicação é a API de integração (`/api/integrators/*`) que conversa com o Desktop App em Java alocado na rede local da clínica.

@@ -18,6 +18,7 @@ class IrisTypesController extends BaseSettingController
         $this->routePrefix     = 'panel.setting.iristypes';
         $this->jsFile          = 'resources/js/system/iristypes.js';
         $this->baseUrl         = url('panel/setting/iristypes');
+        $this->inertiaPage     = 'IrisTypes';
     }
 
     public function store(IrisTypeRequest $request) { return $this->genericStore($request); }

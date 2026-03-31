@@ -19,6 +19,7 @@ class ResourcesController extends BaseSettingController
         $this->jsFile          = 'resources/js/system/clinic-resources.js';
         $this->viewSlot        = 'clinic-resources';
         $this->baseUrl         = url('panel/setting/resources');
+        $this->inertiaPage     = 'Resources';
         $this->crudFields      = [
             'name'        => '',
             'type'        => 'room',

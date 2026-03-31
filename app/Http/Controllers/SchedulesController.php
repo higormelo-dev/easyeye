@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 
 class SchedulesController extends Controller
 {
@@ -44,41 +45,12 @@ class SchedulesController extends Controller
             $q->where('entity_id', $entityId)->orWhereNull('entity_id');
         })->where('active', true)->orderBy('name')->get();
 
-        // Lookups para o modal de edição da ficha do paciente
-        $genders          = People::$genders;
-        $maritalStatuses  = People::$maritalStatuses;
-        $statesOfBrazil   = People::$statesOfBrazil;
-        $skinTypes        = SkinType::all()->pluck('name', 'id')->toArray();
-        $irisTypes        = IrisType::all()->pluck('name', 'id')->toArray();
-        $patientCovenants = Covenant::orderBy('name')->get()->pluck('name', 'id')->toArray();
-
-        $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.schedules.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
-
-        return view('system.schedules.index', compact(
-            'doctors', 'covenants', 'visitTypes', 'meta', 'loggedDoctor',
-            'genders', 'maritalStatuses', 'statesOfBrazil',
-            'skinTypes', 'irisTypes', 'patientCovenants'
-        ));
+        return Inertia::render('Schedules/Index', [
+            'doctors'       => $doctors->values(),
+            'covenants'     => $covenants,
+            'visitTypes'    => $visitTypes,
+            'loggedDoctor'  => $loggedDoctor,
+        ]);
     }
 
     /**
@@ -148,7 +120,47 @@ class SchedulesController extends Controller
             default => null,
         };
 
-        $events = $eventQuery->orderBy('starts_at')->get();
+        if ($request->wantsJson() || $request->hasHeader('X-Inertia')) {
+            $mappedSchedules = $schedules->map(fn ($s) => [
+                'type'               => 'schedule',
+                'id'                 => $s->id,
+                'time'               => $s->date_time->format('H:i'),
+                'date_time'          => $s->date_time,
+                'full_name'          => $s->full_name,
+                'patient_id'         => $s->patient_id,
+                'patient_code'       => $s->patient?->code,
+                'telephone'          => $s->telephone,
+                'cellphone'          => $s->cellphone,
+                'cellphone_whatsapp' => (bool)$s->cellphone_whatsapp,
+                'notes'              => $s->notes,
+                'situation_id'       => $s->situation->value,
+                'situation_label'    => $s->situation->label(),
+                'situation_badge'    => $s->situation->badgeClass(),
+                'is_terminal'        => $s->situation->isTerminal(),
+                'doctor_name'        => $s->doctor?->entityUser?->user?->name ?? 'Médico',
+                'covenant_name'      => $s->covenant?->name ?? 'Particular',
+                'covenant_color'     => $s->covenant?->color ?? '#6c757d',
+                'visit_name'         => $s->visitType?->name ?? 'Consulta',
+            ]);
+
+            $mappedEvents = $events->map(fn ($e) => [
+                'type'        => 'event',
+                'id'          => $e->id,
+                'time'        => $e->starts_at->format('H:i'),
+                'date_time'   => $e->starts_at,
+                'title'       => $e->title,
+                'doctor_name' => $e->doctor?->entityUser?->user?->name,
+                'description' => $e->description,
+            ]);
+
+            $items = $mappedSchedules->concat($mappedEvents)
+                ->sortBy('date_time')
+                ->values();
+
+            return response()->json([
+                'items' => $items,
+            ]);
+        }
 
         return view('system.schedules.list', compact('schedules', 'events'));
     }
@@ -167,7 +179,11 @@ class SchedulesController extends Controller
             ]);
         }
 
-        return view('system.schedules.show', compact('schedule'));
+        return Inertia::render('Schedules/Show', [
+            'record' => array_merge($schedule->toArray(), [
+                'date_time' => $schedule->date_time->format('Y-m-d\TH:i'),
+            ])
+        ]);
     }
 
     public function store(ScheduleRequest $request): JsonResponse

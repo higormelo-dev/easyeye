@@ -2,16 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\DataTables\UsersDataTable;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
 use App\Models\{EntityUser, User};
 use App\Services\EntityUserService;
-use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 
 class UsersController extends Controller
 {
@@ -89,49 +88,28 @@ class UsersController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(UsersDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(): \Inertia\Response
     {
-        $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.accesscontrol.users.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
+        $roles = [];
+        if (! session()->get('selected_entity_is_client')) {
+            $roles = User::$rolesOfManager;
+        } else {
+            $roles = User::$rolesOfClients;
+            unset($roles['doctor']);
+        }
 
-        return $dataTable->render('system.users.index', compact('meta'));
+        return Inertia::render('Users/Index', [
+            'roles' => $roles,
+        ]);
     }
 
     /**
      * Show the form for creating a new resource.
+     * Now handled by the React modal in Index page — redirect to index.
      */
     public function create()
     {
-        $roles = ['' => 'Selecione uma opção'];
-
-        if (! session()->get('selected_entity_is_client')) {
-            $roles = array_merge($roles, User::$rolesOfManager);
-        } else {
-            $clientRoles = User::$rolesOfClients;
-            unset($clientRoles['doctor']);
-            $roles = array_merge($roles, $clientRoles);
-        }
-
-        return view('system.users.form', compact('roles'));
+        return redirect()->route('panel.accesscontrol.users.index');
     }
 
     /**
@@ -157,7 +135,7 @@ class UsersController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id): Application|View|JsonResponse|EntityUserResource
+    public function show(string $id): Application|\Inertia\Response|JsonResponse|EntityUserResource
     {
         $record = $this->service->findByIdOrCode($id);
 
@@ -167,10 +145,13 @@ class UsersController extends Controller
             ]);
         }
 
-        return view(
-            'system.users.show',
-            compact('record')
-        );
+        $record->load('user');
+        $rolesMap = session()->get('selected_entity_is_client') ? User::$rolesOfClients : User::$rolesOfManager;
+        $record->rule_label = $rolesMap[$record->rule] ?? $record->rule;
+
+        return Inertia::render('Users/Show', [
+            'record' => $record,
+        ]);
     }
 
     /**
