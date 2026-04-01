@@ -48,7 +48,10 @@ abstract class BaseSettingController extends Controller
         $perPage = 12;
 
         $records = $class::query()
-            ->where('entity_id', session('selected_entity_id'))
+            ->where(fn ($q) => $q
+                ->where('entity_id', session('selected_entity_id'))
+                ->orWhereNull('entity_id')
+            )
             ->when($search, fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
             ->orderBy('name')
             ->paginate($perPage);

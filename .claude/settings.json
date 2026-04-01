@@ -19,7 +19,10 @@
       "Read(//home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/**)",
       "Bash(done)",
       "Bash(npm run:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(./vendor/bin/pest --exclude=tests/Feature/Subscriptions/UsageMeterServiceTest.php)",
+      "Bash(./vendor/bin/pest --filter \"not UsageMeterServiceTest\")"
     ]
   }
 }

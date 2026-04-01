@@ -48,7 +48,10 @@ abstract class BaseSettingService
         $class = $this->modelClass();
 
         return $class::query()
-            ->where('entity_id', session('selected_entity_id'))
+            ->where(fn ($q) => $q
+                ->where('entity_id', session('selected_entity_id'))
+                ->orWhereNull('entity_id')
+            )
             ->count();
     }
 
