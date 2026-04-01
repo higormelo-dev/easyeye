@@ -7,6 +7,7 @@ use App\Http\Controllers\Manager\{
     EntityUserIntegratorsController,
     EntityUsersController,
     ImpersonateController,
+    PartnersReportController,
     PlansController,
     SubscriptionsController
 };
@@ -41,6 +42,10 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
 
     // ── Planos ─────────────────────────────────────────────────────────────
     Route::resource('plans', PlansController::class)->except('create', 'edit');
+
+    // ── Parceiros ──────────────────────────────────────────────────────────
+    Route::get('partners', [PartnersReportController::class, 'index'])->name('partners.index');
+    Route::patch('partners/commissions/{commission}/pay', [PartnersReportController::class, 'payCommission'])->name('partners.commission.pay');
 
     // ── Assinaturas ────────────────────────────────────────────────────────
     Route::post('subscriptions/activate', [SubscriptionsController::class, 'activate'])->name('subscriptions.activate');

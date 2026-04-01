@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
-use App\Models\EntityUser;
+use App\Enums\EntityGate;
+use App\Models\{Entity, EntityUser};
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -14,7 +16,13 @@ class EntityUserRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $entity = Entity::find(session('selected_entity_id'));
+
+        if (! $entity) {
+            return false;
+        }
+
+        return Gate::allows(EntityGate::ManageUsers->value, $entity);
     }
 
     /**

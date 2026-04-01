@@ -8,7 +8,7 @@ use App\Services\BaseSettingService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Http\{JsonResponse, RedirectResponse};
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
 
@@ -39,6 +39,29 @@ abstract class BaseSettingController extends Controller
             $this->viewData(),
             ['jsFile' => $this->jsFile]
         ));
+    }
+
+    public function cards(Request $request): JsonResponse
+    {
+        $class   = $this->service->getModelClass();
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 12;
+
+        $records = $class::query()
+            ->where('entity_id', session('selected_entity_id'))
+            ->when($search, fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->orderBy('name')
+            ->paginate($perPage);
+
+        return response()->json([
+            'data' => $records->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'active' => (bool) $r->active]),
+            'meta' => [
+                'total'        => $records->total(),
+                'per_page'     => $records->perPage(),
+                'current_page' => $records->currentPage(),
+                'last_page'    => $records->lastPage(),
+            ],
+        ]);
     }
 
     public function create(): Factory|Application|View
@@ -135,13 +158,16 @@ abstract class BaseSettingController extends Controller
             'storeUrl'        => route($this->routePrefix . '.store'),
             'baseUrl'         => $this->baseUrl,
             'crudFields'      => $this->crudFields,
+            'storageKey'      => $this->viewSlot . '_view',
         ];
     }
 
-    private function buildMeta(): array
+    protected function buildMeta(): array
     {
         return [
             'title'       => $this->titleController,
+            'total'       => $this->service->count(),
+            'cardsUrl'    => route($this->routePrefix . '.cards'),
             'action'      => __('actions.records'),
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                         'active' => false],

@@ -43,6 +43,20 @@ abstract class BaseSettingService
             ->firstOrFail();
     }
 
+    public function count(): int
+    {
+        $class = $this->modelClass();
+
+        return $class::query()
+            ->where('entity_id', session('selected_entity_id'))
+            ->count();
+    }
+
+    public function getModelClass(): string
+    {
+        return $this->modelClass();
+    }
+
     protected function getCreateData(FormRequest $request): array
     {
         return ['name' => $request->name];

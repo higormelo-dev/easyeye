@@ -1,61 +1,69 @@
-# Product Requirements Document (PRD)
-**Produto:** EasyEye (Medicare)
-**Data:** Março de 2026
-**Visão:** Ser o Sistema Operacional definitivo (SaaS B2B) para clínicas e consultórios de oftalmologia no Brasil, focado em alta produtividade clínica, compliance rigoroso e integração perfeita com equipamentos de diagnóstico.
+# Product Requirements Document (PRD) - EasyEye (Medicare)
+
+**Versão:** 2.0  
+**Data:** Março de 2026  
+**Status:** Em Evolução (Migração React/Inertia em curso)
 
 ---
 
-## 1. Sumário Executivo
-O **EasyEye** é uma plataforma SaaS multi-tenant focada na vertical de oftalmologia. Ao contrário de sistemas de gestão horizontal genéricos, o EasyEye resolve o maior gargalo técnico da especialidade: a fragmentação entre o prontuário eletrônico e os equipamentos robóticos de diagnóstico (paquímetros, topógrafos, auto-refratores). Através de um integrador local (desktop) e uma API robusta, a plataforma unifica a jornada do paciente, desde o agendamento até a assinatura digital do prontuário, garantindo conformidade com o CFM e a LGPD.
+## 1. Visão do Produto
+O **EasyEye** (codinome interno *Medicare*) é o "Sistema Operacional" definitivo para clínicas de oftalmologia. Ele resolve a fragmentação entre o atendimento clínico e os equipamentos de diagnóstico, unificando agendamento, prontuário eletrônico (PEP), captura automática de exames e gestão de conformidade (CFM/LGPD) em uma única plataforma SaaS premium.
 
-## 2. Declaração do Problema
-* **Desconexão de Hardware/Software:** Médicos oftalmologistas perdem, em média, de 2 a 5 minutos por consulta exportando imagens de máquinas locais via pen-drive ou rede mal configurada para anexar manualmente em prontuários web.
-* **Riscos Legais e Compliance:** Sistemas menores falham em prover a imutabilidade exigida pela Resolução CFM 2.227/2018 para prontuários eletrônicos sem papel, além de não controlarem adequadamente os consentimentos exigidos pela LGPD.
-* **Falta de Foco Especializado:** Sistemas como iClinic ou Feegow oferecem interfaces amplas demais, não otimizadas para o workflow tático do oftalmologista e suas especificidades (ex: lateralidade de exames - OD/OE).
+## 2. O Problema
+1.  **Gargalo de Hardware:** Oftalmologistas perdem tempo precioso movendo arquivos de máquinas de exames (Topógrafos, OCTs) para o prontuário via pen-drives ou redes locais instáveis.
+2.  **Risco Jurídico:** A maioria dos sistemas não garante a imutabilidade do prontuário exigida pelo CFM (Res. 2.227/2018) nem o registro rigoroso de acesso a dados sensíveis (LGPD).
+3.  **Experiência Datada:** Interfaces de sistemas médicos costumam ser complexas, lentas e não otimizadas para o fluxo rápido de uma clínica oftalmológica.
 
-## 3. Público-Alvo e Personas
-1. **O Médico Oftalmologista (Dr. Roberto):** Focado em ver mais pacientes por hora sem perder qualidade. Odeia trabalho administrativo e burocracia de software.
-2. **A Secretária/Recepção (Ana):** Focada em velocidade de agendamento, recepção de pacientes e baixa taxa de no-show (faltas).
-3. **O Gestor/Dono da Clínica (Carlos):** Foca no faturamento, controle de glosas, aquisição de novos pacientes e cumprimento de regras para evitar multas.
+## 3. Personas
+*   **Dr. Roberto (Oftalmologista):** Precisa de agilidade. Quer ditar a evolução, ver os exames automaticamente no prontuário e assinar digitalmente com um clique.
+*   **Ana (Recepção/Secretária):** Gerencia agendas lotadas, confirmações de pacientes e o fluxo na sala de espera.
+*   **Carlos (Gestor da Clínica):** Focado em métricas de faturamento, retenção de pacientes (LTV) e conformidade legal total para evitar multas.
 
-## 4. Funcionalidades Atuais (Core V1)
+## 4. Funcionalidades de Core (V1 - Estável)
 
-### 4.1 Gestão Clínica e Agendamentos
-- **Prontuário Eletrônico:** Focado na oftalmologia, com suporte a histórico e evolução tática.
-- **Painel de Agendamentos:** Controle de status da consulta (Agendado, Em Andamento, Concluído, Cancelado).
-- **Multi-Tenancy por Entidade:** Clínicas são Entities isoladas (`ENT-XXX`). Usuários podem ter múltiplos papéis (Roles) dentro de uma entidade.
+### 4.1 Gestão Clínica 360°
+*   **Agendamento Inteligente:** Controle de status (Agendado, Em Atendimento, Concluído, Cancelado) com visão por médico e unidade.
+*   **Prontuário Eletrônico Oftalmológico:** Campos específicos para lateralidade (OD/OE), histórico clínico e evolução tática.
+*   **Multi-Tenancy (Entidades):** Isolamento total de dados entre clínicas, com suporte a múltiplos papéis (Roles) por usuário (Médico, Recepcionista, Gestor).
 
 ### 4.2 EasyEye Integrator (Hardware-to-Cloud)
-- **Sincronização Automática:** Aplicativo desktop em Java (EasyEye Integrator) que monitora as pastas de saída dos equipamentos médicos.
-- **Resolução Inteligente de Entidades:** A API (`POST /api/integrators/v1/exams`) identifica o paciente (`PAC-XXX`) através do nome do arquivo (ex: `PAC-000002-od.jpeg`) e vincula automaticamente o exame da máquina ao agendamento do dia, salvando no prontuário sem cliques.
+*   **Automação de Exames:** Aplicativo desktop que monitora pastas de saída de equipamentos e faz upload automático para a nuvem.
+*   **Match Inteligente:** A API identifica o paciente e o agendamento vigente através do nome do arquivo, vinculando o exame ao prontuário sem intervenção manual.
 
-### 4.3 Compliance Enterprise (CFM & LGPD)
-- **Assinatura Eletrônica (CFM):** Congelamento (lock) do prontuário ao assinar, gerando um hash SHA-256 (imutabilidade).
-- **Gestão de Consentimentos:** Painel LGPD para coletar, versionar e revogar permissões de uso de dados sensíveis e imagens.
-- **Log de Acesso Total:** Registro estrito de quem leu ou modificou cada dado médico (Audit Logs).
+### 4.3 Compliance & Segurança (Enterprise Ready)
+*   **Assinatura Digital (CFM):** Sistema de congelamento de prontuário com hash SHA-256 para garantir imutabilidade.
+*   **Arquitetura LGPD Native:** Logs de acesso a dados sensíveis (`data_access_logs`), gestão de consentimentos versionados e solicitações de direitos do titular.
+*   **Snapshot de Versões:** Histórico completo de alterações em registros clínicos.
 
-### 4.4 Growth e Monetização (PLG)
-- **Billing por Uso (Meters):** Planos controlam limites de envios de API (exames) e uso de créditos mensais de IA.
-- **Sistema de Parcerias e Indicações:** Clínicas geram códigos de indicação para descontos. Revendedores recebem comissionamento nativo mensurado por marcos de Ativação (`ActivationSteps`).
+### 4.4 Experiência do Paciente & Sala de Espera
+*   **Waiting Room TV:** Display público para sala de espera que exibe a fila de chamadas em tempo real, pareado via QRCode.
 
 ---
 
-## 5. Roadmap e Funcionalidades Futuras (V2 e V3)
+## 5. Funcionalidades em Implementação (V2 - Modernização)
 
-### 5.1 Foco em Produtividade com Inteligência Artificial (V2)
-- **Transcrição de Evolução por Voz (Voice-to-Text):** O médico dita a evolução e a IA resume e preenche os campos do prontuário de forma estruturada. (Consumindo a cota `AiMonthlyCredits`).
-- **Pré-Análise de Imagens Diagnósticas:** IA capaz de identificar anomalias primárias em fotos de retina ou topografias, agindo como segunda opinião.
-- **Agendamento via WhatsApp Bot AI:** Integração direta com a agenda do EasyEye, permitindo que o paciente marque, reagende e confirme presença 24/7 de forma conversacional.
+### 5.1 Nova Experiência Frontend (React + Inertia.js)
+*   **Migração de Blade para React:** Refatoração completa da interface para uma experiência de SPA (Single Page Application) fluida, utilizando o template premium *Preclinic*.
+*   **Componentização:** Criação de biblioteca de componentes reutilizáveis para garantir consistência visual e velocidade de desenvolvimento.
 
-### 5.2 Faturamento e Financeiro (V3)
-- **Faturamento TISS (Integração de Convênios):** Geração de guias TISS/TUSS em lote para minimizar glosas com planos de saúde.
-- **Conciliação Bancária e Split de Pagamentos:** Divisão automática dos honorários entre a clínica e os oftalmologistas associados nas consultas particulares.
+### 5.2 IA e Produtividade Clínica
+*   **Voice-to-Text (Ditado Médico):** Transcrição e estruturação automática de dados da consulta via IA, otimizando o preenchimento do PEP.
+*   **IA de Triagem de Imagens:** Pré-análise de exames para detecção de anomalias comuns (ex: Catarata, Glaucoma) como apoio à decisão.
 
-### 5.3 Engajamento do Paciente
-- **Portal do Paciente:** Acesso web/mobile simples para o paciente acessar suas receitas de óculos atualizadas, declarações e laudos de exames diagnosticados pelas máquinas.
+---
 
-## 6. Métricas de Sucesso (KPIs)
-- **Ativação (Activation Rate):** Tempo médio desde a criação do Trial até o envio do 1º exame via Integrador.
-- **Engajamento:** Quantidade média de exames enviados via API por clínica mensalmente.
-- **CAC vs LTV:** Manter o Custo de Aquisição baixo graças ao motor de *Referral/Partners* embutido, frente a uma retenção (LTV) altíssima causada pela "aderência" do integrador de equipamentos.
-- **Churn Rate:** Meta audaciosa de manter abaixo de 1% a.m., já que desplugar equipamentos de hardware da nuvem gera enorme atrito.
+## 6. Roadmap e Futuro (V3+)
+
+### 6.1 Ecossistema Mobile
+*   **App do Médico:** Acesso rápido à agenda e prontuários pelo celular (reutilizando a lógica do frontend React).
+*   **Portal do Paciente:** App/Web para o paciente visualizar receitas de óculos, laudos de exames e agendar consultas.
+
+### 6.2 Finanças e Expansão
+*   **Módulo Financeiro TISS:** Faturamento eletrônico de guias para convênios conforme padrão ANS.
+*   **Telemedicina Integrada:** Consultas remotas com integração nativa ao prontuário e assinatura digital de receitas.
+*   **Marketplace de Insumos:** Integração com fornecedores de lentes e medicamentos para clínicas.
+
+## 7. Métricas de Sucesso (KPIs)
+*   **Activation Score:** Percentual de clínicas que realizam o primeiro upload de exame via Integrador nos primeiros 7 dias.
+*   **Time-to-Chart:** Tempo médio gasto pelo médico para concluir o preenchimento e assinatura de um prontuário.
+*   **Retention (LTV):** Baixa taxa de churn devido à dependência tecnológica da integração com hardware.

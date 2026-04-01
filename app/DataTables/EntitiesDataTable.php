@@ -94,23 +94,23 @@ class EntitiesDataTable extends BaseDataTable
 
         if (! $record->deleted_at) {
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-edit"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>';
 
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
             if ($record->entity_users_count > 0) {
                 $btnActions .= '<a href="' . route('panel.manager.entities.users', $record->id) . '"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                    class="btn waves-effect waves-light btn-light btn-xs m-1"
                     data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="Usuários"><i class="fas fa-users"></i></a>';
             } else {
                 $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 disabled"
+                    class="btn waves-effect waves-light btn-light btn-xs m-1 disabled"
                     aria-disabled="true" tabindex="-1"
                     data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="Usuários"><i class="fas fa-users"></i></a>';
@@ -118,19 +118,19 @@ class EntitiesDataTable extends BaseDataTable
 
             if ($record->entity_user_integrators_count > 0) {
                 $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.index', $record->id) . '"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                    class="btn waves-effect waves-light btn-light btn-xs m-1"
                     data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
             } else {
                 $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 disabled"
+                    class="btn waves-effect waves-light btn-light btn-xs m-1 disabled"
                     aria-disabled="true" tabindex="-1"
                     data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
             }
 
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-active"
                 data-id="' . $record->id . '" data-situation="' . ($record->active ? 0 : 1) . '"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . ($record->active ? __('actions.disable') : __('actions.enable')) . '">
@@ -142,7 +142,7 @@ class EntitiesDataTable extends BaseDataTable
                 title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
         } else {
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-restore"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-restore"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.restore') . '"><i class="fas fa-recycle"></i></a>';
         }

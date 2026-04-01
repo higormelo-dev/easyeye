@@ -79,10 +79,10 @@
                             <div class="row g-2 mb-3">
                                 <div class="col-4">
                                     <label class="pmr-label">{{ __('actions.medical_records.chromatic_vision') }}</label>
-                                    <select name="visual_acuity_type_id" class="form-select form-select-sm">
+                                    <select name="color_vision_type_id" class="form-select form-select-sm">
                                         <option value="">—</option>
                                         @foreach($colorVisionTypes as $item)
-                                            <option value="{{ $item->id }}" {{ old('visual_acuity_type_id') === $item->id ? 'selected' : '' }}>{{ $item->name }}</option>
+                                            <option value="{{ $item->id }}" {{ old('color_vision_type_id') === $item->id ? 'selected' : '' }}>{{ $item->name }}</option>
                                         @endforeach
                                     </select>
                                 </div>

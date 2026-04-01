@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./vendor/bin/pest tests/Feature/AclTest.php)",
+      "Bash(./vendor/bin/pest tests/Feature/AclTest.php --filter \"doctor pode acessar schedules\" --verbose)",
+      "Bash(./vendor/bin/pest tests/Feature/AclTest.php --filter \"doctor pode acessar schedules\")",
+      "Bash(./vendor/bin/pest tests/Feature/AclTest.php --filter \"schedules\")",
+      "Bash(./vendor/bin/pest --version)",
+      "Bash(./vendor/bin/phpunit --version)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(./vendor/bin/pest tests/Feature/Subscriptions/TrialServiceTest.php)",
+      "Bash(./vendor/bin/pest --parallel)",
+      "Bash(./vendor/bin/pest)",
+      "Bash(./vendor/bin/pest --no-parallel)",
+      "Bash(grep -n \"function index\\\\|function cards\\\\|function show\\\\|$meta\" /home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/app/Http/Controllers/PatientsController.php)",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(echo \"=== $f ===\")",
+      "Read(//home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/**)",
+      "Bash(done)",
+      "Bash(npm run:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

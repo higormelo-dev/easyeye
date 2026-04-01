@@ -13,6 +13,9 @@ Alpine.data('patientViewToggle', patientViewToggle);
 import doctorViewToggle from './components/doctorViewToggle';
 Alpine.data('doctorViewToggle', doctorViewToggle);
 
+import settingViewToggle from './components/settingViewToggle';
+Alpine.data('settingViewToggle', settingViewToggle);
+
 import userViewToggle from './components/userViewToggle';
 Alpine.data('userViewToggle', userViewToggle);
 

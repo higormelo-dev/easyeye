@@ -35,10 +35,11 @@ class PatientsController extends Controller
     public function index(PatientsDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
-            'title'          => $this->titleController,
-            'total_patients' => Patient::where('entity_id', session('selected_entity_id'))->count(),
-            'action'         => __('actions.records'),
-            'breadcrumbs'    => [
+            'title'            => $this->titleController,
+            'breadcrumb_title' => false,
+            'total_patients'   => Patient::where('entity_id', session('selected_entity_id'))->count(),
+            'action'           => __('actions.records'),
+            'breadcrumbs'      => [
                 [
                     'label'  => __('actions.sidemenu.dashboard'),
                     'url'    => route('panel.dashboard'),

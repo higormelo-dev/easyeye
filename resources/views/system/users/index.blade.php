@@ -8,62 +8,77 @@
     <div x-data="userViewToggle(@js(route('panel.accesscontrol.users.cards')), @js(asset('system/images/team.png')))"
          x-init="init()">
 
-        {{-- Toolbar --}}
-        <div class="row mb-3 align-items-center">
-            <div class="col-12 col-md-auto">
-                @include('components.subnav')
+        {{-- ══ Page Header ══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-1 border-bottom">
+            <div class="flex-grow-1">
+                <h4 class="fw-bold mb-0">
+                    {{ $meta['title'] }}
+                    <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
+                        {{ __('actions.total') }}: {{ $meta['total_users'] }}
+                    </span>
+                </h4>
             </div>
-            <div class="col-12 col-md d-flex align-items-center gap-2 mt-2 mt-md-0 justify-content-md-end">
-                {{-- Busca unificada --}}
-                <div class="input-group input-group-sm flex-grow-1" style="max-width: 320px;">
-                    <span class="input-group-text"><i class="fa fa-search"></i></span>
-                    <input type="text"
-                        class="form-control"
-                        placeholder="{{ __('actions.search') }}..."
-                        x-model="search"
-                        x-on:input.debounce.400ms="performSearch()">
-                    <button class="btn btn-outline-secondary" type="button"
-                        x-show="search"
-                        x-on:click="clearSearch()">
-                        <i class="fa fa-times"></i>
-                    </button>
-                </div>
-
+            <div class="d-flex align-items-center gap-2">
                 {{-- Toggle tabela / cards --}}
-                <div class="btn-group btn-group-sm flex-shrink-0" role="group" aria-label="{{ __('actions.view_mode') }}">
-                    <button type="button" class="btn"
-                        :class="view === 'table' ? 'btn-primary' : 'btn-outline-secondary'"
-                        x-on:click="setView('table')"
-                        title="{{ __('actions.table_view') }}">
-                        <i class="fa fa-list"></i>
+                <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
+                            :class="view === 'table' ? 'bg-light' : 'bg-white'"
+                            x-on:click="setView('table')"
+                            title="{{ __('actions.table_view') }}">
+                        <i class="ti ti-list fs-14 text-body"></i>
                     </button>
-                    <button type="button" class="btn"
-                        :class="view === 'cards' ? 'btn-primary' : 'btn-outline-secondary'"
-                        x-on:click="setView('cards')"
-                        title="{{ __('actions.card_view') }}">
-                        <i class="fa fa-th-large"></i>
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
+                            :class="view === 'cards' ? 'bg-light' : 'bg-white'"
+                            x-on:click="setView('cards')"
+                            title="{{ __('actions.card_view') }}">
+                        <i class="ti ti-layout-grid fs-14 text-body"></i>
                     </button>
                 </div>
+                {{-- Novo Usuário --}}
+                <a href="javascript:void(0);" class="btn btn-primary fs-13 btn-md new-register">
+                    <i class="ti ti-plus me-1"></i>{{ __('actions.new') }}
+                </a>
             </div>
         </div>
+        {{-- ══ /Page Header ═════════════════════════════════════════════════════ --}}
 
-        {{-- DataTable View --}}
-        <div x-show="view === 'table'">
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header">
-                            <h4 class="card-title mb-0">{{ $meta['action'] }}</h4>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
+        {{-- ══ Filter Bar ═══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-center justify-content-between flex-wrap mb-3">
+            <div class="search-set">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <div class="table-search d-flex align-items-center mb-0">
+                        <div class="search-input">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white">
+                                    <i class="ti ti-search fs-12"></i>
+                                </span>
+                                <input type="text"
+                                       class="form-control border-start-0"
+                                       placeholder="{{ __('actions.search') }}..."
+                                       x-model="search"
+                                       x-on:input.debounce.400ms="performSearch()">
+                                <button class="btn btn-outline-secondary border-start-0" type="button"
+                                        x-show="search"
+                                        x-on:click="clearSearch()">
+                                    <i class="ti ti-x fs-12"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+        {{-- ══ /Filter Bar ══════════════════════════════════════════════════════ --}}
+
+        {{-- ══ DataTable View ═══════════════════════════════════════════════════ --}}
+        <div x-show="view === 'table'">
+            <div class="table-responsive">
+                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
+            </div>
+        </div>
+        {{-- ══ /DataTable View ══════════════════════════════════════════════════ --}}
 
         {{-- Cards View --}}
         <div x-show="view === 'cards'" x-cloak>

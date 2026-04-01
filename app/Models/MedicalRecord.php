@@ -6,6 +6,7 @@ use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Factories\HasFactory, Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\ColorVisionType;
 
 class MedicalRecord extends Model
 {
@@ -28,9 +29,11 @@ class MedicalRecord extends Model
         'patient_id',
         'doctor_id',
         'schedule_id',
+        // Exame físico — seleções
         'visual_acuity_type_id',
         'near_point_convergence_id',
         'cover_test_type_id',
+        'color_vision_type_id',        // CBO: visão cromática (campo corrigido)
         'visual_acuity_without_correction_right_id',
         'visual_acuity_without_correction_left_id',
         'visual_acuity_with_correction_right_id',
@@ -39,16 +42,26 @@ class MedicalRecord extends Model
         'lens_away_id',
         'lens_near_id',
         'code',
+        // Anamnese — CBO
         'main_complaint',
+        'hda',                         // CBO: história da doença atual
         'diabetic',
         'diabetic_family',
         'hypertensive',
         'hypertensive_family',
         'glaucomatous',
         'glaucomatous_family',
+        'ocular_surgical_history',     // CBO: antecedentes cirúrgicos oculares
+        'medications_in_use',          // CBO: medicamentos em uso
+        // Exame físico — texto
+        'ocular_motility',             // CBO: motilidade ocular extrínseca
         'tonometer_right',
         'tonometer_left',
         'tonometer_time',
+        'pachymetry_right',            // CBO: paquimetria OD (μm)
+        'pachymetry_left',             // CBO: paquimetria OE (μm)
+        'gonioscopy_right',            // CBO: gonioscopia OD
+        'gonioscopy_left',             // CBO: gonioscopia OE
         'dynamic_spherical_right',
         'dynamic_spherical_left',
         'dynamic_cylindrical_right',
@@ -59,6 +72,7 @@ class MedicalRecord extends Model
         'static_spherical_left',
         'static_cylindrical_right',
         'static_cylindrical_left',
+        'static_axis_right',
         'static_axis_left',
         'biomicroscopy_right',
         'biomicroscopy_left',
@@ -66,7 +80,13 @@ class MedicalRecord extends Model
         'fundoscopy_left',
         'observation_general',
         'observation_of_lenses',
-        // Campos de assinatura — CFM Res. 2.227/2018
+        // Diagnóstico — CBO obrigatório
+        'diagnosis_cid10',             // CBO: código CID-10
+        'diagnosis_description',       // CBO: descrição do diagnóstico
+        // Conduta — CBO obrigatório
+        'clinical_conduct',            // CBO: conduta clínica / plano terapêutico
+        'follow_up_days',              // CBO: retorno em dias
+        // Assinatura — CFM Res. 2.227/2018
         'signed_by',
         'signed_at',
         'signature_hash',
@@ -143,6 +163,11 @@ class MedicalRecord extends Model
     public function coverTestType(): BelongsTo
     {
         return $this->belongsTo(CoverTestType::class, 'cover_test_type_id');
+    }
+
+    public function colorVisionType(): BelongsTo
+    {
+        return $this->belongsTo(ColorVisionType::class, 'color_vision_type_id');
     }
 
     public function visualAcuityTypeWithoutCorrectionRight(): BelongsTo

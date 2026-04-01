@@ -2,15 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, ScheduleSituation};
-use App\Models\{Covenant, Doctor, Schedule};
+use App\Enums\{ClientRule, EntityGate, ScheduleSituation};
+use App\Models\{Covenant, Doctor, Entity, Schedule};
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class ReportsController extends Controller
 {
     public function index()
     {
+        Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
+
         $meta = [
             'title'       => __('actions.sidemenu.reports'),
             'action'      => __('actions.sidemenu.dashboard'),
@@ -29,6 +32,8 @@ class ReportsController extends Controller
      */
     public function schedules(Request $request)
     {
+        Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
+
         $entityId  = session('selected_entity_id');
         $doctors   = $this->doctorsByEntity($entityId);
         $covenants = Covenant::where(function ($q) use ($entityId) {
@@ -122,6 +127,8 @@ class ReportsController extends Controller
      */
     public function absenteeism(Request $request)
     {
+        Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
+
         $entityId = session('selected_entity_id');
         $doctors  = $this->doctorsByEntity($entityId);
 

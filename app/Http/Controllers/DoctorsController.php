@@ -3,15 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\DataTables\DoctorsDataTable;
+use App\Enums\EntityGate;
 use App\Http\Requests\{DoctorRequest};
 use App\Http\Resources\{DoctorResource, EntityUserResource};
-use App\Models\{Doctor, EntityUser, Patient, People, User};
+use App\Models\{Doctor, Entity, EntityUser, Patient, People, User};
 use App\Services\DoctorService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{DB, Gate};
 
 class DoctorsController extends Controller
 {
@@ -87,8 +88,9 @@ class DoctorsController extends Controller
     public function index(DoctorsDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
-            'title'         => $this->titleController,
-            'total_doctors' => Doctor::query()
+            'title'            => $this->titleController,
+            'breadcrumb_title' => false,
+            'total_doctors'    => Doctor::query()
                 ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
                 ->where('entity_users.entity_id', session('selected_entity_id'))
                 ->count(),
@@ -128,6 +130,8 @@ class DoctorsController extends Controller
      */
     public function store(DoctorRequest $request): JsonResponse
     {
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
+
         $entityUser = $this->service->create($request);
 
         return response()->json([
@@ -227,6 +231,8 @@ class DoctorsController extends Controller
      */
     public function update(DoctorRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse
     {
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
+
         $record        = $this->service->findByIdOrCode($id);
         $updatedRecord = $this->service->update($record, $request);
         $updatedRecord->refresh();
@@ -249,6 +255,8 @@ class DoctorsController extends Controller
      */
     public function destroy(string $id): Application|View|JsonResponse
     {
+        Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
+
         $record = $this->service->findByIdOrCode($id);
 
         return DB::transaction(function () use ($record) {

@@ -92,9 +92,14 @@ class UsersController extends Controller
     public function index(UsersDataTable $dataTable): Factory|Application|View|JsonResponse
     {
         $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
+            'title'            => $this->titleController,
+            'breadcrumb_title' => false,
+            'total_users'      => EntityUser::query()
+                ->where('entity_id', session('selected_entity_id'))
+                ->whereNot('rule', 'doctor')
+                ->count(),
+            'action'           => __('actions.records'),
+            'breadcrumbs'      => [
                 [
                     'label'  => __('actions.sidemenu.dashboard'),
                     'url'    => route('panel.dashboard'),

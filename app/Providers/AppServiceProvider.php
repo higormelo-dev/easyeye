@@ -2,10 +2,11 @@
 
 namespace App\Providers;
 
+use App\Enums\EntityGate;
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
-use App\Observers\{ActivationObserver, EntityObserver, SubscriptionObserver};
+use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
-use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\{Blade, Gate, URL};
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -50,9 +51,27 @@ class AppServiceProvider extends ServiceProvider
         });
 
         // -------------------------------------------------------------------------
-        // Observers existentes
+        // Blade: @canEntity('entity.manage-users') / @endcanEntity
+        //
+        // Alternativa limpa ao session('selected_entity_user_rule') === 'admin'
+        // nas views. Delega para os Gates definidos em AuthServiceProvider,
+        // resolvendo a entity a partir da sessão ativa do painel.
         // -------------------------------------------------------------------------
-        Entity::observe(EntityObserver::class);
+        Blade::if('canEntity', function (string $gate): bool {
+            $entityId = session('selected_entity_id');
+
+            if (! $entityId) {
+                return false;
+            }
+
+            $entity = Entity::find($entityId);
+
+            if (! $entity) {
+                return false;
+            }
+
+            return Gate::allows($gate, $entity);
+        });
 
         // -------------------------------------------------------------------------
         // CAC: Activation Tracking — observa múltiplos models via métodos nomeados

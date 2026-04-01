@@ -15,6 +15,8 @@
 
 @include('system.dashboard._header')
 
+@include('system.dashboard._activation')
+
 @include('system.dashboard._kpis')
 
 @include('system.dashboard._modules')

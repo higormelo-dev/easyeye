@@ -1,4 +1,3 @@
-@php use App\Enums\ClientRule; @endphp
 <li>
     <a class="waves-effect waves-dark" href="{{ route('panel.schedules.index') }}">
         <i class="fa fa-calendar"></i>
@@ -13,7 +12,7 @@
     </a>
 </li>
 
-@if(in_array(session('selected_entity_user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true))
+@canEntity('entity.edit-schedule')
     <li>
         <a class="waves-effect waves-dark"
            href="{{ route('panel.doctors.index') }}">
@@ -21,9 +20,33 @@
             <span class="hide-menu">{{ __('actions.sidemenu.doctors') }}</span>
         </a>
     </li>
-@endif
+@endcanEntity
 
-@if(in_array(session('selected_entity_user_rule'), [ClientRule::Admin->value, ClientRule::Financial->value], true))
+@canEntity('entity.view-financial')
+    <li>
+        <a class="has-arrow waves-effect waves-dark" href="javascript:void(0);" aria-expanded="false">
+            <i class="fas fa-chart-bar"></i><span class="hide-menu">{{ __('actions.sidemenu.reports') }}</span>
+        </a>
+        <ul aria-expanded="false" class="collapse">
+            <li>
+                <a href="{{ route('panel.reports.schedules') }}" class="link-underline link-underline-opacity-0">
+                    <span class="fa fa-calendar-check"></span> {{ __('actions.reports.schedules_label') }}
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('panel.reports.absenteeism') }}" class="link-underline link-underline-opacity-0">
+                    <span class="fa fa-user-times"></span> {{ __('actions.reports.absenteeism_label') }}
+                </a>
+            </li>
+            @canEntity('entity.manage-settings')
+                <li>
+                    <a href="{{ route('panel.reports.compliance') }}" class="link-underline link-underline-opacity-0">
+                        <span class="fa fa-shield-alt"></span> Compliance & Auditoria
+                    </a>
+                </li>
+            @endcanEntity
+        </ul>
+    </li>
     <li>
         <a class="has-arrow waves-effect waves-dark" href="javascript:void(0);" aria-expanded="false">
             <i class="fas fa-cash-register"></i><span class="hide-menu">Financeiro</span>
@@ -34,9 +57,9 @@
             </li>
         </ul>
     </li>
-@endif
+@endcanEntity
 
-@if(session()->get('selected_entity_user_rule') === ClientRule::Admin->value)
+@canEntity('entity.manage-settings')
     <li>
         <a class="has-arrow waves-effect waves-dark" href="javascript:void(0)" aria-expanded="false">
             <i class="fas fa-stream"></i><span class="hide-menu">Configuração</span>
@@ -123,13 +146,13 @@
             </li>
         </ul>
     </li>
-@endif
+@endcanEntity
 
-@if(session()->get('selected_entity_user_rule') === \App\Enums\ClientRule::Admin->value)
+@canEntity('entity.manage-users')
     <li>
         <a class="waves-effect waves-dark" href="{{ route('panel.accesscontrol.users.index') }}">
             <i class="fa fa-users-cog"></i>
             <span class="hide-menu">{{ __('actions.users') }}</span>
         </a>
     </li>
-@endif
+@endcanEntity
