@@ -165,11 +165,12 @@ abstract class BaseSettingController extends Controller
     protected function buildMeta(): array
     {
         return [
-            'title'       => $this->titleController,
-            'total'       => $this->service->count(),
-            'cardsUrl'    => route($this->routePrefix . '.cards'),
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
+            'title'             => $this->titleController,
+            'total'             => $this->service->count(),
+            'cardsUrl'          => route($this->routePrefix . '.cards'),
+            'breadcrumb_title'  => false,
+            'action'            => __('actions.records'),
+            'breadcrumbs'       => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                         'active' => false],
                 ['label' => $this->titleController,           'url' => route($this->routePrefix . '.index'), 'active' => false],
                 ['label' => __('actions.records'),            'url' => 'javascript:void(0);',                'active' => true],
