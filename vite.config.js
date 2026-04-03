@@ -9,6 +9,7 @@ export default defineConfig({
                 'resources/css/vendor.css',
                 'resources/css/app.css',
                 'resources/css/dashboard.css',
+                'resources/css/manager-dashboard.css',
                 'resources/js/vendor.js',
                 'resources/js/app.js',
                 'resources/js/system/auxiliary_functions.js',

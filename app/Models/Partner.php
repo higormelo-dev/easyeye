@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\PartnerType;
+use App\Enums\{CommissionStatus, PartnerType};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
@@ -24,6 +24,7 @@ class Partner extends Model
         'status',
         'notes',
         'created_by',
+        'user_id',
     ];
 
     protected function casts(): array
@@ -40,6 +41,11 @@ class Partner extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     /** Clínicas atribuídas a este parceiro */
@@ -67,7 +73,7 @@ class Partner extends Model
     public function pendingCommissionsAmount(): float
     {
         return (float) $this->commissions()
-            ->where('status', \App\Enums\CommissionStatus::Pending->value)
+            ->where('status', CommissionStatus::Pending->value)
             ->sum('amount');
     }
 }

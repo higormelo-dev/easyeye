@@ -41,6 +41,7 @@
           storeDocUrl: @js(route('panel.patients.medicalrecords.documentations.store', [$patient, $r])),
           storeFileUrl: @js(route('panel.patients.medicalrecords.files.store', [$patient, $r])),
           storeTonometryUrl: @js(route('panel.patients.medicalrecords.tonometry.store', [$patient, $r])),
+          quickActionUrlTemplate: @js(route('panel.patients.medicalrecords.quick-actions.issue', [$patient, $r, '__ACTION__'])),
           @else
           storeTonometryUrl: '',
           @endif
@@ -706,6 +707,64 @@
             </div>
         </div>
     </div>
+
+    @php($selectedEntityForQuickActions = \App\Models\Entity::find(session('selected_entity_id')))
+    @if($isEdit && $selectedEntityForQuickActions && auth()->user()?->can(\App\Enums\EntityGate::IssueReport->value, $selectedEntityForQuickActions))
+    <div class="px-3 pb-2">
+        <div class="d-flex flex-wrap gap-1">
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueMedicationPrescription()">
+                Medicamentos
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueProcedureRequest()">
+                Procedimentos
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueQuickAction('pterygium-prescription')">
+                Receituário Pterígio
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueCataractPrescription()">
+                Receituário Catarata
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueQuickAction('test-eye')">
+                Teste do Olhinho
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueQuickAction('retinal-mapping')">
+                Mapeamento de Retina
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueQuickAction('attendance-certificate')">
+                Atestado Comparecimento
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueMedicalCertificate()">
+                Atestado Médico
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueQuickAction('ophthalmological-report')">
+                Laudo Oftalmológico
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    :disabled="quickActionBusy"
+                    @click="issueMedicalDeclaration()">
+                Declaração Médica
+            </button>
+        </div>
+    </div>
+    @endif
 
     {{-- ═══════════════════════════════════════════════════════════════════
          LISTA DE ARQUIVOS (somente edit, aparece abaixo da barra)

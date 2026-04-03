@@ -82,7 +82,7 @@
                         Botão de upgrade — ao integrar com gateway de pagamento,
                         substitua este link pela rota de checkout do plano.
                     --}}
-                    <a href="mailto:{{ config('mail.support_address', 'contato@medicare.com.br') }}?subject=Assinatura%20{{ urlencode($plan->name) }}"
+                    <a href="mailto:{{ config('mail.support_address', 'contato@easyeye.com.br') }}?subject=Assinatura%20{{ urlencode($plan->name) }}"
                        class="btn {{ $popular ? 'btn-primary' : 'btn-outline-primary' }} w-100">
                         {{ __('subscriptions.expired_page.upgrade_cta') }}
                     </a>
@@ -95,8 +95,8 @@
     {{-- Footer --}}
     <p class="text-center text-muted small">
         {{ __('subscriptions.expired_page.contact_support') }}
-        <a href="mailto:{{ config('mail.support_address', 'contato@medicare.com.br') }}">
-            {{ config('mail.support_address', 'contato@medicare.com.br') }}
+        <a href="mailto:{{ config('mail.support_address', 'contato@easyeye.com.br') }}">
+            {{ config('mail.support_address', 'contato@easyeye.com.br') }}
         </a>
     </p>
 

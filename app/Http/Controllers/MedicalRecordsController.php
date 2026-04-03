@@ -119,6 +119,7 @@ class MedicalRecordsController extends Controller
      */
     public function show(Patient $patient, MedicalRecord $medicalrecord): JsonResponse
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         $medicalrecord->load([
@@ -195,9 +196,9 @@ class MedicalRecordsController extends Controller
             'observation_general'   => $medicalrecord->observation_general,
             'observation_of_lenses' => $medicalrecord->observation_of_lenses,
             // Diagnóstico & conduta
-            'diagnosis_cids' => $medicalrecord->diagnosis_cids ?? [],
-            'clinical_conduct'      => $medicalrecord->clinical_conduct,
-            'follow_up_days'        => $medicalrecord->follow_up_days,
+            'diagnosis_cids'   => $medicalrecord->diagnosis_cids ?? [],
+            'clinical_conduct' => $medicalrecord->clinical_conduct,
+            'follow_up_days'   => $medicalrecord->follow_up_days,
             // Assinatura (CFM Res. 2.227/2018)
             'is_locked'           => $medicalrecord->isLocked(),
             'is_signed'           => $medicalrecord->isSigned(),
@@ -225,6 +226,7 @@ class MedicalRecordsController extends Controller
      */
     public function edit(Patient $patient, MedicalRecord $medicalrecord): Factory|Application|View
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
@@ -246,6 +248,7 @@ class MedicalRecordsController extends Controller
      */
     public function update(UpdateMedicalRecordRequest $request, Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         try {
             $this->service->update($medicalrecord, $request->validated());
         } catch (LockedMedicalRecordException) {
@@ -262,6 +265,7 @@ class MedicalRecordsController extends Controller
      */
     public function destroy(Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         try {
             $this->service->delete($medicalrecord);
         } catch (LockedMedicalRecordException) {
@@ -290,6 +294,7 @@ class MedicalRecordsController extends Controller
      */
     public function pdf(Patient $patient, MedicalRecord $medicalrecord): Response
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         return $this->pdfService->generateRecord($medicalrecord);
@@ -301,6 +306,7 @@ class MedicalRecordsController extends Controller
      */
     public function tonometryPdf(Request $request, Patient $patient, MedicalRecord $medicalrecord): Response
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         $time = $request->string('time')->trim()->value() ?: now()->format('H:i');
@@ -333,6 +339,7 @@ class MedicalRecordsController extends Controller
      */
     public function templates(Patient $patient, MedicalRecord $medicalrecord): JsonResponse
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $entityId  = session('selected_entity_id');
         $templates = $this->documentationService->getActiveTemplates($entityId);
 
@@ -344,17 +351,19 @@ class MedicalRecordsController extends Controller
      */
     public function templatePreview(Request $request, Patient $patient, MedicalRecord $medicalrecord): JsonResponse
     {
+        $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $validated = $request->validate([
             'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
         ]);
 
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
+        $this->assertTemplateBelongsToCurrentEntity($content);
         $doctor  = $medicalrecord->doctor ?? Doctor::find($request->doctor_id);
         $entity  = Entity::findOrFail(session('selected_entity_id'));
 
-        $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity);
+        $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $medicalrecord);
 
-        return response()->json(['content' => $resolved]);
+        return response()->json(['content' => $resolved['html'], 'unresolved' => $resolved['unresolved']]);
     }
 
     /**
@@ -399,5 +408,19 @@ class MedicalRecordsController extends Controller
         ];
 
         return [$commonData, $meta];
+    }
+
+    private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void
+    {
+        abort_if($medicalrecord->patient_id !== $patient->id, 404);
+    }
+
+    private function assertTemplateBelongsToCurrentEntity(ReportSettingContent $content): void
+    {
+        $selectedEntityId = (string) session('selected_entity_id');
+        $content->loadMissing('reportSetting');
+
+        $settingEntityId = (string) ($content->reportSetting?->entity_id ?? '');
+        abort_if($settingEntityId !== '' && $settingEntityId !== $selectedEntityId, 404);
     }
 }

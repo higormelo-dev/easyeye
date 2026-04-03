@@ -29,6 +29,10 @@ class DatabaseSeeder extends Seeder
         $this->call(NearPointConvergencesSeeder::class);
         $this->call(MedicinePresentationsSeeder::class);
         $this->call(Cid10CodesSeeder::class);
+        $this->call(ReportSettingSeeder::class);
+        $this->call(ReportSettingContentSeeder::class);
+        $this->call(ReportSettingVariableSeeder::class);
+        $this->call(AdoptGlobalReportSettingsForEntitiesSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);

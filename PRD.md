@@ -1,68 +1,61 @@
-**Versão:** 2.0  
-**Data:** Abril de 2026  
-**Status:** Estável (Arquitetura Blade + Alpine.js + Tailwind)
+**Versão:** 2.5
+**Data:** Abril de 2026
+**Status:** Madura (Stack Blade + Alpine.js + Tailwind CSS)
 
 ---
 
 ## 1. Visão do Produto
-O **EasyEye** (codinome interno *Medicare*) é o "Sistema Operacional" definitivo para clínicas de oftalmologia. Ele resolve a fragmentação entre o atendimento clínico e os equipamentos de diagnóstico, unificando agendamento, prontuário eletrônico (PEP), captura automática de exames e gestão de conformidade (CFM/LGPD) em uma única plataforma SaaS premium.
+O **EasyEye** é uma plataforma SaaS (Software as a Service) multi-tenant projetada como o "Sistema Operacional" para clínicas de oftalmologia. O sistema integra a jornada completa do paciente — do agendamento à conformidade legal — com um diferencial técnico único: a automação da captura de exames diretamente do hardware diagnóstico para a nuvem.
 
-## 2. O Problema
-1.  **Gargalo de Hardware:** Oftalmologistas perdem tempo precioso movendo arquivos de máquinas de exames (Topógrafos, OCTs) para o prontuário via pen-drives ou redes locais instáveis.
-2.  **Risco Jurídico:** A maioria dos sistemas não garante a imutabilidade do prontuário exigida pelo CFM (Res. 2.227/2018) nem o registro rigoroso de acesso a dados sensíveis (LGPD).
-3.  **Experiência Datada:** Interfaces de sistemas médicos costumam ser complexas, lentas e não otimizadas para o fluxo rápido de uma clínica oftalmológica.
+## 2. O Problema & Soluções Core
+1.  **Gargalo de Hardware:** Médicos gastam tempo movendo exames manualmente.
+    *   *Solução:* **EasyEye Integrator**, um bridge que automatiza o upload e vinculação de exames via IA de reconhecimento de arquivos.
+2.  **Risco Jurídico (CFM/LGPD):** Falta de imutabilidade em prontuários e auditoria de dados sensíveis.
+    *   *Solução:* Assinatura eletrônica com hash SHA-256, versionamento de prontuários (snapshots) e logs automáticos de acesso a dados.
+3.  **Complexidade Operacional:** Sistemas legados são lentos e confusos.
+    *   *Solução:* Interface premium baseada em templates modernos, focada na experiência do usuário (UX) e rapidez de resposta.
 
 ## 3. Personas
-*   **Dr. Roberto (Oftalmologista):** Precisa de agilidade. Quer ditar a evolução, ver os exames automaticamente no prontuário e assinar digitalmente com um clique.
-*   **Ana (Recepção/Secretária):** Gerencia agendas lotadas, confirmações de pacientes e o fluxo na sala de espera.
-*   **Carlos (Gestor da Clínica):** Focado em métricas de faturamento, retenção de pacientes (LTV) e conformidade legal total para evitar multas.
+*   **Dr. Roberto (Oftalmologista):** Focado em agilidade clínica e segurança jurídica.
+*   **Ana (Recepção/Secretária):** Gerencia o fluxo de pacientes e faturamento.
+*   **Carlos (Gestor da Clínica):** Focado em indicadores de crescimento (CAC/LTV) e compliance total.
 
-## 4. Funcionalidades de Core (V1 - Estável)
+## 4. Funcionalidades de Grande Porte (Implementadas)
 
-### 4.1 Gestão Clínica 360°
-*   **Agendamento Inteligente:** Controle de status (Agendado, Em Atendimento, Concluído, Cancelado) com visão por médico e unidade.
-*   **Prontuário Eletrônico Oftalmológico:** Campos específicos para lateralidade (OD/OE), histórico clínico e evolução tática.
-*   **Multi-Tenancy (Entidades):** Isolamento total de dados entre clínicas, com suporte a múltiplos papéis (Roles) por usuário (Médico, Recepcionista, Gestor).
+### 4.1 Ecossistema de Crescimento (CAC/Growth)
+Uma camada estratégica para reduzir o custo de aquisição e aumentar a retenção:
+*   **Programa de Indicação (Referral):** Sistema peer-to-peer onde clínicas indicam outras e recebem recompensas (descontos ou extensões de trial).
+*   **Portal de Parceiros/Revendedores:** Dashboard para distribuidores de equipamentos e consultores gerenciarem leads e comissões automáticas na conversão.
+*   **Ativação de Trial (Activation Score):** Monitoramento de 7 marcos críticos (ex: 1º médico adicionado, 1º exame subido) para identificar clínicas com baixo engajamento.
 
-### 4.2 EasyEye Integrator (Hardware-to-Cloud)
-*   **Automação de Exames:** Aplicativo desktop que monitora pastas de saída de equipamentos e faz upload automático para a nuvem.
-*   **Match Inteligente:** A API identifica o paciente e o agendamento vigente através do nome do arquivo, vinculando o exame ao prontuário sem intervenção manual.
+### 4.2 Gestão Clínica & PEP
+*   **Prontuário Oftalmológico Especializado:** Campos táticos para refração, biometria e exames complementares.
+*   **Agendamento Multi-Unidade:** Controle centralizado de agendas com status em tempo real.
+*   **Waiting Room TV:** Display para sala de espera que sincroniza com a recepção via QRCode.
 
-### 4.3 Compliance & Segurança (Enterprise Ready)
-*   **Assinatura Digital (CFM):** Sistema de congelamento de prontuário com hash SHA-256 para garantir imutabilidade.
-*   **Arquitetura LGPD Native:** Logs de acesso a dados sensíveis (`data_access_logs`), gestão de consentimentos versionados e solicitações de direitos do titular.
-*   **Snapshot de Versões:** Histórico completo de alterações em registros clínicos.
+### 4.3 Compliance "Enterprise Ready"
+*   **CFM Res. 2.227/2018:** Assinatura digital que congela o registro clínico; qualquer alteração subsequente cria uma nova versão imutável.
+*   **LGPD Nativa:** Gestão de consentimentos do paciente por finalidade (Art. 7/11) e canal de atendimento para solicitações de direitos do titular (Art. 18).
 
-### 4.4 Experiência do Paciente & Sala de Espera
-*   **Waiting Room TV:** Display público para sala de espera que exibe a fila de chamadas em tempo real, pareado via QRCode.
-
----
-
-## 5. Funcionalidades em Implementação (V2 - Modernização)
-
-### 5.1 Aperfeiçoamento de Interface (Blade + Alpine.js)
-*   **UX Otimizada:** Refinamento constante dos templates Blade para garantir carregamento instantâneo.
-*   **Componentes Alpine:** Uso de Alpine.js para reatividade em modais, filtros e interações dinâmicas sem a complexidade de SPAs.
-*   **Dashboards em Tempo Real:** Integração de gráficos e KPIs diretamente via Blade com atualizações parciais.
-
-### 5.2 IA e Produtividade Clínica
-*   **Voice-to-Text (Ditado Médico):** Transcrição e estruturação automática de dados da consulta via IA, otimizando o preenchimento do PEP.
-*   **IA de Triagem de Imagens:** Pré-análise de exames para detecção de anomalias comuns (ex: Catarata, Glaucoma) como apoio à decisão.
+## 5. Arquitetura Multi-Tenant
+*   **Isolamento de Dados:** Cada clínica (Entidade) possui seus dados totalmente isolados logicamente.
+*   **RBAC (Role-Based Access Control):** Papéis granulares (Dono, Administrador, Médico, Recepcionista) que herdam permissões específicas por entidade.
 
 ---
 
 ## 6. Roadmap e Futuro (V3+)
 
-### 6.1 Ecossistema Mobile
-*   **App do Médico:** Acesso rápido à agenda e prontuários pelo celular via Web App responsivo.
-*   **Portal do Paciente:** Portal web simplificado para visualização de exames e receitas.
+### 6.1 IA & Expansão Clínica
+*   **Assistente de Redação:** IA para síntese de histórias clínicas a partir de tópicos.
+*   **Integração TISS/TUSS:** Faturamento eletrônico para convênios conforme padrão ANS.
 
-### 6.2 Finanças e Expansão
-*   **Módulo Financeiro TISS:** Faturamento eletrônico de guias para convênios conforme padrão ANS.
-*   **Telemedicina Integrada:** Consultas remotas com integração nativa ao prontuário e assinatura digital de receitas.
-*   **Marketplace de Insumos:** Integração com fornecedores de lentes e medicamentos para clínicas.
+### 6.2 Mobile & Engajamento
+*   **Portal do Paciente:** Visualização de laudos e receitas em ambiente seguro.
+*   **App do Médico:** Notificações de agenda e visualização rápida de prontuários.
 
 ## 7. Métricas de Sucesso (KPIs)
-*   **Activation Score:** Percentual de clínicas que realizam o primeiro upload de exame via Integrador nos primeiros 7 dias.
-*   **Time-to-Chart:** Tempo médio gasto pelo médico para concluir o preenchimento e assinatura de um prontuário.
+*   **Activation Score (P90):** Tempo médio para atingir 100% de ativação nos primeiros 15 dias.
+*   **Referral Conversion Rate:** Percentual de trials iniciados via indicação que se convertem em planos pagos.
+*   **Time-to-Sign:** Velocidade entre a consulta e a assinatura definitiva do prontuário.
+*   **Churn Preventivo:** Identificação de clínicas com queda de uso do Integrador (sinal de churn).
 *   **Retention (LTV):** Baixa taxa de churn devido à dependência tecnológica da integração com hardware.

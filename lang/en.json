@@ -259,5 +259,51 @@
     "Yes": "Yes",
     "You are receiving this email because we received a password reset request for your account.": "You are receiving this email because we received a password reset request for your account.",
     "You're logged in!": "You're logged in!",
-    "Your email address is unverified.": "Your email address is unverified."
+    "Your email address is unverified.": "Your email address is unverified.",
+
+    "manager_dashboard.good_morning": "Good morning",
+    "manager_dashboard.good_afternoon": "Good afternoon",
+    "manager_dashboard.good_evening": "Good evening",
+    "manager_dashboard.subtitle": "System admin panel — overview of all clinics",
+    "manager_dashboard.btn_entities": "Entities",
+    "manager_dashboard.btn_plans": "Plans",
+    "manager_dashboard.btn_partners": "Partners",
+
+    "manager_dashboard.kpi_entities": "Clinics",
+    "manager_dashboard.kpi_active_subs": "Active Subscriptions",
+    "manager_dashboard.kpi_trial": "On Trial",
+    "manager_dashboard.kpi_mrr": "Estimated MRR",
+    "manager_dashboard.kpi_patients": "Patients",
+    "manager_dashboard.kpi_doctors": "Doctors",
+    "manager_dashboard.kpi_records": "Medical Records",
+    "manager_dashboard.kpi_schedules": "Schedules",
+    "manager_dashboard.today": "Today",
+    "manager_dashboard.month": "Month",
+
+    "manager_dashboard.subscription_funnel": "Subscription Funnel",
+    "manager_dashboard.chart_growth": "Monthly Clinic Growth",
+    "manager_dashboard.chart_new_entities": "New Clinics",
+
+    "manager_dashboard.trials_expiring": "Trials Expiring in 7 Days",
+    "manager_dashboard.no_trials_expiring": "No trials expiring in the next 7 days",
+    "manager_dashboard.recent_entities": "Recently Created Clinics",
+    "manager_dashboard.no_entities": "No clinics registered",
+    "manager_dashboard.view_all": "View All",
+    "manager_dashboard.top_entities": "Top 5 Clinics by Patients",
+
+    "manager_dashboard.col_entity": "Clinic",
+    "manager_dashboard.col_plan": "Plan",
+    "manager_dashboard.col_expires": "Expires in",
+    "manager_dashboard.col_activation": "Activation",
+    "manager_dashboard.col_date": "Date",
+    "manager_dashboard.col_subscription": "Subscription",
+    "manager_dashboard.col_patients": "Patients",
+
+    "manager_dashboard.partners_summary": "Partners Summary",
+    "manager_dashboard.partners": "Partners",
+    "manager_dashboard.leads_active": "Active Leads",
+    "manager_dashboard.commissions_pending": "Pending Commissions",
+    "manager_dashboard.leads_funnel": "Leads Funnel",
+    "manager_dashboard.referral_codes": "Active Referral Codes",
+    "manager_dashboard.referral_events": "Referral Events"
 }

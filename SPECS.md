@@ -1,74 +1,69 @@
 **Linguagem & Framework:** PHP 8.4 / Laravel 11  
 **Frontend:** Blade Templates, Alpine.js, Tailwind CSS & Bootstrap 5
-**Banco de Dados:** SQLite (Dev), PostgreSQL (Prod)
-**Gestão de Estado:** Multi-Tenancy baseada em Sessão
+**Banco de Dados:** SQLite (Dev/Test), PostgreSQL (Prod)
+**Middleware Stack:** `auth` → `verified` → `entity.selected` → `entity.role`
 
 ---
 
-## 1. Arquitetura do Sistema
+## 1. Arquitetura Multi-Tenancy (Session-Based)
 
-### 1.1 Multi-Tenancy
-O sistema utiliza um modelo de **Shared Database, Shared Schema**, com isolamento via `entity_id`.
-*   **Identificação:** Entidades utilizam prefixos legíveis (ex: `ENT-0000000001`).
-*   **Middleware:** `EnsureEntitySelected` gerencia a entidade ativa na sessão do usuário.
-*   **RBAC:** Controle de acesso baseado em papéis (`entity_users`) vinculados a permissões específicas (`EntityGate`).
+O sistema opera sob um modelo de **Shared Database, Shared Schema**, onde o isolamento ocorre via `entity_id`.
+*   **Identificadores:** Entidades e registros principais utilizam IDs sequenciais públicos com prefixos (ex: `ENT-0000000001`, `PAC-0000000001`).
+*   **Gestão de Sessão:** A entidade ativa é armazenada na sessão após a seleção pelo usuário. O middleware `EnsureEntitySelected` protege todas as rotas do painel.
+*   **RBAC Dinâmico:** Usuários podem pertencer a múltiplas entidades com papéis diferentes. A autorização é validada via `EntityGate` e `EnsureEntityRole`.
 
-### 1.2 Camada de Serviços (Service Layer)
-Toda a lógica de negócios está encapsulada em `app/Services/`. Os Controllers são "thin", servindo apenas como ponto de entrada para as rotas.
-*   Serviços principais: `MedicalRecordSignatureService`, `PatientService`, `SubscriptionService`, `FeatureGateService`.
+## 2. Camada de Serviços e Regras de Negócio
 
-### 1.3 Stack de Frontend (Híbrida)
-O projeto está em fase de transição de tecnologia de interface:
-*   **Blade/Alpine Stack:** Reatividade leve sem necessidade de Virtual DOM.
-*   **Vite Assets:** Empacotamento de JS Vanilla e CSS/SCSS globais.
-*   **Tailwind UI:** Utilização de classes utilitárias para interfaces rápidas e responsivas.
-*   **Custom JS:** Scripts modulares em `resources/js/system/` para lógicas específicas de cada módulo.
+A lógica de alto nível é isolada em `app/Services/`. Controllers são apenas orquestradores.
 
----
+### 2.1 Core Services
+*   **SubscriptionService:** Ciclo de vida de assinaturas (Trial, Active, Expired).
+*   **FeatureGateService:** Singleton que valida acesso a funcionalidades baseado nas configurações do plano.
+*   **UsageMeterService:** Rastreia o consumo de API (uploads) para enforcement de quotas mensais.
 
-## 2. Integração com Equipamentos
-
-### 2.1 API do Integrador (`/api/integrators/`)
-*   **Autenticação:** Laravel Sanctum com tokens de longa duração e validação de `HWID` (Hardware ID).
-*   **Upload de Exames:** Recebimento de arquivos via Multipart. O backend realiza o parsing do nome do arquivo para vinculação automática ao paciente e agendamento pendente.
-*   **Quotas:** O `UsageMeterService` monitora o consumo de API (uploads de exames) conforme o plano da clínica.
-
-### 2.2 Waiting Room TV (`/tv/`)
-*   **Public Display:** Rotas públicas para exibição de fila de chamadas.
-*   **Pareamento:** Utiliza sistema de QRCode para autenticar a Smart TV com a entidade da clínica sem necessidade de login manual complexo.
+### 2.2 Subsistema de Growth (CAC)
+Implementado para otimizar o custo de aquisição de clientes:
+*   **ActivationService:** Rastreia o progresso da clínica através de enums de `ActivationStep` com pesos específicos (score 0-100).
+*   **ReferralService:** Gerencia o ciclo de indicações peer-to-peer (geração de códigos, eventos de conversão e recompensas).
+*   **PartnerService:** Gerencia o programa de parceiros com atribuição via UTM/Tokens, rastreamento de leads e geração de comissões.
 
 ---
 
-## 3. Compliance & Engenharia de Dados
+## 3. Padrões de Desenvolvimento (System Patterns)
 
-### 3.1 Compliance CFM (Assinatura de Prontuário)
-*   **Trait `Signable`:** Implementa lógica de hashing SHA-256 dos dados clínicos no momento da assinatura.
-*   **Imutabilidade:** Uma vez assinado (`is_locked = true`), o registro não pode ser alterado ou excluído.
-*   **Versionamento:** O Trait `Versionable` cria snapshots em `record_versions` antes de qualquer atualização em registros sensíveis.
+### 3.1 Observers & Event-Driven Logic
+O sistema automatiza comportamentos através de Observers em `app/Observers/`:
+*   **EntityObserver:** Inicia automaticamente o trial ao criar uma entidade.
+*   **ActivationObserver:** Registra marcos de ativação em tempo real ao interagir com modelos clínicos.
+*   **SubscriptionObserver:** Dispara eventos de indicação e comissionamento de parceiros.
 
-### 3.2 Compliance LGPD (Privacidade)
-*   **Auditoria:** Trait `Auditable` registra todas as ações de escrita (CUD) em `audit_logs`.
-*   **Acesso a Dados:** Trait `LogsDataAccess` registra visualizações de dados sensíveis em `data_access_logs`.
-*   **Consentimentos:** Tabelas `patient_consents` e `term_versions` gerenciam o histórico de aceites e revogações.
-
----
-
-## 4. Infraestrutura e DevSecOps
-
-### 4.1 Fila e Background Jobs
-*   **Redis:** Utilizado para cache, sessões e driver de filas (Laravel Horizon).
-*   **Jobs:** Processamento assíncrono para envio de e-mails, processamento de logs de auditoria e cálculo de comissões.
-
-### 4.2 Testes e Qualidade
-*   **Pest 4:** Framework de testes para Feature e Unit testing. Cobertura focada em Gates de Planos, Auditoria e Integridade Clinical.
-*   **Laravel Pint:** Padronização de código conforme PSR-12.
-
-### 4.3 Containerização
-*   **Docker:** Configuração completa via `Dockerfile` (PHP 8.4-FPM) e `docker-compose.yml` (Nginx, Redis, PostgreSQL).
+### 3.2 Traits Transversais
+*   **Signable:** Hashing SHA-256 e lock de segurança para prontuários clínicos.
+*   **Versionable:** Criação automática de snapshots em `record_versions` antes de mutações de dados.
+*   **Auditable & HasAuditColumns:** Rastreamento completo de CUD e preenchimento de `created_by`/`updated_by`.
+*   **LogsDataAccess:** Trait de controller para registrar leitura de dados sensíveis (compliance LGPD).
 
 ---
 
-## 5. Próximos Desafios Técnicos
-*   **S3 Integration:** Migração do armazenamento de exames (blobs gigantes) de local para Object Storage compatível com S3.
-*   **WebSockets (Laravel Reverb):** Implementação de notificações em tempo real para o integrador e tela de TV.
-*   **IA Pipelines:** Desenvolvimento de wrappers para integração com LLMs (OpenAI/Claude) para síntese de prontuários.
+## 4. Integrações e API
+
+### 4.1 EasyEye Integrator API
+*   **Auth:** Laravel Sanctum com validação de HWID.
+*   **Protocolo:** Upload multipart via `/api/integrators/upload`.
+*   **Processamento:** Parsing assíncrono de metadados para vinculação direta ao agendamento vigente.
+
+### 4.2 Waiting Room TV
+*   **Display Público:** Rota `/tv/{slug}` otimizada para navegadores de smart TVs.
+*   **Sincronização:** Polling/Websocket (planejado Laravel Reverb) para atualização de chamadas em tempo real.
+
+---
+
+## 5. Infraestrutura e Qualidade
+
+*   **Processamento em Fila:** Redis + Laravel Horizon para jobs de auditoria e comissionamento.
+*   **Qualidade de Código:** Laravel Pint (estilo) e Pest 4 (testes).
+*   **Ambiente Docker:** PHP 8.4-FPM executando em instâncias isoladas com Nginx e Redis.
+
+## 6. Governança de Dados (Compliance)
+*   **Retention Policy:** Soft Deletes implementados em todos os recursos críticos com funcionalidade de `restore()`.
+*   **Audit Context:** Singleton `AuditContext` que garante que o ID do usuário correto seja capturado em jobs de background.

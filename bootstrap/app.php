@@ -9,6 +9,7 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     CheckSubscription,
     EnsureEntityRole,
     EnsureEntitySelected,
+    EnsureIsPartner,
     EnsureUserBelongsToEntity,
     HandleImpersonation,
     ParseMultipartFormData,
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
 use Illuminate\Validation\ValidationException;
+use Sentry\Laravel\Integration;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\{HttpException, MethodNotAllowedHttpException, NotFoundHttpException};
 
@@ -42,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'token.expiration'     => ApiCheckTokenExpiration::class,
             'api.plan'             => ApiCheckPlanAccess::class,
             'terms.accepted'       => RequireTermsAcceptance::class,
+            'partner'              => EnsureIsPartner::class,
         ]);
 
         // Adiciona o SetLocale e HandleImpersonation ao grupo web
@@ -60,6 +63,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(AuthenticatesRequests::class, ApiTokenPreCheck::class);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        if (app()->environment('testing') || app()->environment('production')) {
+            Integration::handles($exceptions);
+        }
+
         $exceptions->render(function (AuthenticationException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
@@ -106,7 +113,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        $exceptions->render(function (\Throwable $e, $request) {
+        $exceptions->render(function (Throwable $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
                 $messages = [
                     'message' => __('http-statuses.500'),

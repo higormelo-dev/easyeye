@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\{DocumentationType, PaperSize};
+use App\Models\Entity;
 use App\Models\{MedicalRecord, MedicalRecordDocumentation, ReportSetting};
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\Response;
@@ -48,7 +50,7 @@ class MedicalRecordPdfService
         $filename = preg_replace('/[^A-Za-z0-9\-_.]/', '_', $filename);
 
         return SnappyPdf::loadView('pdf.medical_record', compact('record', 'setting'))
-            ->setPaper($setting?->paper_size ?? 'A4')
+            ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
             ->setOption('margin-top', ($setting?->margin_top ?? 2.0) . 'cm')
             ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
             ->setOption('margin-bottom', ($setting?->margin_bottom ?? 2.0) . 'cm')
@@ -73,7 +75,7 @@ class MedicalRecordPdfService
         $filename = 'TONOMETRIA-' . $record->code . '.pdf';
 
         return SnappyPdf::loadView('pdf.tonometry', compact('record', 'setting', 'time'))
-            ->setPaper($setting?->paper_size ?? 'A4')
+            ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
             ->setOption('margin-top', ($setting?->margin_top ?? 2.0) . 'cm')
             ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
             ->setOption('margin-bottom', ($setting?->margin_bottom ?? 2.0) . 'cm')
@@ -90,11 +92,11 @@ class MedicalRecordPdfService
     {
         $doc->loadMissing(['patient.person', 'doctor.person', 'reportSetting', 'medicalRecord.schedule']);
 
-        $filename = strtoupper($doc->type) . '-' . $doc->id . '.pdf';
+        $filename = strtoupper($doc->type->value) . '-' . $doc->id . '.pdf';
 
-        if ($doc->type === 'tonometry') {
-            $entity  = $doc->medicalRecord?->schedule?->entity
-                ?? \App\Models\Entity::find(session('selected_entity_id'));
+        if ($doc->type === DocumentationType::Tonometry) {
+            $entity = $doc->medicalRecord?->schedule?->entity
+                ?? Entity::find(session('selected_entity_id'));
             $setting = ReportSetting::where('entity_id', $entity?->id)->where('active', true)->first();
             $tData   = $doc->tonometryData();
             $patient = $doc->patient;
@@ -116,7 +118,7 @@ class MedicalRecordPdfService
         $setting = $doc->reportSetting;
 
         return SnappyPdf::loadView('pdf.documentation', compact('doc', 'setting'))
-            ->setPaper($setting?->paper_size ?? 'A4')
+            ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
             ->setOption('margin-top', ($setting?->margin_top ?? 2.0) . 'cm')
             ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
             ->setOption('margin-bottom', ($setting?->margin_bottom ?? 2.0) . 'cm')

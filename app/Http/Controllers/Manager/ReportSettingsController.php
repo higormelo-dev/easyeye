@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Manager;
 
 use App\DataTables\Manager\ManagerReportSettingsDataTable;
+use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
 use App\Http\Controllers\Controller;
-use App\Models\{ReportSetting, ReportSettingContent};
+use App\Models\{ReportCategory, ReportSetting};
+use App\Services\ReportSettingService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -15,33 +17,45 @@ use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
  */
 class ReportSettingsController extends Controller
 {
-    public function __construct(private readonly ManagerReportSettingsDataTable $dataTable) {}
+    public function __construct(
+        private readonly ManagerReportSettingsDataTable $dataTable,
+        private readonly ReportSettingService $service,
+    ) {
+    }
 
     public function index(): mixed
     {
-        $total = ReportSetting::whereNull('entity_id')->count();
+        $total      = ReportSetting::global()->count();
+        $categories = ReportCategory::active()->ordered()->get();
 
         $meta = [
             'title'            => __('actions.report_settings.title') . ' — ' . __('actions.global'),
             'total'            => $total,
             'cardsUrl'         => route('panel.manager.report-settings.cards'),
             'breadcrumb_title' => false,
+            'isManager'        => true,
+            'statuses'         => ReportSettingStatus::values(),
             'breadcrumbs'      => [
-                ['label' => __('actions.sidemenu.dashboard'),    'url' => route('panel.dashboard'),                            'active' => false],
-                ['label' => __('actions.report_settings.title'), 'url' => route('panel.manager.report-settings.index'),        'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.report_settings.title'), 'url' => route('panel.manager.report-settings.index'), 'active' => true],
             ],
         ];
 
-        return $this->dataTable->render('system.report_settings.index', compact('meta'));
+        return $this->dataTable->render('system.report_settings.index', compact('meta', 'categories'));
     }
 
     public function cards(Request $request): JsonResponse
     {
-        $search  = $request->string('search')->trim()->value();
-        $perPage = 12;
+        $search     = $request->string('search')->trim()->value();
+        $status     = $request->string('status')->trim()->value();
+        $categoryId = $request->string('category_id')->trim()->value();
+        $perPage    = 12;
 
-        $records = ReportSetting::whereNull('entity_id')
+        $records = ReportSetting::global()
             ->when($search, fn ($q) => $q->whereRaw('LOWER(title) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->when($status, fn ($q) => $q->where('status', $status))
+            ->when($categoryId, fn ($q) => $q->where('report_category_id', $categoryId))
+            ->with('category')
             ->orderBy('title')
             ->paginate($perPage);
 
@@ -54,8 +68,16 @@ class ReportSettingsController extends Controller
                 'show_signature' => $r->show_signature,
                 'show_footer'    => $r->show_footer,
                 'active'         => (bool) $r->active,
+                'status'         => $r->status?->value,
+                'status_label'   => $r->status?->label(),
+                'status_badge'   => $r->status?->badgeClass(),
+                'version'        => $r->version,
+                'category'       => $r->category?->name,
+                'adopted_count'  => $r->adoptedCopies()->count(),
                 'edit_url'       => route('panel.manager.report-settings.edit', $r),
                 'delete_url'     => route('panel.manager.report-settings.destroy', $r),
+                'publish_url'    => route('panel.manager.report-settings.publish', $r),
+                'archive_url'    => route('panel.manager.report-settings.archive', $r),
             ]),
             'meta' => [
                 'total'        => $records->total(),
@@ -68,18 +90,22 @@ class ReportSettingsController extends Controller
 
     public function create(): Factory|Application|View
     {
-        $meta = $this->buildMeta(__('actions.report_settings.create'));
+        $categories = ReportCategory::active()->ordered()->get();
+        $meta       = $this->buildMeta(__('actions.report_settings.create'));
 
-        return view('system.report_settings.form', compact('meta'));
+        return view('system.report_settings.form', compact('meta', 'categories'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $validated = $this->validateRequest($request);
 
-        $setting = ReportSetting::create(array_merge($validated, ['entity_id' => null]));
+        $setting = ReportSetting::create(array_merge($validated, [
+            'entity_id' => null,
+            'status'    => ReportSettingStatus::Draft,
+        ]));
 
-        $this->syncContents($setting, $request->input('contents', []));
+        $this->service->syncContents($setting, $request->input('contents', []));
 
         return redirect()
             ->route('panel.manager.report-settings.index')
@@ -89,9 +115,10 @@ class ReportSettingsController extends Controller
     public function edit(ReportSetting $reportSetting): Factory|Application|View
     {
         $reportSetting->load('contents');
-        $meta = $this->buildMeta(__('actions.report_settings.edit'));
+        $categories = ReportCategory::active()->ordered()->get();
+        $meta       = $this->buildMeta(__('actions.report_settings.edit'));
 
-        return view('system.report_settings.form', compact('meta', 'reportSetting'));
+        return view('system.report_settings.form', compact('meta', 'reportSetting', 'categories'));
     }
 
     public function update(Request $request, ReportSetting $reportSetting): RedirectResponse
@@ -100,7 +127,7 @@ class ReportSettingsController extends Controller
 
         $reportSetting->update($validated);
 
-        $this->syncContents($reportSetting, $request->input('contents', []));
+        $this->service->syncContents($reportSetting, $request->input('contents', []));
 
         return redirect()
             ->route('panel.manager.report-settings.index')
@@ -116,68 +143,65 @@ class ReportSettingsController extends Controller
             ->with('message', __('actions.report_settings.deleted'));
     }
 
+    /**
+     * Publica um template global (draft→published).
+     */
+    public function publish(ReportSetting $reportSetting): RedirectResponse
+    {
+        $this->service->publish($reportSetting);
+
+        return redirect()
+            ->route('panel.manager.report-settings.index')
+            ->with('message', __('actions.report_settings.published'));
+    }
+
+    /**
+     * Arquiva um template global (published→archived).
+     */
+    public function archive(ReportSetting $reportSetting): RedirectResponse
+    {
+        $this->service->archive($reportSetting);
+
+        return redirect()
+            ->route('panel.manager.report-settings.index')
+            ->with('message', __('actions.report_settings.archived'));
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────────────
 
     private function validateRequest(Request $request): array
     {
         return $request->validate([
-            'title'                => ['required', 'string', 'max:255'],
-            'paper_size'           => ['nullable', 'string', 'in:A4,A5,Letter,Legal'],
-            'font_family'          => ['nullable', 'string', 'max:50'],
-            'font_size'            => ['nullable', 'integer', 'min:8', 'max:24'],
-            'margin_top'           => ['nullable', 'numeric', 'min:0', 'max:10'],
-            'margin_right'         => ['nullable', 'numeric', 'min:0', 'max:10'],
-            'margin_bottom'        => ['nullable', 'numeric', 'min:0', 'max:10'],
-            'margin_left'          => ['nullable', 'numeric', 'min:0', 'max:10'],
-            'show_header'          => ['boolean'],
-            'header_show_logo'     => ['boolean'],
-            'header_show_name'     => ['boolean'],
-            'header_show_address'  => ['boolean'],
-            'header_show_phone'    => ['boolean'],
-            'show_signature'       => ['boolean'],
-            'signature_show_name'  => ['boolean'],
-            'signature_show_crm'   => ['boolean'],
-            'signature_show_rqe'   => ['boolean'],
-            'show_footer'          => ['boolean'],
-            'footer_text'          => ['nullable', 'string', 'max:500'],
-            'footer_show_address'  => ['boolean'],
-            'footer_show_phone'    => ['boolean'],
-            'active'               => ['boolean'],
-            'contents'             => ['nullable', 'array'],
-            'contents.*.type'      => ['required', 'string', 'in:prescription,procedure,certificate,referral,report,tonometry'],
-            'contents.*.label'     => ['required', 'string', 'max:255'],
-            'contents.*.content'   => ['required', 'string'],
-            'contents.*.active'    => ['boolean'],
+            'title'               => ['required', 'string', 'max:255'],
+            'description'         => ['nullable', 'string', 'max:1000'],
+            'report_category_id'  => ['nullable', 'uuid', 'exists:report_categories,id'],
+            'paper_size'          => ['nullable', 'string', 'in:' . implode(',', PaperSize::values())],
+            'font_family'         => ['nullable', 'string', 'max:50'],
+            'font_size'           => ['nullable', 'integer', 'min:8', 'max:24'],
+            'margin_top'          => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'margin_right'        => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'margin_bottom'       => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'margin_left'         => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'show_header'         => ['boolean'],
+            'header_show_logo'    => ['boolean'],
+            'header_show_name'    => ['boolean'],
+            'header_show_address' => ['boolean'],
+            'header_show_phone'   => ['boolean'],
+            'show_signature'      => ['boolean'],
+            'signature_show_name' => ['boolean'],
+            'signature_show_crm'  => ['boolean'],
+            'signature_show_rqe'  => ['boolean'],
+            'show_footer'         => ['boolean'],
+            'footer_text'         => ['nullable', 'string', 'max:500'],
+            'footer_show_address' => ['boolean'],
+            'footer_show_phone'   => ['boolean'],
+            'active'              => ['boolean'],
+            'contents'            => ['nullable', 'array'],
+            'contents.*.type'     => ['required', 'string', 'in:' . implode(',', DocumentationType::values())],
+            'contents.*.label'    => ['required', 'string', 'max:255'],
+            'contents.*.content'  => ['required', 'string'],
+            'contents.*.active'   => ['boolean'],
         ]);
-    }
-
-    private function syncContents(ReportSetting $setting, array $contents): void
-    {
-        $keptIds = [];
-
-        foreach ($contents as $row) {
-            $content = isset($row['id']) ? ReportSettingContent::find($row['id']) : null;
-
-            if ($content) {
-                $content->update([
-                    'type'    => $row['type'],
-                    'label'   => $row['label'],
-                    'content' => $row['content'],
-                    'active'  => $row['active'] ?? true,
-                ]);
-            } else {
-                $content = $setting->contents()->create([
-                    'type'    => $row['type'],
-                    'label'   => $row['label'],
-                    'content' => $row['content'],
-                    'active'  => $row['active'] ?? true,
-                ]);
-            }
-
-            $keptIds[] = $content->id;
-        }
-
-        $setting->contents()->whereNotIn('id', $keptIds)->delete();
     }
 
     private function buildMeta(string $pageTitle): array
@@ -186,9 +210,9 @@ class ReportSettingsController extends Controller
             'title'            => $pageTitle,
             'breadcrumb_title' => false,
             'breadcrumbs'      => [
-                ['label' => __('actions.sidemenu.dashboard'),    'url' => route('panel.dashboard'),                      'active' => false],
-                ['label' => __('actions.report_settings.title'), 'url' => route('panel.manager.report-settings.index'),  'active' => false],
-                ['label' => $pageTitle,                          'url' => 'javascript:void(0);',                         'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.report_settings.title'), 'url' => route('panel.manager.report-settings.index'), 'active' => false],
+                ['label' => $pageTitle, 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
     }

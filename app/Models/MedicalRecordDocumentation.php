@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DocumentationType;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
@@ -20,10 +21,16 @@ class MedicalRecordDocumentation extends Model
         'doctor_id',
         'report_setting_id',
         'report_setting_content_id',
+        'template_version',
         'type',
         'title',
         'content',
     ];
+
+    protected function casts(): array
+    {
+        return ['type' => DocumentationType::class];
+    }
 
     public function medicalRecord(): BelongsTo
     {
@@ -57,25 +64,23 @@ class MedicalRecordDocumentation extends Model
 
     public function getTypeLabel(): string
     {
-        return match ($this->type) {
-            'prescription' => __('actions.documentation.types.prescription'),
-            'procedure'    => __('actions.documentation.types.procedure'),
-            'certificate'  => __('actions.documentation.types.certificate'),
-            'referral'     => __('actions.documentation.types.referral'),
-            'report'       => __('actions.documentation.types.report'),
-            'tonometry'    => __('actions.documentation.types.tonometry'),
-            default        => $this->type,
-        };
+        return $this->type instanceof DocumentationType
+            ? $this->type->label()
+            : (string) $this->type;
     }
 
     /**
      * Retorna dados da tonometria decodificados do campo content (JSON).
+     *
      * @return array{od: string|null, oe: string|null, time: string|null}
      */
     public function tonometryData(): array
     {
-        if ($this->type !== 'tonometry') return ['od' => null, 'oe' => null, 'time' => null];
+        if ($this->type !== DocumentationType::Tonometry) {
+            return ['od' => null, 'oe' => null, 'time' => null];
+        }
         $data = json_decode($this->content ?? '{}', true);
+
         return ['od' => $data['od'] ?? null, 'oe' => $data['oe'] ?? null, 'time' => $data['time'] ?? null];
     }
 }

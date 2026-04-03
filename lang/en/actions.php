@@ -206,6 +206,7 @@ return [
     'lense'                  => 'Lense',
     'nearpointconvergence'   => 'Near Point Convergence',
     'category'               => 'Category',
+    'version'                => 'Version',
     'abbreviation'           => 'Abbreviation',
     'name'                   => 'Name',
     'rule'                   => 'Role',
@@ -245,6 +246,7 @@ return [
         'medical_records'       => 'Medical Records',
         'reports'               => 'Reports',
         'resources'             => 'Resources',
+        'partners'              => 'Partners',
     ],
 
     'reports' => [
@@ -448,8 +450,8 @@ return [
         'biomicroscopy_ph' => 'Biomicroscopic exam within normal limits',
         'fundoscopy'       => 'Fundoscopy',
         'fundoscopy_ph'    => 'Fundoscopic exam within normal limits',
-        'general_obs'   => 'General observation',
-        'lenses_obs'    => 'Lenses observation',
+        'general_obs'      => 'General observation',
+        'lenses_obs'       => 'Lenses observation',
 
         // Diagnosis
         'cid10'                    => 'ICD-10',
@@ -523,5 +525,82 @@ return [
         'resend_verification' => 'Resend verification email',
         'verification_sent'   => 'A new verification link has been sent to your email.',
         'photo_hint'          => 'JPG, PNG or WEBP. Max 2 MB.',
+    ],
+
+    'partners' => [
+        // Partner portal
+        'subtitle'        => 'Manage partners, leads and commissions',
+        'account_created' => 'Partner registered successfully. Access email sent.',
+        'portal_title'    => 'Partner Portal',
+        'my_leads'        => 'My Leads',
+        'my_commissions'  => 'My Commissions',
+
+        // CRUD / actions
+        'title'            => 'Partners',
+        'new'              => 'New Partner',
+        'new_lead'         => 'New Lead',
+        'edit'             => 'Edit Partner',
+        'register_partner' => 'Register partner',
+        'save_changes'     => 'Save changes',
+        'register_now'     => 'Register now',
+        'pay'              => 'Pay',
+
+        // Empty states
+        'empty'          => 'No partners registered.',
+        'no_leads'       => 'No leads registered.',
+        'no_commissions' => 'No commissions generated.',
+
+        // Tabs / sections
+        'leads'       => 'Leads',
+        'commissions' => 'Commissions',
+
+        // KPIs
+        'active_partners'     => 'Active Partners',
+        'total_leads'         => 'Leads (total)',
+        'pending_commissions' => 'Pending Commissions',
+        'paid_commissions'    => 'Paid Commissions (total)',
+        'lead_funnel'         => 'Lead Funnel',
+        'recent_commissions'  => 'Recent Commissions',
+
+        // Form fields
+        'name'                => 'Name',
+        'email'               => 'Email',
+        'type'                => 'Type',
+        'commission_rate'     => 'Commission Rate',
+        'document'            => 'CNPJ/CPF',
+        'status'              => 'Status',
+        'notes'               => 'Notes',
+        'select_placeholder'  => 'Select...',
+        'advance_placeholder' => '— Advance —',
+
+        // Sidebar info labels
+        'commission_label' => 'Commission',
+        'document_label'   => 'CNPJ/CPF',
+        'utm_token'        => 'UTM Token',
+        'registered_at'    => 'Registered at',
+
+        // Status values
+        'status_active'    => 'Active',
+        'status_inactive'  => 'Inactive',
+        'status_suspended' => 'Suspended',
+
+        // Table headers
+        'col_name'        => 'Name',
+        'col_type'        => 'Type',
+        'col_leads'       => 'Leads',
+        'col_commissions' => 'Commissions',
+        'col_pending'     => 'Pending',
+        'col_paid'        => 'Paid',
+        'col_actions'     => 'Actions',
+        'col_partner'     => 'Partner',
+        'col_clinic'      => 'Clinic',
+        'col_value'       => 'Amount',
+        'col_status'      => 'Status',
+        'col_due'         => 'Due Date',
+        'col_city'        => 'City',
+        'col_advance'     => 'Advance',
+        'col_date'        => 'Date',
+        'col_rate'        => 'Rate',
+        'col_period'      => 'Period',
     ],
 ];

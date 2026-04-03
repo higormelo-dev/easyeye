@@ -71,17 +71,28 @@ class MedicalRecordService
      *
      * @param  float|null  $addition  Valor de adição (ex: +2.00)
      *
-     * @return array{right: float|null, left: float|null}
+     * @return array{
+     *   right: float|null,
+     *   left: float|null,
+     *   static_spherical_right: float|null,
+     *   static_spherical_left: float|null
+     * }
      */
     public function calculatePresbyopia(?float $dynamicRight, ?float $dynamicLeft, ?float $addition): array
     {
+        $right = $dynamicRight !== null && $addition !== null
+            ? round($dynamicRight + $addition, 2)
+            : null;
+
+        $left = $dynamicLeft !== null && $addition !== null
+            ? round($dynamicLeft + $addition, 2)
+            : null;
+
         return [
-            'right' => $dynamicRight !== null && $addition !== null
-                ? round($dynamicRight + $addition, 2)
-                : null,
-            'left' => $dynamicLeft !== null && $addition !== null
-                ? round($dynamicLeft + $addition, 2)
-                : null,
+            'right'                  => $right,
+            'left'                   => $left,
+            'static_spherical_right' => $right,
+            'static_spherical_left'  => $left,
         ];
     }
 

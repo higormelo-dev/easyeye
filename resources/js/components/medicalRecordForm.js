@@ -26,6 +26,7 @@ export default ({
     templatePreviewUrl = '',
     storeDocUrl = '',
     storeFileUrl = '',
+    quickActionUrlTemplate = '',
 } = {}) => ({
     // ── Boolean switches ────────────────────────────────────────────────
     isEdit,
@@ -61,15 +62,73 @@ export default ({
         content: '',
     },
     docSaving: false,
+    quickActionUrlTemplate,
+    quickActionBusy: false,
 
     // ── File upload state ───────────────────────────────────────────────
     uploadedFiles: [],
     uploading: false,
     uploadProgress: 0,
 
+    normalizeDocTemplates(payload) {
+        if (Array.isArray(payload)) {
+            return payload;
+        }
+
+        if (!payload || typeof payload !== 'object') {
+            return [];
+        }
+
+        return Object.entries(payload).map(([id, group]) => ({
+            report_setting_id: group.report_setting_id ?? id,
+            report_setting_title: group.report_setting_title ?? group.title ?? '',
+            contents: Array.isArray(group.contents) ? group.contents : [],
+        }));
+    },
+
+    escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    },
+
     // ── Tonometry PDF ───────────────────────────────────────────────────
     _tonometryModal() {
         return bootstrap.Modal.getOrCreateInstance(document.getElementById('tonometryModal'));
+    },
+
+    appendDocumentationRow(doc, prepend = false) {
+        const tbody = document.querySelector('#pmr-docs-tbody');
+        if (!tbody) return;
+
+        const emptyRow = tbody.querySelector('[data-empty]') ?? tbody.querySelector('td[colspan]')?.closest('tr');
+        if (emptyRow) emptyRow.remove();
+
+        const typeLabel = this.escapeHtml(doc.type_label);
+        const title = this.escapeHtml(doc.title);
+        const createdAt = this.escapeHtml(doc.created_at);
+        const pdfUrl = doc.pdf_url ?? '#';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><span class="badge bg-info-subtle text-info">${typeLabel}</span></td>
+            <td>${title}</td>
+            <td>${createdAt}</td>
+            <td class="text-end">
+                <a href="${pdfUrl}" target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
+                    <i class="fas fa-file-pdf"></i>
+                </a>
+            </td>`;
+
+        if (prepend) {
+            tbody.prepend(tr);
+            return;
+        }
+
+        tbody.appendChild(tr);
     },
 
     async printTonometry() {
@@ -92,25 +151,7 @@ export default ({
 
                 if (res.ok) {
                     const doc = await res.json();
-
-                    // Adiciona ao histórico de documentações sem recarregar
-                    const tbody = document.querySelector('#pmr-docs-tbody');
-                    if (tbody) {
-                        const emptyRow = tbody.querySelector('[data-empty]');
-                        if (emptyRow) emptyRow.remove();
-
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td><span class="badge bg-info-subtle text-info">${doc.type_label}</span></td>
-                            <td>${doc.title}</td>
-                            <td>${doc.created_at}</td>
-                            <td class="text-end">
-                                <a href="${doc.pdf_url}" target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
-                                    <i class="fas fa-file-pdf"></i>
-                                </a>
-                            </td>`;
-                        tbody.prepend(tr);
-                    }
+                    this.appendDocumentationRow(doc, true);
 
                     this.tonometryPdfSrc = doc.pdf_url;
                     this._tonometryModal().show();
@@ -156,8 +197,8 @@ export default ({
             if (!res.ok) return;
 
             const data = await res.json();
-            this.staticSphericalRight = data.static_spherical_right ?? 0;
-            this.staticSphericalLeft = data.static_spherical_left ?? 0;
+            this.staticSphericalRight = data.static_spherical_right ?? data.right ?? 0;
+            this.staticSphericalLeft = data.static_spherical_left ?? data.left ?? 0;
         } catch (e) {
             console.error('Presbyopia calc error:', e);
         }
@@ -178,7 +219,8 @@ export default ({
             });
 
             if (res.ok) {
-                this.docTemplates = await res.json();
+                const payload = await res.json();
+                this.docTemplates = this.normalizeDocTemplates(payload);
             }
         } catch (e) {
             console.error('Failed to load templates:', e);
@@ -226,7 +268,7 @@ export default ({
 
                 // Auto-fill title from the selected template label
                 const tpl = this.docTemplates
-                    .flatMap(g => g.contents)
+                    .flatMap((g) => g.contents || [])
                     .find(c => c.id === this.docForm.report_setting_content_id);
                 if (tpl && !this.docForm.title) {
                     this.docForm.title = tpl.label;
@@ -263,25 +305,7 @@ export default ({
             }
 
             const doc = await res.json();
-
-            // Append new row to the documentation table
-            const tbody = document.querySelector('#tab-docs table tbody');
-            if (tbody) {
-                const emptyRow = tbody.querySelector('td[colspan]')?.closest('tr');
-                if (emptyRow) emptyRow.remove();
-
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><span class="badge bg-info-subtle text-info">${doc.type_label}</span></td>
-                    <td>${doc.title ?? ''}</td>
-                    <td>${doc.created_at}</td>
-                    <td class="text-end">
-                        <a href="${doc.pdf_url}" target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
-                            <i class="fas fa-file-pdf"></i>
-                        </a>
-                    </td>`;
-                tbody.appendChild(tr);
-            }
+            this.appendDocumentationRow(doc);
 
             // Close modal and reset
             bootstrap.Modal.getInstance(document.getElementById('docModal'))?.hide();
@@ -303,6 +327,129 @@ export default ({
         } finally {
             this.docSaving = false;
         }
+    },
+
+    // ── Quick actions (paridade legado) ─────────────────────────────────
+    buildQuickActionUrl(action) {
+        if (!this.quickActionUrlTemplate) return '';
+
+        return this.quickActionUrlTemplate.replace('__ACTION__', action);
+    },
+
+    async issueQuickAction(action, payload = {}, { openPdf = true } = {}) {
+        const url = this.buildQuickActionUrl(action);
+        if (!url || this.quickActionBusy) return;
+
+        this.quickActionBusy = true;
+
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                let message = 'Não foi possível emitir o documento.';
+
+                try {
+                    const err = await res.json();
+                    message = err.message ?? message;
+                } catch (_) {
+                    // noop
+                }
+
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'error', title: 'Erro', text: message });
+                }
+
+                return;
+            }
+
+            const doc = await res.json();
+            this.appendDocumentationRow(doc, true);
+
+            if (typeof $.toast === 'function') {
+                $.toast({
+                    heading: 'Sucesso',
+                    text: 'Documento emitido com sucesso.',
+                    position: 'top-right',
+                    loaderBg: '#006A4E',
+                    icon: 'success',
+                    hideAfter: 3500,
+                    stack: 6,
+                });
+            }
+
+            if (openPdf && doc.pdf_url) {
+                window.open(doc.pdf_url, '_blank', 'noopener');
+            }
+        } catch (e) {
+            console.error('Quick action error:', e);
+        } finally {
+            this.quickActionBusy = false;
+        }
+    },
+
+    issueMedicalCertificate() {
+        const rawDays = window.prompt('Dias de afastamento:', '1');
+        if (rawDays === null) return;
+
+        const days = Number(rawDays);
+        if (!Number.isInteger(days) || days <= 0 || days > 365) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'warning', title: 'Atenção', text: 'Informe um número de dias entre 1 e 365.' });
+            }
+
+            return;
+        }
+
+        this.issueQuickAction('medical-certificate', { days });
+    },
+
+    issueCataractPrescription() {
+        const eye = window.prompt('Olho a ser operado (ex: OD ou OE):', 'OD');
+        if (eye === null || eye.trim() === '') return;
+
+        const templateInput = window.prompt('Opção (1 = Pré, 2 = Pós, 3 = Instruções):', '1');
+        if (templateInput === null) return;
+
+        const template = ['1', '2', '3'].includes(templateInput.trim()) ? templateInput.trim() : '1';
+
+        const dateSurgery = window.prompt('Data da cirurgia (dd/mm/aaaa):', '') ?? '';
+        const hourSurgery = window.prompt('Hora da cirurgia (HH:mm):', '') ?? '';
+
+        this.issueQuickAction('cataract-prescription', {
+            eye: eye.trim(),
+            template,
+            date_surgery: dateSurgery.trim(),
+            hour_surgery: hourSurgery.trim(),
+        });
+    },
+
+    issueMedicalDeclaration() {
+        const content = window.prompt('Digite o conteúdo da declaração médica:');
+        if (content === null || content.trim() === '') return;
+
+        this.issueQuickAction('medical-declaration', { content: content.trim() });
+    },
+
+    issueMedicationPrescription() {
+        const content = window.prompt('Liste os medicamentos (um por linha):');
+        if (content === null || content.trim() === '') return;
+
+        this.issueQuickAction('medication-prescription', { content: content.trim() });
+    },
+
+    issueProcedureRequest() {
+        const content = window.prompt('Digite os procedimentos/indicações solicitados:');
+        if (content === null || content.trim() === '') return;
+
+        this.issueQuickAction('procedure-request', { content: content.trim() });
     },
 
     // ── Files: drag & drop ──────────────────────────────────────────────

@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class() extends Migration {
     private array $tables = [
         // Entidades e usuários
         'entities',
@@ -47,8 +47,12 @@ return new class () extends Migration {
 
     public function up(): void
     {
-        foreach ($this->tables as $table) {
-            Schema::table($table, function (Blueprint $table) {
+        foreach ($this->tables as $tableName) {
+            if (Schema::hasColumn($tableName, 'created_by')) {
+                continue;
+            }
+
+            Schema::table($tableName, function (Blueprint $table) {
                 $table->foreignUuid('created_by')->nullable()->after('id')
                     ->constrained('users')->nullOnDelete();
                 $table->foreignUuid('updated_by')->nullable()->after('created_by')
@@ -61,12 +65,27 @@ return new class () extends Migration {
 
     public function down(): void
     {
-        foreach ($this->tables as $table) {
-            Schema::table($table, function (Blueprint $table) {
-                $table->dropForeignIdFor(\App\Models\User::class, 'created_by');
-                $table->dropForeignIdFor(\App\Models\User::class, 'updated_by');
-                $table->dropForeignIdFor(\App\Models\User::class, 'deleted_by');
-                $table->dropColumn(['created_by', 'updated_by', 'deleted_by']);
+        $columns = ['created_by', 'updated_by', 'deleted_by'];
+
+        foreach ($this->tables as $tableName) {
+            if (! Schema::hasColumn($tableName, 'created_by')) {
+                continue;
+            }
+
+            // 1. Drop foreign key constraints first
+            Schema::table($tableName, function (Blueprint $table) use ($tableName, $columns) {
+                foreach ($columns as $col) {
+                    $fkName = "{$tableName}_{$col}_foreign";
+
+                    if (collect(Schema::getForeignKeys($tableName))->contains('name', $fkName)) {
+                        $table->dropForeign($fkName);
+                    }
+                }
+            });
+
+            // 2. Drop columns separately
+            Schema::table($tableName, function (Blueprint $table) use ($columns) {
+                $table->dropColumn($columns);
             });
         }
     }

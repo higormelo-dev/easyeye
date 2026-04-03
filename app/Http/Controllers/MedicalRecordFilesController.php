@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\DataAccessPurpose;
-use App\Models\{MedicalRecord, MedicalRecordFile, Patient};
+use App\Enums\{DataAccessPurpose, EntityGate};
+use App\Models\{Entity, MedicalRecord, MedicalRecordFile, Patient};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response, StreamedResponse};
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -18,6 +19,9 @@ class MedicalRecordFilesController extends Controller
      */
     public function store(Request $request, Patient $patient, MedicalRecord $medicalrecord): JsonResponse
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->authorizeIssueReport();
+
         $request->validate([
             'files'   => ['required', 'array', 'min:1', 'max:10'],
             'files.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx'],
@@ -60,6 +64,9 @@ class MedicalRecordFilesController extends Controller
      */
     public function show(Patient $patient, MedicalRecord $medicalrecord, MedicalRecordFile $file): StreamedResponse|Response
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->assertFileBelongsToRecord($medicalrecord, $file);
+
         $this->logAccess($file, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         if (!Storage::disk('private')->exists($file->file_path)) {
@@ -77,8 +84,29 @@ class MedicalRecordFilesController extends Controller
      */
     public function destroy(Patient $patient, MedicalRecord $medicalrecord, MedicalRecordFile $file): JsonResponse
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->assertFileBelongsToRecord($medicalrecord, $file);
+        $this->authorizeIssueReport();
+
         $file->delete();
 
         return response()->json(['message' => __('actions.medical_records.file_deleted')]);
+    }
+
+    private function authorizeIssueReport(): void
+    {
+        $entityId = session('selected_entity_id');
+        Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail($entityId));
+    }
+
+    private function assertRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalRecord): void
+    {
+        abort_if($medicalRecord->patient_id !== $patient->id, 404);
+    }
+
+    private function assertFileBelongsToRecord(MedicalRecord $medicalRecord, MedicalRecordFile $file): void
+    {
+        abort_if($file->medical_record_id !== $medicalRecord->id, 404);
+        abort_if($file->patient_id !== $medicalRecord->patient_id, 404);
     }
 }

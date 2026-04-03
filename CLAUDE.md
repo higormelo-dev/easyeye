@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Medicare** é uma plataforma multi-tenant SaaS de oftalmologia baseada em **Laravel 11 + Blade + Alpine.js**.
+**EasyEye** é uma plataforma multi-tenant SaaS de oftalmologia baseada em **Laravel 11 + Blade + Alpine.js**.
 
 ## Common Commands
 

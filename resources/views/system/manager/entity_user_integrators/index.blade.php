@@ -33,7 +33,7 @@
             </h4>
         </div>
         <div class="btn-group" role="group">
-            <a href="{{ route('panel.manager.entities.index') }}" class="btn btn-outline-white">
+            <a href="{{ route('panel.manager.entities.index') }}" class="btn btn-outline-white fs-13 btn-md">
                 <i class="fas fa-arrow-left me-1"></i>{{ __('actions.back') }}
             </a>
             <a href="javascript:void(0);" class="btn btn-primary fs-13 btn-md"

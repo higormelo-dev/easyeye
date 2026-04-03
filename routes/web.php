@@ -19,9 +19,12 @@ use App\Http\Controllers\{
 use App\Http\Controllers\{
     MedicalRecordDocumentationsController,
     MedicalRecordFilesController,
+    MedicalRecordQuickActionsController,
     MedicalRecordsController,
     SubscriptionExpiredController,
 };
+use App\Http\Controllers\{Cid10SearchController, TonometryPdfController};
+use App\Http\Controllers\Manager\ManagerDashboardController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
     CovenantsController,
@@ -49,8 +52,8 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::get('/', function () {
-    if (Auth::check() && session()->has('selected_entity_user_id') &&
-        session()->has('selected_entity_id')) {
+    if (Auth::check() && session()->has('selected_entity_user_id')
+        && session()->has('selected_entity_id')) {
         return redirect()->route('panel.dashboard');
     }
 
@@ -81,8 +84,8 @@ Route::group(
             return redirect()->route('panel.dashboard');
         });
         Route::get('/dashboard', function () {
-            if (!session()->get('selected_entity_is_client')) {
-                return view('system.manager.dashboard');
+            if (! session()->get('selected_entity_is_client')) {
+                return app()->call(ManagerDashboardController::class);
             }
 
             $entityId   = session('selected_entity_id');
@@ -158,51 +161,55 @@ Route::group(
 
         // ── admin + doctor + secretary: agenda, prontuários, fila de espera ──
         Route::middleware('entity.role:admin,doctor,secretary')->group(function () {
-            Route::get('patients/{patient}/tonometry-pdf', \App\Http\Controllers\TonometryPdfController::class)
+            Route::get('patients/{patient}/tonometry-pdf', TonometryPdfController::class)
                 ->name('patients.tonometry-pdf');
 
-            Route::get('cid10/search', \App\Http\Controllers\Cid10SearchController::class)
+            Route::get('cid10/search', Cid10SearchController::class)
                 ->name('cid10.search');
 
             Route::get(
                 'patients/{patient}/medicalrecords/ajaxlist',
-                [MedicalRecordsController::class, 'ajaxList']
+                [MedicalRecordsController::class, 'ajaxList'],
             )->name('patients.medicalrecords.ajaxlist');
             Route::post(
                 'patients/{patient}/medicalrecords/calculate-presbyopia',
-                [MedicalRecordsController::class, 'calculatePresbyopia']
+                [MedicalRecordsController::class, 'calculatePresbyopia'],
             )->name('patients.medicalrecords.calculate-presbyopia');
             Route::resource('patients.medicalrecords', MedicalRecordsController::class)
                 ->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
             Route::patch(
                 'patients/{patient}/medicalrecords/{medicalrecord}/restore',
-                [MedicalRecordsController::class, 'restore']
+                [MedicalRecordsController::class, 'restore'],
             )->name('patients.medicalrecords.restore');
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/pdf',
-                [MedicalRecordsController::class, 'pdf']
+                [MedicalRecordsController::class, 'pdf'],
             )->name('patients.medicalrecords.pdf');
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/tonometry-pdf',
-                [MedicalRecordsController::class, 'tonometryPdf']
+                [MedicalRecordsController::class, 'tonometryPdf'],
             )->name('patients.medicalrecords.tonometry-pdf');
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/templates',
-                [MedicalRecordsController::class, 'templates']
+                [MedicalRecordsController::class, 'templates'],
             )->name('patients.medicalrecords.templates');
             Route::post(
                 'patients/{patient}/medicalrecords/{medicalrecord}/template-preview',
-                [MedicalRecordsController::class, 'templatePreview']
+                [MedicalRecordsController::class, 'templatePreview'],
             )->name('patients.medicalrecords.template-preview');
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/quick-actions/{action}',
+                [MedicalRecordQuickActionsController::class, 'issue'],
+            )->name('patients.medicalrecords.quick-actions.issue');
 
             // Documentações de prontuário
             Route::post(
                 'patients/{patient}/medicalrecords/{medicalrecord}/tonometry',
-                [MedicalRecordDocumentationsController::class, 'storeTonometry']
+                [MedicalRecordDocumentationsController::class, 'storeTonometry'],
             )->name('patients.medicalrecords.tonometry.store');
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/documentations/{documentation}/pdf',
-                [MedicalRecordDocumentationsController::class, 'pdf']
+                [MedicalRecordDocumentationsController::class, 'pdf'],
             )->name('patients.medicalrecords.documentations.pdf');
             Route::resource('patients.medicalrecords.documentations', MedicalRecordDocumentationsController::class)
                 ->only(['store', 'show', 'destroy']);
@@ -269,43 +276,43 @@ Route::group(
             });
 
             Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
-                Route::get('covenants/cards', [CovenantsController::class,          'cards'])->name('covenants.cards');
+                Route::get('covenants/cards', [CovenantsController::class, 'cards'])->name('covenants.cards');
                 Route::resource('covenants', CovenantsController::class);
                 Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])->name('covenants.restore');
 
-                Route::get('skintypes/cards', [SkinTypesController::class,          'cards'])->name('skintypes.cards');
+                Route::get('skintypes/cards', [SkinTypesController::class, 'cards'])->name('skintypes.cards');
                 Route::resource('skintypes', SkinTypesController::class);
                 Route::get('skintypes/{skintype}/restore', [SkinTypesController::class, 'restore'])->name('skintypes.restore');
 
-                Route::get('iristypes/cards', [IrisTypesController::class,          'cards'])->name('iristypes.cards');
+                Route::get('iristypes/cards', [IrisTypesController::class, 'cards'])->name('iristypes.cards');
                 Route::resource('iristypes', IrisTypesController::class);
                 Route::get('iristypes/{iristype}/restore', [IrisTypesController::class, 'restore'])->name('iristypes.restore');
 
-                Route::get('visittypes/cards', [VisitTypesController::class,         'cards'])->name('visittypes.cards');
+                Route::get('visittypes/cards', [VisitTypesController::class, 'cards'])->name('visittypes.cards');
                 Route::resource('visittypes', VisitTypesController::class);
                 Route::get('visittypes/{visittype}/restore', [VisitTypesController::class, 'restore'])->name('visittypes.restore');
 
-                Route::get('additiontypes/cards', [AdditionTypesController::class,      'cards'])->name('additiontypes.cards');
+                Route::get('additiontypes/cards', [AdditionTypesController::class, 'cards'])->name('additiontypes.cards');
                 Route::resource('additiontypes', AdditionTypesController::class);
                 Route::get('additiontypes/{additiontype}/restore', [AdditionTypesController::class, 'restore'])->name('additiontypes.restore');
 
-                Route::get('surgerytypes/cards', [SurgeryTypesController::class,       'cards'])->name('surgerytypes.cards');
+                Route::get('surgerytypes/cards', [SurgeryTypesController::class, 'cards'])->name('surgerytypes.cards');
                 Route::resource('surgerytypes', SurgeryTypesController::class);
                 Route::get('surgerytypes/{surgerytype}/restore', [SurgeryTypesController::class, 'restore'])->name('surgerytypes.restore');
 
-                Route::get('covertesttypes/cards', [CoverTestTypesController::class,     'cards'])->name('covertesttypes.cards');
+                Route::get('covertesttypes/cards', [CoverTestTypesController::class, 'cards'])->name('covertesttypes.cards');
                 Route::resource('covertesttypes', CoverTestTypesController::class);
                 Route::get('covertesttypes/{covertesttype}/restore', [CoverTestTypesController::class, 'restore'])->name('covertesttypes.restore');
 
-                Route::get('colorvisiontypes/cards', [ColorVisionTypesController::class,   'cards'])->name('colorvisiontypes.cards');
+                Route::get('colorvisiontypes/cards', [ColorVisionTypesController::class, 'cards'])->name('colorvisiontypes.cards');
                 Route::resource('colorvisiontypes', ColorVisionTypesController::class);
                 Route::get('colorvisiontypes/{colorvisiontype}/restore', [ColorVisionTypesController::class, 'restore'])->name('colorvisiontypes.restore');
 
-                Route::get('visualacuitytypes/cards', [VisualAcuityTypesController::class,  'cards'])->name('visualacuitytypes.cards');
+                Route::get('visualacuitytypes/cards', [VisualAcuityTypesController::class, 'cards'])->name('visualacuitytypes.cards');
                 Route::resource('visualacuitytypes', VisualAcuityTypesController::class);
                 Route::get('visualacuitytypes/{colorvisiontype}/restore', [VisualAcuityTypesController::class, 'restore'])->name('visualacuitytypes.restore');
 
-                Route::get('lenses/cards', [LensesController::class,             'cards'])->name('lenses.cards');
+                Route::get('lenses/cards', [LensesController::class, 'cards'])->name('lenses.cards');
                 Route::resource('lenses', LensesController::class);
                 Route::get('lenses/{lens}/restore', [LensesController::class, 'restore'])->name('lenses.restore');
 
@@ -313,12 +320,14 @@ Route::group(
                 Route::resource('nearpointconvergences', NearPointConvergencesController::class);
                 Route::get('nearpointconvergences/{nearpointconvergence}/restore', [NearPointConvergencesController::class, 'restore'])->name('nearpointconvergences.restore');
 
-                Route::get('resources/cards', [ResourcesController::class,          'cards'])->name('resources.cards');
+                Route::get('resources/cards', [ResourcesController::class, 'cards'])->name('resources.cards');
                 Route::resource('resources', ResourcesController::class);
                 Route::get('resources/{resource}/restore', [ResourcesController::class, 'restore'])->name('resources.restore');
 
                 // Modelos de documentação (receituários, atestados, etc.)
                 Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
+                Route::post('report-settings/{report_setting}/adopt', [ReportSettingsController::class, 'adopt'])->name('report-settings.adopt');
+                Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');
                 Route::resource('report-settings', ReportSettingsController::class);
             });
         });
@@ -328,7 +337,8 @@ Route::group(
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-    }
+    },
 );
 
+require __DIR__ . '/portal.php';
 require __DIR__ . '/auth.php';

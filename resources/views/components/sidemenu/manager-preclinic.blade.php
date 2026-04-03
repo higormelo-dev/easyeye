@@ -24,3 +24,8 @@
         <i class="ti ti-file-description"></i><span>{{ __('actions.report_settings.title') }}</span>
     </a>
 </li>
+<li>
+    <a href="{{ route('panel.manager.partners.index') }}" class="{{ request()->routeIs('panel.manager.partners.*') ? 'active' : '' }}">
+        <i class="ti ti-affiliate"></i><span>{{ __('actions.sidemenu.partners') }}</span>
+    </a>
+</li>

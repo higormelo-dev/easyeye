@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Entity;
+use App\Services\ReportSettingService;
 use App\Services\TrialService;
 use Illuminate\Support\Facades\Log;
 
@@ -10,6 +11,7 @@ class EntityObserver
 {
     public function __construct(
         private readonly TrialService $trialService,
+        private readonly ReportSettingService $reportSettingService,
     ) {
     }
 
@@ -18,15 +20,27 @@ class EntityObserver
      */
     public function created(Entity $entity): void
     {
-        if (!$entity->is_client || $entity->skipAutoTrial) {
+        if (! $entity->is_client) {
             return;
         }
 
+        if (! $entity->skipAutoTrial) {
+            try {
+                $this->trialService->startTrial($entity);
+            } catch (\Throwable $e) {
+                // Não deve impedir a criação da empresa, mas deve ser logado.
+                Log::error('Falha ao iniciar trial para empresa.', [
+                    'entity_id' => $entity->id,
+                    'error'     => $e->getMessage(),
+                ]);
+            }
+        }
+
         try {
-            $this->trialService->startTrial($entity);
+            $this->reportSettingService->adoptPublishedGlobalsForEntity((string) $entity->id);
         } catch (\Throwable $e) {
             // Não deve impedir a criação da empresa, mas deve ser logado.
-            Log::error('Falha ao iniciar trial para empresa.', [
+            Log::error('Falha ao adotar modelos globais padrão para empresa.', [
                 'entity_id' => $entity->id,
                 'error'     => $e->getMessage(),
             ]);

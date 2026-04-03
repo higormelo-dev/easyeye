@@ -7,11 +7,14 @@
 @section('content')
 
 @php
-    $s       = $reportSetting ?? null;
-    $isEdit  = (bool) $s;
-    $action  = $isEdit
-        ? route('panel.setting.report-settings.update', $s)
-        : route('panel.setting.report-settings.store');
+    $s         = $reportSetting ?? null;
+    $isEdit    = (bool) $s;
+    $isManager = request()->routeIs('panel.manager.*');
+    $prefix    = $isManager ? 'panel.manager.report-settings' : 'panel.setting.report-settings';
+    $action    = $isEdit
+        ? route("{$prefix}.update", $s)
+        : route("{$prefix}.store");
+    $cancelUrl = route("{$prefix}.index");
 @endphp
 
 <form method="POST" action="{{ $action }}"
@@ -35,6 +38,16 @@
                     <input type="text" name="title" class="form-control @error('title') is-invalid @enderror"
                            value="{{ old('title', $s?->title) }}" maxlength="255" required>
                     @error('title')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label">{{ __('forms.category') }}</label>
+                    <select name="report_category_id" class="form-select @error('report_category_id') is-invalid @enderror">
+                        <option value="">{{ __('forms.select') }}...</option>
+                        @foreach($categories ?? [] as $cat)
+                            <option value="{{ $cat->id }}" {{ old('report_category_id', $s?->report_category_id) == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('report_category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-6 col-md-3">
                     <label class="form-label">{{ __('forms.paper_size') }}</label>
@@ -63,6 +76,13 @@
                     <label class="form-label">{{ __('forms.font_size') }} (pt)</label>
                     <input type="number" name="font_size" class="form-control"
                            value="{{ old('font_size', $s?->font_size ?? 11) }}" min="8" max="24">
+                </div>
+                <div class="col-12">
+                    <label class="form-label">{{ __('forms.description') }}</label>
+                    <textarea name="description" class="form-control @error('description') is-invalid @enderror"
+                              rows="2" maxlength="1000"
+                              placeholder="{{ __('forms.description_placeholder') }}">{{ old('description', $s?->description) }}</textarea>
+                    @error('description')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
 
@@ -195,7 +215,7 @@
 
     {{-- ── Ações ─────────────────────────────────────────────────────────────── --}}
     <div class="d-flex gap-2 justify-content-end">
-        <a href="{{ route('panel.setting.report-settings.index') }}" class="btn btn-secondary">
+        <a href="{{ $cancelUrl }}" class="btn btn-secondary">
             {{ __('actions.cancel') }}
         </a>
         <button type="submit" class="btn btn-primary">

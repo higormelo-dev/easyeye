@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 return [
     'required_field' => '* Campo obrigatório',
@@ -14,17 +14,18 @@ return [
     'select'           => 'Selecione',
 
     // Labels comuns
-    'name'                  => 'Nome',
-    'abbreviation'          => 'Abreviação',
-    'scale'                 => 'Escala',
-    'active'                => 'Ativo',
-    'category'              => 'Categoria',
-    'description'           => 'Descrição',
-    'observation'           => 'Observação',
-    'code'                  => 'Código',
-    'email'                 => 'E-mail',
-    'password'              => 'Senha',
-    'password_confirmation' => 'Confirmação de Senha',
+    'name'                    => 'Nome',
+    'abbreviation'            => 'Abreviação',
+    'scale'                   => 'Escala',
+    'active'                  => 'Ativo',
+    'category'                => 'Categoria',
+    'description'             => 'Descrição',
+    'description_placeholder' => 'Descrição breve do modelo (opcional)',
+    'observation'             => 'Observação',
+    'code'                    => 'Código',
+    'email'                   => 'E-mail',
+    'password'                => 'Senha',
+    'password_confirmation'   => 'Confirmação de Senha',
 
     // Geral
     'display_name' => 'Nome Abreviado',

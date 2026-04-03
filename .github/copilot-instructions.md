@@ -1,4 +1,4 @@
-# Medicare — Copilot Instructions
+# EasyEye — Copilot Instructions
 
 Plataforma multi-tenant SaaS de oftalmologia. Laravel 12 + Blade + Alpine.js + Bootstrap 5.
 Veja [CLAUDE.md](../CLAUDE.md) para arquitetura completa, tabelas, enums, observers e traits.
@@ -20,7 +20,7 @@ php artisan migrate   # Migrations
 php artisan db:seed   # Seeders (DataFakers só em local/testing)
 ```
 
-Banco de testes: **PostgreSQL** (`medicare_test`), configurado em `phpunit.xml`.
+Banco de testes: **PostgreSQL** (`easyeye_test`), configurado em `phpunit.xml`.
 
 ## Código — Regras Críticas
 

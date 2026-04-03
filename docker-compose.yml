@@ -1,5 +1,5 @@
 services:
-  medicare_app:
+  easyeye_app:
     build:
       context: .
       dockerfile: Dockerfile
@@ -8,18 +8,18 @@ services:
     volumes:
       - ./:/var/www/html/app
     depends_on:
-      - medicare_redis
-      - medicare_nginx
+      - easyeye_redis
+      - easyeye_nginx
     networks:
-      - medicare-network
+      - easyeye-network
     healthcheck:
-      test: curl --fail medicare_app:8080/health || exit 1
+      test: curl --fail easyeye_app:8080/health || exit 1
       interval: 5s
       retries: 5
       start_period: 20s
       timeout: 10s
 
-  medicare_nginx:
+  easyeye_nginx:
     image: nginx:alpine
     restart: unless-stopped
     ports:
@@ -28,36 +28,36 @@ services:
       - ./:/var/www/html/app
       - ./.docker/nginx/:/etc/nginx/conf.d/
     networks:
-      - medicare-network
+      - easyeye-network
 
-  medicare_queue:
+  easyeye_queue:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
-    working_dir: /var/www
+    working_dir: /var/www/html/app
     command: "php artisan queue:work --tries=3"
     volumes:
-      - .:/var/www
+      - .:/var/www/html/app
     depends_on:
-      - medicare_redis
-      - medicare_app
+      - easyeye_redis
+      - easyeye_app
     networks:
-      - medicare-network
+      - easyeye-network
     healthcheck:
-      test: curl --fail medicare_queue:8080/health || exit 1
+      test: curl --fail easyeye_queue:8080/health || exit 1
       interval: 5s
       retries: 5
       start_period: 20s
       timeout: 10s
 
-  medicare_redis:
+  easyeye_redis:
     image: redis:latest
     restart: always
     ports:
       - "6379:6379"
     networks:
-      - medicare-network
+      - easyeye-network
     volumes:
       - ./.docker/redis/data:/var/lib/redis/data
     healthcheck:
@@ -68,5 +68,5 @@ services:
       timeout: 10s
 
 networks:
-  medicare-network:
+  easyeye-network:
     driver: bridge

@@ -7,7 +7,7 @@ use App\Http\Controllers\Manager\{
     EntityUserIntegratorsController,
     EntityUsersController,
     ImpersonateController,
-    PartnersReportController,
+    PartnersController,
     PlansController,
     ReportSettingsController,
     SubscriptionsController
@@ -47,8 +47,11 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     Route::resource('plans', PlansController::class)->except('create', 'edit');
 
     // ── Parceiros ──────────────────────────────────────────────────────────
-    Route::get('partners', [PartnersReportController::class, 'index'])->name('partners.index');
-    Route::patch('partners/commissions/{commission}/pay', [PartnersReportController::class, 'payCommission'])->name('partners.commission.pay');
+    Route::get('partners/{partner}/edit-data', [PartnersController::class, 'editData'])->name('partners.edit-data');
+    Route::get('partners/{partner}', [PartnersController::class, 'show'])->name('partners.show');
+    Route::patch('partners/{partner}/leads/{lead}/advance', [PartnersController::class, 'advanceLead'])->name('partners.leads.advance');
+    Route::patch('partners/commissions/{commission}/pay', [PartnersController::class, 'payCommission'])->name('partners.commission.pay');
+    Route::resource('partners', PartnersController::class)->except('create', 'edit', 'show');
 
     // ── Assinaturas ────────────────────────────────────────────────────────
     Route::get('subscriptions/cards', [SubscriptionsController::class, 'cards'])->name('subscriptions.cards');
@@ -61,5 +64,7 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
 
     // ── Modelos de Documento Globais ────────────────────────────────────────
     Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
+    Route::post('report-settings/{report_setting}/publish', [ReportSettingsController::class, 'publish'])->name('report-settings.publish');
+    Route::post('report-settings/{report_setting}/archive', [ReportSettingsController::class, 'archive'])->name('report-settings.archive');
     Route::resource('report-settings', ReportSettingsController::class)->except('show');
 });

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\Partner;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -26,6 +27,17 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+
+        // Partner portal redirect — before entity logic
+        $partnerRecord = Partner::where('user_id', Auth::id())
+            ->where('status', 'active')
+            ->first();
+
+        if ($partnerRecord) {
+            session(['portal_partner_id' => $partnerRecord->id]);
+
+            return redirect()->route('portal.dashboard');
+        }
 
         $entityUsers = Auth::user()->entityUsers()->with('entity')
             ->where('active', true)->get();

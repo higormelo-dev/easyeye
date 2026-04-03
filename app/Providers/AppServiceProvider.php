@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\{Blade, Gate, URL};
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -37,6 +38,8 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
+        Paginator::useBootstrapFive();
+
         Password::defaults(fn () => Password::min(8)->letters()->numbers());
 
         // Configura o Sanctum para autenticar via Bearer token
@@ -58,13 +61,13 @@ class AppServiceProvider extends ServiceProvider
         Blade::if('canEntity', function (string $gate): bool {
             $entityId = session('selected_entity_id');
 
-            if (!$entityId) {
+            if (! $entityId) {
                 return false;
             }
 
             $entity = Entity::find($entityId);
 
-            if (!$entity) {
+            if (! $entity) {
                 return false;
             }
 

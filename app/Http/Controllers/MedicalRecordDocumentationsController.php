@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\DataAccessPurpose;
-use App\Models\{MedicalRecord, MedicalRecordDocumentation, Patient, ReportSettingContent};
+use App\Enums\{DataAccessPurpose, DocumentationType, EntityGate};
+use App\Models\{Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSettingContent};
 use App\Services\{MedicalRecordDocumentationService, MedicalRecordPdfService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response};
+use Illuminate\Support\Facades\Gate;
 
 class MedicalRecordDocumentationsController extends Controller
 {
@@ -23,6 +24,9 @@ class MedicalRecordDocumentationsController extends Controller
      */
     public function store(Request $request, Patient $patient, MedicalRecord $medicalrecord): JsonResponse
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->authorizeIssueReport();
+
         $validated = $request->validate([
             'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
             'title'                     => ['nullable', 'string', 'max:255'],
@@ -30,6 +34,7 @@ class MedicalRecordDocumentationsController extends Controller
         ]);
 
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
+        $this->assertContentBelongsToCurrentEntity($content);
 
         $documentation = $this->service->store(
             $medicalrecord,
@@ -53,6 +58,9 @@ class MedicalRecordDocumentationsController extends Controller
      */
     public function show(Patient $patient, MedicalRecord $medicalrecord, MedicalRecordDocumentation $documentation): JsonResponse
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->assertDocumentationBelongsToRecord($medicalrecord, $documentation);
+
         $this->logAccess($documentation, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         return response()->json([
@@ -70,6 +78,9 @@ class MedicalRecordDocumentationsController extends Controller
      */
     public function pdf(Patient $patient, MedicalRecord $medicalrecord, MedicalRecordDocumentation $documentation): Response
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->assertDocumentationBelongsToRecord($medicalrecord, $documentation);
+
         $this->logAccess($documentation, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         return $this->pdfService->generateDocumentation($documentation);
@@ -80,6 +91,9 @@ class MedicalRecordDocumentationsController extends Controller
      */
     public function storeTonometry(Request $request, Patient $patient, MedicalRecord $medicalrecord): JsonResponse
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->authorizeIssueReport();
+
         $validated = $request->validate([
             'od'   => ['nullable', 'numeric', 'min:0', 'max:999'],
             'oe'   => ['nullable', 'numeric', 'min:0', 'max:999'],
@@ -90,7 +104,7 @@ class MedicalRecordDocumentationsController extends Controller
             'medical_record_id' => $medicalrecord->id,
             'patient_id'        => $patient->id,
             'doctor_id'         => $medicalrecord->doctor_id,
-            'type'              => 'tonometry',
+            'type'              => DocumentationType::Tonometry,
             'title'             => 'Laudo de Tonômetria — ' . now()->format('d/m/Y H:i'),
             'content'           => json_encode($validated),
         ]);
@@ -110,8 +124,38 @@ class MedicalRecordDocumentationsController extends Controller
      */
     public function destroy(Patient $patient, MedicalRecord $medicalrecord, MedicalRecordDocumentation $documentation): JsonResponse
     {
+        $this->assertRecordBelongsToPatient($patient, $medicalrecord);
+        $this->assertDocumentationBelongsToRecord($medicalrecord, $documentation);
+        $this->authorizeIssueReport();
+
         $documentation->delete();
 
         return response()->json(['message' => __('actions.medical_records.documentation_deleted')]);
+    }
+
+    private function authorizeIssueReport(): void
+    {
+        $entityId = session('selected_entity_id');
+        Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail($entityId));
+    }
+
+    private function assertRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalRecord): void
+    {
+        abort_if($medicalRecord->patient_id !== $patient->id, 404);
+    }
+
+    private function assertDocumentationBelongsToRecord(MedicalRecord $medicalRecord, MedicalRecordDocumentation $documentation): void
+    {
+        abort_if($documentation->medical_record_id !== $medicalRecord->id, 404);
+        abort_if($documentation->patient_id !== $medicalRecord->patient_id, 404);
+    }
+
+    private function assertContentBelongsToCurrentEntity(ReportSettingContent $content): void
+    {
+        $selectedEntityId = (string) session('selected_entity_id');
+        $content->loadMissing('reportSetting');
+
+        $settingEntityId = (string) ($content->reportSetting?->entity_id ?? '');
+        abort_if($settingEntityId !== '' && $settingEntityId !== $selectedEntityId, 404);
     }
 }

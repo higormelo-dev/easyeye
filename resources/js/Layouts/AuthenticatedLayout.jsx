@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Head, Link } from '@inertiajs/react';
 
 /**
- * Premium Layout para o EasyEye (Medicare)
+ * Premium Layout para o EasyEye (EasyEye)
  * Este layout utiliza as classes do Preclinic mas adiciona toques modernos com Tailwind.
  */
 export default function AuthenticatedLayout({ user, header, children, breadcrumbs = [] }) {
@@ -26,7 +26,7 @@ export default function AuthenticatedLayout({ user, header, children, breadcrumb
 
     return (
         <div className={`main-wrapper ${!sidebarOpen ? 'mini-sidebar' : ''} ${sidebarOpen && isMobile ? 'slide-nav' : ''}`}>
-            
+
             {/* ═══════════════════ HEADER (Glassmorphic) ═══════════════════ */}
             <header className="navbar-header glass-effect">
                 <div className="page-container topbar-menu">
@@ -37,8 +37,8 @@ export default function AuthenticatedLayout({ user, header, children, breadcrumb
                                 <span className="logo-sm"><img src="/system/images/preclinic/logo-small.svg" alt="EasyEye" /></span>
                             </span>
                         </Link>
-                        
-                        <button 
+
+                        <button
                             onClick={toggleSidebar}
                             className="sidenav-toggle-btn btn border-0 p-0 text-slate-600 hover:text-indigo-600 transition-colors"
                         >
@@ -58,11 +58,11 @@ export default function AuthenticatedLayout({ user, header, children, breadcrumb
                         <div className="dropdown profile-dropdown">
                             <button className="flex items-center gap-2 p-1 hover:bg-slate-50 rounded-lg transition-all border border-transparent hover:border-slate-100">
                                 <div className="relative">
-                                    <img 
-                                        src={`/system/images/users/${user.id}.jpg`} 
+                                    <img
+                                        src={`/system/images/users/${user.id}.jpg`}
                                         onError={(e) => e.target.src = '/system/images/team.png'}
                                         className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
-                                        alt={user.name} 
+                                        alt={user.name}
                                     />
                                     <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></span>
                                 </div>
@@ -83,15 +83,15 @@ export default function AuthenticatedLayout({ user, header, children, breadcrumb
                         <ul className="space-y-2">
                             <li className="menu-title text-uppercase font-bold text-xs text-slate-400 mb-4 px-2"><span>Principal</span></li>
                             <li>
-                                <SidebarLink 
-                                    href="/panel/dashboard" 
+                                <SidebarLink
+                                    href="/panel/dashboard"
                                     active={window.location.pathname === '/panel/dashboard'}
                                     icon="ti-layout-dashboard"
                                 >
                                     Dashboard
                                 </SidebarLink>
                             </li>
-                            
+
                             <li className="menu-title text-uppercase font-bold text-xs text-slate-400 mt-6 mb-4 px-2"><span>Atendimento</span></li>
                             <li>
                                 <SidebarLink href="/panel/schedules" icon="ti-calendar-event">Agenda</SidebarLink>
@@ -156,11 +156,11 @@ export default function AuthenticatedLayout({ user, header, children, breadcrumb
 
 function SidebarLink({ href, icon, active, children }) {
     return (
-        <Link 
-            href={href} 
+        <Link
+            href={href}
             className={`flex items-center gap-3 p-3 rounded-xl transition-all group ${
-                active 
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                active
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'
             }`}
         >
