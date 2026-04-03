@@ -118,6 +118,11 @@
                             {{ __('actions.sidemenu.nearpointconvergences') }}
                         </a>
                     </li>
+                    <li>
+                        <a href="{{ route('panel.setting.report-settings.index') }}" class="{{ request()->routeIs('panel.setting.report-settings.*') ? 'active' : '' }}">
+                            {{ __('actions.report_settings.title') }}
+                        </a>
+                    </li>
                 </ul>
             </li>
 

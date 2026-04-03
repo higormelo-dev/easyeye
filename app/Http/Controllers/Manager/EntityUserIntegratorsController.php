@@ -26,13 +26,15 @@ class EntityUserIntegratorsController extends Controller
         $entityModel = Entity::query()->findOrFail($entity);
 
         $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
+            'title'            => $entityModel->name,
+            'action'           => $this->titleController,
+            'total'            => EntityUserIntegrator::where('entity_id', $entity)->count(),
+            'breadcrumb_title' => false,
+            'breadcrumbs'      => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.entities'), 'url' => route('panel.manager.entities.index'), 'active' => false],
-                ['label' => $this->titleController, 'url' => route('panel.manager.entities.user-integrators.index', $entity), 'active' => false],
-                ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
+                ['label' => 'Empresas', 'url' => route('panel.manager.entities.index'), 'active' => false],
+                ['label' => $entityModel->name, 'url' => 'javascript:void(0);', 'active' => false],
+                ['label' => $this->titleController, 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
 
@@ -125,7 +127,7 @@ class EntityUserIntegratorsController extends Controller
         $record = $this->model->query()
             ->where('entity_id', $entity->id)
             ->findOrFail($userIntegrator);
-        $active = (bool) $request->input('active', !$record->active);
+        $active = (bool) $request->input('active', ! $record->active);
         $record->update(['active' => $active]);
 
         return response()->json([

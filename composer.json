@@ -28,6 +28,8 @@
   "require-dev": {
     "barryvdh/laravel-ide-helper": "^3.6",
     "fakerphp/faker": "^1.23",
+    "h4cc/wkhtmltoimage-amd64": "^0.12.4",
+    "h4cc/wkhtmltopdf-amd64": "^0.12.4",
     "laravel/breeze": "^2.3",
     "laravel/pail": "^1.1",
     "laravel/pint": "^1.29",

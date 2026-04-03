@@ -60,18 +60,60 @@ class MedicalRecordPdfService
     }
 
     /**
+     * Gera o Laudo de Tonômetria com o horário capturado no momento da impressão.
+     */
+    public function generateTonometry(MedicalRecord $record, string $time): Response
+    {
+        $record->loadMissing(['patient.person', 'doctor.person', 'schedule']);
+
+        $setting = ReportSetting::where('entity_id', $record->schedule?->entity_id ?? session('selected_entity_id'))
+            ->where('active', true)
+            ->first();
+
+        $filename = 'TONOMETRIA-' . $record->code . '.pdf';
+
+        return SnappyPdf::loadView('pdf.tonometry', compact('record', 'setting', 'time'))
+            ->setPaper($setting?->paper_size ?? 'A4')
+            ->setOption('margin-top', ($setting?->margin_top ?? 2.0) . 'cm')
+            ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
+            ->setOption('margin-bottom', ($setting?->margin_bottom ?? 2.0) . 'cm')
+            ->setOption('margin-left', ($setting?->margin_left ?? 2.5) . 'cm')
+            ->setOption('encoding', 'UTF-8')
+            ->inline($filename);
+    }
+
+    /**
      * Gera o PDF de uma documentação clínica (receituário, solicitação, etc.).
+     * Para tipo 'tonometry', usa a view dedicada com dados do campo content (JSON).
      */
     public function generateDocumentation(MedicalRecordDocumentation $doc): Response
     {
-        $doc->loadMissing([
-            'patient.person',
-            'doctor.person',
-            'reportSetting',
-        ]);
+        $doc->loadMissing(['patient.person', 'doctor.person', 'reportSetting', 'medicalRecord.schedule']);
 
-        $setting  = $doc->reportSetting;
         $filename = strtoupper($doc->type) . '-' . $doc->id . '.pdf';
+
+        if ($doc->type === 'tonometry') {
+            $entity  = $doc->medicalRecord?->schedule?->entity
+                ?? \App\Models\Entity::find(session('selected_entity_id'));
+            $setting = ReportSetting::where('entity_id', $entity?->id)->where('active', true)->first();
+            $tData   = $doc->tonometryData();
+            $patient = $doc->patient;
+            $doctor  = $doc->doctor;
+            $od      = $tData['od'];
+            $oe      = $tData['oe'];
+            $time    = $tData['time'] ?? now()->format('H:i');
+
+            return SnappyPdf::loadView('pdf.tonometry', compact('patient', 'doctor', 'entity', 'setting', 'od', 'oe', 'time'))
+                ->setPaper('A5', 'portrait')
+                ->setOption('margin-top', '1.5cm')
+                ->setOption('margin-right', '1.5cm')
+                ->setOption('margin-bottom', '1.5cm')
+                ->setOption('margin-left', '1.5cm')
+                ->setOption('encoding', 'UTF-8')
+                ->inline($filename);
+        }
+
+        $setting = $doc->reportSetting;
 
         return SnappyPdf::loadView('pdf.documentation', compact('doc', 'setting'))
             ->setPaper($setting?->paper_size ?? 'A4')

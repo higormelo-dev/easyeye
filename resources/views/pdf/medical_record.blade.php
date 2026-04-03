@@ -131,7 +131,12 @@
     </div>
     <div class="col col-4">
         <span class="field-label">CRM</span>
-        <span class="field-value">{{ $record->doctor?->crm ?? '—' }}</span>
+        <span class="field-value">
+            {{ $record->doctor?->record ?? '—' }}
+            @if($record->doctor?->record_specialty)
+            &nbsp;· RQE {{ $record->doctor->record_specialty }}
+            @endif
+        </span>
     </div>
     <div class="col col-4">
         <span class="field-label">Convênio</span>
@@ -391,16 +396,26 @@
 @if($record->isSigned())
 <div class="signature-block">
     <div class="signature-line"></div><br>
-    {{ $record->signedBy?->user?->name ?? $record->doctor?->person?->full_name }}<br>
-    @if($record->doctor?->crm) CRM {{ $record->doctor->crm }}<br>@endif
-    Assinado eletronicamente em {{ $record->signed_at->format('d/m/Y \à\s H:i') }}<br>
+    {{ $record->signedBy?->user?->name ?? $record->doctor?->person?->full_name }}
+    @if($record->doctor?->record)
+    <br>CRM {{ $record->doctor->record }}
+    @endif
+    @if($record->doctor?->record_specialty)
+    <br>RQE {{ $record->doctor->record_specialty }}
+    @endif
+    <br>Assinado eletronicamente em {{ $record->signed_at->format('d/m/Y \à\s H:i') }}<br>
     <small style="color:#999;">Hash: {{ $record->signature_hash }}</small>
 </div>
 @else
 <div class="signature-block">
     <div class="signature-line"></div><br>
-    {{ $record->doctor?->person?->full_name ?? '' }}<br>
-    @if($record->doctor?->crm) CRM {{ $record->doctor->crm }} @endif
+    {{ $record->doctor?->person?->full_name ?? '' }}
+    @if($record->doctor?->record)
+    <br>CRM {{ $record->doctor->record }}
+    @endif
+    @if($record->doctor?->record_specialty)
+    <br>RQE {{ $record->doctor->record_specialty }}
+    @endif
 </div>
 @endif
 

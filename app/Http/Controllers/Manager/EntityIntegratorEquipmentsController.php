@@ -33,6 +33,7 @@ class EntityIntegratorEquipmentsController extends Controller
         $meta = [
             'title'       => $this->titleController . ': ' . $integratorModel->name,
             'action'      => __('actions.records'),
+            'total'       => EntityIntegratorEquipment::where('integrator_id', $integratorModel->id)->count(),
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('actions.sidemenu.entities'), 'url' => route('panel.manager.entities.index'), 'active' => false],

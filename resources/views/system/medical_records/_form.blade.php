@@ -30,11 +30,19 @@
           calcPresbyopiaUrl: @js(route('panel.patients.medicalrecords.calculate-presbyopia', $patient)),
           dynamicSphericalRight: {{ $old('dynamic_spherical_right', 0) ?: 0 }},
           dynamicSphericalLeft: {{ $old('dynamic_spherical_left', 0) ?: 0 }},
+          tonometryPdfUrl: @js(route('panel.patients.tonometry-pdf', $patient)),
+          doctorId: @js($r?->doctor_id ?? $currentDoctor?->id ?? ''),
+          savedTonometryOd: @js($r?->tonometer_right),
+          savedTonometryOe: @js($r?->tonometer_left),
+          savedTonometryTime: @js($r?->tonometer_time),
           @if($isEdit)
           templatesUrl: @js(route('panel.patients.medicalrecords.templates', [$patient, $r])),
           templatePreviewUrl: @js(route('panel.patients.medicalrecords.template-preview', [$patient, $r])),
           storeDocUrl: @js(route('panel.patients.medicalrecords.documentations.store', [$patient, $r])),
           storeFileUrl: @js(route('panel.patients.medicalrecords.files.store', [$patient, $r])),
+          storeTonometryUrl: @js(route('panel.patients.medicalrecords.tonometry.store', [$patient, $r])),
+          @else
+          storeTonometryUrl: '',
           @endif
       })">
     @csrf
@@ -235,29 +243,26 @@
                     {{-- Tonometria --}}
                     <div class="col-6">
                         <label class="pmr-label">{{ __('actions.medical_records.tonometry') }}</label>
-                        <div class="d-flex gap-1 align-items-end">
-                            <div class="input-group input-group-sm">
+                        <div class="d-flex gap-1 align-items-center">
+                            <div class="input-group input-group-sm" style="max-width:90px;">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
                                 <input type="number" name="tonometer_right" step="0.5" min="0"
                                        class="form-control form-control-sm text-center"
                                        value="{{ $old('tonometer_right') }}" placeholder="00">
                             </div>
-                            <div class="input-group input-group-sm">
+                            <div class="input-group input-group-sm" style="max-width:90px;">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
                                 <input type="number" name="tonometer_left" step="0.5" min="0"
                                        class="form-control form-control-sm text-center"
                                        value="{{ $old('tonometer_left') }}" placeholder="00">
                             </div>
-                            <div class="input-group input-group-sm" style="max-width:100px;">
-                                <span class="input-group-text"><i class="fas fa-clock"></i></span>
-                                <input type="time" name="tonometer_time"
-                                       class="form-control form-control-sm"
-                                       value="{{ $old('tonometer_time') }}">
-                            </div>
+                            {{-- Hora capturada automaticamente no momento da impressão --}}
+                            <input type="hidden" name="tonometer_time" id="tonometer-time-hidden"
+                                   value="{{ $old('tonometer_time') }}">
                             <button type="button" class="btn btn-pink btn-sm flex-shrink-0"
-                                    title="{{ __('actions.medical_records.current_time') }}"
-                                    @click="$el.closest('.d-flex').querySelector('[name=tonometer_time]').value = new Date().toTimeString().slice(0,5)">
-                                <i class="fas fa-clock"></i>
+                                    title="{{ __('actions.medical_records.print_tonometry') }}"
+                                    @click="printTonometry()">
+                                <i class="fas fa-print"></i>
                             </button>
                         </div>
                     </div>
@@ -741,7 +746,7 @@
     {{-- ═══════════════════════════════════════════════════════════════════
          LISTA DE DOCUMENTAÇÕES EXISTENTES (somente edit)
          ═══════════════════════════════════════════════════════════════════ --}}
-    @if($isEdit && $r->documentations?->count())
+    @if($isEdit)
     <div class="px-3 pb-2">
         <label class="pmr-label">{{ __('actions.medical_records.documentations') }}</label>
         <div class="table-responsive">
@@ -754,8 +759,8 @@
                         <th class="text-end">{{ __('actions.medical_records.doc_actions') }}</th>
                     </tr>
                 </thead>
-                <tbody>
-                    @foreach($r->documentations as $doc)
+                <tbody id="pmr-docs-tbody">
+                    @forelse($r->documentations as $doc)
                     <tr>
                         <td><span class="badge bg-info-subtle text-info">{{ $doc->getTypeLabel() }}</span></td>
                         <td>{{ $doc->title }}</td>
@@ -767,62 +772,90 @@
                             </a>
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr data-empty>
+                        <td colspan="4" class="text-center text-muted small py-2">
+                            {{ __('actions.medical_records.no_documentations') }}
+                        </td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
     </div>
     @endif
 
-</form>
-
-{{-- ═══════════════════════════════════════════════════════════════════════
-     MODAL: Nova Documentação (dentro do edit)
-     ═══════════════════════════════════════════════════════════════════════ --}}
-@if($isEdit)
-<div class="modal fade" id="docModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header py-2">
-                <h6 class="modal-title"><i class="fas fa-file-prescription me-2"></i>{{ __('actions.medical_records.new_documentation') }}</h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                {{-- Template selector --}}
-                <div class="mb-3">
-                    <label class="pmr-label">{{ __('actions.medical_records.select_template') }}</label>
-                    <select class="form-select form-select-sm" x-model="docForm.report_setting_content_id"
-                            @change="previewTemplate()">
-                        <option value="">{{ __('actions.medical_records.select') }}</option>
-                        <template x-for="group in docTemplates" :key="group.report_setting_id">
-                            <optgroup :label="group.report_setting_title">
-                                <template x-for="tpl in group.contents" :key="tpl.id">
-                                    <option :value="tpl.id" x-text="tpl.label"></option>
-                                </template>
-                            </optgroup>
-                        </template>
-                    </select>
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         MODAL: Nova Documentação
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    @if($isEdit)
+    <div class="modal fade" id="docModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title"><i class="fas fa-file-prescription me-2"></i>{{ __('actions.medical_records.new_documentation') }}</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="mb-3">
-                    <label class="pmr-label">{{ __('actions.medical_records.doc_title') }}</label>
-                    <input type="text" class="form-control form-control-sm" x-model="docForm.title"
-                           placeholder="{{ __('actions.medical_records.doc_title_ph') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="pmr-label">{{ __('actions.medical_records.select_template') }}</label>
+                        <select class="form-select form-select-sm" x-model="docForm.report_setting_content_id"
+                                @change="previewTemplate()">
+                            <option value="">{{ __('actions.medical_records.select') }}</option>
+                            <template x-for="group in docTemplates" :key="group.report_setting_id">
+                                <optgroup :label="group.report_setting_title">
+                                    <template x-for="tpl in group.contents" :key="tpl.id">
+                                        <option :value="tpl.id" x-text="tpl.label"></option>
+                                    </template>
+                                </optgroup>
+                            </template>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="pmr-label">{{ __('actions.medical_records.doc_title') }}</label>
+                        <input type="text" class="form-control form-control-sm" x-model="docForm.title"
+                               placeholder="{{ __('actions.medical_records.doc_title_ph') }}">
+                    </div>
+                    <div class="mb-0">
+                        <label class="pmr-label">{{ __('actions.medical_records.doc_content') }}</label>
+                        <textarea class="form-control" rows="12" x-model="docForm.content"
+                                  placeholder="{{ __('actions.medical_records.doc_content_ph') }}"></textarea>
+                    </div>
                 </div>
-                <div class="mb-0">
-                    <label class="pmr-label">{{ __('actions.medical_records.doc_content') }}</label>
-                    <textarea class="form-control" rows="12" x-model="docForm.content"
-                              placeholder="{{ __('actions.medical_records.doc_content_ph') }}"></textarea>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('actions.medical_records.cancel') }}
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" @click="saveDoc()" :disabled="docSaving">
+                        <i class="fas fa-save me-1"></i>{{ __('actions.medical_records.save_documentation') }}
+                    </button>
                 </div>
-            </div>
-            <div class="modal-footer py-2">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
-                    {{ __('actions.medical_records.cancel') }}
-                </button>
-                <button type="button" class="btn btn-primary btn-sm" @click="saveDoc()" :disabled="docSaving">
-                    <i class="fas fa-save me-1"></i>{{ __('actions.medical_records.save_documentation') }}
-                </button>
             </div>
         </div>
     </div>
-</div>
-@endif
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         MODAL BOOTSTRAP: Laudo de Tonômetria (dentro do x-data do form)
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    <div class="modal fade" id="tonometryModal" tabindex="-1"
+         @keydown.escape.window="closeTonometry()">
+        <div class="modal-dialog modal-xl modal-dialog-centered" style="height:90vh;">
+            <div class="modal-content" style="height:100%;">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title mb-0">
+                        <i class="fas fa-print me-2" style="color:#e91e8c;"></i>
+                        {{ __('actions.medical_records.print_tonometry') }}
+                    </h6>
+                    <button type="button" class="btn-close" @click="closeTonometry()"></button>
+                </div>
+                <div class="modal-body p-0" style="flex:1;overflow:hidden;">
+                    <iframe x-bind:src="tonometryPdfSrc"
+                            style="width:100%;height:100%;border:none;display:block;"
+                            title="Laudo de Tonômetria"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</form>

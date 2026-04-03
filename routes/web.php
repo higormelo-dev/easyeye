@@ -158,6 +158,9 @@ Route::group(
 
         // ── admin + doctor + secretary: agenda, prontuários, fila de espera ──
         Route::middleware('entity.role:admin,doctor,secretary')->group(function () {
+            Route::get('patients/{patient}/tonometry-pdf', \App\Http\Controllers\TonometryPdfController::class)
+                ->name('patients.tonometry-pdf');
+
             Route::get('cid10/search', \App\Http\Controllers\Cid10SearchController::class)
                 ->name('cid10.search');
 
@@ -180,6 +183,10 @@ Route::group(
                 [MedicalRecordsController::class, 'pdf']
             )->name('patients.medicalrecords.pdf');
             Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/tonometry-pdf',
+                [MedicalRecordsController::class, 'tonometryPdf']
+            )->name('patients.medicalrecords.tonometry-pdf');
+            Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/templates',
                 [MedicalRecordsController::class, 'templates']
             )->name('patients.medicalrecords.templates');
@@ -189,6 +196,10 @@ Route::group(
             )->name('patients.medicalrecords.template-preview');
 
             // Documentações de prontuário
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/tonometry',
+                [MedicalRecordDocumentationsController::class, 'storeTonometry']
+            )->name('patients.medicalrecords.tonometry.store');
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/documentations/{documentation}/pdf',
                 [MedicalRecordDocumentationsController::class, 'pdf']
@@ -307,6 +318,7 @@ Route::group(
                 Route::get('resources/{resource}/restore', [ResourcesController::class, 'restore'])->name('resources.restore');
 
                 // Modelos de documentação (receituários, atestados, etc.)
+                Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
                 Route::resource('report-settings', ReportSettingsController::class);
             });
         });

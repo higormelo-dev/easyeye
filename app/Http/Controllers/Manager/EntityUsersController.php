@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Controllers\Manager;
 
@@ -26,13 +26,15 @@ class EntityUsersController extends Controller
         Gate::authorize(EntityGate::SaasImpersonate->value, $saasEntity);
 
         $meta = [
-            'title'       => 'Usuários',
-            'action'      => 'Usuários — ' . $entity->name,
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),               'active' => false],
-                ['label' => 'Empresas',                       'url' => route('panel.manager.entities.index'), 'active' => false],
-                ['label' => $entity->name,                    'url' => 'javascript:void(0);',                 'active' => false],
-                ['label' => 'Usuários',                       'url' => 'javascript:void(0);',                 'active' => true],
+            'title'            => $entity->name,
+            'action'           => 'Usuários',
+            'total'            => $entity->entityUsers()->count(),
+            'breadcrumb_title' => false,
+            'breadcrumbs'      => [
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => 'Empresas', 'url' => route('panel.manager.entities.index'), 'active' => false],
+                ['label' => $entity->name, 'url' => 'javascript:void(0);', 'active' => false],
+                ['label' => 'Usuários', 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
 

@@ -46,7 +46,7 @@ class UsersController extends Controller
                 $lower = mb_strtolower($search, 'UTF-8');
                 $q->where(function ($inner) use ($lower) {
                     $inner->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
-                          ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
+                        ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
                 });
             })
             ->select('entity_users.*', 'users.name', 'users.email')
@@ -66,7 +66,7 @@ class UsersController extends Controller
                 'email'      => $eu->email,
                 'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
                 'active'     => (bool) $eu->active,
-                'deleted'    => !is_null($eu->deleted_at),
+                'deleted'    => ! is_null($eu->deleted_at),
                 'entity_id'  => $eu->entity_id,
                 'own_entity' => $eu->entity_id === $entityId,
                 'photo_url'  => file_exists(public_path($userPhotoPath))
@@ -94,7 +94,7 @@ class UsersController extends Controller
         $meta = [
             'title'            => $this->titleController,
             'breadcrumb_title' => false,
-            'total_users'      => EntityUser::query()
+            'total'            => EntityUser::query()
                 ->where('entity_id', session('selected_entity_id'))
                 ->whereNot('rule', 'doctor')
                 ->count(),
@@ -128,7 +128,7 @@ class UsersController extends Controller
     {
         $roles = ['' => 'Selecione uma opção'];
 
-        if (!session()->get('selected_entity_is_client')) {
+        if (! session()->get('selected_entity_is_client')) {
             $roles = array_merge($roles, User::$rolesOfManager);
         } else {
             $clientRoles = User::$rolesOfClients;
@@ -174,7 +174,7 @@ class UsersController extends Controller
 
         return view(
             'system.users.show',
-            compact('record')
+            compact('record'),
         );
     }
 
@@ -186,7 +186,7 @@ class UsersController extends Controller
         $record = $this->service->findByIdOrCode($id);
         $roles  = ['' => 'Selecione uma opção'];
 
-        if (!session()->get('selected_entity_is_client')) {
+        if (! session()->get('selected_entity_is_client')) {
             $roles = array_merge($roles, User::$rolesOfManager);
         } else {
             $clientRoles = User::$rolesOfClients;

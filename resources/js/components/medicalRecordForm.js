@@ -13,6 +13,12 @@ export default ({
     glaucomatous = false,
     glaucomatousFamily = false,
     showOthersHistory = false,
+    tonometryPdfUrl = '',
+    storeTonometryUrl = '',
+    savedTonometryOd = null,
+    savedTonometryOe = null,
+    savedTonometryTime = null,
+    doctorId = '',
     calcPresbyopiaUrl = '',
     dynamicSphericalRight = 0,
     dynamicSphericalLeft = 0,
@@ -30,6 +36,15 @@ export default ({
     glaucomatous,
     glaucomatousFamily,
     showOthersHistory,
+
+    // ── Tonometry print ─────────────────────────────────────────────────
+    tonometryPdfUrl,
+    storeTonometryUrl,
+    doctorId,
+    savedTonometryOd,
+    savedTonometryOe,
+    savedTonometryTime,
+    tonometryPdfSrc: '',
 
     // ── Refraction state ────────────────────────────────────────────────
     dynamicSphericalRight,
@@ -51,6 +66,73 @@ export default ({
     uploadedFiles: [],
     uploading: false,
     uploadProgress: 0,
+
+    // ── Tonometry PDF ───────────────────────────────────────────────────
+    _tonometryModal() {
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('tonometryModal'));
+    },
+
+    async printTonometry() {
+        const od   = document.querySelector('[name="tonometer_right"]')?.value ?? '';
+        const oe   = document.querySelector('[name="tonometer_left"]')?.value ?? '';
+        const time = new Date().toTimeString().slice(0, 5);
+
+        // Edit mode: salva no histórico e abre PDF da documentação salva.
+        if (this.storeTonometryUrl) {
+            try {
+                const res = await fetch(this.storeTonometryUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ od, oe, time }),
+                });
+
+                if (res.ok) {
+                    const doc = await res.json();
+
+                    // Adiciona ao histórico de documentações sem recarregar
+                    const tbody = document.querySelector('#pmr-docs-tbody');
+                    if (tbody) {
+                        const emptyRow = tbody.querySelector('[data-empty]');
+                        if (emptyRow) emptyRow.remove();
+
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><span class="badge bg-info-subtle text-info">${doc.type_label}</span></td>
+                            <td>${doc.title}</td>
+                            <td>${doc.created_at}</td>
+                            <td class="text-end">
+                                <a href="${doc.pdf_url}" target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                </a>
+                            </td>`;
+                        tbody.prepend(tr);
+                    }
+
+                    this.tonometryPdfSrc = doc.pdf_url;
+                    this._tonometryModal().show();
+                    return;
+                }
+            } catch (e) {
+                console.error('Tonometry save error:', e);
+            }
+        }
+
+        // Create mode: abre PDF direto sem salvar histórico.
+        const doctorIdVal = this.doctorId || document.querySelector('[name="doctor_id"]')?.value || '';
+        const params = new URLSearchParams({ time, od, oe });
+        if (doctorIdVal) params.set('doctor_id', doctorIdVal);
+        this.tonometryPdfSrc = `${this.tonometryPdfUrl}?${params.toString()}`;
+        this._tonometryModal().show();
+    },
+
+    closeTonometry() {
+        this._tonometryModal().hide();
+        this.tonometryPdfSrc = '';
+    },
 
     // ── Presbyopia calculation ──────────────────────────────────────────
     async calcPresbyopia() {

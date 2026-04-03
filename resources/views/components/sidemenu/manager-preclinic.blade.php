@@ -19,3 +19,8 @@
         <i class="ti ti-users-group"></i><span>Usuários</span>
     </a>
 </li>
+<li>
+    <a href="{{ route('panel.manager.report-settings.index') }}" class="{{ request()->routeIs('panel.manager.report-settings.*') ? 'active' : '' }}">
+        <i class="ti ti-file-description"></i><span>{{ __('actions.report_settings.title') }}</span>
+    </a>
+</li>

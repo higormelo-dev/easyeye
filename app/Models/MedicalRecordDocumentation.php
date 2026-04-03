@@ -63,7 +63,19 @@ class MedicalRecordDocumentation extends Model
             'certificate'  => __('actions.documentation.types.certificate'),
             'referral'     => __('actions.documentation.types.referral'),
             'report'       => __('actions.documentation.types.report'),
+            'tonometry'    => __('actions.documentation.types.tonometry'),
             default        => $this->type,
         };
+    }
+
+    /**
+     * Retorna dados da tonometria decodificados do campo content (JSON).
+     * @return array{od: string|null, oe: string|null, time: string|null}
+     */
+    public function tonometryData(): array
+    {
+        if ($this->type !== 'tonometry') return ['od' => null, 'oe' => null, 'time' => null];
+        $data = json_decode($this->content ?? '{}', true);
+        return ['od' => $data['od'] ?? null, 'oe' => $data['oe'] ?? null, 'time' => $data['time'] ?? null];
     }
 }

@@ -9,7 +9,7 @@
     <div class="row mb-3 align-items-center">
         <div class="col-12 col-md-auto">
             <div class="btn-group" role="group">
-                <a href="{{ route('panel.manager.entities.user-integrators.integrators.index', [$entity->id, $userIntegrator->id]) }}" class="btn btn-secondary btn-sm">
+                <a href="{{ route('panel.manager.entities.user-integrators.integrators.index', [$entity->id, $userIntegrator->id]) }}" class="btn btn-outline-white btn-sm">
                     <i class="fas fa-arrow-left"></i> {{ __('actions.back') }}
                 </a>
             </div>
@@ -18,7 +18,12 @@
 
     <div class="card">
         <div class="card-header">
-            <h4 class="card-title mb-0">{{ $meta['action'] }}</h4>
+            <h4 class="card-title mb-0">
+                {{ $meta['action'] }}
+                <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
+                    {{ __('actions.total') }}: {{ $meta['total'] }}
+                </span>
+            </h4>
         </div>
         <div class="card-body">
             <div class="table-responsive">

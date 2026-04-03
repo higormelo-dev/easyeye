@@ -8,7 +8,7 @@ use App\Http\Requests\Manager\EntityRequest;
 use App\Models\Entity;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, RedirectResponse};
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 
 class EntitiesController extends Controller
@@ -17,13 +17,17 @@ class EntitiesController extends Controller
 
     public function index(EntitiesDataTable $dataTable): Factory|Application|View|JsonResponse
     {
+        $total = Entity::withTrashed()->where('code', '!=', 'ENT-0000000001')->count();
+
         $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                  'active' => false],
-                ['label' => $this->titleController,          'url' => route('panel.manager.entities.index'),     'active' => false],
-                ['label' => __('actions.records'),            'url' => 'javascript:void(0);',                     'active' => true],
+            'title'            => $this->titleController,
+            'action'           => __('actions.records'),
+            'total'            => $total,
+            'cardsUrl'         => route('panel.manager.entities.cards'),
+            'breadcrumb_title' => false,
+            'breadcrumbs'      => [
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => $this->titleController, 'url' => route('panel.manager.entities.index'), 'active' => true],
             ],
         ];
 
@@ -31,6 +35,36 @@ class EntitiesController extends Controller
         $baseUrl  = url('panel/manager/entities');
 
         return $dataTable->render('system.manager.entities.index', compact('meta', 'storeUrl', 'baseUrl'));
+    }
+
+    public function cards(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 12;
+
+        $records = Entity::withTrashed()
+            ->where('code', '!=', 'ENT-0000000001')
+            ->when($search, fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->orderByDesc('created_at')
+            ->paginate($perPage);
+
+        return response()->json([
+            'data' => $records->map(fn ($r) => [
+                'id'      => $r->id,
+                'code'    => $r->code,
+                'name'    => $r->name,
+                'city'    => $r->city,
+                'state'   => $r->state,
+                'active'  => (bool) $r->active,
+                'deleted' => (bool) $r->deleted_at,
+            ]),
+            'meta' => [
+                'total'        => $records->total(),
+                'per_page'     => $records->perPage(),
+                'current_page' => $records->currentPage(),
+                'last_page'    => $records->lastPage(),
+            ],
+        ]);
     }
 
     public function store(EntityRequest $request): Application|JsonResponse|Redirector|RedirectResponse

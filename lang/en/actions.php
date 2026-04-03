@@ -425,6 +425,7 @@ return [
         'tonometry'        => 'Tonometry',
         'tonometry_h'      => 'Time',
         'current_time'     => 'Current time',
+        'print_tonometry'  => 'Print Tonometry Report',
         'pachymetry'       => 'Pachymetry',
         'gonioscopy'       => 'Gonioscopy',
 

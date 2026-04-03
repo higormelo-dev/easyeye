@@ -5,7 +5,7 @@
 
     {{-- Header --}}
     <div class="mb-4">
-        <img src="{{ asset('system/images/logo-icon.png') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
+        <img src="{{ asset('system/images/preclinic/logo.svg') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
         <h4 class="font-medium mb-0">{{ __('auth.verify_email.title') }}</h4>
     </div>
 

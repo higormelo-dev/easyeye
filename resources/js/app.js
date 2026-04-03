@@ -43,6 +43,9 @@ Alpine.data('medicalRecordForm', medicalRecordForm);
 import cid10Search from './components/cid10Search';
 Alpine.data('cid10Search', cid10Search);
 
+import managerViewToggle from './components/managerViewToggle';
+Alpine.data('managerViewToggle', managerViewToggle);
+
 window.Alpine = Alpine;
 
 Alpine.start();

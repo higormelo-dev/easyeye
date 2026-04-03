@@ -6,24 +6,27 @@
 
 @section('content')
 
-<div class="row mb-3 align-items-center">
-    <div class="col-12 col-md-auto">
-        <a href="{{ route('panel.manager.entities.index') }}" class="btn btn-secondary btn-sm">
-            <i class="fas fa-arrow-left"></i> {{ __('actions.back') }}
-        </a>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <h4 class="card-title mb-0">{{ $meta['action'] }}</h4>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            {{ $dataTable->table(['class' => 'table table-nowrap']) }}
+    {{-- ══ Page Header ══════════════════════════════════════════════════════ --}}
+    <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-1 border-bottom">
+        <div class="flex-grow-1">
+            <h4 class="fw-bold mb-0">
+                {{ $meta['action'] }}
+                <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
+                    {{ __('actions.total') }}: {{ $meta['total'] }}
+                </span>
+            </h4>
+        </div>
+        <div class="btn-group" role="group">
+            <a href="{{ route('panel.manager.entities.index') }}" class="btn btn-outline-white fs-13 btn-md">
+                <i class="fas fa-arrow-left me-1"></i>{{ __('actions.back') }}
+            </a>
         </div>
     </div>
-</div>
+    {{-- ══ /Page Header ═════════════════════════════════════════════════════ --}}
+
+    <div class="table-responsive">
+        {{ $dataTable->table(['class' => 'table table-nowrap']) }}
+    </div>
 
 @endsection
 

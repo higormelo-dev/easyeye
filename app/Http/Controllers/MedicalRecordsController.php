@@ -296,6 +296,19 @@ class MedicalRecordsController extends Controller
     }
 
     /**
+     * Generate and stream a Laudo de Tonômetria PDF.
+     * Accepts ?time=HH:MM to stamp the measurement time captured at print moment.
+     */
+    public function tonometryPdf(Request $request, Patient $patient, MedicalRecord $medicalrecord): Response
+    {
+        $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
+
+        $time = $request->string('time')->trim()->value() ?: now()->format('H:i');
+
+        return $this->pdfService->generateTonometry($medicalrecord, $time);
+    }
+
+    /**
      * Calculate presbyopia addition and return static sphericals as JSON.
      */
     public function calculatePresbyopia(Request $request, Patient $patient): JsonResponse

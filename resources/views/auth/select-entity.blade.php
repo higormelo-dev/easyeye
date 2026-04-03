@@ -8,7 +8,7 @@
 
         {{-- Header --}}
         <div class="text-center mb-4">
-            <img src="{{ asset('system/images/logo-icon.png') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
+            <img src="{{ asset('system/images/preclinic/logo.svg') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
             <h4 class="font-medium mb-0">{{ config('app.name') }}</h4>
             <p class="text-muted mb-0" style="font-size:.85rem">{{ __('auth.select_entity') }}</p>
         </div>

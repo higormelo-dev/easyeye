@@ -104,4 +104,22 @@ return [
     // Lente
     'away' => 'Longe',
     'near' => 'Perto',
+
+    // Modelo de documento
+    'title'            => 'Título',
+    'paper_size'       => 'Tamanho do papel',
+    'font_family'      => 'Fonte',
+    'font_size'        => 'Tamanho da fonte',
+    'margins'          => 'Margens',
+    'margin_top'       => 'Superior',
+    'margin_right'     => 'Direita',
+    'margin_bottom'    => 'Inferior',
+    'margin_left'      => 'Esquerda',
+    'show'             => 'Exibir',
+    'clinic_logo'      => 'Logo da clínica',
+    'clinic_name'      => 'Nome da clínica',
+    'doctor_name'      => 'Nome do médico',
+    'footer_text'      => 'Texto do rodapé',
+    'footer_text_ph'   => 'Deixe em branco para usar o nome da clínica',
+    'footer_text_hint' => 'Aparece no centro do rodapé de cada página.',
 ];

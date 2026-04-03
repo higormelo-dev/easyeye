@@ -143,6 +143,7 @@ return [
     'updated_at'             => 'Atualizado em',
     'deleted_at'             => 'Deletado em',
     'active'                 => 'Ativo',
+    'global'                 => 'Global',
     'inactive'               => 'Inativo',
     'subdomain'              => 'Subdomínio',
     'national_registration'  => 'CNPJ',
@@ -424,6 +425,7 @@ return [
         'tonometry'        => 'Tonometria',
         'tonometry_h'      => 'Horário',
         'current_time'     => 'Hora atual',
+        'print_tonometry'  => 'Imprimir Laudo de Tonômetria',
         'pachymetry'       => 'Paquimetria',
         'gonioscopy'       => 'Gonioscopia',
 
@@ -505,7 +507,27 @@ return [
             'certificate'  => 'Atestado',
             'referral'     => 'Encaminhamento',
             'report'       => 'Laudo',
+            'tonometry'    => 'Tonômetria',
         ],
+    ],
+
+    'report_settings' => [
+        'title'          => 'Modelos de Documento',
+        'new'            => 'Novo Modelo',
+        'create'         => 'Novo Modelo de Documento',
+        'edit'           => 'Editar Modelo de Documento',
+        'saved'          => 'Modelo salvo com sucesso.',
+        'updated'        => 'Modelo atualizado com sucesso.',
+        'deleted'        => 'Modelo excluído com sucesso.',
+        'empty'          => 'Nenhum modelo cadastrado.',
+        'templates'      => 'templates',
+        'general'        => 'Configurações Gerais',
+        'header'         => 'Cabeçalho',
+        'header_desc'    => 'Defina quais informações da clínica aparecem no topo dos documentos.',
+        'signature'      => 'Assinatura',
+        'signature_desc' => 'Defina quais dados do médico aparecem no bloco de assinatura.',
+        'footer'         => 'Rodapé',
+        'footer_desc'    => 'Defina quais informações aparecem no rodapé dos documentos.',
     ],
 
     'profile' => [

@@ -123,15 +123,8 @@
 <div class="content-body">{!! nl2br(e($documentation->content)) !!}</div>
 
 <!-- ─── ASSINATURA ─────────────────────────────────────────────────────────── -->
-@if($setting->show_signature)
-<div class="signature-block">
-    <div class="signature-line"></div><br>
-    {{ $setting->signature_name ?? $doctor?->person?->full_name ?? '' }}
-    @if($setting->signature_role || ($doctor && $doctor->crm))
-    <br>{{ $setting->signature_role ?? 'CRM ' . $doctor->crm }}
-    @endif
-</div>
-@endif
+@php $doctor = $doc->doctor ?? null; @endphp
+@include('pdf._signature')
 
 <!-- ─── RODAPÉ ─────────────────────────────────────────────────────────────── -->
 @if($setting->show_footer)

@@ -6,7 +6,7 @@
     {{-- Logo + Header --}}
     <div class="text-center mb-4">
         <a href="{{ route('register') }}">
-            <img src="{{ asset('system/images/logo-icon.png') }}" alt="{{ config('app.name') }}" width="52" class="mb-3">
+            <img src="{{ asset('system/images/preclinic/logo.svg') }}" alt="{{ config('app.name') }}" width="52" class="mb-3">
         </a>
         <h4 style="font-weight:700;font-size:1.3rem;color:#1e293b;margin-bottom:.25rem;">
             {{ config('app.name') }}

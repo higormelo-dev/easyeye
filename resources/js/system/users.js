@@ -18,11 +18,8 @@ $(function () {
     });
 
     function reloadCurrentView() {
-        const component = window.userViewComponent;
-        if (component && component.view === 'cards') {
-            component.fetchCards(component.meta.current_page);
-        } else {
-            usersDataTable?.ajax.reload();
+        if (window.LaravelDataTables?.['users_datatable']) {
+            window.LaravelDataTables['users_datatable'].ajax.reload(null, false);
         }
     }
 

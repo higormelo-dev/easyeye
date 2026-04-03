@@ -12,7 +12,7 @@ class PlansDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<Plan>  $query
+     * @param Builder<Plan> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
@@ -90,15 +90,15 @@ class PlansDataTable extends BaseDataTable
     {
         return '
             <a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-edit"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>
             <a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>
             <a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-active"
                 data-id="' . $record->id . '" data-situation="' . ($record->active ? 0 : 1) . '"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . ($record->active ? __('actions.disable') : __('actions.enable')) . '">

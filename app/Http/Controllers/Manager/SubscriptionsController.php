@@ -23,10 +23,15 @@ class SubscriptionsController extends Controller
 
     public function index(SubscriptionsDataTable $dataTable): Factory|Application|View|JsonResponse
     {
+        $total = Subscription::count();
+
         $meta = [
-            'title'       => 'Assinaturas',
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
+            'title'            => 'Assinaturas',
+            'action'           => __('actions.records'),
+            'total'            => $total,
+            'cardsUrl'         => route('panel.manager.subscriptions.cards'),
+            'breadcrumb_title' => false,
+            'breadcrumbs'      => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => 'Assinaturas', 'url' => route('panel.manager.subscriptions.index'), 'active' => false],
                 ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
@@ -47,8 +52,49 @@ class SubscriptionsController extends Controller
             'statuses',
             'trialDays',
             'graceDays',
-            'baseUrl'
+            'baseUrl',
         ));
+    }
+
+    public function cards(Request $request): JsonResponse
+    {
+        $search  = $request->string('search')->trim()->value();
+        $perPage = 12;
+
+        $records = Subscription::query()
+            ->select('subscriptions.*', 'entities.name as entity_name', 'entities.active as entity_active', 'plans.name as plan_name')
+            ->join('entities', 'subscriptions.entity_id', '=', 'entities.id')
+            ->leftJoin('plans', 'subscriptions.plan_id', '=', 'plans.id')
+            ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
+                $lower = mb_strtolower($search, 'UTF-8');
+                $inner->whereRaw('LOWER(entities.name) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(plans.name) LIKE ?', ["%{$lower}%"]);
+            }))
+            ->latest('subscriptions.created_at')
+            ->paginate($perPage);
+
+        return response()->json([
+            'data' => $records->map(fn ($r) => [
+                'id'            => $r->id,
+                'entity_id'     => $r->entity_id,
+                'entity_name'   => $r->entity_name,
+                'entity_active' => (bool) $r->entity_active,
+                'plan_name'     => $r->plan_name ?? '-',
+                'status'        => $r->status->value,
+                'status_label'  => $r->status->label(),
+                'status_badge'  => $r->status->badgeClass(),
+                'starts_at'     => $r->starts_at?->format('d/m/Y'),
+                'ends_at'       => $r->ends_at?->format('d/m/Y'),
+                'trial_ends_at' => $r->trial_ends_at?->format('d/m/Y'),
+                'is_accessible' => $r->status->isAccessible(),
+            ]),
+            'meta' => [
+                'total'        => $records->total(),
+                'per_page'     => $records->perPage(),
+                'current_page' => $records->currentPage(),
+                'last_page'    => $records->lastPage(),
+            ],
+        ]);
     }
 
     public function show(Subscription $subscription): \Illuminate\View\View|JsonResponse
@@ -150,7 +196,7 @@ class SubscriptionsController extends Controller
         $entity       = Entity::findOrFail($request->entity_id);
         $subscription = $this->subscriptionService->cancel($entity);
 
-        if (!$subscription) {
+        if (! $subscription) {
             return response()->json(['message' => 'Nenhuma assinatura ativa encontrada.'], 404);
         }
 

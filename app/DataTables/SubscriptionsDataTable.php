@@ -34,7 +34,7 @@ class SubscriptionsDataTable extends BaseDataTable
                 'subscriptions.*',
                 'entities.name as entity_name',
                 'entities.active as entity_active',
-                'plans.name as plan_name'
+                'plans.name as plan_name',
             )
             ->join('entities', 'subscriptions.entity_id', '=', 'entities.id')
             ->leftJoin('plans', 'subscriptions.plan_id', '=', 'plans.id')
@@ -90,12 +90,12 @@ class SubscriptionsDataTable extends BaseDataTable
         $buttons  = '';
 
         $buttons .= '<a href="javascript:void(0);"
-            class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
+            class="btn waves-effect waves-light btn-light btn-xs m-1 btn-edit"
             data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
             title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>';
 
         $buttons .= '<a href="javascript:void(0);"
-            class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+            class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
             data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
             title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 

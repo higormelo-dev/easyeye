@@ -5,50 +5,229 @@
 @endsection
 
 @section('content')
+    <div x-data="managerViewToggle(@js(route('panel.manager.entities.cards')), 'manager_entities_view', 'entities_datatable')"
+         x-init="init()">
 
-<div x-data="crudForm({
-        storeUrl:  '{{ $storeUrl }}',
-        updateUrl: null,
-        fields: {
-            name: '', subdomain: '', email: '', telephone: '', cellphone: '',
-            national_registration: '', state_registration: '', municipal_registration: '',
-            website: '', schedule_interval: 15, active: true,
-            zipcode: '', address: '', number: '', complement: '',
-            district: '', city: '', state: '', country: ''
-        },
-        onSuccess: () => window.dispatchEvent(new CustomEvent('entity-saved'))
-    })"
-     x-init="$nextTick(() => document.getElementById('entityModal').addEventListener('hidden.bs.modal', () => reset()))"
-     @open-create-entity.window="reset(); bootstrap.Modal.getOrCreateInstance(document.getElementById('entityModal')).show()"
-     @edit-entity.window="loadAndEdit(
-         '{{ url('panel/manager/entities') }}' + '/' + $event.detail.id + '/edit-data',
-         '{{ url('panel/manager/entities') }}' + '/' + $event.detail.id,
-         'entityModal'
-     )">
-
-    @include('system.manager.entities._form-modal')
-
-    <div class="row mb-3 align-items-center">
-        <div class="col-12 col-md-auto">
-            <button type="button" class="btn btn-primary btn-sm" @click="$dispatch('open-create-entity')">
-                <i class="fa fa-plus"></i> {{ __('actions.new') }}
-            </button>
+        {{-- ══ Page Header ══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-1 border-bottom">
+            <div class="flex-grow-1">
+                <h4 class="fw-bold mb-0">
+                    {{ $meta['title'] }}
+                    <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
+                        {{ __('actions.total') }}: {{ $meta['total'] }}
+                    </span>
+                </h4>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                {{-- Toggle tabela / cards --}}
+                <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
+                            :class="view === 'table' ? 'bg-light' : 'bg-white'"
+                            x-on:click="setView('table')"
+                            title="{{ __('actions.table_view') }}">
+                        <i class="ti ti-list fs-14 text-body"></i>
+                    </button>
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center justify-content-center border-0"
+                            :class="view === 'cards' ? 'bg-light' : 'bg-white'"
+                            x-on:click="setView('cards')"
+                            title="{{ __('actions.card_view') }}">
+                        <i class="ti ti-layout-grid fs-14 text-body"></i>
+                    </button>
+                </div>
+                {{-- Nova Empresa --}}
+                <div class="btn-group" role="group">
+                    <a href="javascript:void(0);" class="btn btn-primary fs-13 btn-md"
+                       @click="$dispatch('open-create-entity')">
+                        <i class="ti ti-plus me-1"></i>{{ __('actions.new') }}
+                    </a>
+                </div>
+            </div>
         </div>
-    </div>
+        {{-- ══ /Page Header ═════════════════════════════════════════════════════ --}}
 
-    <div class="card">
-        <div class="card-header">
-            <h4 class="card-title mb-0">{{ $meta['action'] }}</h4>
+        {{-- ══ Filter Bar ═══════════════════════════════════════════════════════ --}}
+        <div class="d-flex align-items-center justify-content-between flex-wrap mb-3">
+            <div class="search-set">
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <div class="table-search d-flex align-items-center mb-0">
+                        <div class="search-input">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white">
+                                    <i class="ti ti-search fs-12"></i>
+                                </span>
+                                <input type="text"
+                                       class="form-control border-start-0"
+                                       placeholder="{{ __('actions.search') }}..."
+                                       x-model="search"
+                                       x-on:input.debounce.400ms="performSearch()">
+                                <button class="btn btn-outline-secondary border-start-0" type="button"
+                                        x-show="search"
+                                        x-on:click="clearSearch()">
+                                    <i class="ti ti-x fs-12"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
+        {{-- ══ /Filter Bar ══════════════════════════════════════════════════════ --}}
+
+        {{-- ══ DataTable View ═══════════════════════════════════════════════════ --}}
+        <div x-show="view === 'table'">
             <div class="table-responsive">
                 {{ $dataTable->table(['class' => 'table table-nowrap']) }}
             </div>
         </div>
+        {{-- ══ /DataTable View ══════════════════════════════════════════════════ --}}
+
+        {{-- ══ Cards View ═══════════════════════════════════════════════════════ --}}
+        <div x-show="view === 'cards'" x-cloak>
+
+            {{-- Loading --}}
+            <div x-show="loading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">{{ __('actions.loading') }}...</span>
+                </div>
+            </div>
+
+            {{-- Cards Grid --}}
+            <div x-show="!loading">
+                <div class="row" x-show="items.length > 0">
+                    <template x-for="item in items" :key="item.id">
+                        <div class="col-xs-12 col-sm-6 col-md-6 col-lg-6 col-xl-6 mb-3">
+                            <div class="card card-body h-100">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-shrink-0 me-3">
+                                        <div class="avatar-sm rounded-circle bg-primary-subtle d-flex align-items-center justify-content-center">
+                                            <i class="fa fa-building text-primary"></i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <h5 class="mb-1" x-text="item.name"></h5>
+                                        <div class="mb-2">
+                                            <template x-if="item.deleted">
+                                                <span class="badge bg-danger">{{ __('actions.delete') }}</span>
+                                            </template>
+                                            <template x-if="!item.deleted">
+                                                <span :class="item.active ? 'badge bg-success' : 'badge bg-secondary'"
+                                                      x-text="item.active ? '{{ __("actions.active") }}' : '{{ __("actions.inactive") }}'">
+                                                </span>
+                                            </template>
+                                        </div>
+                                        <address class="small text-muted mb-2">
+                                            <strong>{{ __('actions.code') }}:</strong>
+                                            <span x-text="item.code"></span><br>
+                                            <template x-if="item.city || item.state">
+                                                <span>
+                                                    <strong>{{ __('forms.city') }}:</strong>
+                                                    <span x-text="(item.city || '-') + ' / ' + (item.state || '-')"></span>
+                                                </span>
+                                            </template>
+                                        </address>
+                                        <hr class="my-2">
+                                        <div class="d-flex gap-1 flex-wrap">
+                                            <template x-if="!item.deleted">
+                                                <div class="d-flex gap-1 flex-wrap">
+                                                    <button class="btn btn-sm btn-light btn-show"
+                                                            :data-id="item.id"
+                                                            data-bs-toggle="tooltip"
+                                                            title="{{ __('actions.view') }}">
+                                                        <i class="fa fa-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-light btn-edit"
+                                                            :data-id="item.id"
+                                                            data-bs-toggle="tooltip"
+                                                            title="{{ __('actions.edit') }}">
+                                                        <i class="fa fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-light btn-active"
+                                                            :data-id="item.id"
+                                                            :data-situation="item.active ? 0 : 1"
+                                                            data-bs-toggle="tooltip"
+                                                            :title="item.active ? '{{ __("actions.disable") }}' : '{{ __("actions.enable") }}'">
+                                                        <i :class="item.active ? 'fas fa-lock-open' : 'fas fa-unlock'"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger btn-trash"
+                                                            :data-id="item.id"
+                                                            data-bs-toggle="tooltip"
+                                                            title="{{ __('actions.delete') }}">
+                                                        <i class="fa fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </template>
+                                            <template x-if="item.deleted">
+                                                <button class="btn btn-sm btn-light btn-restore"
+                                                        :data-id="item.id"
+                                                        data-bs-toggle="tooltip"
+                                                        title="{{ __('actions.restore') }}">
+                                                    <i class="fas fa-recycle"></i>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                {{-- Empty state --}}
+                <div x-show="items.length === 0 && !loading" class="text-center py-5 text-muted">
+                    <i class="fa fa-building fa-3x mb-3"></i>
+                    <p>{{ __('actions.no_records') }}</p>
+                </div>
+
+                {{-- Pagination --}}
+                <nav x-show="meta.last_page > 1" class="d-flex justify-content-center mt-3">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item" :class="{ 'disabled': meta.current_page === 1 }">
+                            <button class="page-link" x-on:click="fetchCards(meta.current_page - 1)">
+                                <i class="fa fa-chevron-left"></i>
+                            </button>
+                        </li>
+                        <template x-for="page in meta.last_page" :key="page">
+                            <li class="page-item" :class="{ 'active': page === meta.current_page }">
+                                <button class="page-link" x-text="page" x-on:click="fetchCards(page)"></button>
+                            </li>
+                        </template>
+                        <li class="page-item" :class="{ 'disabled': meta.current_page === meta.last_page }">
+                            <button class="page-link" x-on:click="fetchCards(meta.current_page + 1)">
+                                <i class="fa fa-chevron-right"></i>
+                            </button>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {{-- ══ /Cards View ══════════════════════════════════════════════════════ --}}
+
     </div>
 
-</div>
-
+    {{-- ══ crudForm (escopo separado para o modal) ══════════════════════════ --}}
+    <div x-data="crudForm({
+            storeUrl:  '{{ $storeUrl }}',
+            updateUrl: null,
+            fields: {
+                name: '', subdomain: '', email: '', telephone: '', cellphone: '',
+                national_registration: '', state_registration: '', municipal_registration: '',
+                website: '', schedule_interval: 15, active: true,
+                zipcode: '', address: '', number: '', complement: '',
+                district: '', city: '', state: '', country: ''
+            },
+            onSuccess: () => window.dispatchEvent(new CustomEvent('entity-saved'))
+        })"
+         x-init="$nextTick(() => document.getElementById('entityModal').addEventListener('hidden.bs.modal', () => reset()))"
+         @open-create-entity.window="reset(); bootstrap.Modal.getOrCreateInstance(document.getElementById('entityModal')).show()"
+         @edit-entity.window="loadAndEdit(
+             '{{ url('panel/manager/entities') }}' + '/' + $event.detail.id + '/edit-data',
+             '{{ url('panel/manager/entities') }}' + '/' + $event.detail.id,
+             'entityModal'
+         )">
+        @include('system.manager.entities._form-modal')
+    </div>
 @endsection
 
 @section('modals')
@@ -60,6 +239,12 @@
     <script>
     $(function () {
         const baseUrl = '{{ url('panel/manager/entities') }}';
+
+        function reloadAll() {
+            if (window.LaravelDataTables && window.LaravelDataTables['entities_datatable']) {
+                window.LaravelDataTables['entities_datatable'].ajax.reload(null, false);
+            }
+        }
 
         $(document).on('click', '.btn-edit', function () {
             window.dispatchEvent(new CustomEvent('edit-entity', { detail: { id: $(this).data('id') } }));
@@ -94,7 +279,7 @@
                 data: { active: situation },
                 success: function (res) {
                     if (window.showSuccessToast) showSuccessToast(res.message);
-                    window.dispatchEvent(new CustomEvent('entity-saved'));
+                    reloadAll();
                 },
                 error: function (res) {
                     if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
@@ -121,7 +306,7 @@
                     headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                     success: function (res) {
                         if (window.showSuccessToast) showSuccessToast(res.message);
-                        window.dispatchEvent(new CustomEvent('entity-saved'));
+                        reloadAll();
                     },
                     error: function (res) {
                         if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
@@ -147,7 +332,7 @@
                     headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                     success: function (res) {
                         if (window.showSuccessToast) showSuccessToast(res.message);
-                        window.dispatchEvent(new CustomEvent('entity-saved'));
+                        reloadAll();
                     },
                     error: function (res) {
                         if (window.showErrorToast) showErrorToast(res.responseJSON?.message);
@@ -156,11 +341,7 @@
             });
         });
 
-        window.addEventListener('entity-saved', () => {
-            if (window.LaravelDataTables && window.LaravelDataTables['entities_datatable']) {
-                window.LaravelDataTables['entities_datatable'].ajax.reload(null, false);
-            }
-        });
+        window.addEventListener('entity-saved', () => reloadAll());
     });
     </script>
 @endsection

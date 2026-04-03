@@ -35,7 +35,8 @@ return [
 
     'pdf' => [
         'enabled' => true,
-        'binary'  => env('WKHTML_PDF_BINARY', '/usr/local/bin/wkhtmltopdf'),
+        'binary'  => env('SNAPPY_PDF') ? __DIR__ . '/../vendor/h4cc/wkhtmltopdf-amd64/bin/wkhtmltopdf-amd64'
+                                       : '/usr/local/bin/wkhtmltopdf',
         'timeout' => false,
         'options' => [],
         'env'     => [],
@@ -43,7 +44,8 @@ return [
 
     'image' => [
         'enabled' => true,
-        'binary'  => env('WKHTML_IMG_BINARY', '/usr/local/bin/wkhtmltoimage'),
+        'binary'  => env('SNAPPY_PDF') ? __DIR__ . '/../vendor/h4cc/wkhtmltoimage-amd64/bin/wkhtmltoimage-amd64'
+                                       : '/usr/local/bin/wkhtmltoimage',
         'timeout' => false,
         'options' => [],
         'env'     => [],

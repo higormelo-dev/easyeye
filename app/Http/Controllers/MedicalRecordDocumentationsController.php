@@ -76,6 +76,36 @@ class MedicalRecordDocumentationsController extends Controller
     }
 
     /**
+     * Salva um laudo de tonometria e retorna a URL do PDF para abrir no modal.
+     */
+    public function storeTonometry(Request $request, Patient $patient, MedicalRecord $medicalrecord): JsonResponse
+    {
+        $validated = $request->validate([
+            'od'   => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'oe'   => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'time' => ['required', 'string', 'max:5'],
+        ]);
+
+        $doc = MedicalRecordDocumentation::create([
+            'medical_record_id' => $medicalrecord->id,
+            'patient_id'        => $patient->id,
+            'doctor_id'         => $medicalrecord->doctor_id,
+            'type'              => 'tonometry',
+            'title'             => 'Laudo de Tonômetria — ' . now()->format('d/m/Y H:i'),
+            'content'           => json_encode($validated),
+        ]);
+
+        return response()->json([
+            'id'         => $doc->id,
+            'type'       => $doc->type,
+            'type_label' => $doc->getTypeLabel(),
+            'title'      => $doc->title,
+            'created_at' => $doc->created_at->format('d/m/Y H:i'),
+            'pdf_url'    => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $doc]),
+        ], 201);
+    }
+
+    /**
      * Soft-delete a documentation.
      */
     public function destroy(Patient $patient, MedicalRecord $medicalrecord, MedicalRecordDocumentation $documentation): JsonResponse

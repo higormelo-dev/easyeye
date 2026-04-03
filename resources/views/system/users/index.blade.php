@@ -5,7 +5,7 @@
 @endsection
 
 @section('content')
-    <div x-data="userViewToggle(@js(route('panel.accesscontrol.users.cards')), @js(asset('system/images/team.png')))"
+    <div x-data="managerViewToggle(@js(route('panel.accesscontrol.users.cards')), 'users_view', 'users_datatable')"
          x-init="init()">
 
         {{-- ══ Page Header ══════════════════════════════════════════════════════ --}}
@@ -14,7 +14,7 @@
                 <h4 class="fw-bold mb-0">
                     {{ $meta['title'] }}
                     <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
-                        {{ __('actions.total') }}: {{ $meta['total_users'] }}
+                        {{ __('actions.total') }}: {{ $meta['total'] }}
                     </span>
                 </h4>
             </div>
@@ -80,7 +80,7 @@
         </div>
         {{-- ══ /DataTable View ══════════════════════════════════════════════════ --}}
 
-        {{-- Cards View --}}
+        {{-- ══ Cards View ═══════════════════════════════════════════════════════ --}}
         <div x-show="view === 'cards'" x-cloak>
 
             {{-- Loading --}}
@@ -92,69 +92,70 @@
 
             {{-- Cards Grid --}}
             <div x-show="!loading">
-                <div class="row" x-show="users.length > 0">
-                    <template x-for="user in users" :key="user.id">
+                <div class="row" x-show="items.length > 0">
+                    <template x-for="item in items" :key="item.id">
                         <div class="col-xs-12 col-sm-6 col-md-6 col-lg-6 col-xl-6 mb-3">
                             <div class="card card-body h-100">
-                                <div class="row align-items-center">
-                                    <div class="col-md-4 col-lg-3 text-center">
-                                        <img :src="user.photo_url"
-                                             :alt="user.full_name"
-                                             class="img-fluid rounded-circle"
-                                             x-on:error="$el.src = fallbackPhoto">
+                                <div class="d-flex align-items-start">
+                                    <div class="flex-shrink-0 me-3">
+                                        <img :src="item.photo_url"
+                                             :alt="item.full_name"
+                                             class="rounded-circle"
+                                             width="48" height="48"
+                                             x-on:error="$el.src = '{{ asset('system/images/team.png') }}'">
                                     </div>
-                                    <div class="col-md-8 col-lg-9">
-                                        <h5 class="mb-1" x-text="user.full_name"></h5>
+                                    <div class="flex-grow-1">
+                                        <h5 class="mb-1" x-text="item.full_name"></h5>
                                         <div class="mb-2">
-                                            <template x-if="user.deleted">
+                                            <template x-if="item.deleted">
                                                 <span class="badge bg-danger">{{ __('actions.delete') }}</span>
                                             </template>
-                                            <template x-if="!user.deleted">
-                                                <span :class="user.active ? 'badge bg-success' : 'badge bg-secondary'"
-                                                      x-text="user.active ? '{{ __("actions.active") }}' : '{{ __("actions.inactive") }}'">
+                                            <template x-if="!item.deleted">
+                                                <span :class="item.active ? 'badge bg-success' : 'badge bg-secondary'"
+                                                      x-text="item.active ? '{{ __("actions.active") }}' : '{{ __("actions.inactive") }}'">
                                                 </span>
                                             </template>
                                         </div>
                                         <address class="small text-muted mb-2">
                                             <strong>{{ __('actions.email') }}:</strong>
-                                            <span x-text="user.email"></span><br>
+                                            <span x-text="item.email"></span><br>
                                             <strong>{{ __('actions.rule') }}:</strong>
-                                            <span x-text="user.rule_label ?? '{{ __("actions.not_informed") }}'"></span>
+                                            <span x-text="item.rule_label ?? '{{ __("actions.not_informed") }}'"></span>
                                         </address>
                                         <hr class="my-2">
-                                        <div class="d-flex gap-1">
-                                            <template x-if="!user.deleted && user.own_entity">
-                                                <div class="d-flex gap-1">
+                                        <div class="d-flex gap-1 flex-wrap">
+                                            <template x-if="!item.deleted && item.own_entity">
+                                                <div class="d-flex gap-1 flex-wrap">
                                                     <button class="btn btn-sm btn-light btn-show"
-                                                            :data-id="user.id"
+                                                            :data-id="item.id"
                                                             data-bs-toggle="tooltip"
                                                             title="{{ __('actions.view') }}">
                                                         <i class="fa fa-eye"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-light btn-edit"
-                                                            :data-id="user.id"
+                                                            :data-id="item.id"
                                                             data-bs-toggle="tooltip"
                                                             title="{{ __('actions.edit') }}">
                                                         <i class="fa fa-edit"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-light btn-active"
-                                                            :data-id="user.id"
-                                                            :data-situation="user.active ? 0 : 1"
+                                                            :data-id="item.id"
+                                                            :data-situation="item.active ? 0 : 1"
                                                             data-bs-toggle="tooltip"
-                                                            :title="user.active ? '{{ __("actions.disable") }}' : '{{ __("actions.enable") }}'">
-                                                        <i :class="user.active ? 'fas fa-lock-open' : 'fas fa-unlock'"></i>
+                                                            :title="item.active ? '{{ __("actions.disable") }}' : '{{ __("actions.enable") }}'">
+                                                        <i :class="item.active ? 'fas fa-lock-open' : 'fas fa-unlock'"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-danger btn-trash"
-                                                            :data-id="user.id"
+                                                            :data-id="item.id"
                                                             data-bs-toggle="tooltip"
                                                             title="{{ __('actions.delete') }}">
                                                         <i class="fa fa-trash"></i>
                                                     </button>
                                                 </div>
                                             </template>
-                                            <template x-if="user.deleted && user.own_entity">
+                                            <template x-if="item.deleted && item.own_entity">
                                                 <button class="btn btn-sm btn-light btn-restore"
-                                                        :data-id="user.id"
+                                                        :data-id="item.id"
                                                         data-bs-toggle="tooltip"
                                                         title="{{ __('actions.restore') }}">
                                                     <i class="fas fa-recycle"></i>
@@ -169,7 +170,7 @@
                 </div>
 
                 {{-- Empty state --}}
-                <div x-show="users.length === 0 && !loading" class="text-center py-5 text-muted">
+                <div x-show="items.length === 0 && !loading" class="text-center py-5 text-muted">
                     <i class="fa fa-users fa-3x mb-3"></i>
                     <p>{{ __('actions.no_records') }}</p>
                 </div>
@@ -196,6 +197,7 @@
                 </nav>
             </div>
         </div>
+        {{-- ══ /Cards View ══════════════════════════════════════════════════════ --}}
 
     </div>
 @endsection

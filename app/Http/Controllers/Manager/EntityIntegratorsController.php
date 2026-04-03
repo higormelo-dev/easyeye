@@ -31,14 +31,16 @@ class EntityIntegratorsController extends Controller
             ->findOrFail($userIntegrator);
 
         $meta = [
-            'title'       => $this->titleController,
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
+            'title'            => $entity->name,
+            'action'           => $this->titleController,
+            'total'            => EntityIntegrator::where('entity_user_integrator_id', $userIntegratorModel->id)->count(),
+            'breadcrumb_title' => false,
+            'breadcrumbs'      => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.entities'), 'url' => route('panel.manager.entities.index'), 'active' => false],
+                ['label' => 'Empresas', 'url' => route('panel.manager.entities.index'), 'active' => false],
                 ['label' => __('actions.user_integrators'), 'url' => route('panel.manager.entities.user-integrators.index', $entityId), 'active' => false],
-                ['label' => $this->titleController, 'url' => route('panel.manager.entities.user-integrators.integrators.index', [$entityId, $userIntegrator]), 'active' => false],
-                ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
+                ['label' => $userIntegratorModel->name, 'url' => 'javascript:void(0);', 'active' => false],
+                ['label' => $this->titleController, 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
 
@@ -138,7 +140,7 @@ class EntityIntegratorsController extends Controller
         $record = $this->model->query()
             ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
-        $active = (bool) $request->input('active', !$record->active);
+        $active = (bool) $request->input('active', ! $record->active);
         $record->update(['active' => $active]);
 
         return response()->json([
@@ -181,7 +183,7 @@ class EntityIntegratorsController extends Controller
         do {
             $token = hash(
                 'sha256',
-                microtime(true) . random_bytes(32) . uniqid('', true) . mt_rand()
+                microtime(true) . random_bytes(32) . uniqid('', true) . mt_rand(),
             );
         } while (EntityIntegrator::query()->where('token', $token)->exists());
 

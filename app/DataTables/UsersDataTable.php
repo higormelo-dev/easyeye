@@ -12,7 +12,7 @@ class UsersDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<EntityUser>  $query
+     * @param Builder<EntityUser> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
@@ -22,9 +22,9 @@ class UsersDataTable extends BaseDataTable
             ->editColumn('active', fn (EntityUser $record) => $this->formatActiveColumn($record))
             ->addColumn(
                 'rule_label',
-                fn (EntityUser $record) => !session()->get('selected_entity_is_client')
+                fn (EntityUser $record) => ! session()->get('selected_entity_is_client')
                     ? $record->present()->getRule
-                    : $record->present()->getClientRule
+                    : $record->present()->getClientRule,
             )
             ->filterColumn('name', function ($query, $keyword) {
                 $query->whereRaw('LOWER(users.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
@@ -60,9 +60,7 @@ class UsersDataTable extends BaseDataTable
             ->minifiedAjax()
             ->orderBy(0, 'desc')
             ->selectStyleSingle()
-            ->parameters(array_merge($this->getDefaultParameters(), [
-                'dom' => 'lrtip',
-            ]));
+            ->parameters($this->getDefaultParameters());
     }
 
     /**

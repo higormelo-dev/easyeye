@@ -24,7 +24,7 @@ class EntityIntegratorsDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<EntityIntegrator>  $query
+     * @param Builder<EntityIntegrator> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
@@ -50,7 +50,7 @@ class EntityIntegratorsDataTable extends BaseDataTable
         $query = $model->newQuery()
             ->withTrashed()
             ->select('entity_integrators.*')
-            ->selectRaw('(SELECT COUNT(*) FROM entity_integrator_equipments WHERE entity_integrator_equipments.entity_integrator_id = entity_integrators.id AND entity_integrator_equipments.deleted_at IS NULL) as equipments_count');
+            ->selectRaw('(SELECT COUNT(*) FROM entity_integrator_equipments WHERE entity_integrator_equipments.integrator_id = entity_integrators.id AND entity_integrator_equipments.deleted_at IS NULL) as equipments_count');
 
         if ($this->userIntegratorId) {
             $query->where('entity_user_integrator_id', $this->userIntegratorId);
@@ -105,32 +105,32 @@ class EntityIntegratorsDataTable extends BaseDataTable
     {
         $btnActions = '';
 
-        if (!$record->deleted_at) {
+        if (! $record->deleted_at) {
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-edit"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>';
 
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
             if ($record->equipments_count > 0) {
                 $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.integrators.equipments.index', [$this->entityId, $this->userIntegratorId, $record->id]) . '"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1"
+                    class="btn waves-effect waves-light btn-light btn-xs m-1"
                     data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="' . __('actions.equipments') . '"><i class="fas fa-satellite-dish"></i></a>';
             } else {
                 $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-secondary btn-xs m-1 disabled"
+                    class="btn waves-effect waves-light btn-light btn-xs m-1 disabled"
                     aria-disabled="true" tabindex="-1"
                     data-bs-toggle="tooltip" data-bs-placement="bottom"
                     title="' . __('actions.equipments') . '"><i class="fas fa-satellite-dish"></i></a>';
             }
 
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-active"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-active"
                 data-id="' . $record->id . '" data-situation="' . ($record->active ? 0 : 1) . '"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . ($record->active ? __('actions.disable') : __('actions.enable')) . '">
@@ -142,7 +142,7 @@ class EntityIntegratorsDataTable extends BaseDataTable
                 title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
         } else {
             $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
 
