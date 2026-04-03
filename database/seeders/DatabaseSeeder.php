@@ -32,10 +32,13 @@ class DatabaseSeeder extends Seeder
         $this->call(ReportSettingSeeder::class);
         $this->call(ReportSettingContentSeeder::class);
         $this->call(ReportSettingVariableSeeder::class);
-        $this->call(AdoptGlobalReportSettingsForEntitiesSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);
         }
+
+        // Executa por último para considerar clínicas eventualmente criadas
+        // por seeders de dados faker.
+        $this->call(AdoptGlobalReportSettingsForEntitiesSeeder::class);
     }
 }
