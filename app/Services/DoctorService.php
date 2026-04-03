@@ -60,7 +60,7 @@ class DoctorService
             $doctor->update($data);
             $this->updateEntityUser($doctor->entityUser, $request);
 
-            if (! $request->has('type_method')) {
+            if (!$request->has('type_method')) {
                 $this->updatePerson($doctor->person, $request);
                 $this->updateUser($doctor->entityUser->user, $request);
             }

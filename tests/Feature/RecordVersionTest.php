@@ -2,15 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Covenant;
-use App\Models\Doctor;
-use App\Models\Entity;
-use App\Models\EntityUser;
-use App\Models\MedicalRecord;
-use App\Models\Patient;
-use App\Models\People;
-use App\Models\RecordVersion;
-use App\Models\User;
+use App\Models\{Covenant, Doctor, Entity, EntityUser, MedicalRecord, Patient, People, RecordVersion, User};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -19,8 +11,11 @@ class RecordVersionTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Entity $entity;
+
     private Patient $patient;
+
     private Doctor $doctor;
 
     protected function setUp(): void
@@ -43,8 +38,8 @@ class RecordVersionTest extends TestCase
             'active'      => true,
         ]);
 
-        $doctorUser   = User::factory()->create();
-        $entityUser   = EntityUser::create([
+        $doctorUser = User::factory()->create();
+        $entityUser = EntityUser::create([
             'entity_id' => $this->entity->id,
             'user_id'   => $doctorUser->id,
             'active'    => true,

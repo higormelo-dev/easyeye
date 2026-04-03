@@ -27,6 +27,8 @@ class DatabaseSeeder extends Seeder
         $this->call(VisualAcuityTypesSeeder::class);
         $this->call(LensesSeeder::class);
         $this->call(NearPointConvergencesSeeder::class);
+        $this->call(MedicinePresentationsSeeder::class);
+        $this->call(Cid10CodesSeeder::class);
 
         if (app()->environment(['local', 'testing'])) {
             $this->call(DataFakersSeeder::class);

@@ -7,9 +7,7 @@ use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\{BelongsToMany, HasMany, HasOne};
 
 class Entity extends Model
 {
@@ -138,7 +136,7 @@ class Entity extends Model
      */
     public function isSaas(): bool
     {
-        return ! $this->is_client;
+        return !$this->is_client;
     }
 
     /**

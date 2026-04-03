@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\{DB, Schema};
 
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         // Converte registros com situation = 0 (inválido) para 1 (Agendado)

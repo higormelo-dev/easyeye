@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Doctor, ScheduleEvent};
+use App\Models\{ScheduleEvent};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Validation\Rule;
 

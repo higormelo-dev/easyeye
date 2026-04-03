@@ -3,8 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\SubscriptionStatus;
-use App\Models\Entity;
-use App\Models\Plan;
+use App\Models\{Entity, Plan};
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -15,11 +14,11 @@ class SubscriptionFactory extends Factory
     public function definition(): array
     {
         return [
-            'entity_id'  => Entity::factory(),
-            'plan_id'    => Plan::factory(),
-            'status'     => SubscriptionStatus::Active,
-            'starts_at'  => now(),
-            'ends_at'    => now()->addMonth(),
+            'entity_id' => Entity::factory(),
+            'plan_id'   => Plan::factory(),
+            'status'    => SubscriptionStatus::Active,
+            'starts_at' => now(),
+            'ends_at'   => now()->addMonth(),
         ];
     }
 

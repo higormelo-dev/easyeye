@@ -81,7 +81,7 @@ class ClinicResourcesDataTable extends BaseDataTable
 
         $buttons = $this->buildActionButtons($record, ['delete' => false]);
 
-        if (! $record->deleted_at && $isOwned) {
+        if (!$record->deleted_at && $isOwned) {
             $buttons .= '<button type="button"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-resource-schedule"
                 data-id="' . $record->id . '"

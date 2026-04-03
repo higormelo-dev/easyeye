@@ -20,6 +20,12 @@ class VisitTypesController extends BaseSettingController
         $this->baseUrl         = url('panel/setting/visittypes');
     }
 
-    public function store(VisitTypeRequest $request) { return $this->genericStore($request); }
-    public function update(VisitTypeRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(VisitTypeRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(VisitTypeRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

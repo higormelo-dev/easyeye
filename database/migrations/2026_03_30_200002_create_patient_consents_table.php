@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * LGPD Art. 7, I (dados pessoais) e Art. 11, I (dados sensíveis de saúde).
  * Art. 8 — consentimento deve ser livre, informado e inequívoco.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('patient_consents', function (Blueprint $table) {

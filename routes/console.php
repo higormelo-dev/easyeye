@@ -1,10 +1,8 @@
 <?php
 
-use App\Services\SubscriptionService;
-use App\Services\TrialService;
+use App\Services\{SubscriptionService, TrialService};
 use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\Facades\{Artisan, Schedule};
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

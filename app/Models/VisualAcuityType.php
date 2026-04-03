@@ -16,7 +16,8 @@ class VisualAcuityType extends Model
     use HasUuids;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'VAT';
+    protected string $codePrefix = 'VAT';
+
     protected string $codePrefixGlobal = 'VATP';
 
     protected $fillable = ['entity_id', 'code', 'scale', 'name', 'active'];

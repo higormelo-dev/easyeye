@@ -15,7 +15,7 @@ class LocaleController extends Controller
     public function switch(Request $request, string $locale): RedirectResponse|JsonResponse
     {
         // Verifica se o locale é suportado
-        if (! array_key_exists($locale, SetLocale::SUPPORTED_LOCALES)) {
+        if (!array_key_exists($locale, SetLocale::SUPPORTED_LOCALES)) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
@@ -56,7 +56,7 @@ class LocaleController extends Controller
 
         $entityId = session('selected_entity_id');
 
-        if (! $entityId) {
+        if (!$entityId) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
@@ -69,7 +69,7 @@ class LocaleController extends Controller
 
         $entity = Entity::find($entityId);
 
-        if (! $entity) {
+        if (!$entity) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
@@ -119,18 +119,19 @@ class LocaleController extends Controller
     public function index(): JsonResponse
     {
         $data = [
-            'current'         => app()->getLocale(),
-            'locales'         => SetLocale::getSupportedLocales(),
-            'user_locale'     => null,
-            'entity_locale'   => null,
+            'current'       => app()->getLocale(),
+            'locales'       => SetLocale::getSupportedLocales(),
+            'user_locale'   => null,
+            'entity_locale' => null,
         ];
 
         if (Auth::check()) {
             $data['user_locale'] = Auth::user()->locale;
 
             $entityId = session('selected_entity_id');
+
             if ($entityId) {
-                $entity = Entity::find($entityId);
+                $entity                = Entity::find($entityId);
                 $data['entity_locale'] = $entity?->locale;
             }
         }
@@ -138,4 +139,3 @@ class LocaleController extends Controller
         return response()->json($data);
     }
 }
-

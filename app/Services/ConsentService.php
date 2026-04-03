@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Services;
 
@@ -111,7 +111,7 @@ class ConsentService
 
         return array_values(array_filter(
             $required,
-            fn (ConsentType $type) => ! $this->hasActiveConsent($patient, $type)
+            fn (ConsentType $type) => !$this->hasActiveConsent($patient, $type)
         ));
     }
 
@@ -151,12 +151,9 @@ class ConsentService
     private function resolveLegalBasis(ConsentType $type): LegalBasis
     {
         return match ($type) {
-            ConsentType::DataCollection, ConsentType::ImageAndVoice, ConsentType::ResearchParticipation
-                => LegalBasis::Consent,
-            ConsentType::SensitiveData, ConsentType::MinorGuardian
-                => LegalBasis::HealthProtection,
-            ConsentType::DataSharing
-                => LegalBasis::ContractExecution,
+            ConsentType::DataCollection, ConsentType::ImageAndVoice, ConsentType::ResearchParticipation => LegalBasis::Consent,
+            ConsentType::SensitiveData, ConsentType::MinorGuardian => LegalBasis::HealthProtection,
+            ConsentType::DataSharing => LegalBasis::ContractExecution,
         };
     }
 }

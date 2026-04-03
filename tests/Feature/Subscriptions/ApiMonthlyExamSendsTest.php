@@ -1,6 +1,6 @@
 <?php
 
-use App\Enums\{BillingCycle, FeatureKey};
+use App\Enums\{FeatureKey};
 use App\Exceptions\FeatureDeniedException;
 use App\Models\{Entity, FeatureUsage, Plan, PlanFeature, SubscriptionSetting};
 use App\Services\{FeatureGateService, SubscriptionService};
@@ -9,10 +9,10 @@ beforeEach(function () {
     SubscriptionSetting::setValue('trial_days', 7);
     SubscriptionSetting::setValue('grace_period_days', 3);
 
-    $this->entity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $this->plan    = Plan::factory()->create(['active' => true]);
-    $this->gate    = app(FeatureGateService::class);
-    $this->subSvc  = app(SubscriptionService::class);
+    $this->entity = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $this->plan   = Plan::factory()->create(['active' => true]);
+    $this->gate   = app(FeatureGateService::class);
+    $this->subSvc = app(SubscriptionService::class);
 });
 
 // ── Dependência de HasApiIntegrator ──────────────────────────────────────────

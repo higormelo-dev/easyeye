@@ -10,8 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * Quando a indicada converte para plano pago, o referenciador é recompensado.
  * Canal de menor CAC: confiança médico-para-médico.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('referral_codes', function (Blueprint $table) {

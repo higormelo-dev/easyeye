@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Enums;
 
@@ -9,6 +9,7 @@ namespace App\Enums;
  *
  * Uso:
  *   Gate::check(EntityGate::EditSchedule->value, $entity)
+ *
  *   @can(EntityGate::EditSchedule->value, $entity)
  *
  * Todos os Gates recebem (User $user, Entity $entity) como argumentos.
@@ -20,16 +21,16 @@ enum EntityGate: string
     // ── SaaS (entity com is_client = false) ─────────────────────────────────
 
     /** Qualquer membro ativo da entity SaaS. */
-    case SaasAccess     = 'saas.access';
+    case SaasAccess = 'saas.access';
 
     /** Painel administrativo completo do SaaS (somente admin). */
     case SaasAdminPanel = 'saas.admin-panel';
 
     /** Acesso a funções de suporte interno (admin ou support). */
-    case SaasSupport    = 'saas.support';
+    case SaasSupport = 'saas.support';
 
     /** Acesso a dados financeiros do SaaS (admin ou financial). */
-    case SaasFinancial  = 'saas.financial';
+    case SaasFinancial = 'saas.financial';
 
     /** Iniciar "usar como" para um usuário de uma entity cliente (admin ou support). */
     case SaasImpersonate = 'saas.impersonate';
@@ -37,19 +38,19 @@ enum EntityGate: string
     // ── Client entity (entity com is_client = true) ──────────────────────────
 
     /** Qualquer membro ativo da entity cliente. */
-    case EntityAccess   = 'entity.access';
+    case EntityAccess = 'entity.access';
 
     /** Gerenciar usuários e permissões da entity (admin). */
-    case ManageUsers    = 'entity.manage-users';
+    case ManageUsers = 'entity.manage-users';
 
     /** Ver dados e relatórios financeiros da entity (admin, financial). */
-    case ViewFinancial  = 'entity.view-financial';
+    case ViewFinancial = 'entity.view-financial';
 
     /** Criar, editar e excluir agendamentos (admin, doctor, secretary). */
-    case EditSchedule   = 'entity.edit-schedule';
+    case EditSchedule = 'entity.edit-schedule';
 
     /** Emitir laudos e prontuários médicos (doctor). */
-    case IssueReport    = 'entity.issue-report';
+    case IssueReport = 'entity.issue-report';
 
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';

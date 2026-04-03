@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\BelongsToMany};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\BelongsToMany};
 
 class Notice extends Model
 {

@@ -11,7 +11,8 @@ class RegisterAction
         private readonly CreateEntityAction     $createEntity,
         private readonly CreateEntityUserAction $createEntityUser,
         private readonly StartTrialAction       $startTrial,
-    ) {}
+    ) {
+    }
 
     /**
      * Executa o registro completo dentro de uma transação.
@@ -29,9 +30,9 @@ class RegisterAction
     public function execute(array $data): array
     {
         $result = DB::transaction(function () use ($data) {
-            $user       = $this->createUser->execute($data);
-            $entity     = $this->createEntity->execute($data);
-            $entityUser = $this->createEntityUser->execute($user, $entity);
+            $user         = $this->createUser->execute($data);
+            $entity       = $this->createEntity->execute($data);
+            $entityUser   = $this->createEntityUser->execute($user, $entity);
             $subscription = $this->startTrial->execute($entity, $data['plan_id'] ?? null);
 
             return compact('user', 'entity', 'entityUser', 'subscription');

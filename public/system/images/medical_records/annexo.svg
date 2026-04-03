@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <circle cx="24" cy="24" r="22" fill="#ffebee" stroke="#e53935" stroke-width="1.5"/>
+  <path d="M32 16 l0 16 a8 8 0 0 1 -16 0 l0-20 a5 5 0 0 1 10 0 l0 18 a2 2 0 0 1 -4 0 l0-16"
+        stroke="#e53935" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  <text x="24" y="44" font-family="Arial" font-size="0" fill="#c62828" text-anchor="middle">Anexo</text>
+</svg>

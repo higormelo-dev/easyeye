@@ -22,6 +22,12 @@ class CoverTestTypesController extends BaseSettingController
         $this->crudFields      = ['name' => '', 'abbreviation' => '', 'active' => true];
     }
 
-    public function store(CoverTestTypeRequest $request) { return $this->genericStore($request); }
-    public function update(CoverTestTypeRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(CoverTestTypeRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(CoverTestTypeRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

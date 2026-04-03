@@ -159,14 +159,17 @@ class AuthServiceProvider extends ServiceProvider
 
         /**
          * Emitir laudos médicos e registrar prontuários.
-         * Exclusivo do Doctor — secretary e admin não podem emitir.
+         * Admin e Doctor podem emitir — secretary não.
          */
         Gate::define(EntityGate::IssueReport->value, function (User $user, Entity $entity): bool {
             if (! $entity->isClient()) {
                 return false;
             }
 
-            return $user->hasRoleInEntity($entity, ClientRule::Doctor);
+            return $user->hasAnyRoleInEntity($entity, [
+                ClientRule::Admin,
+                ClientRule::Doctor,
+            ]);
         });
 
         /**

@@ -31,6 +31,7 @@ export default defineConfig({
                 'resources/js/system/surgerytypes.js',
                 'resources/js/system/covertesttypes.js',
                 'resources/js/system/visualacuitytypes.js',
+                'resources/js/system/medical-records.js',
                 'resources/js/auth/password-toggle.js',
             ],
             refresh: true,

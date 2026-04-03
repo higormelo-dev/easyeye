@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * Calculadas automaticamente quando uma clínica atribuída ao parceiro
  * ativa um plano pago.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('partner_commissions', function (Blueprint $table) {

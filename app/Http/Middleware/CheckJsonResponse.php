@@ -15,14 +15,14 @@ class CheckJsonResponse
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->expectsJson() && ! $request->wantsJson()) {
+        if (!$request->expectsJson() && !$request->wantsJson()) {
             return response()->json([
                 'message' => 'This endpoint only accepts JSON requests.',
             ], 406);
         }
 
         if (in_array($request->method(), ['POST', 'PUT', 'PATCH'])) {
-            if (! $this->hasValidContentType($request)) {
+            if (!$this->hasValidContentType($request)) {
                 return response()->json([
                     'message' => __('http-statuses.415'),
                 ], 415);

@@ -53,9 +53,9 @@ class UsersController extends Controller
             ->orderBy('entity_users.created_at', 'desc')
             ->paginate($perPage);
 
-        $isClient    = session()->get('selected_entity_is_client');
-        $entityId    = session()->get('selected_entity_id');
-        $rolesMap    = $isClient ? User::$rolesOfClients : User::$rolesOfManager;
+        $isClient = session()->get('selected_entity_is_client');
+        $entityId = session()->get('selected_entity_id');
+        $rolesMap = $isClient ? User::$rolesOfClients : User::$rolesOfManager;
 
         $data = $entityUsers->map(function (EntityUser $eu) use ($rolesMap, $entityId) {
             $userPhotoPath = 'system/images/users/' . $eu->user_id . '.jpg';
@@ -66,7 +66,7 @@ class UsersController extends Controller
                 'email'      => $eu->email,
                 'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
                 'active'     => (bool) $eu->active,
-                'deleted'    => ! is_null($eu->deleted_at),
+                'deleted'    => !is_null($eu->deleted_at),
                 'entity_id'  => $eu->entity_id,
                 'own_entity' => $eu->entity_id === $entityId,
                 'photo_url'  => file_exists(public_path($userPhotoPath))
@@ -98,8 +98,8 @@ class UsersController extends Controller
                 ->where('entity_id', session('selected_entity_id'))
                 ->whereNot('rule', 'doctor')
                 ->count(),
-            'action'           => __('actions.records'),
-            'breadcrumbs'      => [
+            'action'      => __('actions.records'),
+            'breadcrumbs' => [
                 [
                     'label'  => __('actions.sidemenu.dashboard'),
                     'url'    => route('panel.dashboard'),
@@ -128,7 +128,7 @@ class UsersController extends Controller
     {
         $roles = ['' => 'Selecione uma opção'];
 
-        if (! session()->get('selected_entity_is_client')) {
+        if (!session()->get('selected_entity_is_client')) {
             $roles = array_merge($roles, User::$rolesOfManager);
         } else {
             $clientRoles = User::$rolesOfClients;
@@ -186,7 +186,7 @@ class UsersController extends Controller
         $record = $this->service->findByIdOrCode($id);
         $roles  = ['' => 'Selecione uma opção'];
 
-        if (! session()->get('selected_entity_is_client')) {
+        if (!session()->get('selected_entity_is_client')) {
             $roles = array_merge($roles, User::$rolesOfManager);
         } else {
             $clientRoles = User::$rolesOfClients;

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Observers;
 
@@ -20,14 +20,15 @@ class SubscriptionObserver
     public function __construct(
         private readonly PartnerService $partnerService,
         private readonly ReferralService $referralService,
-    ) {}
+    ) {
+    }
 
     /**
      * Trial iniciado → registra evento ReferralEventType::TrialStarted.
      */
     public function created(Subscription $subscription): void
     {
-        if (! $subscription->isOnTrial()) {
+        if (!$subscription->isOnTrial()) {
             return;
         }
 
@@ -39,7 +40,7 @@ class SubscriptionObserver
      */
     public function updated(Subscription $subscription): void
     {
-        if (! $subscription->wasChanged('status')) {
+        if (!$subscription->wasChanged('status')) {
             return;
         }
 
@@ -58,13 +59,13 @@ class SubscriptionObserver
         try {
             $entity = $subscription->entity;
 
-            if (! $entity->referral_code_id) {
+            if (!$entity->referral_code_id) {
                 return;
             }
 
             $referralCode = $entity->referralCode;
 
-            if (! $referralCode) {
+            if (!$referralCode) {
                 return;
             }
 
@@ -94,13 +95,13 @@ class SubscriptionObserver
         try {
             $entity = $subscription->entity;
 
-            if (! $entity->referral_code_id) {
+            if (!$entity->referral_code_id) {
                 return;
             }
 
             $referralCode = $entity->referralCode;
 
-            if (! $referralCode) {
+            if (!$referralCode) {
                 return;
             }
 

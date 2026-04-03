@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Http\Middleware;
 
@@ -27,14 +27,14 @@ class HandleImpersonation
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! session()->has('impersonating.entity_user_id')) {
+        if (!session()->has('impersonating.entity_user_id')) {
             return $next($request);
         }
 
         $entityUser = EntityUser::with('user')
             ->find(session('impersonating.entity_user_id'));
 
-        if (! $entityUser || ! $entityUser->user) {
+        if (!$entityUser || !$entityUser->user) {
             // Estado inválido: limpa e segue como usuário real
             session()->forget('impersonating');
 

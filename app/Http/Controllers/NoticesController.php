@@ -26,7 +26,7 @@ class NoticesController extends Controller
             ->get();
 
         return response()->json([
-            'data'  => $notices->map(fn ($n) => [
+            'data' => $notices->map(fn ($n) => [
                 'id'         => $n->id,
                 'content'    => $n->content,
                 'priority'   => $n->priority,

@@ -18,7 +18,7 @@ class EntityUserRequest extends FormRequest
     {
         $entity = Entity::find(session('selected_entity_id'));
 
-        if (! $entity) {
+        if (!$entity) {
             return false;
         }
 

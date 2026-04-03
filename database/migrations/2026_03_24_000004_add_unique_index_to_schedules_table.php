@@ -3,8 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Partial unique index on (doctor_id, date_time) excluding soft-deleted rows.
      * Prevents double-booking at DB level even under concurrent inserts.

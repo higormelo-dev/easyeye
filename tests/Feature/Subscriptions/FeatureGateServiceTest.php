@@ -1,12 +1,8 @@
 <?php
 
 use App\Enums\FeatureKey;
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\PlanFeature;
-use App\Models\SubscriptionSetting;
-use App\Services\FeatureGateService;
-use App\Services\SubscriptionService;
+use App\Models\{Entity, Plan, PlanFeature, SubscriptionSetting};
+use App\Services\{FeatureGateService, SubscriptionService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -15,10 +11,10 @@ beforeEach(function () {
     SubscriptionSetting::setValue('trial_days', 7);
     SubscriptionSetting::setValue('grace_period_days', 3);
 
-    $this->entity  = Entity::factory()->create(['is_client' => false]);
-    $this->plan    = Plan::factory()->create(['active' => true]);
-    $this->gate    = app(FeatureGateService::class);
-    $this->subSvc  = app(SubscriptionService::class);
+    $this->entity = Entity::factory()->create(['is_client' => false]);
+    $this->plan   = Plan::factory()->create(['active' => true]);
+    $this->gate   = app(FeatureGateService::class);
+    $this->subSvc = app(SubscriptionService::class);
 });
 
 test('can retorna false sem assinatura', function () {

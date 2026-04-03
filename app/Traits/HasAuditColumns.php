@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Traits;
 
@@ -27,6 +27,7 @@ trait HasAuditColumns
             if (blank($model->created_by)) {
                 $model->created_by = $userId;
             }
+
             if (blank($model->updated_by)) {
                 $model->updated_by = $userId;
             }
@@ -39,7 +40,7 @@ trait HasAuditColumns
         // Preenche deleted_by somente se o model usar SoftDeletes
         if (in_array(SoftDeletes::class, class_uses_recursive(static::class), true)) {
             static::deleting(function (self $model): void {
-                if (! $model->isForceDeleting()) {
+                if (!$model->isForceDeleting()) {
                     $model->deleted_by = static::resolveUserId();
                     $model->saveQuietly();
                 }

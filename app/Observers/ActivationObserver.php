@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Observers;
 
@@ -20,7 +20,8 @@ class ActivationObserver
 {
     public function __construct(
         private readonly ActivationService $activationService,
-    ) {}
+    ) {
+    }
 
     // -------------------------------------------------------------------------
     // Doctor → FirstDoctorAdded
@@ -89,7 +90,7 @@ class ActivationObserver
 
     public function entityUpdated(Entity $entity): void
     {
-        if (! $entity->is_client) {
+        if (!$entity->is_client) {
             return;
         }
 

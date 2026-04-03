@@ -2,12 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\AuditLog;
-use App\Models\Covenant;
-use App\Models\Entity;
-use App\Models\Patient;
-use App\Models\People;
-use App\Models\User;
+use App\Models\{AuditLog, Covenant, Entity, Patient, People, User};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,7 +11,9 @@ class AuditLogTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private Entity $entity;
+
     private Covenant $covenant;
 
     protected function setUp(): void

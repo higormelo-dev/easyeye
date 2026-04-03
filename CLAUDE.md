@@ -2,17 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-
-**Medicare** is a multi-tenant SaaS platform for managing ophthalmology clinics, built with Laravel 11 + Blade + Alpine.js.
+**Medicare** é uma plataforma multi-tenant SaaS de oftalmologia baseada em **Laravel 11 + Blade + Alpine.js**.
 
 ## Common Commands
 
 ```bash
 # Development
-composer dev          # Start all dev services (server, queue, logs, vite) concurrently
-npm run dev           # Vite dev server only
-npm run build         # Production asset build
+composer dev          # Inicia Server, Queue, Workers e Vite
+npm run dev           # Vite Dev Server
+npm run build         # Produção
 
 # Database
 php artisan migrate
@@ -174,12 +172,13 @@ Todos os observers são registrados em `AppServiceProvider::boot()`.
 
 **Observer silencioso**: Todos os observers de compliance e CAC capturam `\Throwable` e fazem `Log::warning/error` sem propagar a exceção — a operação principal nunca é bloqueada por um erro de rastreamento.
 
-### Frontend Stack
+### Frontend Stack (Core Blade)
 
-- **Blade** templates with **Alpine.js** for reactivity
-- **Bootstrap 5** + **Tailwind CSS** (both present)
-- **Vite** bundles: `resources/js/vendor.js` (jQuery + libs), `resources/js/app.js` (global), plus per-module files in `resources/js/system/`
-- Key JS libraries: DataTables, FlatPickr, SweetAlert2, jQuery toast, QRCode (TV pairing)
+- **Engine:** Blade Templates (`resources/views`)
+- **Interatividade:** Alpine.js para estados reativos nos templates.
+- **Assets:** Vite para build de CSS e scripts globais.
+- **Libs Globais:** jQuery (DataTables, Toasts) via `resources/js/vendor.js`.
+- **CSS:** Bootstrap 5 em conjunto com Tailwind CSS.
 
 ### Testing
 

@@ -32,7 +32,7 @@ class DoctorResource extends JsonResource
             ],
         ];
 
-        if (! $request->routeIs('*.index')) {
+        if (!$request->routeIs('*.index')) {
             $data['relationships'] = [
                 'entityUser' => $this->entityUser->toArray() ?? (object) [],
                 'person'     => $this->person->toArray() ?? (object) [],

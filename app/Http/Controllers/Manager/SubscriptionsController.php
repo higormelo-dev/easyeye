@@ -3,16 +3,11 @@
 namespace App\Http\Controllers\Manager;
 
 use App\DataTables\SubscriptionsDataTable;
-use App\Enums\BillingCycle;
-use App\Enums\SubscriptionStatus;
+use App\Enums\{BillingCycle, SubscriptionStatus};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\SubscriptionRequest;
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\SubscriptionSetting;
-use App\Services\SubscriptionService;
-use App\Services\TrialService;
+use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
+use App\Services\{SubscriptionService, TrialService};
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, Request};
@@ -23,7 +18,8 @@ class SubscriptionsController extends Controller
     public function __construct(
         private readonly SubscriptionService $subscriptionService,
         private readonly TrialService $trialService,
-    ) {}
+    ) {
+    }
 
     public function index(SubscriptionsDataTable $dataTable): Factory|Application|View|JsonResponse
     {
@@ -45,7 +41,13 @@ class SubscriptionsController extends Controller
         $baseUrl       = url('panel/manager/subscriptions');
 
         return $dataTable->render('system.manager.subscriptions.index', compact(
-            'meta', 'plans', 'billingCycles', 'statuses', 'trialDays', 'graceDays', 'baseUrl'
+            'meta',
+            'plans',
+            'billingCycles',
+            'statuses',
+            'trialDays',
+            'graceDays',
+            'baseUrl'
         ));
     }
 
@@ -148,7 +150,7 @@ class SubscriptionsController extends Controller
         $entity       = Entity::findOrFail($request->entity_id);
         $subscription = $this->subscriptionService->cancel($entity);
 
-        if (! $subscription) {
+        if (!$subscription) {
             return response()->json(['message' => 'Nenhuma assinatura ativa encontrada.'], 404);
         }
 

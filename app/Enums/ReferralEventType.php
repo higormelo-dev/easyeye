@@ -8,8 +8,8 @@ namespace App\Enums;
  */
 enum ReferralEventType: string
 {
-    case TrialStarted   = 'trial_started';   // Indicado iniciou trial
-    case PlanActivated  = 'plan_activated';  // Indicado converteu para plano pago
+    case TrialStarted  = 'trial_started';   // Indicado iniciou trial
+    case PlanActivated = 'plan_activated';  // Indicado converteu para plano pago
 
     public function label(): string
     {

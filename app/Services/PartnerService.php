@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Services;
 
@@ -95,17 +95,17 @@ class PartnerService
     {
         $entity = $subscription->entity;
 
-        if (! $entity->partner_id) {
+        if (!$entity->partner_id) {
             return null;
         }
 
         $partner = $entity->partner;
 
-        if (! $partner || ! $partner->isActive()) {
+        if (!$partner || !$partner->isActive()) {
             return null;
         }
 
-        $plan  = $subscription->plan;
+        $plan   = $subscription->plan;
         $amount = round(($plan->price * $partner->commission_rate) / 100, 2);
 
         // Comissão gerada com vencimento em 30 dias
@@ -163,10 +163,10 @@ class PartnerService
         $leads = $partner->leads();
 
         return [
-            'total_leads'      => $leads->count(),
-            'active_leads'     => $leads->whereIn('status', ['new', 'contacted', 'trial'])->count(),
-            'converted_leads'  => $leads->where('status', PartnerLeadStatus::Converted->value)->count(),
-            'conversion_rate'  => $leads->count() > 0
+            'total_leads'     => $leads->count(),
+            'active_leads'    => $leads->whereIn('status', ['new', 'contacted', 'trial'])->count(),
+            'converted_leads' => $leads->where('status', PartnerLeadStatus::Converted->value)->count(),
+            'conversion_rate' => $leads->count() > 0
                 ? round($leads->where('status', PartnerLeadStatus::Converted->value)->count() / $leads->count() * 100, 1)
                 : 0,
             'pending_commissions' => $partner->pendingCommissionsAmount(),

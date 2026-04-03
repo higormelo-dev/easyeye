@@ -107,9 +107,9 @@ class SubscriptionsDataTable extends BaseDataTable
                 title="Cancelar assinatura"><i class="fas fa-ban"></i></a>';
         }
 
-        $lockClass  = $record->entity_active ? 'btn-danger' : 'btn-success';
-        $lockIcon   = $record->entity_active ? 'fa-lock' : 'fa-lock-open';
-        $lockTitle  = $record->entity_active ? 'Bloquear acesso' : 'Desbloquear acesso';
+        $lockClass = $record->entity_active ? 'btn-danger' : 'btn-success';
+        $lockIcon  = $record->entity_active ? 'fa-lock' : 'fa-lock-open';
+        $lockTitle = $record->entity_active ? 'Bloquear acesso' : 'Desbloquear acesso';
 
         $buttons .= '<a href="javascript:void(0);"
             class="btn waves-effect waves-light ' . $lockClass . ' btn-xs m-1 btn-block"

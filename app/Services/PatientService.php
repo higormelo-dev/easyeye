@@ -53,7 +53,7 @@ class PatientService
 
             $patient->update($data);
 
-            if (! $request->has('type_method')) {
+            if (!$request->has('type_method')) {
                 $this->updatePersonData($patient->person, $request);
             }
 

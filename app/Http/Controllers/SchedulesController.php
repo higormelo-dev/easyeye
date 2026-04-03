@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\{ClientRule, PatientMood, ScheduleSituation};
 use App\Http\Requests\ScheduleRequest;
 use App\Jobs\NotifyScheduleChangeJob;
-use App\Models\{ClinicResource, Covenant, Doctor, IrisType, People, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
+use App\Models\{Covenant, Doctor, IrisType, People, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
 use App\Notifications\ScheduleNotification;
 use App\Services\ScheduleService;
 use Carbon\Carbon;
@@ -13,8 +13,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\{Rule, ValidationException};
 
 class SchedulesController extends Controller
 {
@@ -75,9 +74,17 @@ class SchedulesController extends Controller
         ];
 
         return view('system.schedules.index', compact(
-            'doctors', 'covenants', 'visitTypes', 'meta', 'loggedDoctor',
-            'genders', 'maritalStatuses', 'statesOfBrazil',
-            'skinTypes', 'irisTypes', 'patientCovenants'
+            'doctors',
+            'covenants',
+            'visitTypes',
+            'meta',
+            'loggedDoctor',
+            'genders',
+            'maritalStatuses',
+            'statesOfBrazil',
+            'skinTypes',
+            'irisTypes',
+            'patientCovenants'
         ));
     }
 
@@ -175,8 +182,8 @@ class SchedulesController extends Controller
         $entityId = session()->get('selected_entity_id');
 
         // ── Recorrência ──────────────────────────────────────────────────────
-        $recurrenceType  = $request->input('recurrence_type');  // weekly | monthly | null
-        $recurrenceUntil = $request->input('recurrence_until'); // Y-m-d | null
+        $recurrenceType    = $request->input('recurrence_type');  // weekly | monthly | null
+        $recurrenceUntil   = $request->input('recurrence_until'); // Y-m-d | null
         $recurrenceGroupId = ($recurrenceType && $recurrenceUntil)
             ? (string) Str::uuid()
             : null;
@@ -279,7 +286,7 @@ class SchedulesController extends Controller
             return response()->json(['message' => 'Agendamento já finalizado e não pode ser alterado.'], 422);
         }
 
-        if (! in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
+        if (!in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
             return response()->json(['message' => 'Transição de situação não permitida.'], 422);
         }
 
@@ -342,7 +349,7 @@ class SchedulesController extends Controller
 
         $errors = $this->service->validateSlot($doctorId, $dateTime);
 
-        if (! empty($errors)) {
+        if (!empty($errors)) {
             return response()->json(['message' => $errors[0]], 422);
         }
 
@@ -362,7 +369,7 @@ class SchedulesController extends Controller
             'active'             => true,
         ]);
 
-        $cancelNote = 'Reagendado para ' . $newSchedule->code;
+        $cancelNote    = 'Reagendado para ' . $newSchedule->code;
         $fromSituation = $schedule->situation;
 
         $schedule->update([
@@ -408,6 +415,7 @@ class SchedulesController extends Controller
         );
 
         $message = "Atualizado {$result['updated']} agendamento(s).";
+
         if ($result['skipped'] > 0) {
             $message .= " {$result['skipped']} ignorado(s) (conflito de horário ou restrição de escala).";
         }
@@ -447,6 +455,7 @@ class SchedulesController extends Controller
         );
 
         $message = "Atualizado {$result['updated']} agendamento(s).";
+
         if ($result['skipped'] > 0) {
             $message .= " {$result['skipped']} ignorado(s) (transição não permitida).";
         }
@@ -495,9 +504,9 @@ class SchedulesController extends Controller
             'schedule_id' => ['nullable', 'uuid'],
         ]);
 
-        $entityId   = session()->get('selected_entity_id');
-        $dateTime   = Carbon::parse($request->input('date_time'));
-        $excludeId  = $request->input('schedule_id');
+        $entityId  = session()->get('selected_entity_id');
+        $dateTime  = Carbon::parse($request->input('date_time'));
+        $excludeId = $request->input('schedule_id');
 
         $availability = $this->service->getResourceAvailability($entityId, $dateTime, $excludeId);
 
@@ -523,13 +532,13 @@ class SchedulesController extends Controller
             ->select('doctors.*')
             ->first();
 
-        if (! $doctor) {
+        if (!$doctor) {
             return response()->json(['has_schedule' => false, 'interval' => 15, 'slots' => []]);
         }
 
         $date        = Carbon::parse($request->input('date'));
         $slots       = $this->service->getAvailableSlots($doctor, $date);
-        $hasSchedule = ! empty($slots) || \App\Models\DoctorWorkSchedule::where('doctor_id', $doctorId)->exists();
+        $hasSchedule = !empty($slots) || \App\Models\DoctorWorkSchedule::where('doctor_id', $doctorId)->exists();
 
         return response()->json([
             'has_schedule' => $hasSchedule,
@@ -561,7 +570,7 @@ class SchedulesController extends Controller
 
             $errors = $this->service->validateSlot($base->doctor_id, $current);
 
-            if (! empty($errors)) {
+            if (!empty($errors)) {
                 continue;
             }
 

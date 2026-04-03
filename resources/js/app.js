@@ -37,6 +37,12 @@ Alpine.data('registerWizard', registerWizard);
 import slotPicker from './components/slotPicker';
 Alpine.data('slotPicker', slotPicker);
 
+import medicalRecordForm from './components/medicalRecordForm';
+Alpine.data('medicalRecordForm', medicalRecordForm);
+
+import cid10Search from './components/cid10Search';
+Alpine.data('cid10Search', cid10Search);
+
 window.Alpine = Alpine;
 
 Alpine.start();

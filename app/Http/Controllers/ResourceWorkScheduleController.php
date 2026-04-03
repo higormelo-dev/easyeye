@@ -24,6 +24,7 @@ class ResourceWorkScheduleController extends Controller
         $dayNames = __('actions.weekdays');
 
         $days = [];
+
         for ($i = 0; $i <= 6; $i++) {
             $ranges = $existingByDay->get($i, collect())
                 ->map(fn ($s) => [
@@ -77,19 +78,19 @@ class ResourceWorkScheduleController extends Controller
         $resource = $this->findResource($resourceId);
 
         $request->validate([
-            'days'                       => ['required', 'array'],
-            'days.*.day'                 => ['required', 'integer', 'min:0', 'max:6'],
-            'days.*.active'              => ['required', 'boolean'],
-            'days.*.ranges'              => ['required', 'array'],
-            'days.*.ranges.*.starts_at'  => ['required', 'date_format:H:i'],
-            'days.*.ranges.*.ends_at'    => ['required', 'date_format:H:i'],
+            'days'                      => ['required', 'array'],
+            'days.*.day'                => ['required', 'integer', 'min:0', 'max:6'],
+            'days.*.active'             => ['required', 'boolean'],
+            'days.*.ranges'             => ['required', 'array'],
+            'days.*.ranges.*.starts_at' => ['required', 'date_format:H:i'],
+            'days.*.ranges.*.ends_at'   => ['required', 'date_format:H:i'],
         ]);
 
         DB::transaction(function () use ($resource, $request) {
             ResourceWorkSchedule::where('resource_id', $resource->id)->delete();
 
             foreach ($request->input('days') as $dayData) {
-                if (! $dayData['active']) {
+                if (!$dayData['active']) {
                     continue;
                 }
 

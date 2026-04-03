@@ -3,10 +3,7 @@
 namespace App\Services;
 
 use App\Enums\FeatureKey;
-use App\Models\Doctor;
-use App\Models\EntityUser;
-use App\Models\FeatureUsage;
-use App\Models\Patient;
+use App\Models\{Doctor, EntityUser, FeatureUsage, Patient};
 
 /**
  * Responsável por ler e registrar o consumo de features por empresa.
@@ -31,9 +28,9 @@ class UsageMeterService
     public function getCurrentUsage(string $entityId, FeatureKey $feature, ?string $subscriptionId = null): int
     {
         return match ($feature) {
-            FeatureKey::MaxUsers         => $this->countUsers($entityId),
-            FeatureKey::MaxPatients      => $this->countPatients($entityId),
-            FeatureKey::MaxDoctors       => $this->countDoctors($entityId),
+            FeatureKey::MaxUsers            => $this->countUsers($entityId),
+            FeatureKey::MaxPatients         => $this->countPatients($entityId),
+            FeatureKey::MaxDoctors          => $this->countDoctors($entityId),
             FeatureKey::AiMonthlyCredits    => $this->getMonthlyUsage($entityId, $feature),
             FeatureKey::ApiMonthlyExamSends => $this->getMonthlyUsage($entityId, $feature),
             default                         => 0,
@@ -58,8 +55,8 @@ class UsageMeterService
         ]);
 
         $usage->subscription_id = $subscriptionId;
-        $usage->used             = ($usage->used ?? 0) + $amount;
-        $usage->last_used_at     = now();
+        $usage->used            = ($usage->used ?? 0) + $amount;
+        $usage->last_used_at    = now();
         $usage->save();
     }
 

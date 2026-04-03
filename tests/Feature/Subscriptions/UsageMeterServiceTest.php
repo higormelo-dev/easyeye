@@ -1,13 +1,8 @@
 <?php
 
-use App\Enums\BillingCycle;
-use App\Enums\FeatureKey;
-use App\Models\Entity;
-use App\Models\FeatureUsage;
-use App\Models\Plan;
-use App\Models\SubscriptionSetting;
-use App\Services\SubscriptionService;
-use App\Services\UsageMeterService;
+use App\Enums\{BillingCycle, FeatureKey};
+use App\Models\{Entity, FeatureUsage, Plan, SubscriptionSetting};
+use App\Services\{SubscriptionService, UsageMeterService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -49,10 +44,10 @@ test('getCurrentUsage retorna 0 sem registros', function () {
 });
 
 test('subscription factory states funcionam corretamente', function () {
-    $trial     = \App\Models\Subscription::factory()->trial(14)->make();
-    $expired   = \App\Models\Subscription::factory()->expired()->make();
-    $grace     = \App\Models\Subscription::factory()->inGracePeriod()->make();
-    $lifetime  = \App\Models\Subscription::factory()->lifetime()->make();
+    $trial    = \App\Models\Subscription::factory()->trial(14)->make();
+    $expired  = \App\Models\Subscription::factory()->expired()->make();
+    $grace    = \App\Models\Subscription::factory()->inGracePeriod()->make();
+    $lifetime = \App\Models\Subscription::factory()->lifetime()->make();
 
     expect($trial->isOnTrial())->toBeTrue();
     expect($expired->isActive())->toBeFalse();

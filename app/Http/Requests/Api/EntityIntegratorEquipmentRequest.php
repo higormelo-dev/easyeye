@@ -29,8 +29,8 @@ class EntityIntegratorEquipmentRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255', $this->uniqueRule('name')],
-            'ip' => ['required', 'ip', $this->uniqueRule('ip')],
-            'mac' => [
+            'ip'   => ['required', 'ip', $this->uniqueRule('ip')],
+            'mac'  => [
                 'required',
                 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
                 $this->uniqueRule('mac'),
@@ -61,7 +61,8 @@ class EntityIntegratorEquipmentRequest extends FormRequest
             $param === null              => null,
             Str::isUuid((string) $param) => $param,
             ctype_digit((string) $param) => EntityIntegratorEquipment::where(
-                'code', sprintf('EIQ-%010d', (int) $param)
+                'code',
+                sprintf('EIQ-%010d', (int) $param)
             )->value('id'),
             default => EntityIntegratorEquipment::where('code', $param)->value('id'),
         };

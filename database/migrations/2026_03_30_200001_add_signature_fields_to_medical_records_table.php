@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * CFM Resolução 2.227/2018 — prontuário eletrônico deve garantir
  * autoria, integridade e imutabilidade após assinatura do médico.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::table('medical_records', function (Blueprint $table) {

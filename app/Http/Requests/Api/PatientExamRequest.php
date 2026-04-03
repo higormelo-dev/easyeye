@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Api;
 
-use App\Models\{ExamType, PatientExam, Schedule};
 use App\Models\EntityIntegratorEquipment;
+use App\Models\{ExamType, PatientExam, Schedule};
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
@@ -45,7 +45,7 @@ class PatientExamRequest extends FormRequest
                     };
                     $query->where($column, $lookupValue);
 
-                    if (! $query->exists()) {
+                    if (!$query->exists()) {
                         $fail(__('validation.custom.validation_invalid.exam_identifier'));
                     }
                 },
@@ -70,7 +70,7 @@ class PatientExamRequest extends FormRequest
                         ->where($column, $lookupValue)
                         ->exists();
 
-                    if (! $exists) {
+                    if (!$exists) {
                         $fail(__('validation.custom.validation_invalid.schedule_identifier'));
                     }
                 },
@@ -132,7 +132,7 @@ class PatientExamRequest extends FormRequest
                     };
                     $query->where($column, $lookupValue);
 
-                    if (! $query->exists()) {
+                    if (!$query->exists()) {
                         $fail(__('validation.custom.validation_invalid.equipment_identifier'));
                     }
                 },
@@ -176,7 +176,7 @@ class PatientExamRequest extends FormRequest
 
         // Garantir que campos opcionais vazios sejam removidos do request
         foreach (['schedule_identifier'] as $field) {
-            if (! isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
+            if (!isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
                 unset($data[$field]);
             }
         }

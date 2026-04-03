@@ -1,13 +1,9 @@
 <?php
 
 use App\Enums\SubscriptionStatus;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\SubscriptionSetting;
-use App\Models\User;
+use App\Models\{Plan, Subscription, SubscriptionSetting, User};
 use App\Services\TrialService;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\{Cache, Event};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -97,7 +93,7 @@ describe('Fluxo de registro', function () {
 
         $response->assertOk();
 
-        $entity       = User::where('email', 'joao@example.com')->first()
+        $entity = User::where('email', 'joao@example.com')->first()
             ->entityUsers->first()->entity;
         $subscription = Subscription::where('entity_id', $entity->id)->firstOrFail();
 

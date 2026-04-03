@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Http\Middleware;
 
@@ -44,13 +44,13 @@ class EnsureEntityRole
 
         $entity = $this->resolveEntity($request);
 
-        if (! $entity) {
+        if (!$entity) {
             return $this->deny($request, __('http-statuses.404'));
         }
 
         $user = $request->user();
 
-        if (! $user || ! $user->hasAnyRoleInEntity($entity, $roles)) {
+        if (!$user || !$user->hasAnyRoleInEntity($entity, $roles)) {
             return $this->deny($request, __('http-statuses.403'));
         }
 

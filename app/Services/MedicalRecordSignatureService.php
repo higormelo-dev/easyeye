@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Services;
 
@@ -22,7 +22,7 @@ class MedicalRecordSignatureService
      */
     public function sign(MedicalRecord $record, EntityUser $entityUser): MedicalRecord
     {
-        if (! $entityUser->doctor) {
+        if (!$entityUser->doctor) {
             throw new \InvalidArgumentException(
                 "O usuário '{$entityUser->user->name}' não é médico e não pode assinar prontuários."
             );
@@ -48,7 +48,7 @@ class MedicalRecordSignatureService
      */
     public function canEdit(MedicalRecord $record): bool
     {
-        return ! $record->isLocked();
+        return !$record->isLocked();
     }
 
     /**

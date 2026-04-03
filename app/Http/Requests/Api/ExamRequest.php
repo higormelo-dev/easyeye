@@ -44,7 +44,7 @@ class ExamRequest extends FormRequest
                     };
                     $query->where($column, $lookupValue);
 
-                    if (! $query->exists()) {
+                    if (!$query->exists()) {
                         $fail(__('validation.custom.validation_invalid.exam_identifier'));
                     }
                 },
@@ -67,7 +67,7 @@ class ExamRequest extends FormRequest
                     };
                     $query->where($column, $lookupValue);
 
-                    if (! $query->exists()) {
+                    if (!$query->exists()) {
                         $fail(__('validation.custom.validation_invalid.patient_identifier'));
                     }
                 },
@@ -90,7 +90,7 @@ class ExamRequest extends FormRequest
                     };
                     $query->where($column, $lookupValue);
 
-                    if (! $query->exists()) {
+                    if (!$query->exists()) {
                         $fail(__('validation.custom.validation_invalid.schedule_identifier'));
                     }
                 },
@@ -114,7 +114,7 @@ class ExamRequest extends FormRequest
                     };
                     $query->where($column, $lookupValue);
 
-                    if (! $query->exists()) {
+                    if (!$query->exists()) {
                         $fail(__('validation.custom.validation_invalid.equipment_identifier'));
                     }
                 },

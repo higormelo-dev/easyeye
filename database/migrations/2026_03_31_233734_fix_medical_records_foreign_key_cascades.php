@@ -16,8 +16,7 @@ use Illuminate\Support\Facades\Schema;
  *   - doctor_id:  SET NULL — médico pode ser removido; prontuários são mantidos sem vínculo.
  *   - schedule_id: SET NULL — agendamento pode ser removido; prontuários são mantidos.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::table('medical_records', function (Blueprint $table) {

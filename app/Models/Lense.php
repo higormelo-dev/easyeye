@@ -16,7 +16,8 @@ class Lense extends Model
     use HasUuids;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'LS';
+    protected string $codePrefix = 'LS';
+
     protected string $codePrefixGlobal = 'LSP';
 
     protected $fillable = ['entity_id', 'code', 'name', 'away', 'near', 'active'];

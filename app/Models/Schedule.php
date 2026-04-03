@@ -87,12 +87,12 @@ class Schedule extends Model
         return [
             'situation'    => ScheduleSituation::class,
             'patient_mood' => PatientMood::class,
-            'arrived_at'  => 'datetime',
+            'arrived_at'   => 'datetime',
             'confirmed_at' => 'datetime',
-            'date_time'   => 'datetime',
-            'created_at'  => 'datetime',
-            'updated_at'  => 'datetime',
-            'deleted_at'  => 'datetime',
+            'date_time'    => 'datetime',
+            'created_at'   => 'datetime',
+            'updated_at'   => 'datetime',
+            'deleted_at'   => 'datetime',
         ];
     }
 

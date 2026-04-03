@@ -1,7 +1,7 @@
 <?php
 
 use App\Enums\FeatureKey;
-use App\Models\{ExamType, Patient, PlanFeature};
+use App\Models\{ExamType, Patient};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 

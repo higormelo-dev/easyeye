@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Concerns\{HasEntityCode, HasUppercaseName};
 use App\Traits\{Auditable, HasAuditColumns};
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class NearPointConvergence extends Model
 {
@@ -16,7 +16,8 @@ class NearPointConvergence extends Model
     use HasUuids;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'NPC';
+    protected string $codePrefix = 'NPC';
+
     protected string $codePrefixGlobal = 'NPCP';
 
     protected $fillable = ['entity_id', 'code', 'name', 'active'];

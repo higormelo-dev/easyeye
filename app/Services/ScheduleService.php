@@ -21,9 +21,8 @@ class ScheduleService
      * Returns an array of human-readable error messages.
      * An empty array means the slot is fully valid.
      *
-     * @param  string       $doctorId
-     * @param  Carbon       $dateTime
      * @param  string|null  $excludeScheduleId  UUID of the record being updated (skips self-conflict)
+     *
      * @return string[]
      */
     /**
@@ -39,7 +38,7 @@ class ScheduleService
         }
 
         // 2 ── Work schedule ─────────────────────────────────────────────────
-        if (! $this->isWithinWorkSchedule($doctorId, $dateTime)) {
+        if (!$this->isWithinWorkSchedule($doctorId, $dateTime)) {
             $dayName  = $this->dayName($dateTime->dayOfWeek);
             $errors[] = __('actions.work_schedule_outside', ['day' => $dayName, 'time' => $dateTime->format('H:i')]);
 
@@ -48,7 +47,7 @@ class ScheduleService
         }
 
         // 3 ── Interval alignment ────────────────────────────────────────────
-        if (! $this->isIntervalAligned($doctorId, $dateTime)) {
+        if (!$this->isIntervalAligned($doctorId, $dateTime)) {
             $doctor   = Doctor::find($doctorId);
             $interval = $doctor ? $doctor->effectiveInterval() : 15;
             $errors[] = __('actions.work_schedule_interval_error', ['interval' => $interval]);
@@ -63,7 +62,7 @@ class ScheduleService
         foreach ($resourceIds as $resourceId) {
             $resource = ClinicResource::find($resourceId);
 
-            if (! $resource) {
+            if (!$resource) {
                 continue;
             }
 
@@ -73,7 +72,7 @@ class ScheduleService
                 continue;
             }
 
-            if (! $this->isResourceWithinSchedule($resourceId, $dateTime)) {
+            if (!$this->isResourceWithinSchedule($resourceId, $dateTime)) {
                 $dayName  = $this->dayName($dateTime->dayOfWeek);
                 $errors[] = __('actions.resource_unavailable', ['name' => $resource->name, 'day' => $dayName, 'time' => $dateTime->format('H:i')]);
 
@@ -115,7 +114,7 @@ class ScheduleService
     {
         $hasAny = ResourceWorkSchedule::where('resource_id', $resourceId)->exists();
 
-        if (! $hasAny) {
+        if (!$hasAny) {
             return true;
         }
 
@@ -153,9 +152,9 @@ class ScheduleService
             ->get();
 
         return $resources->map(function (ClinicResource $resource) use ($dateTime, $excludeScheduleId) {
-            $available = ! $this->isResourceDoubleBooked($resource->id, $dateTime, $excludeScheduleId)
+            $available = !$this->isResourceDoubleBooked($resource->id, $dateTime, $excludeScheduleId)
                 && $this->isResourceWithinSchedule($resource->id, $dateTime)
-                && ! $this->isResourceBlocked($resource->id, $dateTime);
+                && !$this->isResourceBlocked($resource->id, $dateTime);
 
             return [
                 'id'         => $resource->id,
@@ -175,7 +174,7 @@ class ScheduleService
     {
         $hasAny = DoctorWorkSchedule::where('doctor_id', $doctorId)->exists();
 
-        if (! $hasAny) {
+        if (!$hasAny) {
             return true; // No schedule defined → no restriction (backward-compatible)
         }
 
@@ -209,7 +208,7 @@ class ScheduleService
             ->where('ends_at', '>', $timeStr)
             ->first();
 
-        if (! $range) {
+        if (!$range) {
             // isWithinWorkSchedule already rejects out-of-schedule times;
             // here we just avoid a false "misaligned" error for those cases.
             return true;
@@ -289,7 +288,7 @@ class ScheduleService
                 $slots[] = [
                     'time'      => $timeStr,
                     'datetime'  => $current->format('Y-m-d\TH:i'),
-                    'available' => ! $isBooked && ! $isInBlock,
+                    'available' => !$isBooked && !$isInBlock,
                 ];
 
                 $current->addMinutes($interval);
@@ -309,6 +308,7 @@ class ScheduleService
      * @param  string[]    $ids
      * @param  string      $newDate  Format: Y-m-d
      * @param  string|null $newTime  Format: H:i — if null, each schedule keeps its original time
+     *
      * @return array{ updated: int, skipped: int }
      */
     public function bulkReschedule(
@@ -327,8 +327,9 @@ class ScheduleService
                 ->where('entity_id', $entityId)
                 ->first();
 
-            if (! $schedule || $schedule->situation->isTerminal()) {
+            if (!$schedule || $schedule->situation->isTerminal()) {
                 $skipped++;
+
                 continue;
             }
 
@@ -342,8 +343,9 @@ class ScheduleService
                 $schedule->id,  // exclude self to allow same-day same-time move
             );
 
-            if (! empty($errors)) {
+            if (!empty($errors)) {
                 $skipped++;
+
                 continue;
             }
 
@@ -368,6 +370,7 @@ class ScheduleService
      * Writes a ScheduleSituationLog entry for every record actually updated.
      *
      * @param  string[]  $ids
+     *
      * @return array{ updated: int, skipped: int }
      */
     public function bulkUpdateSituation(
@@ -386,18 +389,21 @@ class ScheduleService
                 ->where('entity_id', $entityId)
                 ->first();
 
-            if (! $schedule) {
+            if (!$schedule) {
                 $skipped++;
+
                 continue;
             }
 
             if ($schedule->situation->isTerminal()) {
                 $skipped++;
+
                 continue;
             }
 
-            if (! in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
+            if (!in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
                 $skipped++;
+
                 continue;
             }
 

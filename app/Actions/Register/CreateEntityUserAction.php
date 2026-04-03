@@ -2,9 +2,7 @@
 
 namespace App\Actions\Register;
 
-use App\Models\Entity;
-use App\Models\EntityUser;
-use App\Models\User;
+use App\Models\{Entity, EntityUser, User};
 
 class CreateEntityUserAction
 {

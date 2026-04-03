@@ -121,7 +121,12 @@ class DoctorsController extends Controller
         $baseUrl         = url('panel/doctors');
 
         return $dataTable->render('system.doctors.index', compact(
-            'meta', 'genders', 'maritalStatuses', 'statesOfBrazil', 'storeUrl', 'baseUrl'
+            'meta',
+            'genders',
+            'maritalStatuses',
+            'statesOfBrazil',
+            'storeUrl',
+            'baseUrl'
         ));
     }
 

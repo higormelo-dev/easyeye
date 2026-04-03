@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Services;
 
@@ -48,7 +48,6 @@ class ActivationService
         $completed = EntityActivation::query()
             ->where('entity_id', $entityId)
             ->pluck('step')
-            ->map(fn ($v) => ActivationStep::from($v))
             ->toArray();
 
         return array_sum(array_map(
@@ -96,7 +95,7 @@ class ActivationService
 
         return array_values(array_filter(
             ActivationStep::ordered(),
-            fn (ActivationStep $step) => ! in_array($step->value, $completedValues, true),
+            fn (ActivationStep $step) => !in_array($step->value, $completedValues, true),
         ));
     }
 

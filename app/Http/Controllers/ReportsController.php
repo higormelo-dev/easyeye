@@ -51,9 +51,12 @@ class ReportsController extends Controller
             ],
         ];
 
-        if (! $request->filled('date_from')) {
+        if (!$request->filled('date_from')) {
             return view('system.reports.schedules', compact(
-                'doctors', 'covenants', 'situations', 'meta'
+                'doctors',
+                'covenants',
+                'situations',
+                'meta'
             ));
         }
 
@@ -100,7 +103,7 @@ class ReportsController extends Controller
             'attended'  => $schedules->where('situation', ScheduleSituation::Attended)->count(),
             'cancelled' => $schedules->where('situation', ScheduleSituation::Cancelled)->count(),
             'noshow'    => $schedules->where('situation', ScheduleSituation::NoShow)->count(),
-            'pending'   => $schedules->filter(fn ($s) => ! $s->situation->isTerminal())->count(),
+            'pending'   => $schedules->filter(fn ($s) => !$s->situation->isTerminal())->count(),
         ];
 
         $summary['attendance_rate'] = $summary['total'] > 0
@@ -117,8 +120,13 @@ class ReportsController extends Controller
         ])->values();
 
         return view('system.reports.schedules', compact(
-            'schedules', 'summary', 'byDoctor',
-            'doctors', 'covenants', 'situations', 'meta'
+            'schedules',
+            'summary',
+            'byDoctor',
+            'doctors',
+            'covenants',
+            'situations',
+            'meta'
         ));
     }
 
@@ -142,7 +150,7 @@ class ReportsController extends Controller
             ],
         ];
 
-        if (! $request->filled('date_from')) {
+        if (!$request->filled('date_from')) {
             return view('system.reports.absenteeism', compact('doctors', 'meta'));
         }
 
@@ -194,7 +202,10 @@ class ReportsController extends Controller
         ];
 
         return view('system.reports.absenteeism', compact(
-            'schedules', 'summary', 'doctors', 'meta'
+            'schedules',
+            'summary',
+            'doctors',
+            'meta'
         ));
     }
 

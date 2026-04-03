@@ -31,7 +31,8 @@ abstract class BaseSettingService
 
         return $class::query()
             ->withTrashed()
-            ->where(fn ($q) => $q
+            ->where(
+                fn ($q) => $q
                 ->where('entity_id', session()->get('selected_entity_id'))
                 ->orWhereNull('entity_id')
             )
@@ -48,7 +49,8 @@ abstract class BaseSettingService
         $class = $this->modelClass();
 
         return $class::query()
-            ->where(fn ($q) => $q
+            ->where(
+                fn ($q) => $q
                 ->where('entity_id', session('selected_entity_id'))
                 ->orWhereNull('entity_id')
             )

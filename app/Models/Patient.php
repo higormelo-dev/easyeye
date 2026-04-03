@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Presenters\PatientPresenter;
 use App\Traits\{Auditable, HasAuditColumns};
-use App\Models\{DataAccessLog, LgpdRequest, MedicalRecord, PatientConsent};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};

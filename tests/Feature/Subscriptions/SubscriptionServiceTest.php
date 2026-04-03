@@ -1,11 +1,7 @@
 <?php
 
-use App\Enums\BillingCycle;
-use App\Enums\SubscriptionStatus;
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\SubscriptionSetting;
+use App\Enums\{BillingCycle, SubscriptionStatus};
+use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
 use App\Services\SubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

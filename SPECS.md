@@ -1,8 +1,6 @@
-# Technical Specifications Document (SPECS) - EasyEye (Medicare)
-
-**Linguagem & Framework:** PHP 8.4 / Laravel 13  
-**Frontend:** Blade/Alpine.js (Legado) & Inertia.js/React (Novo)  
-**Banco de Dados:** SQLite (Dev), PostgreSQL (Prod)  
+**Linguagem & Framework:** PHP 8.4 / Laravel 11  
+**Frontend:** Blade Templates, Alpine.js, Tailwind CSS & Bootstrap 5
+**Banco de Dados:** SQLite (Dev), PostgreSQL (Prod)
 **Gestão de Estado:** Multi-Tenancy baseada em Sessão
 
 ---
@@ -21,10 +19,10 @@ Toda a lógica de negócios está encapsulada em `app/Services/`. Os Controllers
 
 ### 1.3 Stack de Frontend (Híbrida)
 O projeto está em fase de transição de tecnologia de interface:
-*   **Painel Administrativo:** Blade + Alpine.js (migrando para React).
-*   **Novos Módulos:** React 18+ via Inertia.js para uma experiência de SPA.
-*   **CSS:** Tailwind CSS para layouts modernos e Bootstrap 5 para componentes legados.
-*   **Assets:** Vite para build e HMR (Hot Module Replacement).
+*   **Blade/Alpine Stack:** Reatividade leve sem necessidade de Virtual DOM.
+*   **Vite Assets:** Empacotamento de JS Vanilla e CSS/SCSS globais.
+*   **Tailwind UI:** Utilização de classes utilitárias para interfaces rápidas e responsivas.
+*   **Custom JS:** Scripts modulares em `resources/js/system/` para lógicas específicas de cada módulo.
 
 ---
 

@@ -25,26 +25,27 @@ class NotifyScheduleChangeJob implements ShouldQueue
         public readonly string  $scheduleId,
         public readonly string  $event,
         public readonly ?string $extraInfo = null,
-    ) {}
+    ) {
+    }
 
     public function handle(): void
     {
         $schedule = Schedule::with(['patient.person', 'doctor', 'entity'])
             ->find($this->scheduleId);
 
-        if (! $schedule) {
+        if (!$schedule) {
             return;
         }
 
         $email = $schedule->patient?->person?->email;
 
-        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return;
         }
 
         $notification = new ScheduleNotification($schedule, $this->event, $this->extraInfo);
 
-        (new AnonymousNotifiable)
+        (new AnonymousNotifiable())
             ->route('mail', [$email => $schedule->full_name])
             ->notify($notification);
     }

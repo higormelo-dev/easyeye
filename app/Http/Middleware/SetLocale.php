@@ -35,7 +35,7 @@ class SetLocale
         $locale = $this->resolveLocale();
 
         // Verifica se o locale é suportado
-        if (! array_key_exists($locale, self::SUPPORTED_LOCALES)) {
+        if (!array_key_exists($locale, self::SUPPORTED_LOCALES)) {
             $locale = config('app.locale');
         }
 
@@ -69,8 +69,10 @@ class SetLocale
 
             // Verifica se há uma entidade selecionada
             $entityId = session('selected_entity_id');
+
             if ($entityId) {
                 $entity = \App\Models\Entity::find($entityId);
+
                 if ($entity && $entity->locale) {
                     return $entity->locale;
                 }
@@ -89,4 +91,3 @@ class SetLocale
         return self::SUPPORTED_LOCALES;
     }
 }
-

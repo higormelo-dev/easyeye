@@ -20,6 +20,12 @@ class ColorVisionTypesController extends BaseSettingController
         $this->baseUrl         = url('panel/setting/colorvisiontypes');
     }
 
-    public function store(ColorVisionTypeRequest $request) { return $this->genericStore($request); }
-    public function update(ColorVisionTypeRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(ColorVisionTypeRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(ColorVisionTypeRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

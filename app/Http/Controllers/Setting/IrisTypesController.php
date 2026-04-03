@@ -20,6 +20,12 @@ class IrisTypesController extends BaseSettingController
         $this->baseUrl         = url('panel/setting/iristypes');
     }
 
-    public function store(IrisTypeRequest $request) { return $this->genericStore($request); }
-    public function update(IrisTypeRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(IrisTypeRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(IrisTypeRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

@@ -10,14 +10,15 @@ class EntityObserver
 {
     public function __construct(
         private readonly TrialService $trialService,
-    ) {}
+    ) {
+    }
 
     /**
      * Ao criar uma empresa cliente, inicia o período de trial automaticamente.
      */
     public function created(Entity $entity): void
     {
-        if (! $entity->is_client || $entity->skipAutoTrial) {
+        if (!$entity->is_client || $entity->skipAutoTrial) {
             return;
         }
 

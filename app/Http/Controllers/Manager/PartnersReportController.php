@@ -15,7 +15,8 @@ class PartnersReportController extends Controller
 {
     public function __construct(
         private readonly PartnerService $partnerService,
-    ) {}
+    ) {
+    }
 
     public function index(): View
     {
@@ -59,7 +60,12 @@ class PartnersReportController extends Controller
             ->get();
 
         return view('system.manager.partners.index', compact(
-            'meta', 'partners', 'funnel', 'pendingTotal', 'paidTotal', 'recentCommissions'
+            'meta',
+            'partners',
+            'funnel',
+            'pendingTotal',
+            'paidTotal',
+            'recentCommissions'
         ));
     }
 

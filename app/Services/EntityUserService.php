@@ -28,7 +28,7 @@ class EntityUserService
     public function update(EntityUser $entityUser, EntityUserRequest $request): EntityUser
     {
         return DB::transaction(function () use ($entityUser, $request) {
-			$data = [];
+            $data = [];
 
             if ($request->has('active')) {
                 $data['active'] = $request->boolean('active');
@@ -40,7 +40,7 @@ class EntityUserService
 
             $entityUser->update($data);
 
-            if (! $request->has('type_method')) {
+            if (!$request->has('type_method')) {
                 $this->updateUser($entityUser->user, $request);
             }
 

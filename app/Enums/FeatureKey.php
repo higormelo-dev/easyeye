@@ -53,7 +53,7 @@ enum FeatureKey: string
     /** True = chave representa um limite numérico (0 = ilimitado). */
     public function isNumeric(): bool
     {
-        return ! $this->isBoolean();
+        return !$this->isBoolean();
     }
 
     /** True = limite deve ser redefinido mensalmente (créditos IA). */

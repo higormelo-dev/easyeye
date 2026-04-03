@@ -75,7 +75,7 @@ abstract class BaseDataTable extends DataTable
                 title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        if (! $isOwned || $record->deleted_at) {
+        if (!$isOwned || $record->deleted_at) {
             return '';
         }
 
@@ -84,15 +84,18 @@ abstract class BaseDataTable extends DataTable
         $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
 
         $items = '';
+
         if ($options['edit']) {
             $items .= '<li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
                 <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>';
         }
+
         if ($options['active']) {
             $items .= '<li><a class="dropdown-item btn-active" href="javascript:void(0);"
                 data-id="' . $record->id . '" data-situation="' . $activeSituation . '">
                 <i class="ti ' . $activeIcon . ' me-1"></i>' . $activeTitle . '</a></li>';
         }
+
         if ($options['delete']) {
             $items .= '<li><a class="dropdown-item btn-trash text-danger" href="javascript:void(0);"
                 data-id="' . $record->id . '">

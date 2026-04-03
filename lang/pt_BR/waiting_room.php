@@ -1,50 +1,50 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 return [
 
     // ── Títulos e cabeçalhos ──────────────────────────────────────────────────
-    'title'              => 'Sala de Espera',
-    'title_admin'        => 'Sala de Espera — Administração',
-    'updated_at'         => 'Atualizado às :time',
-    'refresh'            => 'Atualizar',
+    'title'       => 'Sala de Espera',
+    'title_admin' => 'Sala de Espera — Administração',
+    'updated_at'  => 'Atualizado às :time',
+    'refresh'     => 'Atualizar',
 
     // ── Filtros ───────────────────────────────────────────────────────────────
-    'filter_date'        => 'Data',
-    'filter_doctor'      => 'Médico',
-    'filter_doctor_all'  => 'Todos os médicos',
-    'filter_status'      => 'Situação',
-    'filter_status_all'  => 'Todas as situações',
+    'filter_date'       => 'Data',
+    'filter_doctor'     => 'Médico',
+    'filter_doctor_all' => 'Todos os médicos',
+    'filter_status'     => 'Situação',
+    'filter_status_all' => 'Todas as situações',
 
     // ── KPIs ─────────────────────────────────────────────────────────────────
-    'kpi_total'          => 'Total',
-    'kpi_waiting'        => 'Aguardando',
-    'kpi_in_progress'    => 'Em atendimento',
-    'kpi_done'           => 'Concluídos',
-    'kpi_absent'         => 'Faltas / Cancelados',
+    'kpi_total'       => 'Total',
+    'kpi_waiting'     => 'Aguardando',
+    'kpi_in_progress' => 'Em atendimento',
+    'kpi_done'        => 'Concluídos',
+    'kpi_absent'      => 'Faltas / Cancelados',
 
     // ── Colunas da tabela ─────────────────────────────────────────────────────
-    'col_time'           => 'Hora',
-    'col_patient'        => 'Paciente',
-    'col_doctor'         => 'Médico',
-    'col_type'           => 'Tipo',
-    'col_status'         => 'Situação',
-    'col_wait'           => 'Espera',
-    'col_actions'        => 'Ações',
+    'col_time'    => 'Hora',
+    'col_patient' => 'Paciente',
+    'col_doctor'  => 'Médico',
+    'col_type'    => 'Tipo',
+    'col_status'  => 'Situação',
+    'col_wait'    => 'Espera',
+    'col_actions' => 'Ações',
 
     // ── Ações operacionais (admin) ────────────────────────────────────────────
-    'action_checkin'     => 'Chegou',
-    'action_confirm'     => 'Confirmar',
-    'action_start'       => 'Iniciar atendimento',
-    'action_noshow'      => 'Marcar falta',
-    'action_cancel'      => 'Cancelar',
-    'action_reschedule'  => 'Reagendar',
-    'action_view_card'   => 'Ver ficha',
+    'action_checkin'    => 'Chegou',
+    'action_confirm'    => 'Confirmar',
+    'action_start'      => 'Iniciar atendimento',
+    'action_noshow'     => 'Marcar falta',
+    'action_cancel'     => 'Cancelar',
+    'action_reschedule' => 'Reagendar',
+    'action_view_card'  => 'Ver ficha',
 
     // ── Ações médico (doctor view) ────────────────────────────────────────────
-    'action_call'        => 'Chamar',
-    'action_finish'      => 'Finalizar',
+    'action_call'   => 'Chamar',
+    'action_finish' => 'Finalizar',
 
     // ── Offcanvas "Ver Ficha" ─────────────────────────────────────────────────
     'card_title'         => 'Ficha do Paciente',
@@ -69,9 +69,9 @@ return [
     'noshow_confirm_message' => 'Deseja registrar a falta deste paciente?',
 
     // ── Estados vazios ────────────────────────────────────────────────────────
-    'empty_queue'        => 'Nenhum paciente aguardando no momento.',
-    'empty_day'          => 'Nenhum agendamento encontrado para este dia.',
-    'empty_filtered'     => 'Nenhum resultado para os filtros selecionados.',
+    'empty_queue'    => 'Nenhum paciente aguardando no momento.',
+    'empty_day'      => 'Nenhum agendamento encontrado para este dia.',
+    'empty_filtered' => 'Nenhum resultado para os filtros selecionados.',
 
     // ── Status (mapeados do ScheduleSituation) ────────────────────────────────
     'status' => [

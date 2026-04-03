@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Concerns\{HasEntityCode, HasUppercaseName};
 use App\Traits\{Auditable, HasAuditColumns};
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class ColorVisionType extends Model
 {
@@ -16,7 +16,8 @@ class ColorVisionType extends Model
     use HasUuids;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'CVT';
+    protected string $codePrefix = 'CVT';
+
     protected string $codePrefixGlobal = 'CVTP';
 
     protected $fillable = ['entity_id', 'code', 'name', 'active'];

@@ -8,14 +8,14 @@ namespace App\Enums;
  */
 enum LgpdRequestType: string
 {
-    case Access           = 'access';            // Art. 18, II  — Confirmação e acesso aos dados
-    case Correction       = 'correction';         // Art. 18, III — Correção de dados incompletos/inexatos
-    case Anonymization    = 'anonymization';      // Art. 18, IV  — Anonimização ou bloqueio
-    case Portability      = 'portability';        // Art. 18, V   — Portabilidade dos dados
-    case Deletion         = 'deletion';           // Art. 18, VI  — Eliminação dos dados
-    case RevokeConsent    = 'revoke_consent';     // Art. 18, IX  — Revogação do consentimento
-    case Information      = 'information';        // Art. 18, VII — Informação sobre compartilhamento
-    case Opposition       = 'opposition';         // Art. 18, X   — Oposição ao tratamento
+    case Access        = 'access';            // Art. 18, II  — Confirmação e acesso aos dados
+    case Correction    = 'correction';         // Art. 18, III — Correção de dados incompletos/inexatos
+    case Anonymization = 'anonymization';      // Art. 18, IV  — Anonimização ou bloqueio
+    case Portability   = 'portability';        // Art. 18, V   — Portabilidade dos dados
+    case Deletion      = 'deletion';           // Art. 18, VI  — Eliminação dos dados
+    case RevokeConsent = 'revoke_consent';     // Art. 18, IX  — Revogação do consentimento
+    case Information   = 'information';        // Art. 18, VII — Informação sobre compartilhamento
+    case Opposition    = 'opposition';         // Art. 18, X   — Oposição ao tratamento
 
     public function label(): string
     {

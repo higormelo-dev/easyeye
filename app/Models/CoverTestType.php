@@ -16,7 +16,8 @@ class CoverTestType extends Model
     use HasUuids;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'CT';
+    protected string $codePrefix = 'CT';
+
     protected string $codePrefixGlobal = 'CTP';
 
     protected $fillable = ['entity_id', 'code', 'name', 'abbreviation', 'active'];

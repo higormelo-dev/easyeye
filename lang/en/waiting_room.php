@@ -1,50 +1,50 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 return [
 
     // ── Titles and headers ────────────────────────────────────────────────────
-    'title'              => 'Waiting Room',
-    'title_admin'        => 'Waiting Room — Administration',
-    'updated_at'         => 'Updated at :time',
-    'refresh'            => 'Refresh',
+    'title'       => 'Waiting Room',
+    'title_admin' => 'Waiting Room — Administration',
+    'updated_at'  => 'Updated at :time',
+    'refresh'     => 'Refresh',
 
     // ── Filters ───────────────────────────────────────────────────────────────
-    'filter_date'        => 'Date',
-    'filter_doctor'      => 'Doctor',
-    'filter_doctor_all'  => 'All doctors',
-    'filter_status'      => 'Status',
-    'filter_status_all'  => 'All statuses',
+    'filter_date'       => 'Date',
+    'filter_doctor'     => 'Doctor',
+    'filter_doctor_all' => 'All doctors',
+    'filter_status'     => 'Status',
+    'filter_status_all' => 'All statuses',
 
     // ── KPIs ─────────────────────────────────────────────────────────────────
-    'kpi_total'          => 'Total',
-    'kpi_waiting'        => 'Waiting',
-    'kpi_in_progress'    => 'In progress',
-    'kpi_done'           => 'Completed',
-    'kpi_absent'         => 'No-shows / Cancelled',
+    'kpi_total'       => 'Total',
+    'kpi_waiting'     => 'Waiting',
+    'kpi_in_progress' => 'In progress',
+    'kpi_done'        => 'Completed',
+    'kpi_absent'      => 'No-shows / Cancelled',
 
     // ── Table columns ─────────────────────────────────────────────────────────
-    'col_time'           => 'Time',
-    'col_patient'        => 'Patient',
-    'col_doctor'         => 'Doctor',
-    'col_type'           => 'Type',
-    'col_status'         => 'Status',
-    'col_wait'           => 'Wait',
-    'col_actions'        => 'Actions',
+    'col_time'    => 'Time',
+    'col_patient' => 'Patient',
+    'col_doctor'  => 'Doctor',
+    'col_type'    => 'Type',
+    'col_status'  => 'Status',
+    'col_wait'    => 'Wait',
+    'col_actions' => 'Actions',
 
     // ── Operational actions (admin) ───────────────────────────────────────────
-    'action_checkin'     => 'Checked in',
-    'action_confirm'     => 'Confirm',
-    'action_start'       => 'Start appointment',
-    'action_noshow'      => 'Mark no-show',
-    'action_cancel'      => 'Cancel',
-    'action_reschedule'  => 'Reschedule',
-    'action_view_card'   => 'View record',
+    'action_checkin'    => 'Checked in',
+    'action_confirm'    => 'Confirm',
+    'action_start'      => 'Start appointment',
+    'action_noshow'     => 'Mark no-show',
+    'action_cancel'     => 'Cancel',
+    'action_reschedule' => 'Reschedule',
+    'action_view_card'  => 'View record',
 
     // ── Doctor actions ────────────────────────────────────────────────────────
-    'action_call'        => 'Call in',
-    'action_finish'      => 'Finish',
+    'action_call'   => 'Call in',
+    'action_finish' => 'Finish',
 
     // ── "View record" offcanvas ───────────────────────────────────────────────
     'card_title'         => 'Patient Record',
@@ -69,9 +69,9 @@ return [
     'noshow_confirm_message' => 'Mark this patient as no-show?',
 
     // ── Empty states ──────────────────────────────────────────────────────────
-    'empty_queue'        => 'No patients waiting at the moment.',
-    'empty_day'          => 'No appointments found for this day.',
-    'empty_filtered'     => 'No results for the selected filters.',
+    'empty_queue'    => 'No patients waiting at the moment.',
+    'empty_day'      => 'No appointments found for this day.',
+    'empty_filtered' => 'No results for the selected filters.',
 
     // ── Statuses ──────────────────────────────────────────────────────────────
     'status' => [

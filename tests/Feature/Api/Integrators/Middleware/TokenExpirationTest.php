@@ -31,7 +31,7 @@ describe('Middleware ApiCheckTokenExpiration', function () {
         );
 
         // Simular último uso há 6 dias atrás (mais de 3 dias úteis)
-        $accessToken            = PersonalAccessToken::findToken($token->plainTextToken);
+        $accessToken               = PersonalAccessToken::findToken($token->plainTextToken);
         $accessToken->last_used_at = Carbon::now()->subDays(6);
         $accessToken->save();
 
@@ -48,7 +48,7 @@ describe('Middleware ApiCheckTokenExpiration', function () {
 
         // Token que expira amanhã (terça) = 1 dia útil
         $expiresAt = Carbon::parse('2025-03-11 10:00:00');
-        $token = $ctx['integratorUser']->createToken(
+        $token     = $ctx['integratorUser']->createToken(
             'integrator-token',
             ['integrator_id:' . $ctx['integrator']->id],
             $expiresAt

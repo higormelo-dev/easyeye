@@ -20,6 +20,12 @@ class NearPointConvergencesController extends BaseSettingController
         $this->baseUrl         = url('panel/setting/nearpointconvergences');
     }
 
-    public function store(NearPointConvergenceRequest $request) { return $this->genericStore($request); }
-    public function update(NearPointConvergenceRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(NearPointConvergenceRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(NearPointConvergenceRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

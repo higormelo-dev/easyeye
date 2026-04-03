@@ -1,13 +1,12 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Traits;
 
 use App\Exceptions\LockedMedicalRecordException;
 use App\Models\EntityUser;
 use App\Services\AuditService;
-use App\Support\AuditContext;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
@@ -62,7 +61,7 @@ trait Signable
 
         // Hash garante integridade: exclui os campos de assinatura para que
         // o hash seja reproduzível na verificação, independente de quando é calculado.
-        $contentHash = hash('sha256', serialize($this->clinicalContent()));
+        $contentHash   = hash('sha256', serialize($this->clinicalContent()));
         $signatureHash = hash('sha256', implode('|', [
             $this->getKey(),
             $entityUser->getKey(),
@@ -101,7 +100,7 @@ trait Signable
      */
     public function verifyIntegrity(): bool
     {
-        if (! $this->is_locked || ! $this->signature_hash) {
+        if (!$this->is_locked || !$this->signature_hash) {
             return false;
         }
 

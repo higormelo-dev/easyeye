@@ -28,6 +28,12 @@ class SurgeryTypesController extends BaseSettingController
         return array_merge(parent::viewData(), ['categories' => SurgeryType::$categories]);
     }
 
-    public function store(SurgeryTypeRequest $request) { return $this->genericStore($request); }
-    public function update(SurgeryTypeRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(SurgeryTypeRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(SurgeryTypeRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

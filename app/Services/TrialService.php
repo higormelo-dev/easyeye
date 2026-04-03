@@ -3,10 +3,7 @@
 namespace App\Services;
 
 use App\Enums\SubscriptionStatus;
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\SubscriptionSetting;
+use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
 
 class TrialService
 {

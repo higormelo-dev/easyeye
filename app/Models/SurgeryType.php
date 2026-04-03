@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use App\Concerns\{HasEntityCode, HasUppercaseName};
+use App\Presenters\SurgeryTypePresenter;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 use Laracasts\Presenter\PresentableTrait;
-use App\Presenters\SurgeryTypePresenter;
 
 class SurgeryType extends Model
 {
@@ -19,9 +19,11 @@ class SurgeryType extends Model
     use PresentableTrait;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'SURG';
+    protected string $codePrefix = 'SURG';
+
     protected string $codePrefixGlobal = 'SURGP';
-    protected $presenter               = SurgeryTypePresenter::class;
+
+    protected $presenter = SurgeryTypePresenter::class;
 
     protected $fillable = ['entity_id', 'code', 'category', 'name', 'active'];
 

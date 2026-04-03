@@ -104,7 +104,7 @@ class EntityUserIntegratorsDataTable extends BaseDataTable
     {
         $btnActions = '';
 
-        if (! $record->deleted_at) {
+        if (!$record->deleted_at) {
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-edit"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"

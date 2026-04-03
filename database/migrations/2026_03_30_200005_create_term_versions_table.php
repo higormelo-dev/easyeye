@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * LGPD Art. 8 — consentimento deve referenciar a versão do documento vigente.
  * Toda alteração na política exige novo aceite dos usuários.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('term_versions', function (Blueprint $table) {

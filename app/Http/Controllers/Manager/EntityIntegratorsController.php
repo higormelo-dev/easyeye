@@ -100,7 +100,7 @@ class EntityIntegratorsController extends Controller
      */
     public function update(EntityIntegratorRequest $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
-        $record            = $this->model->query()
+        $record = $this->model->query()
             ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
         $attributes        = $request->except(['_token', 'mac']);
@@ -138,7 +138,7 @@ class EntityIntegratorsController extends Controller
         $record = $this->model->query()
             ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integrator);
-        $active = (bool) $request->input('active', ! $record->active);
+        $active = (bool) $request->input('active', !$record->active);
         $record->update(['active' => $active]);
 
         return response()->json([

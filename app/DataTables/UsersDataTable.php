@@ -20,7 +20,9 @@ class UsersDataTable extends BaseDataTable
             ->addColumn('action', fn (EntityUser $record) => $this->buildActionButtons($record))
             ->editColumn('created_at', fn (EntityUser $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (EntityUser $record) => $this->formatActiveColumn($record))
-            ->addColumn('rule_label', fn (EntityUser $record) => ! session()->get('selected_entity_is_client')
+            ->addColumn(
+                'rule_label',
+                fn (EntityUser $record) => !session()->get('selected_entity_is_client')
                     ? $record->present()->getRule
                     : $record->present()->getClientRule
             )

@@ -6,10 +6,8 @@ use App\Enums\SubscriptionStatus;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 class Subscription extends Model
 {
@@ -94,7 +92,7 @@ class Subscription extends Model
      */
     public function inGracePeriod(): bool
     {
-        return ! $this->isActive()
+        return !$this->isActive()
             && ($this->grace_period_ends_at?->isFuture() ?? false);
     }
 

@@ -1,0 +1,69 @@
+<?php
+
+namespace App\Models;
+
+use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class MedicalRecordDocumentation extends Model
+{
+    use Auditable;
+    use HasAuditColumns;
+    use HasUuids;
+    use SoftDeletes;
+
+    protected $fillable = [
+        'medical_record_id',
+        'patient_id',
+        'doctor_id',
+        'report_setting_id',
+        'report_setting_content_id',
+        'type',
+        'title',
+        'content',
+    ];
+
+    public function medicalRecord(): BelongsTo
+    {
+        return $this->belongsTo(MedicalRecord::class);
+    }
+
+    public function patient(): BelongsTo
+    {
+        return $this->belongsTo(Patient::class);
+    }
+
+    public function doctor(): BelongsTo
+    {
+        return $this->belongsTo(Doctor::class);
+    }
+
+    public function reportSetting(): BelongsTo
+    {
+        return $this->belongsTo(ReportSetting::class);
+    }
+
+    public function reportSettingContent(): BelongsTo
+    {
+        return $this->belongsTo(ReportSettingContent::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function getTypeLabel(): string
+    {
+        return match ($this->type) {
+            'prescription' => __('actions.documentation.types.prescription'),
+            'procedure'    => __('actions.documentation.types.procedure'),
+            'certificate'  => __('actions.documentation.types.certificate'),
+            'referral'     => __('actions.documentation.types.referral'),
+            'report'       => __('actions.documentation.types.report'),
+            default        => $this->type,
+        };
+    }
+}

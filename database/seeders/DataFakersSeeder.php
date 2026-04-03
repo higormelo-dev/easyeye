@@ -455,17 +455,17 @@ class DataFakersSeeder extends Seeder
             foreach ($doctors as $doctor) {
                 $entityUser = $entityUsers->get($doctor->entity_user_id);
 
-                if (! $entityUser) {
+                if (!$entityUser) {
                     continue;
                 }
 
                 $entityId = $entityUser->entity_id;
 
-                if (! isset($usedPatientsPerDay[$entityId])) {
+                if (!isset($usedPatientsPerDay[$entityId])) {
                     $usedPatientsPerDay[$entityId] = [];
                 }
 
-                if (! isset($codeCounter[$entityId])) {
+                if (!isset($codeCounter[$entityId])) {
                     $codeCounter[$entityId] = 0;
                 }
 
@@ -478,7 +478,7 @@ class DataFakersSeeder extends Seeder
                 }
 
                 $availablePatients = $patientsOfEntity->filter(
-                    fn ($patient) => ! in_array($patient->id, $usedPatientsPerDay[$entityId])
+                    fn ($patient) => !in_array($patient->id, $usedPatientsPerDay[$entityId])
                 );
 
                 if ($availablePatients->isEmpty()) {
@@ -512,7 +512,7 @@ class DataFakersSeeder extends Seeder
             $date->addDay();
         }
 
-        if (! empty($schedulesBatch)) {
+        if (!empty($schedulesBatch)) {
             Schedule::insert($schedulesBatch);
         }
 
@@ -565,7 +565,7 @@ class DataFakersSeeder extends Seeder
         while ($currentTime < $endTime) {
             $availablePatients = array_values(array_filter(
                 $availablePatients,
-                fn ($p) => ! in_array($p->id, $usedPatientsPerDay[$entityId])
+                fn ($p) => !in_array($p->id, $usedPatientsPerDay[$entityId])
             ));
 
             if (empty($availablePatients)) {

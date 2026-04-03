@@ -23,6 +23,9 @@
       "Bash(git commit:*)",
       "Bash(./vendor/bin/pest --exclude=tests/Feature/Subscriptions/UsageMeterServiceTest.php)",
       "Bash(./vendor/bin/pest --filter \"not UsageMeterServiceTest\")"
+    ],
+    "additionalDirectories": [
+      "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images"
     ]
   }
 }

@@ -3,8 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\FeatureKey;
-use App\Models\Entity;
-use App\Models\Subscription;
+use App\Models\{Entity, Subscription};
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

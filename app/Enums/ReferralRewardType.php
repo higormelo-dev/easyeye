@@ -7,8 +7,8 @@ namespace App\Enums;
  */
 enum ReferralRewardType: string
 {
-    case TrialExtension      = 'trial_extension';      // Extensão de dias no trial atual
-    case DiscountPercentage  = 'discount_percentage';  // % de desconto na próxima fatura
+    case TrialExtension     = 'trial_extension';      // Extensão de dias no trial atual
+    case DiscountPercentage = 'discount_percentage';  // % de desconto na próxima fatura
 
     public function label(): string
     {

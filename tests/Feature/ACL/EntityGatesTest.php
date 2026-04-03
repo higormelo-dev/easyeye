@@ -355,16 +355,16 @@ test('[cenário 6] mesmo usuário é support no SaaS e admin em entity cliente',
 
 test('[cenário 7] todos os Gates negam usuário sem vínculo algum', function () {
     $gates = [
-        EntityGate::SaasAccess->value      => $this->saasEntity,
-        EntityGate::SaasAdminPanel->value  => $this->saasEntity,
-        EntityGate::SaasSupport->value     => $this->saasEntity,
-        EntityGate::SaasFinancial->value   => $this->saasEntity,
-        EntityGate::EntityAccess->value    => $this->clientEntity,
-        EntityGate::ManageUsers->value     => $this->clientEntity,
-        EntityGate::ViewFinancial->value   => $this->clientEntity,
-        EntityGate::EditSchedule->value    => $this->clientEntity,
-        EntityGate::IssueReport->value     => $this->clientEntity,
-        EntityGate::ManageSettings->value  => $this->clientEntity,
+        EntityGate::SaasAccess->value     => $this->saasEntity,
+        EntityGate::SaasAdminPanel->value => $this->saasEntity,
+        EntityGate::SaasSupport->value    => $this->saasEntity,
+        EntityGate::SaasFinancial->value  => $this->saasEntity,
+        EntityGate::EntityAccess->value   => $this->clientEntity,
+        EntityGate::ManageUsers->value    => $this->clientEntity,
+        EntityGate::ViewFinancial->value  => $this->clientEntity,
+        EntityGate::EditSchedule->value   => $this->clientEntity,
+        EntityGate::IssueReport->value    => $this->clientEntity,
+        EntityGate::ManageSettings->value => $this->clientEntity,
     ];
 
     foreach ($gates as $gate => $entity) {

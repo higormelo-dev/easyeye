@@ -22,6 +22,12 @@ class VisualAcuityTypesController extends BaseSettingController
         $this->crudFields      = ['name' => '', 'scale' => 0, 'active' => true];
     }
 
-    public function store(VisualAcuityTypeRequest $request) { return $this->genericStore($request); }
-    public function update(VisualAcuityTypeRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(VisualAcuityTypeRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(VisualAcuityTypeRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

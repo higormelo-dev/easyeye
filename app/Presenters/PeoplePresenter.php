@@ -2,7 +2,6 @@
 
 namespace App\Presenters;
 
-use App\Models\People;
 use Laracasts\Presenter\Presenter;
 
 class PeoplePresenter extends Presenter
@@ -23,7 +22,7 @@ class PeoplePresenter extends Presenter
 
     public function getAge(): string
     {
-        if (! $this->birth_date) {
+        if (!$this->birth_date) {
             return __('actions.age.not_informed');
         }
 

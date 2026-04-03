@@ -110,9 +110,9 @@ function createEntityUser(
  */
 function createDoctorForEntity(\App\Models\Entity $entity): \App\Models\Doctor
 {
-    $user    = \App\Models\User::factory()->create();
-    $people  = \App\Models\People::factory()->create();
-    $eu      = createEntityUser($entity, $user, \App\Enums\ClientRule::Doctor->value);
+    $user   = \App\Models\User::factory()->create();
+    $people = \App\Models\People::factory()->create();
+    $eu     = createEntityUser($entity, $user, \App\Enums\ClientRule::Doctor->value);
 
     return \App\Models\Doctor::create([
         'entity_user_id' => $eu->id,

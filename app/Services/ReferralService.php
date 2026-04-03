@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Services;
 
@@ -45,7 +45,7 @@ class ReferralService
     {
         $referral = ReferralCode::where('code', strtoupper($code))->first();
 
-        if (! $referral || ! $referral->isUsable()) {
+        if (!$referral || !$referral->isUsable()) {
             throw new \InvalidArgumentException(
                 "Código de indicação '{$code}' é inválido, expirado ou esgotado."
             );
@@ -82,10 +82,10 @@ class ReferralService
      */
     private function applyReward(ReferralCode $code, Subscription $activatedSubscription): void
     {
-        $referrerEntity = $code->entity;
+        $referrerEntity       = $code->entity;
         $referrerSubscription = $referrerEntity->subscription;
 
-        if (! $referrerSubscription) {
+        if (!$referrerSubscription) {
             return;
         }
 
@@ -115,10 +115,10 @@ class ReferralService
             ]);
 
             \Log::info('ReferralService: trial estendido por indicação.', [
-                'referrer_entity_id'  => $subscription->entity_id,
-                'referred_entity_id'  => $referenceSubscription->entity_id,
-                'days_added'          => $days,
-                'referral_code'       => $code->code,
+                'referrer_entity_id' => $subscription->entity_id,
+                'referred_entity_id' => $referenceSubscription->entity_id,
+                'days_added'         => $days,
+                'referral_code'      => $code->code,
             ]);
         }
     }
@@ -127,9 +127,9 @@ class ReferralService
     {
         // firstOrCreate: idempotente, um evento por tipo por código-clínica
         ReferralEvent::firstOrCreate([
-            'referral_code_id'  => $code->id,
+            'referral_code_id'   => $code->id,
             'referred_entity_id' => $referredEntity->id,
-            'event_type'        => $type->value,
+            'event_type'         => $type->value,
         ], [
             'created_at' => now(),
         ]);

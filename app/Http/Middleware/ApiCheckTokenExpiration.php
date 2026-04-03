@@ -6,8 +6,7 @@ use App\Models\EntityIntegrator;
 use App\Traits\HasBusinessDays;
 use Carbon\Carbon;
 use Closure;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{JsonResponse, Request};
 use Symfony\Component\HttpFoundation\Response;
 
 class ApiCheckTokenExpiration
@@ -23,7 +22,7 @@ class ApiCheckTokenExpiration
     {
         $token = $request->user() ? $request->user()->currentAccessToken() : null;
 
-        if (! $token) {
+        if (!$token) {
             return $next($request);
         }
 
@@ -60,19 +59,19 @@ class ApiCheckTokenExpiration
                 ->where('active', true)
                 ->first();
 
-            if (! $integrator) {
+            if (!$integrator) {
                 $token->delete();
 
                 return $this->invalidResponse('auth.integrator_inactive');
             }
 
-            if (! $integrator->user->active) {
+            if (!$integrator->user->active) {
                 $token->delete();
 
                 return $this->invalidResponse('auth.user_integrator_inactive');
             }
 
-            if (! ($integrator->user->entity && $integrator->user->entity->active)) {
+            if (!($integrator->user->entity && $integrator->user->entity->active)) {
                 $token->delete();
 
                 return $this->invalidResponse('auth.entity_inactive');

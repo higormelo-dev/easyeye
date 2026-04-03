@@ -32,9 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
-            'entity.selected' => EnsureEntitySelected::class,
-            'entity.member'   => EnsureUserBelongsToEntity::class,
-            'entity.role'     => EnsureEntityRole::class,
+            'entity.selected'      => EnsureEntitySelected::class,
+            'entity.member'        => EnsureUserBelongsToEntity::class,
+            'entity.role'          => EnsureEntityRole::class,
             'check.subscription'   => CheckSubscription::class,
             'feature'              => CheckFeature::class,
             'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,

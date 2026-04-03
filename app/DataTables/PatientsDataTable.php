@@ -20,7 +20,8 @@ class PatientsDataTable extends BaseDataTable
             ->addColumn('action', fn (Patient $record) => $this->buildActionButtons($record))
             ->addColumn('name', fn (Patient $record) => $record->full_name)
             ->addColumn('gender_label', fn (Patient $record) => $record->person->present()->getGender)
-            ->addColumn('cellphone_label',
+            ->addColumn(
+                'cellphone_label',
                 fn (Patient $record) => ($record->person->whatsapp ?
                         '<i class="fab fa-whatsapp text-success"></i>' : '') . ' ' .
                     $record->person->present()->getCellphone
@@ -132,13 +133,13 @@ class PatientsDataTable extends BaseDataTable
         }
 
         // Registro global: apenas visualizar
-        if ($isGlobal && ! $record->deleted_at) {
+        if ($isGlobal && !$record->deleted_at) {
             return '<a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>';
         }
 
-        if (! $isOwned) {
+        if (!$isOwned) {
             return '';
         }
 

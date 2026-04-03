@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\{EntityIntegrator, EntityUserIntegrator};
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\PersonalAccessToken;

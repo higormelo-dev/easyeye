@@ -32,7 +32,7 @@ class ScheduleRequest extends FormRequest
                         ->whereNull('doctors.deleted_at')
                         ->exists();
 
-                    if (! $exists) {
+                    if (!$exists) {
                         $fail(__('validation.custom.schedule.doctor_not_found'));
                     }
                 },
@@ -74,7 +74,7 @@ class ScheduleRequest extends FormRequest
                 function ($attribute, $value, $fail) {
                     $doctorId = $this->input('doctor_id');
 
-                    if (! $doctorId || ! Str::isUuid($doctorId)) {
+                    if (!$doctorId || !Str::isUuid($doctorId)) {
                         return; // doctor_id validation will already report the error
                     }
 
@@ -89,7 +89,7 @@ class ScheduleRequest extends FormRequest
                         (array) $this->input('resource_ids', [])
                     );
 
-                    if (! empty($errors)) {
+                    if (!empty($errors)) {
                         $fail($errors[0]);
                     }
                 },
@@ -100,9 +100,9 @@ class ScheduleRequest extends FormRequest
             'situation'           => ['nullable', 'integer'],
             'notes'               => ['nullable', 'string', 'max:2000'],
             'cancellation_reason' => ['nullable', 'string', 'max:2000'],
-            'waiting_list_id' => ['nullable', 'uuid', 'exists:waiting_list,id'],
-            'recurrence_type'  => ['nullable', 'string', 'in:weekly,monthly'],
-            'recurrence_until' => ['nullable', 'date', 'after:date_time'],
+            'waiting_list_id'     => ['nullable', 'uuid', 'exists:waiting_list,id'],
+            'recurrence_type'     => ['nullable', 'string', 'in:weekly,monthly'],
+            'recurrence_until'    => ['nullable', 'date', 'after:date_time'],
             'resource_ids'        => ['nullable', 'array'],
             'resource_ids.*'      => [
                 'uuid',

@@ -15,7 +15,7 @@ class EntityUserIntegratorsController extends Controller
     public function __construct(EntityUserIntegrator $entityUserIntegrator)
     {
         $this->titleController = __('actions.user_integrators');
-        $this->model = $entityUserIntegrator;
+        $this->model           = $entityUserIntegrator;
     }
 
     /**
@@ -81,11 +81,12 @@ class EntityUserIntegratorsController extends Controller
      */
     public function update(EntityUserIntegratorRequest $request, string $entityId, string $userIntegrator): JsonResponse
     {
-        $entity  = Entity::query()->findOrFail($entityId);
-        $record  = $this->model->query()
+        $entity = Entity::query()->findOrFail($entityId);
+        $record = $this->model->query()
             ->where('entity_id', $entity->id)
             ->findOrFail($userIntegrator);
         $data = $request->validated();
+
         if (empty($data['password'])) {
             unset($data['password']);
         }
@@ -124,7 +125,7 @@ class EntityUserIntegratorsController extends Controller
         $record = $this->model->query()
             ->where('entity_id', $entity->id)
             ->findOrFail($userIntegrator);
-        $active = (bool) $request->input('active', ! $record->active);
+        $active = (bool) $request->input('active', !$record->active);
         $record->update(['active' => $active]);
 
         return response()->json([

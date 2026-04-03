@@ -9,8 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * LGPD Art. 8, §5 — ônus da prova do consentimento é do controlador.
  * Este registro é a prova auditável do aceite.
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('user_term_acceptances', function (Blueprint $table) {

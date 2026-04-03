@@ -9,7 +9,7 @@ use App\Models\AdditionType;
 use App\Services\AdditionTypeService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Http\{JsonResponse, RedirectResponse};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
 

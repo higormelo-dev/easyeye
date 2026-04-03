@@ -2,12 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\BillingCycle;
-use App\Enums\SubscriptionStatus;
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\SubscriptionSetting;
+use App\Enums\{BillingCycle, SubscriptionStatus};
+use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
 
 class SubscriptionService
 {
@@ -20,11 +16,11 @@ class SubscriptionService
         $this->cancelCurrent($entity);
 
         return Subscription::create([
-            'entity_id'  => $entity->id,
-            'plan_id'    => $plan->id,
-            'status'     => SubscriptionStatus::Active,
-            'starts_at'  => now(),
-            'ends_at'    => $cycle->addToNow(),
+            'entity_id' => $entity->id,
+            'plan_id'   => $plan->id,
+            'status'    => SubscriptionStatus::Active,
+            'starts_at' => now(),
+            'ends_at'   => $cycle->addToNow(),
         ]);
     }
 
@@ -36,7 +32,7 @@ class SubscriptionService
     {
         $subscription = $this->getCurrent($entity);
 
-        if (! $subscription) {
+        if (!$subscription) {
             return null;
         }
 

@@ -1,14 +1,13 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Models;
 
 use App\Enums\ReferralRewardType;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 class ReferralCode extends Model
 {
@@ -57,7 +56,7 @@ class ReferralCode extends Model
 
     public function isUsable(): bool
     {
-        if (! $this->active) {
+        if (!$this->active) {
             return false;
         }
 

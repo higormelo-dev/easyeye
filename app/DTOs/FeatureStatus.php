@@ -33,7 +33,8 @@ final class FeatureStatus
          * PHP_INT_MAX quando ilimitado; -1 quando feature é booleana.
          */
         public readonly int $remaining,
-    ) {}
+    ) {
+    }
 
     /** Converte para array (uso em respostas de API). */
     public function toArray(): array

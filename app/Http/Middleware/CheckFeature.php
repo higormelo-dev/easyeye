@@ -30,13 +30,14 @@ class CheckFeature
 {
     public function __construct(
         private readonly FeatureGateService $gate,
-    ) {}
+    ) {
+    }
 
     public function handle(Request $request, Closure $next, string $featureKey): Response
     {
         $feature = FeatureKey::tryFrom($featureKey);
 
-        if (! $feature) {
+        if (!$feature) {
             // Chave inválida: falha aberta (permite acesso) para não bloquear
             // rotas por typo silencioso em produção. Log do erro em debug.
             logger()->warning("CheckFeature: chave de feature inválida [{$featureKey}]");
@@ -46,7 +47,7 @@ class CheckFeature
 
         $entityId = session('selected_entity_id');
 
-        if (! $entityId) {
+        if (!$entityId) {
             return $next($request);
         }
 

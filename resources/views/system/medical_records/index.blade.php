@@ -10,7 +10,7 @@
 <div class="row mb-3 align-items-center">
     <div class="col-12 col-md-auto">
         <div class="btn-group" role="group">
-            <a href="{{ route('panel.patients.index') }}" class="btn btn-secondary btn-sm">
+            <a href="{{ route('panel.patients.index') }}" class="btn btn-outline-white btn-sm">
                 <i class="fas fa-arrow-left me-1"></i>{{ __('actions.sidemenu.patients') }}
             </a>
             <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}" class="btn btn-primary btn-sm">

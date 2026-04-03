@@ -5,18 +5,17 @@ namespace App\Models;
 use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Factories\HasFactory, Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\ColorVisionType;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 class MedicalRecord extends Model
 {
+    use Auditable;
     // use HasFactory;
     use HasAuditColumns;
-    use Auditable;
-    use Versionable;
-    use Signable;
     use HasUuids;
+    use Signable;
     use SoftDeletes;
+    use Versionable;
 
     protected $primaryKey = 'id';
 
@@ -45,6 +44,7 @@ class MedicalRecord extends Model
         // Anamnese — CBO
         'main_complaint',
         'hda',                         // CBO: história da doença atual
+        'others_history',              // Outros antecedentes relevantes
         'diabetic',
         'diabetic_family',
         'hypertensive',
@@ -80,9 +80,8 @@ class MedicalRecord extends Model
         'fundoscopy_left',
         'observation_general',
         'observation_of_lenses',
-        // Diagnóstico — CBO obrigatório
-        'diagnosis_cid10',             // CBO: código CID-10
-        'diagnosis_description',       // CBO: descrição do diagnóstico
+        // Diagnóstico — CBO obrigatório (múltiplos CIDs como JSON [{code, description}])
+        'diagnosis_cids',
         // Conduta — CBO obrigatório
         'clinical_conduct',            // CBO: conduta clínica / plano terapêutico
         'follow_up_days',              // CBO: retorno em dias
@@ -127,11 +126,12 @@ class MedicalRecord extends Model
     protected function casts(): array
     {
         return [
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
-            'signed_at'  => 'datetime',
-            'is_locked'  => 'boolean',
+            'created_at'     => 'datetime',
+            'updated_at'     => 'datetime',
+            'deleted_at'     => 'datetime',
+            'signed_at'      => 'datetime',
+            'is_locked'      => 'boolean',
+            'diagnosis_cids' => 'array',
         ];
     }
 
@@ -203,5 +203,21 @@ class MedicalRecord extends Model
     public function lensNear(): BelongsTo
     {
         return $this->belongsTo(Lense::class, 'lens_near_id');
+    }
+
+    public function documentations(): HasMany
+    {
+        return $this->hasMany(MedicalRecordDocumentation::class);
+    }
+
+    public function files(): HasMany
+    {
+        return $this->hasMany(MedicalRecordFile::class);
+    }
+
+    /** EntityUser que assinou o prontuário (CFM Res. 2.227/2018) */
+    public function signedBy(): BelongsTo
+    {
+        return $this->belongsTo(EntityUser::class, 'signed_by');
     }
 }

@@ -12,7 +12,8 @@ class CheckSubscription
 {
     public function __construct(
         private readonly SubscriptionService $subscriptionService,
-    ) {}
+    ) {
+    }
 
     /**
      * Bloqueia acesso quando a empresa não possui assinatura ativa nem período de graça.
@@ -22,18 +23,18 @@ class CheckSubscription
     {
         $entityId = session('selected_entity_id');
 
-        if (! $entityId) {
+        if (!$entityId) {
             return $next($request);
         }
 
         $entity = Entity::find($entityId);
 
         // Entidades não-cliente (equipe interna/manager) não precisam de assinatura
-        if (! $entity || ! $entity->is_client) {
+        if (!$entity || !$entity->is_client) {
             return $next($request);
         }
 
-        if (! $this->subscriptionService->hasAccess($entity)) {
+        if (!$this->subscriptionService->hasAccess($entity)) {
             if ($request->expectsJson()) {
                 return response()->json([
                     'message' => __('subscriptions.access_blocked'),

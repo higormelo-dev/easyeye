@@ -2,17 +2,15 @@
 
 namespace App\Actions\Register;
 
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\SubscriptionSetting;
+use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
 use App\Services\TrialService;
 
 class StartTrialAction
 {
     public function __construct(
         private readonly TrialService $trialService,
-    ) {}
+    ) {
+    }
 
     /**
      * Inicia o trial com o plano escolhido pelo usuário (ou o menor tier disponível).

@@ -9,10 +9,9 @@ use App\Models\{SkinType};
 use App\Services\SkinTypeService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Http\{JsonResponse, RedirectResponse};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class SkinTypesController extends Controller
 {

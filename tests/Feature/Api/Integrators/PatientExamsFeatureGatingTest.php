@@ -10,7 +10,7 @@ describe('POST/PATCH patient exams — feature gating ApiMonthlyExamSends', func
     beforeEach(function () {
         Storage::fake('s3');
 
-        $this->ctx      = setupIntegrator([
+        $this->ctx = setupIntegrator([
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '3',
         ]);

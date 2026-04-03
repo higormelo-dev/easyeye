@@ -3,8 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
-return new class extends Migration
-{
+return new class () extends Migration {
     /**
      * Replace the existing partial unique index with one that also excludes
      * terminal situations (NoShow = 8, Cancelled = 9).

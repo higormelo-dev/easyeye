@@ -12,17 +12,18 @@ class ScheduleNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public const EVENT_CREATED    = 'created';
-    public const EVENT_CONFIRMED  = 'confirmed';
-    public const EVENT_CANCELLED  = 'cancelled';
+    public const EVENT_CREATED     = 'created';
+    public const EVENT_CONFIRMED   = 'confirmed';
+    public const EVENT_CANCELLED   = 'cancelled';
     public const EVENT_RESCHEDULED = 'rescheduled';
-    public const EVENT_REMINDER   = 'reminder';
+    public const EVENT_REMINDER    = 'reminder';
 
     public function __construct(
         public readonly Schedule $schedule,
         public readonly string   $event,
         public readonly ?string  $extraInfo = null,
-    ) {}
+    ) {
+    }
 
     public function via(object $notifiable): array
     {
@@ -35,10 +36,10 @@ class ScheduleNotification extends Notification implements ShouldQueue
         $doctorName = $this->schedule->doctor?->abbreviation
             ?? $this->schedule->doctor?->user_name
             ?? 'Médico';
-        $dateTime   = $this->schedule->date_time->format('d/m/Y \à\s H:i');
+        $dateTime = $this->schedule->date_time->format('d/m/Y \à\s H:i');
 
         return match ($this->event) {
-            self::EVENT_CREATED => (new MailMessage)
+            self::EVENT_CREATED => (new MailMessage())
                 ->subject("[{$clinicName}] Agendamento confirmado — {$dateTime}")
                 ->greeting("Olá, {$this->schedule->full_name}!")
                 ->line("Seu agendamento foi **confirmado**:")
@@ -48,7 +49,7 @@ class ScheduleNotification extends Notification implements ShouldQueue
                 ->line('Lembre-se de chegar com 15 minutos de antecedência.')
                 ->salutation("Até breve — {$clinicName}"),
 
-            self::EVENT_CONFIRMED => (new MailMessage)
+            self::EVENT_CONFIRMED => (new MailMessage())
                 ->subject("[{$clinicName}] Presença confirmada — {$dateTime}")
                 ->greeting("Olá, {$this->schedule->full_name}!")
                 ->line('Sua **presença foi confirmada**. Esperamos por você!')
@@ -56,7 +57,7 @@ class ScheduleNotification extends Notification implements ShouldQueue
                 ->line("👨‍⚕️ **Médico:** {$doctorName}")
                 ->salutation("Até breve — {$clinicName}"),
 
-            self::EVENT_CANCELLED => (new MailMessage)
+            self::EVENT_CANCELLED => (new MailMessage())
                 ->subject("[{$clinicName}] Agendamento cancelado")
                 ->greeting("Olá, {$this->schedule->full_name}.")
                 ->line('Informamos que seu agendamento foi **cancelado**.')
@@ -65,7 +66,7 @@ class ScheduleNotification extends Notification implements ShouldQueue
                 ->line('Entre em contato para reagendar.')
                 ->salutation("Atenciosamente — {$clinicName}"),
 
-            self::EVENT_RESCHEDULED => (new MailMessage)
+            self::EVENT_RESCHEDULED => (new MailMessage())
                 ->subject("[{$clinicName}] Agendamento remarcado — {$dateTime}")
                 ->greeting("Olá, {$this->schedule->full_name}!")
                 ->line('Seu agendamento foi **remarcado**:')
@@ -74,7 +75,7 @@ class ScheduleNotification extends Notification implements ShouldQueue
                 ->when($this->extraInfo, fn ($mail) => $mail->line("**Observação:** {$this->extraInfo}"))
                 ->salutation("Atenciosamente — {$clinicName}"),
 
-            self::EVENT_REMINDER => (new MailMessage)
+            self::EVENT_REMINDER => (new MailMessage())
                 ->subject("[{$clinicName}] Lembrete de consulta — {$dateTime}")
                 ->greeting("Olá, {$this->schedule->full_name}!")
                 ->line('Este é um **lembrete** do seu agendamento:')
@@ -83,7 +84,7 @@ class ScheduleNotification extends Notification implements ShouldQueue
                 ->line('Lembre-se de trazer seus documentos e exames anteriores.')
                 ->salutation("Até logo — {$clinicName}"),
 
-            default => (new MailMessage)
+            default => (new MailMessage())
                 ->subject("[{$clinicName}] Atualização no seu agendamento")
                 ->line("Houve uma atualização no agendamento do dia {$dateTime}."),
         };

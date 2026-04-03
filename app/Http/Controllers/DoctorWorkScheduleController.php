@@ -24,6 +24,7 @@ class DoctorWorkScheduleController extends Controller
         $dayNames = __('actions.weekdays');
 
         $days = [];
+
         for ($i = 0; $i <= 6; $i++) {
             $ranges = $existingByDay->get($i, collect())
                 ->map(fn ($s) => [
@@ -68,12 +69,12 @@ class DoctorWorkScheduleController extends Controller
                 'color'     => $doctor->color ?: '#6c757d',
                 'photo_url' => $photoUrl,
             ],
-            'days'            => $days,
-            'interval'        => $doctor->schedule_interval,
-            'entity_interval' => $doctor->entityUser->entity->schedule_interval ?? 15,
-            'blocks'          => $blocks,
-            'sync_url'        => url("panel/doctors/{$doctor->id}/work-schedule"),
-            'store_block_url' => url("panel/doctors/{$doctor->id}/blocks"),
+            'days'               => $days,
+            'interval'           => $doctor->schedule_interval,
+            'entity_interval'    => $doctor->entityUser->entity->schedule_interval ?? 15,
+            'blocks'             => $blocks,
+            'sync_url'           => url("panel/doctors/{$doctor->id}/work-schedule"),
+            'store_block_url'    => url("panel/doctors/{$doctor->id}/blocks"),
             'destroy_block_base' => url("panel/doctors/{$doctor->id}/blocks"),
         ]);
     }
@@ -94,6 +95,7 @@ class DoctorWorkScheduleController extends Controller
         $dayNames = __('actions.weekdays');
 
         $days = [];
+
         for ($i = 0; $i <= 6; $i++) {
             $ranges = $existingByDay->get($i, collect())
                 ->map(fn ($s) => [
@@ -138,13 +140,13 @@ class DoctorWorkScheduleController extends Controller
         $doctor = $this->findDoctor($doctorId);
 
         $request->validate([
-            'schedule_interval'          => ['nullable', 'integer', 'min:5', 'max:120'],
-            'days'                       => ['required', 'array'],
-            'days.*.day'                 => ['required', 'integer', 'min:0', 'max:6'],
-            'days.*.active'              => ['required', 'boolean'],
-            'days.*.ranges'              => ['required', 'array'],
-            'days.*.ranges.*.starts_at'  => ['required', 'date_format:H:i'],
-            'days.*.ranges.*.ends_at'    => ['required', 'date_format:H:i'],
+            'schedule_interval'         => ['nullable', 'integer', 'min:5', 'max:120'],
+            'days'                      => ['required', 'array'],
+            'days.*.day'                => ['required', 'integer', 'min:0', 'max:6'],
+            'days.*.active'             => ['required', 'boolean'],
+            'days.*.ranges'             => ['required', 'array'],
+            'days.*.ranges.*.starts_at' => ['required', 'date_format:H:i'],
+            'days.*.ranges.*.ends_at'   => ['required', 'date_format:H:i'],
         ]);
 
         DB::transaction(function () use ($doctor, $request) {
@@ -153,7 +155,7 @@ class DoctorWorkScheduleController extends Controller
             DoctorWorkSchedule::where('doctor_id', $doctor->id)->delete();
 
             foreach ($request->input('days') as $dayData) {
-                if (! $dayData['active']) {
+                if (!$dayData['active']) {
                     continue;
                 }
 

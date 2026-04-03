@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Concerns\{HasEntityCode, HasUppercaseName};
 use App\Traits\{Auditable, HasAuditColumns};
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class VisitType extends Model
 {
@@ -16,7 +16,8 @@ class VisitType extends Model
     use HasUuids;
     use SoftDeletes;
 
-    protected string $codePrefix       = 'VT';
+    protected string $codePrefix = 'VT';
+
     protected string $codePrefixGlobal = 'VTP';
 
     protected $fillable = ['entity_id', 'code', 'name', 'active'];

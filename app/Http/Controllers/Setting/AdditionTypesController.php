@@ -20,6 +20,12 @@ class AdditionTypesController extends BaseSettingController
         $this->baseUrl         = url('panel/setting/additiontypes');
     }
 
-    public function store(AdditionTypeRequest $request) { return $this->genericStore($request); }
-    public function update(AdditionTypeRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(AdditionTypeRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(AdditionTypeRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

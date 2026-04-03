@@ -109,7 +109,7 @@ class PatientExamService
                         'public'
                     );
 
-                if (! $uploaded) {
+                if (!$uploaded) {
                     throw new \RuntimeException('Failed to upload exam archive.');
                 }
 
@@ -333,8 +333,12 @@ class PatientExamService
         $integrator = request()->attributes->get('integrator');
         $query      = EntityIntegratorEquipment::query()
             ->where(function (Builder $query) use ($integrator) {
-                $query->whereHas('integrator', fn (Builder $q) => $q
-                    ->whereHas('user', fn (Builder $q2) => $q2
+                $query->whereHas(
+                    'integrator',
+                    fn (Builder $q) => $q
+                    ->whereHas(
+                        'user',
+                        fn (Builder $q2) => $q2
                         ->where('entity_id', $integrator->user->entity_id)
                     )
                 )->orWhereNull('integrator_id');

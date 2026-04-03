@@ -3,15 +3,13 @@
 namespace App\Http\Controllers\Manager;
 
 use App\DataTables\PlansDataTable;
-use App\Enums\BillingCycle;
-use App\Enums\FeatureKey;
+use App\Enums\{BillingCycle, FeatureKey};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\PlanRequest;
-use App\Models\Plan;
-use App\Models\PlanFeature;
+use App\Models\{Plan, PlanFeature};
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Http\{JsonResponse};
 use Illuminate\Support\Str;
 
 class PlansController extends Controller
@@ -116,13 +114,13 @@ class PlansController extends Controller
     private function syncFeatures(Plan $plan, array $features): void
     {
         foreach ($features as $key => $value) {
-            if (! FeatureKey::tryFrom($key)) {
+            if (!FeatureKey::tryFrom($key)) {
                 continue;
             }
 
             PlanFeature::updateOrCreate(
                 ['plan_id' => $plan->id, 'feature' => $key],
-                ['value'   => (string) $value]
+                ['value' => (string) $value]
             );
         }
 

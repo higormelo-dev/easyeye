@@ -66,7 +66,13 @@ class PatientsController extends Controller
         $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
 
         return $dataTable->render('system.patients.index', compact(
-            'meta', 'genders', 'maritalStatuses', 'statesOfBrazil', 'covenants', 'skinTypes', 'irisTypes'
+            'meta',
+            'genders',
+            'maritalStatuses',
+            'statesOfBrazil',
+            'covenants',
+            'skinTypes',
+            'irisTypes'
         ));
     }
 

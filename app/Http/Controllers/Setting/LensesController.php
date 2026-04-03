@@ -22,6 +22,12 @@ class LensesController extends BaseSettingController
         $this->crudFields      = ['name' => '', 'away' => false, 'near' => false, 'active' => true];
     }
 
-    public function store(LenseRequest $request) { return $this->genericStore($request); }
-    public function update(LenseRequest $request, string $id) { return $this->genericUpdate($request, $id); }
+    public function store(LenseRequest $request)
+    {
+        return $this->genericStore($request);
+    }
+    public function update(LenseRequest $request, string $id)
+    {
+        return $this->genericUpdate($request, $id);
+    }
 }

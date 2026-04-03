@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Services;
 
@@ -110,14 +110,14 @@ class LgpdService
                 'created_at'  => $patient->created_at?->toIso8601String(),
             ],
             'personal_data' => $patient->person ? [
-                'full_name'     => $patient->person->full_name,
-                'birth_date'    => $patient->person->birth_date?->toDateString(),
-                'gender'        => $patient->person->gender,
-                'email'         => $patient->person->email,
-                'telephone'     => $patient->person->telephone,
-                'cellphone'     => $patient->person->cellphone,
+                'full_name'         => $patient->person->full_name,
+                'birth_date'        => $patient->person->birth_date?->toDateString(),
+                'gender'            => $patient->person->gender,
+                'email'             => $patient->person->email,
+                'telephone'         => $patient->person->telephone,
+                'cellphone'         => $patient->person->cellphone,
                 'national_registry' => $patient->person->national_registry,
-                'address'       => [
+                'address'           => [
                     'zipcode'    => $patient->person->zipcode,
                     'address'    => $patient->person->address,
                     'number'     => $patient->person->number,
@@ -131,11 +131,11 @@ class LgpdService
                 ->with(['doctor.person', 'schedule'])
                 ->get()
                 ->map(fn ($r) => [
-                    'code'        => $r->code,
-                    'date'        => $r->created_at?->toIso8601String(),
-                    'doctor'      => $r->doctor?->person?->full_name,
-                    'is_signed'   => $r->isSigned(),
-                    'signed_at'   => $r->signed_at?->toIso8601String(),
+                    'code'      => $r->code,
+                    'date'      => $r->created_at?->toIso8601String(),
+                    'doctor'    => $r->doctor?->person?->full_name,
+                    'is_signed' => $r->isSigned(),
+                    'signed_at' => $r->signed_at?->toIso8601String(),
                 ])
                 ->toArray(),
             'consents' => $patient->consents()

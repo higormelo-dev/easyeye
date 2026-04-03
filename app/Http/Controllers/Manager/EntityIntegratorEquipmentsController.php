@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Manager;
 use App\DataTables\EntityIntegratorEquipmentsDataTable;
 use App\Http\Controllers\Controller;
 use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator};
-use Illuminate\Http\JsonResponse;
 
 class EntityIntegratorEquipmentsController extends Controller
 {
@@ -27,7 +26,7 @@ class EntityIntegratorEquipmentsController extends Controller
         $userIntegratorModel = EntityUserIntegrator::query()
             ->where('entity_id', $entity->id)
             ->findOrFail($userIntegrator);
-        $integratorModel     = EntityIntegrator::query()
+        $integratorModel = EntityIntegrator::query()
             ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
@@ -63,7 +62,7 @@ class EntityIntegratorEquipmentsController extends Controller
         $integrator = EntityIntegrator::query()->withTrashed()
             ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integratorId);
-        $record     = $this->model->query()->withTrashed()->where('integrator_id', $integrator->id)->findOrFail($equipment);
+        $record = $this->model->query()->withTrashed()->where('integrator_id', $integrator->id)->findOrFail($equipment);
 
         if (request()->wantsJson()) {
             return response()->json(['data' => $record->toArray()]);

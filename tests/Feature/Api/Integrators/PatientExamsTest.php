@@ -156,10 +156,10 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier'      => $this->examType->code,
-                'schedule_identifier'  => $this->schedule->code,
-                'archive'              => UploadedFile::fake()->image('exam.jpg'),
-                'name'                 => 'Exame Fundoscopia 01',
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Fundoscopia 01',
             ],
             $this->ctx['headers']
         )->assertCreated()
@@ -371,10 +371,10 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
         $response = $this->postJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams",
             [
-                'exam_identifier'     => $this->examType->code,
-                'schedule_identifier' => $this->schedule->code,
-                'archive'             => UploadedFile::fake()->image('exam.jpg'),
-                'name'                => 'Exame Com Equipamento',
+                'exam_identifier'      => $this->examType->code,
+                'schedule_identifier'  => $this->schedule->code,
+                'archive'              => UploadedFile::fake()->image('exam.jpg'),
+                'name'                 => 'Exame Com Equipamento',
                 'equipment_identifier' => $equipment->id,
             ],
             $this->ctx['headers']

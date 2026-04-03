@@ -26,7 +26,7 @@ class WaitingListRequest extends FormRequest
                         ->whereNull('doctors.deleted_at')
                         ->exists();
 
-                    if (! $exists) {
+                    if (!$exists) {
                         $fail('Médico não encontrado nesta clínica.');
                     }
                 },
@@ -41,11 +41,11 @@ class WaitingListRequest extends FormRequest
                     })->whereNull('deleted_at');
                 }),
             ],
-            'full_name'           => ['required', 'string', 'max:255'],
-            'telephone'           => ['nullable', 'string', 'max:20'],
-            'cellphone'           => ['nullable', 'string', 'max:20'],
-            'cellphone_whatsapp'  => ['nullable', 'boolean'],
-            'covenant_id'         => [
+            'full_name'          => ['required', 'string', 'max:255'],
+            'telephone'          => ['nullable', 'string', 'max:20'],
+            'cellphone'          => ['nullable', 'string', 'max:20'],
+            'cellphone_whatsapp' => ['nullable', 'boolean'],
+            'covenant_id'        => [
                 'nullable',
                 'uuid',
                 Rule::exists('covenants', 'id')->where(function ($query) {

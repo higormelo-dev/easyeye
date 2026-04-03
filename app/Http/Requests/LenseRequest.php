@@ -39,10 +39,12 @@ class LenseRequest extends FormRequest
                 'required_without:type_method',
                 'boolean',
                 function ($attribute, $value, $fail) {
-                    if (! $this->input('away') && ! $this->input('near')) {
+                    if (!$this->input('away') && !$this->input('near')) {
                         $fail(
-                            __('validation.at_least_one_required',
-                                ['fields' => __('validation.attributes.away_or_near')])
+                            __(
+                                'validation.at_least_one_required',
+                                ['fields' => __('validation.attributes.away_or_near')]
+                            )
                         );
                     }
                 },

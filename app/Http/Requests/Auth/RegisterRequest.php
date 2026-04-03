@@ -34,7 +34,7 @@ class RegisterRequest extends FormRequest
                 'max:14',
                 Rule::unique('entities', 'national_registration')->whereNotNull('national_registration'),
             ],
-            'plan_id'               => ['nullable', 'uuid', 'exists:plans,id'],
+            'plan_id' => ['nullable', 'uuid', 'exists:plans,id'],
         ];
     }
 

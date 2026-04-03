@@ -13,7 +13,6 @@
 use App\Enums\FeatureKey;
 use App\Models\{ExamType, FeatureUsage, Patient};
 use App\Services\FeatureGateService;
-use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -24,7 +23,7 @@ beforeEach(function () {
 
 describe('Fluxo de limite mensal de exames (end-to-end)', function () {
     it('bloqueia no 4° envio com plano de limite 3', function () {
-        $ctx      = setupIntegrator([
+        $ctx = setupIntegrator([
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '3',
         ]);
@@ -52,7 +51,7 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
     });
 
     it('reinicia o contador na virada do mês', function () {
-        $ctx      = setupIntegrator([
+        $ctx = setupIntegrator([
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '1',
         ]);
@@ -91,7 +90,7 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
     });
 
     it('plano ilimitado (limite = 0) nunca bloqueia', function () {
-        $ctx      = setupIntegrator([
+        $ctx = setupIntegrator([
             FeatureKey::HasApiIntegrator->value    => '1',
             FeatureKey::ApiMonthlyExamSends->value => '0',
         ]);
@@ -115,7 +114,7 @@ describe('Fluxo de limite mensal de exames (end-to-end)', function () {
     });
 
     it('bloqueia todos os envios quando HasApiIntegrator está desativado', function () {
-        $ctx     = setupIntegrator([
+        $ctx = setupIntegrator([
             FeatureKey::HasApiIntegrator->value    => '0',
             FeatureKey::ApiMonthlyExamSends->value => '100',
         ]);

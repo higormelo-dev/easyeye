@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Http\Controllers\Manager;
 
@@ -44,7 +44,7 @@ class ImpersonateController extends Controller
         abort_if((string) $entityUser->entity_id !== (string) $entity->id, 404);
 
         // O vínculo deve estar ativo
-        abort_if(! $entityUser->active, 403, __('actions.impersonate.user_inactive'));
+        abort_if(!$entityUser->active, 403, __('actions.impersonate.user_inactive'));
 
         // O usuário real (ainda não houve troca) deve ser admin/support do SaaS
         // A SaaS entity é a entity ativa na sessão atual (antes da impersonação)
@@ -87,7 +87,7 @@ class ImpersonateController extends Controller
      */
     public function destroy(): RedirectResponse
     {
-        if (! session()->has('impersonating')) {
+        if (!session()->has('impersonating')) {
             return redirect()->route('panel.dashboard');
         }
 

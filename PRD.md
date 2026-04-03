@@ -1,8 +1,6 @@
-# Product Requirements Document (PRD) - EasyEye (Medicare)
-
 **Versão:** 2.0  
-**Data:** Março de 2026  
-**Status:** Em Evolução (Migração React/Inertia em curso)
+**Data:** Abril de 2026  
+**Status:** Estável (Arquitetura Blade + Alpine.js + Tailwind)
 
 ---
 
@@ -42,9 +40,10 @@ O **EasyEye** (codinome interno *Medicare*) é o "Sistema Operacional" definitiv
 
 ## 5. Funcionalidades em Implementação (V2 - Modernização)
 
-### 5.1 Nova Experiência Frontend (React + Inertia.js)
-*   **Migração de Blade para React:** Refatoração completa da interface para uma experiência de SPA (Single Page Application) fluida, utilizando o template premium *Preclinic*.
-*   **Componentização:** Criação de biblioteca de componentes reutilizáveis para garantir consistência visual e velocidade de desenvolvimento.
+### 5.1 Aperfeiçoamento de Interface (Blade + Alpine.js)
+*   **UX Otimizada:** Refinamento constante dos templates Blade para garantir carregamento instantâneo.
+*   **Componentes Alpine:** Uso de Alpine.js para reatividade em modais, filtros e interações dinâmicas sem a complexidade de SPAs.
+*   **Dashboards em Tempo Real:** Integração de gráficos e KPIs diretamente via Blade com atualizações parciais.
 
 ### 5.2 IA e Produtividade Clínica
 *   **Voice-to-Text (Ditado Médico):** Transcrição e estruturação automática de dados da consulta via IA, otimizando o preenchimento do PEP.
@@ -55,8 +54,8 @@ O **EasyEye** (codinome interno *Medicare*) é o "Sistema Operacional" definitiv
 ## 6. Roadmap e Futuro (V3+)
 
 ### 6.1 Ecossistema Mobile
-*   **App do Médico:** Acesso rápido à agenda e prontuários pelo celular (reutilizando a lógica do frontend React).
-*   **Portal do Paciente:** App/Web para o paciente visualizar receitas de óculos, laudos de exames e agendar consultas.
+*   **App do Médico:** Acesso rápido à agenda e prontuários pelo celular via Web App responsivo.
+*   **Portal do Paciente:** Portal web simplificado para visualização de exames e receitas.
 
 ### 6.2 Finanças e Expansão
 *   **Módulo Financeiro TISS:** Faturamento eletrônico de guias para convênios conforme padrão ANS.

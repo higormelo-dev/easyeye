@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Traits;
 
@@ -39,7 +39,7 @@ trait HasEntityRoles
      */
     public function getRuleInEntity(Entity $entity): ?string
     {
-        if (! array_key_exists($entity->id, $this->entityRuleCache)) {
+        if (!array_key_exists($entity->id, $this->entityRuleCache)) {
             $this->entityRuleCache[$entity->id] = EntityUser::query()
                 ->where('user_id', $this->id)
                 ->where('entity_id', $entity->id)
@@ -153,7 +153,7 @@ trait HasEntityRoles
      */
     public function hasNoneOfRolesInEntity(Entity $entity, array $roles): bool
     {
-        return ! $this->hasAnyRoleInEntity($entity, $roles);
+        return !$this->hasAnyRoleInEntity($entity, $roles);
     }
 
     /**

@@ -122,7 +122,7 @@ class DoctorsDataTable extends BaseDataTable
                 title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        if (! $isOwned) {
+        if (!$isOwned) {
             return '';
         }
 

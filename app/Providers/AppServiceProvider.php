@@ -2,15 +2,13 @@
 
 namespace App\Providers;
 
-use App\Enums\EntityGate;
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
 use Illuminate\Support\Facades\{Blade, Gate, URL};
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
-use Laravel\Sanctum\PersonalAccessToken;
-use Laravel\Sanctum\Sanctum;
+use Laravel\Sanctum\{PersonalAccessToken, Sanctum};
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -60,13 +58,13 @@ class AppServiceProvider extends ServiceProvider
         Blade::if('canEntity', function (string $gate): bool {
             $entityId = session('selected_entity_id');
 
-            if (! $entityId) {
+            if (!$entityId) {
                 return false;
             }
 
             $entity = Entity::find($entityId);
 
-            if (! $entity) {
+            if (!$entity) {
                 return false;
             }
 
@@ -78,13 +76,13 @@ class AppServiceProvider extends ServiceProvider
         // -------------------------------------------------------------------------
         $activationObserver = $this->app->make(ActivationObserver::class);
 
-        Doctor::created(fn ($m)           => $activationObserver->created($m));
-        Patient::created(fn ($m)          => $activationObserver->patientCreated($m));
-        Schedule::created(fn ($m)         => $activationObserver->scheduleCreated($m));
-        MedicalRecord::created(fn ($m)    => $activationObserver->medicalRecordCreated($m));
-        EntityUser::created(fn ($m)       => $activationObserver->entityUserCreated($m));
+        Doctor::created(fn ($m) => $activationObserver->created($m));
+        Patient::created(fn ($m) => $activationObserver->patientCreated($m));
+        Schedule::created(fn ($m) => $activationObserver->scheduleCreated($m));
+        MedicalRecord::created(fn ($m) => $activationObserver->medicalRecordCreated($m));
+        EntityUser::created(fn ($m) => $activationObserver->entityUserCreated($m));
         EntityIntegrator::created(fn ($m) => $activationObserver->entityIntegratorCreated($m));
-        Entity::updated(fn ($m)           => $activationObserver->entityUpdated($m));
+        Entity::updated(fn ($m) => $activationObserver->entityUpdated($m));
 
         // -------------------------------------------------------------------------
         // CAC: Subscription events — comissão de parceiro + reward de indicação

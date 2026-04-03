@@ -20,8 +20,7 @@ use Illuminate\Support\Facades\Schema;
  *   - Atualizar $table = 'system_settings' no model
  *   - Atualizar SubscriptionSettingSeeder com campos type, group, label
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('system_settings', function (Blueprint $table) {

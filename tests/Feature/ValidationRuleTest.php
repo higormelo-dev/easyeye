@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\Rule;
 use Tests\TestCase;
 
@@ -27,10 +26,10 @@ class ValidationRuleTest extends TestCase
     {
         // The error "Method 'orWhereNull' not found in \Illuminate\Validation\Rules\Exists"
         // strongly suggests that ->orWhereNull was called on an Exists object.
-        
+
         $this->expectException(\Error::class);
         $this->expectExceptionMessage("Call to undefined method Illuminate\Validation\Rules\Exists::orWhereNull()");
-        
+
         $rule = Rule::exists('skin_types', 'id');
         $rule->orWhereNull('entity_id');
     }

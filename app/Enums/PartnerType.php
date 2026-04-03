@@ -8,10 +8,10 @@ namespace App\Enums;
  */
 enum PartnerType: string
 {
-    case Distributor  = 'distributor';  // Distribuidor de equipamentos oftalmológicos
-    case Association  = 'association';  // Associação/conselho médico (CBO, CREMESP, etc.)
-    case Consultant   = 'consultant';   // Consultor independente
-    case Agency       = 'agency';       // Agência de marketing/tecnologia
+    case Distributor = 'distributor';  // Distribuidor de equipamentos oftalmológicos
+    case Association = 'association';  // Associação/conselho médico (CBO, CREMESP, etc.)
+    case Consultant  = 'consultant';   // Consultor independente
+    case Agency      = 'agency';       // Agência de marketing/tecnologia
 
     public function label(): string
     {

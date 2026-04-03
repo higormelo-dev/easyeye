@@ -8,11 +8,11 @@ namespace App\Enums;
  */
 enum ConsentType: string
 {
-    case DataCollection       = 'data_collection';      // Coleta e armazenamento de dados pessoais
-    case SensitiveData        = 'sensitive_data';        // Dados de saúde (dado sensível — Art. 11)
-    case DataSharing          = 'data_sharing';          // Compartilhamento com convênios/terceiros
-    case MinorGuardian        = 'minor_guardian';        // Representação legal de menor de idade
-    case ImageAndVoice        = 'image_and_voice';       // Uso de imagem/voz (exames com foto/vídeo)
+    case DataCollection        = 'data_collection';      // Coleta e armazenamento de dados pessoais
+    case SensitiveData         = 'sensitive_data';        // Dados de saúde (dado sensível — Art. 11)
+    case DataSharing           = 'data_sharing';          // Compartilhamento com convênios/terceiros
+    case MinorGuardian         = 'minor_guardian';        // Representação legal de menor de idade
+    case ImageAndVoice         = 'image_and_voice';       // Uso de imagem/voz (exames com foto/vídeo)
     case ResearchParticipation = 'research';             // Participação em pesquisa clínica
 
     public function label(): string

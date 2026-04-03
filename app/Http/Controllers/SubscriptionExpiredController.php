@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Entity;
-use App\Models\Plan;
-use App\Models\Subscription;
+use App\Models\{Entity, Plan, Subscription};
 use App\Services\SubscriptionService;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
@@ -13,7 +11,8 @@ class SubscriptionExpiredController extends Controller
 {
     public function __construct(
         private readonly SubscriptionService $subscriptionService,
-    ) {}
+    ) {
+    }
 
     public function __invoke(): Factory|Application|View
     {

@@ -20,8 +20,7 @@ use Illuminate\Support\Facades\Schema;
  * period: 'YYYY-MM' para features com reset mensal (ex: ai_monthly_credits).
  *         'lifetime' para contadores sem reset (ex: total de pacientes).
  */
-return new class extends Migration
-{
+return new class () extends Migration {
     public function up(): void
     {
         Schema::create('feature_usages', function (Blueprint $table) {

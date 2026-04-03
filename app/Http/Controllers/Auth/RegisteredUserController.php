@@ -5,9 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Actions\Register\RegisterAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
-use App\Models\Plan;
-use App\Models\SubscriptionSetting;
-use App\Models\User;
+use App\Models\{Plan, SubscriptionSetting, User};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Auth;
 use Illuminate\View\View;
@@ -32,7 +30,7 @@ class RegisteredUserController extends Controller
     {
         $exists = User::where('email', $request->string('email')->lower()->toString())->exists();
 
-        return response()->json(['available' => ! $exists]);
+        return response()->json(['available' => !$exists]);
     }
 
     /**

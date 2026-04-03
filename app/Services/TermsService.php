@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace App\Services;
 
@@ -42,6 +42,7 @@ class TermsService
     {
         foreach (self::REQUIRED_TYPES as $type) {
             $current = TermVersion::currentFor($type);
+
             if ($current === null) {
                 continue;
             }
@@ -51,7 +52,7 @@ class TermsService
                 ->where('term_version_id', $current->id)
                 ->exists();
 
-            if (! $accepted) {
+            if (!$accepted) {
                 return false;
             }
         }
@@ -70,6 +71,7 @@ class TermsService
 
         foreach (self::REQUIRED_TYPES as $type) {
             $current = TermVersion::currentFor($type);
+
             if ($current === null) {
                 continue;
             }
@@ -79,7 +81,7 @@ class TermsService
                 ->where('term_version_id', $current->id)
                 ->exists();
 
-            if (! $accepted) {
+            if (!$accepted) {
                 $pending[] = $current;
             }
         }

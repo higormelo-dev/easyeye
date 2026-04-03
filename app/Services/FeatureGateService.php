@@ -56,7 +56,8 @@ class FeatureGateService
 
     public function __construct(
         private readonly UsageMeterService $usageMeter,
-    ) {}
+    ) {
+    }
 
     // ── Verificação de acesso ────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ class FeatureGateService
     {
         $status = $this->status($entityId, $feature);
 
-        if (! $status->allowed) {
+        if (!$status->allowed) {
             throw new FeatureDeniedException($feature, $status);
         }
     }
@@ -94,7 +95,7 @@ class FeatureGateService
     {
         $subscription = $this->getSubscription($entityId);
 
-        if (! $subscription) {
+        if (!$subscription) {
             return new FeatureStatus(
                 feature:     $feature,
                 allowed:     false,
@@ -113,7 +114,7 @@ class FeatureGateService
         if ($feature === FeatureKey::ApiMonthlyExamSends) {
             $apiEnabled = $subscription->plan->featureValue(FeatureKey::HasApiIntegrator) === '1';
 
-            if (! $apiEnabled) {
+            if (!$apiEnabled) {
                 return new FeatureStatus(
                     feature:     $feature,
                     allowed:     false,
@@ -193,13 +194,13 @@ class FeatureGateService
      */
     public function increment(string $entityId, FeatureKey $feature, int $amount = 1): void
     {
-        if (! $feature->isMonthlyReset()) {
+        if (!$feature->isMonthlyReset()) {
             return;
         }
 
         $subscription = $this->getSubscription($entityId);
 
-        if (! $subscription) {
+        if (!$subscription) {
             return;
         }
 
@@ -215,13 +216,13 @@ class FeatureGateService
      */
     public function decrement(string $entityId, FeatureKey $feature, int $amount = 1): void
     {
-        if (! $feature->isMonthlyReset()) {
+        if (!$feature->isMonthlyReset()) {
             return;
         }
 
         $subscription = $this->getSubscription($entityId);
 
-        if (! $subscription) {
+        if (!$subscription) {
             return;
         }
 
@@ -238,7 +239,7 @@ class FeatureGateService
      */
     public function canAndIncrement(string $entityId, FeatureKey $feature, int $amount = 1): bool
     {
-        if (! $this->can($entityId, $feature)) {
+        if (!$this->can($entityId, $feature)) {
             return false;
         }
 
@@ -254,6 +255,7 @@ class FeatureGateService
      * Útil para popular dashboards, menus e páginas de configuração.
      *
      * @param  FeatureKey[]  $features
+     *
      * @return array<string, FeatureStatus>  chaveado por FeatureKey::value
      */
     public function statusBatch(string $entityId, array $features): array
@@ -280,7 +282,7 @@ class FeatureGateService
 
     private function getSubscription(string $entityId): ?Subscription
     {
-        if (! array_key_exists($entityId, $this->subscriptionCache)) {
+        if (!array_key_exists($entityId, $this->subscriptionCache)) {
             $this->subscriptionCache[$entityId] = Subscription::forEntity($entityId)
                 ->accessible()
                 ->with('plan.features')

@@ -3,10 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
+use Illuminate\Http\{RedirectResponse, Request};
+use Illuminate\Support\Facades\{Auth, Redirect};
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -16,7 +14,7 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
-        $user = $request->user();
+        $user          = $request->user();
         $userPhotoPath = 'system/images/users/' . $user->id . '.jpg';
 
         return view('profile.edit', [
@@ -49,7 +47,8 @@ class ProfileController extends Controller
 
         if ($request->hasFile('photo')) {
             $dir = public_path('system/images/users');
-            if (! is_dir($dir)) {
+
+            if (!is_dir($dir)) {
                 mkdir($dir, 0755, true);
             }
             $request->file('photo')->move($dir, $request->user()->id . '.jpg');
