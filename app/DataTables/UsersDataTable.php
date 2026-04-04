@@ -17,7 +17,10 @@ class UsersDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (EntityUser $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (EntityUser $record) => $this->buildActionButtons($record, [
+                'variant' => 'dropdown',
+                'show'    => true,
+            ]))
             ->editColumn('created_at', fn (EntityUser $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (EntityUser $record) => $this->formatActiveColumn($record))
             ->addColumn(

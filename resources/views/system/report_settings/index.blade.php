@@ -238,9 +238,7 @@
 
     {{-- ══ DataTable View ════════════════════════════════════════════════════════ --}}
     <div x-show="view === 'table'">
-        <div class="table-responsive">
-            {{ $dataTable->table(['class' => 'table table-nowrap']) }}
-        </div>
+        {{ $dataTable->table(['class' => 'table table-nowrap']) }}
     </div>
     {{-- ══ /DataTable View ════════════════════════════════════════════════════════ --}}
 
@@ -466,53 +464,51 @@
         </div>
 
         <div x-show="globalView === 'table'" x-cloak>
-            <div class="table-responsive">
-                <table class="table table-nowrap">
-                    <thead>
+            <table class="table table-nowrap">
+                <thead>
+                    <tr>
+                        <th>{{ __('actions.name') }}</th>
+                        <th>{{ __('actions.category') }}</th>
+                        <th>{{ __('actions.type') }}</th>
+                        <th>{{ __('actions.version') }}</th>
+                        <th class="text-end">{{ __('actions.actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="gt in pagedGlobalTemplates" :key="`global-table-${gt.id}`">
                         <tr>
-                            <th>{{ __('actions.name') }}</th>
-                            <th>{{ __('actions.category') }}</th>
-                            <th>{{ __('actions.type') }}</th>
-                            <th>{{ __('actions.version') }}</th>
-                            <th class="text-end">{{ __('actions.actions') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <template x-for="gt in pagedGlobalTemplates" :key="`global-table-${gt.id}`">
-                            <tr>
-                                <td>
-                                    <div class="fw-medium" x-text="gt.title"></div>
-                                    <small class="text-muted" x-text="truncate(gt.description, 100)"></small>
-                                </td>
-                                <td x-text="gt.category || '-'"></td>
-                                <td x-text="gt.paper_size || '-'"></td>
-                                <td x-text="gt.version || '-'"></td>
-                                <td class="text-end">
-                                    <div class="d-inline-flex align-items-center gap-1">
-                                        <button type="button"
-                                                class="btn btn-outline-secondary btn-sm"
-                                                @click="openGlobalTemplatePreview(gt.preview_url)">
-                                            <i class="ti ti-eye me-1"></i>{{ __('actions.view') }}
+                            <td>
+                                <div class="fw-medium" x-text="gt.title"></div>
+                                <small class="text-muted" x-text="truncate(gt.description, 100)"></small>
+                            </td>
+                            <td x-text="gt.category || '-'"></td>
+                            <td x-text="gt.paper_size || '-'"></td>
+                            <td x-text="gt.version || '-'"></td>
+                            <td class="text-end">
+                                <div class="d-inline-flex align-items-center gap-1">
+                                    <button type="button"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            @click="openGlobalTemplatePreview(gt.preview_url)">
+                                        <i class="ti ti-eye me-1"></i>{{ __('actions.view') }}
+                                    </button>
+                                    <form :action="gt.adopt_url" method="POST"
+                                          onsubmit="return confirm('{{ __('actions.report_settings.confirm_adopt') }}')">
+                                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-primary btn-sm">
+                                            <i class="ti ti-download me-1"></i>{{ __('actions.report_settings.adopt') }}
                                         </button>
-                                        <form :action="gt.adopt_url" method="POST"
-                                              onsubmit="return confirm('{{ __('actions.report_settings.confirm_adopt') }}')">
-                                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                                            <button type="submit" class="btn btn-primary btn-sm">
-                                                <i class="ti ti-download me-1"></i>{{ __('actions.report_settings.adopt') }}
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                        <tr x-show="pagedGlobalTemplates.length === 0">
-                            <td colspan="5" class="text-center py-4 text-muted">
-                                {{ __('actions.report_settings.empty') }}
+                                    </form>
+                                </div>
                             </td>
                         </tr>
-                    </tbody>
-                </table>
-            </div>
+                    </template>
+                    <tr x-show="pagedGlobalTemplates.length === 0">
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            {{ __('actions.report_settings.empty') }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
         <div x-show="globalView === 'cards'" x-cloak>

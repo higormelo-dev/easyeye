@@ -232,42 +232,63 @@ class PatientRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $merge = [];
+
         if ($this->has('name')) {
-            $this->merge([
-                'name' => mb_strtoupper($this->input('name')),
-            ]);
+            $merge['name'] = mb_strtoupper($this->input('name'));
         }
 
         if ($this->has('nickname')) {
-            $this->merge([
-                'nickname' => mb_strtoupper($this->input('nickname')),
-            ]);
+            $merge['nickname'] = mb_strtoupper($this->input('nickname'));
         }
 
         if ($this->has('mother_name')) {
-            $this->merge([
-                'mother_name' => mb_strtoupper($this->input('mother_name')),
-            ]);
+            $merge['mother_name'] = mb_strtoupper($this->input('mother_name'));
         }
 
         if ($this->has('father_name')) {
-            $this->merge([
-                'father_name' => mb_strtoupper($this->input('father_name')),
-            ]);
+            $merge['father_name'] = mb_strtoupper($this->input('father_name'));
         }
 
         if ($this->has('national_registry')) {
-            $this->merge([
-                'national_registry' => preg_replace('/\D/', '', $this->input('national_registry')),
-            ]);
+            $merge['national_registry'] = preg_replace('/\D/', '', $this->input('national_registry'));
         }
 
         foreach (['telephone', 'cellphone', 'zipcode'] as $field) {
             if ($this->has($field) && $this->input($field) !== null) {
-                $this->merge([
-                    $field => preg_replace('/\D/', '', $this->input($field)),
-                ]);
+                $merge[$field] = preg_replace('/\D/', '', $this->input($field));
             }
         }
+
+        foreach (['whatsapp', 'active'] as $booleanField) {
+            if ($this->has($booleanField)) {
+                $merge[$booleanField] = $this->normalizeBoolean($this->input($booleanField));
+            }
+        }
+
+        if (!empty($merge)) {
+            $this->merge($merge);
+        }
+    }
+
+    private function normalizeBoolean(mixed $value): mixed
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) && in_array($value, [0, 1], true)) {
+            return (bool) $value;
+        }
+
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        return match (mb_strtolower(trim($value))) {
+            '1', 'true', 'on', 'yes' => true,
+            '0', 'false', 'off', 'no' => false,
+            default => $value,
+        };
     }
 }

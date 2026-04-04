@@ -38,54 +38,52 @@
         <span class="text-muted small">{{ $leads->total() }} lead(s)</span>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 small">
-                <thead class="table-light">
-                    <tr>
-                        <th class="px-4">Nome / E-mail</th>
-                        <th>Telefone</th>
-                        <th>Cidade / UF</th>
-                        <th class="text-center">Status</th>
-                        <th class="text-center">Convertido em</th>
-                        <th class="pe-4 text-end">Cadastrado em</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($leads as $lead)
-                    <tr>
-                        <td class="px-4">
-                            <div class="fw-semibold">{{ $lead->name }}</div>
-                            <div class="text-muted" style="font-size:.72rem;">{{ $lead->email }}</div>
-                        </td>
-                        <td>{{ $lead->phone ?? '—' }}</td>
-                        <td>
-                            @if($lead->city || $lead->state)
-                                {{ $lead->city }}{{ $lead->city && $lead->state ? '/' : '' }}{{ $lead->state }}
-                            @else
-                                —
-                            @endif
-                        </td>
-                        <td class="text-center">
-                            <span class="badge {{ $lead->status->badgeClass() }}">{{ $lead->status->label() }}</span>
-                        </td>
-                        <td class="text-center text-muted">{{ $lead->converted_at?->format('d/m/Y') ?? '—' }}</td>
-                        <td class="pe-4 text-end text-muted">{{ $lead->created_at->format('d/m/Y') }}</td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="6" class="text-center text-muted py-4">
-                            {{ __('actions.partners.no_leads') }}
-                            <button type="button" class="btn btn-link btn-sm p-0 ms-1" @click="openModal()">
-                                Cadastrar agora
-                            </button>
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        <table class="table table-hover align-middle mb-0 small">
+            <thead class="table-light">
+                <tr>
+                    <th class="px-4">Nome / E-mail</th>
+                    <th>Telefone</th>
+                    <th>Cidade / UF</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Convertido em</th>
+                    <th class="pe-4 text-end">Cadastrado em</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($leads as $lead)
+                <tr>
+                    <td class="px-4">
+                        <div class="fw-semibold">{{ $lead->name }}</div>
+                        <div class="text-muted" style="font-size:.72rem;">{{ $lead->email }}</div>
+                    </td>
+                    <td>{{ $lead->phone ?? '—' }}</td>
+                    <td>
+                        @if($lead->city || $lead->state)
+                            {{ $lead->city }}{{ $lead->city && $lead->state ? '/' : '' }}{{ $lead->state }}
+                        @else
+                            —
+                        @endif
+                    </td>
+                    <td class="text-center">
+                        <span class="badge {{ $lead->status->badgeClass() }}">{{ $lead->status->label() }}</span>
+                    </td>
+                    <td class="text-center text-muted">{{ $lead->converted_at?->format('d/m/Y') ?? '—' }}</td>
+                    <td class="pe-4 text-end text-muted">{{ $lead->created_at->format('d/m/Y') }}</td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        {{ __('actions.partners.no_leads') }}
+                        <button type="button" class="btn btn-link btn-sm p-0 ms-1" @click="openModal()">
+                            Cadastrar agora
+                        </button>
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
         @if($leads->hasPages())
-        <div class="px-4 py-3 border-top">{{ $leads->links() }}</div>
+            <div class="px-4 py-3 border-top">{{ $leads->links() }}</div>
         @endif
     </div>
 </div>

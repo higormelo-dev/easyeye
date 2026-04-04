@@ -71,4 +71,41 @@ class SkinTypeRequest extends FormRequest
 
         return null;
     }
+
+    /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $merge = [];
+
+        if ($this->has('active')) {
+            $merge['active'] = $this->normalizeBoolean($this->input('active'));
+        }
+
+        if (!empty($merge)) {
+            $this->merge($merge);
+        }
+    }
+
+    private function normalizeBoolean(mixed $value): mixed
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) && in_array($value, [0, 1], true)) {
+            return (bool) $value;
+        }
+
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        return match (mb_strtolower(trim($value))) {
+            '1', 'true', 'on', 'yes' => true,
+            '0', 'false', 'off', 'no' => false,
+            default => $value,
+        };
+    }
 }

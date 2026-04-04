@@ -48,41 +48,39 @@
                     <i class="ti ti-trophy me-2"></i>{{ __('manager_dashboard.top_entities') }}
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table mgr-table mb-0">
-                            <thead>
+                    <table class="table mgr-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>{{ __('manager_dashboard.col_entity') }}</th>
+                                <th>{{ __('manager_dashboard.col_patients') }}</th>
+                                <th>{{ __('manager_dashboard.col_date') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($stats['topEntities'] as $i => $entity)
                                 <tr>
-                                    <th>#</th>
-                                    <th>{{ __('manager_dashboard.col_entity') }}</th>
-                                    <th>{{ __('manager_dashboard.col_patients') }}</th>
-                                    <th>{{ __('manager_dashboard.col_date') }}</th>
+                                    <td>
+                                        @if($i === 0)
+                                            <span class="text-warning"><i class="ti ti-trophy"></i></span>
+                                        @else
+                                            <span class="text-muted">{{ $i + 1 }}</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">{{ $entity->name }}</div>
+                                        <small class="text-muted">{{ $entity->code }}</small>
+                                    </td>
+                                    <td><span class="fw-bold">{{ number_format($entity->patients_count, 0, ',', '.') }}</span></td>
+                                    <td><small>{{ $entity->created_at->format('d/m/Y') }}</small></td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($stats['topEntities'] as $i => $entity)
-                                    <tr>
-                                        <td>
-                                            @if($i === 0)
-                                                <span class="text-warning"><i class="ti ti-trophy"></i></span>
-                                            @else
-                                                <span class="text-muted">{{ $i + 1 }}</span>
-                                            @endif
-                                        </td>
-                                        <td>
-                                            <div class="fw-semibold">{{ $entity->name }}</div>
-                                            <small class="text-muted">{{ $entity->code }}</small>
-                                        </td>
-                                        <td><span class="fw-bold">{{ number_format($entity->patients_count, 0, ',', '.') }}</span></td>
-                                        <td><small>{{ $entity->created_at->format('d/m/Y') }}</small></td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted py-3">{{ __('manager_dashboard.no_entities') }}</td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-3">{{ __('manager_dashboard.no_entities') }}</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

@@ -12,56 +12,54 @@
                 {{ __('manager_dashboard.no_entities') }}
             </div>
         @else
-            <div class="table-responsive">
-                <table class="table mgr-table mb-0">
-                    <thead>
+            <table class="table mgr-table mb-0">
+                <thead>
+                    <tr>
+                        <th>{{ __('manager_dashboard.col_entity') }}</th>
+                        <th>{{ __('manager_dashboard.col_date') }}</th>
+                        <th>{{ __('manager_dashboard.col_subscription') }}</th>
+                        <th>{{ __('manager_dashboard.col_activation') }}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($stats['recentEntities'] as $entity)
+                        @php
+                            $sub        = $entity->latest_sub;
+                            $score      = $entity->activation_score ?? 0;
+                            $scoreClass = $score >= 70 ? 'high' : ($score >= 40 ? 'mid' : 'low');
+                        @endphp
                         <tr>
-                            <th>{{ __('manager_dashboard.col_entity') }}</th>
-                            <th>{{ __('manager_dashboard.col_date') }}</th>
-                            <th>{{ __('manager_dashboard.col_subscription') }}</th>
-                            <th>{{ __('manager_dashboard.col_activation') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach ($stats['recentEntities'] as $entity)
-                            @php
-                                $sub        = $entity->latest_sub;
-                                $score      = $entity->activation_score ?? 0;
-                                $scoreClass = $score >= 70 ? 'high' : ($score >= 40 ? 'mid' : 'low');
-                            @endphp
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold">{{ $entity->name }}</div>
-                                    <small class="text-muted">{{ $entity->code }}</small>
-                                </td>
-                                <td>
-                                    <small>{{ $entity->created_at->format('d/m/Y') }}</small>
-                                </td>
-                                <td>
-                                    @if($sub)
-                                        <span class="badge {{ $sub->status->badgeClass() }}">
-                                            {{ $sub->status->label() }}
-                                        </span>
-                                        @if($sub->plan)
-                                            <small class="d-block text-muted mt-1">{{ $sub->plan->name }}</small>
-                                        @endif
-                                    @else
-                                        <span class="text-muted">—</span>
+                            <td>
+                                <div class="fw-semibold">{{ $entity->name }}</div>
+                                <small class="text-muted">{{ $entity->code }}</small>
+                            </td>
+                            <td>
+                                <small>{{ $entity->created_at->format('d/m/Y') }}</small>
+                            </td>
+                            <td>
+                                @if($sub)
+                                    <span class="badge {{ $sub->status->badgeClass() }}">
+                                        {{ $sub->status->label() }}
+                                    </span>
+                                    @if($sub->plan)
+                                        <small class="d-block text-muted mt-1">{{ $sub->plan->name }}</small>
                                     @endif
-                                </td>
-                                <td>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="score-bar">
-                                            <div class="score-bar-fill score-{{ $scoreClass }}" style="width:{{ $score }}%;"></div>
-                                        </div>
-                                        <span class="fw-semibold text-score-{{ $scoreClass }}" style="font-size:.8rem;">{{ $score }}%</span>
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="score-bar">
+                                        <div class="score-bar-fill score-{{ $scoreClass }}" style="width:{{ $score }}%;"></div>
                                     </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+                                    <span class="fw-semibold text-score-{{ $scoreClass }}" style="font-size:.8rem;">{{ $score }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
         @endif
     </div>
 </div>

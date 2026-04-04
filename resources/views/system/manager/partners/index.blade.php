@@ -128,74 +128,72 @@
                 </button>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table mgr-table mb-0">
-                        <thead>
-                            <tr>
-                                <th>{{ __('actions.partners.col_name') }}</th>
-                                <th>{{ __('actions.partners.col_type') }}</th>
-                                <th class="text-center">{{ __('actions.partners.col_leads') }}</th>
-                                <th class="text-center">{{ __('actions.partners.col_commissions') }}</th>
-                                <th class="text-end">{{ __('actions.partners.col_pending') }}</th>
-                                <th class="text-end">{{ __('actions.partners.col_paid') }}</th>
-                                <th class="text-center">{{ __('actions.partners.col_actions') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($partners as $partner)
-                            <tr>
-                                <td>
-                                    <div class="fw-semibold">{{ $partner->name }}</div>
-                                    <small style="color:var(--ee-text-muted,#64748b);">{{ $partner->email }}</small>
-                                </td>
-                                <td>
-                                    <span class="badge bg-secondary-subtle text-secondary">
-                                        {{ $partner->type->label() }}
-                                    </span>
-                                </td>
-                                <td class="text-center">{{ $partner->leads_count }}</td>
-                                <td class="text-center">{{ $partner->commissions_count }}</td>
-                                <td class="text-end fw-semibold" style="color:#f57c00;">
-                                    R$ {{ number_format((float) $partner->pending_amount, 2, ',', '.') }}
-                                </td>
-                                <td class="text-end fw-semibold" style="color:#388e3c;">
-                                    R$ {{ number_format((float) $partner->paid_amount, 2, ',', '.') }}
-                                </td>
-                                <td class="text-center">
-                                    <div class="d-flex gap-1 justify-content-center">
-                                        <a href="{{ route('panel.manager.partners.show', $partner) }}"
-                                           class="btn btn-sm btn-outline-info py-0 px-2"
-                                           title="{{ __('actions.view') }}">
-                                            <i class="fas fa-eye" style="font-size:.75rem;"></i>
-                                        </a>
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-secondary py-0 px-2"
-                                                title="{{ __('actions.edit') }}"
-                                                @click="openEdit('{{ $partner->id }}', '{{ route('panel.manager.partners.edit-data', $partner) }}', '{{ route('panel.manager.partners.update', $partner) }}')">
-                                            <i class="fas fa-edit" style="font-size:.75rem;"></i>
-                                        </button>
-                                        <button type="button"
-                                                class="btn btn-sm btn-outline-danger py-0 px-2"
-                                                title="{{ __('actions.delete') }}"
-                                                @click="deletePartner('{{ $partner->id }}', '{{ route('panel.manager.partners.destroy', $partner) }}')">
-                                            <i class="fas fa-trash" style="font-size:.75rem;"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="7" class="text-center py-4" style="color:var(--ee-text-muted,#64748b);">
-                                    {{ __('actions.partners.empty') }}
-                                    <button type="button" class="btn btn-link p-0 ms-1" @click="openCreate()">
-                                        {{ __('actions.partners.register_now') }}
+                <table class="table mgr-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>{{ __('actions.partners.col_name') }}</th>
+                            <th>{{ __('actions.partners.col_type') }}</th>
+                            <th class="text-center">{{ __('actions.partners.col_leads') }}</th>
+                            <th class="text-center">{{ __('actions.partners.col_commissions') }}</th>
+                            <th class="text-end">{{ __('actions.partners.col_pending') }}</th>
+                            <th class="text-end">{{ __('actions.partners.col_paid') }}</th>
+                            <th class="text-center">{{ __('actions.partners.col_actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($partners as $partner)
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ $partner->name }}</div>
+                                <small style="color:var(--ee-text-muted,#64748b);">{{ $partner->email }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary-subtle text-secondary">
+                                    {{ $partner->type->label() }}
+                                </span>
+                            </td>
+                            <td class="text-center">{{ $partner->leads_count }}</td>
+                            <td class="text-center">{{ $partner->commissions_count }}</td>
+                            <td class="text-end fw-semibold" style="color:#f57c00;">
+                                R$ {{ number_format((float) $partner->pending_amount, 2, ',', '.') }}
+                            </td>
+                            <td class="text-end fw-semibold" style="color:#388e3c;">
+                                R$ {{ number_format((float) $partner->paid_amount, 2, ',', '.') }}
+                            </td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <a href="{{ route('panel.manager.partners.show', $partner) }}"
+                                       class="btn btn-sm btn-outline-info py-0 px-2"
+                                       title="{{ __('actions.view') }}">
+                                        <i class="fas fa-eye" style="font-size:.75rem;"></i>
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                            title="{{ __('actions.edit') }}"
+                                            @click="openEdit('{{ $partner->id }}', '{{ route('panel.manager.partners.edit-data', $partner) }}', '{{ route('panel.manager.partners.update', $partner) }}')">
+                                        <i class="fas fa-edit" style="font-size:.75rem;"></i>
                                     </button>
-                                </td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger py-0 px-2"
+                                            title="{{ __('actions.delete') }}"
+                                            @click="deletePartner('{{ $partner->id }}', '{{ route('panel.manager.partners.destroy', $partner) }}')">
+                                        <i class="fas fa-trash" style="font-size:.75rem;"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="7" class="text-center py-4" style="color:var(--ee-text-muted,#64748b);">
+                                {{ __('actions.partners.empty') }}
+                                <button type="button" class="btn btn-link p-0 ms-1" @click="openCreate()">
+                                    {{ __('actions.partners.register_now') }}
+                                </button>
+                            </td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -210,50 +208,48 @@
                 <i class="ti ti-cash me-2"></i>{{ __('actions.partners.recent_commissions') }}
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table mgr-table mb-0">
-                        <thead>
-                            <tr>
-                                <th>{{ __('actions.partners.col_partner') }}</th>
-                                <th>{{ __('actions.partners.col_clinic') }}</th>
-                                <th class="text-end">{{ __('actions.partners.col_value') }}</th>
-                                <th class="text-center">{{ __('actions.partners.col_status') }}</th>
-                                <th class="text-center">{{ __('actions.partners.col_due') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($recentCommissions as $commission)
-                            <tr>
-                                <td>{{ $commission->partner?->name ?? '—' }}</td>
-                                <td>{{ $commission->entity?->name ?? '—' }}</td>
-                                <td class="text-end fw-semibold">
-                                    R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}
-                                </td>
-                                <td class="text-center">
-                                    <span class="badge {{ $commission->status->badgeClass() }}">
-                                        {{ $commission->status->label() }}
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    {{ $commission->due_at?->format('d/m/Y') ?? '—' }}
-                                    @if($commission->status === \App\Enums\CommissionStatus::Pending)
-                                    <form action="{{ route('panel.manager.partners.commission.pay', $commission) }}"
-                                          method="POST" class="d-inline ms-2">
-                                        @csrf
-                                        @method('PATCH')
-                                        <button type="submit" class="btn btn-sm btn-success py-0 px-2"
-                                                style="font-size:0.7rem;"
-                                                onclick="return confirm('Marcar como paga?')">
-                                            {{ __('actions.partners.pay') }}
-                                        </button>
-                                    </form>
-                                    @endif
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                <table class="table mgr-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>{{ __('actions.partners.col_partner') }}</th>
+                            <th>{{ __('actions.partners.col_clinic') }}</th>
+                            <th class="text-end">{{ __('actions.partners.col_value') }}</th>
+                            <th class="text-center">{{ __('actions.partners.col_status') }}</th>
+                            <th class="text-center">{{ __('actions.partners.col_due') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($recentCommissions as $commission)
+                        <tr>
+                            <td>{{ $commission->partner?->name ?? '—' }}</td>
+                            <td>{{ $commission->entity?->name ?? '—' }}</td>
+                            <td class="text-end fw-semibold">
+                                R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {{ $commission->status->badgeClass() }}">
+                                    {{ $commission->status->label() }}
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                {{ $commission->due_at?->format('d/m/Y') ?? '—' }}
+                                @if($commission->status === \App\Enums\CommissionStatus::Pending)
+                                <form action="{{ route('panel.manager.partners.commission.pay', $commission) }}"
+                                      method="POST" class="d-inline ms-2">
+                                    @csrf
+                                    @method('PATCH')
+                                    <button type="submit" class="btn btn-sm btn-success py-0 px-2"
+                                            style="font-size:0.7rem;"
+                                            onclick="return confirm('Marcar como paga?')">
+                                        {{ __('actions.partners.pay') }}
+                                    </button>
+                                </form>
+                                @endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

@@ -91,7 +91,7 @@ abstract class BaseSettingController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        if ($this->shouldReturnJson()) {
+        if (request()->wantsJson()) {
             return response()->json(['data' => $record->only(array_keys($this->crudFields))]);
         }
 
@@ -102,7 +102,7 @@ abstract class BaseSettingController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        if ($this->shouldReturnJson()) {
+        if (request()->wantsJson()) {
             return response()->json(['data' => new $this->resourceClass($record)]);
         }
 
@@ -118,7 +118,7 @@ abstract class BaseSettingController extends Controller
             $recordData = $record->toArray();
             $record->delete();
 
-            if ($this->shouldReturnJson()) {
+            if (request()->wantsJson()) {
                 return response()->json(['message' => $message, 'deleted' => $recordData]);
             }
 
@@ -135,7 +135,7 @@ abstract class BaseSettingController extends Controller
             $recordData = $record->toArray();
             $record->restore();
 
-            if ($this->shouldReturnJson()) {
+            if (request()->wantsJson()) {
                 return response()->json(['message' => $message, 'restored' => $recordData]);
             }
 

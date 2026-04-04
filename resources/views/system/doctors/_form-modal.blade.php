@@ -1,5 +1,19 @@
 <x-crud-modal id="doctorModal" title="{{ __('actions.sidemenu.doctors') }}">
     <x-slot:body>
+        {{-- Resumo de validação no padrão do modal de usuários --}}
+        <div class="alert alert-danger"
+             x-show="Object.keys(errors).length > 0"
+             x-cloak>
+            <strong>Erro!</strong> Preencha corretamente os campos abaixo:
+            <ul class="mb-0 mt-2 ps-3">
+                <template x-for="(messages, field) in errors" :key="field">
+                    <template x-for="(message, index) in messages" :key="`${field}-${index}`">
+                        <li x-text="message"></li>
+                    </template>
+                </template>
+            </ul>
+        </div>
+
         <ul class="nav nav-tabs mb-3" id="doctorModalTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="tab-pessoal-btn"

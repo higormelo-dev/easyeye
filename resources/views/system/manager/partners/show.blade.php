@@ -157,128 +157,124 @@
 
                     {{-- ── Leads tab ──────────────────────────────────────── --}}
                     <div class="tab-pane fade show active" id="leads-pane" role="tabpanel">
-                        <div class="table-responsive">
-                            <table class="table mgr-table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>{{ __('actions.partners.col_name') }}</th>
-                                        <th>{{ __('actions.partners.col_city') }}</th>
-                                        <th class="text-center">{{ __('actions.partners.col_status') }}</th>
-                                        <th class="text-center">{{ __('actions.partners.col_advance') }}</th>
-                                        <th class="text-center">{{ __('actions.partners.col_date') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse($leads as $lead)
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold">{{ $lead->name }}</div>
-                                            <small style="color:var(--ee-text-muted,#64748b);">{{ $lead->email }}</small>
-                                        </td>
-                                        <td>{{ $lead->city ? $lead->city . '/' . $lead->state : '—' }}</td>
-                                        <td class="text-center">
-                                            <span class="badge {{ $lead->status->badgeClass() }}">
-                                                {{ $lead->status->label() }}
-                                            </span>
-                                        </td>
-                                        <td class="text-center">
-                                            @if($lead->status !== \App\Enums\PartnerLeadStatus::Converted && $lead->status !== \App\Enums\PartnerLeadStatus::Lost)
-                                            <select class="form-select form-select-sm py-0"
-                                                    style="font-size:.75rem;height:26px;min-width:120px;"
-                                                    data-advance-url="{{ route('panel.manager.partners.leads.advance', [$partner, $lead]) }}"
-                                                    onchange="advanceLeadStatus(this)">
-                                                <option value="">{{ __('actions.partners.advance_placeholder') }}</option>
-                                                @foreach($leadStatuses as $s)
-                                                    @if($s !== $lead->status)
-                                                    <option value="{{ $s->value }}">{{ $s->label() }}</option>
-                                                    @endif
-                                                @endforeach
-                                            </select>
-                                            @else
-                                                <span style="color:var(--ee-text-muted,#64748b);font-size:.8125rem;">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="text-center">
-                                            {{ $lead->created_at->format('d/m/Y') }}
-                                        </td>
-                                    </tr>
-                                    @empty
-                                    <tr>
-                                        <td colspan="5" class="text-center py-4"
-                                            style="color:var(--ee-text-muted,#64748b);">
-                                            {{ __('actions.partners.no_leads') }}
-                                        </td>
-                                    </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+                        <table class="table mgr-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('actions.partners.col_name') }}</th>
+                                    <th>{{ __('actions.partners.col_city') }}</th>
+                                    <th class="text-center">{{ __('actions.partners.col_status') }}</th>
+                                    <th class="text-center">{{ __('actions.partners.col_advance') }}</th>
+                                    <th class="text-center">{{ __('actions.partners.col_date') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($leads as $lead)
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">{{ $lead->name }}</div>
+                                        <small style="color:var(--ee-text-muted,#64748b);">{{ $lead->email }}</small>
+                                    </td>
+                                    <td>{{ $lead->city ? $lead->city . '/' . $lead->state : '—' }}</td>
+                                    <td class="text-center">
+                                        <span class="badge {{ $lead->status->badgeClass() }}">
+                                            {{ $lead->status->label() }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        @if($lead->status !== \App\Enums\PartnerLeadStatus::Converted && $lead->status !== \App\Enums\PartnerLeadStatus::Lost)
+                                        <select class="form-select form-select-sm py-0"
+                                                style="font-size:.75rem;height:26px;min-width:120px;"
+                                                data-advance-url="{{ route('panel.manager.partners.leads.advance', [$partner, $lead]) }}"
+                                                onchange="advanceLeadStatus(this)">
+                                            <option value="">{{ __('actions.partners.advance_placeholder') }}</option>
+                                            @foreach($leadStatuses as $s)
+                                                @if($s !== $lead->status)
+                                                <option value="{{ $s->value }}">{{ $s->label() }}</option>
+                                                @endif
+                                            @endforeach
+                                        </select>
+                                        @else
+                                            <span style="color:var(--ee-text-muted,#64748b);font-size:.8125rem;">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        {{ $lead->created_at->format('d/m/Y') }}
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr>
+                                    <td colspan="5" class="text-center py-4"
+                                        style="color:var(--ee-text-muted,#64748b);">
+                                        {{ __('actions.partners.no_leads') }}
+                                    </td>
+                                </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                         @if($leads->hasPages())
-                        <div class="px-4 py-3" style="border-top:1px solid var(--ee-border,#e2e8f0);">
-                            {{ $leads->links() }}
-                        </div>
+                            <div class="px-4 py-3" style="border-top:1px solid var(--ee-border,#e2e8f0);">
+                                {{ $leads->links() }}
+                            </div>
                         @endif
                     </div>
 
                     {{-- ── Comissões tab ──────────────────────────────────── --}}
                     <div class="tab-pane fade" id="commissions-pane" role="tabpanel">
-                        <div class="table-responsive">
-                            <table class="table mgr-table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>{{ __('actions.partners.col_clinic') }}</th>
-                                        <th class="text-end">{{ __('actions.partners.col_value') }}</th>
-                                        <th class="text-center">{{ __('actions.partners.col_rate') }}</th>
-                                        <th class="text-center">{{ __('actions.partners.col_period') }}</th>
-                                        <th class="text-center">{{ __('actions.partners.col_status') }}</th>
-                                        <th class="text-center">{{ __('actions.partners.col_due') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse($commissions as $commission)
-                                    <tr>
-                                        <td>{{ $commission->entity?->name ?? '—' }}</td>
-                                        <td class="text-end fw-semibold">
-                                            R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}
-                                        </td>
-                                        <td class="text-center">{{ number_format((float) $commission->rate, 1) }}%</td>
-                                        <td class="text-center">{{ $commission->period }}</td>
-                                        <td class="text-center">
-                                            <span class="badge {{ $commission->status->badgeClass() }}">
-                                                {{ $commission->status->label() }}
-                                            </span>
-                                        </td>
-                                        <td class="text-center">
-                                            {{ $commission->due_at?->format('d/m/Y') ?? '—' }}
-                                            @if($commission->status === \App\Enums\CommissionStatus::Pending)
-                                            <form action="{{ route('panel.manager.partners.commission.pay', $commission) }}"
-                                                  method="POST" class="d-inline ms-1">
-                                                @csrf
-                                                @method('PATCH')
-                                                <button type="submit" class="btn btn-sm btn-success py-0 px-1"
-                                                        style="font-size:.65rem;"
-                                                        onclick="return confirm('Marcar como paga?')">
-                                                    {{ __('actions.partners.pay') }}
-                                                </button>
-                                            </form>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                    @empty
-                                    <tr>
-                                        <td colspan="6" class="text-center py-4"
-                                            style="color:var(--ee-text-muted,#64748b);">
-                                            {{ __('actions.partners.no_commissions') }}
-                                        </td>
-                                    </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
+                        <table class="table mgr-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th>{{ __('actions.partners.col_clinic') }}</th>
+                                    <th class="text-end">{{ __('actions.partners.col_value') }}</th>
+                                    <th class="text-center">{{ __('actions.partners.col_rate') }}</th>
+                                    <th class="text-center">{{ __('actions.partners.col_period') }}</th>
+                                    <th class="text-center">{{ __('actions.partners.col_status') }}</th>
+                                    <th class="text-center">{{ __('actions.partners.col_due') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($commissions as $commission)
+                                <tr>
+                                    <td>{{ $commission->entity?->name ?? '—' }}</td>
+                                    <td class="text-end fw-semibold">
+                                        R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}
+                                    </td>
+                                    <td class="text-center">{{ number_format((float) $commission->rate, 1) }}%</td>
+                                    <td class="text-center">{{ $commission->period }}</td>
+                                    <td class="text-center">
+                                        <span class="badge {{ $commission->status->badgeClass() }}">
+                                            {{ $commission->status->label() }}
+                                        </span>
+                                    </td>
+                                    <td class="text-center">
+                                        {{ $commission->due_at?->format('d/m/Y') ?? '—' }}
+                                        @if($commission->status === \App\Enums\CommissionStatus::Pending)
+                                        <form action="{{ route('panel.manager.partners.commission.pay', $commission) }}"
+                                              method="POST" class="d-inline ms-1">
+                                            @csrf
+                                            @method('PATCH')
+                                            <button type="submit" class="btn btn-sm btn-success py-0 px-1"
+                                                    style="font-size:.65rem;"
+                                                    onclick="return confirm('Marcar como paga?')">
+                                                {{ __('actions.partners.pay') }}
+                                            </button>
+                                        </form>
+                                        @endif
+                                    </td>
+                                </tr>
+                                @empty
+                                <tr>
+                                    <td colspan="6" class="text-center py-4"
+                                        style="color:var(--ee-text-muted,#64748b);">
+                                        {{ __('actions.partners.no_commissions') }}
+                                    </td>
+                                </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
                         @if($commissions->hasPages())
-                        <div class="px-4 py-3" style="border-top:1px solid var(--ee-border,#e2e8f0);">
-                            {{ $commissions->links() }}
-                        </div>
+                            <div class="px-4 py-3" style="border-top:1px solid var(--ee-border,#e2e8f0);">
+                                {{ $commissions->links() }}
+                            </div>
                         @endif
                     </div>
 

@@ -62,35 +62,33 @@
                 <a href="{{ route('portal.leads.index') }}" class="btn btn-link btn-sm p-0">Ver todos</a>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 small">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="px-4">Nome</th>
-                                <th>Status</th>
-                                <th class="pe-4 text-end">Data</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($recentLeads as $lead)
-                            <tr>
-                                <td class="px-4">
-                                    <div class="fw-semibold">{{ $lead->name }}</div>
-                                    <div class="text-muted" style="font-size:.72rem;">{{ $lead->email }}</div>
-                                </td>
-                                <td>
-                                    <span class="badge {{ $lead->status->badgeClass() }}">{{ $lead->status->label() }}</span>
-                                </td>
-                                <td class="pe-4 text-end text-muted">{{ $lead->created_at->format('d/m/Y') }}</td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="3" class="text-center text-muted py-3">Nenhum lead cadastrado ainda.</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="px-4">Nome</th>
+                            <th>Status</th>
+                            <th class="pe-4 text-end">Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($recentLeads as $lead)
+                        <tr>
+                            <td class="px-4">
+                                <div class="fw-semibold">{{ $lead->name }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">{{ $lead->email }}</div>
+                            </td>
+                            <td>
+                                <span class="badge {{ $lead->status->badgeClass() }}">{{ $lead->status->label() }}</span>
+                            </td>
+                            <td class="pe-4 text-end text-muted">{{ $lead->created_at->format('d/m/Y') }}</td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-3">Nenhum lead cadastrado ainda.</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -103,36 +101,34 @@
                 <a href="{{ route('portal.commissions.index') }}" class="btn btn-link btn-sm p-0">Ver todas</a>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 small">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="px-4">Clínica</th>
-                                <th class="text-end">Valor</th>
-                                <th class="pe-4 text-center">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($recentCommissions as $commission)
-                            <tr>
-                                <td class="px-4">{{ $commission->entity?->name ?? '—' }}</td>
-                                <td class="text-end fw-semibold">
-                                    R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}
-                                </td>
-                                <td class="pe-4 text-center">
-                                    <span class="badge {{ $commission->status->badgeClass() }}">
-                                        {{ $commission->status->label() }}
-                                    </span>
-                                </td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="3" class="text-center text-muted py-3">Nenhuma comissão ainda.</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="px-4">Clínica</th>
+                            <th class="text-end">Valor</th>
+                            <th class="pe-4 text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($recentCommissions as $commission)
+                        <tr>
+                            <td class="px-4">{{ $commission->entity?->name ?? '—' }}</td>
+                            <td class="text-end fw-semibold">
+                                R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}
+                            </td>
+                            <td class="pe-4 text-center">
+                                <span class="badge {{ $commission->status->badgeClass() }}">
+                                    {{ $commission->status->label() }}
+                                </span>
+                            </td>
+                        </tr>
+                        @empty
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-3">Nenhuma comissão ainda.</td>
+                        </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

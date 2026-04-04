@@ -31,6 +31,12 @@ export function initSettingDatatable({ tableId, prefix }) {
     // Visualizar
     $(document).on('click', '.btn-show', function () {
         const id = $(this).data('id');
+        const modalElement = document.getElementById('modal_default');
+        if (!modalElement) {
+            console.error('modal_default não encontrado para visualização.');
+            return;
+        }
+
         $('.modal-title-default').empty().append(trans.messages.view.replace(':name', entityName));
         $('#btn-modal-default').css('display', 'none');
         $('.modal-dialog').removeClass('modal-sm modal-md modal-lg modal-xl').addClass('modal-lg');
@@ -40,7 +46,7 @@ export function initSettingDatatable({ tableId, prefix }) {
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (data) {
                 $('#retorno-default').empty().append(data);
-                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
+                bootstrap.Modal.getOrCreateInstance(modalElement).show();
             },
             error: handleAjaxError,
         });
@@ -59,7 +65,7 @@ export function initSettingDatatable({ tableId, prefix }) {
             url: `${prefix}/${id}`,
             type: 'put',
             dataType: 'json',
-            data: { active: $(this).data('situation') },
+            data: { type_method: 1, active: $(this).data('situation') },
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (response) {
                 showSuccessToast(response.message);

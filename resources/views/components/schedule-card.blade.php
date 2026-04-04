@@ -58,8 +58,17 @@
                     @endif
                 </div>
 
+                {{-- Linha 3: metadados --}}
+                <div class="text-muted small mt-1">
+                    {{ $schedule->visit_id ? $schedule->visitType->name : strtoupper(__('actions.not_informed')) }}
+                    &mdash;
+                    {{ $schedule->covenant_id ? $schedule->covenant->name : strtoupper(__('actions.not_informed')) }}
+                    @if(! session()->get('doctor_id'))
+                        &mdash; {{ $schedule->doctor->abbreviation }}
+                    @endif
+                </div>
                 {{-- Linha 2: badges de estado --}}
-                <div class="d-flex align-items-center float-end gap-1 flex-wrap mt-1">
+                <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
 
                     {{-- Badge situação --}}
                     <span class="badge {{ $situation->badgeClass() }}">
@@ -100,16 +109,6 @@
 
                 </div>
 
-                {{-- Linha 3: metadados --}}
-                <div class="text-muted small mt-1">
-                    {{ $schedule->visit_id ? $schedule->visitType->name : strtoupper(__('actions.not_informed')) }}
-                    &mdash;
-                    {{ $schedule->covenant_id ? $schedule->covenant->name : strtoupper(__('actions.not_informed')) }}
-                    @if(! session()->get('doctor_id'))
-                        &mdash; {{ $schedule->doctor->abbreviation }}
-                    @endif
-                </div>
-
             </div>
 
             {{-- Ações --}}
@@ -119,7 +118,7 @@
                 @if(! $isTerminal && $isStaff && count($situation->allowedTransitions()) > 0)
                     <div class="btn-group">
                         <button type="button"
-                                class="btn btn-secondary btn-sm dropdown-toggle"
+                                class="btn btn-light btn-sm dropdown-toggle"
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
                                 title="{{ __('actions.change_situation') }}">
@@ -157,7 +156,7 @@
                 @if(! $isTerminal && $isStaff && $schedule->patient_id)
                     <div class="dropdown">
                         <button type="button"
-                                class="btn btn-secondary btn-sm dropdown-toggle"
+                                class="btn btn-light btn-sm dropdown-toggle"
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
                                 title="{{ __('actions.patient_mood_label') }}">
@@ -201,7 +200,7 @@
 
                 @if(! $isTerminal)
                     <button type="button"
-                            class="btn btn-secondary btn-sm"
+                            class="btn btn-light btn-sm"
                             title="{{ __('actions.named.edit', ['name' => __('actions.schedule')]) }}"
                             @click="$dispatch('edit-schedule', { id: '{{ $schedule->id }}' })"
                             x-data>
@@ -211,20 +210,20 @@
 
                 @if($schedule->patient_id)
                     <button type="button"
-                            class="btn btn-secondary btn-sm btn-patient"
+                            class="btn btn-light btn-sm btn-patient"
                             data-id="{{ $schedule->patient_id }}"
                             title="{{ __('actions.named.edit', ['name' => __('actions.patient_record')]) }}">
                         <i class="fas fa-address-card"></i>
                     </button>
                     <a href="{{ route('panel.patients.medicalrecords.index', $schedule->patient_id) }}"
-                       class="btn btn-secondary btn-sm"
+                       class="btn btn-light btn-sm"
                        title="{{ __('actions.medical_records.title') }}">
                         <i class="fas fa-file-medical"></i>
                     </a>
                 @endif
 
                 <button type="button"
-                        class="btn btn-secondary btn-sm btn-show"
+                        class="btn btn-light btn-sm btn-show"
                         data-id="{{ $schedule->id }}"
                         title="{{ __('actions.named.view', ['name' => __('actions.schedule')]) }}">
                     <i class="fas fa-eye"></i>
@@ -234,7 +233,7 @@
                 @if(! $isTerminal && $isStaff)
                     <div class="dropdown">
                         <button type="button"
-                                class="btn btn-outline-secondary btn-sm"
+                                class="btn btn-outline-light btn-sm"
                                 data-bs-toggle="dropdown"
                                 aria-expanded="false"
                                 title="{{ __('actions.more_options') }}">
@@ -247,7 +246,7 @@
                                         data-id="{{ $schedule->id }}"
                                         data-doctor_id="{{ $schedule->doctor_id }}"
                                         data-doctors="{{ json_encode($schedule->doctor ? [['id' => $schedule->doctor_id, 'name' => $schedule->doctor->abbreviation]] : []) }}">
-                                    <i class="fas fa-calendar-alt me-2 text-secondary"></i>{{ __('actions.reschedule_action') }}
+                                    <i class="fas fa-calendar-alt me-2"></i>{{ __('actions.reschedule_action') }}
                                 </button>
                             </li>
                         </ul>

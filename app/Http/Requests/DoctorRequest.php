@@ -34,8 +34,7 @@ class DoctorRequest extends FormRequest
             Rule::unique('people', 'national_registry')
                 ->ignore($this->getIgnoredPersonId(), 'id')
                 ->where(function ($query) {
-                    $query->where('entity_id', session('selected_entity_id'))
-                        ->whereNull('deleted_at');
+                    $query->whereNull('deleted_at');
                 }),
         ];
         $rules['nickname'] = ['required_without:type_method', 'string', 'min:2', 'max:255'];
@@ -47,8 +46,11 @@ class DoctorRequest extends FormRequest
             Rule::unique('doctors', 'record')
                 ->ignore($this->route('doctor'))
                 ->where(function ($query) {
-                    $query->where('entity_id', session('selected_entity_id'))
-                        ->whereNull('deleted_at');
+                    $query->whereIn('entity_user_id', function ($subquery) {
+                        $subquery->select('id')
+                            ->from('entity_users')
+                            ->where('entity_id', session('selected_entity_id'));
+                    })->whereNull('deleted_at');
                 }),
         ];
         $rules['record_specialty'] = [
@@ -59,8 +61,11 @@ class DoctorRequest extends FormRequest
             Rule::unique('doctors', 'record_specialty')
                 ->ignore($this->route('doctor'))
                 ->where(function ($query) {
-                    $query->where('entity_id', session('selected_entity_id'))
-                        ->whereNull('deleted_at');
+                    $query->whereIn('entity_user_id', function ($subquery) {
+                        $subquery->select('id')
+                            ->from('entity_users')
+                            ->where('entity_id', session('selected_entity_id'));
+                    })->whereNull('deleted_at');
                 }),
         ];
         $rules['color'] = [
@@ -70,8 +75,11 @@ class DoctorRequest extends FormRequest
             Rule::unique('doctors', 'color')
                 ->ignore($this->route('doctor'))
                 ->where(function ($query) {
-                    $query->where('entity_id', session('selected_entity_id'))
-                        ->whereNull('deleted_at');
+                    $query->whereIn('entity_user_id', function ($subquery) {
+                        $subquery->select('id')
+                            ->from('entity_users')
+                            ->where('entity_id', session('selected_entity_id'));
+                    })->whereNull('deleted_at');
                 }),
         ];
         $rules['birth_date']     = ['nullable', 'date'];
@@ -84,8 +92,7 @@ class DoctorRequest extends FormRequest
             Rule::unique('people', 'email')
                 ->ignore($this->getIgnoredPersonId(), 'id')
                 ->where(function ($query) {
-                    $query->where('entity_id', session('selected_entity_id'))
-                        ->whereNull('deleted_at');
+                    $query->whereNull('deleted_at');
                 }),
         ];
         $rules['mother_name']            = ['nullable', 'string', 'min:2', 'max:255'];
@@ -180,16 +187,45 @@ class DoctorRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        $merge = [];
+
         if ($this->has('name')) {
-            $this->merge([
-                'name' => mb_strtoupper($this->input('name')),
-            ]);
+            $merge['name'] = mb_strtoupper($this->input('name'));
         }
 
         if ($this->has('color')) {
-            $this->merge([
-                'color' => mb_strtoupper($this->input('color')),
-            ]);
+            $merge['color'] = mb_strtoupper($this->input('color'));
         }
+
+        foreach (['whatsapp', 'partner', 'active'] as $booleanField) {
+            if ($this->has($booleanField)) {
+                $merge[$booleanField] = $this->normalizeBoolean($this->input($booleanField));
+            }
+        }
+
+        if (!empty($merge)) {
+            $this->merge($merge);
+        }
+    }
+
+    private function normalizeBoolean(mixed $value): mixed
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) && in_array($value, [0, 1], true)) {
+            return (bool) $value;
+        }
+
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        return match (mb_strtolower(trim($value))) {
+            '1', 'true', 'on', 'yes' => true,
+            '0', 'false', 'off', 'no' => false,
+            default => $value,
+        };
     }
 }

@@ -10,7 +10,10 @@
         storeUrl:  @js($storeUrl),
         updateUrl: null,
         fields:    @js($crudFields),
-        onSuccess: () => window.dispatchEvent(new CustomEvent('setting-saved'))
+        onSuccess: () => {
+            window.dispatchEvent(new CustomEvent('setting-saved'));
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('settingModal')).hide();
+        }
     })"
      x-init="$nextTick(() => document.getElementById('settingModal').addEventListener('hidden.bs.modal', () => reset()))"
      @open-create-setting.window="reset(); bootstrap.Modal.getOrCreateInstance(document.getElementById('settingModal')).show()"
@@ -93,9 +96,7 @@
 
         {{-- ══ DataTable View ═══════════════════════════════════════════════════ --}}
         <div x-show="view === 'table'">
-            <div class="table-responsive">
-                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
-            </div>
+            {{ $dataTable->table(['class' => 'table table-nowrap']) }}
         </div>
         {{-- ══ /DataTable View ══════════════════════════════════════════════════ --}}
 
@@ -200,6 +201,7 @@
 @endsection
 
 @section('modals')
+    @include('components.modal_default')
     @includeIf('system.settings._partials.' . $viewSlot . '.modals')
 @endsection
 

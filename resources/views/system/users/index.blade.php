@@ -74,9 +74,7 @@
 
         {{-- ══ DataTable View ═══════════════════════════════════════════════════ --}}
         <div x-show="view === 'table'">
-            <div class="table-responsive">
-                {{ $dataTable->table(['class' => 'table table-nowrap']) }}
-            </div>
+            {{ $dataTable->table(['class' => 'table table-nowrap']) }}
         </div>
         {{-- ══ /DataTable View ══════════════════════════════════════════════════ --}}
 
@@ -123,43 +121,56 @@
                                             <span x-text="item.rule_label ?? '{{ __("actions.not_informed") }}'"></span>
                                         </address>
                                         <hr class="my-2">
-                                        <div class="d-flex gap-1 flex-wrap">
+                                        <div class="d-flex align-items-center float-end gap-1">
                                             <template x-if="!item.deleted && item.own_entity">
-                                                <div class="d-flex gap-1 flex-wrap">
-                                                    <button class="btn btn-sm btn-light btn-show"
-                                                            :data-id="item.id"
-                                                            data-bs-toggle="tooltip"
-                                                            title="{{ __('actions.view') }}">
-                                                        <i class="fa fa-eye"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-light btn-edit"
-                                                            :data-id="item.id"
-                                                            data-bs-toggle="tooltip"
-                                                            title="{{ __('actions.edit') }}">
-                                                        <i class="fa fa-edit"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-light btn-active"
-                                                            :data-id="item.id"
-                                                            :data-situation="item.active ? 0 : 1"
-                                                            data-bs-toggle="tooltip"
-                                                            :title="item.active ? '{{ __("actions.disable") }}' : '{{ __("actions.enable") }}'">
-                                                        <i :class="item.active ? 'fas fa-lock-open' : 'fas fa-unlock'"></i>
-                                                    </button>
-                                                    <button class="btn btn-sm btn-danger btn-trash"
-                                                            :data-id="item.id"
-                                                            data-bs-toggle="tooltip"
-                                                            title="{{ __('actions.delete') }}">
-                                                        <i class="fa fa-trash"></i>
-                                                    </button>
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <a href="javascript:void(0);"
+                                                       class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                                       :data-id="item.id"
+                                                       data-bs-toggle="tooltip"
+                                                       title="{{ __('actions.view') }}">
+                                                        <i class="ti ti-eye"></i>
+                                                    </a>
+                                                    <a href="javascript:void(0);"
+                                                       class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                                       data-bs-toggle="dropdown" aria-expanded="false">
+                                                        <i class="ti ti-dots-vertical"></i>
+                                                    </a>
+                                                    <ul class="dropdown-menu p-2">
+                                                        <li>
+                                                            <a class="dropdown-item btn-edit"
+                                                               href="javascript:void(0);"
+                                                               :data-id="item.id">
+                                                                <i class="ti ti-edit me-1"></i>{{ __('actions.edit') }}
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item btn-active"
+                                                               href="javascript:void(0);"
+                                                               :data-id="item.id"
+                                                               :data-situation="item.active ? 0 : 1">
+                                                                <i class="ti me-1" :class="item.active ? 'ti-lock-open' : 'ti-lock'"></i>
+                                                                <span x-text="item.active ? '{{ __('actions.disable') }}' : '{{ __('actions.enable') }}'"></span>
+                                                            </a>
+                                                        </li>
+                                                        <li>
+                                                            <a class="dropdown-item btn-trash text-danger"
+                                                               href="javascript:void(0);"
+                                                               :data-id="item.id">
+                                                                <i class="ti ti-trash me-1"></i>{{ __('actions.delete') }}
+                                                            </a>
+                                                        </li>
+                                                    </ul>
                                                 </div>
                                             </template>
                                             <template x-if="item.deleted && item.own_entity">
-                                                <button class="btn btn-sm btn-light btn-restore"
-                                                        :data-id="item.id"
-                                                        data-bs-toggle="tooltip"
-                                                        title="{{ __('actions.restore') }}">
-                                                    <i class="fas fa-recycle"></i>
-                                                </button>
+                                                <a href="javascript:void(0);"
+                                                   class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                                   :data-id="item.id"
+                                                   data-bs-toggle="tooltip"
+                                                   title="{{ __('actions.restore') }}">
+                                                    <i class="ti ti-recycle"></i>
+                                                </a>
                                             </template>
                                         </div>
                                     </div>

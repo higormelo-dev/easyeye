@@ -808,39 +808,37 @@
     @if($isEdit)
     <div class="px-3 pb-2">
         <label class="pmr-label">{{ __('actions.medical_records.documentations') }}</label>
-        <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0 pmr-docs-table">
-                <thead class="table-light">
-                    <tr>
-                        <th>{{ __('actions.medical_records.doc_type') }}</th>
-                        <th>{{ __('actions.medical_records.doc_title') }}</th>
-                        <th>{{ __('actions.medical_records.doc_date') }}</th>
-                        <th class="text-end">{{ __('actions.medical_records.doc_actions') }}</th>
-                    </tr>
-                </thead>
-                <tbody id="pmr-docs-tbody">
-                    @forelse($r->documentations as $doc)
-                    <tr>
-                        <td><span class="badge bg-info-subtle text-info">{{ $doc->getTypeLabel() }}</span></td>
-                        <td>{{ $doc->title }}</td>
-                        <td>{{ $doc->created_at?->format('d/m/Y H:i') }}</td>
-                        <td class="text-end">
-                            <a href="{{ route('panel.patients.medicalrecords.documentations.pdf', [$patient, $r, $doc]) }}"
-                               target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
-                                <i class="fas fa-file-pdf"></i>
-                            </a>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr data-empty>
-                        <td colspan="4" class="text-center text-muted small py-2">
-                            {{ __('actions.medical_records.no_documentations') }}
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        <table class="table table-sm table-hover mb-0 pmr-docs-table">
+            <thead class="table-light">
+                <tr>
+                    <th>{{ __('actions.medical_records.doc_type') }}</th>
+                    <th>{{ __('actions.medical_records.doc_title') }}</th>
+                    <th>{{ __('actions.medical_records.doc_date') }}</th>
+                    <th class="text-end">{{ __('actions.medical_records.doc_actions') }}</th>
+                </tr>
+            </thead>
+            <tbody id="pmr-docs-tbody">
+                @forelse($r->documentations as $doc)
+                <tr>
+                    <td><span class="badge bg-info-subtle text-info">{{ $doc->getTypeLabel() }}</span></td>
+                    <td>{{ $doc->title }}</td>
+                    <td>{{ $doc->created_at?->format('d/m/Y H:i') }}</td>
+                    <td class="text-end">
+                        <a href="{{ route('panel.patients.medicalrecords.documentations.pdf', [$patient, $r, $doc]) }}"
+                           target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
+                            <i class="fas fa-file-pdf"></i>
+                        </a>
+                    </td>
+                </tr>
+                @empty
+                <tr data-empty>
+                    <td colspan="4" class="text-center text-muted small py-2">
+                        {{ __('actions.medical_records.no_documentations') }}
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
     </div>
     @endif
 

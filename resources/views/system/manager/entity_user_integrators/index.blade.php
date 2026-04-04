@@ -44,9 +44,7 @@
     </div>
     {{-- ══ /Page Header ═════════════════════════════════════════════════════ --}}
 
-    <div class="table-responsive">
-        {{ $dataTable->table(['class' => 'table table-nowrap']) }}
-    </div>
+    {{ $dataTable->table(['class' => 'table table-nowrap']) }}
 
 </div>
 

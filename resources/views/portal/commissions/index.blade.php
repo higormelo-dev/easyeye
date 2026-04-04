@@ -47,51 +47,49 @@
         <span class="text-muted small">{{ $commissions->total() }} registro(s)</span>
     </div>
     <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0 small">
-                <thead class="table-light">
-                    <tr>
-                        <th class="px-4">Clínica</th>
-                        <th class="text-center">Período</th>
-                        <th class="text-end">Taxa</th>
-                        <th class="text-end">Valor</th>
-                        <th class="text-center">Vencimento</th>
-                        <th class="text-center">Pago em</th>
-                        <th class="pe-4 text-center">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($commissions as $commission)
-                    <tr>
-                        <td class="px-4">
-                            <div class="fw-semibold">{{ $commission->entity?->name ?? '—' }}</div>
-                        </td>
-                        <td class="text-center text-muted">{{ $commission->period ?? '—' }}</td>
-                        <td class="text-end text-muted">
-                            {{ $commission->rate ? number_format((float) $commission->rate, 1, ',', '.') . '%' : '—' }}
-                        </td>
-                        <td class="text-end fw-semibold">R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}</td>
-                        <td class="text-center text-muted">{{ $commission->due_at?->format('d/m/Y') ?? '—' }}</td>
-                        <td class="text-center text-muted">{{ $commission->paid_at?->format('d/m/Y') ?? '—' }}</td>
-                        <td class="pe-4 text-center">
-                            <span class="badge {{ $commission->status->badgeClass() }}">{{ $commission->status->label() }}</span>
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="7" class="text-center text-muted py-4">
-                            {{ __('actions.partners.no_commissions') }}
-                            <a href="{{ route('portal.leads.index') }}" class="btn btn-link btn-sm p-0 ms-1">
-                                Cadastre leads para gerar comissões
-                            </a>
-                        </td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
+        <table class="table table-hover align-middle mb-0 small">
+            <thead class="table-light">
+                <tr>
+                    <th class="px-4">Clínica</th>
+                    <th class="text-center">Período</th>
+                    <th class="text-end">Taxa</th>
+                    <th class="text-end">Valor</th>
+                    <th class="text-center">Vencimento</th>
+                    <th class="text-center">Pago em</th>
+                    <th class="pe-4 text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($commissions as $commission)
+                <tr>
+                    <td class="px-4">
+                        <div class="fw-semibold">{{ $commission->entity?->name ?? '—' }}</div>
+                    </td>
+                    <td class="text-center text-muted">{{ $commission->period ?? '—' }}</td>
+                    <td class="text-end text-muted">
+                        {{ $commission->rate ? number_format((float) $commission->rate, 1, ',', '.') . '%' : '—' }}
+                    </td>
+                    <td class="text-end fw-semibold">R$ {{ number_format((float) $commission->amount, 2, ',', '.') }}</td>
+                    <td class="text-center text-muted">{{ $commission->due_at?->format('d/m/Y') ?? '—' }}</td>
+                    <td class="text-center text-muted">{{ $commission->paid_at?->format('d/m/Y') ?? '—' }}</td>
+                    <td class="pe-4 text-center">
+                        <span class="badge {{ $commission->status->badgeClass() }}">{{ $commission->status->label() }}</span>
+                    </td>
+                </tr>
+                @empty
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        {{ __('actions.partners.no_commissions') }}
+                        <a href="{{ route('portal.leads.index') }}" class="btn btn-link btn-sm p-0 ms-1">
+                            Cadastre leads para gerar comissões
+                        </a>
+                    </td>
+                </tr>
+                @endforelse
+            </tbody>
+        </table>
         @if($commissions->hasPages())
-        <div class="px-4 py-3 border-top">{{ $commissions->links() }}</div>
+            <div class="px-4 py-3 border-top">{{ $commissions->links() }}</div>
         @endif
     </div>
 </div>

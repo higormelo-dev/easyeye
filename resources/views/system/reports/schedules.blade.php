@@ -135,30 +135,28 @@
                 <div class="card-header bg-transparent fw-semibold small text-uppercase text-muted">
                     Por Médico
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Médico</th>
+                            <th class="text-center">Total</th>
+                            <th class="text-center text-success">Atendidos</th>
+                            <th class="text-center text-warning">Faltaram</th>
+                            <th class="text-center text-danger">Cancelados</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($byDoctor as $row)
                             <tr>
-                                <th>Médico</th>
-                                <th class="text-center">Total</th>
-                                <th class="text-center text-success">Atendidos</th>
-                                <th class="text-center text-warning">Faltaram</th>
-                                <th class="text-center text-danger">Cancelados</th>
+                                <td>{{ $row['doctor_name'] }}</td>
+                                <td class="text-center fw-semibold">{{ $row['total'] }}</td>
+                                <td class="text-center text-success">{{ $row['attended'] }}</td>
+                                <td class="text-center text-warning">{{ $row['noshow'] }}</td>
+                                <td class="text-center text-danger">{{ $row['cancelled'] }}</td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($byDoctor as $row)
-                                <tr>
-                                    <td>{{ $row['doctor_name'] }}</td>
-                                    <td class="text-center fw-semibold">{{ $row['total'] }}</td>
-                                    <td class="text-center text-success">{{ $row['attended'] }}</td>
-                                    <td class="text-center text-warning">{{ $row['noshow'] }}</td>
-                                    <td class="text-center text-danger">{{ $row['cancelled'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
         @endif
 
@@ -173,44 +171,42 @@
                     <p class="mb-0">Nenhum agendamento encontrado para o período.</p>
                 </div>
             @else
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
+                <table class="table table-sm table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Código</th>
+                            <th>Data/Hora</th>
+                            <th>Paciente</th>
+                            <th>Médico</th>
+                            <th>Convênio</th>
+                            <th>Situação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($schedules as $schedule)
                             <tr>
-                                <th>Código</th>
-                                <th>Data/Hora</th>
-                                <th>Paciente</th>
-                                <th>Médico</th>
-                                <th>Convênio</th>
-                                <th>Situação</th>
+                                <td class="text-muted" style="font-size:.8rem;">{{ $schedule->code }}</td>
+                                <td style="font-size:.85rem; white-space:nowrap;">
+                                    {{ $schedule->date_time->format('d/m/Y H:i') }}
+                                </td>
+                                <td style="font-size:.85rem;">
+                                    {{ $schedule->patient?->person?->full_name ?? $schedule->full_name }}
+                                </td>
+                                <td style="font-size:.85rem;">
+                                    {{ $schedule->doctor?->user_name ?? '—' }}
+                                </td>
+                                <td style="font-size:.85rem;">
+                                    {{ $schedule->covenant?->name ?? '—' }}
+                                </td>
+                                <td>
+                                    <span class="badge {{ $schedule->situation->badgeClass() }}" style="font-size:.72rem;">
+                                        {{ $schedule->situation->label() }}
+                                    </span>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($schedules as $schedule)
-                                <tr>
-                                    <td class="text-muted" style="font-size:.8rem;">{{ $schedule->code }}</td>
-                                    <td style="font-size:.85rem; white-space:nowrap;">
-                                        {{ $schedule->date_time->format('d/m/Y H:i') }}
-                                    </td>
-                                    <td style="font-size:.85rem;">
-                                        {{ $schedule->patient?->person?->full_name ?? $schedule->full_name }}
-                                    </td>
-                                    <td style="font-size:.85rem;">
-                                        {{ $schedule->doctor?->user_name ?? '—' }}
-                                    </td>
-                                    <td style="font-size:.85rem;">
-                                        {{ $schedule->covenant?->name ?? '—' }}
-                                    </td>
-                                    <td>
-                                        <span class="badge {{ $schedule->situation->badgeClass() }}" style="font-size:.72rem;">
-                                            {{ $schedule->situation->label() }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
             @endif
         </div>
     @endisset
