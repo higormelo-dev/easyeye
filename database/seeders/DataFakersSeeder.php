@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Enums\{ScheduleSituation, SubscriptionStatus};
+use App\Enums\{ActivationStep, ScheduleSituation, SubscriptionStatus};
 use App\Models\{Covenant,
     Doctor,
     Entity,
@@ -22,6 +22,7 @@ use App\Models\{Covenant,
     User,
     VisitType};
 use Carbon\Carbon;
+use App\Services\ActivationService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,11 +34,13 @@ class DataFakersSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->command->info('⏳ Criando People (3.000)...');
-        People::factory(3000)->create();
+        $peopleCount = $this->seedInt('SEED_FAKE_PEOPLE', 3000, 1);
+        $this->command->info("⏳ Criando People ({$peopleCount})...");
+        People::factory($peopleCount)->create();
 
-        $this->command->info('⏳ Criando Entities (15)...');
-        Entity::factory(15)
+        $entityCount = $this->seedInt('SEED_FAKE_ENTITIES', 15, 1);
+        $this->command->info("⏳ Criando Entities ({$entityCount})...");
+        Entity::factory($entityCount)
             ->sequence(fn ($attributes) => [
                 'subdomain' => Str::slug(fake()->company()) . '-' . ($attributes->index + 1),
             ])
@@ -49,8 +52,9 @@ class DataFakersSeeder extends Seeder
             ->whereNot('name', 'Medical Group')
             ->get();
 
-        $this->command->info('⏳ Criando Users (95)...');
-        $users = User::factory(95)->create(['password' => Hash::make('123456789')]);
+        $usersCount = $this->seedInt('SEED_FAKE_USERS', 95, 1);
+        $this->command->info("⏳ Criando Users ({$usersCount})...");
+        $users = User::factory($usersCount)->create(['password' => Hash::make('123456789')]);
 
         // ── Planos ──────────────────────────────────────────────────────────
         $planBasico  = Plan::where('slug', 'basico')->first();
@@ -341,31 +345,64 @@ class DataFakersSeeder extends Seeder
 
         // ── Patients ─────────────────────────────────────────────────────────
         $this->command->info('⏳ Criando Patients...');
-        $people    = People::all();
+        $people    = People::query()->select('id')->get();
         $skinTypes = SkinType::all();
         $irisTypes = IrisType::all();
         $covenants = Covenant::all();
+        $patientsBatch = [];
+        $patientsNow   = now();
+        $entityIds     = $entities->pluck('id')->all();
+        $patientCodes  = $this->loadEntityCodeCounters(Patient::class, 'PAC', $entityIds);
+        $entitiesWithPatients = [];
 
-        $people->each(function ($person) use ($entities, $skinTypes, $irisTypes, $covenants) {
+        foreach ($people as $person) {
             $numberOfEntities = fake()->numberBetween(1, 3);
             $selectedEntities = $entities->random($numberOfEntities);
 
-            $selectedEntities->each(function ($entity) use ($person, $skinTypes, $irisTypes, $covenants) {
-                Patient::create([
-                    'entity_id'   => $entity->id,
-                    'person_id'   => $person->id,
+            foreach ($selectedEntities as $entity) {
+                $entityId                 = (string) $entity->id;
+                $patientCodes[$entityId]  = ($patientCodes[$entityId] ?? 0) + 1;
+                $entitiesWithPatients[$entityId] = true;
+                $patientsBatch[]          = [
+                    'id'         => (string) Str::uuid(),
+                    'entity_id'  => $entityId,
+                    'person_id'  => (string) $person->id,
                     'covenant_id' => $covenants->isNotEmpty() ? $covenants->random()->id : null,
-                    'skin_id'     => $skinTypes->random()->id,
-                    'iris_id'     => $irisTypes->random()->id,
+                    'skin_id'    => $skinTypes->random()->id,
+                    'iris_id'    => $irisTypes->random()->id,
+                    'code'       => sprintf('PAC-%010d', $patientCodes[$entityId]),
                     'card_number' => fake()->optional(0.6)->creditCardNumber(),
-                    'active'      => fake()->boolean(90),
-                ]);
-            });
-        });
+                    'active'     => fake()->boolean(90),
+                    'created_at' => $patientsNow,
+                    'updated_at' => $patientsNow,
+                ];
+
+                if (count($patientsBatch) >= 1000) {
+                    Patient::insert($patientsBatch);
+                    $patientsBatch = [];
+                }
+            }
+        }
+
+        if (!empty($patientsBatch)) {
+            Patient::insert($patientsBatch);
+        }
+
+        $this->markActivationSteps(array_keys($entitiesWithPatients), ActivationStep::FirstPatientAdded);
 
         // ── Doctors ──────────────────────────────────────────────────────────
-        $this->command->info('⏳ Criando Doctors (250)...');
-        $doctorCount = 250;
+        $doctorCount = $this->seedInt('SEED_FAKE_DOCTORS', 250, 1);
+        $this->command->info("⏳ Criando Doctors ({$doctorCount})...");
+        $entityUsersBatch = [];
+        $doctorsBatch     = [];
+        $doctorsNow       = now();
+        $entitiesWithDoctors = [];
+        $entityIsClient   = $entities->pluck('is_client', 'id')->all();
+        $entityUserCode   = [
+            'EU'  => $this->loadGlobalCodeCounter(EntityUser::class, 'EU'),
+            'EUP' => $this->loadGlobalCodeCounter(EntityUser::class, 'EUP'),
+        ];
+        $doctorCode = $this->loadGlobalCodeCounter(Doctor::class, 'DOC');
 
         for ($i = 0; $i < $doctorCount; $i++) {
             $person     = People::factory()->create();
@@ -378,26 +415,57 @@ class DataFakersSeeder extends Seeder
             $numberOfEntities = fake()->numberBetween(1, 6);
             $selectedEntities = $entities->random($numberOfEntities);
 
-            $selectedEntities->each(function ($entity) use ($userDoctor, $person) {
-                $entityUserDoctor = EntityUser::create([
-                    'entity_id' => $entity->id,
-                    'user_id'   => $userDoctor->id,
-                    'active'    => true,
-                    'rule'      => 'doctor',
-                ]);
+            foreach ($selectedEntities as $entity) {
+                $entityId = (string) $entity->id;
+                $prefix   = ($entityIsClient[$entityId] ?? true) ? 'EU' : 'EUP';
+                $entityUserCode[$prefix]++;
+                $doctorCode++;
+                $entitiesWithDoctors[$entityId] = true;
 
-                Doctor::create([
-                    'entity_user_id'   => $entityUserDoctor->id,
-                    'person_id'        => $person->id,
-                    'record'           => fake()->unique()->numerify('######'),
+                $entityUserId = (string) Str::uuid();
+                $entityUsersBatch[] = [
+                    'id'         => $entityUserId,
+                    'entity_id'  => $entityId,
+                    'user_id'    => (string) $userDoctor->id,
+                    'code'       => sprintf('%s-%010d', $prefix, $entityUserCode[$prefix]),
+                    'rule'       => 'doctor',
+                    'is_owner'   => false,
+                    'active'     => true,
+                    'created_at' => $doctorsNow,
+                    'updated_at' => $doctorsNow,
+                ];
+
+                $doctorsBatch[] = [
+                    'id'               => (string) Str::uuid(),
+                    'entity_user_id'   => $entityUserId,
+                    'person_id'        => (string) $person->id,
+                    'code'             => sprintf('DOC-%010d', $doctorCode),
+                    'record'           => fake()->numerify('######'),
                     'record_specialty' => fake()->optional(0.7)->numerify('#####'),
                     'color'            => fake()->hexColor(),
                     'partner'          => fake()->boolean(20),
                     'active'           => fake()->boolean(90),
                     'observation'      => fake()->optional(0.3)->sentence(),
-                ]);
-            });
+                    'created_at'       => $doctorsNow,
+                    'updated_at'       => $doctorsNow,
+                ];
+
+                if (count($entityUsersBatch) >= 500) {
+                    EntityUser::insert($entityUsersBatch);
+                    Doctor::insert($doctorsBatch);
+                    $entityUsersBatch = [];
+                    $doctorsBatch     = [];
+                }
+            }
         }
+
+        if (!empty($entityUsersBatch)) {
+            EntityUser::insert($entityUsersBatch);
+            Doctor::insert($doctorsBatch);
+        }
+
+        $this->markActivationSteps(array_keys($entitiesWithDoctors), ActivationStep::FirstDoctorAdded);
+        $this->markActivationSteps(array_keys($entitiesWithDoctors), ActivationStep::TeamMemberInvited);
 
         // ── Schedules + PatientExams ─────────────────────────────────────────
         $this->command->info('⏳ Criando Schedules e PatientExams...');
@@ -411,19 +479,23 @@ class DataFakersSeeder extends Seeder
      */
     private function createSchedules(): void
     {
-        $doctors        = Doctor::all();
+        $doctors        = Doctor::query()->select('id', 'entity_user_id')->get();
         $schedulesBatch = [];
-        $batchSize      = 1000;
+        $batchSize      = $this->seedInt('SEED_FAKE_SCHEDULE_BATCH_SIZE', 1000, 100);
         $codeCounter    = [];
 
         // Cache em memória para evitar queries repetidas durante o loop
-        $entityUsers        = EntityUser::all()->keyBy('id');
-        $entitiesById       = Entity::all()->keyBy('id');
-        $allPatients        = Patient::with('person')->get()->groupBy('entity_id');
-        $allCovenants       = Covenant::all();
+        $entityUsers        = EntityUser::query()->select('id', 'entity_id')->get()->keyBy('id');
+        $entitiesById       = Entity::query()->select('id', 'schedule_interval')->get()->keyBy('id');
+        $allPatients        = Patient::query()
+            ->select('id', 'entity_id', 'person_id')
+            ->with('person:id,full_name')
+            ->get()
+            ->groupBy('entity_id');
+        $allCovenants       = Covenant::query()->select('id', 'entity_id')->get();
         $globalCovenants    = $allCovenants->whereNull('entity_id');
         $covenantsByEntity  = $allCovenants->whereNotNull('entity_id')->groupBy('entity_id');
-        $allVisitTypes      = VisitType::all();
+        $allVisitTypes      = VisitType::query()->select('id', 'entity_id')->get();
         $globalVisitTypes   = $allVisitTypes->whereNull('entity_id');
         $visitTypesByEntity = $allVisitTypes->whereNotNull('entity_id')->groupBy('entity_id');
 
@@ -441,16 +513,20 @@ class DataFakersSeeder extends Seeder
         }
 
         // Janela temporal: 1 mês passado até 3 meses futuros (todos os dias)
-        $startDate = Carbon::now()->subMonth()->startOfDay();
-        $endDate   = Carbon::now()->addMonths(3)->endOfDay();
+        $pastMonths  = $this->seedInt('SEED_FAKE_SCHEDULE_PAST_MONTHS', 1, 0);
+        $futureMonths = $this->seedInt('SEED_FAKE_SCHEDULE_FUTURE_MONTHS', 3, 0);
+        $startDate = Carbon::now()->subMonths($pastMonths)->startOfDay();
+        $endDate   = Carbon::now()->addMonths($futureMonths)->endOfDay();
         $date      = $startDate->copy();
+        $attendedExamChance = $this->seedPercent('SEED_FAKE_ATTENDED_EXAM_PERCENT', 30);
 
         // Coleta de agendamentos Attended para gerar PatientExams posteriormente
         $attendedForExams = [];
+        $entitiesWithSchedules = [];
 
         while ($date->lte($endDate)) {
-            $usedPatientsPerDay = [];
-            $isPast             = $date->copy()->endOfDay()->isPast();
+            $dailyPatientPools = [];
+            $isPast            = $date->copy()->endOfDay()->isPast();
 
             foreach ($doctors as $doctor) {
                 $entityUser = $entityUsers->get($doctor->entity_user_id);
@@ -460,10 +536,6 @@ class DataFakersSeeder extends Seeder
                 }
 
                 $entityId = $entityUser->entity_id;
-
-                if (!isset($usedPatientsPerDay[$entityId])) {
-                    $usedPatientsPerDay[$entityId] = [];
-                }
 
                 if (!isset($codeCounter[$entityId])) {
                     $codeCounter[$entityId] = 0;
@@ -477,23 +549,26 @@ class DataFakersSeeder extends Seeder
                     continue;
                 }
 
-                $availablePatients = $patientsOfEntity->filter(
-                    fn ($patient) => !in_array($patient->id, $usedPatientsPerDay[$entityId])
-                );
+                if (!isset($dailyPatientPools[$entityId])) {
+                    $dailyPatientPools[$entityId] = $patientsOfEntity->shuffle()->values()->all();
+                }
 
-                if ($availablePatients->isEmpty()) {
+                $patientPool = &$dailyPatientPools[$entityId];
+
+                if (empty($patientPool)) {
                     continue;
                 }
 
                 $interval       = $entitiesById->get($entityId)?->schedule_interval ?? 15;
-                $morningSlots   = $this->generateTimeSlots($date, 8, 12, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast, $interval);
-                $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $availablePatients, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $usedPatientsPerDay, $isPast, $interval);
+                $morningSlots   = $this->generateTimeSlots($date, 8, 12, $doctor, $entityId, $patientPool, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $isPast, $interval);
+                $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $patientPool, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $isPast, $interval);
 
                 foreach (array_merge($morningSlots, $afternoonSlots) as $slot) {
                     $schedulesBatch[] = $slot;
+                    $entitiesWithSchedules[$slot['entity_id']] = true;
 
                     // Seleciona 30% dos Attended passados para geração de exames
-                    if ($isPast && $slot['situation'] === ScheduleSituation::Attended->value && fake()->boolean(30)) {
+                    if ($isPast && $slot['situation'] === ScheduleSituation::Attended->value && fake()->boolean($attendedExamChance)) {
                         $attendedForExams[] = [
                             'id'         => $slot['id'],
                             'patient_id' => $slot['patient_id'],
@@ -507,6 +582,8 @@ class DataFakersSeeder extends Seeder
                     Schedule::insert($schedulesBatch);
                     $schedulesBatch = [];
                 }
+
+                unset($patientPool);
             }
 
             $date->addDay();
@@ -516,6 +593,7 @@ class DataFakersSeeder extends Seeder
             Schedule::insert($schedulesBatch);
         }
 
+        $this->markActivationSteps(array_keys($entitiesWithSchedules), ActivationStep::FirstScheduleCreated);
         $this->createPatientExams($attendedForExams);
     }
 
@@ -530,11 +608,10 @@ class DataFakersSeeder extends Seeder
         int $endHour,
         Doctor $doctor,
         string $entityId,
-        $patients,
+        array &$patientPool,
         $covenants,
         $visitTypes,
         array &$codeCounter,
-        array &$usedPatientsPerDay,
         bool $isPast = false,
         int $intervalMinutes = 15,
     ): array {
@@ -560,20 +637,8 @@ class DataFakersSeeder extends Seeder
                 ScheduleSituation::Cancelled->value,
             ];
 
-        $availablePatients = $patients->values()->all();
-
-        while ($currentTime < $endTime) {
-            $availablePatients = array_values(array_filter(
-                $availablePatients,
-                fn ($p) => !in_array($p->id, $usedPatientsPerDay[$entityId])
-            ));
-
-            if (empty($availablePatients)) {
-                break;
-            }
-
-            $patient                         = $availablePatients[array_rand($availablePatients)];
-            $usedPatientsPerDay[$entityId][] = $patient->id;
+        while ($currentTime < $endTime && !empty($patientPool)) {
+            $patient = array_pop($patientPool);
 
             $covenant  = $covenants->random();
             $visitType = $visitTypes->random();
@@ -625,7 +690,7 @@ class DataFakersSeeder extends Seeder
 
     /**
      * Criar PatientExams para agendamentos Attended selecionados (1–3 exames cada).
-     * Usa create() individual para disparar o booted() que auto-gera o código EXM-*.
+     * Usa inserção em lote com contador EXM-* em memória por paciente.
      */
     private function createPatientExams(array $attendedSchedules): void
     {
@@ -633,6 +698,9 @@ class DataFakersSeeder extends Seeder
             return;
         }
 
+        $patientExamBatch  = [];
+        $patientExamNow    = now();
+        $patientExamCode   = $this->loadPatientExamCodeCounters();
         $allExamTypes      = ExamType::all();
         $globalExamTypes   = $allExamTypes->whereNull('entity_id');
         $examTypesByEntity = $allExamTypes->whereNotNull('entity_id')->groupBy('entity_id');
@@ -649,18 +717,32 @@ class DataFakersSeeder extends Seeder
             $examCount = fake()->numberBetween(1, 3);
 
             for ($i = 0; $i < $examCount; $i++) {
-                // create() dispara o booted() do modelo, gerando o código EXM-* por patient
-                PatientExam::create([
-                    'patient_id'  => $schedule['patient_id'],
-                    'doctor_id'   => $schedule['doctor_id'],
+                $patientId                    = (string) $schedule['patient_id'];
+                $patientExamCode[$patientId]  = ($patientExamCode[$patientId] ?? 0) + 1;
+                $patientExamBatch[]           = [
+                    'id'         => (string) Str::uuid(),
+                    'patient_id' => $patientId,
+                    'doctor_id'  => $schedule['doctor_id'],
                     'schedule_id' => $schedule['id'],
-                    'exam_id'     => $examTypesOfEntity->random()->id,
-                    'archive'     => 'exams/fake-' . Str::uuid() . '.jpg',
-                    'name'        => fake()->optional(0.5)->sentence(3),
-                    'laterality'  => fake()->randomElement([null, null, 0, 1, 2]),
-                    'active'      => true,
-                ]);
+                    'exam_id'    => $examTypesOfEntity->random()->id,
+                    'code'       => sprintf('EXM-%010d', $patientExamCode[$patientId]),
+                    'archive'    => 'exams/fake-' . Str::uuid() . '.jpg',
+                    'name'       => fake()->optional(0.5)->sentence(3),
+                    'laterality' => fake()->randomElement([null, null, 0, 1, 2]),
+                    'active'     => true,
+                    'created_at' => $patientExamNow,
+                    'updated_at' => $patientExamNow,
+                ];
+
+                if (count($patientExamBatch) >= 1000) {
+                    PatientExam::insert($patientExamBatch);
+                    $patientExamBatch = [];
+                }
             }
+        }
+
+        if (!empty($patientExamBatch)) {
+            PatientExam::insert($patientExamBatch);
         }
     }
 
@@ -687,6 +769,120 @@ class DataFakersSeeder extends Seeder
                 'card_number' => fake()->optional(0.6)->creditCardNumber(),
                 'active'      => true,
             ]);
+        }
+    }
+
+    /**
+     * @param  array<int, string>  $entityIds
+     * @return array<string, int>
+     */
+    private function loadEntityCodeCounters(string $modelClass, string $prefix, array $entityIds): array
+    {
+        if (empty($entityIds)) {
+            return [];
+        }
+
+        $codes = [];
+        $rows  = $modelClass::withoutGlobalScopes()
+            ->select('entity_id', 'code')
+            ->whereIn('entity_id', $entityIds)
+            ->where('code', 'like', $prefix . '-%')
+            ->orderBy('entity_id')
+            ->orderByDesc('code')
+            ->get();
+
+        foreach ($rows as $row) {
+            $entityId = (string) $row->entity_id;
+
+            if (isset($codes[$entityId])) {
+                continue;
+            }
+
+            $codes[$entityId] = (int) substr((string) $row->code, strlen($prefix) + 1);
+        }
+
+        return $codes;
+    }
+
+    private function loadGlobalCodeCounter(string $modelClass, string $prefix): int
+    {
+        $lastCode = $modelClass::withoutGlobalScopes()
+            ->where('code', 'like', $prefix . '-%')
+            ->orderBy('code', 'desc')
+            ->value('code');
+
+        if (!is_string($lastCode)) {
+            return 0;
+        }
+
+        return (int) substr($lastCode, strlen($prefix) + 1);
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function loadPatientExamCodeCounters(): array
+    {
+        $codes = [];
+        $rows  = PatientExam::withoutGlobalScopes()
+            ->select('patient_id', 'code')
+            ->where('code', 'like', 'EXM-%')
+            ->orderBy('patient_id')
+            ->orderByDesc('code')
+            ->get();
+
+        foreach ($rows as $row) {
+            $patientId = (string) $row->patient_id;
+
+            if (isset($codes[$patientId])) {
+                continue;
+            }
+
+            $codes[$patientId] = (int) substr((string) $row->code, 4);
+        }
+
+        return $codes;
+    }
+
+    private function seedInt(string $key, int $default, int $min): int
+    {
+        $value = env($key);
+
+        if (!is_numeric($value)) {
+            return $default;
+        }
+
+        return max($min, (int) $value);
+    }
+
+    private function seedPercent(string $key, int $default): int
+    {
+        $value = env($key);
+
+        if (!is_numeric($value)) {
+            return $default;
+        }
+
+        return min(100, max(0, (int) $value));
+    }
+
+    /**
+     * @param  array<int, string>  $entityIds
+     */
+    private function markActivationSteps(array $entityIds, ActivationStep $step): void
+    {
+        if (empty($entityIds)) {
+            return;
+        }
+
+        $activationService = app(ActivationService::class);
+
+        foreach ($entityIds as $entityId) {
+            if (blank($entityId)) {
+                continue;
+            }
+
+            $activationService->complete((string) $entityId, $step);
         }
     }
 }
