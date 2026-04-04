@@ -36,13 +36,13 @@
         <div class="d-flex flex-wrap gap-2">
             @foreach($progress as $item)
                 @if($item['completed'])
-                    <span class="badge bg-success d-flex align-items-center gap-1 py-2 px-3"
+                    <span class="badge bg-success d-flex align-items-center float-end gap-1 py-2 px-3"
                           title="Concluído em {{ $item['completed_at'] ? \Carbon\Carbon::parse($item['completed_at'])->format('d/m/Y') : '' }}">
                         <i class="fas fa-check fa-xs"></i>
                         {{ $item['label'] }}
                     </span>
                 @else
-                    <span class="badge bg-light text-muted border d-flex align-items-center gap-1 py-2 px-3">
+                    <span class="badge bg-light text-muted border d-flex align-items-center float-end gap-1 py-2 px-3">
                         <i class="fas fa-circle fa-xs" style="font-size: 0.5rem;"></i>
                         {{ $item['label'] }}
                         <span class="fw-semibold text-{{ $color }}">+{{ $item['weight'] }}%</span>

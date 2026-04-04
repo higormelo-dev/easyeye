@@ -17,7 +17,7 @@ class CovenantsDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (Covenant $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (Covenant $record) => $this->buildActionButtons($record, ['variant' => 'dropdown', 'show' => true, 'global_view' => true]))
             ->editColumn('created_at', fn (Covenant $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (Covenant $record) => $this->formatActiveColumn($record))
             ->rawColumns(['active', 'action'])

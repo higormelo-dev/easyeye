@@ -18,7 +18,7 @@ class NearPointConvergencesDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (NearPointConvergence $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (NearPointConvergence $record) => $this->buildActionButtons($record, ['variant' => 'dropdown', 'show' => true, 'global_view' => true]))
             ->editColumn('created_at', fn (NearPointConvergence $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (NearPointConvergence $record) => $this->formatActiveColumn($record))
             ->rawColumns(['active', 'action'])

@@ -18,7 +18,7 @@ class IrisTypesDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (IrisType $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (IrisType $record) => $this->buildActionButtons($record, ['variant' => 'dropdown', 'show' => true, 'global_view' => true]))
             ->editColumn('created_at', fn (IrisType $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (IrisType $record) => $this->formatActiveColumn($record))
             ->rawColumns(['active', 'action'])

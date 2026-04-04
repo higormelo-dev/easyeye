@@ -102,7 +102,7 @@
                     <li class="d-flex justify-content-between align-items-center py-2"
                         style="border-bottom:1px solid var(--ee-border,#e2e8f0);">
                         <span style="color:var(--ee-text-muted,#64748b);">{{ __('actions.partners.utm_token') }}</span>
-                        <div class="d-flex align-items-center gap-1">
+                        <div class="d-flex align-items-center float-end gap-1">
                             <code style="font-size:.75rem;">{{ $partner->token }}</code>
                             <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
                                     onclick="navigator.clipboard.writeText('{{ $partner->token }}').then(() => this.textContent='✓')"

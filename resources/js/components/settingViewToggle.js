@@ -10,6 +10,7 @@ export default (cardsUrl, storageKey) => ({
         if (saved === 'cards' || saved === 'table') {
             this.view = saved;
         }
+        window.settingViewComponent = this;
         if (this.view === 'cards') {
             this.fetchCards(1);
         }
@@ -66,6 +67,10 @@ export default (cardsUrl, storageKey) => ({
                 this.settings = res.data;
                 this.meta     = res.meta;
                 this.loading  = false;
+                this.$nextTick(() => {
+                    document.querySelectorAll('[data-bs-toggle="tooltip"]')
+                        .forEach(el => new bootstrap.Tooltip(el, { trigger: 'hover' }));
+                });
             })
             .catch(() => { this.loading = false; });
     },

@@ -17,6 +17,34 @@ export function initSettingDatatable({ tableId, prefix }) {
     });
 
     const trans = window.translations;
+    const entityName = trans?.actions?.setting ?? trans?.actions?.record ?? 'registro';
+
+    function reloadCurrentView() {
+        const component = window.settingViewComponent;
+        if (component && component.view === 'cards') {
+            component.fetchCards(component.meta.current_page);
+        } else {
+            dt?.ajax.reload();
+        }
+    }
+
+    // Visualizar
+    $(document).on('click', '.btn-show', function () {
+        const id = $(this).data('id');
+        $('.modal-title-default').empty().append(trans.messages.view.replace(':name', entityName));
+        $('#btn-modal-default').css('display', 'none');
+        $('.modal-dialog').removeClass('modal-sm modal-md modal-lg modal-xl').addClass('modal-lg');
+        $("#erro-default").removeClass('show').css('display', 'none');
+        $.ajax({
+            url: `${prefix}/${id}`,
+            headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+            success: function (data) {
+                $('#retorno-default').empty().append(data);
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('modal_default')).show();
+            },
+            error: handleAjaxError,
+        });
+    });
 
     // Edit — delegate to Alpine crudForm via custom event
     $(document).on('click', '.btn-edit', function () {
@@ -35,7 +63,7 @@ export function initSettingDatatable({ tableId, prefix }) {
             headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
             success: function (response) {
                 showSuccessToast(response.message);
-                dt?.ajax.reload();
+                reloadCurrentView();
             },
             error: handleAjaxError,
         });
@@ -61,7 +89,7 @@ export function initSettingDatatable({ tableId, prefix }) {
                     headers:  { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                     success: function (response) {
                         showSuccessToast(response.message);
-                        dt?.ajax.reload();
+                        reloadCurrentView();
                     },
                     error: function (data) { showErrorToast(data.responseJSON?.message); },
                 });
@@ -88,7 +116,7 @@ export function initSettingDatatable({ tableId, prefix }) {
                     headers:  { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
                     success: function (response) {
                         showSuccessToast(response.message);
-                        dt?.ajax.reload();
+                        reloadCurrentView();
                     },
                     error: function (data) { showErrorToast(data.responseJSON?.message); },
                 });
@@ -97,5 +125,5 @@ export function initSettingDatatable({ tableId, prefix }) {
     });
 
     // Reload after successful save via Alpine crudForm
-    window.addEventListener('setting-saved', () => dt?.ajax.reload());
+    window.addEventListener('setting-saved', () => reloadCurrentView());
 }

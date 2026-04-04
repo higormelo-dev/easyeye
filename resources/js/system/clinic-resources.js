@@ -3,7 +3,7 @@ import { initSettingDatatable } from './setting.js';
 import { showSuccessToast, showErrorToast } from './auxiliary_functions.js';
 
 $(function () {
-    initSettingDatatable({ tableId: 'clinic_resources_datatable', prefix: 'setting/resources' });
+    initSettingDatatable({ tableId: 'clinic_resources_datatable', prefix: 'resources' });
 
     // Open resource work-schedule modal
     $(document).on('click', '.btn-resource-schedule', function () {

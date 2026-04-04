@@ -46,6 +46,7 @@ abstract class BaseSettingController extends Controller
         $class   = $this->service->getModelClass();
         $search  = $request->string('search')->trim()->value();
         $perPage = 12;
+        $entityId = (string) session('selected_entity_id');
 
         $records = $class::query()
             ->where(
@@ -58,7 +59,20 @@ abstract class BaseSettingController extends Controller
             ->paginate($perPage);
 
         return response()->json([
-            'data' => $records->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'active' => (bool) $r->active]),
+            'data' => $records->map(function ($r) use ($entityId) {
+                $recordEntityId = (string) ($r->entity_id ?? '');
+                $isGlobal       = $r->entity_id === null;
+                $isOwned        = !$isGlobal && $recordEntityId === $entityId;
+
+                return [
+                    'id'        => $r->id,
+                    'name'      => $r->name,
+                    'code'      => $r->code,
+                    'active'    => (bool) $r->active,
+                    'is_global' => $isGlobal,
+                    'is_owned'  => $isOwned,
+                ];
+            }),
             'meta' => [
                 'total'        => $records->total(),
                 'per_page'     => $records->perPage(),
@@ -77,7 +91,7 @@ abstract class BaseSettingController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        if (request()->wantsJson()) {
+        if ($this->shouldReturnJson()) {
             return response()->json(['data' => $record->only(array_keys($this->crudFields))]);
         }
 
@@ -88,7 +102,7 @@ abstract class BaseSettingController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        if (request()->wantsJson()) {
+        if ($this->shouldReturnJson()) {
             return response()->json(['data' => new $this->resourceClass($record)]);
         }
 
@@ -104,7 +118,7 @@ abstract class BaseSettingController extends Controller
             $recordData = $record->toArray();
             $record->delete();
 
-            if (request()->wantsJson()) {
+            if ($this->shouldReturnJson()) {
                 return response()->json(['message' => $message, 'deleted' => $recordData]);
             }
 
@@ -121,7 +135,7 @@ abstract class BaseSettingController extends Controller
             $recordData = $record->toArray();
             $record->restore();
 
-            if (request()->wantsJson()) {
+            if ($this->shouldReturnJson()) {
                 return response()->json(['message' => $message, 'restored' => $recordData]);
             }
 
@@ -134,7 +148,7 @@ abstract class BaseSettingController extends Controller
         $record        = $this->service->create($request);
         $messageReturn = $this->getCreateMessage();
 
-        if ($request->wantsJson()) {
+        if ($this->shouldReturnJson($request)) {
             return response()->json(['message' => $messageReturn, 'data' => new $this->resourceClass($record)]);
         }
 
@@ -147,7 +161,7 @@ abstract class BaseSettingController extends Controller
         $updated       = $this->service->update($record, $request);
         $messageReturn = $this->getUpdateMessage($request);
 
-        if ($request->wantsJson()) {
+        if ($this->shouldReturnJson($request)) {
             return response()->json(['message' => $messageReturn, 'data' => new $this->resourceClass($updated)]);
         }
 
@@ -180,5 +194,15 @@ abstract class BaseSettingController extends Controller
                 ['label' => __('actions.records'),            'url' => 'javascript:void(0);',                'active' => true],
             ],
         ];
+    }
+
+    private function shouldReturnJson(?Request $request = null): bool
+    {
+        $request ??= request();
+
+        return $request->expectsJson()
+            || $request->wantsJson()
+            || $request->isJson()
+            || $request->ajax();
     }
 }

@@ -12,7 +12,7 @@ class DoctorsDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<Doctor>  $query
+     * @param Builder<Doctor> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
@@ -43,7 +43,7 @@ class DoctorsDataTable extends BaseDataTable
                 'users.name as user_name',
                 'users.email',
                 'people.full_name',
-                'people.nickname'
+                'people.nickname',
             )
             ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
             ->join('users', 'entity_users.user_id', '=', 'users.id')
@@ -122,7 +122,7 @@ class DoctorsDataTable extends BaseDataTable
                 title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        if (!$isOwned) {
+        if (! $isOwned) {
             return '';
         }
 
@@ -131,7 +131,7 @@ class DoctorsDataTable extends BaseDataTable
         $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
 
         return '
-<div class="d-flex align-items-center gap-1">
+<div class="d-flex align-items-center float-end gap-1">
     <a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
        data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
        title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>

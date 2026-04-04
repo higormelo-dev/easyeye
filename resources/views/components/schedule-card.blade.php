@@ -59,7 +59,7 @@
                 </div>
 
                 {{-- Linha 2: badges de estado --}}
-                <div class="d-flex align-items-center gap-1 flex-wrap mt-1">
+                <div class="d-flex align-items-center float-end gap-1 flex-wrap mt-1">
 
                     {{-- Badge situação --}}
                     <span class="badge {{ $situation->badgeClass() }}">
@@ -113,7 +113,7 @@
             </div>
 
             {{-- Ações --}}
-            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+            <div class="d-flex align-items-center float-end gap-1 flex-shrink-0">
 
                 {{-- ── Dropdown de situação (fa-list-ul) ── --}}
                 @if(! $isTerminal && $isStaff && count($situation->allowedTransitions()) > 0)

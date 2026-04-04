@@ -91,13 +91,13 @@ class ManagerReportSettingsDataTable extends BaseDataTable
 
         return '
             <div class="d-flex justify-content-end gap-1">
-                <a href="' . $editUrl . '" class="btn btn-outline-secondary btn-sm" title="' . __('actions.edit') . '">
+                <a href="' . $editUrl . '" class="btn btn-light btn-sm" title="' . __('actions.edit') . '">
                     <i class="ti ti-edit"></i>
                 </a>
                 <form action="' . $deleteUrl . '" method="POST" onsubmit="return confirm(\'' . __('actions.confirm_delete') . '\')">
                     <input type="hidden" name="_token" value="' . csrf_token() . '">
                     <input type="hidden" name="_method" value="DELETE">
-                    <button type="submit" class="btn btn-outline-danger btn-sm" title="' . __('actions.delete') . '">
+                    <button type="submit" class="btn btn-danger btn-sm" title="' . __('actions.delete') . '">
                         <i class="ti ti-trash"></i>
                     </button>
                 </form>

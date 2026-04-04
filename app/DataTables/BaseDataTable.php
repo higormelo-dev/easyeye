@@ -59,14 +59,21 @@ abstract class BaseDataTable extends DataTable
     protected function buildActionButtons(mixed $record, array $options = []): string
     {
         $defaults = [
-            'edit'    => true,
-            'show'    => false,
-            'active'  => true,
-            'delete'  => true,
-            'restore' => true,
+            'variant'     => 'legacy',
+            'edit'        => true,
+            'show'        => false,
+            'active'      => true,
+            'delete'      => true,
+            'restore'     => true,
+            'global_view' => false,
         ];
 
-        $options  = array_merge($defaults, $options);
+        $options = array_merge($defaults, $options);
+
+        if ($options['variant'] === 'dropdown') {
+            return $this->buildDropdownActionButtons($record, $options);
+        }
+
         $entityId = session()->get('selected_entity_id');
         $isOwned  = $record->entity_id === $entityId;
 
@@ -117,6 +124,76 @@ abstract class BaseDataTable extends DataTable
         }
 
         return $btnActions;
+    }
+
+    /**
+     * Build action buttons in the same dropdown style used by patients/doctors.
+     */
+    private function buildDropdownActionButtons(mixed $record, array $options): string
+    {
+        $entityId       = session()->get('selected_entity_id');
+        $recordEntityId = data_get($record, 'entity_id');
+        $isGlobal       = $recordEntityId === null;
+        $isOwned        = $recordEntityId === $entityId;
+        $isDeleted      = ! blank(data_get($record, 'deleted_at'));
+
+        if ($isDeleted && $isOwned && $options['restore']) {
+            return '<a href="javascript:void(0);" class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
+        }
+
+        if ($isGlobal && ! $isDeleted && $options['show'] && $options['global_view']) {
+            return '<a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+                title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>';
+        }
+
+        if (! $isOwned || $isDeleted) {
+            return '';
+        }
+
+        $menuItems = '';
+
+        if ($options['edit']) {
+            $menuItems .= '<li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
+                <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>';
+        }
+
+        if ($options['active']) {
+            $activeSituation = $record->active ? 0 : 1;
+            $activeIcon      = $record->active ? 'ti-lock-open' : 'ti-lock';
+            $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
+
+            $menuItems .= '<li><a class="dropdown-item btn-active" href="javascript:void(0);"
+                    data-id="' . $record->id . '" data-situation="' . $activeSituation . '">
+                <i class="ti ' . $activeIcon . ' me-1"></i>' . $activeTitle . '</a></li>';
+        }
+
+        if ($options['delete']) {
+            $menuItems .= '<li><a class="dropdown-item btn-trash text-danger" href="javascript:void(0);"
+                    data-id="' . $record->id . '">
+                <i class="ti ti-trash me-1"></i>' . __('actions.delete') . '</a></li>';
+        }
+
+        $showButton = '';
+
+        if ($options['show']) {
+            $showButton = '<a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+               data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+               title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>';
+        }
+
+        $dropdown = '';
+
+        if ($menuItems !== '') {
+            $dropdown = '
+            <a href="javascript:void(0);" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+               data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots-vertical"></i></a>
+            <ul class="dropdown-menu p-2">' . $menuItems . '</ul>';
+        }
+
+        return '<div class="d-flex align-items-center float-end gap-1">' . $showButton . $dropdown . '</div>';
     }
 
     /**

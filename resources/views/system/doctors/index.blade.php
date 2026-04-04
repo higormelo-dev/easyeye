@@ -164,7 +164,7 @@
                                             <span x-text="doctor.email ?? '{{ __('actions.not_informed') }}'"></span>
                                         </address>
                                         <hr class="my-2">
-                                        <div class="d-flex align-items-center gap-1">
+                                        <div class="d-flex align-items-center float-end gap-1">
                                             <a href="javascript:void(0);"
                                                class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                                                :data-id="doctor.id"

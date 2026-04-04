@@ -17,7 +17,7 @@ class LensesDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (Lense $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (Lense $record) => $this->buildActionButtons($record, ['variant' => 'dropdown', 'show' => true, 'global_view' => true]))
             ->editColumn('created_at', fn (Lense $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (Lense $record) => $this->formatActiveColumn($record))
             ->editColumn('type', fn (Lense $record) => $this->formatTypesColumn($record))

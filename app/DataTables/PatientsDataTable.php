@@ -12,7 +12,7 @@ class PatientsDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<Patient>  $query
+     * @param Builder<Patient> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
@@ -24,7 +24,7 @@ class PatientsDataTable extends BaseDataTable
                 'cellphone_label',
                 fn (Patient $record) => ($record->person->whatsapp ?
                         '<i class="fab fa-whatsapp text-success"></i>' : '') . ' ' .
-                    $record->person->present()->getCellphone
+                    $record->person->present()->getCellphone,
             )
             ->editColumn('created_at', fn (Patient $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (Patient $record) => $this->formatActiveColumn($record))
@@ -53,7 +53,7 @@ class PatientsDataTable extends BaseDataTable
                 'people.full_name',
                 'people.gender',
                 'people.cellphone',
-                'people.whatsapp'
+                'people.whatsapp',
             )
             ->join('people', 'patients.person_id', '=', 'people.id')
             ->where(function ($query) {
@@ -133,13 +133,13 @@ class PatientsDataTable extends BaseDataTable
         }
 
         // Registro global: apenas visualizar
-        if ($isGlobal && !$record->deleted_at) {
+        if ($isGlobal && ! $record->deleted_at) {
             return '<a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>';
         }
 
-        if (!$isOwned) {
+        if (! $isOwned) {
             return '';
         }
 
@@ -148,7 +148,7 @@ class PatientsDataTable extends BaseDataTable
         $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
 
         return '
-<div class="d-flex align-items-center gap-1">
+<div class="d-flex align-items-center float-end gap-1">
     <a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
        data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
        title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>

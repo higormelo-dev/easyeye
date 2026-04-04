@@ -136,7 +136,7 @@
                         <i class="fas fa-exclamation-triangle me-1"></i> Urgente
                     </label>
                 </div>
-                <div class="d-flex align-items-center gap-1">
+                <div class="d-flex align-items-center float-end gap-1">
                     <label class="small text-muted mb-0">Expira em:</label>
                     <input type="date" class="form-control form-control-sm" x-model="newExpires" style="max-width:150px;">
                 </div>

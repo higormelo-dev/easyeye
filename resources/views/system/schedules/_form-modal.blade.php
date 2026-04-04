@@ -251,7 +251,7 @@
                 {{-- Lista de recursos com disponibilidade --}}
                 <div class="d-flex flex-wrap gap-2 mt-1">
                     <template x-for="resource in form.resources_available" :key="resource.id">
-                        <label class="d-flex align-items-center gap-1 px-2 py-1 rounded border"
+                        <label class="d-flex align-items-center float-end gap-1 px-2 py-1 rounded border"
                                style="cursor:pointer; font-size:.82rem;"
                                :class="{
                                    'border-success bg-success bg-opacity-10': resource.available && form.resource_ids?.includes(resource.id),

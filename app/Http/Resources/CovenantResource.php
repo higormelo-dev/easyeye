@@ -15,10 +15,11 @@ class CovenantResource extends JsonResource
     public function toArray(Request $request): array
     {
         $data = [
-            'type'       => 'doctor',
+            'type'       => 'covenant',
             'id'         => $this->id,
             'attributes' => [
                 'entity_id'  => $this->entity_id,
+                'code'       => $this->code,
                 'name'       => $this->name,
                 'color'      => $this->color,
                 'table'      => (bool) $this->table,

@@ -17,7 +17,7 @@ class SurgeryTypesDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (SurgeryType $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (SurgeryType $record) => $this->buildActionButtons($record, ['variant' => 'dropdown', 'show' => true, 'global_view' => true]))
             ->editColumn('created_at', fn (SurgeryType $record) => $this->formatDateColumn($record->created_at))
             ->editColumn('active', fn (SurgeryType $record) => $this->formatActiveColumn($record))
             ->editColumn('category', fn (SurgeryType $record) => $record->present()->getCategory())

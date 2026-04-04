@@ -124,28 +124,39 @@
                                     </span>
                                 </div>
                                 <hr class="my-2">
-                                <div class="d-flex align-items-center gap-1">
+                                <div class="d-flex align-items-center float-end gap-1">
                                     <a href="javascript:void(0);"
-                                       class="btn-edit shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                       class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                                        :data-id="setting.id"
                                        data-bs-toggle="tooltip"
-                                       title="{{ __('actions.edit') }}">
-                                        <i class="ti ti-edit"></i>
+                                       title="{{ __('actions.view') }}">
+                                        <i class="ti ti-eye"></i>
                                     </a>
-                                    <a href="javascript:void(0);"
-                                       class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
-                                       data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="ti ti-dots-vertical"></i>
-                                    </a>
-                                    <ul class="dropdown-menu p-2">
-                                        <li>
-                                            <a class="dropdown-item btn-trash text-danger"
-                                               href="javascript:void(0);"
-                                               :data-id="setting.id">
-                                                <i class="ti ti-trash me-1"></i>{{ __('actions.delete') }}
+                                    <template x-if="setting.is_owned">
+                                        <div class="d-inline-flex align-items-center gap-1">
+                                            <a href="javascript:void(0);"
+                                               class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                               data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="ti ti-dots-vertical"></i>
                                             </a>
-                                        </li>
-                                    </ul>
+                                            <ul class="dropdown-menu p-2">
+                                                <li>
+                                                    <a class="dropdown-item btn-edit"
+                                                       href="javascript:void(0);"
+                                                       :data-id="setting.id">
+                                                        <i class="ti ti-edit me-1"></i>{{ __('actions.edit') }}
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item btn-trash text-danger"
+                                                       href="javascript:void(0);"
+                                                       :data-id="setting.id">
+                                                        <i class="ti ti-trash me-1"></i>{{ __('actions.delete') }}
+                                                    </a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>

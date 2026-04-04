@@ -669,7 +669,7 @@
                                class="d-none" @change="uploadFiles($event.target.files)">
                     </label>
 
-                    <div x-show="uploading" class="d-flex align-items-center gap-1" style="min-width:80px;">
+                    <div x-show="uploading" class="d-flex align-items-center float-end gap-1" style="min-width:80px;">
                         <div class="progress flex-grow-1" style="height:4px;">
                             <div class="progress-bar bg-info" :style="`width:${uploadProgress}%`"></div>
                         </div>
