@@ -1,10 +1,8 @@
 /**
  * Login page — password visibility toggle.
  *
- * Uses Material Design Icons (mdi-eye / mdi-eye-off) already loaded
- * in the guest layout via style.min.css.
+ * Works with the icon set used by auth pages (Tabler and legacy MDI).
  */
 import { initPasswordToggles } from './password-toggle';
 
 document.addEventListener('DOMContentLoaded', initPasswordToggles);
-

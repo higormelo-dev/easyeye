@@ -90,64 +90,48 @@ class EntitiesDataTable extends BaseDataTable
      */
     private function buildEntityActionButtons(Entity $record): string
     {
-        $btnActions = '';
-
-        if (!$record->deleted_at) {
-            $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-edit"
+        if ($record->deleted_at) {
+            return '<a href="javascript:void(0);" class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>';
-
-            $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
-                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
-
-            if ($record->entity_users_count > 0) {
-                $btnActions .= '<a href="' . route('panel.manager.entities.users', $record->id) . '"
-                    class="btn waves-effect waves-light btn-light btn-xs m-1"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Usuários"><i class="fas fa-users"></i></a>';
-            } else {
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-light btn-xs m-1 disabled"
-                    aria-disabled="true" tabindex="-1"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Usuários"><i class="fas fa-users"></i></a>';
-            }
-
-            if ($record->entity_user_integrators_count > 0) {
-                $btnActions .= '<a href="' . route('panel.manager.entities.user-integrators.index', $record->id) . '"
-                    class="btn waves-effect waves-light btn-light btn-xs m-1"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
-            } else {
-                $btnActions .= '<a href="javascript:void(0);"
-                    class="btn waves-effect waves-light btn-light btn-xs m-1 disabled"
-                    aria-disabled="true" tabindex="-1"
-                    data-bs-toggle="tooltip" data-bs-placement="bottom"
-                    title="Usuários Integradores"><i class="fas fa-user-cog"></i></a>';
-            }
-
-            $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-active"
-                data-id="' . $record->id . '" data-situation="' . ($record->active ? 0 : 1) . '"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . ($record->active ? __('actions.disable') : __('actions.enable')) . '">
-                <i class="fas ' . ($record->active ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>';
-
-            $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
-                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
-        } else {
-            $btnActions .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-restore"
-                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.restore') . '"><i class="fas fa-recycle"></i></a>';
+                title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        return $btnActions;
+        $usersItem = $record->entity_users_count > 0
+            ? '<li><a class="dropdown-item" href="' . route('panel.manager.entities.users', $record->id) . '">
+                <i class="ti ti-users me-1"></i>Usuários</a></li>'
+            : '<li><span class="dropdown-item text-muted disabled" aria-disabled="true">
+                <i class="ti ti-users me-1"></i>Usuários</span></li>';
+
+        $userIntegratorsItem = $record->entity_user_integrators_count > 0
+            ? '<li><a class="dropdown-item" href="' . route('panel.manager.entities.user-integrators.index', $record->id) . '">
+                <i class="ti ti-user-cog me-1"></i>Usuários Integradores</a></li>'
+            : '<li><span class="dropdown-item text-muted disabled" aria-disabled="true">
+                <i class="ti ti-user-cog me-1"></i>Usuários Integradores</span></li>';
+
+        $activeSituation = $record->active ? 0 : 1;
+        $activeIcon      = $record->active ? 'ti-lock-open' : 'ti-lock';
+        $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
+
+        return '
+<div class="d-flex align-items-center float-end gap-1">
+    <a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+       title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>
+    <a href="javascript:void(0);" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots-vertical"></i></a>
+    <ul class="dropdown-menu p-2">
+        <li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
+            <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>
+        ' . $usersItem . '
+        ' . $userIntegratorsItem . '
+        <li><a class="dropdown-item btn-active" href="javascript:void(0);"
+               data-id="' . $record->id . '" data-situation="' . $activeSituation . '">
+            <i class="ti ' . $activeIcon . ' me-1"></i>' . $activeTitle . '</a></li>
+        <li><a class="dropdown-item btn-trash text-danger" href="javascript:void(0);"
+               data-id="' . $record->id . '">
+            <i class="ti ti-trash me-1"></i>' . __('actions.delete') . '</a></li>
+    </ul>
+</div>';
     }
 
     /**

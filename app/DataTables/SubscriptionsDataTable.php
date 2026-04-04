@@ -87,37 +87,33 @@ class SubscriptionsDataTable extends BaseDataTable
     private function buildSubscriptionActionButtons(Subscription $record): string
     {
         $entityId = $record->entity_id;
-        $buttons  = '';
-
-        $buttons .= '<a href="javascript:void(0);"
-            class="btn waves-effect waves-light btn-light btn-xs m-1 btn-edit"
-            data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-            title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>';
-
-        $buttons .= '<a href="javascript:void(0);"
-            class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
-            data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-            title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
+        $cancelItem = '';
 
         if ($record->status->isAccessible()) {
-            $buttons .= '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-cancel"
-                data-id="' . $record->id . '" data-entity-id="' . $entityId . '"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="Cancelar assinatura"><i class="fas fa-ban"></i></a>';
+            $cancelItem = '<li><a class="dropdown-item btn-cancel text-warning" href="javascript:void(0);"
+                    data-id="' . $record->id . '" data-entity-id="' . $entityId . '">
+                <i class="ti ti-ban me-1"></i>Cancelar assinatura</a></li>';
         }
 
-        $lockClass = $record->entity_active ? 'btn-danger' : 'btn-success';
-        $lockIcon  = $record->entity_active ? 'fa-lock' : 'fa-lock-open';
-        $lockTitle = $record->entity_active ? 'Bloquear acesso' : 'Desbloquear acesso';
+        $blockTitle = $record->entity_active ? 'Bloquear acesso' : 'Desbloquear acesso';
+        $blockIcon  = $record->entity_active ? 'ti-lock' : 'ti-lock-open';
 
-        $buttons .= '<a href="javascript:void(0);"
-            class="btn waves-effect waves-light ' . $lockClass . ' btn-xs m-1 btn-block"
-            data-entity-id="' . $entityId . '" data-active="' . ($record->entity_active ? 0 : 1) . '"
-            data-bs-toggle="tooltip" data-bs-placement="bottom"
-            title="' . $lockTitle . '"><i class="fas ' . $lockIcon . '"></i></a>';
-
-        return $buttons;
+        return '
+<div class="d-flex align-items-center float-end gap-1">
+    <a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+       title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>
+    <a href="javascript:void(0);" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots-vertical"></i></a>
+    <ul class="dropdown-menu p-2">
+        <li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
+            <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>
+        ' . $cancelItem . '
+        <li><a class="dropdown-item btn-block" href="javascript:void(0);"
+               data-entity-id="' . $entityId . '" data-active="' . ($record->entity_active ? 0 : 1) . '">
+            <i class="ti ' . $blockIcon . ' me-1"></i>' . $blockTitle . '</a></li>
+    </ul>
+</div>';
     }
 
     protected function filename(): string

@@ -108,7 +108,7 @@
                     {{-- Modo normal: busca + botão Selecionar --}}
                     @if(session()->get('selected_entity_user_rule') !== 'doctor')
                         <button type="button"
-                                class="btn btn-outline-secondary btn-sm flex-shrink-0"
+                                class="btn btn-outline-white btn-sm flex-shrink-0"
                                 x-show="! selectionMode"
                                 @click="toggleSelectionMode()"
                                 title="Selecionar agendamentos para ação em massa">
@@ -121,13 +121,13 @@
                          x-show="selectionMode"
                          x-cloak>
                         <button type="button"
-                                class="btn btn-outline-secondary btn-sm"
+                                class="btn btn-outline-white btn-sm"
                                 @click="clearSelection()"
                                 title="Sair do modo de seleção">
                             <i class="fas fa-times me-1"></i> Cancelar
                         </button>
                         <button type="button"
-                                class="btn btn-outline-secondary btn-sm"
+                                class="btn btn-outline-white btn-sm"
                                 @click="toggleSelectAll()"
                                 title="Selecionar / desselecionar todos">
                             <i class="fas me-1" :class="isAllSelected() ? 'fa-check-square' : 'fa-square'"></i>
@@ -176,7 +176,7 @@
                                placeholder="{{ __('actions.search') }}..."
                                x-model="search"
                                @input.debounce.400ms="fetchList()">
-                        <button class="btn btn-outline-secondary rounded-start-pill" type="button"
+                        <button class="btn btn-outline-white rounded-start-pill" type="button"
                                 x-show="search"
                                 x-cloak
                                 @click="search = ''; fetchList()">

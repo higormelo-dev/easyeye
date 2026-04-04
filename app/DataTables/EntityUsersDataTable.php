@@ -111,11 +111,11 @@ class EntityUsersDataTable extends BaseDataTable
             $url = route('panel.manager.entities.impersonate', [$record->entity_id, $record->id]);
 
             return '<a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-warning btn-xs m-1 btn-impersonate"
+                class="btn-impersonate shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-url="' . $url . '"
                 data-name="' . e($record->name) . '"
                 data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.impersonate.use_as') . '"><i class="fas fa-user-secret"></i></a>';
+                title="' . __('actions.impersonate.use_as') . '"><i class="ti ti-user-cog"></i></a>';
         }
 
         return '';

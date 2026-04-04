@@ -1,54 +1,54 @@
 @extends('layouts.guest')
 
+@section('auth_layout', 'register-illustration')
+@section('auth_page_title', __('auth.forgot_password.title'))
+@section('auth_page_subtitle', __('auth.back_to_login'))
+@section('auth_hero_title', __('auth.forgot_password.title'))
+@section('auth_hero_text', __('Recupere o acesso da sua conta em poucos passos.'))
+@section('auth_hero_image', asset('system/images/auth/forgot-illustration-img.png'))
+@section('auth_cover_image', asset('system/images/auth/cover-imgs-1.png'))
+
 @section('content')
-<div class="card-body">
     <form method="POST" action="{{ route('password.email') }}" class="form-horizontal form-material">
         @csrf
 
-        {{-- Header --}}
-        <div class="text-center mb-4">
-            <a href="{{ route('login') }}">
-                <img src="{{ asset('system/images/preclinic/logo.svg') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
-            </a>
-            <h4 class="font-medium mb-0">{{ __('auth.forgot_password.title') }}</h4>
-        </div>
-
-        <div class="alert alert-info mb-3" style="font-size:.85rem">
+        <div class="alert alert-info mb-3">
             {{ __('auth.forgot_password.description') }}
         </div>
 
-        {{-- Status de sucesso --}}
         @if (session('status'))
-            <div class="alert alert-success mb-3" style="font-size:.85rem">{{ session('status') }}</div>
+            <div class="alert alert-success mb-3">{{ session('status') }}</div>
         @endif
 
-        {{-- Erro --}}
         @error('email')
-            <div class="alert alert-danger mb-3" style="font-size:.85rem">{{ $message }}</div>
+            <div class="alert alert-danger mb-3">{{ $message }}</div>
         @enderror
 
-        {{-- E-mail --}}
         <div class="form-group mb-4">
             <label class="form-label">{{ __('actions.email') }} <span class="text-danger">*</span></label>
-            <input type="email" name="email"
-                   class="form-control @error('email') is-invalid @enderror"
-                   value="{{ old('email') }}"
-                   required autofocus autocomplete="username">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">
+                    <i class="ti ti-mail text-muted"></i>
+                </span>
+                <input type="email"
+                       name="email"
+                       class="form-control border-start-0 @error('email') is-invalid @enderror"
+                       value="{{ old('email') }}"
+                       required
+                       autofocus
+                       autocomplete="username"
+                       placeholder="{{ __('actions.email') }}">
+            </div>
         </div>
 
-        {{-- Botão enviar --}}
         <div class="d-grid mb-3">
-            <button type="submit" class="btn btn-info btn-block waves-effect waves-light">
+            <button type="submit" class="btn btn-info waves-effect waves-light fw-semibold">
                 {{ __('auth.forgot_password.send_link') }}
             </button>
         </div>
 
-        <p class="text-center">
-            <a href="{{ route('login') }}" class="text-muted" style="font-size:.85rem">
-                &larr; {{ __('auth.back_to_login') }}
-            </a>
+        <p class="text-center mb-0">
+            <a href="{{ route('login') }}" class="hover-a">{{ __('auth.back_to_login') }}</a>
         </p>
-
     </form>
-</div>
 @endsection

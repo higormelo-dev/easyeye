@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ __('actions.partners.portal_title') }} — {{ config('app.name', 'EasyEye') }}</title>
-    <link rel="shortcut icon" href="{{ asset('system/images/preclinic/favicon.png') }}">
+    <link rel="shortcut icon" href="{{ asset('system/images/favicon.png') }}">
     <style>[x-cloak] { display: none !important; }</style>
     <script src="{{ asset('js/jquery.min.js') }}"></script>
     @vite(['resources/css/vendor.css', 'resources/css/app.css', 'resources/js/vendor.js', 'resources/js/app.js'])

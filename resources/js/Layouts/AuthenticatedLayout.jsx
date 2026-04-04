@@ -33,8 +33,8 @@ export default function AuthenticatedLayout({ user, header, children, breadcrumb
                     <div className="d-flex align-items-center gap-3">
                         <Link href="/panel/dashboard" className="logo">
                             <span className="logo-light">
-                                <span className="logo-lg"><img src="/system/images/preclinic/logo.svg" alt="EasyEye" /></span>
-                                <span className="logo-sm"><img src="/system/images/preclinic/logo-small.svg" alt="EasyEye" /></span>
+                                <span className="logo-lg"><img src="/system/images/logo.svg" alt="EasyEye" /></span>
+                                <span className="logo-sm"><img src="/system/images/logo-small.svg" alt="EasyEye" /></span>
                             </span>
                         </Link>
 

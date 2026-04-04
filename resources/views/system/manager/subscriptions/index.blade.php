@@ -137,36 +137,47 @@
                                             </template>
                                         </address>
                                         <hr class="my-2">
-                                        <div class="d-flex gap-1 flex-wrap">
-                                            <button class="btn btn-sm btn-light btn-show"
-                                                    :data-id="item.id"
-                                                    data-bs-toggle="tooltip"
-                                                    title="{{ __('actions.view') }}">
-                                                <i class="fa fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-light btn-edit"
-                                                    :data-id="item.id"
-                                                    data-bs-toggle="tooltip"
-                                                    title="{{ __('actions.edit') }}">
-                                                <i class="fa fa-edit"></i>
-                                            </button>
-                                            <template x-if="item.is_accessible">
-                                                <button class="btn btn-sm btn-warning btn-cancel"
-                                                        :data-id="item.id"
-                                                        :data-entity-id="item.entity_id"
-                                                        data-bs-toggle="tooltip"
-                                                        title="Cancelar assinatura">
-                                                    <i class="fas fa-ban"></i>
-                                                </button>
-                                            </template>
-                                            <button class="btn btn-sm btn-block"
-                                                    :class="item.entity_active ? 'btn-danger' : 'btn-success'"
-                                                    :data-entity-id="item.entity_id"
-                                                    :data-active="item.entity_active ? 0 : 1"
-                                                    data-bs-toggle="tooltip"
-                                                    :title="item.entity_active ? 'Bloquear acesso' : 'Desbloquear acesso'">
-                                                <i class="fas" :class="item.entity_active ? 'fa-lock' : 'fa-lock-open'"></i>
-                                            </button>
+                                        <div class="d-flex align-items-center float-end gap-1">
+                                            <a href="javascript:void(0);"
+                                               class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                               :data-id="item.id"
+                                               data-bs-toggle="tooltip"
+                                               title="{{ __('actions.view') }}">
+                                                <i class="ti ti-eye"></i>
+                                            </a>
+                                            <a href="javascript:void(0);"
+                                               class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                               data-bs-toggle="dropdown" aria-expanded="false">
+                                                <i class="ti ti-dots-vertical"></i>
+                                            </a>
+                                            <ul class="dropdown-menu p-2">
+                                                <li>
+                                                    <a class="dropdown-item btn-edit"
+                                                       href="javascript:void(0);"
+                                                       :data-id="item.id">
+                                                        <i class="ti ti-edit me-1"></i>{{ __('actions.edit') }}
+                                                    </a>
+                                                </li>
+                                                <template x-if="item.is_accessible">
+                                                    <li>
+                                                        <a class="dropdown-item btn-cancel text-warning"
+                                                           href="javascript:void(0);"
+                                                           :data-id="item.id"
+                                                           :data-entity-id="item.entity_id">
+                                                            <i class="ti ti-ban me-1"></i>Cancelar assinatura
+                                                        </a>
+                                                    </li>
+                                                </template>
+                                                <li>
+                                                    <a class="dropdown-item btn-block"
+                                                       href="javascript:void(0);"
+                                                       :data-entity-id="item.entity_id"
+                                                       :data-active="item.entity_active ? 0 : 1">
+                                                        <i class="ti me-1" :class="item.entity_active ? 'ti-lock' : 'ti-lock-open'"></i>
+                                                        <span x-text="item.entity_active ? 'Bloquear acesso' : 'Desbloquear acesso'"></span>
+                                                    </a>
+                                                </li>
+                                            </ul>
                                         </div>
                                     </div>
                                 </div>

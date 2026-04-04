@@ -1,42 +1,37 @@
 @extends('layouts.guest')
 
+@section('auth_layout', 'register-illustration')
+@section('auth_page_title', __('auth.verify_email.title'))
+@section('auth_page_subtitle', __('Confirmação necessária'))
+@section('auth_hero_title', __('auth.verify_email.title'))
+@section('auth_hero_text', __('Valide seu e-mail para liberar todos os recursos da clínica.'))
+@section('auth_hero_image', asset('system/images/auth/email-verification-illustration-img.png'))
+@section('auth_cover_image', asset('system/images/auth/cover-imgs-1.png'))
+
 @section('content')
-<div class="card-body text-center">
-
-    {{-- Header --}}
-    <div class="mb-4">
-        <img src="{{ asset('system/images/preclinic/logo.svg') }}" alt="{{ config('app.name') }}" width="48" class="mb-2">
-        <h4 class="font-medium mb-0">{{ __('auth.verify_email.title') }}</h4>
-    </div>
-
-    <p class="text-muted mb-4" style="font-size:.85rem">
+    <p class="text-muted mb-4" style="font-size:.9rem;">
         {{ __('auth.verify_email.description') }}
     </p>
 
-    {{-- Confirmação de reenvio --}}
     @if (session('status') == 'verification-link-sent')
-        <div class="alert alert-success mb-4" style="font-size:.85rem">
+        <div class="alert alert-success mb-4">
             {{ __('auth.verify_email.link_sent') }}
         </div>
     @endif
 
-    {{-- Botão reenviar --}}
     <form method="POST" action="{{ route('verification.send') }}" class="mb-3">
         @csrf
         <div class="d-grid">
-            <button type="submit" class="btn btn-info waves-effect waves-light">
+            <button type="submit" class="btn btn-info waves-effect waves-light fw-semibold">
                 {{ __('auth.verify_email.resend') }}
             </button>
         </div>
     </form>
 
-    {{-- Sair --}}
-    <form method="POST" action="{{ route('logout') }}">
+    <form method="POST" action="{{ route('logout') }}" class="text-center">
         @csrf
-        <button type="submit" class="btn btn-link text-muted" style="font-size:.85rem">
+        <button type="submit" class="btn btn-link text-muted">
             {{ __('auth.log_out') }}
         </button>
     </form>
-
-</div>
 @endsection

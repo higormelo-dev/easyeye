@@ -13,6 +13,8 @@ return [
     'remember_me'              => 'Lembrar-me',
     'back_to_login'            => 'Voltar para o login',
     'select_entity'            => 'Selecionar empresa',
+    'login_subtitle'           => 'Por favor, informe seus dados para acessar o sistema',
+    'no_account_yet'           => 'Ainda não tem uma conta?',
     'inactive'                 => 'Usuário não está ativo',
     'integrator_invalid'       => 'Código do integrador inválido ou inativo',
     'token_not_provided'       => 'Token não fornecido',

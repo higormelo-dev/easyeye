@@ -1,19 +1,5 @@
 <x-crud-modal id="patientModal" title="{{ __('actions.patient') }}">
     <x-slot:body>
-        {{-- Resumo de validação no padrão do modal de usuários --}}
-        <div class="alert alert-danger"
-             x-show="Object.keys(errors).length > 0"
-             x-cloak>
-            <strong>Erro!</strong> Preencha corretamente os campos abaixo:
-            <ul class="mb-0 mt-2 ps-3">
-                <template x-for="(messages, field) in errors" :key="field">
-                    <template x-for="(message, index) in messages" :key="`${field}-${index}`">
-                        <li x-text="message"></li>
-                    </template>
-                </template>
-            </ul>
-        </div>
-
         {{-- Abas de navegação --}}
         <ul class="nav nav-tabs mb-3" id="patientModalTabs" role="tablist">
             <li class="nav-item" role="presentation">

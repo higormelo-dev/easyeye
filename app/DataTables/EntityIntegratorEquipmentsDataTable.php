@@ -106,9 +106,9 @@ class EntityIntegratorEquipmentsDataTable extends BaseDataTable
     private function buildEquipmentActionButtons(EntityIntegratorEquipment $record): string
     {
         return '<a href="javascript:void(0);"
-            class="btn waves-effect waves-light btn-secondary btn-xs m-1 btn-show"
+            class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
             data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-            title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>';
+            title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>';
     }
 
     /**

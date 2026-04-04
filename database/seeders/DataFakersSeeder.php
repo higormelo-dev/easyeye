@@ -29,6 +29,10 @@ use Illuminate\Support\Str;
 
 class DataFakersSeeder extends Seeder
 {
+    private const INTEGRATOR_TEST_ENTITY_NAME = 'Clínica Teste Integrador';
+
+    private const INTEGRATOR_TEST_ENTITY_SUBDOMAIN = 'clinica-teste-integrador';
+
     /**
      * Run the database seeds.
      */
@@ -50,6 +54,9 @@ class DataFakersSeeder extends Seeder
         $entities = Entity::query()
             ->where('is_client', true)
             ->whereNot('name', 'Medical Group')
+            // Esta clínica é reservada para testes de API de integradores e não
+            // deve receber massa fake (principalmente equipamentos).
+            ->whereNot('subdomain', self::INTEGRATOR_TEST_ENTITY_SUBDOMAIN)
             ->get();
 
         $usersCount = $this->seedInt('SEED_FAKE_USERS', 95, 1);
@@ -171,8 +178,8 @@ class DataFakersSeeder extends Seeder
 
         // ── Integrador de teste com credenciais fixas ────────────────────────
         $testEntity = Entity::create([
-            'name'      => 'Clínica Teste Integrador',
-            'subdomain' => 'clinica-teste-integrador',
+            'name'      => self::INTEGRATOR_TEST_ENTITY_NAME,
+            'subdomain' => self::INTEGRATOR_TEST_ENTITY_SUBDOMAIN,
             'city'      => 'São Paulo',
             'state'     => 'SP',
             'country'   => 'BR',
@@ -212,6 +219,14 @@ class DataFakersSeeder extends Seeder
             'mac'                       => 'AA:BB:CC:DD:EE:02',
             'active'                    => true,
         ]);
+
+        // Regra de negócio: esta clínica é exclusiva para testes da API de
+        // integradores e deve permanecer sem equipamentos cadastrados.
+        EntityIntegratorEquipment::withTrashed()
+            ->whereHas('integrator.user', static function ($query) use ($testEntity) {
+                $query->where('entity_id', $testEntity->id);
+            })
+            ->forceDelete();
 
         // ── Usuários fixos da Clínica Teste Integrador ───────────────────────
 

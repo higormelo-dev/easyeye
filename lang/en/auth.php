@@ -14,6 +14,8 @@ return [
     'remember_me'     => 'Remember Me',
     'back_to_login'   => 'Back to login',
     'select_entity'   => 'Select company',
+    'login_subtitle'  => 'Please enter below details to access the dashboard',
+    'no_account_yet'  => 'Don\'t have an account yet?',
 
     'inactive'                 => 'User is not active',
     'integrator_invalid'       => 'Invalid integrator code or inactive',

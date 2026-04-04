@@ -20,9 +20,7 @@ class PlansDataTable extends BaseDataTable
             ->addColumn('action', fn (Plan $record) => $this->buildPlanActionButtons($record))
             ->editColumn('price', fn (Plan $record) => 'R$ ' . number_format((float) $record->price, 2, ',', '.'))
             ->editColumn('billing_cycle', fn (Plan $record) => $record->billing_cycle->label())
-            ->editColumn('active', fn (Plan $record) => $record->active
-                ? '<span class="badge bg-success">' . __('actions.yes') . '</span>'
-                : '<span class="badge bg-dark">' . __('actions.no') . '</span>')
+            ->editColumn('active', fn (Plan $record) => $this->formatActiveColumn($record))
             ->rawColumns(['active', 'action'])
             ->filterColumn('name', function ($query, $keyword) {
                 $query->whereRaw('LOWER(plans.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
@@ -89,24 +87,23 @@ class PlansDataTable extends BaseDataTable
     private function buildPlanActionButtons(Plan $record): string
     {
         return '
-            <a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-edit"
-                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.edit') . '"><i class="fa fa-edit"></i></a>
-            <a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-show"
-                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.view') . '"><i class="fa fa-eye"></i></a>
-            <a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-light btn-xs m-1 btn-active"
-                data-id="' . $record->id . '" data-situation="' . ($record->active ? 0 : 1) . '"
-                data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . ($record->active ? __('actions.disable') : __('actions.enable')) . '">
-                <i class="fas ' . ($record->active ? 'fa-lock-open' : 'fa-unlock') . '"></i></a>
-            <a href="javascript:void(0);"
-                class="btn waves-effect waves-light btn-danger btn-xs m-1 btn-trash"
-                data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
-                title="' . __('actions.delete') . '"><i class="fas fa-trash-alt"></i></a>';
+<div class="d-flex align-items-center float-end gap-1">
+    <a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
+       title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>
+    <a href="javascript:void(0);" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots-vertical"></i></a>
+    <ul class="dropdown-menu p-2">
+        <li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
+            <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>
+        <li><a class="dropdown-item btn-active" href="javascript:void(0);"
+               data-id="' . $record->id . '" data-situation="' . ($record->active ? 0 : 1) . '">
+            <i class="ti ' . ($record->active ? 'ti-lock-open' : 'ti-lock') . ' me-1"></i>' . ($record->active ? __('actions.disable') : __('actions.enable')) . '</a></li>
+        <li><a class="dropdown-item btn-trash text-danger" href="javascript:void(0);"
+               data-id="' . $record->id . '">
+            <i class="ti ti-trash me-1"></i>' . __('actions.delete') . '</a></li>
+    </ul>
+</div>';
     }
 
     /**

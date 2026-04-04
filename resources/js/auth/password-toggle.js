@@ -3,19 +3,19 @@
  *
  * Discovers every [data-toggle-password] button on the page and wires up
  * click handlers that toggle the linked <input> between type="password"
- * and type="text", swapping the MDI icon accordingly.
+ * and type="text", swapping the icon accordingly.
  *
  * Usage (Blade):
  *   <button type="button" class="btn btn-outline-secondary"
  *           data-toggle-password="#my-input" tabindex="-1">
- *       <i class="mdi mdi-eye-off"></i>
+ *       <i class="ti ti-eye-off"></i>
  *   </button>
  */
 export function initPasswordToggles() {
     document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const input = document.querySelector(btn.getAttribute('data-toggle-password'));
-            const icon  = btn.querySelector('.mdi');
+            const icon  = btn.querySelector('i');
 
             if (!input || !icon) return;
 
@@ -23,9 +23,14 @@ export function initPasswordToggles() {
 
             input.type = isHidden ? 'text' : 'password';
 
-            icon.classList.toggle('mdi-eye',     isHidden);
-            icon.classList.toggle('mdi-eye-off', !isHidden);
+            if (icon.classList.contains('mdi') || icon.className.includes('mdi-')) {
+                icon.classList.toggle('mdi-eye', isHidden);
+                icon.classList.toggle('mdi-eye-off', !isHidden);
+                return;
+            }
+
+            icon.classList.toggle('ti-eye', isHidden);
+            icon.classList.toggle('ti-eye-off', !isHidden);
         });
     });
 }
-
