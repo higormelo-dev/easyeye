@@ -20,9 +20,17 @@
                     <button class="btn btn-primary btn-sm" type="submit">
                         <i class="ti ti-filter me-1"></i> Filtrar
                     </button>
-                    <a href="{{ route('panel.financial.reports.cash-flow.export', request()->query()) }}" class="btn btn-outline-secondary btn-sm ms-1">
-                        <i class="ti ti-download me-1"></i> Exportar CSV
-                    </a>
+                    <div class="btn-group ms-1">
+                        <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="ti ti-download me-1"></i> Exportar
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{{ route('panel.financial.reports.cash-flow.export', array_merge(request()->query(), ['format' => 'csv'])) }}">CSV</a></li>
+                            <li><a class="dropdown-item" href="{{ route('panel.financial.reports.cash-flow.export', array_merge(request()->query(), ['format' => 'xls'])) }}">XLS (XSL)</a></li>
+                            <li><a class="dropdown-item" href="{{ route('panel.financial.reports.cash-flow.export', array_merge(request()->query(), ['format' => 'xlsx'])) }}">XLSX</a></li>
+                            <li><a class="dropdown-item" href="{{ route('panel.financial.reports.cash-flow.export', array_merge(request()->query(), ['format' => 'pdf'])) }}">PDF</a></li>
+                        </ul>
+                    </div>
                 </div>
             </form>
         </div>
@@ -168,4 +176,3 @@
         </div>
     </div>
 @endsection
-

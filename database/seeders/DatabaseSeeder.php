@@ -30,6 +30,7 @@ class DatabaseSeeder extends Seeder
         $this->call(MedicinePresentationsSeeder::class);
         $this->call(Cid10CodesSeeder::class);
         $this->call(FinancialCategoriesSeeder::class);
+        $this->call(TissReferenceSeeder::class);
         $this->call(ReportSettingSeeder::class);
         $this->call(ReportSettingContentSeeder::class);
         $this->call(ReportSettingVariableSeeder::class);
