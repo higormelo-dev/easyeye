@@ -3,9 +3,9 @@
 
     {{-- Pacientes --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #1976d2!important;">
+        <div class="card stat-card stat-card--patients h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e3f2fd;color:#1976d2;">
+                <div class="stat-icon stat-icon--patients">
                     <i class="fa fa-users"></i>
                 </div>
                 <div>
@@ -18,9 +18,9 @@
 
     {{-- Consultas Hoje --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #5c6bc0!important;">
+        <div class="card stat-card stat-card--today h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#ede7f6;color:#5c6bc0;">
+                <div class="stat-icon stat-icon--today">
                     <i class="fa fa-calendar-check-o"></i>
                 </div>
                 <div>
@@ -33,9 +33,9 @@
 
     {{-- Médicos Ativos --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #388e3c!important;">
+        <div class="card stat-card stat-card--doctors h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e8f5e9;color:#388e3c;">
+                <div class="stat-icon stat-icon--doctors">
                     <i class="fa fa-user-md"></i>
                 </div>
                 <div>
@@ -48,9 +48,9 @@
 
     {{-- Cirurgias Hoje (mock) --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card stat-card-mock h-100" style="border-top:3px solid #7b1fa2!important;">
+        <div class="card stat-card stat-card--surgeries stat-card-mock h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#f3e5f5;color:#7b1fa2;">
+                <div class="stat-icon stat-icon--surgeries">
                     <i class="fa fa-scissors"></i>
                 </div>
                 <div>
@@ -69,9 +69,9 @@
 
     {{-- Exames Pendentes (mock) --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card stat-card-mock h-100" style="border-top:3px solid #e65100!important;">
+        <div class="card stat-card stat-card--exams stat-card-mock h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#fbe9e7;color:#e65100;">
+                <div class="stat-icon stat-icon--exams">
                     <i class="fa fa-eye"></i>
                 </div>
                 <div>
@@ -86,9 +86,9 @@
     @if($rule !== 'doctor')
     {{-- Guias Aguardando (mock) --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card stat-card-mock h-100" style="border-top:3px solid #bf360c!important;">
+        <div class="card stat-card stat-card--guides stat-card-mock h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#fce4ec;color:#bf360c;">
+                <div class="stat-icon stat-icon--guides">
                     <i class="fa fa-file-text-o"></i>
                 </div>
                 <div>
@@ -102,9 +102,9 @@
 
     {{-- A Receber (mock) --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card stat-card-mock h-100" style="border-top:3px solid #00695c!important;">
+        <div class="card stat-card stat-card--receivable stat-card-mock h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e0f2f1;color:#00695c;">
+                <div class="stat-icon stat-icon--receivable">
                     <i class="fa fa-dollar"></i>
                 </div>
                 <div>
@@ -118,9 +118,9 @@
 
     {{-- Satisfação (mock) --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card stat-card-mock h-100" style="border-top:3px solid #f57f17!important;">
+        <div class="card stat-card stat-card--satisfaction stat-card-mock h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#fff8e1;color:#f57f17;">
+                <div class="stat-icon stat-icon--satisfaction">
                     <i class="fa fa-star-o"></i>
                 </div>
                 <div>

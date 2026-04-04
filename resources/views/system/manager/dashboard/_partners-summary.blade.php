@@ -12,7 +12,7 @@
         <div class="row g-2 mb-3">
             <div class="col-4">
                 <div class="mgr-mini-kpi">
-                    <div class="mini-icon" style="background:#e3f2fd;color:#1976d2;">
+                    <div class="mini-icon mini-icon--partners">
                         <i class="ti ti-users"></i>
                     </div>
                     <div>
@@ -23,7 +23,7 @@
             </div>
             <div class="col-4">
                 <div class="mgr-mini-kpi">
-                    <div class="mini-icon" style="background:#e8f5e9;color:#388e3c;">
+                    <div class="mini-icon mini-icon--leads">
                         <i class="ti ti-target-arrow"></i>
                     </div>
                     <div>
@@ -34,7 +34,7 @@
             </div>
             <div class="col-4">
                 <div class="mgr-mini-kpi">
-                    <div class="mini-icon" style="background:#fff3e0;color:#f57c00;">
+                    <div class="mini-icon mini-icon--commissions">
                         <i class="ti ti-cash"></i>
                     </div>
                     <div>

@@ -5,9 +5,9 @@
 
     {{-- Total Clínicas --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #1976d2!important;">
+        <div class="card stat-card stat-card--entities h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e3f2fd;color:#1976d2;">
+                <div class="stat-icon stat-icon--entities">
                     <i class="ti ti-building"></i>
                 </div>
                 <div>
@@ -30,9 +30,9 @@
 
     {{-- Assinaturas Ativas --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #388e3c!important;">
+        <div class="card stat-card stat-card--active h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e8f5e9;color:#388e3c;">
+                <div class="stat-icon stat-icon--active">
                     <i class="ti ti-circle-check"></i>
                 </div>
                 <div>
@@ -45,9 +45,9 @@
 
     {{-- Em Trial --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #f57c00!important;">
+        <div class="card stat-card stat-card--trial h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#fff3e0;color:#f57c00;">
+                <div class="stat-icon stat-icon--trial">
                     <i class="ti ti-clock-hour-4"></i>
                 </div>
                 <div>
@@ -60,9 +60,9 @@
 
     {{-- MRR Estimado --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #7b1fa2!important;">
+        <div class="card stat-card stat-card--mrr h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#f3e5f5;color:#7b1fa2;">
+                <div class="stat-icon stat-icon--mrr">
                     <i class="ti ti-currency-real"></i>
                 </div>
                 <div>
@@ -80,9 +80,9 @@
 
     {{-- Total Pacientes --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #0d47a1!important;">
+        <div class="card stat-card stat-card--patients h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e3f2fd;color:#0d47a1;">
+                <div class="stat-icon stat-icon--patients">
                     <i class="ti ti-users"></i>
                 </div>
                 <div>
@@ -95,9 +95,9 @@
 
     {{-- Total Médicos --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #2e7d32!important;">
+        <div class="card stat-card stat-card--doctors h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e8f5e9;color:#2e7d32;">
+                <div class="stat-icon stat-icon--doctors">
                     <i class="ti ti-stethoscope"></i>
                 </div>
                 <div>
@@ -110,9 +110,9 @@
 
     {{-- Total Prontuários --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #00695c!important;">
+        <div class="card stat-card stat-card--records h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#e0f2f1;color:#00695c;">
+                <div class="stat-icon stat-icon--records">
                     <i class="ti ti-file-text"></i>
                 </div>
                 <div>
@@ -125,9 +125,9 @@
 
     {{-- Agendamentos --}}
     <div class="col-6 col-md-3">
-        <div class="card stat-card h-100" style="border-top:3px solid #5c6bc0!important;">
+        <div class="card stat-card stat-card--schedules h-100">
             <div class="card-body d-flex align-items-center gap-3 p-3">
-                <div class="stat-icon" style="background:#ede7f6;color:#5c6bc0;">
+                <div class="stat-icon stat-icon--schedules">
                     <i class="ti ti-calendar-event"></i>
                 </div>
                 <div>

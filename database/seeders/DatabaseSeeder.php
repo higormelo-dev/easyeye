@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
         $this->call(NearPointConvergencesSeeder::class);
         $this->call(MedicinePresentationsSeeder::class);
         $this->call(Cid10CodesSeeder::class);
+        $this->call(FinancialCategoriesSeeder::class);
         $this->call(ReportSettingSeeder::class);
         $this->call(ReportSettingContentSeeder::class);
         $this->call(ReportSettingVariableSeeder::class);

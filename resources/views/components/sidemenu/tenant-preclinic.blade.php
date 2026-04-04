@@ -25,15 +25,29 @@
 
 {{-- Financeiro --}}
 @if(in_array(session('selected_entity_user_rule'), [ClientRule::Admin->value, ClientRule::Financial->value], true))
+    @php $financialOpen = request()->routeIs('panel.financial.*'); @endphp
     <li class="submenu">
-        <a href="javascript:void(0);">
-            <i class="ti ti-cash-register"></i><span>Financeiro</span>
+        <a href="javascript:void(0);" class="{{ $financialOpen ? 'subdrop active' : '' }}">
+            <i class="ti ti-cash-register"></i><span>{{ __('actions.sidemenu.financial') }}</span>
             <span class="menu-arrow"></span>
         </a>
-        <ul>
+        <ul style="{{ $financialOpen ? 'display: block;' : '' }}">
             <li>
-                <a href="javascript:void(0);">
-                    <i class="ti ti-building-bank"></i> Fluxo de caixa
+                <a href="{{ route('panel.financial.cash-flow.index') }}"
+                   class="{{ request()->routeIs('panel.financial.cash-flow.*') ? 'active' : '' }}">
+                    <i class="ti ti-building-bank"></i> {{ __('actions.sidemenu.cash_flow') }}
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('panel.financial.billing.index') }}"
+                   class="{{ request()->routeIs('panel.financial.billing.*') ? 'active' : '' }}">
+                    <i class="ti ti-file-invoice"></i> {{ __('actions.sidemenu.tiss_billing') }}
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('panel.financial.reports.index') }}"
+                   class="{{ request()->routeIs('panel.financial.reports.*') ? 'active' : '' }}">
+                    <i class="ti ti-chart-arcs"></i> {{ __('actions.sidemenu.financial_reports') }}
                 </a>
             </li>
         </ul>

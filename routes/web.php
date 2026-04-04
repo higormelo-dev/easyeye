@@ -5,6 +5,9 @@ use App\Http\Controllers\{
     ComplianceController,
     DoctorWorkScheduleController,
     DoctorsController,
+    Financial\BillingController as FinancialBillingController,
+    Financial\CashFlowController,
+    Financial\FinancialReportsController,
     LocaleController,
     NoticesController,
     PatientsController,
@@ -261,6 +264,30 @@ Route::group(
             Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
             Route::get('reports/schedules', [ReportsController::class, 'schedules'])->name('reports.schedules');
             Route::get('reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('reports.absenteeism');
+
+            Route::prefix('financial')->as('financial.')->group(function () {
+                // Fluxo de caixa
+                Route::get('cash-flow', [CashFlowController::class, 'index'])->name('cash-flow.index');
+                Route::post('cash-flow', [CashFlowController::class, 'store'])->name('cash-flow.store');
+                Route::match(['PUT', 'PATCH'], 'cash-flow/{entry}', [CashFlowController::class, 'update'])->name('cash-flow.update');
+                Route::delete('cash-flow/{entry}', [CashFlowController::class, 'destroy'])->name('cash-flow.destroy');
+
+                // Faturamento TISS (individual e lote)
+                Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
+                Route::post('billing/individual', [FinancialBillingController::class, 'storeIndividual'])->name('billing.individual.store');
+                Route::post('billing/batch', [FinancialBillingController::class, 'storeBatch'])->name('billing.batch.store');
+                Route::post('billing/batches/{batch}/submit', [FinancialBillingController::class, 'submitBatch'])->name('billing.batches.submit');
+                Route::get('billing/batches/{batch}/xml', [FinancialBillingController::class, 'exportBatchXml'])->name('billing.batches.xml');
+                Route::post('billing/claims/{claim}/paid', [FinancialBillingController::class, 'markClaimPaid'])->name('billing.claims.paid');
+                Route::post('billing/claims/{claim}/denied', [FinancialBillingController::class, 'markClaimDenied'])->name('billing.claims.denied');
+
+                // Relatórios financeiros
+                Route::get('reports', [FinancialReportsController::class, 'index'])->name('reports.index');
+                Route::get('reports/cash-flow', [FinancialReportsController::class, 'cashFlow'])->name('reports.cash-flow');
+                Route::get('reports/covenants', [FinancialReportsController::class, 'covenants'])->name('reports.covenants');
+                Route::get('reports/cash-flow/export', [FinancialReportsController::class, 'exportCashFlowCsv'])->name('reports.cash-flow.export');
+                Route::get('reports/covenants/export', [FinancialReportsController::class, 'exportCovenantsCsv'])->name('reports.covenants.export');
+            });
         });
 
         // ── admin only: compliance, controle de acesso, configurações ─────────

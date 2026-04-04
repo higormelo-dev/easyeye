@@ -247,6 +247,10 @@ return [
         'reports'               => 'Reports',
         'resources'             => 'Resources',
         'partners'              => 'Partners',
+        'financial'             => 'Financial',
+        'cash_flow'             => 'Cash Flow',
+        'tiss_billing'          => 'TISS Billing',
+        'financial_reports'     => 'Financial Reports',
     ],
 
     'reports' => [
@@ -254,6 +258,10 @@ return [
         'schedules_label'   => 'Production',
         'absenteeism'       => 'Absenteeism Report',
         'absenteeism_label' => 'Absenteeism',
+        'cash_flow'         => 'Cash Flow',
+        'cash_flow_label'   => 'Cash Flow',
+        'covenants'         => 'Covenant Billing',
+        'covenants_label'   => 'Covenant Billing',
     ],
 
     'datatable' => [

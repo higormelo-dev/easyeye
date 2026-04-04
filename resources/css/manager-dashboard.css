@@ -173,3 +173,132 @@
 .text-score-low  { color: #ef4444; }
 .text-score-mid  { color: #f59e0b; }
 .text-score-high { color: #22c55e; }
+
+/* ─── KPI Palette (sem inline styles) ─────────────────────────────────── */
+.page-dashboard .stat-card {
+    border: 1px solid var(--ee-border, #e2e8f0) !important;
+    border-top-width: 3px !important;
+    border-top-style: solid !important;
+}
+
+.page-dashboard .stat-card--entities { border-top-color: #1976d2 !important; }
+.page-dashboard .stat-card--active { border-top-color: #388e3c !important; }
+.page-dashboard .stat-card--trial { border-top-color: #f57c00 !important; }
+.page-dashboard .stat-card--mrr { border-top-color: #7b1fa2 !important; }
+.page-dashboard .stat-card--patients { border-top-color: #0d47a1 !important; }
+.page-dashboard .stat-card--doctors { border-top-color: #2e7d32 !important; }
+.page-dashboard .stat-card--records { border-top-color: #00695c !important; }
+.page-dashboard .stat-card--schedules { border-top-color: #5c6bc0 !important; }
+
+.page-dashboard .stat-icon--entities { background: #e3f2fd; color: #1976d2; }
+.page-dashboard .stat-icon--active { background: #e8f5e9; color: #388e3c; }
+.page-dashboard .stat-icon--trial { background: #fff3e0; color: #f57c00; }
+.page-dashboard .stat-icon--mrr { background: #f3e5f5; color: #7b1fa2; }
+.page-dashboard .stat-icon--patients { background: #e3f2fd; color: #0d47a1; }
+.page-dashboard .stat-icon--doctors { background: #e8f5e9; color: #2e7d32; }
+.page-dashboard .stat-icon--records { background: #e0f2f1; color: #00695c; }
+.page-dashboard .stat-icon--schedules { background: #ede7f6; color: #5c6bc0; }
+
+.page-dashboard .mini-icon--partners { background: #e3f2fd; color: #1976d2; }
+.page-dashboard .mini-icon--leads { background: #e8f5e9; color: #388e3c; }
+.page-dashboard .mini-icon--commissions { background: #fff3e0; color: #f57c00; }
+
+/* ─── Neutraliza base do tema para tabelas desse dashboard ────────────── */
+.page-dashboard .mgr-table th,
+.page-dashboard .mgr-table td {
+    background: transparent !important;
+}
+
+/* ─── Dark Mode: Manager Dashboard ────────────────────────────────────── */
+:root[data-bs-theme=dark] .page-dashboard {
+    --ee-bg: #060b18;
+    --ee-surface: #0f1729;
+    --ee-border: #24344e;
+    --ee-text: #e4ebfa;
+    --ee-text-muted: #9fb0cc;
+    --ee-primary-light: rgba(25, 118, 210, 0.14);
+    --ee-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+    --ee-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    --ee-shadow-lg: 0 12px 30px rgba(0, 0, 0, 0.5);
+    background: var(--ee-bg);
+    border-radius: var(--ee-radius-lg, 0.875rem);
+    padding: 0.25rem;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .card,
+:root[data-bs-theme=dark] .page-dashboard .mgr-chart-card,
+:root[data-bs-theme=dark] .page-dashboard .mgr-mini-kpi {
+    background: linear-gradient(180deg, #111b30 0%, #0f1729 100%) !important;
+    border-color: var(--ee-border, #24344e) !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .card-header,
+:root[data-bs-theme=dark] .page-dashboard .mgr-chart-card .card-header {
+    background: #111b30 !important;
+    border-color: var(--ee-border, #24344e) !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .mgr-table thead th {
+    background: #152238 !important;
+    border-color: var(--ee-border, #24344e) !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .mgr-table tbody tr {
+    background: #0c1428;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .mgr-table tbody td {
+    border-color: #1f3048 !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .mgr-table tbody tr:hover {
+    background: #162541;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .funnel-bar-wrapper,
+:root[data-bs-theme=dark] .page-dashboard .score-bar {
+    background: #22334c;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .period-badge {
+    background: #1c2a43;
+    color: #aec0dd;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .period-badge .period-value {
+    color: var(--ee-text, #e4ebfa);
+}
+
+:root[data-bs-theme=dark] .page-dashboard .btn-outline-primary {
+    color: #91c2ff !important;
+    border-color: #335683 !important;
+    background: rgba(13, 28, 53, 0.35) !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .btn-outline-primary:hover {
+    color: #d8e8ff !important;
+    border-color: #4f77ab !important;
+    background: rgba(39, 79, 132, 0.35) !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard hr {
+    border-color: var(--ee-border, #24344e);
+    opacity: 1;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .text-muted {
+    color: var(--ee-text-muted, #9fb0cc) !important;
+}
+
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--entities { background: rgba(25, 118, 210, 0.2); color: #86bbff; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--active { background: rgba(56, 142, 60, 0.2); color: #82d38b; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--trial { background: rgba(245, 124, 0, 0.2); color: #ffc075; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--mrr { background: rgba(123, 31, 162, 0.22); color: #d59cf0; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--patients { background: rgba(13, 71, 161, 0.24); color: #8ab8ff; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--doctors { background: rgba(46, 125, 50, 0.22); color: #94de9b; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--records { background: rgba(0, 105, 92, 0.24); color: #73dfcf; }
+:root[data-bs-theme=dark] .page-dashboard .stat-icon--schedules { background: rgba(92, 107, 192, 0.24); color: #a7b4ff; }
+
+:root[data-bs-theme=dark] .page-dashboard .mini-icon--partners { background: rgba(25, 118, 210, 0.2); color: #86bbff; }
+:root[data-bs-theme=dark] .page-dashboard .mini-icon--leads { background: rgba(56, 142, 60, 0.2); color: #82d38b; }
+:root[data-bs-theme=dark] .page-dashboard .mini-icon--commissions { background: rgba(245, 124, 0, 0.2); color: #ffc075; }

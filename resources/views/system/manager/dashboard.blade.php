@@ -92,24 +92,57 @@
 @push('scripts')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // ── Gráfico de Crescimento (Morris.js Line) ─────────────────────────
-    if (typeof Morris !== 'undefined' && document.getElementById('mgr-chart-growth')) {
+    function isDarkTheme() {
+        return document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    }
+
+    function growthChartPalette() {
+        if (isDarkTheme()) {
+            return {
+                line: '#5da6ff',
+                point: '#80bdff',
+                pointStroke: '#0f1729',
+                gridText: '#a7b8d6',
+                gridLine: '#22334c',
+            };
+        }
+
+        return {
+            line: '#1976d2',
+            point: '#1976d2',
+            pointStroke: '#ffffff',
+            gridText: '#64748b',
+            gridLine: '#e2e8f0',
+        };
+    }
+
+    function renderGrowthChart() {
+        var chartEl = document.getElementById('mgr-chart-growth');
+        if (typeof Morris === 'undefined' || !chartEl) {
+            return;
+        }
+
+        chartEl.innerHTML = '';
+
         var labels = @json($stats['growthLabels']);
         var values = @json($stats['growthValues']);
         var chartData = [];
         for (var i = 0; i < labels.length; i++) {
             chartData.push({ month: labels[i], count: values[i] });
         }
+        var palette = growthChartPalette();
+
         Morris.Line({
             element: 'mgr-chart-growth',
             data: chartData,
             xkey: 'month',
             ykeys: ['count'],
             labels: ['{{ __("manager_dashboard.chart_new_entities") }}'],
-            lineColors: ['#1976d2'],
-            pointFillColors: ['#1976d2'],
-            pointStrokeColors: ['#fff'],
-            gridTextColor: '#64748b',
+            lineColors: [palette.line],
+            pointFillColors: [palette.point],
+            pointStrokeColors: [palette.pointStroke],
+            gridTextColor: palette.gridText,
+            gridLineColor: palette.gridLine,
             gridTextSize: 12,
             hideHover: 'auto',
             resize: true,
@@ -118,6 +151,20 @@ document.addEventListener('DOMContentLoaded', function () {
             behaveLikeLine: true,
             smooth: true,
         });
+    }
+
+    renderGrowthChart();
+
+    if (typeof MutationObserver !== 'undefined') {
+        var observer = new MutationObserver(function (mutations) {
+            for (var i = 0; i < mutations.length; i++) {
+                if (mutations[i].attributeName === 'data-bs-theme') {
+                    renderGrowthChart();
+                    break;
+                }
+            }
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
     }
 });
 </script>

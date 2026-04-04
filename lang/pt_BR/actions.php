@@ -248,12 +248,20 @@ return [
         'reports'               => 'Relatórios',
         'resources'             => 'Recursos',
         'partners'              => 'Parceiros',
+        'financial'             => 'Financeiro',
+        'cash_flow'             => 'Fluxo de caixa',
+        'tiss_billing'          => 'Faturamento TISS',
+        'financial_reports'     => 'Relatórios financeiros',
     ],
     'reports' => [
         'schedules'         => 'Relatório de Produção',
         'schedules_label'   => 'Produção',
         'absenteeism'       => 'Relatório de Absenteísmo',
         'absenteeism_label' => 'Absenteísmo',
+        'cash_flow'         => 'Fluxo de caixa',
+        'cash_flow_label'   => 'Fluxo de caixa',
+        'covenants'         => 'Faturamento Convênios',
+        'covenants_label'   => 'Faturamento Convênios',
     ],
 
     'datatable' => [
