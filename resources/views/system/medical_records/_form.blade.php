@@ -18,6 +18,7 @@
           ? route('panel.patients.medicalrecords.update', [$patient, $r])
           : route('panel.patients.medicalrecords.store', $patient) }}"
       enctype="multipart/form-data"
+      class="pmr-form"
       x-data="medicalRecordForm({
           isEdit: {{ $isEdit ? 'true' : 'false' }},
           diabetic: {{ $old('diabetic') ? 'true' : 'false' }},
@@ -53,11 +54,13 @@
          MÉDICO (só quando necessário) + QUEIXA + FLAGS (linha topo)
          ═══════════════════════════════════════════════════════════════════ --}}
 
-    {{-- Médico logado no create: apenas campo oculto --}}
-    @if($currentDoctor && !$isEdit)
-        <input type="hidden" name="doctor_id" value="{{ $currentDoctor->id }}">
+    {{-- Médico vinculado: campo oculto (exceto admin, que pode escolher) --}}
+    @if(!$canChooseDoctor && $currentDoctor)
+        <input type="hidden"
+               name="doctor_id"
+               value="{{ $oldId('doctor_id') ?: $currentDoctor->id }}">
     @else
-    {{-- Sem médico logado OU no edit: select compacto em linha própria --}}
+    {{-- Sem médico vinculado: select compacto em linha própria --}}
     <div class="pmr-section px-3 pt-2">
         <div class="row g-2">
             <div class="col-12 col-md-4 col-lg-3">
@@ -78,7 +81,7 @@
     @endif
 
     {{-- Queixa principal (col-8) + Flags (col-4) na mesma linha --}}
-    <div class="pmr-section px-3 pt-2 pb-0">
+    <div class="pmr-section pmr-top-strip px-3 pt-2 pb-0">
         {{-- Queixa principal + Switches --}}
         <div class="row g-2 align-items-start">
             <div class="col-12 col-lg-8">
@@ -88,12 +91,12 @@
                        placeholder="{{ __('actions.medical_records.complaint_ph') }}">
             </div>
             {{-- Switches: Diabético / Hipertenso / Glaucomatoso --}}
-            <div class="col-12 col-lg-4">
-                <div class="row g-1">
+            <div class="col-12 col-lg-4 pmr-risk-wrap">
+                <div class="row g-1 pmr-risk-grid">
                     @foreach(['diabetic', 'hypertensive'] as $flag)
-                    <div class="col-4">
+                    <div class="col-4 pmr-risk-item">
                         <label class="pmr-label text-center d-block" style="font-size:.7rem;">{{ __('actions.medical_records.' . $flag) }}</label>
-                        <div class="d-flex flex-column align-items-center gap-1">
+                        <div class="pmr-risk-switches">
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" role="switch"
                                        name="{{ $flag }}" value="1"
@@ -111,9 +114,9 @@
                     @endforeach
 
                     {{-- Glaucomatoso — com campo "Outros" expansível --}}
-                    <div class="col-4">
+                    <div class="col-4 pmr-risk-item">
                         <label class="pmr-label text-center d-block" style="font-size:.7rem;">{{ __('actions.medical_records.glaucomatous') }}</label>
-                        <div class="d-flex flex-column align-items-center gap-1">
+                        <div class="pmr-risk-switches">
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" role="switch"
                                        name="glaucomatous" value="1"
@@ -126,10 +129,12 @@
                                        x-model="glaucomatousFamily">
                                 <label class="form-check-label pmr-toggle-label">{{ __('actions.medical_records.family') }}</label>
                             </div>
-                            {{-- Botão "Outros" --}}
+                        </div>
+                        {{-- Botão "Outros" --}}
+                        <div class="text-center mt-1">
                             <button type="button"
                                     class="btn btn-link p-0 pmr-toggle-label text-decoration-none"
-                                    style="font-size:.7rem;color:var(--bs-secondary);"
+                                    style="font-size:.68rem;color:var(--bs-secondary);"
                                     @click="showOthersHistory = !showOthersHistory">
                                 <i class="fas fa-plus-circle fa-xs me-1" x-show="!showOthersHistory"></i>
                                 <i class="fas fa-minus-circle fa-xs me-1" x-show="showOthersHistory" x-cloak></i>
@@ -152,34 +157,16 @@
                        x-effect="if (showOthersHistory) $nextTick(() => $refs.othersHistoryInput.focus())">
             </div>
         </div>
-
-        {{-- HDA / Histórico cirúrgico ocular / Medicamentos em uso --}}
-        <div class="row g-2 mt-2">
-            <div class="col-12">
-                <label class="pmr-label">{{ __('actions.medical_records.hda') }}</label>
-                <textarea name="hda" rows="2" class="form-control form-control-sm"
-                          placeholder="{{ __('actions.medical_records.hda_ph') }}">{{ $old('hda') }}</textarea>
-            </div>
-            <div class="col-12 col-md-6">
-                <label class="pmr-label">{{ __('actions.medical_records.ocular_surgical_history') }}</label>
-                <textarea name="ocular_surgical_history" rows="2"
-                          class="form-control form-control-sm">{{ $old('ocular_surgical_history') }}</textarea>
-            </div>
-            <div class="col-12 col-md-6">
-                <label class="pmr-label">{{ __('actions.medical_records.medications_in_use') }}</label>
-                <textarea name="medications_in_use" rows="2"
-                          class="form-control form-control-sm">{{ $old('medications_in_use') }}</textarea>
-            </div>
-        </div>
     </div>
 
     {{-- ═══════════════════════════════════════════════════════════════════
          DUAS COLUNAS PRINCIPAIS
          ═══════════════════════════════════════════════════════════════════ --}}
-    <div class="row g-0 px-3 pt-1 pb-1">
+    <div class="row g-2 px-3 pt-1 pb-1 pmr-main-columns">
 
         {{-- ── COLUNA ESQUERDA ─────────────────────────────────────────── --}}
         <div class="col-12 col-lg-6 pe-lg-2">
+            <div class="pmr-main-panel">
 
             {{-- Vis. cromática / PPC / Cover test --}}
             <div class="pmr-section mb-1">
@@ -374,10 +361,12 @@
                 </div>
             </div>
 
+            </div>
         </div>{{-- /col esquerda --}}
 
         {{-- ── COLUNA DIREITA ──────────────────────────────────────────── --}}
         <div class="col-12 col-lg-6 ps-lg-2">
+            <div class="pmr-main-panel">
 
             {{-- Adição / Longe / Perto + Calc presbiopia --}}
             <div class="pmr-section mb-1">
@@ -497,6 +486,7 @@
             </div>
 
 
+            </div>
         </div>{{-- /col direita --}}
 
     </div>{{-- /row duas colunas --}}
@@ -514,6 +504,24 @@
 
         <div class="collapse {{ ($old('observation_of_lenses') || $old('diagnosis_cids') || $old('clinical_conduct') || $old('ocular_motility')) ? 'show' : '' }}"
              id="pmr-extra-fields">
+
+            <div class="row g-2 mb-2">
+                <div class="col-12">
+                    <label class="pmr-label">{{ __('actions.medical_records.hda') }}</label>
+                    <textarea name="hda" rows="2" class="form-control form-control-sm"
+                              placeholder="{{ __('actions.medical_records.hda_ph') }}">{{ $old('hda') }}</textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="pmr-label">{{ __('actions.medical_records.ocular_surgical_history') }}</label>
+                    <textarea name="ocular_surgical_history" rows="2"
+                              class="form-control form-control-sm">{{ $old('ocular_surgical_history') }}</textarea>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="pmr-label">{{ __('actions.medical_records.medications_in_use') }}</label>
+                    <textarea name="medications_in_use" rows="2"
+                              class="form-control form-control-sm">{{ $old('medications_in_use') }}</textarea>
+                </div>
+            </div>
 
             {{-- Motilidade ocular --}}
             <div class="row g-2 mb-2">

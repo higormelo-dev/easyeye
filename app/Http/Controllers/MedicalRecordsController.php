@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DataAccessPurpose;
+use App\Enums\ClientRule;
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
@@ -374,6 +375,7 @@ class MedicalRecordsController extends Controller
     private function commonFormData(Patient $patient): array
     {
         $entityId = session('selected_entity_id');
+        $entity   = Entity::find($entityId);
 
         $doctors = Doctor::with(['person', 'entityUser'])
             ->whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
@@ -386,6 +388,7 @@ class MedicalRecordsController extends Controller
         $commonData = [
             'doctors'            => $doctors,
             'currentDoctor'      => $currentDoctor,
+            'canChooseDoctor'    => $entity && auth()->user()?->hasRoleInEntity($entity, ClientRule::Admin),
             'visualAcuityTypes'  => VisualAcuityType::orderBy('name')->get(),
             'colorVisionTypes'   => ColorVisionType::orderBy('name')->get(),
             'coverTestTypes'     => CoverTestType::orderBy('name')->get(),

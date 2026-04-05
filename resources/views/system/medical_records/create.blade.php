@@ -5,36 +5,38 @@
 @endsection
 
 @section('content')
-
-{{-- ── Subnav ──────────────────────────────────────────────────────────── --}}
-<div class="row mb-3 align-items-center">
-    <div class="col-12 col-md-auto">
-        <a href="{{ route('panel.patients.medicalrecords.index', $patient) }}" class="btn btn-outline-white btn-sm">
-            <i class="fas fa-arrow-left me-1"></i>{{ __('actions.medical_records.title') }}
-        </a>
-    </div>
-</div>
-
-<div class="row g-3">
-
-    {{-- ── Coluna lateral: info do paciente ─────────────────────────────── --}}
-    <div class="col-12 col-md-3">
-        <div class="patient-info-sticky">
-            @include('system.medical_records._patient-info')
+<div class="pmr-screen">
+    {{-- ── Subnav ──────────────────────────────────────────────────────────── --}}
+    <div class="row mb-3 align-items-center">
+        <div class="col-12 col-md-auto">
+            <div class="btn-group" role="group">
+                <a href="{{ route('panel.patients.index') }}" class="btn btn-outline-white btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>{{ __('actions.sidemenu.patients') }}
+                </a>
+                <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>{{ __('actions.new') }}
+                </a>
+            </div>
         </div>
     </div>
 
-    {{-- ── Coluna principal: formulário ─────────────────────────────────── --}}
-    <div class="col-12 col-md-9">
-        <div class="card overflow-hidden" style="border-top:3px solid #26a69a;">
-            @include('system.medical_records._form', ['medicalrecord' => null])
+    <div class="row g-2">
+        <div class="col-12 col-lg-3 col-xl-2">
+            <div class="patient-info-sticky">
+                @include('system.medical_records._patient-info')
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-9 col-xl-10">
+            <div class="card pmr-content-card overflow-hidden">
+                @include('system.medical_records._form', ['medicalrecord' => null])
+            </div>
         </div>
     </div>
-
 </div>
-
 @endsection
 
 @section('javascript')
 @include('system.medical_records._form-styles')
 @vite(['resources/js/system/medical-records.js'])
+@endsection
