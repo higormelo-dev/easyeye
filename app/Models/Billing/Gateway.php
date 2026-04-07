@@ -18,6 +18,7 @@ class Gateway extends Model
         'code',
         'name',
         'active',
+        'is_default',
         'supports_subscriptions',
         'supports_one_time_charges',
         'supports_refunds',
@@ -30,6 +31,7 @@ class Gateway extends Model
     {
         return [
             'active'                    => 'boolean',
+            'is_default'                => 'boolean',
             'supports_subscriptions'    => 'boolean',
             'supports_one_time_charges' => 'boolean',
             'supports_refunds'          => 'boolean',
@@ -45,5 +47,10 @@ class Gateway extends Model
     public function credentials(): HasMany
     {
         return $this->hasMany(GatewayCredential::class, 'gateway_id');
+    }
+
+    public function entityAccess(): HasMany
+    {
+        return $this->hasMany(EntityGatewayAccess::class, 'gateway_id');
     }
 }

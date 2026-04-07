@@ -56,11 +56,14 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
 
     // ── Gateways de Pagamento ──────────────────────────────────────────────
     Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');
+    Route::patch('gateways/{gateway}/set-default', [GatewaysController::class, 'setDefault'])->name('gateways.set-default');
     Route::patch('gateways/{gateway}/toggle-active', [GatewaysController::class, 'toggleActive'])->name('gateways.toggle-active');
     Route::patch('gateways/{gateway}/priority', [GatewaysController::class, 'updatePriority'])->name('gateways.priority');
     Route::get('gateways/{gateway}/credentials', [GatewaysController::class, 'credentials'])->name('gateways.credentials');
     Route::post('gateways/{gateway}/credentials', [GatewaysController::class, 'storeCredential'])->name('gateways.credentials.store');
     Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [GatewaysController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
+    Route::get('gateways/{gateway}/entity-access', [GatewaysController::class, 'entityAccess'])->name('gateways.entity-access');
+    Route::patch('gateways/{gateway}/entity-access/{entity}', [GatewaysController::class, 'toggleEntityAccess'])->name('gateways.entity-access.toggle');
 
     // ── Assinaturas ────────────────────────────────────────────────────────
     Route::get('subscriptions/cards', [SubscriptionsController::class, 'cards'])->name('subscriptions.cards');

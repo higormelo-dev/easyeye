@@ -5,18 +5,28 @@ namespace App\Http\Controllers\Setting;
 use App\Enums\Billing\CredentialScope;
 use App\Http\Controllers\Controller;
 use App\Models\Billing\{Gateway, GatewayCredential};
-use App\Services\Billing\GatewayCredentialResolver;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
 
 class TenantGatewayController extends Controller
 {
+    /**
+     * Lista os gateways disponíveis para esta clínica.
+     *
+     * Somente gateways:
+     *   - ativos globalmente (gateways.active = true)
+     *   - com acesso habilitado para esta clínica pelo SaaS owner (entity_gateway_access.enabled = true)
+     */
     public function index(): \Illuminate\View\View
     {
         $entityId = (string) session('selected_entity_id');
 
         $gateways = Gateway::query()
             ->where('active', true)
+            ->whereHas('entityAccess', fn ($q) => $q
+                ->where('entity_id', $entityId)
+                ->where('enabled', true)
+            )
             ->withCount([
                 'credentials' => fn ($q) => $q
                     ->where('entity_id', $entityId)
@@ -35,6 +45,8 @@ class TenantGatewayController extends Controller
     public function credentials(Gateway $gateway): JsonResponse
     {
         $entityId = (string) session('selected_entity_id');
+
+        $this->abortUnlessAllowed($gateway, $entityId);
 
         $credentials = $gateway->credentials()
             ->where('entity_id', $entityId)
@@ -63,6 +75,10 @@ class TenantGatewayController extends Controller
      */
     public function storeCredential(Request $request, Gateway $gateway): JsonResponse
     {
+        $entityId = (string) session('selected_entity_id');
+
+        $this->abortUnlessAllowed($gateway, $entityId);
+
         $request->validate([
             'label'          => ['nullable', 'string', 'max:120'],
             'secret'         => ['required', 'string', 'min:8'],
@@ -71,9 +87,6 @@ class TenantGatewayController extends Controller
             'valid_to'       => ['nullable', 'date', 'after:valid_from'],
         ]);
 
-        $entityId = (string) session('selected_entity_id');
-
-        // Desativa credenciais anteriores deste gateway para este tenant
         GatewayCredential::query()
             ->where('gateway_id', $gateway->id)
             ->where('entity_id', $entityId)
@@ -107,7 +120,6 @@ class TenantGatewayController extends Controller
     {
         $entityId = (string) session('selected_entity_id');
 
-        // Garante que a credencial pertence a este gateway e a este tenant
         if ($credential->gateway_id !== $gateway->id || (string) $credential->entity_id !== $entityId) {
             abort(404);
         }
@@ -117,5 +129,20 @@ class TenantGatewayController extends Controller
         Cache::forget("gateway_credential:{$gateway->code}:{$entityId}");
 
         return response()->json(['message' => 'Credencial revogada.']);
+    }
+
+    /**
+     * Garante que a clínica tem acesso habilitado ao gateway pelo SaaS owner.
+     */
+    private function abortUnlessAllowed(Gateway $gateway, string $entityId): void
+    {
+        $allowed = $gateway->entityAccess()
+            ->where('entity_id', $entityId)
+            ->where('enabled', true)
+            ->exists();
+
+        if (! $allowed) {
+            abort(403, 'Sua clínica não tem acesso a este gateway.');
+        }
     }
 }

@@ -4,7 +4,7 @@ namespace App\Providers;
 
 use App\Contracts\Billing\PaymentGatewayInterface;
 use App\Enums\Billing\GatewayCode;
-use App\Services\Billing\{BillingCancellationService, CircuitBreakerService, GatewayRegistry};
+use App\Services\Billing\{BillingCancellationService, CircuitBreakerService, GatewayDefaultService, GatewayRegistry};
 use App\Services\Billing\Gateways\{AsaasGateway, InfinitePayGateway, MercadoPagoGateway, PagBankGateway, PagarmeGateway, StripeBrGateway};
 use Illuminate\Support\ServiceProvider;
 
@@ -31,10 +31,15 @@ class BillingServiceProvider extends ServiceProvider
             ]);
         });
 
-        $this->app->bind(PaymentGatewayInterface::class, function ($app): PaymentGatewayInterface {
-            $default = config('billing.default_gateway', GatewayCode::Asaas->value);
+        // GatewayDefaultService — singleton com cache interno (TTL=10min)
+        $this->app->singleton(GatewayDefaultService::class);
 
-            return $app->make(GatewayRegistry::class)->get((string) $default);
+        // Binding da interface para o gateway padrão definido no banco
+        $this->app->bind(PaymentGatewayInterface::class, function ($app): PaymentGatewayInterface {
+            $defaultCode = $app->make(GatewayDefaultService::class)->getDefaultCode()
+                ?? GatewayCode::Asaas->value;
+
+            return $app->make(GatewayRegistry::class)->get($defaultCode);
         });
 
         // BillingCancellationService resolved from container (its deps are all singletons/bound)

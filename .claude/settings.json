@@ -24,7 +24,10 @@
       "Bash(./vendor/bin/pest --exclude=tests/Feature/Subscriptions/UsageMeterServiceTest.php)",
       "Bash(./vendor/bin/pest --filter \"not UsageMeterServiceTest\")",
       "Bash(./vendor/bin/pest tests/Unit/Tiss/ --no-coverage)",
-      "Bash(./vendor/bin/pint app/Domains/Tiss/ app/Providers/TissServiceProvider.php bootstrap/providers.php)"
+      "Bash(./vendor/bin/pint app/Domains/Tiss/ app/Providers/TissServiceProvider.php bootstrap/providers.php)",
+      "Bash(find /home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/routes -type f -name \"*.php\" -exec grep -l \"WebhookController\" {} \\\\;)",
+      "Bash(php -l lang/pt_BR/gateways.php)",
+      "Bash(php -l lang/en/gateways.php)"
     ],
     "additionalDirectories": [
       "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images"

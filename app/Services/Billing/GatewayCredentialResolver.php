@@ -11,38 +11,20 @@ use Illuminate\Support\Facades\Cache;
  * ┌─────────────────────────────────────────────────────────────────────┐
  * │  CONTEXTO 1 — SaaS billing (entityId = null)                       │
  * │  Propósito: cobrar CLÍNICAS pela assinatura do EasyEye             │
- * │  Prioridade:                                                        │
- * │    1. .env  (ASAAS_SECRET, INFINITEPAY_SECRET…)  ← fonte primária  │
- * │    2. gateway_credentials (scope=global) ← override sem redeploy   │
+ * │  Fonte: gateway_credentials (scope=global, entity_id=null)         │
+ * │  Gerenciado em: /panel/manager/gateways                            │
  * ├─────────────────────────────────────────────────────────────────────┤
  * │  CONTEXTO 2 — Tenant payment (entityId = uuid da clínica)          │
  * │  Propósito: clínica recebe pagamentos dos PACIENTES dela            │
- * │  Prioridade:                                                        │
- * │    1. gateway_credentials (scope=tenant, entity_id=uuid)           │
- * │    NÃO cai para global — chave do SaaS ≠ chave da clínica          │
+ * │  Fonte: gateway_credentials (scope=tenant, entity_id=uuid)         │
+ * │  NÃO cai para global — chave do SaaS ≠ chave da clínica           │
  * └─────────────────────────────────────────────────────────────────────┘
+ *
+ * Credenciais são gerenciadas 100% via banco de dados.
+ * Não há dependência de variáveis de ambiente para chaves de API.
  */
 class GatewayCredentialResolver
 {
-    /** Mapeamento de gateway code → nome da variável de ambiente. */
-    private const ENV_MAP = [
-        'asaas'       => 'ASAAS_SECRET',
-        'infinitepay' => 'INFINITEPAY_SECRET',
-        'mercadopago' => 'MERCADOPAGO_SECRET',
-        'pagarme'     => 'PAGARME_SECRET',
-        'stripe_br'   => 'STRIPE_BR_SECRET',
-        'pagbank'     => 'PAGBANK_SECRET',
-    ];
-
-    private const ENV_WEBHOOK_MAP = [
-        'asaas'       => 'ASAAS_WEBHOOK_SECRET',
-        'infinitepay' => 'INFINITEPAY_WEBHOOK_SECRET',
-        'mercadopago' => 'MERCADOPAGO_WEBHOOK_SECRET',
-        'pagarme'     => 'PAGARME_WEBHOOK_SECRET',
-        'stripe_br'   => 'STRIPE_BR_WEBHOOK_SECRET',
-        'pagbank'     => 'PAGBANK_WEBHOOK_SECRET',
-    ];
-
     public function __construct(
         private readonly int $cacheTtl = 300,
     ) {
@@ -56,20 +38,6 @@ class GatewayCredentialResolver
      */
     public function resolveSecret(string $gatewayCode, ?string $entityId = null): ?string
     {
-        // ── Contexto SaaS billing (entityId = null) ───────────────────────
-        if ($entityId === null) {
-            // 1. .env é a fonte primária
-            $envSecret = $this->resolveFromEnv($gatewayCode);
-            if ($envSecret !== null) {
-                return $envSecret;
-            }
-
-            // 2. Fallback: credencial global no banco (override operacional sem redeploy)
-            return $this->resolveSecretFromDb($gatewayCode, null);
-        }
-
-        // ── Contexto tenant (entityId = uuid da clínica) ──────────────────
-        // Busca APENAS credencial do tenant — jamais usa chave do SaaS
         return $this->resolveSecretFromDb($gatewayCode, $entityId);
     }
 
@@ -78,15 +46,6 @@ class GatewayCredentialResolver
      */
     public function resolveWebhookSecret(string $gatewayCode, ?string $entityId = null): ?string
     {
-        if ($entityId === null) {
-            $envSecret = env(self::ENV_WEBHOOK_MAP[$gatewayCode] ?? '');
-            if (is_string($envSecret) && $envSecret !== '') {
-                return $envSecret;
-            }
-
-            return $this->resolveCredentialFromDb($gatewayCode, null)?->webhook_secret;
-        }
-
         return $this->resolveCredentialFromDb($gatewayCode, $entityId)?->webhook_secret;
     }
 
@@ -95,9 +54,7 @@ class GatewayCredentialResolver
      */
     public function resolveExtra(string $gatewayCode, string $key, ?string $entityId = null): ?string
     {
-        $credential = ($entityId === null)
-            ? $this->resolveCredentialFromDb($gatewayCode, null)
-            : $this->resolveCredentialFromDb($gatewayCode, $entityId);
+        $credential = $this->resolveCredentialFromDb($gatewayCode, $entityId);
 
         if (! $credential || ! is_array($credential->credentials)) {
             return null;
@@ -125,18 +82,6 @@ class GatewayCredentialResolver
     }
 
     // ── Helpers privados ──────────────────────────────────────────────────
-
-    private function resolveFromEnv(string $gatewayCode): ?string
-    {
-        $envKey = self::ENV_MAP[$gatewayCode] ?? null;
-        if ($envKey === null) {
-            return null;
-        }
-
-        $value = env($envKey);
-
-        return (is_string($value) && $value !== '') ? $value : null;
-    }
 
     private function resolveSecretFromDb(string $gatewayCode, ?string $entityId): ?string
     {

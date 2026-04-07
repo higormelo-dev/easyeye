@@ -10,6 +10,7 @@ class GatewayResolver
 {
     public function __construct(
         private readonly GatewayRegistry $registry,
+        private readonly GatewayDefaultService $defaultService,
     ) {
     }
 
@@ -18,7 +19,7 @@ class GatewayResolver
         $code = $subscription->pinned_gateway
             ?? $requestedGateway
             ?? $this->resolveFromTenantSettings($subscription->entity_id, $subscription->plan_id)
-            ?? config('billing.default_gateway');
+            ?? $this->defaultService->getDefaultCode();
 
         return $this->registry->get((string) $code);
     }
@@ -27,7 +28,7 @@ class GatewayResolver
     {
         $code = $requestedGateway
             ?? $this->resolveFromTenantSettings((string) $entity->id, (string) $plan->id)
-            ?? config('billing.default_gateway');
+            ?? $this->defaultService->getDefaultCode();
 
         return $this->registry->get((string) $code);
     }
