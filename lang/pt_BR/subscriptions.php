@@ -12,9 +12,11 @@ return [
     ],
 
     'billing_cycle' => [
-        'monthly'  => 'Mensal',
-        'yearly'   => 'Anual',
-        'lifetime' => 'Vitalício',
+        'monthly'    => 'Mensal',
+        'quarterly'  => 'Trimestral',
+        'semiannual' => 'Semestral',
+        'yearly'     => 'Anual',
+        'lifetime'   => 'Vitalício',
     ],
 
     'expired_page' => [

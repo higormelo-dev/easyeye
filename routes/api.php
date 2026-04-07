@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
     PatientExamsController,
     PatientsController,
     SchedulesController};
+use App\Http\Controllers\Billing\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
@@ -32,3 +33,7 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
         });
     });
 });
+
+Route::post('billing/webhooks/{gateway}', WebhookController::class)
+    ->name('billing.webhooks')
+    ->middleware('throttle:240,1');

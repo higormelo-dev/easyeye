@@ -19,7 +19,6 @@
                 </h4>
             </div>
             <div class="d-flex align-items-center gap-2">
-                {{-- Toggle tabela / cards --}}
                 <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
                     <button type="button"
                             class="rounded p-1 d-flex align-items-center justify-content-center border-0"
@@ -98,19 +97,28 @@
         {{-- ══ Cards View ═══════════════════════════════════════════════════════ --}}
         <div x-show="view === 'cards'" x-cloak>
 
-            {{-- Loading --}}
             <div x-show="loading" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">{{ __('actions.loading') }}...</span>
                 </div>
             </div>
 
-            {{-- Cards Grid --}}
             <div x-show="!loading">
                 <div class="row" x-show="items.length > 0">
                     <template x-for="item in items" :key="item.id">
-                        <div class="col-xs-12 col-sm-6 col-md-6 col-lg-6 col-xl-6 mb-3">
-                            <div class="card card-body h-100">
+                        <div class="col-xs-12 col-sm-6 col-md-6 col-lg-4 mb-3">
+                            <div class="card card-body h-100 position-relative"
+                                 :class="item.needs_attention ? 'border-danger border-2' : ''">
+
+                                {{-- Badge de atenção --}}
+                                <template x-if="item.needs_attention">
+                                    <span class="position-absolute top-0 end-0 m-2">
+                                        <span class="badge badge-soft-danger">
+                                            <i class="ti ti-alert-triangle me-1"></i>Requer atenção
+                                        </span>
+                                    </span>
+                                </template>
+
                                 <div class="d-flex align-items-start">
                                     <div class="flex-shrink-0 me-3">
                                         <div class="avatar-sm rounded-circle d-flex align-items-center justify-content-center"
@@ -121,21 +129,41 @@
                                     </div>
                                     <div class="flex-grow-1">
                                         <h5 class="mb-1" x-text="item.entity_name"></h5>
-                                        <div class="mb-2">
-                                            <span class="badge" :class="item.status_badge"
-                                                  x-text="item.status_label"></span>
+
+                                        {{-- Status + Billing State --}}
+                                        <div class="mb-2 d-flex gap-1 flex-wrap">
+                                            <span class="badge" :class="item.status_badge" x-text="item.status_label"></span>
+                                            <template x-if="item.billing_state">
+                                                <span class="badge" :class="item.billing_state_badge" x-text="item.billing_state_label"></span>
+                                            </template>
                                         </div>
+
                                         <address class="small text-muted mb-2">
-                                            <strong>{{ __('actions.plan') }}:</strong>
+                                            <strong>Plano:</strong>
                                             <span x-text="item.plan_name"></span><br>
-                                            <strong>{{ __('actions.starts_at') }}:</strong>
+                                            <template x-if="item.gateway">
+                                                <span><strong>Gateway:</strong> <span class="text-uppercase fw-semibold" x-text="item.gateway"></span><br></span>
+                                            </template>
+                                            <strong>Início:</strong>
                                             <span x-text="item.starts_at || '-'"></span><br>
-                                            <strong>{{ __('actions.ends_at') }}:</strong>
+                                            <strong>Vencimento:</strong>
                                             <span x-text="item.ends_at || 'Vitalício'"></span>
+                                            <template x-if="item.next_billing_at">
+                                                <span><br><strong>Próxima cobrança:</strong> <span x-text="item.next_billing_at"></span></span>
+                                            </template>
                                             <template x-if="item.trial_ends_at">
                                                 <span><br><strong>Trial até:</strong> <span x-text="item.trial_ends_at"></span></span>
                                             </template>
                                         </address>
+
+                                        {{-- Erro de cobrança --}}
+                                        <template x-if="item.last_billing_error">
+                                            <div class="alert alert-danger py-1 px-2 small mb-2">
+                                                <i class="ti ti-alert-circle me-1"></i>
+                                                <span x-text="item.last_billing_error"></span>
+                                            </div>
+                                        </template>
+
                                         <hr class="my-2">
                                         <div class="d-flex align-items-center float-end gap-1">
                                             <a href="javascript:void(0);"
@@ -158,13 +186,21 @@
                                                         <i class="ti ti-edit me-1"></i>{{ __('actions.edit') }}
                                                     </a>
                                                 </li>
+                                                <li>
+                                                    <a class="dropdown-item btn-activate text-success"
+                                                       href="javascript:void(0);"
+                                                       :data-id="item.id"
+                                                       :data-entity-id="item.entity_id">
+                                                        <i class="ti ti-player-play me-1"></i>Ativar plano
+                                                    </a>
+                                                </li>
                                                 <template x-if="item.is_accessible">
                                                     <li>
                                                         <a class="dropdown-item btn-cancel text-warning"
                                                            href="javascript:void(0);"
                                                            :data-id="item.id"
                                                            :data-entity-id="item.entity_id">
-                                                            <i class="ti ti-ban me-1"></i>Cancelar assinatura
+                                                            <i class="ti ti-ban me-1"></i>Cancelar
                                                         </a>
                                                     </li>
                                                 </template>
@@ -186,13 +222,11 @@
                     </template>
                 </div>
 
-                {{-- Empty state --}}
                 <div x-show="items.length === 0 && !loading" class="text-center py-5 text-muted">
                     <i class="fas fa-file-contract fa-3x mb-3"></i>
                     <p>{{ __('actions.no_records') }}</p>
                 </div>
 
-                {{-- Pagination --}}
                 <nav x-show="meta.last_page > 1" class="d-flex justify-content-center mt-3">
                     <ul class="pagination pagination-sm mb-0">
                         <li class="page-item" :class="{ 'disabled': meta.current_page === 1 }">
@@ -218,7 +252,7 @@
 
     </div>
 
-    {{-- ══ crudForm (escopo separado para o modal) ══════════════════════════ --}}
+    {{-- ══ Modal Edição ══════════════════════════════════════════════════════ --}}
     <div x-data="crudForm({
             storeUrl:  null,
             updateUrl: null,
@@ -234,7 +268,6 @@
              'subscriptionModal'
          )">
 
-        {{-- Modal de edição --}}
         <x-crud-modal id="subscriptionModal" title="Assinatura">
             <x-slot:body>
                 <div class="row g-3">
@@ -248,7 +281,6 @@
                         </select>
                         <div class="invalid-feedback" x-text="firstError('plan_id')"></div>
                     </div>
-
                     <div class="col-md-6">
                         <label class="form-label">Status <span class="text-danger">*</span></label>
                         <select class="form-select" x-model="form.status" :class="{'is-invalid': hasError('status')}">
@@ -258,19 +290,16 @@
                         </select>
                         <div class="invalid-feedback" x-text="firstError('status')"></div>
                     </div>
-
                     <div class="col-md-4">
                         <label class="form-label">Início <span class="text-danger">*</span></label>
                         <input type="date" class="form-control" x-model="form.starts_at"
                                :class="{'is-invalid': hasError('starts_at')}">
                         <div class="invalid-feedback" x-text="firstError('starts_at')"></div>
                     </div>
-
                     <div class="col-md-4">
                         <label class="form-label">Vencimento</label>
                         <input type="date" class="form-control" x-model="form.ends_at">
                     </div>
-
                     <div class="col-md-4">
                         <label class="form-label">Trial até</label>
                         <input type="date" class="form-control" x-model="form.trial_ends_at">
@@ -279,6 +308,69 @@
             </x-slot:body>
         </x-crud-modal>
     </div>
+    {{-- ══ /Modal Edição ════════════════════════════════════════════════════ --}}
+
+    {{-- ══ Modal Ativar Plano ═══════════════════════════════════════════════ --}}
+    <div class="modal fade" id="activateModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="ti ti-player-play me-2 text-success"></i>Ativar Plano Pago</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="activate-form">
+                    <div class="modal-body">
+                        <input type="hidden" id="activate-entity-id" name="entity_id">
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Empresa</label>
+                            <p class="form-control-plaintext fw-bold" id="activate-entity-name">-</p>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Plano <span class="text-danger">*</span></label>
+                            <select class="form-select" name="plan_id" id="activate-plan-id" required>
+                                <option value="">-- Selecione --</option>
+                                @foreach($plans as $plan)
+                                    <option value="{{ $plan->id }}">
+                                        {{ $plan->name }}
+                                        @if($plan->price)
+                                            — R$ {{ number_format($plan->price, 2, ',', '.') }}
+                                        @endif
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ciclo de cobrança <span class="text-danger">*</span></label>
+                            <select class="form-select" name="billing_cycle" id="activate-cycle" required>
+                                @foreach($billingCycles as $cycle)
+                                    <option value="{{ $cycle->value }}">{{ $cycle->label() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Gateway</label>
+                            <select class="form-select" name="gateway" id="activate-gateway">
+                                <option value="">Padrão do sistema</option>
+                                @foreach($gateways as $gateway)
+                                    <option value="{{ $gateway->value }}">{{ strtoupper($gateway->value) }}</option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">Deixe em branco para usar o gateway padrão configurado.</div>
+                        </div>
+                        <div id="activate-error" class="alert alert-danger d-none"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success" id="activate-submit-btn">
+                            <span id="activate-spinner" class="spinner-border spinner-border-sm me-1 d-none"></span>
+                            Ativar assinatura
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {{-- ══ /Modal Ativar Plano ══════════════════════════════════════════════ --}}
 @endsection
 
 @section('modals')
@@ -290,6 +382,7 @@
     <script>
     $(function () {
         const baseUrl = '{{ $baseUrl }}';
+        const csrf    = $('meta[name="csrf-token"]').attr('content');
 
         function reloadAll() {
             if (window.LaravelDataTables && window.LaravelDataTables['subscriptions_datatable']) {
@@ -297,18 +390,15 @@
             }
         }
 
-        $(document).on('click', '.btn-edit', function () {
-            window.dispatchEvent(new CustomEvent('edit-subscription', { detail: { id: $(this).data('id') } }));
-        });
-
+        // ── Visualizar ──────────────────────────────────────────────────────
         $(document).on('click', '.btn-show', function () {
             const id = $(this).data('id');
-            $('.modal-title-default').text('{{ __("actions.messages.view", ["name" => __("actions.subscription")]) }}');
+            $('.modal-title-default').text('Detalhes da Assinatura');
             $('#btn-modal-default').hide();
             $('#erro-default').hide();
             $.ajax({
                 url: baseUrl + '/' + id,
-                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                headers: { 'X-CSRF-TOKEN': csrf },
                 success: function (data) {
                     $('#retorno-default').html(data);
                     $('#modal_default').modal('show');
@@ -319,11 +409,68 @@
             });
         });
 
+        // ── Editar ──────────────────────────────────────────────────────────
+        $(document).on('click', '.btn-edit', function () {
+            window.dispatchEvent(new CustomEvent('edit-subscription', { detail: { id: $(this).data('id') } }));
+        });
+
+        // ── Ativar Plano ────────────────────────────────────────────────────
+        $(document).on('click', '.btn-activate', function () {
+            const entityId   = $(this).data('entity-id');
+            const entityName = $(this).closest('[data-entity-name]')?.data('entity-name')
+                ?? $(this).closest('.card')?.find('h5')?.text()?.trim()
+                ?? '—';
+
+            $('#activate-entity-id').val(entityId);
+            $('#activate-entity-name').text(entityName);
+            $('#activate-plan-id').val('').trigger('change');
+            $('#activate-gateway').val('');
+            $('#activate-error').addClass('d-none').text('');
+            $('#activateModal').modal('show');
+        });
+
+        $('#activate-form').on('submit', function (e) {
+            e.preventDefault();
+            const btn     = $('#activate-submit-btn');
+            const spinner = $('#activate-spinner');
+            btn.prop('disabled', true);
+            spinner.removeClass('d-none');
+            $('#activate-error').addClass('d-none');
+
+            $.ajax({
+                method: 'POST',
+                url: baseUrl + '/activate',
+                dataType: 'json',
+                headers: { 'X-CSRF-TOKEN': csrf },
+                data: {
+                    entity_id:     $('#activate-entity-id').val(),
+                    plan_id:       $('#activate-plan-id').val(),
+                    billing_cycle: $('#activate-cycle').val(),
+                    gateway:       $('#activate-gateway').val() || undefined,
+                },
+                success: function (res) {
+                    $('#activateModal').modal('hide');
+                    if (window.showSuccessToast) showSuccessToast(res.message);
+                    reloadAll();
+                    window.dispatchEvent(new CustomEvent('subscription-saved'));
+                },
+                error: function (res) {
+                    const msg = res.responseJSON?.message ?? 'Erro ao ativar assinatura.';
+                    $('#activate-error').removeClass('d-none').text(msg);
+                },
+                complete: function () {
+                    btn.prop('disabled', false);
+                    spinner.addClass('d-none');
+                }
+            });
+        });
+
+        // ── Cancelar ────────────────────────────────────────────────────────
         $(document).on('click', '.btn-cancel', function () {
             const entityId = $(this).data('entity-id');
             Swal.fire({
                 title: 'Cancelar assinatura?',
-                text: 'O acesso será mantido durante o período de graça.',
+                text: 'O acesso será mantido durante o período de graça. O cancelamento também será enviado ao gateway.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#dc3545',
@@ -335,7 +482,7 @@
                     method: 'POST',
                     url: baseUrl + '/cancel',
                     dataType: 'json',
-                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                    headers: { 'X-CSRF-TOKEN': csrf },
                     data: { entity_id: entityId },
                     success: function (res) {
                         if (window.showSuccessToast) showSuccessToast(res.message);
@@ -348,6 +495,7 @@
             });
         });
 
+        // ── Bloquear / Desbloquear ──────────────────────────────────────────
         $(document).on('click', '.btn-block', function () {
             const entityId  = $(this).data('entity-id');
             const active    = $(this).data('active');
@@ -369,7 +517,7 @@
                     method: 'PATCH',
                     url: baseUrl + '/block-access',
                     dataType: 'json',
-                    headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                    headers: { 'X-CSRF-TOKEN': csrf },
                     data: { entity_id: entityId, active: active },
                     success: function (res) {
                         if (window.showSuccessToast) showSuccessToast(res.message);
@@ -382,6 +530,7 @@
             });
         });
 
+        // ── Configurações ───────────────────────────────────────────────────
         $('#settings-form').on('submit', function (e) {
             e.preventDefault();
             const data = Object.fromEntries(new FormData(this));
@@ -389,7 +538,7 @@
                 method: 'POST',
                 url: baseUrl + '/settings',
                 dataType: 'json',
-                headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') },
+                headers: { 'X-CSRF-TOKEN': csrf },
                 data: data,
                 success: function (res) {
                     if (window.showSuccessToast) showSuccessToast(res.message);

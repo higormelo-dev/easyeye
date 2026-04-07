@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
         $this->call(EntityAndUserAdministratorSeeder::class);
         $this->call(SubscriptionSettingSeeder::class);
         $this->call(PlanSeeder::class);
+        $this->call(BillingGatewaysSeeder::class);
         $this->call(CovenantsSeeder::class);
         $this->call(SkinTypesSeeder::class);
         $this->call(IrisTypesSeeder::class);

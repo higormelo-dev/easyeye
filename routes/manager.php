@@ -6,6 +6,7 @@ use App\Http\Controllers\Manager\{
     EntityIntegratorsController,
     EntityUserIntegratorsController,
     EntityUsersController,
+    GatewaysController,
     ImpersonateController,
     PartnersController,
     PlansController,
@@ -53,6 +54,14 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     Route::patch('partners/commissions/{commission}/pay', [PartnersController::class, 'payCommission'])->name('partners.commission.pay');
     Route::resource('partners', PartnersController::class)->except('create', 'edit', 'show');
 
+    // ── Gateways de Pagamento ──────────────────────────────────────────────
+    Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');
+    Route::patch('gateways/{gateway}/toggle-active', [GatewaysController::class, 'toggleActive'])->name('gateways.toggle-active');
+    Route::patch('gateways/{gateway}/priority', [GatewaysController::class, 'updatePriority'])->name('gateways.priority');
+    Route::get('gateways/{gateway}/credentials', [GatewaysController::class, 'credentials'])->name('gateways.credentials');
+    Route::post('gateways/{gateway}/credentials', [GatewaysController::class, 'storeCredential'])->name('gateways.credentials.store');
+    Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [GatewaysController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
+
     // ── Assinaturas ────────────────────────────────────────────────────────
     Route::get('subscriptions/cards', [SubscriptionsController::class, 'cards'])->name('subscriptions.cards');
     Route::post('subscriptions/activate', [SubscriptionsController::class, 'activate'])->name('subscriptions.activate');
@@ -60,6 +69,8 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     Route::post('subscriptions/cancel', [SubscriptionsController::class, 'cancel'])->name('subscriptions.cancel');
     Route::post('subscriptions/settings', [SubscriptionsController::class, 'updateSettings'])->name('subscriptions.settings');
     Route::patch('subscriptions/block-access', [SubscriptionsController::class, 'blockAccess'])->name('subscriptions.block-access');
+    Route::get('subscriptions/{subscription}/invoices', [SubscriptionsController::class, 'invoices'])->name('subscriptions.invoices');
+    Route::get('subscriptions/{subscription}/retries', [SubscriptionsController::class, 'retries'])->name('subscriptions.retries');
     Route::resource('subscriptions', SubscriptionsController::class)->only('index', 'show', 'update');
 
     // ── Modelos de Documento Globais ────────────────────────────────────────

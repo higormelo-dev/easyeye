@@ -38,6 +38,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     ResourcesController,
     SkinTypesController,
     SurgeryTypesController,
+    TenantGatewayController,
     VisitTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\ReportSettingsController;
@@ -356,6 +357,12 @@ Route::group(
                 Route::post('report-settings/{report_setting}/adopt', [ReportSettingsController::class, 'adopt'])->name('report-settings.adopt');
                 Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');
                 Route::resource('report-settings', ReportSettingsController::class);
+
+                // ── Gateways de Pagamento do Tenant ────────────────────────
+                Route::get('gateways', [TenantGatewayController::class, 'index'])->name('gateways.index');
+                Route::get('gateways/{gateway}/credentials', [TenantGatewayController::class, 'credentials'])->name('gateways.credentials');
+                Route::post('gateways/{gateway}/credentials', [TenantGatewayController::class, 'storeCredential'])->name('gateways.credentials.store');
+                Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [TenantGatewayController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
             });
         });
 

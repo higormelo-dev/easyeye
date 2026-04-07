@@ -146,6 +146,13 @@
                     <i class="ti ti-device-desktop"></i><span>{{ __('actions.sidemenu.resources') ?? 'Recursos' }}</span>
                 </a>
             </li>
+
+            {{-- Gateways de Pagamento --}}
+            <li>
+                <a href="{{ route('panel.setting.gateways.index') }}" class="{{ request()->routeIs('panel.setting.gateways.*') ? 'active' : '' }}">
+                    <i class="ti ti-credit-card"></i><span>Gateways de Pagamento</span>
+                </a>
+            </li>
         </ul>
     </li>
 

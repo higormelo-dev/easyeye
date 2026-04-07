@@ -78,14 +78,22 @@ class SubscriptionService
     public function expireOverdue(): int
     {
         $graceDays = SubscriptionSetting::gracePeriodDays();
+        $count     = 0;
 
-        return Subscription::where('status', SubscriptionStatus::Active)
+        // Iterate individually so Eloquent observers fire for each record.
+        Subscription::where('status', SubscriptionStatus::Active)
             ->whereNotNull('ends_at')
             ->where('ends_at', '<', now())
-            ->update([
-                'status'               => SubscriptionStatus::Expired,
-                'grace_period_ends_at' => now()->addDays($graceDays),
-            ]);
+            ->each(function (Subscription $subscription) use ($graceDays, &$count): void {
+                $subscription->update([
+                    'status'               => SubscriptionStatus::Expired,
+                    'grace_period_ends_at' => now()->addDays($graceDays),
+                ]);
+
+                $count++;
+            });
+
+        return $count;
     }
 
     /**
@@ -113,11 +121,15 @@ class SubscriptionService
 
     private function cancelCurrent(Entity $entity): void
     {
+        // Iterate individually so Eloquent observers (SubscriptionObserver) fire for each record.
+        // Mass update via ::update() bypasses observers entirely.
         Subscription::forEntity($entity->id)
             ->whereIn('status', [SubscriptionStatus::Trial->value, SubscriptionStatus::Active->value])
-            ->update([
-                'status'       => SubscriptionStatus::Cancelled,
-                'cancelled_at' => now(),
-            ]);
+            ->each(function (Subscription $subscription): void {
+                $subscription->update([
+                    'status'       => SubscriptionStatus::Cancelled,
+                    'cancelled_at' => now(),
+                ]);
+            });
     }
 }

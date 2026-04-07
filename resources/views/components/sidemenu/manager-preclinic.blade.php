@@ -15,6 +15,11 @@
     </a>
 </li>
 <li>
+    <a href="{{ route('panel.manager.gateways.index') }}" class="{{ request()->routeIs('panel.manager.gateways.*') ? 'active' : '' }}">
+        <i class="ti ti-credit-card"></i><span>Gateways</span>
+    </a>
+</li>
+<li>
     <a href="{{ route('panel.accesscontrol.users.index') }}" class="{{ request()->routeIs('panel.accesscontrol.users.*') ? 'active' : '' }}">
         <i class="ti ti-users-group"></i><span>Usuários</span>
     </a>

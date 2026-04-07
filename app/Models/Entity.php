@@ -2,17 +2,20 @@
 
 namespace App\Models;
 
+use App\Enums\SubscriptionStatus;
+use App\Models\Billing\{Invoice, Payment, TenantGatewaySetting};
 use App\Services\EntityRoleService;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\{BelongsToMany, HasMany, HasOne};
 
 class Entity extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;
@@ -84,7 +87,7 @@ class Entity extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {
@@ -136,7 +139,7 @@ class Entity extends Model
      */
     public function isSaas(): bool
     {
-        return !$this->is_client;
+        return ! $this->is_client;
     }
 
     /**
@@ -212,7 +215,7 @@ class Entity extends Model
     public function subscription(): HasOne
     {
         return $this->hasOne(Subscription::class, 'entity_id')
-            ->whereIn('status', [\App\Enums\SubscriptionStatus::Trial->value, \App\Enums\SubscriptionStatus::Active->value])
+            ->whereIn('status', [SubscriptionStatus::Trial->value, SubscriptionStatus::Active->value])
             ->latest();
     }
 
@@ -222,18 +225,33 @@ class Entity extends Model
         return $this->hasMany(Subscription::class, 'entity_id');
     }
 
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class, 'entity_id');
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class, 'entity_id');
+    }
+
+    public function gatewaySettings(): HasMany
+    {
+        return $this->hasMany(TenantGatewaySetting::class, 'entity_id');
+    }
+
     // -------------------------------------------------------------------------
     // CAC: Programa de Indicação + Parceiros + Activation Tracking
     // -------------------------------------------------------------------------
 
     /** Parceiro/revendedor responsável pela aquisição desta clínica */
-    public function partner(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function partner(): BelongsTo
     {
         return $this->belongsTo(Partner::class, 'partner_id');
     }
 
     /** Código de indicação usado no cadastro desta clínica */
-    public function referralCode(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function referralCode(): BelongsTo
     {
         return $this->belongsTo(ReferralCode::class, 'referral_code_id');
     }

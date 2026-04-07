@@ -13,18 +13,31 @@ class SubscriptionsDataTable extends BaseDataTable
     {
         return (new EloquentDataTable($query))
             ->addColumn('action', fn (Subscription $record) => $this->buildSubscriptionActionButtons($record))
-            ->editColumn('status', fn (Subscription $record) => '<span class="badge ' . $record->status->badgeClass() . '">' . $record->status->label() . '</span>')
+            ->editColumn('entity_name', fn (Subscription $record) => $this->buildEntityNameColumn($record))
+            ->editColumn('status', fn (Subscription $record) => '
+                <span class="badge ' . $record->status->badgeClass() . '">' . $record->status->label() . '</span>')
+            ->editColumn('billing_state', fn (Subscription $record) => $this->buildBillingStateColumn($record))
+            ->editColumn('gateway', fn (Subscription $record) => $record->gateway
+                ? '<span class="badge badge-soft-primary text-uppercase">' . $record->gateway . '</span>'
+                : '<span class="text-muted">-</span>')
+            ->editColumn('next_billing_at', fn (Subscription $record) => $record->next_billing_at
+                ? $record->next_billing_at->format('d/m/Y')
+                : '<span class="text-muted">-</span>')
             ->editColumn('starts_at', fn (Subscription $record) => $this->formatDateColumn($record->starts_at, 'd/m/Y'))
-            ->editColumn('ends_at', fn (Subscription $record) => $record->ends_at ? $record->ends_at->format('d/m/Y') : '<span class="text-muted">Vitalício</span>')
-            ->editColumn('trial_ends_at', fn (Subscription $record) => $record->trial_ends_at ? $record->trial_ends_at->format('d/m/Y') : '-')
-            ->rawColumns(['status', 'ends_at', 'action'])
+            ->editColumn('ends_at', fn (Subscription $record) => $record->ends_at
+                ? $record->ends_at->format('d/m/Y')
+                : '<span class="text-muted">Vitalício</span>')
+            ->rawColumns(['entity_name', 'status', 'billing_state', 'gateway', 'next_billing_at', 'ends_at', 'action'])
             ->filterColumn('entity_name', function ($query, $keyword) {
                 $query->whereRaw('LOWER(entities.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
             })
             ->filterColumn('plan_name', function ($query, $keyword) {
                 $query->whereRaw('LOWER(plans.name) LIKE ?', ['%' . mb_strtolower($keyword, 'UTF-8') . '%']);
             })
-            ->setRowId('id');
+            ->setRowId('id')
+            ->setRowClass(fn (Subscription $record) => in_array($record->billing_state, ['past_due', 'chargeback', 'error'], true)
+                ? 'table-warning'
+                : '');
     }
 
     public function query(Subscription $model): Builder
@@ -65,14 +78,22 @@ class SubscriptionsDataTable extends BaseDataTable
                 ->title('Status')
                 ->searchable(false)
                 ->className('text-center'),
+            Column::make('billing_state')
+                ->title('Cobrança')
+                ->searchable(false)
+                ->className('text-center'),
+            Column::make('gateway')
+                ->title('Gateway')
+                ->searchable(false)
+                ->className('text-center'),
+            Column::make('next_billing_at')
+                ->title('Próxima cobrança')
+                ->searchable(false),
             Column::make('starts_at')
                 ->title('Início')
                 ->searchable(false),
             Column::make('ends_at')
                 ->title('Vencimento')
-                ->searchable(false),
-            Column::make('trial_ends_at')
-                ->title('Trial até')
                 ->searchable(false),
             Column::computed('action')
                 ->title(__('actions.actions'))
@@ -84,16 +105,63 @@ class SubscriptionsDataTable extends BaseDataTable
         ];
     }
 
+    private function buildEntityNameColumn(Subscription $record): string
+    {
+        $attention = in_array($record->billing_state, ['past_due', 'chargeback', 'error'], true)
+            ? '<i class="ti ti-alert-triangle text-danger ms-1" title="Requer atenção"></i>'
+            : '';
+
+        return '<span>' . e($record->entity_name) . $attention . '</span>';
+    }
+
+    private function buildBillingStateColumn(Subscription $record): string
+    {
+        if (! $record->billing_state) {
+            return '<span class="text-muted">-</span>';
+        }
+
+        $badge = match ($record->billing_state) {
+            'paid'               => 'badge-soft-success',
+            'pending'            => 'badge-soft-warning',
+            'past_due'           => 'badge-soft-orange',
+            'chargeback'         => 'badge-soft-danger',
+            'error'              => 'badge-soft-danger',
+            'cancelled'          => 'badge-soft-secondary',
+            'pending_activation' => 'badge-soft-info',
+            default              => 'badge-soft-secondary',
+        };
+
+        $label = match ($record->billing_state) {
+            'paid'               => 'Pago',
+            'pending'            => 'Pendente',
+            'past_due'           => 'Em atraso',
+            'chargeback'         => 'Chargeback',
+            'error'              => 'Erro',
+            'cancelled'          => 'Cancelado',
+            'pending_activation' => 'Ativando...',
+            default              => $record->billing_state,
+        };
+
+        $errorTip = $record->last_billing_error
+            ? ' title="' . e(mb_substr($record->last_billing_error, 0, 120)) . '" data-bs-toggle="tooltip"'
+            : '';
+
+        return '<span class="badge ' . $badge . '"' . $errorTip . '>' . $label . '</span>';
+    }
+
     private function buildSubscriptionActionButtons(Subscription $record): string
     {
         $entityId = $record->entity_id;
-        $cancelItem = '';
 
-        if ($record->status->isAccessible()) {
-            $cancelItem = '<li><a class="dropdown-item btn-cancel text-warning" href="javascript:void(0);"
+        $cancelItem = $record->status->isAccessible()
+            ? '<li><a class="dropdown-item btn-cancel text-warning" href="javascript:void(0);"
                     data-id="' . $record->id . '" data-entity-id="' . $entityId . '">
-                <i class="ti ti-ban me-1"></i>Cancelar assinatura</a></li>';
-        }
+                <i class="ti ti-ban me-1"></i>Cancelar</a></li>'
+            : '';
+
+        $activateItem = '<li><a class="dropdown-item btn-activate text-success" href="javascript:void(0);"
+                data-id="' . $record->id . '" data-entity-id="' . $entityId . '">
+            <i class="ti ti-player-play me-1"></i>Ativar plano</a></li>';
 
         $blockTitle = $record->entity_active ? 'Bloquear acesso' : 'Desbloquear acesso';
         $blockIcon  = $record->entity_active ? 'ti-lock' : 'ti-lock-open';
@@ -108,6 +176,7 @@ class SubscriptionsDataTable extends BaseDataTable
     <ul class="dropdown-menu p-2">
         <li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
             <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>
+        ' . $activateItem . '
         ' . $cancelItem . '
         <li><a class="dropdown-item btn-block" href="javascript:void(0);"
                data-entity-id="' . $entityId . '" data-active="' . ($record->entity_active ? 0 : 1) . '">
