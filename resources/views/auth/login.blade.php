@@ -170,6 +170,35 @@
             font-size: .85rem;
         }
     }
+
+    /* ── Dark mode overrides for login page ── */
+    [data-bs-theme="dark"] .ee-login-title    { color: #e2e8f0; }
+    [data-bs-theme="dark"] .ee-login-subtitle { color: #94a3b8; }
+    [data-bs-theme="dark"] .ee-login-copy     { color: #94a3b8; }
+    [data-bs-theme="dark"] .ee-login-register { color: #cbd5e1; }
+
+    [data-bs-theme="dark"] .ee-login-card { border-color: #2d3560; }
+
+    [data-bs-theme="dark"] .ee-login-form .form-label { color: #cbd5e1; }
+
+    [data-bs-theme="dark"] .ee-login-form .input-group-text {
+        background-color: var(--bs-body-bg) !important;
+        border-color: #3d4570;
+        color: #94a3b8;
+    }
+    [data-bs-theme="dark"] .ee-login-form .form-control,
+    [data-bs-theme="dark"] .ee-login-form .form-select { border-color: #3d4570; }
+
+    [data-bs-theme="dark"] .ee-login-form .input-group .btn {
+        border-color: #3d4570;
+        color: #94a3b8;
+    }
+
+    [data-bs-theme="dark"] .ee-social-link {
+        background: var(--bs-body-bg);
+        border-color: #3d4570;
+    }
+    [data-bs-theme="dark"] .ee-social-link:hover { border-color: #2e37a4; }
 </style>
 @endpush
 
@@ -209,7 +238,7 @@
                                required
                                autofocus
                                autocomplete="username"
-                               placeholder="Enter Email Address">
+                               placeholder="{{ __('actions.email') }}">
                     </div>
                 </div>
 
@@ -247,12 +276,12 @@
                             {{ __('auth.remember_me') }}
                         </label>
                     </div>
-                    <a href="{{ route('password.request') }}" class="ee-login-forgot">Forgot Password?</a>
+                    <a href="{{ route('password.request') }}" class="ee-login-forgot">{{ __('auth.forget_password') }}</a>
                 </div>
 
                 <div class="d-grid mb-1">
                     <button type="submit" class="btn btn-primary ee-login-submit waves-effect waves-light">
-                        Login
+                        {{ __('auth.sign_in') }}
                     </button>
                 </div>
             </form>
@@ -265,7 +294,7 @@
             </p>
 
             @php $currentLocale = \App\Http\Middleware\SetLocale::getSupportedLocales()[app()->getLocale()] ?? null; @endphp
-            <div class="border-top pt-3 mt-4 d-flex justify-content-center">
+            <div class="border-top pt-3 mt-3 d-flex align-items-center justify-content-center gap-1">
                 <div class="dropdown">
                     <button type="button"
                             class="btn btn-link btn-sm text-muted text-decoration-none dropdown-toggle"
@@ -289,6 +318,13 @@
                         @endforeach
                     </ul>
                 </div>
+                <button type="button"
+                        class="btn btn-link btn-sm text-muted p-1 ee-guest-dark-toggle"
+                        title="{{ __('actions.switch') }}"
+                        style="font-size:1rem; line-height:1;">
+                    <i class="ti ti-moon ee-dark-icon-moon"></i>
+                    <i class="ti ti-sun ee-dark-icon-sun"></i>
+                </button>
             </div>
         </div>
     </div>

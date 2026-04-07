@@ -8,6 +8,8 @@
     <title>{{ config('app.name', 'EasyEye') }}</title>
     <!-- Favicon -->
     <link rel="shortcut icon" href="{{ asset('system/images/favicon.png') }}">
+    <!-- Apply guest dark mode before paint to avoid flash -->
+    <script>(function(){var t=localStorage.getItem('ee-guest-theme');if(t==='dark'){document.documentElement.setAttribute('data-bs-theme','dark');}})();</script>
     <!-- Theme Config Js (must run before paint to avoid flash) -->
     <script src="{{ asset('js/preclinic-theme-script.js') }}"></script>
     {{-- Vendor + App bundles (all CSS/JS via npm/Vite) --}}
@@ -154,6 +156,36 @@
                 max-width: 560px;
             }
         }
+
+        /* ── Dark mode icon state (CSS-driven, no flash) ── */
+        .ee-dark-icon-sun { display: none; }
+        [data-bs-theme="dark"] .ee-dark-icon-moon { display: none; }
+        [data-bs-theme="dark"] .ee-dark-icon-sun  { display: inline; }
+
+        /* ── Dark mode overrides for guest pages ── */
+        [data-bs-theme="dark"] .main-wrapper.auth-bg { background: #0f1117; }
+
+        [data-bs-theme="dark"] .ee-login-illustration-side,
+        [data-bs-theme="dark"] .ee-auth-illustration-side { background: #1a1d2e; }
+
+        [data-bs-theme="dark"] .ee-login-illustration-wrapper { background: linear-gradient(90deg, #1a1d2e 0 58%, #0f1117 58%); }
+        [data-bs-theme="dark"] .ee-auth-illustration-wrapper  { background: linear-gradient(90deg, #1a1d2e 0 58%, #0f1117 58%); }
+
+        @media (max-width: 991.98px) {
+            [data-bs-theme="dark"] .ee-login-illustration-wrapper,
+            [data-bs-theme="dark"] .ee-auth-illustration-wrapper { background: #0f1117; }
+        }
+
+        [data-bs-theme="dark"] .ee-login-form-side,
+        [data-bs-theme="dark"] .ee-auth-form-side { background: #0f1117; }
+
+        [data-bs-theme="dark"] .ee-auth-card,
+        [data-bs-theme="dark"] .ee-auth-illustration-card { border-color: #2d3560; }
+
+        [data-bs-theme="dark"] .ee-auth-header h4 { color: #e2e8f0; }
+        [data-bs-theme="dark"] .ee-auth-header p  { color: #94a3b8; }
+
+        [data-bs-theme="dark"] .ee-auth-form .form-label { color: #cbd5e1; }
     </style>
 </head>
 <body>
@@ -183,8 +215,8 @@
                         <div class="w-100 ee-auth-shell ee-login-shell">
                             @yield('content')
 
-                            @unless($hideLocale)
-                                <div class="d-flex justify-content-center mt-3">
+                                    <div class="d-flex align-items-center justify-content-center gap-1 mt-3">
+                                @unless($hideLocale)
                                     <div class="dropdown">
                                         <button type="button"
                                                 class="btn btn-link btn-sm text-muted text-decoration-none dropdown-toggle"
@@ -208,8 +240,15 @@
                                             @endforeach
                                         </ul>
                                     </div>
-                                </div>
-                            @endunless
+                                @endunless
+                                <button type="button"
+                                        class="btn btn-link btn-sm text-muted p-1 ee-guest-dark-toggle"
+                                        title="{{ __('actions.switch') }}"
+                                        style="font-size:1rem; line-height:1;">
+                                    <i class="ti ti-moon ee-dark-icon-moon"></i>
+                                    <i class="ti ti-sun ee-dark-icon-sun"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -239,8 +278,8 @@
 
                                     @yield('content')
 
-                                    @unless($hideLocale)
-                                        <div class="border-top pt-3 mt-4 d-flex justify-content-center">
+                                    <div class="border-top pt-3 mt-4 d-flex align-items-center justify-content-center gap-1">
+                                        @unless($hideLocale)
                                             <div class="dropdown">
                                                 <button type="button"
                                                         class="btn btn-link btn-sm text-muted text-decoration-none dropdown-toggle"
@@ -264,8 +303,15 @@
                                                     @endforeach
                                                 </ul>
                                             </div>
-                                        </div>
-                                    @endunless
+                                        @endunless
+                                        <button type="button"
+                                                class="btn btn-link btn-sm text-muted p-1 ee-guest-dark-toggle"
+                                                title="{{ __('actions.switch') }}"
+                                                style="font-size:1rem; line-height:1;">
+                                            <i class="ti ti-moon ee-dark-icon-moon"></i>
+                                            <i class="ti ti-sun ee-dark-icon-sun"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -295,9 +341,8 @@
                                 <div class="card-body p-4 p-xl-5 ee-auth-form">
                                     @yield('content')
 
-                                    @unless($hideLocale)
-                                        {{-- Language selector --}}
-                                        <div class="border-top pt-3 mt-4 d-flex justify-content-center">
+                                    <div class="border-top pt-3 mt-4 d-flex align-items-center justify-content-center gap-1">
+                                        @unless($hideLocale)
                                             <div class="dropdown">
                                                 <button type="button"
                                                         class="btn btn-link btn-sm text-muted text-decoration-none dropdown-toggle"
@@ -321,8 +366,15 @@
                                                     @endforeach
                                                 </ul>
                                             </div>
-                                        </div>
-                                    @endunless
+                                        @endunless
+                                        <button type="button"
+                                                class="btn btn-link btn-sm text-muted p-1 ee-guest-dark-toggle"
+                                                title="{{ __('actions.switch') }}"
+                                                style="font-size:1rem; line-height:1;">
+                                            <i class="ti ti-moon ee-dark-icon-moon"></i>
+                                            <i class="ti ti-sun ee-dark-icon-sun"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -363,5 +415,17 @@
     </script>
     @stack('scripts')
     @yield('javascript')
+    <script>
+        (function () {
+            document.querySelectorAll('.ee-guest-dark-toggle').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var html = document.documentElement;
+                    var next = html.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark';
+                    html.setAttribute('data-bs-theme', next);
+                    localStorage.setItem('ee-guest-theme', next);
+                });
+            });
+        })();
+    </script>
 </body>
 </html>
