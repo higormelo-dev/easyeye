@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Enums\{ActivationStep, ScheduleSituation, SubscriptionStatus};
+use App\Enums\{ActivationStep, FeatureKey, ScheduleSituation, SubscriptionStatus};
 use App\Models\{Covenant,
     Doctor,
     Entity,
@@ -38,6 +38,17 @@ class DataFakersSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->command->info('⏳ Garantindo catálogo de planos...');
+        $this->call(PlanSeeder::class);
+        $this->command->info('⏳ Garantindo catálogos clínicos base...');
+        $this->call([
+            CovenantsSeeder::class,
+            SkinTypesSeeder::class,
+            IrisTypesSeeder::class,
+            VisitTypesSeeder::class,
+            ExamTypesSeeder::class,
+        ]);
+
         $peopleCount = $this->seedInt('SEED_FAKE_PEOPLE', 3000, 1);
         $this->command->info("⏳ Criando People ({$peopleCount})...");
         People::factory($peopleCount)->create();
@@ -67,6 +78,23 @@ class DataFakersSeeder extends Seeder
         $planBasico  = Plan::where('slug', 'basico')->first();
         $planPro     = Plan::where('slug', 'pro')->first();
         $planPremium = Plan::where('slug', 'premium')->first();
+        $integratorTestPlan = Plan::query()
+            ->where('active', true)
+            ->whereHas('features', static function ($query): void {
+                $query->where('feature', FeatureKey::HasApiIntegrator->value)
+                    ->where('value', '1');
+            })
+            ->orderByDesc('sort_order')
+            ->orderByDesc('price')
+            ->first();
+
+        if (!$integratorTestPlan) {
+            throw new \RuntimeException(
+                'Nenhum plano ativo com acesso à API de integradores foi encontrado. Execute o PlanSeeder antes do DataFakersSeeder.'
+            );
+        }
+
+        $integratorTestPlan->loadMissing('features');
 
         // Distribuição de planos: 20% Básico, 50% Pro, 30% Premium
         $planDistribution = array_merge(
@@ -177,48 +205,62 @@ class DataFakersSeeder extends Seeder
         });
 
         // ── Integrador de teste com credenciais fixas ────────────────────────
-        $testEntity = Entity::create([
-            'name'      => self::INTEGRATOR_TEST_ENTITY_NAME,
-            'subdomain' => self::INTEGRATOR_TEST_ENTITY_SUBDOMAIN,
-            'city'      => 'São Paulo',
-            'state'     => 'SP',
-            'country'   => 'BR',
-            'is_client' => true,
-            'active'    => true,
-        ]);
+        $testEntity = Entity::updateOrCreate(
+            ['subdomain' => self::INTEGRATOR_TEST_ENTITY_SUBDOMAIN],
+            [
+                'name'      => self::INTEGRATOR_TEST_ENTITY_NAME,
+                'city'      => 'São Paulo',
+                'state'     => 'SP',
+                'country'   => 'BR',
+                'is_client' => true,
+                'active'    => true,
+            ]
+        );
+
+        // Evita múltiplas assinaturas acessíveis em re-seed e garante
+        // leitura determinística do middleware de acesso da API.
+        Subscription::query()
+            ->where('entity_id', $testEntity->id)
+            ->delete();
 
         Subscription::create([
             'entity_id' => $testEntity->id,
-            'plan_id'   => $planPro?->id,
+            'plan_id'   => $integratorTestPlan->id,
             'status'    => SubscriptionStatus::Active,
             'starts_at' => now()->subMonth(),
             'ends_at'   => now()->addYear(),
         ]);
 
-        $testIntegratorUser = EntityUserIntegrator::create([
-            'entity_id'         => $testEntity->id,
-            'name'              => 'Integrador de Teste',
-            'email'             => 'integrador@teste.com',
-            'email_verified_at' => now(),
-            'password'          => Hash::make('Integrador@123'),
-            'active'            => true,
-        ]);
+        $testIntegratorUser = EntityUserIntegrator::updateOrCreate(
+            ['email' => 'integrador@teste.com'],
+            [
+                'entity_id'         => $testEntity->id,
+                'name'              => 'Integrador de Teste',
+                'email_verified_at' => now(),
+                'password'          => Hash::make('Integrador@123'),
+                'active'            => true,
+            ]
+        );
 
-        $testIntegrator = EntityIntegrator::create([
-            'entity_user_integrator_id' => $testIntegratorUser->id,
-            'name'                      => 'Equipamento Teste 01',
-            'ip'                        => '192.168.1.100',
-            'mac'                       => 'AA:BB:CC:DD:EE:01',
-            'active'                    => true,
-        ]);
+        $testIntegrator = EntityIntegrator::updateOrCreate(
+            ['mac' => 'AA:BB:CC:DD:EE:01'],
+            [
+                'entity_user_integrator_id' => $testIntegratorUser->id,
+                'name'                      => 'Equipamento Teste 01',
+                'ip'                        => '192.168.1.100',
+                'active'                    => true,
+            ]
+        );
 
-        EntityIntegrator::create([
-            'entity_user_integrator_id' => $testIntegratorUser->id,
-            'name'                      => 'Equipamento Teste 02',
-            'ip'                        => '192.168.1.101',
-            'mac'                       => 'AA:BB:CC:DD:EE:02',
-            'active'                    => true,
-        ]);
+        EntityIntegrator::updateOrCreate(
+            ['mac' => 'AA:BB:CC:DD:EE:02'],
+            [
+                'entity_user_integrator_id' => $testIntegratorUser->id,
+                'name'                      => 'Equipamento Teste 02',
+                'ip'                        => '192.168.1.101',
+                'active'                    => true,
+            ]
+        );
 
         // Regra de negócio: esta clínica é exclusiva para testes da API de
         // integradores e deve permanecer sem equipamentos cadastrados.
@@ -231,100 +273,139 @@ class DataFakersSeeder extends Seeder
         // ── Usuários fixos da Clínica Teste Integrador ───────────────────────
 
         // Admin
-        $testAdminPerson = People::create([
-            'full_name' => 'ADMIN CLÍNICA TESTE',
-            'email'     => 'admin@clinicateste.com',
-            'cellphone' => '',
-        ]);
-        $testAdminUser = User::create([
-            'name'              => $testAdminPerson->full_name,
-            'email'             => 'admin@clinicateste.com',
-            'email_verified_at' => now(),
-            'password'          => Hash::make('Admin@123'),
-        ]);
-        EntityUser::create([
-            'entity_id' => $testEntity->id,
-            'user_id'   => $testAdminUser->id,
-            'rule'      => 'admin',
-            'active'    => true,
-        ]);
+        $testAdminPerson = People::updateOrCreate(
+            ['email' => 'admin@clinicateste.com'],
+            [
+                'full_name' => 'ADMIN CLÍNICA TESTE',
+                'cellphone' => '',
+            ]
+        );
+        $testAdminUser = User::updateOrCreate(
+            ['email' => 'admin@clinicateste.com'],
+            [
+                'name'              => $testAdminPerson->full_name,
+                'email_verified_at' => now(),
+                'password'          => Hash::make('Admin@123'),
+            ]
+        );
+        EntityUser::updateOrCreate(
+            [
+                'entity_id' => $testEntity->id,
+                'user_id'   => $testAdminUser->id,
+            ],
+            [
+                'rule'      => 'admin',
+                'active'    => true,
+            ]
+        );
 
         // Dra. Ana Lima
-        $testAnaPersona = People::create([
-            'full_name' => 'DRA. ANA LIMA',
-            'email'     => 'dra.ana@clinicateste.com',
-            'cellphone' => '',
-        ]);
-        $testAnaUser = User::create([
-            'name'              => $testAnaPersona->full_name,
-            'email'             => 'dra.ana@clinicateste.com',
-            'email_verified_at' => now(),
-            'password'          => Hash::make('Medico@123'),
-        ]);
-        $testAnaEntityUser = EntityUser::create([
-            'entity_id' => $testEntity->id,
-            'user_id'   => $testAnaUser->id,
-            'rule'      => 'doctor',
-            'active'    => true,
-        ]);
-        $testAnaDoctor = Doctor::create([
-            'entity_user_id'   => $testAnaEntityUser->id,
-            'person_id'        => $testAnaPersona->id,
-            'record'           => '123456',
-            'record_specialty' => '12345',
-            'color'            => '#e91e63',
-            'partner'          => false,
-            'active'           => true,
-        ]);
+        $testAnaPersona = People::updateOrCreate(
+            ['email' => 'dra.ana@clinicateste.com'],
+            [
+                'full_name' => 'DRA. ANA LIMA',
+                'cellphone' => '',
+            ]
+        );
+        $testAnaUser = User::updateOrCreate(
+            ['email' => 'dra.ana@clinicateste.com'],
+            [
+                'name'              => $testAnaPersona->full_name,
+                'email_verified_at' => now(),
+                'password'          => Hash::make('Medico@123'),
+            ]
+        );
+        $testAnaEntityUser = EntityUser::updateOrCreate(
+            [
+                'entity_id' => $testEntity->id,
+                'user_id'   => $testAnaUser->id,
+            ],
+            [
+                'rule'      => 'doctor',
+                'active'    => true,
+            ]
+        );
+        $testAnaDoctor = Doctor::updateOrCreate(
+            ['entity_user_id' => $testAnaEntityUser->id],
+            [
+                'person_id'        => $testAnaPersona->id,
+                'record'           => '123456',
+                'record_specialty' => '12345',
+                'color'            => '#e91e63',
+                'partner'          => false,
+                'active'           => true,
+            ]
+        );
 
         // Dr. Carlos Souza
-        $testCarlosPerson = People::create([
-            'full_name' => 'DR. CARLOS SOUZA',
-            'email'     => 'dr.carlos@clinicateste.com',
-            'cellphone' => '',
-        ]);
-        $testCarlosUser = User::create([
-            'name'              => $testCarlosPerson->full_name,
-            'email'             => 'dr.carlos@clinicateste.com',
-            'email_verified_at' => now(),
-            'password'          => Hash::make('Medico@123'),
-        ]);
-        $testCarlosEntityUser = EntityUser::create([
-            'entity_id' => $testEntity->id,
-            'user_id'   => $testCarlosUser->id,
-            'rule'      => 'doctor',
-            'active'    => true,
-        ]);
-        $testCarlosDoctor = Doctor::create([
-            'entity_user_id'   => $testCarlosEntityUser->id,
-            'person_id'        => $testCarlosPerson->id,
-            'record'           => '654321',
-            'record_specialty' => '54321',
-            'color'            => '#1976d2',
-            'partner'          => false,
-            'active'           => true,
-        ]);
+        $testCarlosPerson = People::updateOrCreate(
+            ['email' => 'dr.carlos@clinicateste.com'],
+            [
+                'full_name' => 'DR. CARLOS SOUZA',
+                'cellphone' => '',
+            ]
+        );
+        $testCarlosUser = User::updateOrCreate(
+            ['email' => 'dr.carlos@clinicateste.com'],
+            [
+                'name'              => $testCarlosPerson->full_name,
+                'email_verified_at' => now(),
+                'password'          => Hash::make('Medico@123'),
+            ]
+        );
+        $testCarlosEntityUser = EntityUser::updateOrCreate(
+            [
+                'entity_id' => $testEntity->id,
+                'user_id'   => $testCarlosUser->id,
+            ],
+            [
+                'rule'      => 'doctor',
+                'active'    => true,
+            ]
+        );
+        $testCarlosDoctor = Doctor::updateOrCreate(
+            ['entity_user_id' => $testCarlosEntityUser->id],
+            [
+                'person_id'        => $testCarlosPerson->id,
+                'record'           => '654321',
+                'record_specialty' => '54321',
+                'color'            => '#1976d2',
+                'partner'          => false,
+                'active'           => true,
+            ]
+        );
 
         // Secretária
-        $testSecretaryPerson = People::create([
-            'full_name' => 'SECRETÁRIA CLÍNICA TESTE',
-            'email'     => 'secretaria@clinicateste.com',
-            'cellphone' => '',
-        ]);
-        $testSecretaryUser = User::create([
-            'name'              => $testSecretaryPerson->full_name,
-            'email'             => 'secretaria@clinicateste.com',
-            'email_verified_at' => now(),
-            'password'          => Hash::make('Secretaria@123'),
-        ]);
-        EntityUser::create([
-            'entity_id' => $testEntity->id,
-            'user_id'   => $testSecretaryUser->id,
-            'rule'      => 'secretary',
-            'active'    => true,
-        ]);
+        $testSecretaryPerson = People::updateOrCreate(
+            ['email' => 'secretaria@clinicateste.com'],
+            [
+                'full_name' => 'SECRETÁRIA CLÍNICA TESTE',
+                'cellphone' => '',
+            ]
+        );
+        $testSecretaryUser = User::updateOrCreate(
+            ['email' => 'secretaria@clinicateste.com'],
+            [
+                'name'              => $testSecretaryPerson->full_name,
+                'email_verified_at' => now(),
+                'password'          => Hash::make('Secretaria@123'),
+            ]
+        );
+        EntityUser::updateOrCreate(
+            [
+                'entity_id' => $testEntity->id,
+                'user_id'   => $testSecretaryUser->id,
+            ],
+            [
+                'rule'      => 'secretary',
+                'active'    => true,
+            ]
+        );
 
         $this->createTestEntityData($testEntity);
+
+        $testPlanApiAccess = $integratorTestPlan->featureValue(FeatureKey::HasApiIntegrator) ?? '0';
+        $testPlanExamSendLimit = $integratorTestPlan->featureValue(FeatureKey::ApiMonthlyExamSends) ?? 'n/a';
 
         $this->command->info('');
         $this->command->info('═══════════════════════════════════════════════════════');
@@ -335,7 +416,7 @@ class DataFakersSeeder extends Seeder
         $this->command->info('  password : Integrador@123');
         $this->command->info('  code     : ' . $testIntegrator->code);
         $this->command->info('  entity   : ' . $testEntity->name);
-        $this->command->info('  plano    : Pro (has_api_integrator=1, api_monthly_exam_sends=100)');
+        $this->command->info('  plano    : ' . $integratorTestPlan->name . " (has_api_integrator={$testPlanApiAccess}, api_monthly_exam_sends={$testPlanExamSendLimit})");
         $this->command->info('═══════════════════════════════════════════════════════');
         $this->command->info('');
         $this->command->info('═══════════════════════════════════════════════════════');
