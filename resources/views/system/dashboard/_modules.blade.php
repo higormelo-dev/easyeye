@@ -10,15 +10,14 @@
         </a>
     </div>
 
-    {{-- Eye Images (em breve) --}}
+    {{-- Eye Images --}}
     <div class="col-6 col-sm-4 col-md-2">
-        <div class="module-shortcut disabled w-100">
-            <span class="badge-soon">{{ __('dashboard.coming_soon') }}</span>
-            <span class="ms-icon module-icon--soon">
+        <a href="{{ route('panel.eye-images.index') }}" class="module-shortcut w-100">
+            <span class="ms-icon module-icon">
                 <i class="fa fa-eye"></i>
             </span>
             <span>{{ __('dashboard.module_eye_images') }}</span>
-        </div>
+        </a>
     </div>
 
     @if(in_array($rule, ['admin', 'financial'], true))

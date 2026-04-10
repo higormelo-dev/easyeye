@@ -5,6 +5,7 @@ use App\Http\Controllers\{
     ComplianceController,
     DoctorWorkScheduleController,
     DoctorsController,
+    EyeImagesController,
     Financial\BillingController as FinancialBillingController,
     Financial\CashFlowController,
     Financial\FinancialReportsController,
@@ -142,6 +143,8 @@ Route::group(
 
             return view('system.dashboard', compact('stats', 'activation', 'activationScore'));
         })->name('dashboard');
+
+        Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');
         // ══════════════════════════════════════════════════════════════════════
         // ACL: rotas agrupadas por nível mínimo de acesso
         // Middleware entity.role aplica a role check via EnsureEntityRole.

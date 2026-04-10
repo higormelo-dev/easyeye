@@ -85,6 +85,21 @@ describe('GET /api/integrators/v1/schedules', function () {
         expect($response->json('meta.total'))->toBe(1);
     });
 
+    it('searches schedules by code even when schedule date is not today', function () {
+        $targetSchedule = makeSchedule($this->ctx, [
+            'date_time' => now()->subDays(14),
+        ]);
+        makeSchedule($this->ctx, ['date_time' => now()]);
+
+        $response = $this->getJson(
+            "/api/integrators/v1/schedules?search={$targetSchedule->code}",
+            $this->ctx['headers']
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1)
+            ->and($response->json('data.0.id'))->toBe($targetSchedule->id);
+    });
+
     it('searches schedules by doctor name', function () {
         $user       = User::factory()->create();
         $entityUser = createEntityUser($this->ctx['entity'], $user, 'doctor');

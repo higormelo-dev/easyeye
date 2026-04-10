@@ -14,6 +14,13 @@
     </a>
 </li>
 
+{{-- Eye Images --}}
+<li>
+    <a href="{{ route('panel.eye-images.index') }}" class="{{ request()->routeIs('panel.eye-images.*') ? 'active' : '' }}">
+        <i class="ti ti-eye"></i><span>{{ __('dashboard.module_eye_images') }}</span>
+    </a>
+</li>
+
 {{-- Médicos --}}
 @if(in_array(session('selected_entity_user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true))
     <li>
