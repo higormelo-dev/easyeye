@@ -104,7 +104,7 @@ class ExamType extends Model
         10 => 'TESTES FUNCIONAIS E COMPLEMENTARES',
         11 => 'EXAMES PRÉ E PÓS-OPERATÓRIOS',
         12 => 'OUTROS',
-    ];
+    ];z
 
     public function entity(): BelongsTo
     {

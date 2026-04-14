@@ -158,8 +158,10 @@ class ExamTypesSeeder extends Seeder
     private function createExamsForCategory(int $categoryId, array $exams): void
     {
         foreach ($exams as $examName) {
+            $normalized = mb_convert_case($examName, MB_CASE_UPPER, 'UTF-8');
+
             ExamType::firstOrCreate(
-                ['name' => $examName, 'category' => $categoryId],
+                ['name' => $normalized, 'category' => $categoryId],
                 ['active' => true]
             );
         }
