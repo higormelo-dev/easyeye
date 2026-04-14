@@ -13,6 +13,7 @@ class ExamTypesSeeder extends Seeder
     public function run(): void
     {
         $examsByCategory = [
+            // Avaliação Básica
             1 => [
                 'Acuidade visual (longe e perto)',
                 'Refração objetiva',
@@ -24,7 +25,10 @@ class ExamTypesSeeder extends Seeder
                 'Biomicroscopia (lâmpada de fenda)',
                 'Tonometria (pressão intraocular)',
                 'Fundoscopia (oftalmoscopia direta/indireta)',
+                'Foto Lâmpada de Fenda',
+                'Fotos Clínicas',
             ],
+            // Refração
             2 => [
                 'Refração computadorizada',
                 'Refração cicloplegica',
@@ -33,7 +37,9 @@ class ExamTypesSeeder extends Seeder
                 'Curva base para lente de contato',
                 'Avaliação de conforto de lentes',
                 'Over-refraction',
+                'Aberrometria',
             ],
+            // Retina e Vítreo
             3 => [
                 'Mapeamento de retina',
                 'Retinografia colorida',
@@ -44,7 +50,17 @@ class ExamTypesSeeder extends Seeder
                 'OCT de retina',
                 'OCT-A (angiografia por OCT)',
                 'Ultrassonografia ocular (modo B)',
+                'Autofluorescência',
+                'OCT Mácula',
+                'OCT Coroide',
+                'Infra Red',
+                'Retinografia',
+                'Retinografia Autofluorescência',
+                'Retinografia Fluorescente',
+                'Retinografia Campo Amplo',
+                'Retinografia Estereoscópica',
             ],
+            // Glaucoma
             4 => [
                 'Tonometria de aplanação',
                 'Paquimetria corneana',
@@ -55,7 +71,11 @@ class ExamTypesSeeder extends Seeder
                 'OCT de camada de fibras nervosas (RNFL)',
                 'Curva tensional diária',
                 'Teste de provocação para glaucoma',
+                'Foto de Papila',
+                'Goniofotografia',
+                'OCT GCL',
             ],
+            // Córnea e Superfície Ocular
             5 => [
                 'Topografia corneana',
                 'Tomografia corneana',
@@ -66,14 +86,24 @@ class ExamTypesSeeder extends Seeder
                 'Teste do tempo de ruptura do filme lacrimal (BUT)',
                 'Coloração com fluoresceína',
                 'Coloração com rosa bengala',
+                'Meibografia',
+                'Microscopia Confocal de Córnea',
+                'OCT Segmento Anterior',
+                'Paquimetria Corneana (mapa óptico)',
+                'Pentacam',
+                'UBM (Ultrassom Biomicroscópico)',
+                'Vision Planner – Astigmatism',
             ],
+            // Catarata e Cristalino
             6 => [
                 'Biometria ocular',
                 'Biometria óptica',
                 'Cálculo de lente intraocular (LIO)',
                 'Avaliação do cristalino',
                 'Avaliação de opacidades lenticulares',
+                'Biometria Ultrassônica',
             ],
+            // Estrabismo e Visão Binocular
             7 => [
                 'Teste de Hirschberg',
                 'Teste de Krimsky',
@@ -83,6 +113,7 @@ class ExamTypesSeeder extends Seeder
                 'Teste de estereopsia (Titmus, Randot)',
                 'Avaliação de vergências',
             ],
+            // Oftalmopediatria
             8 => [
                 'Teste do reflexo vermelho',
                 'Teste de Teller',
@@ -90,6 +121,7 @@ class ExamTypesSeeder extends Seeder
                 'Screening visual neonatal',
                 'Avaliação de ambliopia',
             ],
+            // Neuro-oftalmologia
             9 => [
                 'Campimetria para defeitos neurológicos',
                 'Avaliação do nervo óptico',
@@ -97,6 +129,7 @@ class ExamTypesSeeder extends Seeder
                 'Potencial evocado visual (PEV)',
                 'Avaliação pupilar aferente relativa (RAPD)',
             ],
+            // Testes Funcionais e Complementares
             10 => [
                 'Teste de visão de contraste',
                 'Teste de visão noturna',
@@ -104,6 +137,7 @@ class ExamTypesSeeder extends Seeder
                 'Teste de glare (ofuscamento)',
                 'Microperimetria',
             ],
+            // Exames Pré e Pós-operatórios
             11 => [
                 'Avaliação pré-operatória oftalmológica',
                 'Avaliação pós-operatória',
