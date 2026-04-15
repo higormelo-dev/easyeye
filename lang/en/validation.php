@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 return [
     'accepted'        => 'The :attribute field must be accepted.',
@@ -328,12 +328,12 @@ return [
             'serial_number_unique' => 'This serial number is already being used by another equipment.',
         ],
         'validation_invalid' => [
-            'default_message'      => 'Data is invalid.',
-            'exam_identifier'      => 'Exam identifier is invalid',
-            'patient_identifier'   => 'Patient identifier is invalid',
-            'doctor_identifier'    => 'Doctor identifier is invalid',
-            'schedule_identifier'  => 'Schedule identifier is invalid',
-            'equipment_identifier' => 'Equipment identifier is invalid',
+            'default_message'          => 'Data is invalid.',
+            'not_exam_identifier'      => 'Exam identifier not found',
+            'not_patient_identifier'   => 'Patient identifier not found',
+            'not_doctor_identifier'    => 'Doctor identifier not found',
+            'not_schedule_identifier'  => 'Schedule identifier not found',
+            'not_equipment_identifier' => 'Equipment identifier not found',
         ],
         'validation_unique' => [
             'name_combination' => 'An exam with this name already exists for the given combination of exam, doctor and schedule.',

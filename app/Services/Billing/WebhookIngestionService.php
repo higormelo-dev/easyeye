@@ -7,6 +7,7 @@ use App\Exceptions\Billing\GatewayUnauthorizedException;
 use App\Models\Billing\WebhookEvent;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 class WebhookIngestionService
 {
@@ -42,7 +43,7 @@ class WebhookIngestionService
         $eventHash = hash('sha256', $gatewayCode . '|' . $body);
 
         try {
-            $event = WebhookEvent::query()->create([
+            $event = DB::transaction(fn () => WebhookEvent::query()->create([
                 'gateway_code'      => $gatewayCode,
                 'external_event_id' => $dto->externalEventId,
                 'event_type'        => Arr::get($payload, 'event') ?? Arr::get($payload, 'type'),
@@ -53,7 +54,7 @@ class WebhookIngestionService
                 'status'            => 'received',
                 'received_at'       => now(),
                 'correlation_id'    => $correlationId,
-            ]);
+            ]));
         } catch (QueryException $e) {
             if ($this->isUniqueViolation($e)) {
                 $event = WebhookEvent::query()
@@ -123,6 +124,6 @@ class WebhookIngestionService
 
     private function isUniqueViolation(QueryException $e): bool
     {
-        return in_array($e->getCode(), ['23000', '23505'], true);
+        return in_array((string) $e->getCode(), ['23000', '23505'], true);
     }
 }

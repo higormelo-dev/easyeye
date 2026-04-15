@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api;
 
 use App\Models\{EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
@@ -19,7 +20,7 @@ class ExamRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -30,6 +31,12 @@ class ExamRequest extends FormRequest
             'exam_identifier' => [
                 'required',
                 function ($attribute, $value, $fail) use ($entityId) {
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
                     $query = ExamType::query()
                         ->where(function ($query) use ($entityId) {
                             $query->where('entity_id', $entityId)
@@ -38,14 +45,14 @@ class ExamRequest extends FormRequest
                         ->whereNull('deleted_at');
 
                     [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id',   $value],
+                        Str::isUuid($value) => ['id', $value],
                         ctype_digit($value) => ['code', sprintf('ETP-%010d', (int) $value)],
                         default             => ['code', $value],
                     };
                     $query->where($column, $lookupValue);
 
-                    if (!$query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.exam_identifier'));
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_exam_identifier'));
                     }
                 },
             ],
@@ -56,19 +63,25 @@ class ExamRequest extends FormRequest
                         return;
                     }
 
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
                     $query = Patient::query()
                         ->where('entity_id', $entityId)
                         ->whereNull('deleted_at');
 
                     [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id',   $value],
+                        Str::isUuid($value) => ['id', $value],
                         ctype_digit($value) => ['code', sprintf('PAC-%010d', (int) $value)],
                         default             => ['code', $value],
                     };
                     $query->where($column, $lookupValue);
 
-                    if (!$query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.patient_identifier'));
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_patient_identifier'));
                     }
                 },
             ],
@@ -79,19 +92,25 @@ class ExamRequest extends FormRequest
                         return;
                     }
 
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
                     $query = Schedule::query()
                         ->where('entity_id', $entityId)
                         ->whereNull('deleted_at');
 
                     [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id',   $value],
+                        Str::isUuid($value) => ['id', $value],
                         ctype_digit($value) => ['code', sprintf('SDL-%010d', (int) $value)],
                         default             => ['code', $value],
                     };
                     $query->where($column, $lookupValue);
 
-                    if (!$query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.schedule_identifier'));
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));
                     }
                 },
             ],
@@ -103,19 +122,25 @@ class ExamRequest extends FormRequest
                         return;
                     }
 
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
                     $query = EntityIntegratorEquipment::query()
                         ->where('integrator_id', $integrator->id)
                         ->whereNull('deleted_at');
 
                     [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id',   $value],
+                        Str::isUuid($value) => ['id', $value],
                         ctype_digit($value) => ['code', sprintf('EIQ-%010d', (int) $value)],
                         default             => ['code', $value],
                     };
                     $query->where($column, $lookupValue);
 
-                    if (!$query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.equipment_identifier'));
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_equipment_identifier'));
                     }
                 },
             ],
@@ -142,8 +167,43 @@ class ExamRequest extends FormRequest
                     }
                 },
             ],
-            'archive' => 'required|file|mimes:jpg,jpeg,png|max:10240',
+            'archive'              => 'required|file|mimes:jpg,jpeg,png|max:10240',
+            'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
+            'equipment_identifier' => [
+                'nullable',
+                function ($attribute, $value, $fail) use ($integrator) {
+                    if ($value === null) {
+                        return;
+                    }
+
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
+                    $query = EntityIntegratorEquipment::query()
+                        ->where('integrator_id', $integrator->id)
+                        ->whereNull('deleted_at');
+
+                    [$column, $lookupValue] = match (true) {
+                        Str::isUuid($value) => ['id', $value],
+                        ctype_digit($value) => ['code', sprintf('EIQ-%010d', (int) $value)],
+                        default             => ['code', $value],
+                    };
+                    $query->where($column, $lookupValue);
+
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_equipment_identifier'));
+                    }
+                },
+            ],
         ];
+    }
+
+    private function isUuidLike(string $value): bool
+    {
+        return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-/i', $value);
     }
 
     protected function prepareForValidation(): void

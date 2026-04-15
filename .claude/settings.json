@@ -27,7 +27,13 @@
       "Bash(./vendor/bin/pint app/Domains/Tiss/ app/Providers/TissServiceProvider.php bootstrap/providers.php)",
       "Bash(find /home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/routes -type f -name \"*.php\" -exec grep -l \"WebhookController\" {} \\\\;)",
       "Bash(php -l lang/pt_BR/gateways.php)",
-      "Bash(php -l lang/en/gateways.php)"
+      "Bash(php -l lang/en/gateways.php)",
+      "Bash(./vendor/bin/pest tests/Feature/Api/Integrators/PatientExamsTest.php --filter \"creates exam without equipment_id|stores null laterality when not provided|returns 404 when patient is identified by code\")",
+      "Bash(./vendor/bin/pest tests/Feature/Api/Integrators/PatientExamsTest.php)",
+      "Bash(./vendor/bin/pest tests/Feature/Auth/)",
+      "Bash(./vendor/bin/pest tests/Feature/Auth/RegistrationTest.php)",
+      "Bash(php -r \"echo PHP_SAPI . PHP_EOL;\")",
+      "Bash(php -r ' *)"
     ],
     "additionalDirectories": [
       "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images"

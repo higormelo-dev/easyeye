@@ -448,6 +448,7 @@ class BillingSubscriptionOrchestrator
             // Invoice
             $invoice->update([
                 'gateway_id'          => $gatewayId,
+                'gateway_code'        => $gatewayCode,
                 'status'              => $invoiceStatus->value,
                 'paid_at'             => $invoiceStatus === InvoiceStatus::Paid ? now() : null,
                 'raw_gateway_payload' => $this->sanitize($charge->rawResponse),

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 return [
     'accepted'        => 'O campo :attribute deve ser aceito.',
@@ -331,12 +331,12 @@ return [
             'serial_number_unique' => 'Este número de série já está sendo usado por outro equipamento.',
         ],
         'validation_invalid' => [
-            'default_message'      => 'Dados de validação inválidos',
-            'exam_identifier'      => 'Identificador de exame inválido',
-            'patient_identifier'   => 'Identificador de paciente inválido',
-            'doctor_identifier'    => 'Identificador de médico inválido',
-            'schedule_identifier'  => 'Identificador de agendamento inválido',
-            'equipment_identifier' => 'Identificador de equipamento inválido',
+            'default_message'          => 'Dados de validação inválidos',
+            'not_exam_identifier'      => 'Identificador de exame não encontrado',
+            'not_patient_identifier'   => 'Identificador de paciente não encontrado',
+            'not_doctor_identifier'    => 'Identificador de médico não encontrado',
+            'not_schedule_identifier'  => 'Identificador de agendamento não encontrado',
+            'not_equipment_identifier' => 'Identificador de equipamento não encontrado',
         ],
         'validation_unique' => [
             'name_combination' => 'Já existe um exame com este nome para a combinação de exame, médico e agendamento informados.',

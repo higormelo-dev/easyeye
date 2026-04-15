@@ -4,6 +4,7 @@ namespace App\Http\Requests\Api;
 
 use App\Models\EntityIntegratorEquipment;
 use App\Models\{ExamType, PatientExam, Schedule};
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
@@ -20,7 +21,7 @@ class PatientExamRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -31,6 +32,12 @@ class PatientExamRequest extends FormRequest
             'exam_identifier' => [
                 'required',
                 function ($attribute, $value, $fail) use ($entityId) {
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
                     $query = ExamType::query()
                         ->where(function ($query) use ($entityId) {
                             $query->where('entity_id', $entityId)
@@ -39,14 +46,14 @@ class PatientExamRequest extends FormRequest
                         ->whereNull('deleted_at');
 
                     [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id',   $value],
+                        Str::isUuid($value) => ['id', $value],
                         ctype_digit($value) => ['code', sprintf('ETP-%010d', (int) $value)],
                         default             => ['code', $value],
                     };
                     $query->where($column, $lookupValue);
 
-                    if (!$query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.exam_identifier'));
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_exam_identifier'));
                     }
                 },
             ],
@@ -58,8 +65,14 @@ class PatientExamRequest extends FormRequest
                         return;
                     }
 
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
                     [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id',   $value],
+                        Str::isUuid($value) => ['id', $value],
                         ctype_digit($value) => ['code', sprintf('SDL-%010d', (int) $value)],
                         default             => ['code', $value],
                     };
@@ -70,8 +83,8 @@ class PatientExamRequest extends FormRequest
                         ->where($column, $lookupValue)
                         ->exists();
 
-                    if (!$exists) {
-                        $fail(__('validation.custom.validation_invalid.schedule_identifier'));
+                    if (! $exists) {
+                        $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));
                     }
                 },
             ],
@@ -100,7 +113,7 @@ class PatientExamRequest extends FormRequest
 
                     if ($examParam) {
                         [$ignoreCol, $ignoreVal] = match (true) {
-                            Str::isUuid((string) $examParam) => ['id',   $examParam],
+                            Str::isUuid((string) $examParam) => ['id', $examParam],
                             ctype_digit((string) $examParam) => ['code', sprintf('EXM-%010d', (int) $examParam)],
                             default                          => ['code', $examParam],
                         };
@@ -121,23 +134,34 @@ class PatientExamRequest extends FormRequest
                         return;
                     }
 
+                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
+
+                        return;
+                    }
+
                     $query = EntityIntegratorEquipment::query()
                         ->where('integrator_id', $integrator->id)
                         ->whereNull('deleted_at');
 
                     [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id',   $value],
+                        Str::isUuid($value) => ['id', $value],
                         ctype_digit($value) => ['code', sprintf('EIQ-%010d', (int) $value)],
                         default             => ['code', $value],
                     };
                     $query->where($column, $lookupValue);
 
-                    if (!$query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.equipment_identifier'));
+                    if (! $query->exists()) {
+                        $fail(__('validation.custom.validation_invalid.not_equipment_identifier'));
                     }
                 },
             ],
         ];
+    }
+
+    private function isUuidLike(string $value): bool
+    {
+        return (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-/i', $value);
     }
 
     protected function prepareForValidation(): void
@@ -176,7 +200,7 @@ class PatientExamRequest extends FormRequest
 
         // Garantir que campos opcionais vazios sejam removidos do request
         foreach (['schedule_identifier'] as $field) {
-            if (!isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
+            if (! isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
                 unset($data[$field]);
             }
         }
