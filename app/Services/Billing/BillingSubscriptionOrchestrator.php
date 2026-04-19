@@ -3,7 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Contracts\Billing\PaymentGatewayInterface;
-use App\DTOs\Billing\{CancelSubscriptionDTO, CreateChargeDTO, CreateSubscriptionDTO, CustomerDTO};
+use App\DTOs\Billing\{CancelSubscriptionDTO, CreateChargeDTO, CreateSubscriptionDTO, CustomerDTO, GatewayCallContext};
 use App\Enums\Billing\{BillingEventType, CancellationReason, InvoiceStatus, PaymentAttemptStatus, PaymentStatus};
 use App\Enums\{BillingCycle, SubscriptionStatus};
 use App\Exceptions\Billing\GatewayIntegrationException;
@@ -318,10 +318,7 @@ class BillingSubscriptionOrchestrator
         string $idempotencyKey,
         string $correlationId,
     ): array {
-        // Propaga correlation ID e entity ID ao gateway para credenciais corretas
-        if (method_exists($gateway, 'withCorrelationId')) {
-            $gateway->withCorrelationId($correlationId)->withEntityId((string) $entity->id);
-        }
+        $gateway = $gateway->withContext(new GatewayCallContext($correlationId, (string) $entity->id));
 
         $customerId = $gateway->upsertCustomer(new CustomerDTO(
             entityId: (string) $entity->id,

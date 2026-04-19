@@ -131,4 +131,9 @@ class Patient extends Model
     {
         return $this->hasMany(DataAccessLog::class, 'patient_id');
     }
+
+    public function exams(): HasMany
+    {
+        return $this->hasMany(PatientExam::class, 'patient_id');
+    }
 }

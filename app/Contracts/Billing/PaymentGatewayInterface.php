@@ -2,11 +2,13 @@
 
 namespace App\Contracts\Billing;
 
-use App\DTOs\Billing\{CancelSubscriptionDTO, CancelSubscriptionResultDTO, CreateChargeDTO, CreateChargeResultDTO, CreateSubscriptionDTO, CreateSubscriptionResultDTO, CustomerDTO, GatewayHealthDTO, GatewayWebhookInputDTO, NormalizedWebhookEventDTO};
+use App\DTOs\Billing\{CancelSubscriptionDTO, CancelSubscriptionResultDTO, CreateChargeDTO, CreateChargeResultDTO, CreateSubscriptionDTO, CreateSubscriptionResultDTO, CustomerDTO, GatewayCallContext, GatewayHealthDTO, GatewayWebhookInputDTO, NormalizedWebhookEventDTO};
 
 interface PaymentGatewayInterface
 {
     public function code(): string;
+
+    public function withContext(GatewayCallContext $context): static;
 
     public function upsertCustomer(CustomerDTO $customer): string;
 

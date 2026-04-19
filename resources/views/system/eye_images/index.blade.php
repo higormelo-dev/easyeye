@@ -1,321 +1,1077 @@
 @extends('layouts.app')
 
 @section('breadcrumb')
-    {{-- Custom breadcrumb or hidden if needed --}}
     @include('components.breadcrumbs')
 @endsection
 
 @section('content')
+    <div x-data="eyeImagesApp(@js($patients))">
 
-<style>
-    /* Clinical Top Bar Styles */
-    .clinical-top-bar {
-        position: sticky;
-        top: 0;
-        z-index: 1020;
-        background: #f8f9fa;
-        border-bottom: 2px solid #dee2e6;
-        padding: 0.75rem 1rem;
-        margin-left: -1.5rem;
-        margin-right: -1.5rem;
-        margin-top: -1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
+        {{-- ── Card de filtros (sem título) ──────────────────────────────────────── --}}
+        <div class="card mb-3">
+            <div class="card-body py-2 px-3">
 
-    .clinical-search-input {
-        border-radius: 20px 0 0 20px;
-        border-right: none;
-        padding-left: 1.25rem;
-    }
+                {{-- Linha principal ------------------------------------------------ --}}
+                <div class="row g-2 align-items-center">
 
-    .clinical-search-btn {
-        border-radius: 0 20px 20px 0;
-        padding-right: 1.25rem;
-    }
+                    {{-- Busca --}}
+                    <div class="col-12 col-sm-4 col-md-3">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fa fa-search"></i></span>
+                            <input type="text" class="form-control" placeholder="Nome ou código do paciente..."
+                                x-model="search" @keydown.escape="search = ''">
+                            <button class="btn btn-outline-secondary" type="button" x-show="search" x-cloak
+                                @click="search = ''">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
 
-    .filter-pill {
-        font-size: 0.75rem;
-        font-weight: 600;
-        padding: 0.25rem 0.75rem;
-        border-radius: 15px;
-        background: #fff;
-        border: 1px solid #ced4da;
-        color: #495057;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.4rem;
-    }
+                    {{-- Período --}}
+                    <div class="col-6 col-sm-3 col-md-2">
+                        <select class="form-select form-select-sm" :value="period"
+                            @change="changePeriod($event.target.value)">
+                            <option value="hoje">Hoje</option>
+                            <option value="7">Últimos 7 dias</option>
+                            <option value="15">Últimos 15 dias</option>
+                            <option value="30">Últimos 30 dias</option>
+                            <option value="90">Últimos 90 dias</option>
+                        </select>
+                    </div>
 
-    .filter-pill:hover, .filter-pill.active {
-        background: #0d6efd;
-        color: #fff;
-        border-color: #0d6efd;
-    }
+                    {{-- Botão avançado --}}
+                    <div class="col-6 col-sm-auto">
+                        <button type="button" class="btn btn-sm"
+                            :class="showFilters ? 'btn-primary' : 'btn-outline-secondary'"
+                            @click="showFilters = !showFilters">
+                            <i class="fa fa-filter me-1"></i>
+                            Filtros
+                            <i class="fa fa-chevron-down ms-1" x-show="!showFilters"></i>
+                            <i class="fa fa-chevron-up ms-1" x-show="showFilters" x-cloak></i>
+                        </button>
+                    </div>
 
-    .clinical-btn-group .btn {
-        padding: 0.4rem 0.75rem;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
+                    {{-- Novo --}}
+                    <div class="col col-md d-flex justify-content-end">
+                        <button type="button" class="btn btn-primary btn-sm">
+                            <i class="fa fa-plus"></i> {{ __('actions.new') }}
+                        </button>
+                    </div>
 
-    .indicator-badge {
-        font-size: 0.7rem;
-        padding: 0.2rem 0.5rem;
-        border-radius: 10px;
-    }
+                </div>
 
-    .shortcut-hint {
-        font-size: 0.65rem;
-        color: #adb5bd;
-        margin-left: 0.5rem;
-    }
+                {{-- Linha avançada (colapsável) ------------------------------------ --}}
+                <div x-show="showFilters" x-cloak class="row g-2 mt-1 pt-2 border-top align-items-center">
 
-    /* Professional Background for the module */
-    .eye-images-module {
-        background: #e9ecef;
-        min-height: calc(100vh - 150px);
-        padding: 1rem;
-        border-radius: 8px;
-    }
-</style>
+                    {{-- Lateralidade --}}
+                    <div class="col-auto">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted small fw-semibold" style="white-space:nowrap;">Olho:</span>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="radio" class="btn-check" name="f-lat" id="f-lat-all" value=""
+                                    x-model="laterality">
+                                <label class="btn btn-outline-secondary" for="f-lat-all">Todos</label>
 
-<div x-data="eyeImagesViewer({
-    doctors: @js($doctors),
-    examTypes: @js($examTypes),
-    categories: @js($categories)
-})" class="eye-images-module">
+                                <input type="radio" class="btn-check" name="f-lat" id="f-lat-od" value="od"
+                                    x-model="laterality">
+                                <label class="btn btn-outline-primary" for="f-lat-od">OD</label>
 
-    {{-- ── BARRA SUPERIOR CLÍNICA ────────────────────────────────────────── --}}
-    <div class="clinical-top-bar d-flex flex-wrap align-items-center gap-3">
-        
-        {{-- Busca Global --}}
-        <div class="flex-grow-1" style="min-width: 300px;">
-            <div class="input-group">
-                <input type="text" 
-                       class="form-control clinical-search-input" 
-                       placeholder="Buscar paciente, ID, exame, médico, diagnóstico..."
-                       x-model="searchQuery"
-                       @keydown.slash.window.prevent="$el.focus()"
-                       @keydown.escape.window="clearSearch()"
-                       @input.debounce.500ms="performSearch()">
-                <button class="btn btn-primary clinical-search-btn" @click="performSearch()">
-                    <i class="fa fa-search"></i>
-                    <span class="shortcut-hint">[/]</span>
-                </button>
+                                <input type="radio" class="btn-check" name="f-lat" id="f-lat-oe" value="oe"
+                                    x-model="laterality">
+                                <label class="btn btn-outline-danger" for="f-lat-oe">OE</label>
+
+                                <input type="radio" class="btn-check" name="f-lat" id="f-lat-ao" value="ao"
+                                    x-model="laterality">
+                                <label class="btn btn-outline-dark" for="f-lat-ao">AO</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Tipo de exame --}}
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <select class="form-select form-select-sm" x-model="examTypeId">
+                            <option value="">Todos os exames</option>
+                            <template x-for="t in availableExamTypes" :key="t.id">
+                                <option :value="t.id" x-text="t.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    {{-- Status --}}
+                    <div class="col-12 col-sm-6 col-md-2">
+                        <select class="form-select form-select-sm" x-model="examStatus">
+                            <option value="">Todos os status</option>
+                            <option value="solicitado">Solicitado</option>
+                            <option value="realizado">Realizado</option>
+                            <option value="laudado">Laudado</option>
+                            <option value="cancelado">Cancelado</option>
+                        </select>
+                    </div>
+
+                    {{-- Médico --}}
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <select class="form-select form-select-sm" :value="doctorId"
+                            @change="setDoctor($event.target.value)">
+                            <option value="">Todos os médicos</option>
+                            @foreach ($doctors as $doctor)
+                                <option value="{{ $doctor->id }}">{{ $doctor->person->full_name ?? '—' }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Limpar filtros avançados --}}
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @click="clearFilters()">
+                            <i class="fa fa-times me-1"></i> Limpar
+                        </button>
+                    </div>
+
+                </div>
+
             </div>
         </div>
 
-        {{-- Filtros Rápidos --}}
-        <div class="d-flex flex-wrap align-items-center gap-2">
-            <div class="dropdown">
-                <button class="filter-pill dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="fa fa-user-md"></i> Médico: <span x-text="selectedDoctorName || 'Todos'"></span>
-                </button>
-                <ul class="dropdown-menu shadow">
-                    <li><a class="dropdown-item" href="#" @click.prevent="filterByDoctor(null)">Todos os Médicos</a></li>
-                    <template x-for="doctor in doctors" :key="doctor.id">
-                        <li><a class="dropdown-item" href="#" @click.prevent="filterByDoctor(doctor)" x-text="doctor.person.full_name"></a></li>
-                    </template>
-                </ul>
-            </div>
+        {{-- ── Painel lateral + área principal ────────────────────────────────── --}}
+        <div class="row">
 
-            <div class="dropdown">
-                <button class="filter-pill dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="fa fa-file-image-o"></i> Exame: <span x-text="selectedExamTypeName || 'Todos'"></span>
-                </button>
-                <ul class="dropdown-menu shadow" style="max-height: 300px; overflow-y: auto;">
-                    <li><a class="dropdown-item" href="#" @click.prevent="filterByExamType(null)">Todos os Tipos</a></li>
-                    <template x-for="type in examTypes" :key="type.id">
-                        <li><a class="dropdown-item" href="#" @click.prevent="filterByExamType(type)" x-text="type.name"></a></li>
-                    </template>
-                </ul>
-            </div>
+            {{-- ── Coluna lateral (col-3): período + médicos + pacientes ──────────── --}}
+            <div class="col-xs-12 col-sm-3 col-md-3 col-lg-3">
+                <div class="card panel-info">
+                    <div class="card-body p-2">
 
-            <div class="btn-group clinical-btn-group" role="group">
-                <input type="radio" class="btn-check" name="laterality" id="lat_ao" value="null" x-model="filters.laterality" checked>
-                <label class="btn btn-outline-secondary" for="lat_ao">AO</label>
-                
-                <input type="radio" class="btn-check" name="laterality" id="lat_od" value="1" x-model="filters.laterality">
-                <label class="btn btn-outline-secondary" for="lat_od">OD</label>
-                
-                <input type="radio" class="btn-check" name="laterality" id="lat_oe" value="2" x-model="filters.laterality">
-                <label class="btn btn-outline-secondary" for="lat_oe">OE</label>
-            </div>
+                        {{-- Pacientes ------------------------------------------------- --}}
+                        <h6 class="font-bold text-uppercase px-1 mb-1 mt-3">Pacientes</h6>
+                        <hr class="mt-0 mb-2">
 
-            <div class="dropdown">
-                <button class="filter-pill dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="fa fa-calendar"></i> Período: <span x-text="filters.periodLabel || 'Hoje'"></span>
-                </button>
-                <ul class="dropdown-menu shadow">
-                    <li><a class="dropdown-item" href="#" @click.prevent="setPeriod('today', 'Hoje')">Hoje</a></li>
-                    <li><a class="dropdown-item" href="#" @click.prevent="setPeriod('7days', '7 dias')">Últimos 7 dias</a></li>
-                    <li><a class="dropdown-item" href="#" @click.prevent="setPeriod('30days', '30 dias')">Últimos 30 dias</a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#">Personalizado...</a></li>
-                </ul>
-            </div>
-        </div>
+                        {{-- Spinner --}}
+                        <div x-show="loading" x-cloak class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+                        </div>
 
-        {{-- Filtro por Perfil Clínico --}}
-        <div class="d-flex align-items-center gap-2">
-            <span class="small text-muted fw-bold text-uppercase">Perfil:</span>
-            <div class="d-flex gap-1 overflow-auto pb-1" style="max-width: 400px;">
-                <template x-for="(label, key) in categories" :key="key">
-                    <button class="filter-pill" 
-                            :class="{ 'active': filters.category == key }"
-                            @click="toggleCategory(key)"
-                            x-text="label">
-                    </button>
-                </template>
-            </div>
-        </div>
+                        {{-- Lista --}}
+                        <div x-show="!loading" style="max-height:420px;overflow-y:auto;overflow-x:hidden;">
 
-        {{-- Botões de Ação --}}
-        <div class="ms-auto d-flex align-items-center gap-2">
-            <div class="btn-group clinical-btn-group">
-                <button class="btn btn-outline-primary" title="Comparar Exames" :disabled="selectedCount < 2">
-                    <i class="fa fa-columns"></i>
-                </button>
-                <button class="btn btn-outline-primary" title="Criar Panorama">
-                    <i class="fa fa-th-large"></i>
-                </button>
-                <button class="btn btn-outline-primary" title="Multi-seleção" @click="toggleMultiSelect()" :class="{ 'active': multiSelect }">
-                    <i class="fa fa-check-square-o"></i>
-                </button>
-            </div>
-            
-            <div class="btn-group clinical-btn-group">
-                <button class="btn btn-success" title="Upload Exame Externo">
-                    <i class="fa fa-upload"></i>
-                </button>
-                <button class="btn btn-primary" title="Novo Exame">
-                    <i class="fa fa-plus"></i>
-                </button>
-                <button class="btn btn-light" title="Atualizar Lista" @click="refresh()">
-                    <i class="fa fa-refresh"></i>
-                </button>
-            </div>
-        </div>
-    </div>
+                            <template x-if="filteredPatients.length === 0">
+                                <p class="text-muted text-center small py-3 mb-0">Nenhum paciente.</p>
+                            </template>
 
-    {{-- Indicadores --}}
-    <div class="d-flex align-items-center gap-3 mb-3 px-2">
-        <span class="badge bg-secondary indicator-badge">
-            <span x-text="resultCount"></span> exames encontrados
-        </span>
-        <span class="badge bg-info indicator-badge">
-            <span x-text="openImagesCount"></span> imagens abertas
-        </span>
-        <span class="badge bg-primary indicator-badge" x-show="selectedCount > 0">
-            <span x-text="selectedCount"></span> selecionados
-            <a href="#" class="text-white ms-1" @click.prevent="clearSelection()"><i class="fa fa-times-circle"></i></a>
-        </span>
-    </div>
+                            <template x-for="patient in filteredPatients" :key="patient.id">
+                                <div class="d-flex align-items-center gap-2 px-1 py-1 rounded mb-1"
+                                    style="cursor:pointer;transition:background .12s;"
+                                    :style="selectedPatient?.id === patient.id ? 'background:#e8f0fe;' :
+                                        'background:transparent;'"
+                                    @click="selectPatient(patient)"
+                                    @mouseenter="if(selectedPatient?.id !== patient.id) $el.style.background='#f4f6fb'"
+                                    @mouseleave="if(selectedPatient?.id !== patient.id) $el.style.background='transparent'">
 
-    {{-- Área de Conteúdo (Placeholder para o visualizador/lista) --}}
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow-sm border-0" style="min-height: 400px;">
-                <div class="card-body d-flex flex-column align-items-center justify-content-center text-muted">
-                    <i class="fa fa-eye fa-4x mb-3 opacity-25"></i>
-                    <h5>Módulo Eye Images</h5>
-                    <p>Utilize a barra superior para pesquisar exames e pacientes.</p>
+                                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 text-white fw-bold"
+                                        :style="{
+                                            background: avatarColor(patient.person?.full_name),
+                                            width: '30px',
+                                            height: '30px',
+                                            fontSize: '.62rem'
+                                        }"
+                                        x-text="initials(patient.person?.full_name)">
+                                    </div>
+
+                                    <div class="flex-grow-1 min-w-0">
+                                        <div class="text-truncate fw-semibold" style="font-size:.75rem; line-height:1.2;"
+                                            x-text="patient.person?.full_name ?? '—'"></div>
+                                        <div class="text-muted" style="font-size:.65rem; line-height:1.2;"
+                                            x-text="patient.code"></div>
+                                    </div>
+
+                                    <span class="badge bg-primary rounded-pill flex-shrink-0" style="font-size:.6rem;"
+                                        x-text="patient.exams.length"></span>
+                                </div>
+                            </template>
+
+                        </div>
+
+                        <div x-show="!loading" class="text-muted px-1 mt-1" style="font-size:.65rem;"
+                            x-text="filteredPatients.length + ' paciente(s)'"></div>
+
+                    </div>
                 </div>
             </div>
+
+            {{-- ── Coluna principal (col-9): detalhe dos exames ───────────────────── --}}
+            <div class="col-xs-12 col-sm-9 col-md-9 col-lg-9">
+                <div class="card">
+                    <h5 class="card-header d-flex align-items-center gap-2">
+                        <span x-show="!selectedPatient">{{ $meta['action'] }}</span>
+                        <template x-if="selectedPatient">
+                            <span class="d-flex align-items-center gap-2 w-100">
+                                <button type="button" class="btn btn-outline-secondary btn-sm"
+                                    @click="selectedPatient = null; selectedExamIds = [];">
+                                    <i class="fa fa-arrow-left"></i>
+                                </button>
+                                <span>
+                                    <span x-text="selectedPatient.person?.full_name"></span>
+                                    <small class="text-muted fw-normal ms-2" style="font-size:.72rem;"
+                                        x-text="selectedPatient.code"></small>
+                                </span>
+                                <div class="flex-grow-1"></div>
+                                <a :href="`{{ rtrim(route('panel.patients.medicalrecords.index', ['patient' => '__ID__']), '') }}`
+                                .replace('__ID__', selectedPatient.id)"
+                                    target="_blank" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">
+                                    Prontuário <i class="fa fa-external-link ms-1"></i>
+                                </a>
+                            </span>
+                        </template>
+                    </h5>
+
+                    {{-- Barra de ações do paciente --}}
+                    <div x-show="selectedPatient" x-cloak
+                        class="d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-body-secondary">
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                            :disabled="selectedExamIds.length === 0"
+                            @click="openViewerModal(selectedExamsData)">
+                            <i class="fa fa-images me-1"></i>Visualizar selecionadas
+                            <span class="badge bg-primary ms-1" x-show="selectedExamIds.length > 0"
+                                x-text="selectedExamIds.length"></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                            @click="openViewerModal(selectedPatient.exams)">
+                            <i class="fa fa-th me-1"></i>Visualizar todas
+                        </button>
+                        <div class="vr opacity-25"></div>
+                        <button type="button" class="btn btn-sm btn-outline-dark"
+                            @click="openPrintModal(selectedPatient.exams, true)">
+                            <i class="fa fa-print me-1"></i>Imprimir
+                        </button>
+                        <div class="flex-grow-1"></div>
+                        <span class="text-muted" style="font-size:.7rem;"
+                            x-show="selectedExamIds.length > 0"
+                            x-text="selectedExamIds.length + ' selecionado(s)'"></span>
+                    </div>
+
+                    <div class="card-body">
+
+                        {{-- Placeholder --}}
+                        <template x-if="!selectedPatient">
+                            <div class="text-center py-5 text-muted">
+                                <i class="ti ti-eye" style="font-size:3rem;opacity:.3;"></i>
+                                <p class="mt-3 mb-0">Selecione um paciente na lateral para visualizar os exames.</p>
+                            </div>
+                        </template>
+
+                        {{-- Detalhe --}}
+                        <template x-if="selectedPatient">
+                            <div class="row g-0" style="min-height:480px;">
+
+                                {{-- ── col-4: lista de exames ──────────────────────── --}}
+                                <div class="col-12 border-end pe-0">
+
+                                    {{-- Spinner de URLs --}}
+                                    <div x-show="urlsLoading" x-cloak class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                                        <p class="text-muted small mt-1 mb-0">Carregando imagens…</p>
+                                    </div>
+
+                                    {{-- Vazio --}}
+                                    <template x-if="filteredExams.length === 0 && !urlsLoading">
+                                        <p class="text-muted text-center small py-4">Nenhum exame para os filtros
+                                            selecionados.</p>
+                                    </template>
+
+                                    {{-- Grupos: data + equipamento + tipo --}}
+                                    <div x-show="!urlsLoading"
+                                        style="max-height:520px;overflow-y:auto;overflow-x:hidden;">
+
+                                        <template x-for="group in groupedExams" :key="group.key">
+                                            <div class="mb-1">
+
+                                                {{-- Header: data : equipamento + filtros + ações --}}
+                                                <div class="px-2 py-1 d-flex align-items-center gap-1 flex-wrap bg-body-tertiary text-body border-bottom fw-semibold"
+                                                    style="font-size:.7rem;row-gap:3px;">
+
+                                                    {{-- Esquerda: data + equipamento --}}
+                                                    <span x-text="formatDateFull(group.date)"></span>
+                                                    <template x-if="group.equipment">
+                                                        <span class="d-flex align-items-center gap-1">
+                                                            <span class="opacity-50">:</span>
+                                                            <span x-text="group.equipment.name"></span>
+                                                        </span>
+                                                    </template>
+
+                                                    <div class="flex-grow-1"></div>
+
+                                                    {{-- Seleção por lateralidade --}}
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button type="button" class="btn py-0 px-2"
+                                                            :class="groupLatActive(group, 'od') ? 'btn-primary' : 'btn-outline-primary'"
+                                                            style="font-size:.6rem;"
+                                                            @click.stop="selectExamByLaterality(group, 'od')">OD</button>
+                                                        <button type="button" class="btn py-0 px-2"
+                                                            :class="groupLatActive(group, 'oe') ? 'btn-danger' : 'btn-outline-danger'"
+                                                            style="font-size:.6rem;"
+                                                            @click.stop="selectExamByLaterality(group, 'oe')">OE</button>
+                                                        <button type="button" class="btn py-0 px-2"
+                                                            :class="groupLatActive(group, 'ao') ? 'btn-secondary' : 'btn-outline-secondary'"
+                                                            style="font-size:.6rem;"
+                                                            @click.stop="selectExamByLaterality(group, 'ao')">AO</button>
+                                                        <button type="button" class="btn py-0 px-2"
+                                                            :class="groupLatActive(group, 'all') ? 'btn-secondary' : 'btn-outline-secondary'"
+                                                            style="font-size:.6rem;"
+                                                            @click.stop="selectExamByLaterality(group, 'all')">Todos</button>
+                                                    </div>
+
+                                                    <div class="vr opacity-25 mx-1"></div>
+
+                                                    {{-- Upload --}}
+                                                    <button type="button"
+                                                        class="btn btn-sm py-0 px-2 btn-outline-secondary"
+                                                        style="font-size:.6rem;" title="Upload de imagem">
+                                                        <i class="fa fa-upload me-1"></i>Upload
+                                                    </button>
+
+                                                    {{-- Download --}}
+                                                    <button type="button"
+                                                        class="btn btn-sm py-0 px-2 btn-outline-secondary"
+                                                        style="font-size:.6rem;" title="Download das imagens">
+                                                        <i class="fa fa-download me-1"></i>Download
+                                                    </button>
+
+                                                </div>
+
+                                                {{-- Subtítulo: tipo de exame --}}
+                                                <div class="px-2 py-1 bg-body-secondary text-body-secondary border-bottom"
+                                                    style="font-size:.68rem;">
+                                                    <span x-text="group.examType?.name || 'Exame'"></span>
+                                                </div>
+
+                                                {{-- Thumbnails: fundo sempre escuro (padrão de software médico) --}}
+                                                <div class="d-flex flex-wrap gap-2 p-2 bg-dark">
+                                                    <template x-for="(exam, examIdx) in group.exams" :key="exam.id">
+                                                        <div class="position-relative"
+                                                            style="cursor:pointer;flex-shrink:0;"
+                                                            @click="openViewerModal(group.exams, examIdx)">
+
+                                                            {{-- Badge lateralidade --}}
+                                                            <span class="position-absolute top-0 end-0 rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                                                :class="{
+                                                                    'bg-primary': exam.laterality === 1,
+                                                                    'bg-danger': exam.laterality === 2,
+                                                                    'bg-secondary': exam.laterality !== 1 && exam.laterality !== 2
+                                                                }"
+                                                                style="width:22px;height:22px;font-size:.55rem;z-index:1;margin:3px;"
+                                                                x-text="latLabel(exam.laterality)"></span>
+
+                                                            {{-- Checkbox seleção --}}
+                                                            <span class="position-absolute bottom-0 start-0 d-flex align-items-center justify-content-center"
+                                                                style="z-index:2;margin:3px;"
+                                                                @click.stop="toggleExamSelection(exam.id)">
+                                                                <span class="rounded d-flex align-items-center justify-content-center"
+                                                                    :class="isSelected(exam.id) ? 'bg-primary' : 'bg-dark border border-secondary'"
+                                                                    style="width:16px;height:16px;">
+                                                                    <i class="fa fa-check text-white" style="font-size:.5rem;"
+                                                                        x-show="isSelected(exam.id)"></i>
+                                                                </span>
+                                                            </span>
+
+                                                            {{-- Thumbnail com imagem --}}
+                                                            <template x-if="examUrls[exam.id] && !brokenUrls[exam.id]">
+                                                                <img :src="examUrls[exam.id]" :alt="exam.exam_type?.name"
+                                                                    width="100" height="76"
+                                                                    style="object-fit:cover;display:block;border-radius:4px;transition:outline .1s;"
+                                                                    :style="isSelected(exam.id) ? 'outline:2px solid #6ea8fe;' : 'outline:2px solid transparent;'"
+                                                                    x-on:error="brokenUrls = {...brokenUrls, [exam.id]: true}">
+                                                            </template>
+
+                                                            {{-- Placeholder sem imagem ou quebrada --}}
+                                                            <template x-if="!examUrls[exam.id] || brokenUrls[exam.id]">
+                                                                <div class="d-flex align-items-center justify-content-center rounded"
+                                                                    style="width:100px;height:76px;background:#3a3c42;border-radius:4px;transition:outline .1s;"
+                                                                    :style="isSelected(exam.id) ? 'outline:2px solid #6ea8fe;' : 'outline:2px solid transparent;'">
+                                                                    <i class="ti ti-photo-off" style="font-size:1.4rem;color:#555;"></i>
+                                                                </div>
+                                                            </template>
+
+                                                        </div>
+                                                    </template>
+                                                </div>
+
+                                            </div>
+                                        </template>
+
+                                    </div>
+
+                                </div>
+
+
+                            </div>
+                        </template>
+
+                    </div>
+                </div>
+            </div>
+
         </div>
+
+    {{-- ── Modal visualizador (lightbox) ─────────────────────────────────── --}}
+    <div x-show="showViewerModal" x-cloak
+        style="position:fixed;inset:0;z-index:9998;background:#0a0a0a;display:flex;flex-direction:column;"
+        @keydown.escape.window="showViewerModal = false"
+        @keydown.arrow-left.window="viewerPrev()"
+        @keydown.arrow-right.window="viewerNext()">
+
+        {{-- Toolbar --}}
+        <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0"
+            style="background:#111;border-bottom:1px solid #222;">
+
+            {{-- Lens --}}
+            <button type="button" class="btn btn-sm fw-semibold"
+                :class="viewerLensActive ? 'btn-warning text-dark' : 'btn-outline-secondary'"
+                @click="viewerLensActive = !viewerLensActive; viewerLensVisible = false">
+                <i class="fa fa-search-plus"></i>
+                <span class="ms-1" style="font-size:.72rem;">Lens</span>
+            </button>
+
+            <template x-if="viewerLensActive">
+                <div class="d-flex align-items-center gap-1">
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                        @click="viewerZoom = Math.max(1.5, viewerZoom - 0.5)">
+                        <i class="fa fa-minus" style="font-size:.65rem;"></i>
+                    </button>
+                    <span class="text-light" style="font-size:.72rem;min-width:36px;text-align:center;"
+                        x-text="viewerZoom.toFixed(1) + 'x'"></span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
+                        @click="viewerZoom = Math.min(10, viewerZoom + 0.5)">
+                        <i class="fa fa-plus" style="font-size:.65rem;"></i>
+                    </button>
+                </div>
+            </template>
+
+            <div class="vr opacity-25"></div>
+
+            {{-- Lateralidade + status do exame atual --}}
+            <template x-if="viewerCurrentExam">
+                <span class="d-flex align-items-center gap-1">
+                    <span class="badge px-2"
+                        :class="{
+                            'bg-primary': viewerCurrentExam.laterality === 1,
+                            'bg-danger': viewerCurrentExam.laterality === 2,
+                            'bg-secondary': viewerCurrentExam.laterality !== 1 && viewerCurrentExam.laterality !== 2
+                        }"
+                        x-text="latLabel(viewerCurrentExam.laterality)"></span>
+                    <span class="badge"
+                        :class="{
+                            'bg-warning text-dark': deriveStatus(viewerCurrentExam) === 'solicitado',
+                            'bg-success': deriveStatus(viewerCurrentExam) === 'realizado',
+                            'bg-secondary': deriveStatus(viewerCurrentExam) === 'cancelado'
+                        }"
+                        x-text="statusLabel(viewerCurrentExam)"></span>
+                </span>
+            </template>
+
+            <div class="flex-grow-1"></div>
+
+            {{-- Data/hora + tipo --}}
+            <template x-if="viewerCurrentExam">
+                <span class="text-light fw-semibold" style="font-size:.75rem;">
+                    <span x-text="viewerCurrentExam.exam_type?.name"></span>
+                    <span class="opacity-50 mx-1">—</span>
+                    <span x-text="formatDateTime(viewerCurrentExam.created_at)"></span>
+                </span>
+            </template>
+
+            <div class="vr opacity-25"></div>
+
+            {{-- Navegação --}}
+            <span class="text-secondary" style="font-size:.72rem;"
+                x-text="(viewerIndex + 1) + ' / ' + viewerExams.length"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                @click="viewerPrev()" :disabled="viewerIndex === 0">
+                <i class="fa fa-chevron-left"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                @click="viewerNext()" :disabled="viewerIndex >= viewerExams.length - 1">
+                <i class="fa fa-chevron-right"></i>
+            </button>
+
+            <div class="vr opacity-25"></div>
+
+            {{-- Abrir original --}}
+            <a x-show="viewerImageUrl && !viewerBroken" x-cloak
+                :href="viewerImageUrl" target="_blank"
+                class="btn btn-sm btn-outline-secondary" title="Abrir em nova aba">
+                <i class="fa fa-expand"></i>
+            </a>
+
+            {{-- Fechar --}}
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                @click="showViewerModal = false">
+                <i class="fa fa-times"></i>
+            </button>
+
+        </div>
+
+        {{-- Área da imagem --}}
+        <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center overflow-hidden"
+            x-ref="viewerContainer"
+            :style="viewerLensActive && viewerImageUrl && !viewerBroken ? 'cursor:none;' : ''"
+            @mousemove="onViewerLensMove($event)"
+            @mouseleave="viewerLensVisible = false"
+            @mouseenter="if(viewerLensActive && viewerImageUrl && !viewerBroken) viewerLensVisible = true"
+            @wheel.prevent="if(viewerLensActive) { const s = $event.deltaY < 0 ? 0.5 : -0.5; viewerZoom = Math.min(10, Math.max(1.5, viewerZoom + s)); }">
+
+            {{-- Spinner --}}
+            <div x-show="viewerLoading" x-cloak class="text-center text-white">
+                <div class="spinner-border text-light" role="status"></div>
+                <p class="mt-2 small opacity-75 mb-0">Carregando…</p>
+            </div>
+
+            {{-- Sem imagem --}}
+            <template x-if="!viewerImageUrl && !viewerLoading">
+                <div class="text-center text-muted">
+                    <i class="ti ti-photo-off" style="font-size:4rem;opacity:.3;"></i>
+                    <p class="mt-2 mb-0" x-text="viewerBroken ? 'Arquivo não encontrado.' : 'Nenhuma imagem.'"></p>
+                </div>
+            </template>
+
+            {{-- Imagem principal --}}
+            <img x-show="viewerImageUrl && !viewerLoading && !viewerBroken"
+                x-cloak :src="viewerImageUrl" alt="Exame"
+                style="max-width:100%;max-height:100%;object-fit:contain;display:block;user-select:none;"
+                x-on:load="viewerLoading = false"
+                x-on:error="viewerLoading = false; viewerBroken = true; viewerImageUrl = null;">
+
+            {{-- Lupa --}}
+            <div x-show="viewerLensActive && viewerLensVisible && viewerImageUrl && !viewerBroken"
+                x-cloak :style="viewerLensStyle"
+                style="position:absolute;pointer-events:none;border-radius:50%;z-index:10;">
+            </div>
+
+        </div>
+
+        {{-- Faixa de thumbnails --}}
+        <div class="flex-shrink-0 d-flex gap-2 overflow-auto px-3 py-2"
+            style="background:#111;border-top:1px solid #222;min-height:100px;">
+            <template x-for="(exam, idx) in viewerExams" :key="exam.id">
+                <div style="flex-shrink:0;cursor:pointer;" @click="viewerGoTo(idx)">
+                    <div class="position-relative rounded overflow-hidden"
+                        style="width:80px;height:70px;"
+                        :style="viewerIndex === idx ? 'outline:2px solid #0d6efd;' : 'outline:1px solid #333;'">
+                        <span class="position-absolute top-0 end-0 rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                            :class="{
+                                'bg-primary': exam.laterality === 1,
+                                'bg-danger': exam.laterality === 2,
+                                'bg-secondary': exam.laterality !== 1 && exam.laterality !== 2
+                            }"
+                            style="width:18px;height:18px;font-size:.5rem;z-index:1;margin:2px;"
+                            x-text="latLabel(exam.laterality)"></span>
+                        <template x-if="examUrls[exam.id] && !brokenUrls[exam.id]">
+                            <img :src="examUrls[exam.id]" width="80" height="70"
+                                style="object-fit:cover;display:block;"
+                                x-on:error="brokenUrls = {...brokenUrls, [exam.id]: true}">
+                        </template>
+                        <template x-if="!examUrls[exam.id] || brokenUrls[exam.id]">
+                            <div class="w-100 h-100 d-flex align-items-center justify-content-center"
+                                style="background:#1a1a1a;">
+                                <i class="ti ti-photo-off" style="color:#555;font-size:1.2rem;"></i>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="text-center mt-1"
+                        style="font-size:.58rem;color:#666;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;"
+                        x-text="exam.exam_type?.name ?? '—'"></div>
+                </div>
+            </template>
+        </div>
+
     </div>
 
-</div>
+    {{-- ── Modal de impressão ──────────────────────────────────────────────── --}}
+    <div x-show="showPrintModal" x-cloak
+        style="position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;"
+        @keydown.escape.window="showPrintModal = false">
+
+        {{-- Barra de ferramentas --}}
+        <div class="d-flex align-items-center gap-1 px-3 py-2 flex-shrink-0"
+            style="background:#2c2c2c;color:#fff;">
+
+            {{-- Colunas por linha --}}
+            <div class="btn-group btn-group-sm me-2" role="group">
+                <template x-for="n in [1,2,4,6,9,12,16]" :key="n">
+                    <button type="button" class="btn btn-sm"
+                        :class="printCols === n ? 'btn-light' : 'btn-outline-secondary'"
+                        style="font-size:.72rem;min-width:28px;"
+                        @click="printCols = n"
+                        x-text="n"></button>
+                </template>
+            </div>
+
+            <div class="vr opacity-25 mx-1"></div>
+
+            {{-- Orientação --}}
+            <button type="button" class="btn btn-sm"
+                :class="printOrientation === 'portrait' ? 'btn-light' : 'btn-outline-secondary'"
+                style="font-size:.72rem;" @click="printOrientation = 'portrait'">
+                <i class="fa fa-file me-1"></i>Retrato
+            </button>
+            <button type="button" class="btn btn-sm"
+                :class="printOrientation === 'landscape' ? 'btn-light' : 'btn-outline-secondary'"
+                style="font-size:.72rem;" @click="printOrientation = 'landscape'">
+                <i class="fa fa-file me-1" style="transform:rotate(90deg);display:inline-block;"></i>Paisagem
+            </button>
+
+            <div class="vr opacity-25 mx-1"></div>
+
+            <button type="button" class="btn btn-sm btn-warning text-dark fw-semibold"
+                style="font-size:.72rem;" @click="printReport()">
+                <i class="fa fa-print me-1"></i>Imprimir
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-auto"
+                style="font-size:.72rem;" @click="showPrintModal = false">
+                <i class="fa fa-times me-1"></i>Fechar
+            </button>
+
+        </div>
+
+        {{-- Área de preview --}}
+        <div class="flex-grow-1 overflow-auto" style="background:#888;">
+            <div id="ei-print-content"
+                :class="printOrientation === 'landscape' ? 'ei-landscape' : 'ei-portrait'"
+                class="mx-auto my-3 bg-white shadow"
+                style="width:210mm;min-height:297mm;padding:12mm;box-sizing:border-box;">
+
+                {{-- Cabeçalho da clínica --}}
+                <div class="d-flex justify-content-between align-items-start mb-3 pb-2"
+                    style="border-bottom:2px solid #1a6fc4;">
+                    <div>
+                        <div style="font-size:1.1rem;font-weight:700;color:#1a6fc4;" x-text="EI_ENTITY.name"></div>
+                        <div style="font-size:.72rem;color:#555;" x-show="EI_ENTITY.address" x-text="EI_ENTITY.address"></div>
+                        <div style="font-size:.72rem;color:#555;" x-show="EI_ENTITY.email" x-text="EI_ENTITY.email"></div>
+                        <div style="font-size:.72rem;color:#555;"
+                            x-show="EI_ENTITY.telephone || EI_ENTITY.cellphone"
+                            x-text="[EI_ENTITY.telephone, EI_ENTITY.cellphone].filter(Boolean).join(' | ')"></div>
+                    </div>
+                    <div class="text-end">
+                        <div style="font-size:.72rem;color:#555;">Data do relatório:</div>
+                        <div style="font-size:.85rem;font-weight:600;" x-text="new Date().toLocaleDateString('pt-BR')"></div>
+                    </div>
+                </div>
+
+                {{-- Dados do paciente --}}
+                <div class="mb-3 p-2 rounded" style="background:#f0f4ff;font-size:.78rem;">
+                    <strong x-text="selectedPatient?.person?.full_name"></strong>
+                    <span class="ms-2 text-muted" x-text="selectedPatient?.code"></span>
+                </div>
+
+                {{-- Grade de imagens --}}
+                <div :style="`display:grid;grid-template-columns:repeat(${printCols},1fr);gap:8px;`">
+                    <template x-for="exam in printExams" :key="exam.id">
+                        <div style="break-inside:avoid;">
+                            <div class="text-center mb-1" style="font-size:.65rem;color:#333;font-weight:600;"
+                                x-text="`${exam.exam_type?.name ?? 'Exame'} - ${latLabel(exam.laterality)} - ${formatDateTime(exam.created_at)}`">
+                            </div>
+                            <template x-if="examUrls[exam.id] && !brokenUrls[exam.id]">
+                                <img :src="examUrls[exam.id]" style="width:100%;height:auto;display:block;border:1px solid #ddd;"
+                                    x-on:error="brokenUrls = {...brokenUrls, [exam.id]: true}">
+                            </template>
+                            <template x-if="!examUrls[exam.id] || brokenUrls[exam.id]">
+                                <div class="d-flex align-items-center justify-content-center"
+                                    style="width:100%;aspect-ratio:4/3;background:#eee;border:1px solid #ddd;">
+                                    <i class="ti ti-photo-off" style="font-size:2rem;color:#aaa;"></i>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
 
 @endsection
 
-@section('javascript')
-<script>
-    function eyeImagesViewer(config) {
-        return {
-            doctors: config.doctors,
-            examTypes: config.examTypes,
-            categories: config.categories,
-            searchQuery: '',
-            resultCount: 0,
-            openImagesCount: 0,
-            selectedCount: 0,
-            multiSelect: false,
-            filters: {
-                doctor_id: null,
-                exam_type_id: null,
-                laterality: 'null',
-                period: 'today',
-                periodLabel: 'Hoje',
-                category: null
-            },
-            selectedDoctorName: '',
-            selectedExamTypeName: '',
-
-            init() {
-                console.log('Eye Images Viewer Initialized');
-                // Adicionar listener para Fullscreen
-                window.addEventListener('keydown', (e) => {
-                    if (e.key === 'f' || e.key === 'F') {
-                        this.toggleFullscreen();
-                    }
-                });
-            },
-
-            performSearch() {
-                console.log('Searching for:', this.searchQuery, 'with filters:', this.filters);
-                // Aqui seria a chamada AJAX para buscar os exames
-                this.resultCount = Math.floor(Math.random() * 10); // Mock
-            },
-
-            clearSearch() {
-                this.searchQuery = '';
-                this.performSearch();
-            },
-
-            filterByDoctor(doctor) {
-                this.filters.doctor_id = doctor ? doctor.id : null;
-                this.selectedDoctorName = doctor ? doctor.person.full_name : '';
-                this.performSearch();
-            },
-
-            filterByExamType(type) {
-                this.filters.exam_type_id = type ? type.id : null;
-                this.selectedExamTypeName = type ? type.name : '';
-                this.performSearch();
-            },
-
-            setPeriod(period, label) {
-                this.filters.period = period;
-                this.filters.periodLabel = label;
-                this.performSearch();
-            },
-
-            toggleCategory(key) {
-                this.filters.category = (this.filters.category === key) ? null : key;
-                this.performSearch();
-            },
-
-            toggleMultiSelect() {
-                this.multiSelect = !this.multiSelect;
-            },
-
-            clearSelection() {
-                this.selectedCount = 0;
-            },
-
-            refresh() {
-                this.performSearch();
-            },
-
-            toggleFullscreen() {
-                console.log('Toggling fullscreen mode...');
-                // Implementação de fullscreen do viewer
+@section('styles')
+    <style>
+        @media print {
+            body * { visibility: hidden !important; }
+            #ei-print-content, #ei-print-content * { visibility: visible !important; }
+            #ei-print-content {
+                position: fixed !important;
+                left: 0 !important; top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                box-shadow: none !important;
             }
         }
-    }
-</script>
+        .ei-landscape { width: 297mm; min-height: 210mm; }
+    </style>
+@endsection
+
+@section('javascript')
+    <script>
+        const EI_SEARCH_URL = '{{ route('panel.eye-images.search') }}';
+        const EI_ENTITY = @js($entity ? ['name' => $entity->name, 'address' => $entity->address, 'telephone' => $entity->telephone, 'cellphone' => $entity->cellphone, 'email' => $entity->email] : []);
+
+        function eyeImagesApp(initialPatients) {
+            return {
+                patients: initialPatients ?? [],
+                selectedPatient: null,
+                examUrls: {},
+                brokenUrls: {},
+                urlsLoading: false,
+                search: '',
+                period: 'hoje',
+                laterality: '',
+                doctorId: '',
+                examTypeId: '',
+                examStatus: '',
+                showFilters: false,
+                loading: false,
+                selectedExamIds: [],
+                showPrintModal: false,
+                printExams: [],
+                printCols: 2,
+                printOrientation: 'portrait',
+                showViewerModal: false,
+                viewerExams: [],
+                viewerIndex: 0,
+                viewerImageUrl: null,
+                viewerLoading: false,
+                viewerBroken: false,
+                viewerLensActive: false,
+                viewerLensVisible: false,
+                viewerLensX: 0,
+                viewerLensY: 0,
+                viewerZoom: 3,
+                _viewerW: 0,
+                _viewerH: 0,
+
+                // ── Computed ──────────────────────────────────────────────────────────
+
+                get availableExamTypes() {
+                    const map = new Map();
+                    for (const p of this.patients) {
+                        for (const e of p.exams) {
+                            if (e.exam_type && !map.has(e.exam_id)) {
+                                map.set(e.exam_id, {
+                                    id: e.exam_id,
+                                    name: e.exam_type.name
+                                });
+                            }
+                        }
+                    }
+                    return [...map.values()].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
+                },
+
+                get filteredPatients() {
+                    let list = this.patients;
+
+                    const q = this.search.trim().toLowerCase();
+                    if (q) {
+                        list = list.filter(p =>
+                            (p.person?.full_name ?? '').toLowerCase().includes(q) ||
+                            (p.code ?? '').toLowerCase().includes(q)
+                        );
+                    }
+
+                    if (this.laterality || this.examTypeId || this.examStatus) {
+                        list = list.filter(p => p.exams.some(e => this.examMatchesFilters(e)));
+                    }
+
+                    return list;
+                },
+
+                get filteredExams() {
+                    if (!this.selectedPatient) return [];
+                    return this.selectedPatient.exams.filter(e => this.examMatchesFilters(e));
+                },
+
+                get groupedExams() {
+                    const groups = [];
+                    const seen = {};
+                    for (const exam of this.filteredExams) {
+                        const date = exam.created_at?.substring(0, 10) ?? 'unknown';
+                        const equipId = exam.entity_integrator_equipment_id ?? '';
+                        const typeId = exam.exam_id ?? '';
+                        const key = `${date}|${equipId}|${typeId}`;
+                        if (!seen[key]) {
+                            seen[key] = {
+                                key,
+                                date,
+                                equipment: exam.equipment ?? null,
+                                examType: exam.exam_type ?? null,
+                                exams: []
+                            };
+                            groups.push(seen[key]);
+                        }
+                        seen[key].exams.push(exam);
+                    }
+                    return groups.sort((a, b) => b.date.localeCompare(a.date));
+                },
+
+                get selectedExamsData() {
+                    if (!this.selectedPatient) return [];
+                    return this.selectedPatient.exams.filter(e => this.selectedExamIds.includes(e.id));
+                },
+
+                get viewerCurrentExam() {
+                    return this.viewerExams[this.viewerIndex] ?? null;
+                },
+
+                get viewerLensStyle() {
+                    if (!this.viewerLensVisible || !this.viewerImageUrl) return 'display:none;';
+                    const lensSize = 200;
+                    const bW = this._viewerW * this.viewerZoom;
+                    const bH = this._viewerH * this.viewerZoom;
+                    const bX = -(this.viewerLensX * this.viewerZoom - lensSize / 2);
+                    const bY = -(this.viewerLensY * this.viewerZoom - lensSize / 2);
+                    return `position:absolute;left:${this.viewerLensX}px;top:${this.viewerLensY}px;` +
+                        `width:${lensSize}px;height:${lensSize}px;` +
+                        `border-radius:50%;border:2px solid rgba(255,255,255,0.8);` +
+                        `transform:translate(-50%,-50%);pointer-events:none;` +
+                        `background-image:url(${this.viewerImageUrl});background-repeat:no-repeat;` +
+                        `background-size:${bW}px ${bH}px;background-position:${bX}px ${bY}px;` +
+                        `box-shadow:0 0 0 1px rgba(0,0,0,0.5);z-index:10;`;
+                },
+
+                // ── Helpers ───────────────────────────────────────────────────────────
+
+                examMatchesFilters(e) {
+                    if (this.laterality) {
+                        if (this.laterality === 'ao') {
+                            if (e.laterality === 1 || e.laterality === 2) return false;
+                        } else {
+                            const target = this.laterality === 'od' ? 1 : 2;
+                            if (e.laterality !== target) return false;
+                        }
+                    }
+                    if (this.examTypeId && String(e.exam_id) !== String(this.examTypeId)) return false;
+                    if (this.examStatus && this.deriveStatus(e) !== this.examStatus) return false;
+                    return true;
+                },
+
+                deriveStatus(exam) {
+                    if (exam.active === false || exam.active === 0) return 'cancelado';
+                    if (!exam.archive) return 'solicitado';
+                    return 'realizado';
+                },
+
+                statusLabel(exam) {
+                    return {
+                        solicitado: 'Solicitado',
+                        realizado: 'Realizado',
+                        cancelado: 'Cancelado'
+                    } [this.deriveStatus(exam)] ?? '—';
+                },
+
+                // ── Actions ───────────────────────────────────────────────────────────
+
+                groupLatMatching(group, lat) {
+                    if (lat === 'all') return group.exams;
+                    if (lat === 'od') return group.exams.filter(e => e.laterality === 1);
+                    if (lat === 'oe') return group.exams.filter(e => e.laterality === 2);
+                    return group.exams.filter(e => e.laterality !== 1 && e.laterality !== 2);
+                },
+
+                groupLatActive(group, lat) {
+                    const matching = this.groupLatMatching(group, lat);
+                    return matching.length > 0 && matching.every(e => this.selectedExamIds.includes(e.id));
+                },
+
+                selectExamByLaterality(group, lat) {
+                    const matching = this.groupLatMatching(group, lat);
+                    if (!matching.length) return;
+                    const allSelected = matching.every(e => this.selectedExamIds.includes(e.id));
+                    if (allSelected) {
+                        this.selectedExamIds = this.selectedExamIds.filter(id => !matching.find(e => e.id === id));
+                    } else {
+                        const toAdd = matching.filter(e => !this.selectedExamIds.includes(e.id)).map(e => e.id);
+                        this.selectedExamIds = [...this.selectedExamIds, ...toAdd];
+                    }
+                },
+
+                toggleExamSelection(examId) {
+                    const idx = this.selectedExamIds.indexOf(examId);
+                    if (idx >= 0) this.selectedExamIds.splice(idx, 1);
+                    else this.selectedExamIds.push(examId);
+                },
+
+                isSelected(examId) {
+                    return this.selectedExamIds.includes(examId);
+                },
+
+                openPrintModal(exams, autoPrint = false) {
+                    this.printExams = exams ?? [];
+                    this.showPrintModal = true;
+                    if (autoPrint) {
+                        this.$nextTick(() => setTimeout(() => this.printReport(), 300));
+                    }
+                },
+
+                printReport() {
+                    window.print();
+                },
+
+                openViewerModal(exams, startIndex = 0) {
+                    if (!exams || exams.length === 0) return;
+                    this.viewerExams = exams;
+                    this.viewerIndex = startIndex;
+                    this.viewerImageUrl = null;
+                    this.viewerLoading = false;
+                    this.viewerBroken = false;
+                    this.viewerLensActive = false;
+                    this.viewerLensVisible = false;
+                    this.showViewerModal = true;
+                    this.loadViewerImage(exams[startIndex]);
+                },
+
+                viewerGoTo(idx) {
+                    this.viewerIndex = idx;
+                    this.viewerLensVisible = false;
+                    this.loadViewerImage(this.viewerExams[idx]);
+                },
+
+                viewerNext() {
+                    if (this.viewerIndex < this.viewerExams.length - 1) this.viewerGoTo(this.viewerIndex + 1);
+                },
+
+                viewerPrev() {
+                    if (this.viewerIndex > 0) this.viewerGoTo(this.viewerIndex - 1);
+                },
+
+                loadViewerImage(exam) {
+                    if (!exam) return;
+                    this.viewerBroken = false;
+                    this.viewerImageUrl = null;
+                    this.viewerLoading = false;
+                    const url = this.examUrls[exam.id] ?? null;
+                    if (!url) return;
+                    const probe = new Image();
+                    probe.src = url;
+                    if (probe.complete && probe.naturalWidth > 0) {
+                        this.viewerImageUrl = url;
+                    } else {
+                        this.viewerLoading = true;
+                        this.viewerImageUrl = url;
+                    }
+                },
+
+                onViewerLensMove(event) {
+                    if (!this.viewerLensActive || !this.viewerImageUrl) return;
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    this.viewerLensX = event.clientX - rect.left;
+                    this.viewerLensY = event.clientY - rect.top;
+                    this._viewerW = rect.width;
+                    this._viewerH = rect.height;
+                    this.viewerLensVisible = true;
+                },
+
+                async selectPatient(patient) {
+                    this.selectedPatient = patient;
+                    this.examUrls = {};
+                    this.brokenUrls = {};
+                    this.selectedExamIds = [];
+                    this.urlsLoading = true;
+                    try {
+                        const res = await fetch(`{{ route('panel.eye-images.patient-urls', '__ID__') }}`.replace(
+                            '__ID__', patient.id), {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                        });
+                        const data = await res.json();
+                        this.examUrls = data.urls ?? {};
+                    } catch {
+                        this.examUrls = {};
+                    } finally {
+                        this.urlsLoading = false;
+                    }
+                },
+
+                setDoctor(id) {
+                    this.doctorId = id;
+                    this.selectedPatient = null;
+                    this.fetchPatients();
+                },
+
+                async changePeriod(period) {
+                    this.period = period;
+                    this.selectedPatient = null;
+                    this.search = '';
+                    await this.fetchPatients();
+                },
+
+                clearFilters() {
+                    this.search = '';
+                    this.laterality = '';
+                    this.examTypeId = '';
+                    this.examStatus = '';
+                },
+
+                async fetchPatients() {
+                    this.loading = true;
+                    try {
+                        const params = new URLSearchParams({
+                            period: this.period
+                        });
+                        if (this.doctorId) params.append('doctor_id', this.doctorId);
+                        const res = await fetch(`${EI_SEARCH_URL}?${params}`, {
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                        });
+                        const data = await res.json();
+                        this.patients = data.patients ?? [];
+                    } catch (e) {
+                        console.error('Erro ao buscar pacientes:', e);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                initials(name) {
+                    if (!name) return '?';
+                    const parts = name.trim().split(' ').filter(Boolean);
+                    return parts.length >= 2 ?
+                        (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() :
+                        parts[0][0].toUpperCase();
+                },
+
+                avatarColor(name) {
+                    const palette = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899',
+                        '#6366f1'
+                    ];
+                    if (!name) return palette[0];
+                    let h = 0;
+                    for (const c of name) h = c.charCodeAt(0) + ((h << 5) - h);
+                    return palette[Math.abs(h) % palette.length];
+                },
+
+                latLabel: (v) => ({
+                    1: 'OD',
+                    2: 'OE'
+                } [v] ?? 'AO'),
+
+                formatDateFull(ymd) {
+                    if (!ymd || ymd === 'unknown') return '—';
+                    const [y, m, d] = ymd.split('-');
+                    return `${d}/${m}/${y}`;
+                },
+
+                formatDateShort(ymd) {
+                    if (!ymd || ymd === 'unknown') return '—';
+                    const [y, m, d] = ymd.split('-');
+                    return `${d}/${m}/${y.slice(2)}`;
+                },
+
+                formatDateTime(dt) {
+                    if (!dt) return '—';
+                    const d = new Date(dt);
+                    return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                },
+
+            };
+        }
+    </script>
 @endsection

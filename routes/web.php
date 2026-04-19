@@ -145,6 +145,9 @@ Route::group(
         })->name('dashboard');
 
         Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');
+        Route::get('/eye-images/search', [EyeImagesController::class, 'search'])->name('eye-images.search');
+        Route::get('/eye-images/patient-urls/{patient}', [EyeImagesController::class, 'patientExamUrls'])->name('eye-images.patient-urls');
+        Route::get('/eye-images/image-url/{exam}', [EyeImagesController::class, 'imageUrl'])->name('eye-images.image-url');
         // ══════════════════════════════════════════════════════════════════════
         // ACL: rotas agrupadas por nível mínimo de acesso
         // Middleware entity.role aplica a role check via EnsureEntityRole.

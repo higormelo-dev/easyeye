@@ -2,7 +2,7 @@
 
 namespace App\Services\Billing;
 
-use App\DTOs\Billing\CancelSubscriptionDTO;
+use App\DTOs\Billing\{CancelSubscriptionDTO, GatewayCallContext};
 use App\Enums\Billing\{BillingEventType, CancellationReason};
 use App\Enums\SubscriptionStatus;
 use App\Jobs\Billing\CancelGatewaySubscriptionJob;
@@ -235,9 +235,8 @@ class BillingCancellationService
                 return true; // Gateway não integrado — não há nada a cancelar
             }
 
-            $gateway = $this->gatewayRegistry->get((string) $subscription->gateway);
-            $gateway->withCorrelationId($correlationId)
-                    ->withEntityId((string) $subscription->entity_id);
+            $gateway = $this->gatewayRegistry->get((string) $subscription->gateway)
+                ->withContext(new GatewayCallContext($correlationId, (string) $subscription->entity_id));
 
             $result = $gateway->cancelSubscription(new CancelSubscriptionDTO(
                 subscriptionId: (string) $subscription->id,

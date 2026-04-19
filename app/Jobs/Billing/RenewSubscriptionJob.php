@@ -7,6 +7,7 @@ use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus};
 use App\Enums\BillingCycle;
 use App\Models\Billing\{BillingRetrySchedule, Invoice, Payment};
 use App\Models\{Subscription};
+use App\DTOs\Billing\GatewayCallContext;
 use App\Services\Billing\{BillingLogService, CircuitBreakerService, FinancialEventService, GatewayRegistry};
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -100,8 +101,7 @@ class RenewSubscriptionJob implements ShouldQueue
         }
 
         try {
-            $gateway = $gatewayRegistry->get($gatewayCode);
-            $gateway->withCorrelationId($correlationId)->withEntityId((string) $entity->id);
+            $gateway = $gatewayRegistry->get($gatewayCode)->withContext(new GatewayCallContext($correlationId, (string) $entity->id));
 
             $chargeResult = $gateway->createCharge(new CreateChargeDTO(
                 entityId: (string) $entity->id,

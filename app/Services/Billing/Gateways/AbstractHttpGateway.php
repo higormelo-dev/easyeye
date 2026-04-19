@@ -11,6 +11,7 @@ use App\DTOs\Billing\{
     CreateSubscriptionDTO,
     CreateSubscriptionResultDTO,
     CustomerDTO,
+    GatewayCallContext,
     GatewayHealthDTO,
     GatewayWebhookInputDTO,
     NormalizedWebhookEventDTO,
@@ -35,18 +36,13 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     // ── Contexto de chamada ──────────────────────────────────────────────────
 
-    public function withCorrelationId(string $correlationId): static
+    public function withContext(GatewayCallContext $context): static
     {
-        $this->correlationId = $correlationId;
+        $clone = clone $this;
+        $clone->correlationId = $context->correlationId;
+        $clone->entityId      = $context->entityId;
 
-        return $this;
-    }
-
-    public function withEntityId(string $entityId): static
-    {
-        $this->entityId = $entityId;
-
-        return $this;
+        return $clone;
     }
 
     // ── Interface pública — cada subclasse deve implementar ──────────────────

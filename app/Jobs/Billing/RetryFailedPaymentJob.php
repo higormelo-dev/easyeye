@@ -5,6 +5,7 @@ namespace App\Jobs\Billing;
 use App\DTOs\Billing\CreateChargeDTO;
 use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus};
 use App\Models\Billing\{BillingRetrySchedule, Payment};
+use App\DTOs\Billing\GatewayCallContext;
 use App\Services\Billing\{BillingLogService, CircuitBreakerService, FinancialEventService, GatewayRegistry};
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -69,8 +70,7 @@ class RetryFailedPaymentJob implements ShouldQueue
         }
 
         try {
-            $gateway = $gatewayRegistry->get($gatewayCode);
-            $gateway->withCorrelationId($correlationId)->withEntityId((string) $entity->id);
+            $gateway = $gatewayRegistry->get($gatewayCode)->withContext(new GatewayCallContext($correlationId, (string) $entity->id));
 
             // New idempotency key per attempt to force a fresh charge
             $idempotencyKey = 'retry:' . $invoice->id . ':attempt:' . $schedule->attempt_number;

@@ -125,7 +125,7 @@ class PatientExamRequest extends FormRequest
                     }
                 },
             ],
-            'archive'              => 'required|file|mimes:jpg,jpeg,png|max:10240',
+            'archive'              => 'required|file|mimes:jpg,jpeg,png,emr|max:10240',
             'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
             'equipment_identifier' => [
                 'nullable',

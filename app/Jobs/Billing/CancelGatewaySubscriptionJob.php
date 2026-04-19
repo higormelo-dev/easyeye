@@ -5,6 +5,7 @@ namespace App\Jobs\Billing;
 use App\DTOs\Billing\CancelSubscriptionDTO;
 use App\Enums\Billing\BillingEventType;
 use App\Models\Subscription;
+use App\DTOs\Billing\GatewayCallContext;
 use App\Services\Billing\{BillingLogService, FinancialEventService, GatewayRegistry};
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -82,9 +83,8 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
             return;
         }
 
-        $gateway = $gatewayRegistry->get($this->gatewayCode);
-        $gateway->withCorrelationId($this->correlationId)
-                ->withEntityId((string) $subscription->entity_id);
+        $gateway = $gatewayRegistry->get($this->gatewayCode)
+            ->withContext(new GatewayCallContext($this->correlationId, (string) $subscription->entity_id));
 
         $result = $gateway->cancelSubscription(new CancelSubscriptionDTO(
             subscriptionId: (string) $subscription->id,
