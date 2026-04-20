@@ -346,7 +346,7 @@
                                                     <template x-for="(exam, examIdx) in group.exams" :key="exam.id">
                                                         <div class="position-relative"
                                                             style="cursor:pointer;flex-shrink:0;"
-                                                            @click="openViewerModal(group.exams, examIdx)">
+                                                            @click="toggleExamSelection(exam.id)">
 
                                                             {{-- Badge lateralidade --}}
                                                             <span class="position-absolute top-0 end-0 rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
@@ -360,8 +360,7 @@
 
                                                             {{-- Checkbox seleção --}}
                                                             <span class="position-absolute bottom-0 start-0 d-flex align-items-center justify-content-center"
-                                                                style="z-index:2;margin:3px;"
-                                                                @click.stop="toggleExamSelection(exam.id)">
+                                                                style="z-index:2;margin:3px;">
                                                                 <span class="rounded d-flex align-items-center justify-content-center"
                                                                     :class="isSelected(exam.id) ? 'bg-primary' : 'bg-dark border border-secondary'"
                                                                     style="width:16px;height:16px;">
@@ -409,175 +408,256 @@
 
         </div>
 
-    {{-- ── Modal visualizador (lightbox) ─────────────────────────────────── --}}
+    {{-- ── Modal visualizador split-panel ─────────────────────────────────── --}}
     <div x-show="showViewerModal" x-cloak
-        style="position:fixed;inset:0;z-index:9998;background:#0a0a0a;display:flex;flex-direction:column;"
+        style="position:fixed;inset:0;z-index:9998;background:#0a0a0a;display:flex;flex-direction:column;overflow:hidden;"
         @keydown.escape.window="showViewerModal = false"
         @keydown.arrow-left.window="viewerPrev()"
         @keydown.arrow-right.window="viewerNext()">
 
         {{-- Toolbar --}}
-        <div class="d-flex align-items-center gap-2 px-3 py-2 flex-shrink-0"
-            style="background:#111;border-bottom:1px solid #222;">
+        <div class="d-flex align-items-center gap-1 px-3 py-2 flex-shrink-0 flex-wrap"
+            style="background:#111;border-bottom:1px solid #222;row-gap:4px;">
+
+            {{-- Contagem de painéis: 1 2 3 4 --}}
+            <div class="btn-group btn-group-sm" role="group">
+                <template x-for="n in [1,2,3,4]" :key="n">
+                    <button type="button" class="btn fw-semibold"
+                        :class="viewerPanelCount === n ? 'btn-primary' : 'btn-outline-secondary'"
+                        style="min-width:26px;font-size:.72rem;"
+                        @click="setViewerPanelCount(n)"
+                        x-text="n"></button>
+                </template>
+            </div>
+
+            <div class="vr opacity-25 mx-1"></div>
+
+            {{-- All --}}
+            <button type="button" class="btn btn-sm fw-semibold"
+                :class="viewerAllMode ? 'btn-info text-dark' : 'btn-outline-secondary'"
+                style="font-size:.72rem;" @click="viewerToggleAll()">All</button>
+
+            <div class="vr opacity-25 mx-1"></div>
 
             {{-- Lens --}}
             <button type="button" class="btn btn-sm fw-semibold"
                 :class="viewerLensActive ? 'btn-warning text-dark' : 'btn-outline-secondary'"
+                style="font-size:.72rem;"
                 @click="viewerLensActive = !viewerLensActive; viewerLensVisible = false">
-                <i class="fa fa-search-plus"></i>
-                <span class="ms-1" style="font-size:.72rem;">Lens</span>
+                <i class="fa fa-search-plus"></i> Lens
             </button>
-
             <template x-if="viewerLensActive">
                 <div class="d-flex align-items-center gap-1">
                     <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
                         @click="viewerZoom = Math.max(1.5, viewerZoom - 0.5)">
-                        <i class="fa fa-minus" style="font-size:.65rem;"></i>
-                    </button>
-                    <span class="text-light" style="font-size:.72rem;min-width:36px;text-align:center;"
+                        <i class="fa fa-minus" style="font-size:.65rem;"></i></button>
+                    <span class="text-light" style="font-size:.72rem;min-width:34px;text-align:center;"
                         x-text="viewerZoom.toFixed(1) + 'x'"></span>
                     <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1"
                         @click="viewerZoom = Math.min(10, viewerZoom + 0.5)">
-                        <i class="fa fa-plus" style="font-size:.65rem;"></i>
-                    </button>
+                        <i class="fa fa-plus" style="font-size:.65rem;"></i></button>
                 </div>
             </template>
 
-            <div class="vr opacity-25"></div>
+            <div class="vr opacity-25 mx-1"></div>
 
-            {{-- Lateralidade + status do exame atual --}}
-            <template x-if="viewerCurrentExam">
+            {{-- Fit <--> --}}
+            <button type="button" class="btn btn-sm fw-semibold"
+                :class="viewerFitMode ? 'btn-light text-dark' : 'btn-outline-secondary'"
+                style="font-size:.72rem;" @click="viewerFitMode = !viewerFitMode"
+                title="Ajustar à área de visualização">
+                <i class="fa fa-compress-arrows-alt me-1"></i>Fit
+            </button>
+
+            {{-- OD|OS --}}
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold"
+                style="font-size:.72rem;" @click="viewerSplitOdOs()">OD|OS</button>
+
+            {{-- Laser View --}}
+            <button type="button" class="btn btn-sm fw-semibold"
+                :class="viewerPanelFlipped[viewerActivePanel] ? 'btn-success' : 'btn-outline-secondary'"
+                style="font-size:.72rem;" @click="togglePanelFlip(viewerActivePanel)"
+                title="Inverter imagem verticalmente">
+                <i class="fa fa-undo me-1"></i>Laser
+            </button>
+
+            <div class="vr opacity-25 mx-1"></div>
+
+            {{-- Info do painel ativo --}}
+            <template x-if="viewerPanelExams[viewerActivePanel]">
                 <span class="d-flex align-items-center gap-1">
-                    <span class="badge px-2"
-                        :class="{
-                            'bg-primary': viewerCurrentExam.laterality === 1,
-                            'bg-danger': viewerCurrentExam.laterality === 2,
-                            'bg-secondary': viewerCurrentExam.laterality !== 1 && viewerCurrentExam.laterality !== 2
-                        }"
-                        x-text="latLabel(viewerCurrentExam.laterality)"></span>
                     <span class="badge"
                         :class="{
-                            'bg-warning text-dark': deriveStatus(viewerCurrentExam) === 'solicitado',
-                            'bg-success': deriveStatus(viewerCurrentExam) === 'realizado',
-                            'bg-secondary': deriveStatus(viewerCurrentExam) === 'cancelado'
+                            'bg-primary': viewerPanelExams[viewerActivePanel].laterality === 1,
+                            'bg-danger': viewerPanelExams[viewerActivePanel].laterality === 2,
+                            'bg-secondary': viewerPanelExams[viewerActivePanel].laterality !== 1 && viewerPanelExams[viewerActivePanel].laterality !== 2
                         }"
-                        x-text="statusLabel(viewerCurrentExam)"></span>
+                        x-text="latLabel(viewerPanelExams[viewerActivePanel].laterality)"></span>
+                    <span class="text-light fw-semibold" style="font-size:.72rem;"
+                        x-text="viewerPanelExams[viewerActivePanel].exam_type?.name ?? '—'"></span>
+                    <span class="text-secondary" style="font-size:.65rem;"
+                        x-text="formatDateTime(viewerPanelExams[viewerActivePanel].created_at)"></span>
                 </span>
             </template>
 
             <div class="flex-grow-1"></div>
 
-            {{-- Data/hora + tipo --}}
-            <template x-if="viewerCurrentExam">
-                <span class="text-light fw-semibold" style="font-size:.75rem;">
-                    <span x-text="viewerCurrentExam.exam_type?.name"></span>
-                    <span class="opacity-50 mx-1">—</span>
-                    <span x-text="formatDateTime(viewerCurrentExam.created_at)"></span>
-                </span>
-            </template>
-
-            <div class="vr opacity-25"></div>
-
             {{-- Navegação --}}
             <span class="text-secondary" style="font-size:.72rem;"
-                x-text="(viewerIndex + 1) + ' / ' + viewerExams.length"></span>
+                x-text="viewerActivePanelIndex >= 0 ? (viewerActivePanelIndex + 1) + ' / ' + viewerExams.length : '0 / ' + viewerExams.length"></span>
             <button type="button" class="btn btn-sm btn-outline-secondary"
-                @click="viewerPrev()" :disabled="viewerIndex === 0">
-                <i class="fa fa-chevron-left"></i>
-            </button>
+                @click="viewerPrev()" :disabled="viewerActivePanelIndex <= 0">
+                <i class="fa fa-chevron-left"></i></button>
             <button type="button" class="btn btn-sm btn-outline-secondary"
-                @click="viewerNext()" :disabled="viewerIndex >= viewerExams.length - 1">
-                <i class="fa fa-chevron-right"></i>
-            </button>
+                @click="viewerNext()" :disabled="viewerActivePanelIndex >= viewerExams.length - 1">
+                <i class="fa fa-chevron-right"></i></button>
 
-            <div class="vr opacity-25"></div>
-
-            {{-- Abrir original --}}
-            <a x-show="viewerImageUrl && !viewerBroken" x-cloak
-                :href="viewerImageUrl" target="_blank"
-                class="btn btn-sm btn-outline-secondary" title="Abrir em nova aba">
-                <i class="fa fa-expand"></i>
-            </a>
+            <div class="vr opacity-25 mx-1"></div>
 
             {{-- Fechar --}}
-            <button type="button" class="btn btn-sm btn-outline-danger"
-                @click="showViewerModal = false">
-                <i class="fa fa-times"></i>
-            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" @click="showViewerModal = false">
+                <i class="fa fa-times"></i></button>
 
         </div>
 
-        {{-- Área da imagem --}}
-        <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center overflow-hidden"
-            x-ref="viewerContainer"
-            :style="viewerLensActive && viewerImageUrl && !viewerBroken ? 'cursor:none;' : ''"
-            @mousemove="onViewerLensMove($event)"
-            @mouseleave="viewerLensVisible = false"
-            @mouseenter="if(viewerLensActive && viewerImageUrl && !viewerBroken) viewerLensVisible = true"
-            @wheel.prevent="if(viewerLensActive) { const s = $event.deltaY < 0 ? 0.5 : -0.5; viewerZoom = Math.min(10, Math.max(1.5, viewerZoom + s)); }">
+        {{-- Corpo: painéis + faixas de thumbnails --}}
+        <div class="flex-grow-1 d-flex flex-column" style="overflow:hidden;min-height:0;">
 
-            {{-- Spinner --}}
-            <div x-show="viewerLoading" x-cloak class="text-center text-white">
-                <div class="spinner-border text-light" role="status"></div>
-                <p class="mt-2 small opacity-75 mb-0">Carregando…</p>
+            {{-- Grade de painéis --}}
+            <div class="flex-grow-1" style="overflow:hidden;min-height:0;"
+                :style="`display:grid;grid-template-columns:repeat(${viewerPanelCount},1fr);gap:2px;padding:2px;`">
+
+                <template x-for="pi in viewerPanelCount" :key="pi">
+                    <div class="position-relative d-flex flex-column"
+                        style="background:#111;border-radius:3px;overflow:hidden;min-height:0;cursor:pointer;"
+                        :style="viewerActivePanel === (pi-1) ? 'outline:2px solid #0d6efd;' : 'outline:1px solid #2a2a2a;'"
+                        @click="viewerActivePanel = pi - 1">
+
+                        {{-- Área da imagem --}}
+                        <div class="flex-grow-1 position-relative d-flex align-items-center justify-content-center"
+                            style="overflow:hidden;min-height:0;"
+                            :style="viewerLensActive && viewerPanelUrls[pi-1] && !viewerPanelBroken[pi-1] && viewerActivePanel === (pi-1) ? 'cursor:none;' : ''"
+                            @mousemove.stop="if(viewerActivePanel === (pi-1)) onViewerLensMove($event)"
+                            @mouseleave.stop="if(viewerActivePanel === (pi-1)) viewerLensVisible = false"
+                            @mouseenter.stop="if(viewerActivePanel === (pi-1) && viewerLensActive && viewerPanelUrls[pi-1] && !viewerPanelBroken[pi-1]) viewerLensVisible = true"
+                            @wheel.prevent.stop="if(viewerActivePanel === (pi-1) && viewerLensActive) { const s = $event.deltaY < 0 ? 0.5 : -0.5; viewerZoom = Math.min(10, Math.max(1.5, viewerZoom + s)); }">
+
+                            {{-- Spinner --}}
+                            <div x-show="viewerPanelLoading[pi-1]"
+                                class="text-center text-white position-absolute" style="z-index:5;">
+                                <div class="spinner-border spinner-border-sm text-light" role="status"></div>
+                            </div>
+
+                            {{-- Painel vazio --}}
+                            <div x-show="!viewerPanelExams[pi-1] && !viewerPanelLoading[pi-1]"
+                                class="text-center text-muted">
+                                <i class="ti ti-photo" style="font-size:2.5rem;opacity:.12;"></i>
+                                <p class="mt-1 mb-0" style="font-size:.65rem;opacity:.35;"
+                                    x-text="'Painel ' + pi"></p>
+                            </div>
+
+                            {{-- Exame sem imagem --}}
+                            <div x-show="viewerPanelExams[pi-1] && !viewerPanelUrls[pi-1] && !viewerPanelLoading[pi-1] && !viewerPanelBroken[pi-1]"
+                                x-cloak class="text-center text-muted">
+                                <i class="ti ti-photo-off" style="font-size:2rem;opacity:.3;"></i>
+                                <p class="mt-1 mb-0" style="font-size:.65rem;">Sem imagem</p>
+                            </div>
+
+                            {{-- Arquivo não encontrado --}}
+                            <div x-show="viewerPanelBroken[pi-1]" x-cloak class="text-center text-muted">
+                                <i class="ti ti-photo-off" style="font-size:2rem;opacity:.3;"></i>
+                                <p class="mt-1 mb-0" style="font-size:.65rem;">Não encontrado</p>
+                            </div>
+
+                            {{-- Imagem principal --}}
+                            <img x-show="viewerPanelUrls[pi-1] && !viewerPanelLoading[pi-1] && !viewerPanelBroken[pi-1]"
+                                x-cloak
+                                :src="viewerPanelUrls[pi-1] ?? ''"
+                                alt="Exame"
+                                :style="(viewerFitMode ? 'max-width:100%;max-height:100%;object-fit:contain;' : 'max-width:none;') + 'display:block;user-select:none;' + (viewerPanelFlipped[pi-1] ? 'transform:scaleY(-1);' : '')"
+                                x-on:load="setPanelLoaded(pi-1)"
+                                x-on:error="setPanelError(pi-1)">
+
+                            {{-- Lupa (painel ativo apenas) --}}
+                            <div x-show="viewerLensActive && viewerLensVisible && viewerActivePanel === (pi-1) && viewerPanelUrls[pi-1] && !viewerPanelBroken[pi-1]"
+                                x-cloak :style="viewerLensStyle"
+                                style="position:absolute;pointer-events:none;z-index:10;"></div>
+
+                        </div>
+
+                        {{-- Barra de info do painel --}}
+                        <div class="d-flex align-items-center gap-1 px-2 flex-shrink-0"
+                            style="background:#0d0d0d;font-size:.6rem;min-height:22px;border-top:1px solid #1a1a1a;">
+                            <template x-if="viewerPanelExams[pi-1]">
+                                <span class="d-flex align-items-center gap-1 overflow-hidden w-100">
+                                    <span class="badge flex-shrink-0"
+                                        :class="{
+                                            'bg-primary': viewerPanelExams[pi-1].laterality === 1,
+                                            'bg-danger': viewerPanelExams[pi-1].laterality === 2,
+                                            'bg-secondary': viewerPanelExams[pi-1].laterality !== 1 && viewerPanelExams[pi-1].laterality !== 2
+                                        }"
+                                        style="font-size:.5rem;"
+                                        x-text="latLabel(viewerPanelExams[pi-1].laterality)"></span>
+                                    <span class="text-secondary text-truncate"
+                                        x-text="viewerPanelExams[pi-1].exam_type?.name ?? '—'"></span>
+                                    <span class="text-secondary opacity-50 flex-shrink-0 ms-auto"
+                                        x-text="formatDateFull(viewerPanelExams[pi-1].created_at?.substring(0,10))"></span>
+                                </span>
+                            </template>
+                            <template x-if="!viewerPanelExams[pi-1]">
+                                <span class="text-secondary" style="opacity:.3;"
+                                    x-text="'Painel ' + pi"></span>
+                            </template>
+                        </div>
+
+                    </div>
+                </template>
+
             </div>
 
-            {{-- Sem imagem --}}
-            <template x-if="!viewerImageUrl && !viewerLoading">
-                <div class="text-center text-muted">
-                    <i class="ti ti-photo-off" style="font-size:4rem;opacity:.3;"></i>
-                    <p class="mt-2 mb-0" x-text="viewerBroken ? 'Arquivo não encontrado.' : 'Nenhuma imagem.'"></p>
-                </div>
-            </template>
+            {{-- Faixas de thumbnails (uma por painel, mesma grade) --}}
+            <div class="flex-shrink-0"
+                :style="`display:grid;grid-template-columns:repeat(${viewerPanelCount},1fr);gap:2px;padding:0 2px 2px;`">
 
-            {{-- Imagem principal --}}
-            <img x-show="viewerImageUrl && !viewerLoading && !viewerBroken"
-                x-cloak :src="viewerImageUrl" alt="Exame"
-                style="max-width:100%;max-height:100%;object-fit:contain;display:block;user-select:none;"
-                x-on:load="viewerLoading = false"
-                x-on:error="viewerLoading = false; viewerBroken = true; viewerImageUrl = null;">
+                <template x-for="pi in viewerPanelCount" :key="'s'+pi">
+                    <div class="d-flex gap-1 overflow-x-auto py-1 px-1"
+                        style="background:#0d0d0d;min-height:76px;border-top:1px solid #222;"
+                        :style="viewerActivePanel === (pi-1) ? 'border-top-color:#0d6efd;' : ''">
 
-            {{-- Lupa --}}
-            <div x-show="viewerLensActive && viewerLensVisible && viewerImageUrl && !viewerBroken"
-                x-cloak :style="viewerLensStyle"
-                style="position:absolute;pointer-events:none;border-radius:50%;z-index:10;">
-            </div>
-
-        </div>
-
-        {{-- Faixa de thumbnails --}}
-        <div class="flex-shrink-0 d-flex gap-2 overflow-auto px-3 py-2"
-            style="background:#111;border-top:1px solid #222;min-height:100px;">
-            <template x-for="(exam, idx) in viewerExams" :key="exam.id">
-                <div style="flex-shrink:0;cursor:pointer;" @click="viewerGoTo(idx)">
-                    <div class="position-relative rounded overflow-hidden"
-                        style="width:80px;height:70px;"
-                        :style="viewerIndex === idx ? 'outline:2px solid #0d6efd;' : 'outline:1px solid #333;'">
-                        <span class="position-absolute top-0 end-0 rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                            :class="{
-                                'bg-primary': exam.laterality === 1,
-                                'bg-danger': exam.laterality === 2,
-                                'bg-secondary': exam.laterality !== 1 && exam.laterality !== 2
-                            }"
-                            style="width:18px;height:18px;font-size:.5rem;z-index:1;margin:2px;"
-                            x-text="latLabel(exam.laterality)"></span>
-                        <template x-if="examUrls[exam.id] && !brokenUrls[exam.id]">
-                            <img :src="examUrls[exam.id]" width="80" height="70"
-                                style="object-fit:cover;display:block;"
-                                x-on:error="brokenUrls = {...brokenUrls, [exam.id]: true}">
-                        </template>
-                        <template x-if="!examUrls[exam.id] || brokenUrls[exam.id]">
-                            <div class="w-100 h-100 d-flex align-items-center justify-content-center"
-                                style="background:#1a1a1a;">
-                                <i class="ti ti-photo-off" style="color:#555;font-size:1.2rem;"></i>
+                        <template x-for="(exam, idx) in viewerExams" :key="exam.id">
+                            <div style="flex-shrink:0;cursor:pointer;"
+                                @click.stop="setPanelExam(pi-1, exam); viewerActivePanel = pi-1;">
+                                <div class="position-relative rounded overflow-hidden"
+                                    style="width:64px;height:52px;"
+                                    :style="viewerPanelExams[pi-1]?.id === exam.id ? 'outline:2px solid #0d6efd;' : 'outline:1px solid #2a2a2a;'">
+                                    <span class="position-absolute top-0 end-0 rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                                        :class="{
+                                            'bg-primary': exam.laterality === 1,
+                                            'bg-danger': exam.laterality === 2,
+                                            'bg-secondary': exam.laterality !== 1 && exam.laterality !== 2
+                                        }"
+                                        style="width:14px;height:14px;font-size:.4rem;z-index:1;margin:2px;"
+                                        x-text="latLabel(exam.laterality)"></span>
+                                    <template x-if="examUrls[exam.id] && !brokenUrls[exam.id]">
+                                        <img :src="examUrls[exam.id]" width="64" height="52"
+                                            style="object-fit:cover;display:block;"
+                                            x-on:error="brokenUrls = {...brokenUrls, [exam.id]: true}">
+                                    </template>
+                                    <template x-if="!examUrls[exam.id] || brokenUrls[exam.id]">
+                                        <div class="w-100 h-100 d-flex align-items-center justify-content-center"
+                                            style="background:#1a1a1a;">
+                                            <i class="ti ti-photo-off" style="color:#444;font-size:.9rem;"></i>
+                                        </div>
+                                    </template>
+                                </div>
                             </div>
                         </template>
+
                     </div>
-                    <div class="text-center mt-1"
-                        style="font-size:.58rem;color:#666;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;"
-                        x-text="exam.exam_type?.name ?? '—'"></div>
-                </div>
-            </template>
+                </template>
+
+            </div>
+
         </div>
 
     </div>
@@ -731,10 +811,15 @@
                 printOrientation: 'portrait',
                 showViewerModal: false,
                 viewerExams: [],
-                viewerIndex: 0,
-                viewerImageUrl: null,
-                viewerLoading: false,
-                viewerBroken: false,
+                viewerPanelCount: 1,
+                viewerActivePanel: 0,
+                viewerPanelExams: [null, null, null, null],
+                viewerPanelUrls: [null, null, null, null],
+                viewerPanelLoading: [false, false, false, false],
+                viewerPanelBroken: [false, false, false, false],
+                viewerPanelFlipped: [false, false, false, false],
+                viewerFitMode: true,
+                viewerAllMode: false,
                 viewerLensActive: false,
                 viewerLensVisible: false,
                 viewerLensX: 0,
@@ -812,11 +897,18 @@
                 },
 
                 get viewerCurrentExam() {
-                    return this.viewerExams[this.viewerIndex] ?? null;
+                    return this.viewerPanelExams[this.viewerActivePanel] ?? null;
+                },
+
+                get viewerActivePanelIndex() {
+                    const exam = this.viewerPanelExams[this.viewerActivePanel];
+                    if (!exam) return -1;
+                    return this.viewerExams.findIndex(e => e.id === exam.id);
                 },
 
                 get viewerLensStyle() {
-                    if (!this.viewerLensVisible || !this.viewerImageUrl) return 'display:none;';
+                    const url = this.viewerPanelUrls[this.viewerActivePanel];
+                    if (!this.viewerLensVisible || !url) return 'display:none;';
                     const lensSize = 200;
                     const bW = this._viewerW * this.viewerZoom;
                     const bH = this._viewerH * this.viewerZoom;
@@ -826,7 +918,7 @@
                         `width:${lensSize}px;height:${lensSize}px;` +
                         `border-radius:50%;border:2px solid rgba(255,255,255,0.8);` +
                         `transform:translate(-50%,-50%);pointer-events:none;` +
-                        `background-image:url(${this.viewerImageUrl});background-repeat:no-repeat;` +
+                        `background-image:url(${url});background-repeat:no-repeat;` +
                         `background-size:${bW}px ${bH}px;background-position:${bX}px ${bY}px;` +
                         `box-shadow:0 0 0 1px rgba(0,0,0,0.5);z-index:10;`;
                 },
@@ -912,49 +1004,126 @@
                 openViewerModal(exams, startIndex = 0) {
                     if (!exams || exams.length === 0) return;
                     this.viewerExams = exams;
-                    this.viewerIndex = startIndex;
-                    this.viewerImageUrl = null;
-                    this.viewerLoading = false;
-                    this.viewerBroken = false;
+                    this.viewerPanelExams = [null, null, null, null];
+                    this.viewerPanelUrls = [null, null, null, null];
+                    this.viewerPanelLoading = [false, false, false, false];
+                    this.viewerPanelBroken = [false, false, false, false];
+                    this.viewerPanelFlipped = [false, false, false, false];
+                    this.viewerActivePanel = 0;
+                    this.viewerAllMode = false;
                     this.viewerLensActive = false;
                     this.viewerLensVisible = false;
                     this.showViewerModal = true;
-                    this.loadViewerImage(exams[startIndex]);
+                    this.setPanelExam(0, exams[startIndex]);
                 },
 
                 viewerGoTo(idx) {
-                    this.viewerIndex = idx;
+                    const exam = this.viewerExams[idx];
+                    if (!exam) return;
                     this.viewerLensVisible = false;
-                    this.loadViewerImage(this.viewerExams[idx]);
+                    this.setPanelExam(this.viewerActivePanel, exam);
                 },
 
                 viewerNext() {
-                    if (this.viewerIndex < this.viewerExams.length - 1) this.viewerGoTo(this.viewerIndex + 1);
+                    const idx = this.viewerActivePanelIndex;
+                    if (idx >= 0 && idx < this.viewerExams.length - 1) this.viewerGoTo(idx + 1);
                 },
 
                 viewerPrev() {
-                    if (this.viewerIndex > 0) this.viewerGoTo(this.viewerIndex - 1);
+                    const idx = this.viewerActivePanelIndex;
+                    if (idx > 0) this.viewerGoTo(idx - 1);
                 },
 
-                loadViewerImage(exam) {
+                setPanelExam(pi, exam) {
+                    const exams = [...this.viewerPanelExams];
+                    const urls = [...this.viewerPanelUrls];
+                    const loading = [...this.viewerPanelLoading];
+                    const broken = [...this.viewerPanelBroken];
+                    exams[pi] = exam;
+                    urls[pi] = null;
+                    loading[pi] = false;
+                    broken[pi] = false;
+                    this.viewerPanelExams = exams;
+                    this.viewerPanelUrls = urls;
+                    this.viewerPanelLoading = loading;
+                    this.viewerPanelBroken = broken;
+                    this._loadPanelUrl(pi, exam);
+                },
+
+                _loadPanelUrl(pi, exam) {
                     if (!exam) return;
-                    this.viewerBroken = false;
-                    this.viewerImageUrl = null;
-                    this.viewerLoading = false;
                     const url = this.examUrls[exam.id] ?? null;
                     if (!url) return;
                     const probe = new Image();
                     probe.src = url;
                     if (probe.complete && probe.naturalWidth > 0) {
-                        this.viewerImageUrl = url;
+                        const urls = [...this.viewerPanelUrls];
+                        urls[pi] = url;
+                        this.viewerPanelUrls = urls;
                     } else {
-                        this.viewerLoading = true;
-                        this.viewerImageUrl = url;
+                        const loading = [...this.viewerPanelLoading];
+                        loading[pi] = true;
+                        this.viewerPanelLoading = loading;
+                        const urls = [...this.viewerPanelUrls];
+                        urls[pi] = url;
+                        this.viewerPanelUrls = urls;
                     }
                 },
 
+                setPanelLoaded(pi) {
+                    const loading = [...this.viewerPanelLoading];
+                    loading[pi] = false;
+                    this.viewerPanelLoading = loading;
+                },
+
+                setPanelError(pi) {
+                    const loading = [...this.viewerPanelLoading];
+                    const broken = [...this.viewerPanelBroken];
+                    const urls = [...this.viewerPanelUrls];
+                    loading[pi] = false;
+                    broken[pi] = true;
+                    urls[pi] = null;
+                    this.viewerPanelLoading = loading;
+                    this.viewerPanelBroken = broken;
+                    this.viewerPanelUrls = urls;
+                },
+
+                setViewerPanelCount(n) {
+                    this.viewerPanelCount = n;
+                    this.viewerAllMode = false;
+                    for (let i = 0; i < n; i++) {
+                        if (!this.viewerPanelExams[i] && this.viewerExams[i]) {
+                            this.setPanelExam(i, this.viewerExams[i]);
+                        }
+                    }
+                },
+
+                viewerToggleAll() {
+                    this.viewerAllMode = !this.viewerAllMode;
+                    if (this.viewerAllMode) {
+                        this.viewerPanelCount = 1;
+                    }
+                },
+
+                viewerSplitOdOs() {
+                    this.viewerPanelCount = 2;
+                    this.viewerAllMode = false;
+                    const od = this.viewerExams.find(e => e.laterality === 1);
+                    const oe = this.viewerExams.find(e => e.laterality === 2);
+                    if (od) this.setPanelExam(0, od);
+                    if (oe) this.setPanelExam(1, oe);
+                },
+
+                togglePanelFlip(pi) {
+                    const flipped = [...this.viewerPanelFlipped];
+                    flipped[pi] = !flipped[pi];
+                    this.viewerPanelFlipped = flipped;
+                },
+
                 onViewerLensMove(event) {
-                    if (!this.viewerLensActive || !this.viewerImageUrl) return;
+                    if (!this.viewerLensActive) return;
+                    const url = this.viewerPanelUrls[this.viewerActivePanel];
+                    if (!url) return;
                     const rect = event.currentTarget.getBoundingClientRect();
                     this.viewerLensX = event.clientX - rect.left;
                     this.viewerLensY = event.clientY - rect.top;
