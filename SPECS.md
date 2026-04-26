@@ -1,69 +1,163 @@
-**Linguagem & Framework:** PHP 8.4 / Laravel 11  
-**Frontend:** Blade Templates, Alpine.js, Tailwind CSS & Bootstrap 5
-**Banco de Dados:** SQLite (Dev/Test), PostgreSQL (Prod)
-**Middleware Stack:** `auth` → `verified` → `entity.selected` → `entity.role`
+**Runtime:** PHP 8.4 (ambiente atual) / requisito Composer `^8.2`  
+**Framework:** Laravel 12.x  
+**Frontend:** Blade + Alpine.js + Vite + Bootstrap 5 + Tailwind  
+**Banco:** SQLite (default local/test) com suporte a MySQL/MariaDB/PostgreSQL/SQL Server
 
 ---
 
-## 1. Arquitetura Multi-Tenancy (Session-Based)
+## 1. Visão Arquitetural
+Arquitetura modular em monólito Laravel, orientada a domínio de negócio (clínico, billing, TISS, compliance), com separação por camadas:
 
-O sistema opera sob um modelo de **Shared Database, Shared Schema**, onde o isolamento ocorre via `entity_id`.
-*   **Identificadores:** Entidades e registros principais utilizam IDs sequenciais públicos com prefixos (ex: `ENT-0000000001`, `PAC-0000000001`).
-*   **Gestão de Sessão:** A entidade ativa é armazenada na sessão após a seleção pelo usuário. O middleware `EnsureEntitySelected` protege todas as rotas do painel.
-*   **RBAC Dinâmico:** Usuários podem pertencer a múltiplas entidades com papéis diferentes. A autorização é validada via `EntityGate` e `EnsureEntityRole`.
+1. **HTTP** (`Controllers`, `Requests`, `Middleware`) para orquestração e borda.
+2. **Aplicação/Negócio** (`Services`, `Domains`, `Actions`) para regras centrais.
+3. **Persistência** (`Models`, migrations, enums, traits) para consistência de dados.
+4. **Apresentação** (`Blade`, `DataTables`, `Alpine`, assets Vite) para operação web.
 
-## 2. Camada de Serviços e Regras de Negócio
+## 2. Multi-Tenancy e ACL
 
-A lógica de alto nível é isolada em `app/Services/`. Controllers são apenas orquestradores.
+### 2.1 Modelo de Tenant
+1. Shared database/shared schema com isolamento lógico por `entity_id`.
+2. Entidade ativa armazenada em sessão (`selected_entity_id`).
+3. Associação usuário-entidade via pivot `entity_users`.
 
-### 2.1 Core Services
-*   **SubscriptionService:** Ciclo de vida de assinaturas (Trial, Active, Expired).
-*   **FeatureGateService:** Singleton que valida acesso a funcionalidades baseado nas configurações do plano.
-*   **UsageMeterService:** Rastreia o consumo de API (uploads) para enforcement de quotas mensais.
+### 2.2 Regras de Acesso
+1. Roles SaaS: `admin`, `financial`, `support`, `user`.
+2. Roles Cliente: `admin`, `financial`, `doctor`, `secretary`, `user`.
+3. Gates canônicos em `EntityGate` + `AuthServiceProvider`.
+4. Middleware contextual: `entity.selected`, `entity.member`, `entity.role`, `partner`.
 
-### 2.2 Subsistema de Growth (CAC)
-Implementado para otimizar o custo de aquisição de clientes:
-*   **ActivationService:** Rastreia o progresso da clínica através de enums de `ActivationStep` com pesos específicos (score 0-100).
-*   **ReferralService:** Gerencia o ciclo de indicações peer-to-peer (geração de códigos, eventos de conversão e recompensas).
-*   **PartnerService:** Gerencia o programa de parceiros com atribuição via UTM/Tokens, rastreamento de leads e geração de comissões.
+### 2.3 Stack de Rotas Web
+`auth` -> `verified` -> `entity.selected` -> checks de role/gate por rota.
 
----
+## 3. Mapa de Rotas e Contextos
 
-## 3. Padrões de Desenvolvimento (System Patterns)
+### 3.1 Volumetria Atual
+1. Total de rotas registradas: **367**.
+2. Principais blocos: `panel/setting`, `panel/manager`, `panel/patients`, `panel/financial`, `api/integrators`, `portal`.
 
-### 3.1 Observers & Event-Driven Logic
-O sistema automatiza comportamentos através de Observers em `app/Observers/`:
-*   **EntityObserver:** Inicia automaticamente o trial ao criar uma entidade.
-*   **ActivationObserver:** Registra marcos de ativação em tempo real ao interagir com modelos clínicos.
-*   **SubscriptionObserver:** Dispara eventos de indicação e comissionamento de parceiros.
+### 3.2 Contextos
+1. **`/panel`**: operação clínica e administrativa da entidade selecionada.
+2. **`/panel/manager`**: operação SaaS (entidades, planos, assinaturas, parceiros, gateways, templates globais).
+3. **`/api/integrators`**: API externa para integradores de exames.
+4. **`/api/billing/webhooks/{gateway}`**: ingestão de eventos de cobrança.
+5. **`/portal`**: portal autenticado para parceiros.
 
-### 3.2 Traits Transversais
-*   **Signable:** Hashing SHA-256 e lock de segurança para prontuários clínicos.
-*   **Versionable:** Criação automática de snapshots em `record_versions` antes de mutações de dados.
-*   **Auditable & HasAuditColumns:** Rastreamento completo de CUD e preenchimento de `created_by`/`updated_by`.
-*   **LogsDataAccess:** Trait de controller para registrar leitura de dados sensíveis (compliance LGPD).
+## 4. Domínios Funcionais Implementados
 
----
+### 4.1 Clínico
+1. Pacientes, médicos, agenda, lista de espera e eventos.
+2. Agenda de recursos (salas/equipamentos) e agenda de médicos com bloqueios.
+3. Prontuário, documentações, anexos, PDFs, ações rápidas, CID-10.
 
-## 4. Integrações e API
+### 4.2 Compliance
+1. Assinatura de prontuário (`Signable`) com bloqueio pós-assinatura.
+2. Versionamento (`Versionable`) e snapshots em `record_versions`.
+3. Auditoria (`Auditable`, `HasAuditColumns`) em operações críticas.
+4. Logs de acesso a dados sensíveis (`LogsDataAccess`, `data_access_logs`).
+5. LGPD: consentimentos, solicitações do titular, termos e aceite.
 
-### 4.1 EasyEye Integrator API
-*   **Auth:** Laravel Sanctum com validação de HWID.
-*   **Protocolo:** Upload multipart via `/api/integrators/upload`.
-*   **Processamento:** Parsing assíncrono de metadados para vinculação direta ao agendamento vigente.
+### 4.3 Financeiro e Faturamento
+1. Fluxo de caixa (`financial_cash_entries`, categorias, relatórios).
+2. Faturamento individual e em lote (`billing_claims`, `billing_batches`).
+3. Exportações de XML/CSV e marcação de status de cobrança.
 
-### 4.2 Waiting Room TV
-*   **Display Público:** Rota `/tv/{slug}` otimizada para navegadores de smart TVs.
-*   **Sincronização:** Polling/Websocket (planejado Laravel Reverb) para atualização de chamadas em tempo real.
+### 4.4 Billing Multi-Gateway
+1. Registry + resolver de gateway por contexto.
+2. Fallback rules + circuit breaker.
+3. Processamento idempotente de webhooks.
+4. Entidades de ciclo financeiro (`invoice`, `payment`, `payment_attempt`, `subscription_change`, `cancellation`, `webhook_event`, etc.).
 
----
+### 4.5 TISS
+1. Domínio dedicado em `app/Domains/Tiss`.
+2. Workflows de lote/guia, geração XML, envio e retorno.
+3. Jobs assíncronos (`GenerateTissBatchXmlJob`, `SendTissBatchJob`, `ProcessTissReturnJob`).
+4. Builders por versão (`V202601`, `V202603`).
 
-## 5. Infraestrutura e Qualidade
+### 4.6 Growth/CAC
+1. Referral (`referral_codes`, `referral_events`).
+2. Partner funnel (`partners`, `partner_leads`, `partner_commissions`).
+3. Activation score (`entity_activations`) por observer/evento.
 
-*   **Processamento em Fila:** Redis + Laravel Horizon para jobs de auditoria e comissionamento.
-*   **Qualidade de Código:** Laravel Pint (estilo) e Pest 4 (testes).
-*   **Ambiente Docker:** PHP 8.4-FPM executando em instâncias isoladas com Nginx e Redis.
+### 4.7 API Integradores
+1. Auth com Sanctum + middleware de token/plano/integrador.
+2. Endpoints v1 para equipamentos, pacientes, exames, schedules e exam types.
+3. Suporte a upload multipart de exames.
 
-## 6. Governança de Dados (Compliance)
-*   **Retention Policy:** Soft Deletes implementados em todos os recursos críticos com funcionalidade de `restore()`.
-*   **Audit Context:** Singleton `AuditContext` que garante que o ID do usuário correto seja capturado em jobs de background.
+## 5. Camada de Serviços
+
+### 5.1 Serviços Core
+1. `SubscriptionService`, `TrialService`, `FeatureGateService`, `UsageMeterService`.
+2. `PatientService`, `DoctorService`, `ScheduleService`, `MedicalRecordService`.
+3. `ReportSettingService`, `TemplateVariableResolver`.
+
+### 5.2 Serviços de Compliance
+1. `MedicalRecordSignatureService`, `DataAccessLogService`, `AuditService`, `VersionService`.
+2. `ConsentService`, `LgpdService`, `TermsService`.
+
+### 5.3 Serviços de Billing/TISS
+1. `BillingSubscriptionOrchestrator`, `ProcessWebhookEventService`, `WebhookIngestionService`.
+2. `GatewayResolver`, `FallbackGatewayService`, `CircuitBreakerService`, `GatewayCredentialResolver`.
+3. `TissWorkflowService` e serviços de transporte/retorno/xml.
+
+## 6. Observers, Traits e Providers
+
+### 6.1 Observers
+1. `EntityObserver`: auto-start de trial em criação de entidade.
+2. `ActivationObserver`: marcos de ativação por eventos de domínio.
+3. `SubscriptionObserver`: efeitos de referral/parceiros na assinatura.
+
+### 6.2 Traits Transversais
+1. `Auditable`, `HasAuditColumns`, `Versionable`, `Signable`, `LogsDataAccess`, `HasEntityRoles`.
+
+### 6.3 Service Providers
+1. `AppServiceProvider`, `AuthServiceProvider`, `SubscriptionServiceProvider`.
+2. `BillingServiceProvider` (gateways/circuit-breaker/default gateway).
+3. `TissServiceProvider` (driver mock/http para transporte TISS).
+
+## 7. Banco de Dados
+
+### 7.1 Estratégia
+1. Migrations orientadas a módulos.
+2. UUID para entidades principais e códigos legíveis (`ENT-`, `PAC-`, etc.).
+3. Soft delete em recursos administrativos e cadastros críticos.
+
+### 7.2 Blocos de Tabelas
+1. Core multi-tenant: entidades, usuários, vínculos e integrações.
+2. Clínico: pacientes, médicos, agenda, exames, prontuário e documentação.
+3. Compliance: audit logs, versões, data access, consentimentos, LGPD, termos.
+4. Financeiro/Billing: claims/lotes, cash flow, gateways, invoices, payments, webhooks.
+5. TISS: operadores, credenciais, guias, lotes, XML, retornos, glosas.
+6. Growth: partners, referrals, leads, commissions, activation.
+
+## 8. Frontend (Blade + Vite + Alpine)
+
+### 8.1 Estrutura
+1. Layout principal em `resources/views/layouts/app.blade.php`.
+2. JS app em `resources/js/app.js` com registro de componentes Alpine.
+3. Vendor bundle em `resources/js/vendor.js` (jQuery, DataTables, Bootstrap, plugins).
+4. CSS via `resources/css/vendor.css` + `resources/css/app.css`.
+
+### 8.2 Observações Técnicas
+1. DataTables server-side via Yajra (PHP) + namespace JS `LaravelDataTables`.
+2. jQuery carregado de forma síncrona no layout para scripts inline DataTables.
+3. Scripts de domínio em `resources/js/system/*` e componentes reutilizáveis em `resources/js/components/*`.
+
+## 9. Qualidade, Testes e Operação
+
+### 9.1 Testes
+1. Stack de testes com Pest 4.
+2. Cobertura relevante em ACL, auth, subscriptions, billing/webhook, TISS parser/XML, traits.
+
+### 9.2 Code Quality
+1. Laravel Pint para padronização.
+2. Estrutura de requests/validators por contexto de domínio.
+
+### 9.3 Execução Local
+1. `composer dev` para servidor, queue listener, logs e Vite concorrentes.
+2. Docker Compose com app/nginx/queue/redis.
+3. Queue default em `database` no `.env.example`.
+
+## 10. Riscos Técnicos Atuais
+1. Forte acoplamento com DataTables+jQuery em várias telas administrativas.
+2. Alta superfície de domínio (clínico + billing + TISS) exige disciplina de regressão em releases.
+3. Multi-tenancy por sessão requer atenção especial em jobs, logs e autorizações fora de request web.

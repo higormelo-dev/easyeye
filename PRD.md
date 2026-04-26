@@ -1,61 +1,148 @@
-**Versão:** 2.5
-**Data:** Abril de 2026
-**Status:** Madura (Stack Blade + Alpine.js + Tailwind CSS)
+**Versão:** 2.6  
+**Data:** 25 de abril de 2026  
+**Status:** Produção ativa (escopo implementado)
 
 ---
 
 ## 1. Visão do Produto
-O **EasyEye** é uma plataforma SaaS (Software as a Service) multi-tenant projetada como o "Sistema Operacional" para clínicas de oftalmologia. O sistema integra a jornada completa do paciente — do agendamento à conformidade legal — com um diferencial técnico único: a automação da captura de exames diretamente do hardware diagnóstico para a nuvem.
+O **EasyEye** é uma plataforma SaaS multi-tenant para clínicas de oftalmologia, com foco em operação clínica diária, conformidade regulatória (CFM/LGPD), integração de exames e gestão financeira/faturamento.
 
-## 2. O Problema & Soluções Core
-1.  **Gargalo de Hardware:** Médicos gastam tempo movendo exames manualmente.
-    *   *Solução:* **EasyEye Integrator**, um bridge que automatiza o upload e vinculação de exames via IA de reconhecimento de arquivos.
-2.  **Risco Jurídico (CFM/LGPD):** Falta de imutabilidade em prontuários e auditoria de dados sensíveis.
-    *   *Solução:* Assinatura eletrônica com hash SHA-256, versionamento de prontuários (snapshots) e logs automáticos de acesso a dados.
-3.  **Complexidade Operacional:** Sistemas legados são lentos e confusos.
-    *   *Solução:* Interface premium baseada em templates modernos, focada na experiência do usuário (UX) e rapidez de resposta.
+Produto já cobre operação de ponta a ponta do tenant clínico e operação SaaS do provedor (manager), com camada de parceiros e billing multi-gateway.
 
-## 3. Personas
-*   **Dr. Roberto (Oftalmologista):** Focado em agilidade clínica e segurança jurídica.
-*   **Ana (Recepção/Secretária):** Gerencia o fluxo de pacientes e faturamento.
-*   **Carlos (Gestor da Clínica):** Focado em indicadores de crescimento (CAC/LTV) e compliance total.
+## 2. Objetivos de Negócio (Implementados)
+1. **Centralizar operação clínica** em um único sistema (paciente, médico, agenda, prontuário e documentos).
+2. **Reduzir risco regulatório** com trilha de auditoria, versionamento e assinatura de prontuário.
+3. **Escalar modelo SaaS** com planos, assinatura, trial, quotas e automações de aquisição (referral/parceiros).
+4. **Conectar ecossistema externo** via API para integradores de exames e webhooks financeiros.
 
-## 4. Funcionalidades de Grande Porte (Implementadas)
+## 3. Perfis de Usuário Atendidos
+1. **SaaS (entidade não cliente):** admin, financeiro, suporte, usuário comum.
+2. **Clínica (entidade cliente):** admin, financeiro, médico, secretária, usuário comum.
+3. **Parceiro comercial:** acesso ao portal de leads/comissões.
+4. **Integração externa:** integradores autenticados por token/Sanctum.
 
-### 4.1 Ecossistema de Crescimento (CAC/Growth)
-Uma camada estratégica para reduzir o custo de aquisição e aumentar a retenção:
-*   **Programa de Indicação (Referral):** Sistema peer-to-peer onde clínicas indicam outras e recebem recompensas (descontos ou extensões de trial).
-*   **Portal de Parceiros/Revendedores:** Dashboard para distribuidores de equipamentos e consultores gerenciarem leads e comissões automáticas na conversão.
-*   **Ativação de Trial (Activation Score):** Monitoramento de 7 marcos críticos (ex: 1º médico adicionado, 1º exame subido) para identificar clínicas com baixo engajamento.
+## 4. Escopo Funcional Implementado
 
-### 4.2 Gestão Clínica & PEP
-*   **Prontuário Oftalmológico Especializado:** Campos táticos para refração, biometria e exames complementares.
-*   **Agendamento Multi-Unidade:** Controle centralizado de agendas com status em tempo real.
-*   **Waiting Room TV:** Display para sala de espera que sincroniza com a recepção via QRCode.
+### 4.1 Acesso, Identidade e Contexto de Entidade
+1. Registro, login, recuperação de senha, verificação de e-mail.
+2. Seleção de entidade ativa para usuários multi-entidade.
+3. Impersonação controlada no painel manager.
+4. Internacionalização com locale por entidade e por usuário.
 
-### 4.3 Compliance "Enterprise Ready"
-*   **CFM Res. 2.227/2018:** Assinatura digital que congela o registro clínico; qualquer alteração subsequente cria uma nova versão imutável.
-*   **LGPD Nativa:** Gestão de consentimentos do paciente por finalidade (Art. 7/11) e canal de atendimento para solicitações de direitos do titular (Art. 18).
+### 4.2 Núcleo Clínico
+1. Gestão de pacientes e médicos.
+2. Agenda clínica com slots, bloqueios, reagendamento e atualização de situação/humor.
+3. Lista de espera e eventos de agenda não clínicos.
+4. Agenda de recursos (salas/equipamentos) com horários e bloqueios.
 
-## 5. Arquitetura Multi-Tenant
-*   **Isolamento de Dados:** Cada clínica (Entidade) possui seus dados totalmente isolados logicamente.
-*   **RBAC (Role-Based Access Control):** Papéis granulares (Dono, Administrador, Médico, Recepcionista) que herdam permissões específicas por entidade.
+### 4.3 Prontuário e Documentação
+1. Prontuário oftalmológico com CRUD completo por paciente.
+2. Documentações anexas e arquivos de prontuário.
+3. Emissão de PDF de prontuário e tonometria.
+4. Ações rápidas de documentação e preview por template.
+5. Busca CID-10 e cálculo auxiliar de presbiopia.
 
----
+### 4.4 Compliance Clínico e LGPD
+1. Assinatura de prontuário com hash e bloqueio de edição.
+2. Versionamento de registros clínicos (snapshots).
+3. Auditoria de alterações de dados (CUD).
+4. Log de acesso a dados sensíveis.
+5. Consentimentos de paciente (coleta/revogação/base legal).
+6. Solicitações LGPD (abertura, processamento, conclusão/rejeição).
+7. Versionamento de termos e aceite por usuário.
+8. Relatórios de compliance (auditoria e acesso a dados).
 
-## 6. Roadmap e Futuro (V3+)
+### 4.5 Configurações Clínicas (Tenant)
+1. CRUD de tipologias e catálogos clínicos:
+- convênios
+- tipos de pele
+- tipos de íris
+- tipos de consulta
+- tipos de adição
+- tipos cirúrgicos
+- tipos de cover test
+- tipos de visão de cores
+- tipos de acuidade visual
+- lentes
+- convergência de ponto próximo
+- recursos clínicos
+2. Configuração de templates/documentos da clínica (adotar/reimportar versão global).
+3. Gestão de credenciais de gateway por tenant.
 
-### 6.1 IA & Expansão Clínica
-*   **Assistente de Redação:** IA para síntese de histórias clínicas a partir de tópicos.
-*   **Integração TISS/TUSS:** Faturamento eletrônico para convênios conforme padrão ANS.
+### 4.6 Financeiro e Faturamento
+1. Fluxo de caixa com categorias e lançamentos.
+2. Faturamento individual e em lote.
+3. Submissão de lote e exportação de XML.
+4. Gestão de glosa/pagamento de claims.
+5. Relatórios financeiros (fluxo de caixa e convênios) com exportação CSV.
 
-### 6.2 Mobile & Engajamento
-*   **Portal do Paciente:** Visualização de laudos e receitas em ambiente seguro.
-*   **App do Médico:** Notificações de agenda e visualização rápida de prontuários.
+### 4.7 Domínio TISS
+1. Estruturas e workflow de lotes/guias TISS.
+2. Geração de XML por versão (builders dedicados).
+3. Envio/processamento assíncrono via jobs.
+4. Recebimento e parsing de retorno TISS, incluindo glosa e recurso.
 
-## 7. Métricas de Sucesso (KPIs)
-*   **Activation Score (P90):** Tempo médio para atingir 100% de ativação nos primeiros 15 dias.
-*   **Referral Conversion Rate:** Percentual de trials iniciados via indicação que se convertem em planos pagos.
-*   **Time-to-Sign:** Velocidade entre a consulta e a assinatura definitiva do prontuário.
-*   **Churn Preventivo:** Identificação de clínicas com queda de uso do Integrador (sinal de churn).
-*   **Retention (LTV):** Baixa taxa de churn devido à dependência tecnológica da integração com hardware.
+### 4.8 SaaS Manager
+1. Gestão de entidades cliente.
+2. Gestão de planos e features de plano.
+3. Gestão de assinaturas (trial, ativação, cancelamento, bloqueio, settings).
+4. Gestão de parceiros, leads e comissões.
+5. Gestão de integradores por entidade/usuário integrador/equipamento.
+6. Gestão de gateways globais e regra de acesso por entidade.
+7. Gestão de templates globais de documentação (publish/archive).
+
+### 4.9 Billing Multi-Gateway
+1. Orquestração de assinatura com gateway resolver.
+2. Fallback de gateway por regras.
+3. Circuit breaker por gateway.
+4. Ingestão/processamento idempotente de webhook.
+5. Trilha financeira de invoice/payment/attempt/event/cancellation/retry.
+6. Suporte configurado para gateways:
+- Asaas
+- InfinitePay
+- Mercado Pago
+- Pagar.me
+- Stripe BR
+- PagBank
+
+### 4.10 Crescimento (CAC)
+1. Programa de indicação (referral codes/events/rewards).
+2. Programa de parceiros (partner leads/commissions).
+3. Activation score por entidade via marcos de ativação.
+4. Portal do parceiro para dashboard, leads e comissões.
+
+### 4.11 API de Integradores
+1. Autenticação `signin/signout/check-token`.
+2. API v1 para equipamentos, pacientes, exames, tipos de exame e agendas.
+3. Upload e atualização multipart de exames.
+4. Proteções de API: precheck, expiração de token, validação de plano e auth com integrador.
+
+## 5. Jornada Principal (Estado Atual)
+1. Usuário autentica e seleciona entidade.
+2. Equipe clínica opera agenda/pacientes/prontuários.
+3. Documentação clínica é emitida com rastreabilidade.
+4. Financeiro da clínica processa caixa e faturamento.
+5. SaaS manager monitora entidades, planos, assinatura e billing.
+6. Parceiros alimentam funil de aquisição pelo portal.
+
+## 6. Requisitos Não Funcionais (Implementados)
+1. **Isolamento lógico multi-tenant** por `entity_id` + contexto de sessão.
+2. **ACL contextual** por gate e middleware (`entity.role`, `entity.member`, etc.).
+3. **Soft delete e restore** em entidades críticas.
+4. **Auditoria e rastreabilidade** em camadas de modelo e serviço.
+5. **Operação assíncrona** com filas para workflows de billing/TISS.
+6. **Observabilidade de erros** com integração Sentry por ambiente.
+
+## 7. Escopo Fora do Produto Atual
+1. Aplicativo mobile nativo médico/paciente.
+2. Telemedicina síncrona no próprio produto.
+3. Motor de IA de apoio clínico em produção.
+4. Integrações hospitalares HL7/FHIR completas.
+
+## 8. Indicadores Operacionais Relevantes
+1. Volume de atendimentos/agenda por entidade.
+2. Conversão de trial para assinatura ativa.
+3. Uso de features limitadas por plano.
+4. Taxa de sucesso de cobrança por gateway.
+5. Ciclo de faturamento TISS e índice de glosa.
+6. Evolução de activation score/referral/parceiros.
