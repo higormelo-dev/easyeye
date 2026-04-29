@@ -13,7 +13,7 @@ class ColorVisionTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<ColorVisionType>  $query
+     * @param Builder<ColorVisionType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

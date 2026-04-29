@@ -62,6 +62,41 @@ class MedicalRecordPdfService
     }
 
     /**
+     * Renders the footer HTML to a temp file for use with wkhtmltopdf's --footer-html.
+     * Returns the file path (caller is responsible for unlinking after use).
+     */
+    private function buildFooterFile(?Entity $entity, ?ReportSetting $setting): ?string
+    {
+        if (! $entity) {
+            return null;
+        }
+
+        $parts = array_filter([
+            $entity->address,
+            $entity->number     ? 'nº ' . $entity->number : null,
+            $entity->complement ?: null,
+            $entity->district   ?: null,
+            ($entity->city && $entity->state)
+                ? $entity->city . '/' . $entity->state
+                : ($entity->city ?? $entity->state ?? null),
+            $entity->zipcode ? 'CEP ' . $entity->zipcode : null,
+        ]);
+
+        $html = view('pdf.partials.footer', [
+            'address'    => count($parts) ? implode(', ', $parts) : null,
+            'telephone'  => $entity->telephone  ?: null,
+            'cellphone'  => $entity->cellphone  ?: null,
+            'email'      => $entity->email      ?: null,
+            'fontFamily' => $setting?->font_family ?? 'Arial',
+        ])->render();
+
+        $path = tempnam(sys_get_temp_dir(), 'eeye_ftr_') . '.html';
+        file_put_contents($path, $html);
+
+        return $path;
+    }
+
+    /**
      * Gera o Laudo de Tonômetria com o horário capturado no momento da impressão.
      */
     public function generateTonometry(MedicalRecord $record, string $time): Response
@@ -72,16 +107,27 @@ class MedicalRecordPdfService
             ->where('active', true)
             ->first();
 
-        $filename = 'TONOMETRIA-' . $record->code . '.pdf';
+        $entity = $record->schedule?->entity
+            ?? Entity::find($record->schedule?->entity_id ?? session('selected_entity_id'));
 
-        return SnappyPdf::loadView('pdf.tonometry', compact('record', 'setting', 'time'))
+        $filename   = 'TONOMETRIA-' . $record->code . '.pdf';
+        $footerPath = $this->buildFooterFile($entity, $setting);
+
+        $pdf = SnappyPdf::loadView('pdf.tonometry', compact('record', 'setting', 'time'))
             ->setPaper($setting?->paper_size?->value ?? PaperSize::A4->value)
             ->setOption('margin-top', ($setting?->margin_top ?? 2.0) . 'cm')
             ->setOption('margin-right', ($setting?->margin_right ?? 1.5) . 'cm')
-            ->setOption('margin-bottom', ($setting?->margin_bottom ?? 2.0) . 'cm')
+            ->setOption('margin-bottom', max((float) ($setting?->margin_bottom ?? 2.0), 2.0) . 'cm')
             ->setOption('margin-left', ($setting?->margin_left ?? 2.5) . 'cm')
             ->setOption('encoding', 'UTF-8')
+            ->setOption('footer-html', $footerPath)
             ->inline($filename);
+
+        if ($footerPath) {
+            @unlink($footerPath);
+        }
+
+        return $pdf;
     }
 
     /**
@@ -105,14 +151,23 @@ class MedicalRecordPdfService
             $oe      = $tData['oe'];
             $time    = $tData['time'] ?? now()->format('H:i');
 
-            return SnappyPdf::loadView('pdf.tonometry', compact('patient', 'doctor', 'entity', 'setting', 'od', 'oe', 'time'))
+            $footerPath = $this->buildFooterFile($entity, $setting);
+
+            $pdf = SnappyPdf::loadView('pdf.tonometry', compact('patient', 'doctor', 'entity', 'setting', 'od', 'oe', 'time'))
                 ->setPaper('A5', 'portrait')
                 ->setOption('margin-top', '1.5cm')
                 ->setOption('margin-right', '1.5cm')
-                ->setOption('margin-bottom', '1.5cm')
+                ->setOption('margin-bottom', '2cm')
                 ->setOption('margin-left', '1.5cm')
                 ->setOption('encoding', 'UTF-8')
+                ->setOption('footer-html', $footerPath)
                 ->inline($filename);
+
+            if ($footerPath) {
+                @unlink($footerPath);
+            }
+
+            return $pdf;
         }
 
         $setting = $doc->reportSetting;

@@ -21,7 +21,7 @@ class EntityUsersDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<EntityUser>  $query
+     * @param Builder<EntityUser> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
@@ -107,7 +107,7 @@ class EntityUsersDataTable extends BaseDataTable
 
     private function buildEntityUserActionButtons(EntityUser $record): string
     {
-        if (!$record->deleted_at && $record->active && !session('impersonating')) {
+        if (! $record->deleted_at && $record->active && ! session('impersonating')) {
             $url = route('panel.manager.entities.impersonate', [$record->entity_id, $record->id]);
 
             return '<a href="javascript:void(0);"

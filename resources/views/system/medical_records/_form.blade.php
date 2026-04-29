@@ -29,6 +29,7 @@
           glaucomatousFamily: {{ $old('glaucomatous_family') ? 'true' : 'false' }},
           showOthersHistory: {{ $old('others_history') ? 'true' : 'false' }},
           calcPresbyopiaUrl: @js(route('panel.patients.medicalrecords.calculate-presbyopia', $patient)),
+          lensFormatUrl: @js(route('panel.medicalrecords.lens-format')),
           dynamicSphericalRight: {{ $old('dynamic_spherical_right', 0) ?: 0 }},
           dynamicSphericalLeft: {{ $old('dynamic_spherical_left', 0) ?: 0 }},
           tonometryPdfUrl: @js(route('panel.patients.tonometry-pdf', $patient)),
@@ -50,6 +51,12 @@
     @csrf
     @if($isEdit) @method('PUT') @endif
 
+    {{-- schedule_id: preserva vínculo com a agenda quando o prontuário é
+         iniciado a partir de um agendamento. Controller usa para redirecionar
+         de volta ao calendário após salvar. --}}
+    <input type="hidden" name="schedule_id"
+           value="{{ old('schedule_id', request()->get('schedule_id') ?? $r?->schedule_id) }}">
+
     {{-- ═══════════════════════════════════════════════════════════════════
          MÉDICO (só quando necessário) + QUEIXA + FLAGS (linha topo)
          ═══════════════════════════════════════════════════════════════════ --}}
@@ -65,7 +72,9 @@
         <div class="row g-2">
             <div class="col-12 col-md-4 col-lg-3">
                 <label class="pmr-label">{{ __('actions.medical_records.doctor') }}</label>
-                <select name="doctor_id" class="form-select form-select-sm @error('doctor_id') is-invalid @enderror">
+                <select name="doctor_id"
+                        class="form-select form-select-sm @error('doctor_id') is-invalid @enderror"
+                        @change="doctorId = $event.target.value">
                     <option value="">{{ __('actions.medical_records.select') }}</option>
                     @foreach($doctors as $doctor)
                         <option value="{{ $doctor->id }}"
@@ -95,18 +104,29 @@
                 <div class="row g-1 pmr-risk-grid">
                     @foreach(['diabetic', 'hypertensive'] as $flag)
                     <div class="col-4 pmr-risk-item">
-                        <label class="pmr-label text-center d-block" style="font-size:.7rem;">{{ __('actions.medical_records.' . $flag) }}</label>
+                        <label class="pmr-label text-center d-block" style="font-size:.7rem;">
+                            {{ __('actions.medical_records.' . $flag) }}
+                            {{-- Feedback visual do alerta clínico (paridade smart_oftal #diabeticAlert / #hypertensiveAlert) --}}
+                            <span x-show="alertVisible.{{ $flag }} === 'self'" x-cloak
+                                  x-transition.opacity
+                                  class="ms-1 fw-bold" style="color:#f62d51;">{{ __('actions.medical_records.alert_self') }}</span>
+                            <span x-show="alertVisible.{{ $flag }} === 'family'" x-cloak
+                                  x-transition.opacity
+                                  class="ms-1 fw-bold" style="color:#ffbc34;">{{ __('actions.medical_records.alert_family') }}</span>
+                        </label>
                         <div class="pmr-risk-switches">
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" role="switch"
                                        name="{{ $flag }}" value="1"
-                                       x-model="{{ \Illuminate\Support\Str::camel($flag) }}">
+                                       x-model="{{ \Illuminate\Support\Str::camel($flag) }}"
+                                       @change="if($event.target.checked) flashAlert('{{ $flag }}', 'self')">
                                 <label class="form-check-label pmr-toggle-label">{{ __('actions.medical_records.self') }}</label>
                             </div>
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" role="switch"
                                        name="{{ $flag }}_family" value="1"
-                                       x-model="{{ \Illuminate\Support\Str::camel($flag) }}Family">
+                                       x-model="{{ \Illuminate\Support\Str::camel($flag) }}Family"
+                                       @change="if($event.target.checked) flashAlert('{{ $flag }}', 'family')">
                                 <label class="form-check-label pmr-toggle-label">{{ __('actions.medical_records.family') }}</label>
                             </div>
                         </div>
@@ -115,18 +135,28 @@
 
                     {{-- Glaucomatoso — com campo "Outros" expansível --}}
                     <div class="col-4 pmr-risk-item">
-                        <label class="pmr-label text-center d-block" style="font-size:.7rem;">{{ __('actions.medical_records.glaucomatous') }}</label>
+                        <label class="pmr-label text-center d-block" style="font-size:.7rem;">
+                            {{ __('actions.medical_records.glaucomatous') }}
+                            <span x-show="alertVisible.glaucomatous === 'self'" x-cloak
+                                  x-transition.opacity
+                                  class="ms-1 fw-bold" style="color:#f62d51;">{{ __('actions.medical_records.alert_self') }}</span>
+                            <span x-show="alertVisible.glaucomatous === 'family'" x-cloak
+                                  x-transition.opacity
+                                  class="ms-1 fw-bold" style="color:#ffbc34;">{{ __('actions.medical_records.alert_family') }}</span>
+                        </label>
                         <div class="pmr-risk-switches">
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" role="switch"
                                        name="glaucomatous" value="1"
-                                       x-model="glaucomatous">
+                                       x-model="glaucomatous"
+                                       @change="if($event.target.checked) flashAlert('glaucomatous', 'self')">
                                 <label class="form-check-label pmr-toggle-label">{{ __('actions.medical_records.self') }}</label>
                             </div>
                             <div class="form-check form-switch mb-0">
                                 <input class="form-check-input" type="checkbox" role="switch"
                                        name="glaucomatous_family" value="1"
-                                       x-model="glaucomatousFamily">
+                                       x-model="glaucomatousFamily"
+                                       @change="if($event.target.checked) flashAlert('glaucomatous', 'family')">
                                 <label class="form-check-label pmr-toggle-label">{{ __('actions.medical_records.family') }}</label>
                             </div>
                         </div>
@@ -228,25 +258,45 @@
                             </div>
                         </div>
                     </div>
-                    {{-- Tonometria --}}
+                    {{-- Tonometria
+                         Auto-stamp do horário ao terminar OE (paridade smart_oftal):
+                         o tempo é capturado no momento clínico da medição, garantindo
+                         coerência temporal mesmo quando a impressão acontece minutos depois. --}}
                     <div class="col-6">
-                        <label class="pmr-label">{{ __('actions.medical_records.tonometry') }}</label>
+                        <label class="pmr-label">
+                            {{ __('actions.medical_records.tonometry') }}
+                            {{-- Carimbo do horário clínico: se medição já capturada,
+                                 mostra esse horário (azul); caso contrário, mostra
+                                 relógio ao vivo (cinza) p/ referência do operador. --}}
+                            <span x-show="tonometryStampedTime" x-cloak
+                                  class="ms-1 fw-bold" style="color:#03a9f3; font-size:.7rem;"
+                                  x-text="tonometryStampedTime"></span>
+                            <span x-show="!tonometryStampedTime" x-cloak
+                                  class="ms-1 text-muted" style="font-size:.7rem;"
+                                  x-text="liveTime"></span>
+                        </label>
                         <div class="d-flex gap-1 align-items-center">
                             <div class="input-group input-group-sm" style="max-width:90px;">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
                                 <input type="number" name="tonometer_right" step="0.5" min="0"
                                        class="form-control form-control-sm text-center"
-                                       value="{{ $old('tonometer_right') }}" placeholder="00">
+                                       value="{{ $old('tonometer_right') }}" placeholder="00"
+                                       @click="$event.target.select()">
                             </div>
                             <div class="input-group input-group-sm" style="max-width:90px;">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
                                 <input type="number" name="tonometer_left" step="0.5" min="0"
                                        class="form-control form-control-sm text-center"
-                                       value="{{ $old('tonometer_left') }}" placeholder="00">
+                                       value="{{ $old('tonometer_left') }}" placeholder="00"
+                                       @click="$event.target.select()"
+                                       @blur="stampTonometryTime()">
                             </div>
-                            {{-- Hora capturada automaticamente no momento da impressão --}}
                             <input type="hidden" name="tonometer_time" id="tonometer-time-hidden"
+                                   x-bind:value="tonometryStampedTime"
                                    value="{{ $old('tonometer_time') }}">
+                            {{-- Print: stampTonometryTime(true) é chamado dentro de
+                                 printTonometry quando ainda não houver carimbo,
+                                 garantindo timestamp automático no momento da impressão. --}}
                             <button type="button" class="btn btn-pink btn-sm flex-shrink-0"
                                     title="{{ __('actions.medical_records.print_tonometry') }}"
                                     @click="printTonometry()">
@@ -257,7 +307,10 @@
                 </div>
             </div>
 
-            {{-- Dinâmica --}}
+            {{-- Dinâmica
+                 type="text" + auto-format via lensFormatUrl: o backend normaliza
+                 sinal (+/-), arredonda ao step 0.25 e padroniza o eixo (0..180º).
+                 Enter avança o foco para o próximo campo na sequência clínica padrão. --}}
             <div class="pmr-section mb-1">
                 <label class="pmr-label">{{ __('actions.medical_records.dynamic') }}</label>
                 <table class="pmr-table">
@@ -272,19 +325,39 @@
                     <tbody>
                         <tr>
                             <td class="pmr-od">OD</td>
-                            <td><input type="number" name="dynamic_spherical_right" step="0.25"
-                                       x-model.number="dynamicSphericalRight"
-                                       value="{{ $old('dynamic_spherical_right', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="dynamic_cylindrical_right" step="0.25" value="{{ $old('dynamic_cylindrical_right', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="dynamic_axis_right" min="0" max="180" value="{{ $old('dynamic_axis_right') }}" placeholder="0°"></td>
+                            <td><input type="text" inputmode="decimal" name="dynamic_spherical_right"
+                                       value="{{ $old('dynamic_spherical_right', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('spherical', 'dynamic_spherical_right'); dynamicSphericalRight = parseFloat($event.target.value) || 0"
+                                       @keydown.enter.prevent="formatLens('spherical', 'dynamic_spherical_right').then(() => focusNextLensField('dynamic_spherical_right'))"></td>
+                            <td><input type="text" inputmode="decimal" name="dynamic_cylindrical_right"
+                                       value="{{ $old('dynamic_cylindrical_right', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('cylindrical', 'dynamic_cylindrical_right')"
+                                       @keydown.enter.prevent="formatLens('cylindrical', 'dynamic_cylindrical_right').then(() => focusNextLensField('dynamic_cylindrical_right'))"></td>
+                            <td><input type="text" inputmode="numeric" name="dynamic_axis_right"
+                                       value="{{ $old('dynamic_axis_right') }}" placeholder="0º"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('axis', 'dynamic_axis_right')"
+                                       @keydown.enter.prevent="formatLens('axis', 'dynamic_axis_right').then(() => focusNextLensField('dynamic_axis_right'))"></td>
                         </tr>
                         <tr>
                             <td class="pmr-od">OE</td>
-                            <td><input type="number" name="dynamic_spherical_left" step="0.25"
-                                       x-model.number="dynamicSphericalLeft"
-                                       value="{{ $old('dynamic_spherical_left', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="dynamic_cylindrical_left" step="0.25" value="{{ $old('dynamic_cylindrical_left', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="dynamic_axis_left" min="0" max="180" value="{{ $old('dynamic_axis_left') }}" placeholder="0°"></td>
+                            <td><input type="text" inputmode="decimal" name="dynamic_spherical_left"
+                                       value="{{ $old('dynamic_spherical_left', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('spherical', 'dynamic_spherical_left'); dynamicSphericalLeft = parseFloat($event.target.value) || 0"
+                                       @keydown.enter.prevent="formatLens('spherical', 'dynamic_spherical_left').then(() => focusNextLensField('dynamic_spherical_left'))"></td>
+                            <td><input type="text" inputmode="decimal" name="dynamic_cylindrical_left"
+                                       value="{{ $old('dynamic_cylindrical_left', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('cylindrical', 'dynamic_cylindrical_left')"
+                                       @keydown.enter.prevent="formatLens('cylindrical', 'dynamic_cylindrical_left').then(() => focusNextLensField('dynamic_cylindrical_left'))"></td>
+                            <td><input type="text" inputmode="numeric" name="dynamic_axis_left"
+                                       value="{{ $old('dynamic_axis_left') }}" placeholder="0º"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('axis', 'dynamic_axis_left')"
+                                       @keydown.enter.prevent="formatLens('axis', 'dynamic_axis_left').then(() => focusNextLensField('dynamic_axis_left'))"></td>
                         </tr>
                     </tbody>
                 </table>
@@ -305,19 +378,39 @@
                     <tbody>
                         <tr>
                             <td class="pmr-od">OD</td>
-                            <td><input type="number" name="static_spherical_right" step="0.25"
-                                       x-model.number="staticSphericalRight"
-                                       value="{{ $old('static_spherical_right', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="static_cylindrical_right" step="0.25" value="{{ $old('static_cylindrical_right', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="static_axis_right" min="0" max="180" value="{{ $old('static_axis_right') }}" placeholder="0°"></td>
+                            <td><input type="text" inputmode="decimal" name="static_spherical_right"
+                                       value="{{ $old('static_spherical_right', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('spherical', 'static_spherical_right'); staticSphericalRight = parseFloat($event.target.value) || 0"
+                                       @keydown.enter.prevent="formatLens('spherical', 'static_spherical_right').then(() => focusNextLensField('static_spherical_right'))"></td>
+                            <td><input type="text" inputmode="decimal" name="static_cylindrical_right"
+                                       value="{{ $old('static_cylindrical_right', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('cylindrical', 'static_cylindrical_right')"
+                                       @keydown.enter.prevent="formatLens('cylindrical', 'static_cylindrical_right').then(() => focusNextLensField('static_cylindrical_right'))"></td>
+                            <td><input type="text" inputmode="numeric" name="static_axis_right"
+                                       value="{{ $old('static_axis_right') }}" placeholder="0º"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('axis', 'static_axis_right')"
+                                       @keydown.enter.prevent="formatLens('axis', 'static_axis_right').then(() => focusNextLensField('static_axis_right'))"></td>
                         </tr>
                         <tr>
                             <td class="pmr-od">OE</td>
-                            <td><input type="number" name="static_spherical_left" step="0.25"
-                                       x-model.number="staticSphericalLeft"
-                                       value="{{ $old('static_spherical_left', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="static_cylindrical_left" step="0.25" value="{{ $old('static_cylindrical_left', '0.00') }}" placeholder="0.00"></td>
-                            <td><input type="number" name="static_axis_left" min="0" max="180" value="{{ $old('static_axis_left') }}" placeholder="0°"></td>
+                            <td><input type="text" inputmode="decimal" name="static_spherical_left"
+                                       value="{{ $old('static_spherical_left', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('spherical', 'static_spherical_left'); staticSphericalLeft = parseFloat($event.target.value) || 0"
+                                       @keydown.enter.prevent="formatLens('spherical', 'static_spherical_left').then(() => focusNextLensField('static_spherical_left'))"></td>
+                            <td><input type="text" inputmode="decimal" name="static_cylindrical_left"
+                                       value="{{ $old('static_cylindrical_left', '0.00') }}" placeholder="0.00"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('cylindrical', 'static_cylindrical_left')"
+                                       @keydown.enter.prevent="formatLens('cylindrical', 'static_cylindrical_left').then(() => focusNextLensField('static_cylindrical_left'))"></td>
+                            <td><input type="text" inputmode="numeric" name="static_axis_left"
+                                       value="{{ $old('static_axis_left') }}" placeholder="0º"
+                                       @click="$event.target.select()"
+                                       @blur="formatLens('axis', 'static_axis_left')"
+                                       @keydown.enter.prevent="formatLens('axis', 'static_axis_left')"></td>
                         </tr>
                     </tbody>
                 </table>
@@ -407,11 +500,34 @@
                             <i class="fas fa-pencil-alt"></i>
                         </button>
                         @if($isEdit)
-                        <button type="button" class="btn btn-pink btn-sm"
-                                @click="openNewDocByType('prescription')"
-                                title="{{ __('actions.documentation.types.prescription') }}">
-                            <i class="fas fa-print"></i>
-                        </button>
+                        {{-- Receituário de óculos — dropdown 4 modos
+                             (paridade smart_oftal templates 1..4) --}}
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-pink btn-sm dropdown-toggle"
+                                    data-bs-toggle="dropdown" aria-expanded="false"
+                                    :disabled="quickActionBusy"
+                                    title="{{ __('actions.medical_records.lens_prescription') }}">
+                                <i class="fas fa-print"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><button type="button" class="dropdown-item"
+                                            @click="issueLensPrescription('dynamic')">
+                                    {{ __('actions.medical_records.lens_prescription_dynamic') }}
+                                </button></li>
+                                <li><button type="button" class="dropdown-item"
+                                            @click="issueLensPrescription('static')">
+                                    {{ __('actions.medical_records.lens_prescription_static') }}
+                                </button></li>
+                                <li><button type="button" class="dropdown-item"
+                                            @click="issueLensPrescription('presbyopia_dynamic')">
+                                    {{ __('actions.medical_records.lens_prescription_presdyn') }}
+                                </button></li>
+                                <li><button type="button" class="dropdown-item"
+                                            @click="issueLensPrescription('presbyopia')">
+                                    {{ __('actions.medical_records.lens_prescription_presbyo') }}
+                                </button></li>
+                            </ul>
+                        </div>
                         @endif
                     </div>
                 </div>
@@ -450,13 +566,15 @@
                     <span class="pmr-eye-inline">OD</span>
                     <input type="text" name="biomicroscopy_right"
                            value="{{ $old('biomicroscopy_right', $r?->biomicroscopy_right ?? __('actions.medical_records.biomicroscopy_ph')) }}"
-                           class="form-control form-control-sm">
+                           class="form-control form-control-sm"
+                           @click="$event.target.select()">
                 </div>
                 <div class="d-flex gap-1">
                     <span class="pmr-eye-inline">OE</span>
                     <input type="text" name="biomicroscopy_left"
                            value="{{ $old('biomicroscopy_left', $r?->biomicroscopy_left ?? __('actions.medical_records.biomicroscopy_ph')) }}"
-                           class="form-control form-control-sm">
+                           class="form-control form-control-sm"
+                           @click="$event.target.select()">
                 </div>
             </div>
 
@@ -468,13 +586,15 @@
                     <span class="pmr-eye-inline">OD</span>
                     <input type="text" name="fundoscopy_right"
                            value="{{ $old('fundoscopy_right', $r?->fundoscopy_right ?? __('actions.medical_records.fundoscopy_ph')) }}"
-                           class="form-control form-control-sm">
+                           class="form-control form-control-sm"
+                           @click="$event.target.select()">
                 </div>
                 <div class="d-flex gap-1">
                     <span class="pmr-eye-inline">OE</span>
                     <input type="text" name="fundoscopy_left"
                            value="{{ $old('fundoscopy_left', $r?->fundoscopy_left ?? __('actions.medical_records.fundoscopy_ph')) }}"
-                           class="form-control form-control-sm">
+                           class="form-control form-control-sm"
+                           @click="$event.target.select()">
                 </div>
             </div>
 
@@ -634,13 +754,7 @@
          (estilo smart_oftal icon bar)
          ═══════════════════════════════════════════════════════════════════ --}}
     <div class="pmr-bottom-bar px-3 py-2">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <div>
-                <span class="pmr-label mb-0 d-inline-block">
-                    {{ __('actions.medical_records.doc_bar_label') }}
-                </span>
-            </div>
-
+        <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
             <div class="d-flex flex-wrap gap-1 align-items-center">
                 @php
                     $docTypeImages = [
@@ -899,6 +1013,12 @@
         </div>
     </div>
     @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         MODAL UNIVERSAL: Pré-visualização de qualquer documento PDF emitido.
+         Usado por receituário de óculos (4 modos), atestados, laudos, etc.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    @include('system.medical_records._pdf-preview-modal')
 
     {{-- ═══════════════════════════════════════════════════════════════════════
          MODAL BOOTSTRAP: Laudo de Tonômetria (dentro do x-data do form)

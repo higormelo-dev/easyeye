@@ -12,7 +12,7 @@ class AdditionTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<AdditionType>  $query
+     * @param Builder<AdditionType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Manager;
 
 use App\DataTables\Manager\ManagerReportSettingsDataTable;
+use App\DTOs\ActionPolicy;
 use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
 use App\Http\Controllers\Controller;
 use App\Models\{ReportCategory, ReportSetting};
@@ -67,7 +68,6 @@ class ReportSettingsController extends Controller
                 'show_header'    => $r->show_header,
                 'show_signature' => $r->show_signature,
                 'show_footer'    => $r->show_footer,
-                'active'         => (bool) $r->active,
                 'status'         => $r->status?->value,
                 'status_label'   => $r->status?->label(),
                 'status_badge'   => $r->status?->badgeClass(),
@@ -78,6 +78,7 @@ class ReportSettingsController extends Controller
                 'delete_url'     => route('panel.manager.report-settings.destroy', $r),
                 'publish_url'    => route('panel.manager.report-settings.publish', $r),
                 'archive_url'    => route('panel.manager.report-settings.archive', $r),
+                ...ActionPolicy::forManager($r)->toArray(),
             ]),
             'meta' => [
                 'total'        => $records->total(),

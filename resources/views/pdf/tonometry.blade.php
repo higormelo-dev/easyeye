@@ -1,16 +1,21 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
 <meta charset="UTF-8">
-<title>Laudo de Tonômetria</title>
+<title>{{ __('pdf.title.tonometry') }}</title>
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
     body {
         font-family: {{ $setting?->font_family ?? 'Arial' }}, Helvetica, sans-serif;
         font-size: {{ $setting?->font_size ?? 11 }}pt;
         color: #1a1a1a;
         line-height: 1.6;
+        min-height: 180mm;
+        display: flex;
+        flex-direction: column;
     }
+    .page-content { flex: 1; }
     .header {
         display: table; width: 100%;
         border-bottom: 2px solid #1976d2;
@@ -36,17 +41,18 @@
     .data-table td { padding: 10px 16px; font-size: 12pt; border-bottom: 1px solid #e0e0e0; }
     .data-table td:first-child { color: #555; width: 50%; }
     .data-table td:last-child { font-weight: bold; }
-    .timestamp { text-align: right; font-size: 9pt; color: #888; margin-bottom: 32px; }
-    .signature-block { margin-top: 48px; text-align: center; font-size: 9.5pt; }
-    .signature-line  { border-top: 1px solid #333; display: inline-block; width: 200px; margin-bottom: 4px; }
-    .footer {
-        position: fixed; bottom: 0; left: 0; right: 0;
-        font-size: 8pt; color: #aaa; text-align: center;
-        padding-top: 4px; border-top: 1px solid #e0e0e0;
-    }
+
 </style>
 </head>
 <body>
+@php
+    $patient = $patient ?? ($record->patient ?? null);
+    $doctor  = $doctor  ?? ($record->doctor  ?? null);
+    $entity  = $entity  ?? ($record->schedule?->entity
+                         ?? \App\Models\Entity::find(session('selected_entity_id')));
+@endphp
+
+<div class="page-content">
 
 <!-- ─── CABEÇALHO ─────────────────────────────────────────────────────────── -->
 @if($setting?->show_logo && $entity?->logo_path)
@@ -69,44 +75,37 @@
 @endif
 
 <!-- ─── TÍTULO ─────────────────────────────────────────────────────────────── -->
-<div class="doc-title">Laudo de Tonômetria</div>
+<div class="doc-title">{{ __('pdf.title.tonometry') }}</div>
 
 <!-- ─── DADOS DO PACIENTE ─────────────────────────────────────────────────── -->
 <div class="patient-block">
-    <strong>Paciente:</strong> {{ $patient->person->full_name }}
+    <strong>{{ __('pdf.patient') }}:</strong> {{ $patient->person->full_name }}
     @if($patient->person->birth_date)
-     &nbsp;|&nbsp; <strong>Nascimento:</strong> {{ $patient->person->birth_date->format('d/m/Y') }}
+     &nbsp;|&nbsp; <strong>{{ __('pdf.birth') }}:</strong> {{ $patient->person->birth_date->isoFormat('L') }}
     @endif
-    &nbsp;|&nbsp; <strong>Data:</strong> {{ now()->format('d/m/Y') }}
+    &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ \Illuminate\Support\Carbon::now()->isoFormat('L') }}
 </div>
 
 <!-- ─── RESULTADOS ─────────────────────────────────────────────────────────── -->
 <table class="data-table">
     <tr>
-        <td>Olho Direito</td>
+        <td>{{ __('pdf.right_eye') }}</td>
         <td>{{ $od ? $od . ' mmHg' : '—' }}</td>
     </tr>
     <tr>
-        <td>Olho Esquerdo</td>
+        <td>{{ __('pdf.left_eye') }}</td>
         <td>{{ $oe ? $oe . ' mmHg' : '—' }}</td>
+    </tr>
+    <tr>
+        <td>{{ __('pdf.time_label') }}</td>
+        <td>{{ $time }}</td>
     </tr>
 </table>
 
-<!-- ─── CIDADE + HORÁRIO ───────────────────────────────────────────────────── -->
-<div class="timestamp">
-    @php
-        $loc = collect([$entity?->city, $entity?->state])->filter()->implode('/');
-    @endphp
-    {{ $loc ? $loc . ', ' : '' }}{{ now()->format('d/m/Y') }} {{ $time }}.
-</div>
+</div>{{-- .page-content --}}
 
-<!-- ─── ASSINATURA ─────────────────────────────────────────────────────────── -->
-@include('pdf._signature')
-
-<!-- ─── RODAPÉ ─────────────────────────────────────────────────────────────── -->
-@if($setting?->show_footer)
-<div class="footer">{{ $setting->footer_text ?? $entity?->name }}</div>
-@endif
+<!-- ─── ASSINATURA + RODAPÉ (empurrados ao final da página pelo flex) ─────── -->
+@include('pdf._signature', ['fixedPosition' => false])
 
 </body>
 </html>

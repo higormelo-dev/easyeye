@@ -185,6 +185,10 @@ Route::group(
                 'patients/{patient}/medicalrecords/calculate-presbyopia',
                 [MedicalRecordsController::class, 'calculatePresbyopia'],
             )->name('patients.medicalrecords.calculate-presbyopia');
+            Route::post(
+                'medicalrecords/lens-format',
+                [MedicalRecordsController::class, 'lensFormat'],
+            )->name('medicalrecords.lens-format');
             Route::resource('patients.medicalrecords', MedicalRecordsController::class)
                 ->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
             Route::patch(

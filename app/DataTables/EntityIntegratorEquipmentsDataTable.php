@@ -21,7 +21,7 @@ class EntityIntegratorEquipmentsDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<EntityIntegratorEquipment>  $query
+     * @param Builder<EntityIntegratorEquipment> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

@@ -435,7 +435,8 @@ return [
         'tonometry'        => 'Tonometry',
         'tonometry_h'      => 'Time',
         'current_time'     => 'Current time',
-        'print_tonometry'  => 'Print Tonometry Report',
+        'print_tonometry'           => 'Print Tonometry Report',
+        'doctor_required_for_print' => 'Please select the responsible doctor before printing.',
         'pachymetry'       => 'Pachymetry',
         'gonioscopy'       => 'Gonioscopy',
 
@@ -508,6 +509,26 @@ return [
         'extra_fields'    => 'HPI / Diagnosis / Conduct (expand)',
         'doc_bar_label'   => 'Prescriptions / Reports / Save',
         'save_first'      => 'Save the record to enable documentation',
+        'print_preview'   => 'Document preview',
+        'open_in_new_tab' => 'Open in a new tab',
+
+        // Lens prescription modes (smart_oftal templates 1..4 parity)
+        'lens_prescription'         => 'Lens Prescription',
+        'lens_prescription_dynamic' => 'Dynamic',
+        'lens_prescription_static'  => 'Static',
+        'lens_prescription_presdyn' => 'Presbyopia + Dynamic',
+        'lens_prescription_presbyo' => 'Presbyopia',
+
+        // Clinical alerts
+        'alert_self'   => 'Patient',
+        'alert_family' => 'Family',
+
+        // PDF — i18n keys
+        'birth'        => 'Birth date',
+        'date'         => 'Date',
+        'issued_at'    => 'Issued on',
+        'generated_at' => 'Generated on',
+        'signed_at'    => 'Electronically signed on',
     ],
 
     'documentation' => [

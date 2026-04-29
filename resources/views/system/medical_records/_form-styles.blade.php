@@ -62,7 +62,7 @@
 
 .pmr-form .pmr-label {
     color: var(--pmr-blue);
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-style: italic;
     font-weight: 700;
     margin-bottom: .2rem;

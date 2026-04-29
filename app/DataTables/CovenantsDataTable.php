@@ -12,7 +12,7 @@ class CovenantsDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<Covenant>  $query
+     * @param Builder<Covenant> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

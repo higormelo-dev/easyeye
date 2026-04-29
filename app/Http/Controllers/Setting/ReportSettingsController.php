@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Setting;
 
 use App\DataTables\ReportSettingsDataTable;
+use App\DTOs\ActionPolicy;
 use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
 use App\Http\Controllers\Controller;
 use App\Models\{ReportCategory, ReportSetting};
@@ -24,7 +25,7 @@ class ReportSettingsController extends Controller
      */
     public function index(): mixed
     {
-        $entityId   = session('selected_entity_id');
+        $entityId = session('selected_entity_id');
         $this->service->adoptPublishedGlobalsForEntity((string) $entityId);
         $total      = ReportSetting::forEntity($entityId)->count();
         $categories = ReportCategory::active()->ordered()->get();
@@ -72,7 +73,6 @@ class ReportSettingsController extends Controller
                 'show_header'    => $r->show_header,
                 'show_signature' => $r->show_signature,
                 'show_footer'    => $r->show_footer,
-                'active'         => (bool) $r->active,
                 'is_adopted'     => $r->isAdopted(),
                 'has_update'     => $r->hasUpdateAvailable(),
                 'source_version' => $r->source_version,
@@ -80,6 +80,7 @@ class ReportSettingsController extends Controller
                 'edit_url'       => route('panel.setting.report-settings.edit', $r),
                 'delete_url'     => route('panel.setting.report-settings.destroy', $r),
                 'reimport_url'   => $r->isAdopted() ? route('panel.setting.report-settings.reimport', $r) : null,
+                ...ActionPolicy::from($r, $entityId)->toArray(),
             ]),
             'meta' => [
                 'total'        => $records->total(),

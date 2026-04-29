@@ -22,7 +22,7 @@ class MedicalRecordsDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<MedicalRecord>  $query
+     * @param Builder<MedicalRecord> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

@@ -12,7 +12,7 @@ class LensesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<Lense>  $query
+     * @param Builder<Lense> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

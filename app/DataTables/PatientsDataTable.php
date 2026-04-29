@@ -2,6 +2,7 @@
 
 namespace App\DataTables;
 
+use App\DTOs\ActionPolicy;
 use App\Models\Patient;
 use Illuminate\Database\Eloquent\Builder;
 use Yajra\DataTables\EloquentDataTable;
@@ -17,7 +18,7 @@ class PatientsDataTable extends BaseDataTable
     public function dataTable(Builder $query): EloquentDataTable
     {
         return (new EloquentDataTable($query))
-            ->addColumn('action', fn (Patient $record) => $this->buildActionButtons($record))
+            ->addColumn('action', fn (Patient $record) => $this->buildPatientActions($record))
             ->addColumn('name', fn (Patient $record) => $record->full_name)
             ->addColumn('gender_label', fn (Patient $record) => $record->person->present()->getGender)
             ->addColumn(
@@ -117,49 +118,49 @@ class PatientsDataTable extends BaseDataTable
     }
 
     /**
-     * Override: action buttons no estilo dropdown Tabler (igual ao template Preclinic).
+     * Action buttons custom: dropdown padrão + item extra de prontuário.
      */
-    protected function buildActionButtons(mixed $record, array $options = []): string
+    private function buildPatientActions(Patient $record): string
     {
-        $entityId = session()->get('selected_entity_id');
-        $isGlobal = $record->entity_id === null;
-        $isOwned  = $record->entity_id === $entityId;
+        $policy = ActionPolicy::from($record, session()->get('selected_entity_id'));
 
-        // Registro deletado: apenas botão de restaurar
-        if ($record->deleted_at && $isOwned) {
+        if ($policy->mode === ActionPolicy::MODE_RESTORE) {
             return '<a href="javascript:void(0);" class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        // Registro global: apenas visualizar
-        if ($isGlobal && ! $record->deleted_at) {
+        if ($policy->mode === ActionPolicy::MODE_VIEW_ONLY) {
             return '<a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>';
         }
 
-        if (! $isOwned) {
+        if ($policy->mode !== ActionPolicy::MODE_FULL) {
             return '';
         }
 
-        $activeSituation = $record->active ? 0 : 1;
-        $activeIcon      = $record->active ? 'ti-lock-open' : 'ti-lock';
-        $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
+        $situation        = $policy->active ? 0 : 1;
+        $toggleIcon       = $policy->active ? 'ti-lock-open' : 'ti-lock';
+        $toggleLabel      = $policy->active ? __('actions.disable') : __('actions.enable');
+        $medicalRecordUrl = route('panel.patients.medicalrecords.index', $record->id);
 
         return '
 <div class="d-flex align-items-center float-end gap-1">
     <a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
        data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
        title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>
+    <a href="' . $medicalRecordUrl . '" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+       data-bs-toggle="tooltip" data-bs-placement="bottom"
+       title="' . __('actions.sidemenu.medical_records') . '"><i class="ti ti-stethoscope"></i></a>
     <a href="javascript:void(0);" class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
        data-bs-toggle="dropdown" aria-expanded="false"><i class="ti ti-dots-vertical"></i></a>
     <ul class="dropdown-menu p-2">
         <li><a class="dropdown-item btn-edit" href="javascript:void(0);" data-id="' . $record->id . '">
             <i class="ti ti-edit me-1"></i>' . __('actions.edit') . '</a></li>
         <li><a class="dropdown-item btn-active" href="javascript:void(0);"
-               data-id="' . $record->id . '" data-situation="' . $activeSituation . '">
-            <i class="ti ' . $activeIcon . ' me-1"></i>' . $activeTitle . '</a></li>
+               data-id="' . $record->id . '" data-situation="' . $situation . '">
+            <i class="ti ' . $toggleIcon . ' me-1"></i>' . $toggleLabel . '</a></li>
         <li><a class="dropdown-item btn-trash text-danger" href="javascript:void(0);"
                data-id="' . $record->id . '">
             <i class="ti ti-trash me-1"></i>' . __('actions.delete') . '</a></li>

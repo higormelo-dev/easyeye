@@ -34,11 +34,13 @@ class EntityRequest extends FormRequest
             'number'                 => ['nullable', 'string', 'max:10'],
             'complement'             => ['nullable', 'string', 'max:100'],
             'district'               => ['nullable', 'string', 'max:100'],
-            'city'                   => ['nullable', 'string', 'max:100'],
-            'state'                  => ['nullable', 'string', 'max:2'],
-            'country'                => ['nullable', 'string', 'max:50'],
-            'schedule_interval'      => ['integer', 'in:15,20,30'],
-            'active'                 => ['boolean'],
+            // Localização obrigatória — usada em PDFs clínicos. Sistema é multi-idioma:
+            // state pode ser sigla (UF brasileira) ou nome completo (estados estrangeiros).
+            'city'              => ['required', 'string', 'max:100'],
+            'state'             => ['required', 'string', 'max:50'],
+            'country'           => ['required', 'string', 'max:50'],
+            'schedule_interval' => ['integer', 'in:15,20,30'],
+            'active'            => ['boolean'],
         ];
     }
 
@@ -48,6 +50,9 @@ class EntityRequest extends FormRequest
             'name.required'    => 'O nome da empresa é obrigatório.',
             'subdomain.unique' => 'Este subdomínio já está em uso.',
             'email.email'      => 'Informe um e-mail válido.',
+            'city.required'    => 'A cidade da clínica é obrigatória (impressa em todos os documentos clínicos).',
+            'state.required'   => 'O estado/UF da clínica é obrigatório.',
+            'country.required' => 'O país da clínica é obrigatório.',
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Manager;
 
 use App\DataTables\PlansDataTable;
+use App\DTOs\ActionPolicy;
 use App\Enums\{BillingCycle, FeatureKey};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\PlanRequest;
@@ -56,7 +57,7 @@ class PlansController extends Controller
                 'description'   => $r->description,
                 'price'         => 'R$ ' . number_format((float) $r->price, 2, ',', '.'),
                 'billing_cycle' => $r->billing_cycle->label(),
-                'active'        => (bool) $r->active,
+                ...ActionPolicy::forManager($r)->toArray(),
             ]),
             'meta' => [
                 'total'        => $records->total(),

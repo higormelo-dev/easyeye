@@ -435,7 +435,8 @@ return [
         'tonometry'        => 'Tonometria',
         'tonometry_h'      => 'Horário',
         'current_time'     => 'Hora atual',
-        'print_tonometry'  => 'Imprimir Laudo de Tonômetria',
+        'print_tonometry'           => 'Imprimir Laudo de Tonômetria',
+        'doctor_required_for_print' => 'Selecione o médico responsável antes de imprimir.',
         'pachymetry'       => 'Paquimetria',
         'gonioscopy'       => 'Gonioscopia',
 
@@ -508,6 +509,26 @@ return [
         'extra_fields'    => 'HDA / Diagnóstico / Conduta (expandir)',
         'doc_bar_label'   => 'Prescrições / Laudos / Salvar',
         'save_first'      => 'Salve o prontuário para habilitar documentações',
+        'print_preview'   => 'Visualização do documento',
+        'open_in_new_tab' => 'Abrir em nova aba',
+
+        // Receituário de óculos — modos (paridade smart_oftal templates 1..4)
+        'lens_prescription'           => 'Receituário de Lentes',
+        'lens_prescription_dynamic'   => 'Dinâmica',
+        'lens_prescription_static'    => 'Estática',
+        'lens_prescription_presdyn'   => 'Presbiopia + Dinâmica',
+        'lens_prescription_presbyo'   => 'Presbiopia',
+
+        // Alertas clínicos
+        'alert_self'   => 'Paciente',
+        'alert_family' => 'Familiar',
+
+        // PDF — chaves i18n
+        'birth'        => 'Nascimento',
+        'date'         => 'Data',
+        'issued_at'    => 'Emitido em',
+        'generated_at' => 'Gerado em',
+        'signed_at'    => 'Assinado eletronicamente em',
     ],
 
     'documentation' => [

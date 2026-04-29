@@ -126,15 +126,35 @@
                                 </div>
                                 <hr class="my-2">
                                 <div class="d-flex align-items-center float-end gap-1">
-                                    <a href="javascript:void(0);"
-                                       class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
-                                       :data-id="setting.id"
-                                       data-bs-toggle="tooltip"
-                                       title="{{ __('actions.view') }}">
-                                        <i class="ti ti-eye"></i>
-                                    </a>
-                                    <template x-if="setting.is_owned">
-                                        <div class="d-inline-flex align-items-center gap-1">
+                                    <template x-if="setting.mode === 'restore'">
+                                        <a href="javascript:void(0);"
+                                           class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                           :data-id="setting.id"
+                                           data-bs-toggle="tooltip"
+                                           title="{{ __('actions.restore') }}">
+                                            <i class="ti ti-recycle"></i>
+                                        </a>
+                                    </template>
+
+                                    <template x-if="setting.mode === 'view_only'">
+                                        <a href="javascript:void(0);"
+                                           class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                           :data-id="setting.id"
+                                           data-bs-toggle="tooltip"
+                                           title="{{ __('actions.view') }}">
+                                            <i class="ti ti-eye"></i>
+                                        </a>
+                                    </template>
+
+                                    <template x-if="setting.mode === 'full'">
+                                        <div class="d-flex align-items-center gap-1">
+                                            <a href="javascript:void(0);"
+                                               class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
+                                               :data-id="setting.id"
+                                               data-bs-toggle="tooltip"
+                                               title="{{ __('actions.view') }}">
+                                                <i class="ti ti-eye"></i>
+                                            </a>
                                             <a href="javascript:void(0);"
                                                class="shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                                                data-bs-toggle="dropdown" aria-expanded="false">
@@ -146,6 +166,16 @@
                                                        href="javascript:void(0);"
                                                        :data-id="setting.id">
                                                         <i class="ti ti-edit me-1"></i>{{ __('actions.edit') }}
+                                                    </a>
+                                                </li>
+                                                <li>
+                                                    <a class="dropdown-item btn-active"
+                                                       href="javascript:void(0);"
+                                                       :data-id="setting.id"
+                                                       :data-situation="setting.active ? 0 : 1">
+                                                        <i class="ti me-1"
+                                                           :class="setting.active ? 'ti-lock-open' : 'ti-lock'"></i>
+                                                        <span x-text="setting.active ? '{{ __('actions.disable') }}' : '{{ __('actions.enable') }}'"></span>
                                                     </a>
                                                 </li>
                                                 <li>

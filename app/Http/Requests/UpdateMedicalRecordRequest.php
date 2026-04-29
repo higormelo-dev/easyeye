@@ -11,11 +11,46 @@ class UpdateMedicalRecordRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Normaliza valores antes da validação (espelha StoreMedicalRecordRequest).
+     */
+    protected function prepareForValidation(): void
+    {
+        $axisFields = [
+            'dynamic_axis_right', 'dynamic_axis_left',
+            'static_axis_right', 'static_axis_left',
+        ];
+
+        $payload = [];
+
+        foreach ($axisFields as $field) {
+            if ($this->filled($field)) {
+                $payload[$field] = preg_replace('/[^\d\-]/', '', (string) $this->input($field));
+            }
+        }
+
+        if (! $this->filled('doctor_id')) {
+            $entityId = session('selected_entity_id');
+            $doctor   = \App\Models\Doctor::whereHas('entityUser', fn ($q) => $q
+                ->where('entity_id', $entityId)
+                ->where('user_id', auth()->id()))
+                ->first();
+            if ($doctor) {
+                $payload['doctor_id'] = $doctor->id;
+            }
+        }
+
+        if ($payload !== []) {
+            $this->merge($payload);
+        }
+    }
+
     public function rules(): array
     {
         return [
-            // Identificacao
-            'doctor_id' => ['sometimes', 'nullable', 'uuid', 'exists:doctors,id'],
+            // Identificacao — doctor obrigatório (auto-preenchido se user é médico).
+            'doctor_id'   => ['required', 'uuid', 'exists:doctors,id'],
+            'schedule_id' => ['sometimes', 'nullable', 'uuid', 'exists:schedules,id'],
             // Exame fisico — selecoes
             'visual_acuity_type_id'                     => ['sometimes', 'nullable', 'uuid', 'exists:visual_acuity_types,id'],
             'near_point_convergence_id'                 => ['sometimes', 'nullable', 'uuid', 'exists:near_point_convergences,id'],
@@ -74,6 +109,14 @@ class UpdateMedicalRecordRequest extends FormRequest
             // Conduta — CBO obrigatorio
             'clinical_conduct' => ['sometimes', 'nullable', 'string', 'max:10000'],
             'follow_up_days'   => ['sometimes', 'nullable', 'integer', 'min:1', 'max:3650'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'doctor_id.required' => 'Selecione o médico responsável antes de salvar o prontuário.',
+            'doctor_id.exists'   => 'Médico selecionado não pertence à entidade ativa.',
         ];
     }
 }

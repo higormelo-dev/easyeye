@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
 <meta charset="UTF-8">
-<title>Prontuário {{ $record->code }}</title>
+<title>{{ __('pdf.title.medical_record') }} {{ $record->code }}</title>
 <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -10,6 +10,8 @@
         font-size: 11pt;
         color: #1a1a1a;
         line-height: 1.45;
+        /* Reserva espaço inferior para signature fixa + footer (ver _signature.blade.php). */
+        padding-bottom: 140px;
     }
     /* ── Header ─────────────────────────────────────────────────── */
     .header {
@@ -90,6 +92,14 @@
 </style>
 </head>
 <body>
+@php
+    // Variáveis derivadas do $record p/ uso direto + repasse a partials.
+    // A service envia apenas (record, setting); o resto vem das relações já carregadas.
+    $patient = $record->patient ?? null;
+    $doctor  = $record->doctor  ?? null;
+    $entity  = $record->schedule?->entity
+            ?? \App\Models\Entity::find(session('selected_entity_id'));
+@endphp
 
 <!-- ─── CABEÇALHO ─────────────────────────────────────────────────────────── -->
 <div class="header">
@@ -104,33 +114,33 @@
     </div>
     <div class="header-code">
         <strong>{{ $record->code }}</strong><br>
-        {{ $record->created_at->format('d/m/Y H:i') }}
+        {{ $record->created_at->isoFormat('L LT') }}
     </div>
 </div>
 
 <!-- ─── DADOS DO PACIENTE ─────────────────────────────────────────────────── -->
-<div class="section-title">Dados do Paciente</div>
+<div class="section-title">{{ __('pdf.section_patient_data') }}</div>
 <div class="row">
     <div class="col col-4">
-        <span class="field-label">Nome</span>
+        <span class="field-label">{{ __('pdf.name') }}</span>
         <span class="field-value">{{ $patient->person->full_name }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Data de Nascimento</span>
-        <span class="field-value">{{ $patient->person->birth_date?->format('d/m/Y') ?? '—' }}</span>
+        <span class="field-label">{{ __('pdf.birth_date') }}</span>
+        <span class="field-value">{{ $patient->person->birth_date?->isoFormat('L') ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Código</span>
+        <span class="field-label">{{ __('pdf.code') }}</span>
         <span class="field-value">{{ $patient->code }}</span>
     </div>
 </div>
 <div class="row">
     <div class="col col-4">
-        <span class="field-label">Médico responsável</span>
+        <span class="field-label">{{ __('pdf.doctor') }}</span>
         <span class="field-value">{{ $record->doctor?->person?->full_name ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">CRM</span>
+        <span class="field-label">{{ __('pdf.crm') }}</span>
         <span class="field-value">
             {{ $record->doctor?->record ?? '—' }}
             @if($record->doctor?->record_specialty)
@@ -139,110 +149,110 @@
         </span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Convênio</span>
-        <span class="field-value">{{ $patient->covenant?->name ?? 'Particular' }}</span>
+        <span class="field-label">{{ __('pdf.covenant') }}</span>
+        <span class="field-value">{{ $patient->covenant?->name ?? __('pdf.private_payment') }}</span>
     </div>
 </div>
 
 <!-- ─── ANAMNESE ──────────────────────────────────────────────────────────── -->
-<div class="section-title">Anamnese</div>
+<div class="section-title">{{ __('pdf.section_anamnesis') }}</div>
 @if($record->main_complaint)
 <div class="row"><div class="col col-12">
-    <span class="field-label">Queixa principal</span>
+    <span class="field-label">{{ __('pdf.main_complaint') }}</span>
     <span class="field-value">{{ $record->main_complaint }}</span>
 </div></div>
 @endif
 @if($record->hda)
 <div class="row"><div class="col col-12">
-    <span class="field-label">HDA</span>
+    <span class="field-label">{{ __('pdf.hda') }}</span>
     <span class="field-value">{{ $record->hda }}</span>
 </div></div>
 @endif
 <div class="bool-grid">
     <div class="bool-item @if($record->diabetic) bool-yes @else bool-no @endif">
-        Diabético: {{ $record->diabetic ? 'Sim' : 'Não' }}
-        @if($record->diabetic_family) (HF) @endif
+        {{ __('pdf.diabetic') }}: {{ $record->diabetic ? __('pdf.yes') : __('pdf.no') }}
+        @if($record->diabetic_family) {{ __('pdf.family_history_short') }} @endif
     </div>
     <div class="bool-item @if($record->hypertensive) bool-yes @else bool-no @endif">
-        Hipertenso: {{ $record->hypertensive ? 'Sim' : 'Não' }}
-        @if($record->hypertensive_family) (HF) @endif
+        {{ __('pdf.hypertensive') }}: {{ $record->hypertensive ? __('pdf.yes') : __('pdf.no') }}
+        @if($record->hypertensive_family) {{ __('pdf.family_history_short') }} @endif
     </div>
     <div class="bool-item @if($record->glaucomatous) bool-yes @else bool-no @endif">
-        Glaucomatoso: {{ $record->glaucomatous ? 'Sim' : 'Não' }}
-        @if($record->glaucomatous_family) (HF) @endif
+        {{ __('pdf.glaucomatous') }}: {{ $record->glaucomatous ? __('pdf.yes') : __('pdf.no') }}
+        @if($record->glaucomatous_family) {{ __('pdf.family_history_short') }} @endif
     </div>
 </div>
 @if($record->ocular_surgical_history)
 <div class="row" style="margin-top:6px;"><div class="col col-12">
-    <span class="field-label">Histórico cirúrgico ocular</span>
+    <span class="field-label">{{ __('pdf.ocular_surgical_history') }}</span>
     <span class="field-value">{{ $record->ocular_surgical_history }}</span>
 </div></div>
 @endif
 @if($record->medications_in_use)
 <div class="row"><div class="col col-12">
-    <span class="field-label">Medicamentos em uso</span>
+    <span class="field-label">{{ __('pdf.medications_in_use') }}</span>
     <span class="field-value">{{ $record->medications_in_use }}</span>
 </div></div>
 @endif
 
 <!-- ─── EXAME FÍSICO ───────────────────────────────────────────────────────── -->
-<div class="section-title">Exame Físico</div>
+<div class="section-title">{{ __('pdf.section_physical_exam') }}</div>
 <div class="row">
     <div class="col col-4">
-        <span class="field-label">AV sem correção OD</span>
+        <span class="field-label">{{ __('pdf.av_without_od') }}</span>
         <span class="field-value">{{ $record->visualAcuityWithoutCorrectionRight?->name ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">AV sem correção OE</span>
+        <span class="field-label">{{ __('pdf.av_without_oe') }}</span>
         <span class="field-value">{{ $record->visualAcuityWithoutCorrectionLeft?->name ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Acuidade Visual</span>
+        <span class="field-label">{{ __('pdf.visual_acuity') }}</span>
         <span class="field-value">{{ $record->visualAcuityType?->name ?? '—' }}</span>
     </div>
 </div>
 <div class="row">
     <div class="col col-4">
-        <span class="field-label">PPC</span>
+        <span class="field-label">{{ __('pdf.near_point_convergence') }}</span>
         <span class="field-value">{{ $record->nearPointConvergence?->name ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Cover Test</span>
+        <span class="field-label">{{ __('pdf.cover_test') }}</span>
         <span class="field-value">{{ $record->coverTestType?->name ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Visão Cromática</span>
+        <span class="field-label">{{ __('pdf.color_vision') }}</span>
         <span class="field-value">{{ $record->colorVisionType?->name ?? '—' }}</span>
     </div>
 </div>
 @if($record->ocular_motility)
 <div class="row"><div class="col col-12">
-    <span class="field-label">Motilidade ocular</span>
+    <span class="field-label">{{ __('pdf.ocular_motility') }}</span>
     <span class="field-value">{{ $record->ocular_motility }}</span>
 </div></div>
 @endif
 <div class="row">
     <div class="col col-4">
-        <span class="field-label">Tonometria OD</span>
+        <span class="field-label">{{ __('pdf.tonometry_od') }}</span>
         <span class="field-value">{{ $record->tonometer_right ? $record->tonometer_right . ' mmHg' : '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Tonometria OE</span>
+        <span class="field-label">{{ __('pdf.tonometry_oe') }}</span>
         <span class="field-value">{{ $record->tonometer_left ? $record->tonometer_left . ' mmHg' : '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Horário</span>
+        <span class="field-label">{{ __('pdf.time_label') }}</span>
         <span class="field-value">{{ $record->tonometer_time ?? '—' }}</span>
     </div>
 </div>
 @if($record->pachymetry_right || $record->pachymetry_left)
 <div class="row">
     <div class="col col-6">
-        <span class="field-label">Paquimetria OD</span>
+        <span class="field-label">{{ __('pdf.pachymetry_od') }}</span>
         <span class="field-value">{{ $record->pachymetry_right ? $record->pachymetry_right . ' μm' : '—' }}</span>
     </div>
     <div class="col col-6">
-        <span class="field-label">Paquimetria OE</span>
+        <span class="field-label">{{ __('pdf.pachymetry_oe') }}</span>
         <span class="field-value">{{ $record->pachymetry_left ? $record->pachymetry_left . ' μm' : '—' }}</span>
     </div>
 </div>
@@ -250,32 +260,32 @@
 @if($record->gonioscopy_right || $record->gonioscopy_left)
 <div class="row">
     <div class="col col-6">
-        <span class="field-label">Gonioscopia OD</span>
+        <span class="field-label">{{ __('pdf.gonioscopy_od') }}</span>
         <span class="field-value">{{ $record->gonioscopy_right ?? '—' }}</span>
     </div>
     <div class="col col-6">
-        <span class="field-label">Gonioscopia OE</span>
+        <span class="field-label">{{ __('pdf.gonioscopy_oe') }}</span>
         <span class="field-value">{{ $record->gonioscopy_left ?? '—' }}</span>
     </div>
 </div>
 @endif
 
 <!-- ─── REFRAÇÃO ───────────────────────────────────────────────────────────── -->
-<div class="section-title">Refração</div>
+<div class="section-title">{{ __('pdf.section_refraction') }}</div>
 <table class="clinical">
     <thead>
         <tr>
-            <th style="width:18%">Olho</th>
-            <th>Esférico</th>
-            <th>Cilíndrico</th>
-            <th>Eixo</th>
-            <th>AV s/c</th>
-            <th>AV c/c</th>
+            <th style="width:18%">{{ __('pdf.eye') }}</th>
+            <th>{{ __('pdf.spherical') }}</th>
+            <th>{{ __('pdf.cylindrical') }}</th>
+            <th>{{ __('pdf.axis') }}</th>
+            <th>{{ __('pdf.av_sc_short') }}</th>
+            <th>{{ __('pdf.av_cc_short') }}</th>
         </tr>
     </thead>
     <tbody>
         <tr>
-            <td class="label">OD — Dinâmica</td>
+            <td class="label">OD — {{ __('pdf.dynamic') }}</td>
             <td>{{ $record->dynamic_spherical_right ?? '—' }}</td>
             <td>{{ $record->dynamic_cylindrical_right ?? '—' }}</td>
             <td>{{ $record->dynamic_axis_right ?? '—' }}</td>
@@ -283,7 +293,7 @@
             <td>{{ $record->visualAcuityWithCorrectionRight?->name ?? '—' }}</td>
         </tr>
         <tr>
-            <td class="label">OE — Dinâmica</td>
+            <td class="label">OE — {{ __('pdf.dynamic') }}</td>
             <td>{{ $record->dynamic_spherical_left ?? '—' }}</td>
             <td>{{ $record->dynamic_cylindrical_left ?? '—' }}</td>
             <td>{{ $record->dynamic_axis_left ?? '—' }}</td>
@@ -291,14 +301,14 @@
             <td>{{ $record->visualAcuityWithCorrectionLeft?->name ?? '—' }}</td>
         </tr>
         <tr>
-            <td class="label">OD — Estática</td>
+            <td class="label">OD — {{ __('pdf.static') }}</td>
             <td>{{ $record->static_spherical_right ?? '—' }}</td>
             <td>{{ $record->static_cylindrical_right ?? '—' }}</td>
             <td>{{ $record->static_axis_right ?? '—' }}</td>
             <td colspan="2">—</td>
         </tr>
         <tr>
-            <td class="label">OE — Estática</td>
+            <td class="label">OE — {{ __('pdf.static') }}</td>
             <td>{{ $record->static_spherical_left ?? '—' }}</td>
             <td>{{ $record->static_cylindrical_left ?? '—' }}</td>
             <td>{{ $record->static_axis_left ?? '—' }}</td>
@@ -309,15 +319,15 @@
 @if($record->additionType || $record->lensAway || $record->lensNear)
 <div class="row">
     <div class="col col-4">
-        <span class="field-label">Adição</span>
+        <span class="field-label">{{ __('pdf.addition') }}</span>
         <span class="field-value">{{ $record->additionType?->name ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Lente Longe</span>
+        <span class="field-label">{{ __('pdf.lens_away') }}</span>
         <span class="field-value">{{ $record->lensAway?->name ?? '—' }}</span>
     </div>
     <div class="col col-4">
-        <span class="field-label">Lente Perto</span>
+        <span class="field-label">{{ __('pdf.lens_near') }}</span>
         <span class="field-value">{{ $record->lensNear?->name ?? '—' }}</span>
     </div>
 </div>
@@ -325,37 +335,37 @@
 
 <!-- ─── ACHADOS CLÍNICOS ───────────────────────────────────────────────────── -->
 @if($record->biomicroscopy_right || $record->biomicroscopy_left || $record->fundoscopy_right || $record->fundoscopy_left)
-<div class="section-title">Achados Clínicos</div>
+<div class="section-title">{{ __('pdf.section_clinical_findings') }}</div>
 <div class="row">
     <div class="col col-6">
-        <span class="field-label">Biomicroscopia OD</span>
+        <span class="field-label">{{ __('pdf.biomicroscopy_od') }}</span>
         <span class="field-value">{{ $record->biomicroscopy_right ?? '—' }}</span>
     </div>
     <div class="col col-6">
-        <span class="field-label">Biomicroscopia OE</span>
+        <span class="field-label">{{ __('pdf.biomicroscopy_oe') }}</span>
         <span class="field-value">{{ $record->biomicroscopy_left ?? '—' }}</span>
     </div>
 </div>
 <div class="row">
     <div class="col col-6">
-        <span class="field-label">Fundoscopia OD</span>
+        <span class="field-label">{{ __('pdf.fundoscopy_od') }}</span>
         <span class="field-value">{{ $record->fundoscopy_right ?? '—' }}</span>
     </div>
     <div class="col col-6">
-        <span class="field-label">Fundoscopia OE</span>
+        <span class="field-label">{{ __('pdf.fundoscopy_oe') }}</span>
         <span class="field-value">{{ $record->fundoscopy_left ?? '—' }}</span>
     </div>
 </div>
 @endif
 @if($record->observation_general)
 <div class="row"><div class="col col-12">
-    <span class="field-label">Observações gerais</span>
+    <span class="field-label">{{ __('pdf.observations_general') }}</span>
     <span class="field-value">{{ $record->observation_general }}</span>
 </div></div>
 @endif
 @if($record->observation_of_lenses)
 <div class="row"><div class="col col-12">
-    <span class="field-label">Observações sobre lentes</span>
+    <span class="field-label">{{ __('pdf.observations_lenses') }}</span>
     <span class="field-value">{{ $record->observation_of_lenses }}</span>
 </div></div>
 @endif
@@ -363,16 +373,16 @@
 <!-- ─── DIAGNÓSTICO & CONDUTA ─────────────────────────────────────────────── -->
 @php $hasDiagnosis = !empty($record->diagnosis_cids); @endphp
 @if($hasDiagnosis || $record->clinical_conduct)
-<div class="section-title">Diagnóstico &amp; Conduta</div>
+<div class="section-title">{{ __('pdf.section_diagnosis_conduct') }}</div>
 @if($hasDiagnosis)
 @foreach($record->diagnosis_cids as $cid)
 <div class="row">
     <div class="col col-3">
-        <span class="field-label">CID-10</span>
+        <span class="field-label">{{ __('pdf.cid10') }}</span>
         <span class="field-value">{{ $cid['code'] }}</span>
     </div>
     <div class="col col-9">
-        <span class="field-label">Descrição</span>
+        <span class="field-label">{{ __('pdf.description') }}</span>
         <span class="field-value">{{ $cid['description'] ?? '—' }}</span>
     </div>
 </div>
@@ -380,48 +390,58 @@
 @endif
 @if($record->clinical_conduct)
 <div class="row"><div class="col col-12">
-    <span class="field-label">Conduta clínica</span>
+    <span class="field-label">{{ __('pdf.clinical_conduct') }}</span>
     <span class="field-value">{{ $record->clinical_conduct }}</span>
 </div></div>
 @endif
 @if($record->follow_up_days)
 <div class="row"><div class="col col-4">
-    <span class="field-label">Retorno em</span>
-    <span class="field-value">{{ $record->follow_up_days }} dias</span>
+    <span class="field-label">{{ __('pdf.follow_up') }}</span>
+    <span class="field-value">{{ $record->follow_up_days }} {{ __('pdf.days') }}</span>
 </div></div>
 @endif
 @endif
 
-<!-- ─── ASSINATURA ─────────────────────────────────────────────────────────── -->
-@if($record->isSigned())
-<div class="signature-block">
-    <div class="signature-line"></div><br>
-    {{ $record->signedBy?->user?->name ?? $record->doctor?->person?->full_name }}
-    @if($record->doctor?->record)
-    <br>CRM {{ $record->doctor->record }}
-    @endif
-    @if($record->doctor?->record_specialty)
-    <br>RQE {{ $record->doctor->record_specialty }}
-    @endif
-    <br>Assinado eletronicamente em {{ $record->signed_at->format('d/m/Y \à\s H:i') }}<br>
-    <small style="color:#999;">Hash: {{ $record->signature_hash }}</small>
+<!-- ─── ASSINATURA (ancorada no rodapé via position:fixed) ─────────────────── -->
+@php
+    /** @var \App\Services\LocationFormatter $_locFormatter */
+    $_locFormatter = app(\App\Services\LocationFormatter::class);
+    $_locFmt       = $_locFormatter->format($entity);
+    $_dateLine     = $record->isSigned()
+        ? \Illuminate\Support\Carbon::parse($record->signed_at)->isoFormat('LL')
+        : \Illuminate\Support\Carbon::now()->isoFormat('LL');
+@endphp
+<div class="pmr-signature-fixed" style="
+    position: fixed;
+    left: 0; right: 0;
+    bottom: 30px;
+    text-align: center;
+    font-size: 9.5pt;
+    background: #fff;
+    padding: 0 10mm;
+">
+    <div style="margin-bottom:18px;">
+        {{ trim($_locFmt ? $_locFmt . ', ' : '') }}{{ $_dateLine }}.
+    </div>
+    <div class="signature-block" style="display:inline-block; min-width:240px;">
+        <div class="signature-line" style="border-top:1px solid #333; width:240px; margin:0 auto 4px;"></div>
+        @if($record->isSigned())
+            {{ $record->signedBy?->user?->name ?? $record->doctor?->person?->full_name }}
+            @if($record->doctor?->record)<br>CRM {{ $record->doctor->record }}@endif
+            @if($record->doctor?->record_specialty)<br>RQE {{ $record->doctor->record_specialty }}@endif
+            <br>{{ __('pdf.signed_at') }} {{ $record->signed_at->isoFormat('L LT') }}<br>
+            <small style="color:#999;">{{ __('pdf.signature_hash') }}: {{ $record->signature_hash }}</small>
+        @else
+            {{ $record->doctor?->person?->full_name ?? '' }}
+            @if($record->doctor?->record)<br>CRM {{ $record->doctor->record }}@endif
+            @if($record->doctor?->record_specialty)<br>RQE {{ $record->doctor->record_specialty }}@endif
+        @endif
+    </div>
 </div>
-@else
-<div class="signature-block">
-    <div class="signature-line"></div><br>
-    {{ $record->doctor?->person?->full_name ?? '' }}
-    @if($record->doctor?->record)
-    <br>CRM {{ $record->doctor->record }}
-    @endif
-    @if($record->doctor?->record_specialty)
-    <br>RQE {{ $record->doctor->record_specialty }}
-    @endif
-</div>
-@endif
 
 <!-- ─── RODAPÉ ─────────────────────────────────────────────────────────────── -->
 <div class="footer">
-    {{ $entity->name }} · Gerado em {{ now()->format('d/m/Y H:i') }} · {{ $record->code }}
+    {{ $entity->name }} · {{ __('pdf.generated_at') }} {{ \Illuminate\Support\Carbon::now()->isoFormat('L LT') }} · {{ $record->code }}
 </div>
 
 </body>

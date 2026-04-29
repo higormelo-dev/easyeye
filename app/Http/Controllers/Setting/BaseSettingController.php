@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Setting;
 
 use App\DataTables\BaseDataTable;
+use App\DTOs\ActionPolicy;
 use App\Http\Controllers\Controller;
 use App\Services\BaseSettingService;
 use Illuminate\Contracts\View\{Factory, View};
@@ -37,42 +38,34 @@ abstract class BaseSettingController extends Controller
         return $this->dataTable->render('system.settings.index', array_merge(
             compact('meta'),
             $this->viewData(),
-            ['jsFile' => $this->jsFile]
+            ['jsFile' => $this->jsFile],
         ));
     }
 
     public function cards(Request $request): JsonResponse
     {
-        $class   = $this->service->getModelClass();
-        $search  = $request->string('search')->trim()->value();
-        $perPage = 12;
-        $entityId = (string) session('selected_entity_id');
+        $class    = $this->service->getModelClass();
+        $search   = $request->string('search')->trim()->value();
+        $perPage  = 12;
+        $entityId = session('selected_entity_id');
 
         $records = $class::query()
             ->where(
                 fn ($q) => $q
-                ->where('entity_id', session('selected_entity_id'))
-                ->orWhereNull('entity_id')
+                    ->where('entity_id', $entityId)
+                    ->orWhereNull('entity_id'),
             )
             ->when($search, fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
             ->orderBy('name')
             ->paginate($perPage);
 
         return response()->json([
-            'data' => $records->map(function ($r) use ($entityId) {
-                $recordEntityId = (string) ($r->entity_id ?? '');
-                $isGlobal       = $r->entity_id === null;
-                $isOwned        = !$isGlobal && $recordEntityId === $entityId;
-
-                return [
-                    'id'        => $r->id,
-                    'name'      => $r->name,
-                    'code'      => $r->code,
-                    'active'    => (bool) $r->active,
-                    'is_global' => $isGlobal,
-                    'is_owned'  => $isOwned,
-                ];
-            }),
+            'data' => $records->map(fn ($r) => [
+                'id'   => $r->id,
+                'name' => $r->name,
+                'code' => $r->code,
+                ...ActionPolicy::from($r, $entityId)->toArray(),
+            ]),
             'meta' => [
                 'total'        => $records->total(),
                 'per_page'     => $records->perPage(),
@@ -189,9 +182,9 @@ abstract class BaseSettingController extends Controller
             'breadcrumb_title' => false,
             'action'           => __('actions.records'),
             'breadcrumbs'      => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                         'active' => false],
-                ['label' => $this->titleController,           'url' => route($this->routePrefix . '.index'), 'active' => false],
-                ['label' => __('actions.records'),            'url' => 'javascript:void(0);',                'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => $this->titleController, 'url' => route($this->routePrefix . '.index'), 'active' => false],
+                ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
     }

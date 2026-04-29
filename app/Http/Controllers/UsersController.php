@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\DataTables\UsersDataTable;
+use App\DTOs\ActionPolicy;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
 use App\Models\{EntityUser, User};
@@ -65,13 +66,10 @@ class UsersController extends Controller
                 'full_name'  => $eu->name,
                 'email'      => $eu->email,
                 'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
-                'active'     => (bool) $eu->active,
-                'deleted'    => ! is_null($eu->deleted_at),
-                'entity_id'  => $eu->entity_id,
-                'own_entity' => $eu->entity_id === $entityId,
                 'photo_url'  => file_exists(public_path($userPhotoPath))
                     ? asset($userPhotoPath)
                     : asset('system/images/team.png'),
+                ...ActionPolicy::from($eu, $entityId)->toArray(),
             ];
         });
 

@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\DataTables\DoctorsDataTable;
+use App\DTOs\ActionPolicy;
 use App\Enums\EntityGate;
-use App\Http\Requests\{DoctorRequest};
+use App\Http\Requests\DoctorRequest;
 use App\Http\Resources\{DoctorResource, EntityUserResource};
 use App\Models\{Doctor, Entity, EntityUser, Patient, People, User};
 use App\Services\DoctorService;
@@ -51,11 +52,19 @@ class DoctorsController extends Controller
                         ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
                 });
             })
-            ->select('doctors.*', 'users.name as user_name', 'users.email', 'entity_users.user_id')
+            ->select(
+                'doctors.*',
+                'users.name as user_name',
+                'users.email',
+                'entity_users.user_id',
+                'entity_users.entity_id',
+            )
             ->orderBy('doctors.created_at', 'desc')
             ->paginate($perPage);
 
-        $data = $doctors->map(function (Doctor $d) {
+        $entityId = session()->get('selected_entity_id');
+
+        $data = $doctors->map(function (Doctor $d) use ($entityId) {
             $userPhotoPath = 'system/images/users/' . $d->user_id . '.jpg';
 
             return [
@@ -64,10 +73,10 @@ class DoctorsController extends Controller
                 'code'      => $d->code,
                 'record'    => $d->record,
                 'email'     => $d->email,
-                'active'    => (bool) $d->active,
                 'photo_url' => file_exists(public_path($userPhotoPath))
                     ? asset($userPhotoPath)
                     : asset('system/images/team.png'),
+                ...ActionPolicy::from($d, $entityId)->toArray(),
             ];
         });
 
@@ -126,7 +135,7 @@ class DoctorsController extends Controller
             'maritalStatuses',
             'statesOfBrazil',
             'storeUrl',
-            'baseUrl'
+            'baseUrl',
         ));
     }
 
@@ -160,7 +169,7 @@ class DoctorsController extends Controller
 
         return view(
             'system.doctors.show',
-            compact('record')
+            compact('record'),
         );
     }
 
@@ -227,7 +236,7 @@ class DoctorsController extends Controller
 
         return view(
             'system.doctors.show',
-            compact('record')
+            compact('record'),
         );
     }
 

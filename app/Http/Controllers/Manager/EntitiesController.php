@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Manager;
 
 use App\DataTables\EntitiesDataTable;
+use App\DTOs\ActionPolicy;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\EntityRequest;
 use App\Models\Entity;
@@ -50,13 +51,12 @@ class EntitiesController extends Controller
 
         return response()->json([
             'data' => $records->map(fn ($r) => [
-                'id'      => $r->id,
-                'code'    => $r->code,
-                'name'    => $r->name,
-                'city'    => $r->city,
-                'state'   => $r->state,
-                'active'  => (bool) $r->active,
-                'deleted' => (bool) $r->deleted_at,
+                'id'    => $r->id,
+                'code'  => $r->code,
+                'name'  => $r->name,
+                'city'  => $r->city,
+                'state' => $r->state,
+                ...ActionPolicy::forManager($r)->toArray(),
             ]),
             'meta' => [
                 'total'        => $records->total(),

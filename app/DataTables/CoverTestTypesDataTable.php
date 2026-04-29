@@ -12,7 +12,7 @@ class CoverTestTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<CoverTestType>  $query
+     * @param Builder<CoverTestType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

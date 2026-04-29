@@ -2,6 +2,7 @@
 
 namespace App\DataTables;
 
+use App\DTOs\ActionPolicy;
 use App\Models\Doctor;
 use Illuminate\Database\Eloquent\Builder;
 use Yajra\DataTables\EloquentDataTable;
@@ -109,26 +110,26 @@ class DoctorsDataTable extends BaseDataTable
     }
 
     /**
-     * Override: action buttons no estilo dropdown Tabler (igual ao template Preclinic).
+     * Override: action buttons. Doctor adiciona item extra btn-work-schedule
+     * ao dropdown padrão.
      */
     private function buildDoctorActionButtons(Doctor $record): string
     {
-        $entityId = session()->get('selected_entity_id');
-        $isOwned  = $record->entity_id === $entityId;
+        $policy = ActionPolicy::from($record, session()->get('selected_entity_id'));
 
-        if ($record->deleted_at && $isOwned) {
+        if ($policy->mode === ActionPolicy::MODE_RESTORE) {
             return '<a href="javascript:void(0);" class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        if (! $isOwned) {
+        if ($policy->mode !== ActionPolicy::MODE_FULL) {
             return '';
         }
 
-        $activeSituation = $record->active ? 0 : 1;
-        $activeIcon      = $record->active ? 'ti-lock-open' : 'ti-lock';
-        $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
+        $activeSituation = $policy->active ? 0 : 1;
+        $activeIcon      = $policy->active ? 'ti-lock-open' : 'ti-lock';
+        $activeTitle     = $policy->active ? __('actions.disable') : __('actions.enable');
 
         return '
 <div class="d-flex align-items-center float-end gap-1">

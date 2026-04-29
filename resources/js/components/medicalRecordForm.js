@@ -27,6 +27,7 @@ export default ({
     storeDocUrl = '',
     storeFileUrl = '',
     quickActionUrlTemplate = '',
+    lensFormatUrl = '',
 } = {}) => ({
     // ── Boolean switches ────────────────────────────────────────────────
     isEdit,
@@ -46,6 +47,16 @@ export default ({
     savedTonometryOe,
     savedTonometryTime,
     tonometryPdfSrc: '',
+    /**
+     * Horário capturado no momento clínico da medição (HH:mm:ss).
+     * Persistido no hidden tonometer_time via x-bind, garantindo paridade
+     * com smart_oftal: o tempo reflete quando OE foi medido, não quando se imprime.
+     */
+    tonometryStampedTime: savedTonometryTime || '',
+
+    /** Relógio ao vivo (HH:mm:ss) — atualizado a cada 1s. */
+    liveTime: '',
+    _liveTimeInterval: null,
 
     // ── Refraction state ────────────────────────────────────────────────
     dynamicSphericalRight,
@@ -69,6 +80,29 @@ export default ({
     uploadedFiles: [],
     uploading: false,
     uploadProgress: 0,
+
+    // ── PDF preview universal (substitui .print-documentation legado) ───
+    pdfPreviewUrl: '',
+    pdfPreviewTitle: '',
+
+    // ── Clinical alerts (paciente / familiar — feedback fade) ───────────
+    alertVisible: { diabetic: '', hypertensive: '', glaucomatous: '' },
+    _alertTimers: { diabetic: null, hypertensive: null, glaucomatous: null },
+
+    /**
+     * Hook automático do Alpine: dispara quando o componente é montado.
+     * Inicializa o relógio ao vivo (paridade smart_oftal `displayTime`).
+     */
+    init() {
+        const tick = () => { this.liveTime = new Date().toTimeString().slice(0, 8); };
+        tick();
+        this._liveTimeInterval = setInterval(tick, 1000);
+    },
+
+    /** Limpa o intervalo quando o componente é desmontado (evita leak). */
+    destroy() {
+        if (this._liveTimeInterval) clearInterval(this._liveTimeInterval);
+    },
 
     normalizeDocTemplates(payload) {
         if (Array.isArray(payload)) {
@@ -98,6 +132,84 @@ export default ({
     // ── Tonometry PDF ───────────────────────────────────────────────────
     _tonometryModal() {
         return bootstrap.Modal.getOrCreateInstance(document.getElementById('tonometryModal'));
+    },
+
+    // ── PDF preview universal ───────────────────────────────────────────
+    _pdfPreviewModal() {
+        const el = document.getElementById('pdfPreviewModal');
+        return el ? bootstrap.Modal.getOrCreateInstance(el) : null;
+    },
+
+    openPdfPreview(url, title = '') {
+        if (!url) return;
+        this.pdfPreviewUrl = url;
+        this.pdfPreviewTitle = title;
+        this._pdfPreviewModal()?.show();
+    },
+
+    closePdfPreview() {
+        this._pdfPreviewModal()?.hide();
+        this.pdfPreviewUrl = '';
+        this.pdfPreviewTitle = '';
+    },
+
+    // ── Clinical alerts (paciente / familiar) ───────────────────────────
+    flashAlert(group, kind) {
+        if (!['diabetic', 'hypertensive', 'glaucomatous'].includes(group)) return;
+        this.alertVisible[group] = kind; // 'self' ou 'family'
+        if (this._alertTimers[group]) clearTimeout(this._alertTimers[group]);
+        this._alertTimers[group] = setTimeout(() => { this.alertVisible[group] = ''; }, 1800);
+    },
+
+    // ── Lens auto-format (paridade smart_oftal patients.formatlense) ────
+    async formatLens(kind, name) {
+        if (!lensFormatUrl) return;
+        const input = document.querySelector(`[name="${name}"]`);
+        if (!input) return;
+        const value = input.value;
+        if (value === '' || value == null) return;
+
+        try {
+            const res = await fetch(lensFormatUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ kind, value: String(value) }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (typeof data.value === 'string') {
+                input.value = data.value;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        } catch (e) {
+            console.error('Lens format error:', e);
+        }
+    },
+
+    focusNextLensField(currentName) {
+        const order = [
+            'dynamic_spherical_right', 'dynamic_cylindrical_right', 'dynamic_axis_right',
+            'dynamic_spherical_left', 'dynamic_cylindrical_left', 'dynamic_axis_left',
+            'static_spherical_right', 'static_cylindrical_right', 'static_axis_right',
+            'static_spherical_left', 'static_cylindrical_left', 'static_axis_left',
+        ];
+        const idx = order.indexOf(currentName);
+        if (idx === -1 || idx + 1 >= order.length) return;
+        const next = document.querySelector(`[name="${order[idx + 1]}"]`);
+        if (next) {
+            next.focus();
+            if (typeof next.select === 'function') next.select();
+        }
+    },
+
+    // ── Receituário de óculos: 4 modos (paridade smart_oftal templates 1..4) ─
+    issueLensPrescription(mode) {
+        if (!['dynamic', 'static', 'presbyopia_dynamic', 'presbyopia'].includes(mode)) return;
+        return this.issueQuickAction('lens-prescription', { mode }, { preview: true });
     },
 
     appendDocumentationRow(doc, prepend = false) {
@@ -131,10 +243,44 @@ export default ({
         tbody.appendChild(tr);
     },
 
+    /**
+     * Captura o horário atual no formato HH:mm:ss e armazena em tonometryStampedTime.
+     * Disparado automaticamente no blur do campo OE e manualmente pelo botão de relógio.
+     *
+     * @param {boolean} force  Se true, sobrescreve mesmo se já houver horário registrado.
+     */
+    stampTonometryTime(force = false) {
+        if (!force && this.tonometryStampedTime) return;
+        const odEl = document.querySelector('[name="tonometer_right"]');
+        const oeEl = document.querySelector('[name="tonometer_left"]');
+        // só carimba se as duas medidas existem (paridade: tonometer_left blur w/ both filled)
+        if (!force && (!odEl?.value || !oeEl?.value)) return;
+        this.tonometryStampedTime = new Date().toTimeString().slice(0, 8);
+    },
+
     async printTonometry() {
         const od   = document.querySelector('[name="tonometer_right"]')?.value ?? '';
         const oe   = document.querySelector('[name="tonometer_left"]')?.value ?? '';
-        const time = new Date().toTimeString().slice(0, 5);
+
+        // Bloqueia print sem médico — admin não tem doctorId auto-resolvido.
+        // Médico logado tem doctorId vindo do backend (currentDoctor) → não bloqueia.
+        const doctorIdVal = this.doctorId || document.querySelector('[name="doctor_id"]')?.value || '';
+        if (!doctorIdVal) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Médico obrigatório',
+                    text: 'Selecione o médico responsável antes de imprimir.',
+                });
+            } else {
+                alert('Selecione o médico responsável antes de imprimir.');
+            }
+            return;
+        }
+
+        // se ainda não houver carimbo (ex: usuário clicou print sem dar blur em OE), captura agora
+        if (!this.tonometryStampedTime) this.stampTonometryTime(true);
+        const time = (this.tonometryStampedTime || new Date().toTimeString().slice(0, 8)).slice(0, 5);
 
         // Edit mode: salva no histórico e abre PDF da documentação salva.
         if (this.storeTonometryUrl) {
@@ -146,7 +292,7 @@ export default ({
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                         'Accept': 'application/json',
                     },
-                    body: JSON.stringify({ od, oe, time }),
+                    body: JSON.stringify({ od, oe, time, doctor_id: doctorIdVal }),
                 });
 
                 if (res.ok) {
@@ -163,9 +309,7 @@ export default ({
         }
 
         // Create mode: abre PDF direto sem salvar histórico.
-        const doctorIdVal = this.doctorId || document.querySelector('[name="doctor_id"]')?.value || '';
-        const params = new URLSearchParams({ time, od, oe });
-        if (doctorIdVal) params.set('doctor_id', doctorIdVal);
+        const params = new URLSearchParams({ time, od, oe, doctor_id: doctorIdVal });
         this.tonometryPdfSrc = `${this.tonometryPdfUrl}?${params.toString()}`;
         this._tonometryModal().show();
     },
@@ -336,9 +480,24 @@ export default ({
         return this.quickActionUrlTemplate.replace('__ACTION__', action);
     },
 
-    async issueQuickAction(action, payload = {}, { openPdf = true } = {}) {
+    async issueQuickAction(action, payload = {}, { openPdf = true, preview = false } = {}) {
         const url = this.buildQuickActionUrl(action);
         if (!url || this.quickActionBusy) return;
+
+        // Bloqueio de autoria: admin precisa ter selecionado médico antes.
+        const doctorIdVal = this.doctorId || document.querySelector('[name="doctor_id"]')?.value || '';
+        if (!doctorIdVal) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Médico obrigatório',
+                    text: 'Selecione o médico responsável antes de emitir o documento.',
+                });
+            } else {
+                alert('Selecione o médico responsável antes de emitir o documento.');
+            }
+            return;
+        }
 
         this.quickActionBusy = true;
 
@@ -385,7 +544,9 @@ export default ({
                 });
             }
 
-            if (openPdf && doc.pdf_url) {
+            if (preview && doc.pdf_url) {
+                this.openPdfPreview(doc.pdf_url, doc.title || '');
+            } else if (openPdf && doc.pdf_url) {
                 window.open(doc.pdf_url, '_blank', 'noopener');
             }
         } catch (e) {

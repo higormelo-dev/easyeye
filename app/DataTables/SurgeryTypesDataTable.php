@@ -2,7 +2,7 @@
 
 namespace App\DataTables;
 
-use App\Models\{SurgeryType};
+use App\Models\SurgeryType;
 use Illuminate\Database\Eloquent\Builder;
 use Yajra\DataTables\EloquentDataTable;
 use Yajra\DataTables\Html\{Builder as HtmlBuilder, Column};
@@ -12,7 +12,7 @@ class SurgeryTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<SurgeryType>  $query
+     * @param Builder<SurgeryType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

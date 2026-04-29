@@ -3,8 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\DataTables\PatientsDataTable;
+use App\DTOs\ActionPolicy;
 use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
-use App\Http\Resources\{PatientResource};
+use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
 use App\Services\PatientService;
 use Illuminate\Contracts\View\{Factory, View};
@@ -72,7 +73,7 @@ class PatientsController extends Controller
             'statesOfBrazil',
             'covenants',
             'skinTypes',
-            'irisTypes'
+            'irisTypes',
         ));
     }
 
@@ -106,20 +107,23 @@ class PatientsController extends Controller
             ->orderBy('patients.created_at', 'desc')
             ->paginate($perPage);
 
+        $entityId = session()->get('selected_entity_id');
+
         $data = $patients->map(fn (Patient $p) => [
             'id'        => $p->id,
             'full_name' => $p->person->full_name,
             'code'      => $p->code,
-            'active'    => (bool) $p->active,
             'age'       => $p->person->birth_date?->age
                 ? $p->person->birth_date->age . ' ' . __('actions.years')
                 : null,
             'photo_url' => $p->photo && Storage::disk('public')->exists('images/patient/' . $p->photo)
                 ? asset('storage/images/patient/' . $p->photo)
                 : asset('system/images/team.png'),
-            'skin'     => $p->skinType?->name,
-            'iris'     => $p->irisType?->name,
-            'covenant' => $p->covenant?->name,
+            'skin'                => $p->skinType?->name,
+            'iris'                => $p->irisType?->name,
+            'covenant'            => $p->covenant?->name,
+            'medical_records_url' => route('panel.patients.medicalrecords.index', $p->id),
+            ...ActionPolicy::from($p, $entityId)->toArray(),
         ]);
 
         return response()->json([
@@ -146,13 +150,12 @@ class PatientsController extends Controller
                 [
                     'message' => $messageReturn,
                     'data'    => new PatientResource($record),
-                ]
+                ],
             );
         }
 
         return redirect(action('\\' . static::class . '@index'))
             ->with('message', $messageReturn);
-
     }
 
     /**
@@ -166,13 +169,13 @@ class PatientsController extends Controller
             return response()->json(
                 [
                     'data' => new PatientResource($record),
-                ]
+                ],
             );
         }
 
         return view(
             'system.patients.show',
-            compact('record')
+            compact('record'),
         );
     }
 

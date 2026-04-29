@@ -12,7 +12,7 @@ class SkinTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<SkinType>  $query
+     * @param Builder<SkinType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

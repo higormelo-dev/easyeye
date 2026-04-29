@@ -17,7 +17,7 @@ class MedicalRecordQuickActionService
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
      */
     public function issue(
         string $action,
@@ -36,7 +36,7 @@ class MedicalRecordQuickActionService
         );
 
         $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $record);
-        $html = $this->applyCustomReplacements($resolved['html'], $this->buildCustomReplacements($action, $payload));
+        $html     = $this->applyCustomReplacements($resolved['html'], $this->buildCustomReplacements($action, $payload));
 
         return $this->documentationService->store(
             $record,
@@ -47,34 +47,75 @@ class MedicalRecordQuickActionService
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
+     *
      * @return array{0:string, 1:string, 2:string}
      */
     private function resolveTemplateDefinition(string $action, array $payload): array
     {
         return match ($action) {
-            'pterygium-prescription' => ['RECEITUÁRIO DE PTERÍGIO', 'pos_operatorio', 'Receituário de Pterígio'],
-            'test-eye' => ['TESTE DO OLHINHO', 'padrao', 'Teste do Olhinho'],
-            'attendance-certificate' => ['ATESTADO DE COMPARECIMENTO', 'comparecimento', 'Atestado de Comparecimento'],
-            'medical-certificate' => ['ATESTADO MÉDICO', 'afastamento', 'Atestado Médico'],
-            'cataract-prescription' => ['RECEITUÁRIO DE CATARATA', $this->resolveCataractSlug($payload), 'Receituário de Catarata'],
-            'retinal-mapping' => ['MAPEAMENTO DE RETINA', 'padrao', 'Mapeamento de Retina'],
+            'pterygium-prescription'  => ['RECEITUÁRIO DE PTERÍGIO', 'pos_operatorio', 'Receituário de Pterígio'],
+            'test-eye'                => ['TESTE DO OLHINHO', 'padrao', 'Teste do Olhinho'],
+            'attendance-certificate'  => ['ATESTADO DE COMPARECIMENTO', 'comparecimento', 'Atestado de Comparecimento'],
+            'medical-certificate'     => ['ATESTADO MÉDICO', 'afastamento', 'Atestado Médico'],
+            'cataract-prescription'   => ['RECEITUÁRIO DE CATARATA', $this->resolveCataractSlug($payload), 'Receituário de Catarata'],
+            'retinal-mapping'         => ['MAPEAMENTO DE RETINA', 'padrao', 'Mapeamento de Retina'],
             'ophthalmological-report' => ['LAUDO OFTALMOLÓGICO', 'completo', 'Laudo Oftalmológico'],
-            'medical-declaration' => ['RELATÓRIO OFTALMOLÓGICO', 'declaracao_medica', 'Declaração Médica'],
+            'medical-declaration'     => ['RELATÓRIO OFTALMOLÓGICO', 'declaracao_medica', 'Declaração Médica'],
             'medication-prescription' => ['PRESCRIÇÃO DE MEDICAMENTOS', 'padrao', 'Prescrição de Medicamentos'],
-            'procedure-request' => ['SOLICITAÇÃO DE PROCEDIMENTOS', 'padrao', 'Solicitação de Procedimentos'],
+            'procedure-request'       => ['SOLICITAÇÃO DE PROCEDIMENTOS', 'padrao', 'Solicitação de Procedimentos'],
+            'lens-prescription'       => [
+                'PRESCRIÇÃO DE LENTES',
+                $this->resolveLensPrescriptionSlug($payload),
+                $this->resolveLensPrescriptionTitle($payload),
+            ],
             default => throw new InvalidArgumentException('Ação rápida inválida.'),
         };
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * Mapeia o modo de impressão (paridade smart_oftal templates 1..4) para o slug do template.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function resolveLensPrescriptionSlug(array $payload): string
+    {
+        $mode = (string) ($payload['mode'] ?? 'dynamic');
+
+        return match ($mode) {
+            'dynamic'            => 'dinamica_longe',
+            'static'             => 'estatica_longe',
+            'presbyopia_dynamic' => 'longe_perto_presbiopia',
+            'presbyopia'         => 'perto_presbiopia',
+            default              => 'dinamica_longe',
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function resolveLensPrescriptionTitle(array $payload): string
+    {
+        $mode = (string) ($payload['mode'] ?? 'dynamic');
+
+        return match ($mode) {
+            'dynamic'            => 'Receituário de Lentes — Dinâmica',
+            'static'             => 'Receituário de Lentes — Estática',
+            'presbyopia_dynamic' => 'Receituário de Lentes — Longe e Perto (Presbiopia)',
+            'presbyopia'         => 'Receituário de Lentes — Perto (Presbiopia)',
+            default              => 'Receituário de Lentes',
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     *
      * @return array<string, string>
      */
     private function buildCustomReplacements(string $action, array $payload): array
     {
         return match ($action) {
-            'medical-certificate' => $this->buildMedicalCertificateReplacements($payload),
+            'medical-certificate'   => $this->buildMedicalCertificateReplacements($payload),
             'cataract-prescription' => [
                 '{{OLHO_OPERADO}}'  => (string) ($payload['eye'] ?? ''),
                 '{{DATA_CIRURGIA}}' => (string) ($payload['date_surgery'] ?? ''),
@@ -94,7 +135,8 @@ class MedicalRecordQuickActionService
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
+     *
      * @return array<string, string>
      */
     private function buildMedicalCertificateReplacements(array $payload): array
@@ -111,7 +153,7 @@ class MedicalRecordQuickActionService
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param array<string, mixed> $payload
      */
     private function resolveCataractSlug(array $payload): string
     {
@@ -148,7 +190,7 @@ class MedicalRecordQuickActionService
     }
 
     /**
-     * @param  array<string, string>  $replacements
+     * @param array<string, string> $replacements
      */
     private function applyCustomReplacements(string $html, array $replacements): string
     {
@@ -177,6 +219,7 @@ class MedicalRecordQuickActionService
         if (class_exists(NumberFormatter::class)) {
             $formatter = new NumberFormatter('pt_BR', NumberFormatter::SPELLOUT);
             $formatted = $formatter->format($number);
+
             if (is_string($formatted) && $formatted !== '') {
                 return $formatted;
             }
@@ -185,4 +228,3 @@ class MedicalRecordQuickActionService
         return (string) $number;
     }
 }
-

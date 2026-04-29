@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
 <meta charset="UTF-8">
 <title>{{ $documentation->getTypeLabel() }} — {{ $documentation->title }}</title>
@@ -10,7 +10,8 @@
         font-size: {{ $setting->font_size ?? 11 }}pt;
         color: #1a1a1a;
         line-height: 1.55;
-        padding: {{ $setting->margin_top ?? 20 }}mm {{ $setting->margin_right ?? 15 }}mm {{ $setting->margin_bottom ?? 20 }}mm {{ $setting->margin_left ?? 15 }}mm;
+        padding: {{ $setting->margin_top ?? 20 }}mm {{ $setting->margin_right ?? 15 }}mm
+                 calc({{ $setting->margin_bottom ?? 20 }}mm + 130px) {{ $setting->margin_left ?? 15 }}mm;
     }
 
     /* ── Header ─────────────────────────────────────────────────── */
@@ -83,6 +84,14 @@
 </style>
 </head>
 <body>
+@php
+    // Variáveis derivadas de $doc p/ uso direto + repasse a partials.
+    $documentation = $doc;
+    $patient       = $doc->patient ?? null;
+    $doctor        = $doc->doctor  ?? null;
+    $entity        = $doc->medicalRecord?->schedule?->entity
+                  ?? \App\Models\Entity::find(session('selected_entity_id'));
+@endphp
 
 <!-- ─── CABEÇALHO ─────────────────────────────────────────────────────────── -->
 @if($setting->show_logo)
@@ -108,14 +117,14 @@
 <!-- ─── DADOS DO PACIENTE ─────────────────────────────────────────────────── -->
 @if($setting->patient_name)
 <div class="patient-block">
-    <strong>Paciente:</strong> {{ $patient->person->full_name }}
+    <strong>{{ __('pdf.patient') }}:</strong> {{ $patient->person->full_name }}
     @if($setting->patient_birth && $patient->person->birth_date)
-     &nbsp;|&nbsp; <strong>Nascimento:</strong> {{ $patient->person->birth_date->format('d/m/Y') }}
+     &nbsp;|&nbsp; <strong>{{ __('pdf.birth') }}:</strong> {{ $patient->person->birth_date->isoFormat('L') }}
     @endif
     @if($setting->patient_address && $patient->person->address_full)
      &nbsp;|&nbsp; {{ $patient->person->address_full }}
     @endif
-    &nbsp;|&nbsp; <strong>Data:</strong> {{ now()->format('d/m/Y') }}
+    &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ \Illuminate\Support\Carbon::now()->isoFormat('L') }}
 </div>
 @endif
 
@@ -123,14 +132,13 @@
 <div class="content-body">{!! nl2br(e($documentation->content)) !!}</div>
 
 <!-- ─── ASSINATURA ─────────────────────────────────────────────────────────── -->
-@php $doctor = $doc->doctor ?? null; @endphp
 @include('pdf._signature')
 
 <!-- ─── RODAPÉ ─────────────────────────────────────────────────────────────── -->
 @if($setting->show_footer)
 <div class="footer">
     {{ $setting->footer_text ?? $entity->name }}
-    &nbsp;·&nbsp; Emitido em {{ now()->format('d/m/Y \à\s H:i') }}
+    &nbsp;·&nbsp; {{ __('pdf.issued_at') }} {{ \Illuminate\Support\Carbon::now()->isoFormat('L LT') }}
 </div>
 @endif
 

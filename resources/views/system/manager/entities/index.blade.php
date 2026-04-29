@@ -127,7 +127,7 @@
                                         </address>
                                         <hr class="my-2">
                                         <div class="d-flex align-items-center float-end gap-1">
-                                            <template x-if="!item.deleted">
+                                            <template x-if="item.mode === 'full'">
                                                 <div class="d-flex align-items-center gap-1">
                                                     <a href="javascript:void(0);"
                                                        class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
@@ -168,7 +168,7 @@
                                                     </ul>
                                                 </div>
                                             </template>
-                                            <template x-if="item.deleted">
+                                            <template x-if="item.mode === 'restore'">
                                                 <a href="javascript:void(0);"
                                                    class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                                                    :data-id="item.id"

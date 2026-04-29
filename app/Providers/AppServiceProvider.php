@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
+use Carbon\Carbon;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\{Blade, Gate, URL};
 use Illuminate\Support\ServiceProvider;
@@ -39,6 +40,11 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Paginator::useBootstrapFive();
+
+        // Carbon::isoFormat usa o locale do Carbon (independente de app()->getLocale()).
+        // SetLocale middleware atualiza per-request; este boot cobre CLI/jobs/PDFs gerados
+        // fora do contexto web (ex: queue worker enviando relatório por e-mail).
+        Carbon::setLocale(config('app.locale', 'pt_BR'));
 
         Password::defaults(fn () => Password::min(8)->letters()->numbers());
 

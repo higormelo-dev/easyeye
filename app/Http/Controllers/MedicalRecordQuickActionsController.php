@@ -5,8 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\EntityGate;
 use App\Models\{Entity, MedicalRecord, Patient};
 use App\Services\MedicalRecordQuickActionService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 
@@ -23,11 +22,22 @@ class MedicalRecordQuickActionsController extends Controller
         $this->authorizeIssueReport();
 
         $payload = $this->validatePayload($request, $action);
-        $entity = Entity::findOrFail(session('selected_entity_id'));
-        $doctor = $medicalrecord->doctor;
+        $entity  = Entity::findOrFail(session('selected_entity_id'));
+        $doctor  = $medicalrecord->doctor;
+
+        // Fallback: usuário logado é médico → resolve automaticamente.
+        if (! $doctor) {
+            $doctor = \App\Models\Doctor::with('person')
+                ->whereHas('entityUser', fn ($q) => $q
+                    ->where('entity_id', $entity->id)
+                    ->where('user_id', auth()->id()))
+                ->first();
+        }
 
         if (! $doctor) {
-            return response()->json(['message' => 'Prontuário sem médico vinculado.'], 422);
+            return response()->json([
+                'message' => 'Selecione o médico responsável antes de emitir o documento.',
+            ], 422);
         }
 
         try {
@@ -72,6 +82,9 @@ class MedicalRecordQuickActionsController extends Controller
             'medical-declaration', 'medication-prescription', 'procedure-request' => $request->validate([
                 'content' => ['required', 'string'],
             ]),
+            'lens-prescription' => $request->validate([
+                'mode' => ['required', 'in:dynamic,static,presbyopia_dynamic,presbyopia'],
+            ]),
             default => [],
         };
     }
@@ -87,4 +100,3 @@ class MedicalRecordQuickActionsController extends Controller
         abort_if($medicalrecord->patient_id !== $patient->id, 404);
     }
 }
-

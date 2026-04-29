@@ -11,11 +11,50 @@ class StoreMedicalRecordRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Normaliza valores antes da validação:
+     *   - Eixo: remove sufixo º (ex: "180º" → 180)
+     *   - Esférico/Cilíndrico: aceita formato com sinal (+1.25, -2.50)
+     *   - doctor_id: se usuário logado é médico e nada foi enviado, auto-preenche
+     *     com o id do próprio Doctor — admin precisa enviar explícito (rule required).
+     */
+    protected function prepareForValidation(): void
+    {
+        $axisFields = [
+            'dynamic_axis_right', 'dynamic_axis_left',
+            'static_axis_right', 'static_axis_left',
+        ];
+
+        $payload = [];
+
+        foreach ($axisFields as $field) {
+            if ($this->filled($field)) {
+                $payload[$field] = preg_replace('/[^\d\-]/', '', (string) $this->input($field));
+            }
+        }
+
+        if (! $this->filled('doctor_id')) {
+            $entityId = session('selected_entity_id');
+            $doctor   = \App\Models\Doctor::whereHas('entityUser', fn ($q) => $q
+                ->where('entity_id', $entityId)
+                ->where('user_id', auth()->id()))
+                ->first();
+            if ($doctor) {
+                $payload['doctor_id'] = $doctor->id;
+            }
+        }
+
+        if ($payload !== []) {
+            $this->merge($payload);
+        }
+    }
+
     public function rules(): array
     {
         return [
-            // Identificação
-            'doctor_id' => ['nullable', 'uuid', 'exists:doctors,id'],
+            // Identificação — doctor obrigatório (auto-preenchido se user é médico).
+            'doctor_id'   => ['required', 'uuid', 'exists:doctors,id'],
+            'schedule_id' => ['nullable', 'uuid', 'exists:schedules,id'],
             // Exame físico — seleções
             'visual_acuity_type_id'                     => ['nullable', 'uuid', 'exists:visual_acuity_types,id'],
             'near_point_convergence_id'                 => ['nullable', 'uuid', 'exists:near_point_convergences,id'],
@@ -68,12 +107,20 @@ class StoreMedicalRecordRequest extends FormRequest
             'observation_general'       => ['nullable', 'string', 'max:5000'],
             'observation_of_lenses'     => ['nullable', 'string', 'max:5000'],
             // Diagnóstico — CBO obrigatório (array de {code, description})
-            'diagnosis_cids'              => ['nullable', 'array', 'max:20'],
-            'diagnosis_cids.*.code'       => ['required_with:diagnosis_cids', 'string', 'max:10'],
+            'diagnosis_cids'               => ['nullable', 'array', 'max:20'],
+            'diagnosis_cids.*.code'        => ['required_with:diagnosis_cids', 'string', 'max:10'],
             'diagnosis_cids.*.description' => ['required_with:diagnosis_cids', 'string', 'max:500'],
             // Conduta — CBO obrigatório
             'clinical_conduct' => ['nullable', 'string', 'max:10000'],
             'follow_up_days'   => ['nullable', 'integer', 'min:1', 'max:3650'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'doctor_id.required' => 'Selecione o médico responsável antes de salvar o prontuário.',
+            'doctor_id.exists'   => 'Médico selecionado não pertence à entidade ativa.',
         ];
     }
 }

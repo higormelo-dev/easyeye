@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\{DataAccessPurpose, DocumentationType, EntityGate};
-use App\Models\{Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSettingContent};
+use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSettingContent};
 use App\Services\{MedicalRecordDocumentationService, MedicalRecordPdfService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response};
@@ -95,15 +95,30 @@ class MedicalRecordDocumentationsController extends Controller
         $this->authorizeIssueReport();
 
         $validated = $request->validate([
-            'od'   => ['nullable', 'numeric', 'min:0', 'max:999'],
-            'oe'   => ['nullable', 'numeric', 'min:0', 'max:999'],
-            'time' => ['required', 'string', 'max:5'],
+            'od'        => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'oe'        => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'time'      => ['required', 'string', 'max:5'],
+            'doctor_id' => ['nullable', 'uuid'],
         ]);
+
+        $entityId = session('selected_entity_id');
+
+        // Resolve doctor: explicit request → record's doctor → logged-in user's doctor profile.
+        $doctorId = $validated['doctor_id'] ?? $medicalrecord->doctor_id;
+
+        if (! $doctorId) {
+            $doctorId = Doctor::whereHas('entityUser', fn ($q) => $q
+                ->where('entity_id', $entityId)
+                ->where('user_id', auth()->id()))
+                ->value('id');
+        }
+
+        abort_if(! $doctorId, 422, __('actions.medical_records.doctor_required_for_print'));
 
         $doc = MedicalRecordDocumentation::create([
             'medical_record_id' => $medicalrecord->id,
             'patient_id'        => $patient->id,
-            'doctor_id'         => $medicalrecord->doctor_id,
+            'doctor_id'         => $doctorId,
             'type'              => DocumentationType::Tonometry,
             'title'             => 'Laudo de Tonômetria — ' . now()->format('d/m/Y H:i'),
             'content'           => json_encode($validated),

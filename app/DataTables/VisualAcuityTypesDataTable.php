@@ -12,7 +12,7 @@ class VisualAcuityTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<VisualAcuityType>  $query
+     * @param Builder<VisualAcuityType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

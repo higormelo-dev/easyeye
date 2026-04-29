@@ -12,7 +12,7 @@ class VisitTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<VisitType>  $query
+     * @param Builder<VisitType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

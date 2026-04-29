@@ -12,7 +12,7 @@ class EntitiesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<Entity>  $query
+     * @param Builder<Entity> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

@@ -2,6 +2,7 @@
 
 namespace App\DataTables;
 
+use App\DTOs\ActionPolicy;
 use Yajra\DataTables\Services\DataTable;
 
 abstract class BaseDataTable extends DataTable
@@ -70,21 +71,20 @@ abstract class BaseDataTable extends DataTable
 
         $options = array_merge($defaults, $options);
 
+        $policy = ActionPolicy::from($record, session()->get('selected_entity_id'));
+
         if ($options['variant'] === 'dropdown') {
-            return $this->buildDropdownActionButtons($record, $options);
+            return $this->buildDropdownActionButtons($record, $options, $policy);
         }
 
-        $entityId = session()->get('selected_entity_id');
-        $isOwned  = $record->entity_id === $entityId;
-
-        if ($record->deleted_at && $isOwned && $options['restore']) {
+        if ($policy->mode === ActionPolicy::MODE_RESTORE && $options['restore']) {
             return '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-light btn-xs m-1 btn-restore"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.restore') . '"><i class="fas fa-recycle"></i></a>';
         }
 
-        if (! $isOwned || $record->deleted_at) {
+        if ($policy->mode !== ActionPolicy::MODE_FULL) {
             return '';
         }
 
@@ -105,9 +105,9 @@ abstract class BaseDataTable extends DataTable
         }
 
         if ($options['active']) {
-            $activeSituation = $record->active ? 0 : 1;
-            $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
-            $activeIcon      = $record->active ? 'fa-lock-open' : 'fa-unlock';
+            $activeSituation = $policy->active ? 0 : 1;
+            $activeTitle     = $policy->active ? __('actions.disable') : __('actions.enable');
+            $activeIcon      = $policy->active ? 'fa-lock-open' : 'fa-unlock';
 
             $btnActions .= '<a href="javascript:void(0);"
                 class="btn waves-effect waves-light btn-light btn-xs m-1 btn-active"
@@ -129,27 +129,21 @@ abstract class BaseDataTable extends DataTable
     /**
      * Build action buttons in the same dropdown style used by patients/doctors.
      */
-    private function buildDropdownActionButtons(mixed $record, array $options): string
+    private function buildDropdownActionButtons(mixed $record, array $options, ActionPolicy $policy): string
     {
-        $entityId       = session()->get('selected_entity_id');
-        $recordEntityId = data_get($record, 'entity_id');
-        $isGlobal       = $recordEntityId === null;
-        $isOwned        = $recordEntityId === $entityId;
-        $isDeleted      = ! blank(data_get($record, 'deleted_at'));
-
-        if ($isDeleted && $isOwned && $options['restore']) {
+        if ($policy->mode === ActionPolicy::MODE_RESTORE && $options['restore']) {
             return '<a href="javascript:void(0);" class="btn-restore shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.restore') . '"><i class="ti ti-recycle"></i></a>';
         }
 
-        if ($isGlobal && ! $isDeleted && $options['show'] && $options['global_view']) {
+        if ($policy->mode === ActionPolicy::MODE_VIEW_ONLY && $options['show'] && $options['global_view']) {
             return '<a href="javascript:void(0);" class="btn-show shadow-sm fs-14 d-inline-flex border rounded-2 p-1"
                 data-id="' . $record->id . '" data-bs-toggle="tooltip" data-bs-placement="bottom"
                 title="' . __('actions.view') . '"><i class="ti ti-eye"></i></a>';
         }
 
-        if (! $isOwned || $isDeleted) {
+        if ($policy->mode !== ActionPolicy::MODE_FULL) {
             return '';
         }
 
@@ -161,9 +155,9 @@ abstract class BaseDataTable extends DataTable
         }
 
         if ($options['active']) {
-            $activeSituation = $record->active ? 0 : 1;
-            $activeIcon      = $record->active ? 'ti-lock-open' : 'ti-lock';
-            $activeTitle     = $record->active ? __('actions.disable') : __('actions.enable');
+            $activeSituation = $policy->active ? 0 : 1;
+            $activeIcon      = $policy->active ? 'ti-lock-open' : 'ti-lock';
+            $activeTitle     = $policy->active ? __('actions.disable') : __('actions.enable');
 
             $menuItems .= '<li><a class="dropdown-item btn-active" href="javascript:void(0);"
                     data-id="' . $record->id . '" data-situation="' . $activeSituation . '">

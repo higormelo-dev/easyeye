@@ -13,7 +13,7 @@ class NearPointConvergencesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder  $query  Results from query() method.
+     * @param Builder $query Results from query() method.
      */
     public function dataTable(Builder $query): EloquentDataTable
     {

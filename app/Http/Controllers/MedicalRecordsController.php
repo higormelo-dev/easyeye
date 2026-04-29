@@ -2,14 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\DataAccessPurpose;
-use App\Enums\ClientRule;
+use App\Enums\{ClientRule, DataAccessPurpose};
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
     MedicalRecord, NearPointConvergence, Patient, VisualAcuityType};
 use App\Models\ReportSettingContent;
-use App\Services\{MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService};
+use App\Services\{LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Contracts\View\{Factory, View};
 use Illuminate\Foundation\Application;
@@ -23,6 +22,7 @@ class MedicalRecordsController extends Controller
         private readonly MedicalRecordService $service,
         private readonly MedicalRecordDocumentationService $documentationService,
         private readonly MedicalRecordPdfService $pdfService,
+        private readonly LensFormatterService $lensFormatter,
     ) {
     }
 
@@ -108,11 +108,11 @@ class MedicalRecordsController extends Controller
      */
     public function store(StoreMedicalRecordRequest $request, Patient $patient): RedirectResponse
     {
-        $this->service->store($request->validated(), $patient);
+        $validated = $request->validated();
 
-        return redirect()
-            ->route('panel.patients.medicalrecords.index', $patient)
-            ->with('message', __('actions.medical_records.saved'));
+        $this->service->store($validated, $patient);
+
+        return $this->redirectAfterSave($patient, $validated, __('actions.medical_records.saved'));
     }
 
     /**
@@ -250,15 +250,15 @@ class MedicalRecordsController extends Controller
     public function update(UpdateMedicalRecordRequest $request, Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
     {
         $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+        $validated = $request->validated();
+
         try {
-            $this->service->update($medicalrecord, $request->validated());
+            $this->service->update($medicalrecord, $validated);
         } catch (LockedMedicalRecordException) {
             return back()->with('error', __('actions.medical_records.locked'));
         }
 
-        return redirect()
-            ->route('panel.patients.medicalrecords.index', $patient)
-            ->with('message', __('actions.medical_records.updated'));
+        return $this->redirectAfterSave($patient, $validated, __('actions.medical_records.updated'));
     }
 
     /**
@@ -267,6 +267,7 @@ class MedicalRecordsController extends Controller
     public function destroy(Patient $patient, MedicalRecord $medicalrecord): RedirectResponse
     {
         $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
+
         try {
             $this->service->delete($medicalrecord);
         } catch (LockedMedicalRecordException) {
@@ -310,9 +311,36 @@ class MedicalRecordsController extends Controller
         $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
+        // Auto-resolve doctor_id se prontuário ainda não tem (admin precisa selecionar
+        // antes; médico logado é resolvido automaticamente).
+        if (! $medicalrecord->doctor_id) {
+            $entityId = session('selected_entity_id');
+            $doctor   = Doctor::whereHas('entityUser', fn ($q) => $q
+                ->where('entity_id', $entityId)
+                ->where('user_id', auth()->id()))
+                ->first();
+            abort_if(! $doctor, 422, __('actions.medical_records.doctor_required') ?? 'Selecione o médico responsável antes de imprimir.');
+            $medicalrecord->doctor_id = $doctor->id;
+        }
+
         $time = $request->string('time')->trim()->value() ?: now()->format('H:i');
 
         return $this->pdfService->generateTonometry($medicalrecord, $time);
+    }
+
+    /**
+     * Format lens reference (esférico / cilíndrico / eixo) following oftalmological convention.
+     */
+    public function lensFormat(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'kind'  => ['required', 'in:spherical,cylindrical,axis'],
+            'value' => ['nullable', 'string', 'max:16'],
+        ]);
+
+        return response()->json([
+            'value' => $this->lensFormatter->format($validated['kind'], $validated['value'] ?? null),
+        ]);
     }
 
     /**
@@ -359,8 +387,8 @@ class MedicalRecordsController extends Controller
 
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
         $this->assertTemplateBelongsToCurrentEntity($content);
-        $doctor  = $medicalrecord->doctor ?? Doctor::find($request->doctor_id);
-        $entity  = Entity::findOrFail(session('selected_entity_id'));
+        $doctor = $medicalrecord->doctor ?? Doctor::find($request->doctor_id);
+        $entity = Entity::findOrFail(session('selected_entity_id'));
 
         $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $medicalrecord);
 
@@ -416,6 +444,23 @@ class MedicalRecordsController extends Controller
     private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void
     {
         abort_if($medicalrecord->patient_id !== $patient->id, 404);
+    }
+
+    /**
+     * Redireciona para a agenda quando o prontuário foi originado de um agendamento;
+     * caso contrário, segue para a listagem padrão de prontuários do paciente.
+     */
+    private function redirectAfterSave(Patient $patient, array $validated, string $message): RedirectResponse
+    {
+        if (! empty($validated['schedule_id'])) {
+            return redirect()
+                ->route('panel.schedules.index')
+                ->with('message', $message);
+        }
+
+        return redirect()
+            ->route('panel.patients.medicalrecords.index', $patient)
+            ->with('message', $message);
     }
 
     private function assertTemplateBelongsToCurrentEntity(ReportSettingContent $content): void

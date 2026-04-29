@@ -13,7 +13,7 @@ class IrisTypesDataTable extends BaseDataTable
     /**
      * Build the DataTable class.
      *
-     * @param  Builder<IrisType>  $query
+     * @param Builder<IrisType> $query
      */
     public function dataTable(Builder $query): EloquentDataTable
     {
