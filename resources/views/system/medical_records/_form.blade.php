@@ -19,7 +19,9 @@
           : route('panel.patients.medicalrecords.store', $patient) }}"
       enctype="multipart/form-data"
       class="pmr-form"
+      @submit="validateBeforeSubmit($event)"
       x-data="medicalRecordForm({
+          validationRulesUrl: @js(route('panel.medical-records.validation-rules', ['mode' => $isEdit ? 'update' : 'store'])),
           isEdit: {{ $isEdit ? 'true' : 'false' }},
           diabetic: {{ $old('diabetic') ? 'true' : 'false' }},
           diabeticFamily: {{ $old('diabetic_family') ? 'true' : 'false' }},
@@ -44,12 +46,51 @@
           storeFileUrl: @js(route('panel.patients.medicalrecords.files.store', [$patient, $r])),
           storeTonometryUrl: @js(route('panel.patients.medicalrecords.tonometry.store', [$patient, $r])),
           quickActionUrlTemplate: @js(route('panel.patients.medicalrecords.quick-actions.issue', [$patient, $r, '__ACTION__'])),
+          examTemplateUrlTemplate: @js(route('panel.patients.medicalrecords.exam-template', [$patient, $r, '__EXAM__'])),
+          medicineSearchUrl: @js(route('panel.medicines.search')),
+          medicationFormatLineUrl: @js(route('panel.medication-prescription.format-line')),
+          procedureSearchUrl: @js(route('panel.procedures.search')),
+          indicationSearchUrl: @js(route('panel.indications.search')),
+          procedureFormatLineUrl: @js(route('panel.procedure-solicitation.format-line')),
+          dayExtensionPreviewUrl: @js(route('panel.medical-records.day-extension-preview')),
           @else
           storeTonometryUrl: '',
           @endif
       })">
     @csrf
     @if($isEdit) @method('PUT') @endif
+
+    {{-- F9 — alerta de erros client-side. Substitui @include('errors.message-error')
+         do legado quando o validador detecta problema antes de bater no servidor.
+         Após reload, ainda renderiza erros server-side via $errors padrão. --}}
+    <div class="alert alert-danger m-3 mb-0" role="alert"
+         x-show="hasClientErrors" x-cloak>
+        <h6 class="alert-heading mb-1">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            {{ __('actions.medical_records.client_errors_title') }}
+        </h6>
+        <ul class="mb-0 small ps-3">
+            <template x-for="(msgs, field) in clientErrors" :key="field">
+                <template x-for="(m, i) in msgs" :key="field + '-' + i">
+                    <li x-text="m"></li>
+                </template>
+            </template>
+        </ul>
+    </div>
+
+    @if ($errors->any())
+        <div class="alert alert-danger m-3 mb-0" role="alert">
+            <h6 class="alert-heading mb-1">
+                <i class="fas fa-exclamation-triangle me-1"></i>
+                {{ __('actions.medical_records.server_errors_title') }}
+            </h6>
+            <ul class="mb-0 small ps-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     {{-- schedule_id: preserva vínculo com a agenda quando o prontuário é
          iniciado a partir de um agendamento. Controller usa para redirecionar
@@ -750,143 +791,160 @@
     </div>
 
     {{-- ═══════════════════════════════════════════════════════════════════
-         BARRA INFERIOR: Documentações / Arquivos / Salvar
-         (estilo smart_oftal icon bar)
+         BARRA INFERIOR: Quick-actions + Documentações + Arquivos + Salvar.
+         Mescla as duas barras antigas em uma — ergonomia clínica do
+         smart_oftal preservada, sem duplicação visual.
          ═══════════════════════════════════════════════════════════════════ --}}
+    @php
+        // Todos os doc-types já são cobertos por quick-actions estruturadas
+        // (Medicamentos/Pterígio/Catarata/Atestados/Laudo) ou pelo Hub de
+        // Laudos de Exame. Loop de doc-types removido — barra inferior
+        // mantém apenas Hub + Anexo + Salvar.
+        $selectedEntityForQuickActions = \App\Models\Entity::find(session('selected_entity_id'));
+        $canQuickAction = $isEdit
+            && $selectedEntityForQuickActions
+            && auth()->user()?->can(\App\Enums\EntityGate::IssueReport->value, $selectedEntityForQuickActions);
+    @endphp
+
     <div class="pmr-bottom-bar px-3 py-2">
-        <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
-            <div class="d-flex flex-wrap gap-1 align-items-center">
-                @php
-                    $docTypeImages = [
-                        'prescription' => 'prescription.svg',
-                        'procedure'    => 'procedure.svg',
-                        'certificate'  => 'certificate.svg',
-                        'referral'     => 'referral.svg',
-                    ];
-                    $saveFirst = __('actions.medical_records.save_first');
-                @endphp
+        <div class="d-flex flex-wrap gap-1 align-items-center">
+            {{-- ── Quick-actions estruturadas (paridade smart_oftal) ────────
+                 Só aparecem em EDIT com permissão IssueReport — exigem record
+                 persistido (FK quick_action.medical_record_id). ─────────── --}}
+            @if($canQuickAction)
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Receituário de Medicamentos"
+                        :disabled="quickActionBusy"
+                        @click="openMedicationPrescription()">
+                    <i class="fas fa-pills" style="font-size:1.6rem;color:#9c27b0;"></i>
+                    <span class="pmr-doc-img-btn-label">Medicamentos</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Solicitação de Procedimentos"
+                        :disabled="quickActionBusy"
+                        @click="openProcedureSolicitation()">
+                    <i class="fas fa-clipboard-list" style="font-size:1.6rem;color:#3f51b5;"></i>
+                    <span class="pmr-doc-img-btn-label">Procedimentos</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Receituário de Pterígio"
+                        :disabled="quickActionBusy"
+                        @click="issueQuickAction('pterygium-prescription')">
+                    <i class="fas fa-eye-low-vision" style="font-size:1.6rem;color:#ff5722;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Receituário<br>Pterígio</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Receituário de Catarata"
+                        :disabled="quickActionBusy"
+                        @click="openCataractPrescription()">
+                    <i class="fas fa-eye" style="font-size:1.6rem;color:#00bcd4;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Receituário<br>Catarata</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Teste do Olhinho"
+                        :disabled="quickActionBusy"
+                        @click="issueQuickAction('test-eye')">
+                    <i class="fas fa-baby" style="font-size:1.6rem;color:#e91e63;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Teste do<br>Olhinho</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Mapeamento de Retina"
+                        :disabled="quickActionBusy"
+                        @click="issueQuickAction('retinal-mapping')">
+                    <i class="fas fa-bullseye" style="font-size:1.6rem;color:#673ab7;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Mapeamento<br>de Retina</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Atestado de Comparecimento"
+                        :disabled="quickActionBusy"
+                        @click="openAttendanceCertificate()">
+                    <i class="fas fa-user-check" style="font-size:1.6rem;color:#4caf50;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Atestado<br>Comparecim.</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Atestado Médico"
+                        :disabled="quickActionBusy"
+                        @click="openMedicalCertificate()">
+                    <i class="fas fa-stethoscope" style="font-size:1.6rem;color:#2196f3;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Atestado<br>Médico</span>
+                </button>
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Laudo Oftalmológico"
+                        :disabled="quickActionBusy"
+                        @click="issueQuickAction('ophthalmological-report')">
+                    <i class="fas fa-vial-circle-check" style="font-size:1.6rem;color:#795548;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudo<br>Oftalmológ.</span>
+                </button>
+                {{-- Botão "Declaração Médica" removido — duplicava o card
+                     "Declaração em Branco" do Hub de Laudos de Exame
+                     (mesmo template `declaracao_medica`). Hub flow é canônico:
+                     usuário revisa no editor TinyMCE antes de salvar. --}}
+            @endif
 
-                @if($isEdit)
-                    {{-- EDIT: botões interativos --}}
-                    @foreach($documentationTypes ?? [] as $typeKey => $typeLabel)
-                        @if($typeKey === 'report') @continue @endif
-                        <button type="button" class="btn pmr-doc-img-btn" title="{{ $typeLabel }}"
-                                @click="openNewDocByType('{{ $typeKey }}')">
-                            <img src="{{ asset('system/images/medical_records/' . ($docTypeImages[$typeKey] ?? 'report.svg')) }}"
-                                 alt="{{ $typeLabel }}">
-                            <span class="pmr-doc-img-btn-label">{{ $typeLabel }}</span>
-                        </button>
-                    @endforeach
+            {{-- Hub + Anexo: presentes em ambos os modos (CREATE + EDIT). --}}
+            @if($isEdit)
+                {{-- F4b: Hub visual de Laudos de Exame (15 cases do ExamReportRegistry) --}}
+                @if(! empty($examReports))
+                <button type="button" class="btn pmr-doc-img-btn" title="Laudos de Exame"
+                        data-bs-toggle="modal" data-bs-target="#examHubModal">
+                    <i class="fas fa-microscope" style="font-size:1.6rem;color:#03a9f3;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
+                </button>
+                @endif
 
-                    <button type="button" class="btn pmr-doc-img-btn" title="Laudos Médicos"
-                            @click="openNewDocByType('report')">
-                        <img src="{{ asset('system/images/medical_records/laudos_medicos.svg') }}" alt="Laudos">
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>Médicos</span>
-                    </button>
+                {{-- Lista de docs já emitidas (modal sob demanda).
+                     Modifier `.pmr-doc-img-btn-wide` expande width para
+                     comportar "Documentações" em linha única, sem split. --}}
+                <button type="button" class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
+                        title="{{ __('actions.medical_records.documentations') }}"
+                        data-bs-toggle="modal" data-bs-target="#documentationsModal">
+                    <i class="fas fa-folder-open" style="font-size:1.6rem;color:#0288d1;"></i>
+                    <span class="pmr-doc-img-btn-label">Documentações</span>
+                </button>
 
-                    <label class="btn pmr-doc-img-btn pmr-doc-annexo" title="{{ __('actions.medical_records.upload_files') }}">
-                        <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
-                        <span class="pmr-doc-img-btn-label">Anexo</span>
-                        <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
-                               class="d-none" @change="uploadFiles($event.target.files)">
-                    </label>
+                <label class="btn pmr-doc-img-btn pmr-doc-annexo" title="{{ __('actions.medical_records.upload_files') }}">
+                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                    <span class="pmr-doc-img-btn-label">Anexo</span>
+                    <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
+                           class="d-none" @change="uploadFiles($event.target.files)">
+                </label>
 
-                    <div x-show="uploading" class="d-flex align-items-center float-end gap-1" style="min-width:80px;">
+                {{-- Progress só existe no DOM durante upload ativo. `<template x-if>`
+                     remove o nó completamente quando uploading=false (vs x-show
+                     que apenas oculta com display:none, mantendo o layout slot). --}}
+                <template x-if="uploading">
+                    <div class="d-flex align-items-center gap-1" style="min-width:80px;">
                         <div class="progress flex-grow-1" style="height:4px;">
                             <div class="progress-bar bg-info" :style="`width:${uploadProgress}%`"></div>
                         </div>
                         <small class="text-muted" x-text="`${uploadProgress}%`"></small>
                     </div>
-                @else
-                    {{-- CREATE: preview visual (disabled) — mantém percepção de tela completa --}}
-                    @foreach($documentationTypes ?? [] as $typeKey => $typeLabel)
-                        @if($typeKey === 'report') @continue @endif
-                        <button type="button" class="btn pmr-doc-img-btn pmr-doc-preview"
-                                disabled title="{{ $saveFirst }}">
-                            <img src="{{ asset('system/images/medical_records/' . ($docTypeImages[$typeKey] ?? 'report.svg')) }}"
-                                 alt="{{ $typeLabel }}">
-                            <span class="pmr-doc-img-btn-label">{{ $typeLabel }}</span>
-                        </button>
-                    @endforeach
-
-                    <button type="button" class="btn pmr-doc-img-btn pmr-doc-preview"
-                            disabled title="{{ $saveFirst }}">
-                        <img src="{{ asset('system/images/medical_records/laudos_medicos.svg') }}" alt="Laudos">
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>Médicos</span>
-                    </button>
-
-                    <button type="button" class="btn pmr-doc-img-btn pmr-doc-annexo pmr-doc-preview"
-                            disabled title="{{ $saveFirst }}">
-                        <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
-                        <span class="pmr-doc-img-btn-label">Anexo</span>
-                    </button>
+                </template>
+            @else
+                {{-- CREATE: Hub + Anexo via submitWithAction (save + open). --}}
+                @if(! empty($examReports))
+                <button type="button" class="btn pmr-doc-img-btn"
+                        title="Laudos de Exame — {{ __('actions.medical_records.save_first_then_action') }}"
+                        @click="submitWithAction('exam-hub')">
+                    <i class="fas fa-microscope" style="font-size:1.6rem;color:#03a9f3;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
+                </button>
                 @endif
 
-                {{-- Salvar --}}
-                <button type="submit" class="btn pmr-save-btn ms-1" title="{{ __('actions.medical_records.save') }}">
-                    <i class="fas fa-check-circle"></i>
+                <button type="button" class="btn pmr-doc-img-btn pmr-doc-annexo"
+                        title="Anexo — {{ __('actions.medical_records.save_first_then_action') }}"
+                        @click="submitWithAction('annexo')">
+                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                    <span class="pmr-doc-img-btn-label">Anexo</span>
                 </button>
-            </div>
-        </div>
-    </div>
+            @endif
 
-    @php($selectedEntityForQuickActions = \App\Models\Entity::find(session('selected_entity_id')))
-    @if($isEdit && $selectedEntityForQuickActions && auth()->user()?->can(\App\Enums\EntityGate::IssueReport->value, $selectedEntityForQuickActions))
-    <div class="px-3 pb-2">
-        <div class="d-flex flex-wrap gap-1">
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueMedicationPrescription()">
-                Medicamentos
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueProcedureRequest()">
-                Procedimentos
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueQuickAction('pterygium-prescription')">
-                Receituário Pterígio
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueCataractPrescription()">
-                Receituário Catarata
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueQuickAction('test-eye')">
-                Teste do Olhinho
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueQuickAction('retinal-mapping')">
-                Mapeamento de Retina
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueQuickAction('attendance-certificate')">
-                Atestado Comparecimento
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueMedicalCertificate()">
-                Atestado Médico
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueQuickAction('ophthalmological-report')">
-                Laudo Oftalmológico
-            </button>
-            <button type="button" class="btn btn-outline-secondary btn-sm"
-                    :disabled="quickActionBusy"
-                    @click="issueMedicalDeclaration()">
-                Declaração Médica
+            {{-- Salvar — empurrado para a direita via ms-auto. --}}
+            <button type="submit" class="btn pmr-save-btn ms-auto" title="{{ __('actions.medical_records.save') }}">
+                <i class="fas fa-check-circle"></i>
             </button>
         </div>
     </div>
-    @endif
 
     {{-- ═══════════════════════════════════════════════════════════════════
          LISTA DE ARQUIVOS (somente edit, aparece abaixo da barra)
@@ -925,42 +983,62 @@
     @endif
 
     {{-- ═══════════════════════════════════════════════════════════════════
-         LISTA DE DOCUMENTAÇÕES EXISTENTES (somente edit)
+         MODAL: Lista de Documentações Existentes (somente edit)
+         Abre via botão "Documentações" na bottom-bar (`#documentationsModal`).
+         Tabela renderizada server-side; novas docs criadas via quick-action
+         atualizam o `<tbody id="pmr-docs-tbody">` via JS (mantém ID p/ compat).
          ═══════════════════════════════════════════════════════════════════ --}}
     @if($isEdit)
-    <div class="px-3 pb-2">
-        <label class="pmr-label">{{ __('actions.medical_records.documentations') }}</label>
-        <table class="table table-sm table-hover mb-0 pmr-docs-table">
-            <thead class="table-light">
-                <tr>
-                    <th>{{ __('actions.medical_records.doc_type') }}</th>
-                    <th>{{ __('actions.medical_records.doc_title') }}</th>
-                    <th>{{ __('actions.medical_records.doc_date') }}</th>
-                    <th class="text-end">{{ __('actions.medical_records.doc_actions') }}</th>
-                </tr>
-            </thead>
-            <tbody id="pmr-docs-tbody">
-                @forelse($r->documentations as $doc)
-                <tr>
-                    <td><span class="badge bg-info-subtle text-info">{{ $doc->getTypeLabel() }}</span></td>
-                    <td>{{ $doc->title }}</td>
-                    <td>{{ $doc->created_at?->format('d/m/Y H:i') }}</td>
-                    <td class="text-end">
-                        <a href="{{ route('panel.patients.medicalrecords.documentations.pdf', [$patient, $r, $doc]) }}"
-                           target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
-                            <i class="fas fa-file-pdf"></i>
-                        </a>
-                    </td>
-                </tr>
-                @empty
-                <tr data-empty>
-                    <td colspan="4" class="text-center text-muted small py-2">
-                        {{ __('actions.medical_records.no_documentations') }}
-                    </td>
-                </tr>
-                @endforelse
-            </tbody>
-        </table>
+    <div class="modal fade" id="documentationsModal" tabindex="-1" aria-labelledby="documentationsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title" id="documentationsModalLabel">
+                        <i class="fas fa-folder-open me-2" style="color:#0288d1;"></i>
+                        {{ __('actions.medical_records.documentations') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body p-2">
+                    <table class="table table-sm table-hover mb-0 pmr-docs-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th>{{ __('actions.medical_records.doc_type') }}</th>
+                                <th>{{ __('actions.medical_records.doc_title') }}</th>
+                                <th>{{ __('actions.medical_records.doc_date') }}</th>
+                                <th class="text-end">{{ __('actions.medical_records.doc_actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pmr-docs-tbody">
+                            @forelse($r->documentations as $doc)
+                            <tr>
+                                <td><span class="badge bg-info-subtle text-info">{{ $doc->getTypeLabel() }}</span></td>
+                                <td>{{ $doc->title }}</td>
+                                <td>{{ $doc->created_at?->format('d/m/Y H:i') }}</td>
+                                <td class="text-end">
+                                    <a href="{{ route('panel.patients.medicalrecords.documentations.pdf', [$patient, $r, $doc]) }}"
+                                       target="_blank" class="btn btn-outline-secondary btn-sm" title="PDF">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            @empty
+                            <tr data-empty>
+                                <td colspan="4" class="text-center text-muted small py-2">
+                                    {{ __('actions.medical_records.no_documentations') }}
+                                </td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('actions.medical_records.close') }}
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
     @endif
 
@@ -976,28 +1054,51 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="pmr-label">{{ __('actions.medical_records.select_template') }}</label>
-                        <select class="form-select form-select-sm" x-model="docForm.report_setting_content_id"
-                                @change="previewTemplate()">
-                            <option value="">{{ __('actions.medical_records.select') }}</option>
-                            <template x-for="group in docTemplates" :key="group.report_setting_id">
-                                <optgroup :label="group.report_setting_title">
-                                    <template x-for="tpl in group.contents" :key="tpl.id">
-                                        <option :value="tpl.id" x-text="tpl.label"></option>
-                                    </template>
-                                </optgroup>
-                            </template>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="pmr-label">{{ __('actions.medical_records.doc_title') }}</label>
-                        <input type="text" class="form-control form-control-sm" x-model="docForm.title"
-                               placeholder="{{ __('actions.medical_records.doc_title_ph') }}">
+                    {{-- Linha topo: template OU badge de exame + título editável.
+                         No fluxo F4 (exam-report) o título já vem auto-populado
+                         pelo ExamReportRegistry (`label — subtype`); ocultamos
+                         o input para reduzir ruído visual e usamos col-12 no
+                         badge. Em fluxo livre (sem exam_type) layout col-6/col-6. --}}
+                    <div class="row g-2 mb-3">
+                        {{-- Fluxo F4: badge ocupa linha inteira; título escondido (auto). --}}
+                        <div class="col-12" x-show="docForm.exam_type" x-cloak>
+                            <span class="badge bg-info-subtle text-info">
+                                <i class="fas fa-microscope me-1"></i>
+                                <span x-text="docForm.exam_label || docForm.exam_type"></span>
+                            </span>
+                            {{-- input hidden mantém title no payload mesmo sem UI editável --}}
+                            <input type="hidden" x-model="docForm.title">
+                        </div>
+
+                        {{-- Fluxo livre: select de template + input de título lado a lado. --}}
+                        <template x-if="!docForm.exam_type">
+                            <div class="row g-2 m-0 p-0 w-100">
+                                <div class="col-12 col-md-6">
+                                    <label class="pmr-label">{{ __('actions.medical_records.select_template') }}</label>
+                                    <select class="form-select form-select-sm" x-model="docForm.report_setting_content_id"
+                                            @change="previewTemplate()">
+                                        <option value="">{{ __('actions.medical_records.select') }}</option>
+                                        <template x-for="group in docTemplates" :key="group.report_setting_id">
+                                            <optgroup :label="group.report_setting_title">
+                                                <template x-for="tpl in group.contents" :key="tpl.id">
+                                                    <option :value="tpl.id" x-text="tpl.label"></option>
+                                                </template>
+                                            </optgroup>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="pmr-label">{{ __('actions.medical_records.doc_title') }}</label>
+                                    <input type="text" class="form-control form-control-sm" x-model="docForm.title"
+                                           placeholder="{{ __('actions.medical_records.doc_title_ph') }}">
+                                </div>
+                            </div>
+                        </template>
                     </div>
                     <div class="mb-0">
                         <label class="pmr-label">{{ __('actions.medical_records.doc_content') }}</label>
-                        <textarea class="form-control" rows="12" x-model="docForm.content"
+                        <textarea id="doc-modal-content" class="form-control" rows="12"
+                                  x-model="docForm.content"
                                   placeholder="{{ __('actions.medical_records.doc_content_ph') }}"></textarea>
                     </div>
                 </div>
@@ -1019,6 +1120,561 @@
          Usado por receituário de óculos (4 modos), atestados, laudos, etc.
          ═══════════════════════════════════════════════════════════════════════ --}}
     @include('system.medical_records._pdf-preview-modal')
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         F4b — HUB DE LAUDOS DE EXAME
+         Lista 15 cases do ExamReportRegistry. Cada card chama openExam(value)
+         que carrega template (auto-popula via TemplateVariableResolver) e abre
+         docModal já no fluxo exam-report. Templates ausentes geram toast.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         F5 — BUILDER de Receituário de Medicamentos
+         Search async (medicines.search) → adiciona à lista (limit 5, dedupe)
+         → backend formata cada linha (medication-prescription.format-line)
+         → textarea editável → salvar via quick-action 'medication-prescription'.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    @if($isEdit)
+    <div class="modal fade" id="medicationPrescriptionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">
+                        <i class="fas fa-prescription me-2" style="color:#e91e8c;"></i>
+                        Receituário de Medicamentos
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    {{-- Buscador --}}
+                    <label class="pmr-label mb-1">Adicionar medicamento</label>
+                    <div class="position-relative mb-2">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text"
+                                   class="form-control form-control-sm"
+                                   placeholder="Digite ao menos 2 letras (ex: dipirona, colírio…)"
+                                   x-model="medSearchQuery"
+                                   @input.debounce.300ms="searchMedicines()"
+                                   @keydown.escape="medSearchOpen = false"
+                                   :disabled="prescription.length >= maxMedicines">
+                            <span class="input-group-text bg-transparent" x-show="medSearchLoading" x-cloak>
+                                <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                            </span>
+                        </div>
+                        <ul class="list-group shadow-sm position-absolute w-100"
+                            style="z-index:1080;top:100%;max-height:280px;overflow-y:auto;"
+                            x-show="medSearchOpen && medSearchResults.length > 0"
+                            x-cloak
+                            @click.outside="medSearchOpen = false">
+                            <template x-for="item in medSearchResults" :key="item.id">
+                                <li class="list-group-item list-group-item-action py-1 px-2"
+                                    style="cursor:pointer;font-size:.82rem;"
+                                    @mousedown.prevent="addMedicine(item)">
+                                    <span class="fw-semibold" x-text="item.name"></span>
+                                    <span class="text-muted ms-1" x-show="item.presentation" x-cloak
+                                          x-text="'(' + item.presentation + ')'"></span>
+                                    <span class="text-secondary ms-2 small" x-show="item.dosage" x-cloak
+                                          x-text="item.dosage + ' ' + (item.frequency || '')"></span>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    {{-- Limit warning --}}
+                    <div class="alert alert-warning py-1 px-2 small mb-2"
+                         x-show="prescription.length >= maxMedicines" x-cloak>
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        Limite de <span x-text="maxMedicines"></span> medicamentos atingido. Imprima esta receita antes de adicionar mais.
+                    </div>
+
+                    {{-- Lista de medicamentos selecionados --}}
+                    <div class="mb-2" x-show="prescription.length > 0" x-cloak>
+                        <label class="pmr-label mb-1">Medicamentos da receita (<span x-text="prescription.length"></span>/<span x-text="maxMedicines"></span>)</label>
+                        <ul class="list-group">
+                            <template x-for="(item, idx) in prescription" :key="item.id + '-' + idx">
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
+                                    style="font-size:.82rem;">
+                                    <span>
+                                        <span class="badge bg-secondary me-1" x-text="idx + 1"></span>
+                                        <span class="fw-semibold" x-text="item.name"></span>
+                                        <span class="text-muted ms-1" x-show="item.presentation" x-cloak
+                                              x-text="'(' + item.presentation + ')'"></span>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                            @click="removeMedicine(idx)"
+                                            title="Remover">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    {{-- Textarea editável --}}
+                    <label class="pmr-label mb-1">Conteúdo da receita</label>
+                    <textarea class="form-control form-control-sm"
+                              rows="10"
+                              x-model="medicineLists"
+                              placeholder="Linhas formatadas aparecem aqui. Edição livre permitida antes da impressão."></textarea>
+                </div>
+                <div class="modal-footer py-2 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            @click="clearMedicines()"
+                            :disabled="prescription.length === 0 && !medicineLists">
+                        <i class="fas fa-eraser me-1"></i>Limpar
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                            {{ __('actions.medical_records.cancel') }}
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm"
+                                @click="submitMedicationPrescription()"
+                                :disabled="quickActionBusy || (!medicineLists.trim())">
+                            <i class="fas fa-print me-1"></i>Emitir Receita
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         F6 — MODAL: Solicitação de Procedimentos
+         Médico busca procedimento + tipo (rotina/urgência/controle/comparativo)
+         e indicações em listas separadas; ambas concatenadas na textarea
+         editável. Emissão chama quick-action 'procedure-request'.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    @if($isEdit)
+    <div class="modal fade" id="procedureSolicitationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">
+                        <i class="fas fa-stethoscope me-2" style="color:#03a9f3;"></i>
+                        {{ __('actions.medical_records.procedure_title') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 mb-2">
+                        {{-- Procedure search + type --}}
+                        <div class="col-12 col-md-7">
+                            <label class="pmr-label mb-1">{{ __('actions.medical_records.procedure_search_label') }}</label>
+                            <div class="position-relative">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                    <input type="text"
+                                           class="form-control form-control-sm"
+                                           placeholder="{{ __('actions.medical_records.procedure_search_ph') }}"
+                                           x-model="procSearchQuery"
+                                           @input.debounce.300ms="searchProcedures()"
+                                           @keydown.escape="procSearchOpen = false"
+                                           :disabled="procSelected.length + indSelected.length >= maxProcSolicitations">
+                                    <span class="input-group-text bg-transparent" x-show="procSearchLoading" x-cloak>
+                                        <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                                    </span>
+                                </div>
+                                <ul class="list-group shadow-sm position-absolute w-100"
+                                    style="z-index:1080;top:100%;max-height:240px;overflow-y:auto;"
+                                    x-show="procSearchOpen && procSearchResults.length > 0"
+                                    x-cloak
+                                    @click.outside="procSearchOpen = false">
+                                    <template x-for="item in procSearchResults" :key="item.id">
+                                        <li class="list-group-item list-group-item-action py-1 px-2"
+                                            style="cursor:pointer;font-size:.82rem;"
+                                            @mousedown.prevent="addProcedure(item)">
+                                            <span class="fw-semibold" x-text="item.name"></span>
+                                            <span class="text-muted ms-1 small" x-show="item.code" x-cloak
+                                                  x-text="'(' + item.code + ')'"></span>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <label class="pmr-label mb-1">{{ __('actions.medical_records.procedure_type_label') }}</label>
+                            <select class="form-select form-select-sm" x-model="procTypeSelected">
+                                <option value="">—</option>
+                                <option value="rotina">{{ __('actions.medical_records.procedure_type_rotina') }}</option>
+                                <option value="urgencia">{{ __('actions.medical_records.procedure_type_urgencia') }}</option>
+                                <option value="controle">{{ __('actions.medical_records.procedure_type_controle') }}</option>
+                                <option value="comparativo">{{ __('actions.medical_records.procedure_type_comparativo') }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {{-- Indication search --}}
+                    <label class="pmr-label mb-1">{{ __('actions.medical_records.procedure_indication_label') }}</label>
+                    <div class="position-relative mb-2">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="fas fa-search"></i></span>
+                            <input type="text"
+                                   class="form-control form-control-sm"
+                                   placeholder="{{ __('actions.medical_records.procedure_indication_ph') }}"
+                                   x-model="indSearchQuery"
+                                   @input.debounce.300ms="searchIndications()"
+                                   @keydown.escape="indSearchOpen = false"
+                                   :disabled="procSelected.length + indSelected.length >= maxProcSolicitations">
+                            <span class="input-group-text bg-transparent" x-show="indSearchLoading" x-cloak>
+                                <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                            </span>
+                        </div>
+                        <ul class="list-group shadow-sm position-absolute w-100"
+                            style="z-index:1080;top:100%;max-height:240px;overflow-y:auto;"
+                            x-show="indSearchOpen && indSearchResults.length > 0"
+                            x-cloak
+                            @click.outside="indSearchOpen = false">
+                            <template x-for="item in indSearchResults" :key="item.id">
+                                <li class="list-group-item list-group-item-action py-1 px-2"
+                                    style="cursor:pointer;font-size:.82rem;"
+                                    @mousedown.prevent="addIndication(item)">
+                                    <span x-text="item.description"></span>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    {{-- Limit warning --}}
+                    <div class="alert alert-warning py-1 px-2 small mb-2"
+                         x-show="(procSelected.length + indSelected.length) >= maxProcSolicitations" x-cloak>
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        {{ __('actions.medical_records.procedure_max_reached') }}
+                    </div>
+
+                    {{-- Selected list --}}
+                    <div class="mb-2"
+                         x-show="procSelected.length + indSelected.length > 0" x-cloak>
+                        <label class="pmr-label mb-1">
+                            {{ __('actions.medical_records.procedure_selected') }}
+                            (<span x-text="procSelected.length + indSelected.length"></span>/<span x-text="maxProcSolicitations"></span>)
+                        </label>
+                        <ul class="list-group">
+                            <template x-for="(item, idx) in procSelected" :key="'p-' + item.id + '-' + idx">
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
+                                    style="font-size:.82rem;">
+                                    <span>
+                                        <span class="badge bg-info text-dark me-1">P</span>
+                                        <span class="fw-semibold" x-text="item.name"></span>
+                                        <span class="text-muted ms-1 small" x-show="item.type" x-cloak
+                                              x-text="'— ' + item.type_label"></span>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                            @click="removeProcedure(idx)" title="Remover">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </li>
+                            </template>
+                            <template x-for="(item, idx) in indSelected" :key="'i-' + item.id + '-' + idx">
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-1 px-2"
+                                    style="font-size:.82rem;">
+                                    <span>
+                                        <span class="badge bg-secondary me-1">I</span>
+                                        <span x-text="item.description"></span>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-link text-danger p-0"
+                                            @click="removeIndication(idx)" title="Remover">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </li>
+                            </template>
+                        </ul>
+                    </div>
+
+                    {{-- Editable textarea --}}
+                    <label class="pmr-label mb-1">{{ __('actions.medical_records.procedure_content') }}</label>
+                    <textarea class="form-control form-control-sm"
+                              rows="8"
+                              x-model="procedureLists"
+                              placeholder="Linhas formatadas aparecem aqui. Edição livre permitida antes da impressão."></textarea>
+                </div>
+                <div class="modal-footer py-2 d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            @click="clearProcedureSolicitation()"
+                            :disabled="procSelected.length === 0 && indSelected.length === 0 && !procedureLists">
+                        <i class="fas fa-eraser me-1"></i>Limpar
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                            {{ __('actions.medical_records.cancel') }}
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm"
+                                @click="submitProcedureSolicitation()"
+                                :disabled="quickActionBusy || !procedureLists.trim()">
+                            <i class="fas fa-print me-1"></i>{{ __('actions.medical_records.procedure_emit') }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         F8 — MODAL: Receituário de Catarata
+         Coleta olho operado, modelo do receituário e (opcional) data/hora
+         da cirurgia, evitando série de window.prompt do legado.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    @if($isEdit)
+    <div class="modal fade" id="cataractPrescriptionModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">
+                        <i class="fas fa-eye me-2" style="color:#e91e8c;"></i>
+                        {{ __('actions.medical_records.cataract_title') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    {{-- Olho operado --}}
+                    <label class="pmr-label mb-1">{{ __('actions.medical_records.cataract_eye_label') }}</label>
+                    <div class="btn-group w-100 mb-3" role="group" aria-label="Olho operado">
+                        <input type="radio" class="btn-check" id="cataractEyeRight"
+                               value="right" x-model="cataractForm.eye">
+                        <label class="btn btn-outline-primary btn-sm" for="cataractEyeRight">
+                            {{ __('actions.medical_records.cataract_eye_right') }}
+                        </label>
+
+                        <input type="radio" class="btn-check" id="cataractEyeLeft"
+                               value="left" x-model="cataractForm.eye">
+                        <label class="btn btn-outline-primary btn-sm" for="cataractEyeLeft">
+                            {{ __('actions.medical_records.cataract_eye_left') }}
+                        </label>
+
+                        <input type="radio" class="btn-check" id="cataractEyeBoth"
+                               value="both" x-model="cataractForm.eye">
+                        <label class="btn btn-outline-primary btn-sm" for="cataractEyeBoth">
+                            {{ __('actions.medical_records.cataract_eye_both') }}
+                        </label>
+                    </div>
+
+                    {{-- Modelo --}}
+                    <label class="pmr-label mb-1">{{ __('actions.medical_records.cataract_template') }}</label>
+                    <select class="form-select form-select-sm mb-3" x-model="cataractForm.template">
+                        <option value="pre_operatorio">{{ __('actions.medical_records.cataract_template_pre') }}</option>
+                        <option value="pos_operatorio">{{ __('actions.medical_records.cataract_template_pos') }}</option>
+                        <option value="instrucoes_cirurgicas">{{ __('actions.medical_records.cataract_template_inst') }}</option>
+                    </select>
+
+                    {{-- Data + hora (relevantes p/ instrucoes_cirurgicas) --}}
+                    <div class="row g-2 mb-1"
+                         :class="{ 'opacity-75': cataractForm.template !== 'instrucoes_cirurgicas' }">
+                        <div class="col-7">
+                            <label class="pmr-label mb-1">{{ __('actions.medical_records.cataract_date') }}</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   placeholder="dd/mm/aaaa"
+                                   maxlength="10"
+                                   x-model="cataractForm.date_surgery"
+                                   @input="formatCataractDate($event)">
+                        </div>
+                        <div class="col-5">
+                            <label class="pmr-label mb-1">{{ __('actions.medical_records.cataract_hour') }}</label>
+                            <input type="time" class="form-control form-control-sm"
+                                   x-model="cataractForm.hour_surgery">
+                        </div>
+                    </div>
+                    <small class="text-muted d-block"
+                           x-show="cataractForm.template === 'instrucoes_cirurgicas'" x-cloak>
+                        <i class="fas fa-info-circle me-1"></i>
+                        {{ __('actions.medical_records.cataract_help_inst') }}
+                    </small>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('actions.medical_records.cancel') }}
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm"
+                            @click="submitCataractPrescription()"
+                            :disabled="quickActionBusy || !cataractForm.eye">
+                        <i class="fas fa-print me-1"></i>{{ __('actions.medical_records.cataract_emit') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         F7 — MODAL: Atestado de Comparecimento
+         Template renderizado server-side. Médico edita só "observações" livres
+         (anexadas ao final do documento), sem reescrever cabeçalho/data.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    @if($isEdit)
+    <div class="modal fade" id="attendanceCertificateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">
+                        <i class="fas fa-file-signature me-2" style="color:#03a9f3;"></i>
+                        {{ __('actions.medical_records.attendance_certificate_title') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="pmr-label mb-1">{{ __('actions.medical_records.certificate_obs_label') }}</label>
+                    <textarea id="attendance-cert-content"
+                              class="form-control form-control-sm"
+                              rows="6"
+                              maxlength="5000"
+                              placeholder="{{ __('actions.medical_records.certificate_obs_ph') }}"
+                              x-model="attendanceForm.content"></textarea>
+                    <small class="text-muted d-block mt-1">
+                        <span x-text="(attendanceForm.content || '').length"></span>/5000
+                    </small>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('actions.medical_records.cancel') }}
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm"
+                            @click="submitAttendanceCertificate()"
+                            :disabled="quickActionBusy">
+                        <i class="fas fa-print me-1"></i>{{ __('actions.medical_records.certificate_emit') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         F7 — MODAL: Atestado Médico (afastamento)
+         Dias + dia por extenso (preview backend) + observações livres.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    <div class="modal fade" id="medicalCertificateModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">
+                        <i class="fas fa-notes-medical me-2" style="color:#e91e8c;"></i>
+                        {{ __('actions.medical_records.medical_certificate_title') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-2 mb-2">
+                        <div class="col-7">
+                            <label class="pmr-label mb-1">{{ __('actions.medical_records.medical_cert_days_label') }}</label>
+                            <input type="number" min="1" max="365" step="1"
+                                   class="form-control form-control-sm"
+                                   x-model.number="medicalForm.days"
+                                   @input.debounce.350ms="refreshDayExtension()">
+                            <small class="text-muted d-block mt-1">
+                                {{ __('actions.medical_records.medical_cert_days_help') }}
+                            </small>
+                        </div>
+                        <div class="col-5">
+                            <label class="pmr-label mb-1">{{ __('actions.medical_records.medical_cert_date_label') }}</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   placeholder="dd/mm/aaaa"
+                                   maxlength="10"
+                                   x-model="medicalForm.date"
+                                   @input="formatMedicalCertDate($event)">
+                            <button type="button" class="btn btn-link btn-sm p-0 mt-1"
+                                    @click="medicalForm.date = ''">
+                                <small>{{ __('actions.medical_records.medical_cert_date_today') }}</small>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Preview real-time do dia por extenso --}}
+                    <div class="alert alert-info py-2 px-2 small mb-2"
+                         x-show="medicalForm.daysPreview" x-cloak>
+                        <i class="fas fa-eye me-1"></i>
+                        <strong>{{ __('actions.medical_records.medical_cert_days_preview') }}:</strong>
+                        <span x-text="medicalForm.daysPreview"></span>
+                    </div>
+
+                    <label class="pmr-label mb-1">{{ __('actions.medical_records.certificate_obs_label') }}</label>
+                    <textarea id="medical-cert-content"
+                              class="form-control form-control-sm"
+                              rows="5"
+                              maxlength="5000"
+                              placeholder="{{ __('actions.medical_records.certificate_obs_ph') }}"
+                              x-model="medicalForm.content"></textarea>
+                    <small class="text-muted d-block mt-1">
+                        <span x-text="(medicalForm.content || '').length"></span>/5000
+                    </small>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('actions.medical_records.cancel') }}
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm"
+                            @click="submitMedicalCertificate()"
+                            :disabled="quickActionBusy || !medicalForm.days || medicalForm.days < 1 || medicalForm.days > 365">
+                        <i class="fas fa-print me-1"></i>{{ __('actions.medical_records.certificate_emit') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @if($isEdit && ! empty($examReports))
+    <div class="modal fade" id="examHubModal" tabindex="-1" aria-labelledby="examHubModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title" id="examHubModalLabel">
+                        <i class="fas fa-microscope me-2" style="color:#03a9f3;"></i>
+                        {{ __('actions.medical_records.exam_hub_title') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">
+                        {{ __('actions.medical_records.exam_hub_help') }}
+                    </p>
+                    <div class="row g-2 pmr-exam-hub">
+                        @foreach($examReports as $exam)
+                        <div class="col-6 col-md-4 col-lg-3">
+                            @if(empty($exam['subtypes']))
+                                {{-- Exame com template único: card abre direto --}}
+                                <button type="button"
+                                        class="btn pmr-exam-card w-100 h-100"
+                                        @click="openExamFromHub(@js($exam['value']))"
+                                        title="{{ $exam['label'] }}">
+                                    <i class="fas {{ $exam['icon'] }} pmr-exam-card-icon"></i>
+                                    <span class="pmr-exam-card-label">{{ $exam['label'] }}</span>
+                                </button>
+                            @else
+                                {{-- F4e — Exame multi-variante (Pentacam): dropdown com subtipos --}}
+                                <div class="dropdown w-100 h-100">
+                                    <button type="button"
+                                            class="btn pmr-exam-card pmr-exam-card-multi w-100 h-100 dropdown-toggle"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false"
+                                            title="{{ $exam['label'] }}">
+                                        <i class="fas {{ $exam['icon'] }} pmr-exam-card-icon"></i>
+                                        <span class="pmr-exam-card-label">{{ $exam['label'] }}</span>
+                                    </button>
+                                    <ul class="dropdown-menu pmr-exam-subtypes-menu">
+                                        @foreach($exam['subtypes'] as $sub)
+                                            <li>
+                                                <button type="button"
+                                                        class="dropdown-item"
+                                                        @click="openExamFromHub(@js($exam['value']), @js($sub['slug']))">
+                                                    <i class="fas fa-angle-right me-2 text-muted small"></i>{{ $sub['label'] }}
+                                                </button>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('actions.medical_records.cancel') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- ═══════════════════════════════════════════════════════════════════════
          MODAL BOOTSTRAP: Laudo de Tonômetria (dentro do x-data do form)

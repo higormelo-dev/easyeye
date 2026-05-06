@@ -23,6 +23,7 @@ class ReportSettingService
         }
 
         $entity = Entity::query()->find($entityId);
+
         if (! $entity || ! $entity->isClient()) {
             return 0;
         }
@@ -339,6 +340,125 @@ class ReportSettingService
             ]);
 
             return $localSetting->fresh('contents.variables');
+        });
+    }
+
+    // ─── Backfill (F4d) ─────────────────────────────────────────────────────
+
+    /**
+     * Sincroniza contents/variables das cópias adoptadas com o template global.
+     *
+     * Estratégia conservadora (F4d):
+     *   - Slug presente no global mas ausente na cópia → CRIA
+     *   - Slug presente em ambos:
+     *       • Se HTML diferente → ATUALIZA (preserva o ID, então
+     *         `MedicalRecordDocumentation.report_setting_content_id` continua
+     *         válido. Documentações já emitidas não são afetadas pois o
+     *         conteúdo final foi persistido em `MedicalRecordDocumentation.content`)
+     *       • Variables: substitui conjunto (delete + insert)
+     *   - Slug presente na cópia mas ausente no global → NÃO TOCA
+     *     (preserva customizações da clínica)
+     *
+     * Idempotente. Pode ser executado em CI/deploy sem efeitos colaterais.
+     *
+     * @return array{settings_synced:int,contents_created:int,contents_updated:int}
+     */
+    public function syncAdoptedContentsWithGlobal(): array
+    {
+        $stats = ['settings_synced' => 0, 'contents_created' => 0, 'contents_updated' => 0];
+
+        $globals = ReportSetting::global()
+            ->published()
+            ->active()
+            ->with('contents.variables')
+            ->get();
+
+        foreach ($globals as $global) {
+            $copies = ReportSetting::query()
+                ->where('source_setting_id', $global->id)
+                ->with('contents.variables')
+                ->get();
+
+            if ($copies->isEmpty()) {
+                continue;
+            }
+
+            $diff = false;
+
+            foreach ($copies as $copy) {
+                $touched = $this->syncCopyContentsAgainstGlobal($global, $copy, $stats);
+
+                if ($touched) {
+                    $diff = true;
+                }
+            }
+
+            if ($diff) {
+                $stats['settings_synced']++;
+            }
+        }
+
+        return $stats;
+    }
+
+    /**
+     * @param array{settings_synced:int,contents_created:int,contents_updated:int} &$stats
+     */
+    private function syncCopyContentsAgainstGlobal(ReportSetting $global, ReportSetting $copy, array &$stats): bool
+    {
+        return DB::transaction(function () use ($global, $copy, &$stats) {
+            $touched = false;
+
+            foreach ($global->contents as $globalContent) {
+                $localContent = $copy->contents->firstWhere('slug', $globalContent->slug);
+
+                if (! $localContent) {
+                    // CRIA novo content + variables na cópia local
+                    $contentCopy = $globalContent->replicate([
+                        'id', 'report_setting_id', 'created_at', 'updated_at',
+                        'deleted_at', 'created_by', 'updated_by',
+                    ]);
+                    $contentCopy->report_setting_id = $copy->id;
+                    $contentCopy->save();
+
+                    foreach ($globalContent->variables as $variable) {
+                        $varCopy = $variable->replicate([
+                            'id', 'report_setting_content_id', 'created_at', 'updated_at',
+                        ]);
+                        $varCopy->report_setting_content_id = $contentCopy->id;
+                        $varCopy->save();
+                    }
+
+                    $stats['contents_created']++;
+                    $touched = true;
+
+                    continue;
+                }
+
+                if ($localContent->content !== $globalContent->content || $localContent->label !== $globalContent->label) {
+                    $localContent->update([
+                        'content'    => $globalContent->content,
+                        'label'      => $globalContent->label,
+                        'sort_order' => $globalContent->sort_order,
+                    ]);
+
+                    // Substitui variables (delete-then-insert) — ID do content é preservado.
+                    $localContent->variables()->delete();
+
+                    foreach ($globalContent->variables as $variable) {
+                        $varCopy = $variable->replicate([
+                            'id', 'report_setting_content_id', 'created_at', 'updated_at',
+                        ]);
+                        $varCopy->report_setting_content_id = $localContent->id;
+                        $varCopy->save();
+                    }
+
+                    $stats['contents_updated']++;
+                    $touched = true;
+                }
+            }
+
+            return $touched;
         });
     }
 

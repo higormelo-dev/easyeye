@@ -2,9 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\ExamReportRegistry;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, ReportSettingContent};
 use InvalidArgumentException;
-use NumberFormatter;
+use Mews\Purifier\Facades\Purifier;
 
 /**
  * Orquestra emissões rápidas (paridade operacional com botões legados).
@@ -13,6 +14,8 @@ class MedicalRecordQuickActionService
 {
     public function __construct(
         private readonly MedicalRecordDocumentationService $documentationService,
+        private readonly SurgerySchedulingDocService $surgerySchedulingDoc,
+        private readonly DayExtensionService $dayExtension,
     ) {
     }
 
@@ -35,8 +38,16 @@ class MedicalRecordQuickActionService
             $slug,
         );
 
-        $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $record);
-        $html     = $this->applyCustomReplacements($resolved['html'], $this->buildCustomReplacements($action, $payload));
+        $customReplacements = $this->buildCustomReplacements($action, $payload);
+
+        // Custom replacements precedem o resolver: caso contrário variáveis
+        // tipadas (e.g. {{DATA_ATUAL}} source_type=date) sobrescrevem o
+        // payload do médico (ex.: atestado retroativo com data específica).
+        $contentForResolve = $this->applyTemplateOverrides($content, $customReplacements);
+
+        $resolved = $this->documentationService->loadTemplate($contentForResolve, $patient, $doctor, $entity, $record);
+        $html     = $this->applyCustomReplacements($resolved['html'], []);
+        $html     = $this->appendObservations($action, $html, $payload);
 
         return $this->documentationService->store(
             $record,
@@ -44,6 +55,58 @@ class MedicalRecordQuickActionService
             $html,
             $title ?: null,
         );
+    }
+
+    /**
+     * Aplica custom replacements (payload do médico) no conteúdo bruto do
+     * template — antes do resolver. Devolve um clone do `ReportSettingContent`
+     * para evitar mutação do model recuperado do banco.
+     *
+     * @param array<string, string> $replacements
+     */
+    private function applyTemplateOverrides(ReportSettingContent $content, array $replacements): ReportSettingContent
+    {
+        if ($replacements === []) {
+            return $content;
+        }
+
+        $clone          = clone $content;
+        $clone->content = str_replace(
+            array_keys($replacements),
+            array_values($replacements),
+            (string) $content->content,
+        );
+
+        return $clone;
+    }
+
+    /**
+     * F7 — atestados aceitam observações livres do médico, anexadas ao final
+     * do template renderizado em um bloco semântico próprio. Outros actions
+     * são pass-through.
+     *
+     * @param array<string, mixed> $payload
+     */
+    private function appendObservations(string $action, string $html, array $payload): string
+    {
+        if (! in_array($action, ['attendance-certificate', 'medical-certificate'], true)) {
+            return $html;
+        }
+
+        $raw = trim((string) ($payload['content'] ?? ''));
+
+        if ($raw === '') {
+            return $html;
+        }
+
+        // Atestados agora vêm do TinyMCE (HTML rico). Detecta tags para
+        // decidir entre sanitizar HTML (profile `medical`) ou escapar +
+        // nl2br (legado / payload sem editor).
+        $isHtml = $raw !== strip_tags($raw);
+        $body   = $isHtml ? $this->sanitizeHtml($raw) : nl2br(e($raw));
+
+        return $html . '<div class="pmr-observations"><p><strong>Observações:</strong></p>'
+            . $body . '</div>';
     }
 
     /**
@@ -69,8 +132,48 @@ class MedicalRecordQuickActionService
                 $this->resolveLensPrescriptionSlug($payload),
                 $this->resolveLensPrescriptionTitle($payload),
             ],
-            default => throw new InvalidArgumentException('Ação rápida inválida.'),
+            'exam-report' => $this->resolveExamReportDefinition($payload),
+            default       => throw new InvalidArgumentException('Ação rápida inválida.'),
         };
+    }
+
+    /**
+     * Resolve definição de template para emissão genérica de laudo de exame.
+     *
+     * Centraliza no `ExamReportRegistry` o mapeamento `exam_type → ReportSetting+slug`,
+     * permitindo que F4 evolua para 15 tipos sem alterar o controller.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return array{0:string, 1:string, 2:string}
+     */
+    private function resolveExamReportDefinition(array $payload): array
+    {
+        $examType = (string) ($payload['exam_type'] ?? '');
+        $exam     = ExamReportRegistry::tryFrom($examType);
+
+        if (! $exam) {
+            throw new InvalidArgumentException("Tipo de exame inválido: {$examType}");
+        }
+
+        // F4e — exames com múltiplas variantes (Pentacam) usam payload.subtype
+        // p/ resolver o slug correto do template. Sem subtype, cai no default.
+        $subtype = isset($payload['subtype']) && $payload['subtype'] !== ''
+            ? (string) $payload['subtype']
+            : null;
+
+        $slug = $exam->resolveSubtypeSlug($subtype);
+
+        $defaultTitle = $exam->label();
+
+        if ($subtype !== null && ($subtypeLabel = $exam->subtypeLabel($subtype)) !== null) {
+            $defaultTitle = $exam->label() . ' — ' . $subtypeLabel;
+        }
+
+        $title = (string) ($payload['title'] ?? '');
+        $title = $title !== '' ? $title : $defaultTitle;
+
+        return [$exam->settingTitle(), $slug, $title];
     }
 
     /**
@@ -116,11 +219,11 @@ class MedicalRecordQuickActionService
     {
         return match ($action) {
             'medical-certificate'   => $this->buildMedicalCertificateReplacements($payload),
-            'cataract-prescription' => [
-                '{{OLHO_OPERADO}}'  => (string) ($payload['eye'] ?? ''),
-                '{{DATA_CIRURGIA}}' => (string) ($payload['date_surgery'] ?? ''),
-                '{{HORA_CIRURGIA}}' => (string) ($payload['hour_surgery'] ?? ''),
-            ],
+            'cataract-prescription' => $this->surgerySchedulingDoc->buildReplacements(
+                (string) ($payload['eye'] ?? ''),
+                isset($payload['date_surgery']) ? (string) $payload['date_surgery'] : null,
+                isset($payload['hour_surgery']) ? (string) $payload['hour_surgery'] : null,
+            ),
             'medical-declaration' => [
                 '{{CONTEUDO_LIVRE}}' => $this->sanitizeMultiline((string) ($payload['content'] ?? '')),
             ],
@@ -129,6 +232,12 @@ class MedicalRecordQuickActionService
             ],
             'procedure-request' => [
                 '{{PROCEDIMENTOS_SOLICITADOS}}' => $this->sanitizeMultiline((string) ($payload['content'] ?? '')),
+            ],
+            'exam-report' => [
+                // exam-report content vem do TinyMCE (HTML rico). Usa profile
+                // `medical` em vez de escape literal para preservar formatação
+                // clínica e bloquear XSS persistente em PDF/views.
+                '{{CONTEUDO_LIVRE}}' => $this->sanitizeHtml((string) ($payload['content'] ?? '')),
             ],
             default => [],
         };
@@ -147,7 +256,7 @@ class MedicalRecordQuickActionService
 
         return [
             '{{DIAS_AFASTAMENTO}}'         => (string) $days,
-            '{{DIAS_AFASTAMENTO_EXTENSO}}' => $this->spellNumberPtBr($days),
+            '{{DIAS_AFASTAMENTO_EXTENSO}}' => $this->dayExtension->spell($days),
             '{{DATA_ATUAL}}'               => $date,
         ];
     }
@@ -157,14 +266,29 @@ class MedicalRecordQuickActionService
      */
     private function resolveCataractSlug(array $payload): string
     {
-        $template = (string) ($payload['template'] ?? 'pre_operatorio');
+        return $this->surgerySchedulingDoc->resolveTemplateSlug(
+            isset($payload['template']) ? (string) $payload['template'] : null,
+        );
+    }
 
-        return match ($template) {
-            '1', 'pre_operatorio' => 'pre_operatorio',
-            '2', 'pos_operatorio' => 'pos_operatorio',
-            '3', 'instrucoes_cirurgicas' => 'instrucoes_cirurgicas',
-            default => 'pre_operatorio',
-        };
+    /**
+     * Localiza o template ativo para um exame do `ExamReportRegistry` na entidade,
+     * com fallback para template global. Reusado pelo endpoint exam-template.
+     */
+    public function findActiveTemplateForExam(string $entityId, ExamReportRegistry $exam): ReportSettingContent
+    {
+        return $this->findTemplateContent($entityId, $exam->settingTitle(), $exam->slug());
+    }
+
+    /**
+     * F4e — variante do anterior que respeita subtipo selecionado pelo médico
+     * em exames multi-template (ex: Pentacam). Subtype inválido cai no default.
+     */
+    public function findActiveTemplateForExamSubtype(string $entityId, ExamReportRegistry $exam, ?string $subtype): ReportSettingContent
+    {
+        $slug = $exam->resolveSubtypeSlug($subtype);
+
+        return $this->findTemplateContent($entityId, $exam->settingTitle(), $slug);
     }
 
     private function findTemplateContent(string $entityId, string $settingTitle, string $slug): ReportSettingContent
@@ -194,15 +318,17 @@ class MedicalRecordQuickActionService
      */
     private function applyCustomReplacements(string $html, array $replacements): string
     {
-        if ($replacements === []) {
-            return $html;
+        if ($replacements !== []) {
+            $html = str_replace(
+                array_keys($replacements),
+                array_values($replacements),
+                $html,
+            );
         }
 
-        return str_replace(
-            array_keys($replacements),
-            array_values($replacements),
-            $html,
-        );
+        // Scrub final: placeholders custom não preenchidos (payload sem o valor)
+        // viram string vazia. Evita "{{XYZ}}" residual no PDF emitido.
+        return preg_replace('/\{\{[A-Z_][A-Z0-9_]*\}\}/u', '', $html) ?? $html;
     }
 
     private function sanitizeMultiline(string $value): string
@@ -210,21 +336,19 @@ class MedicalRecordQuickActionService
         return nl2br(e(trim($value)));
     }
 
-    private function spellNumberPtBr(int $number): string
+    /**
+     * Sanitiza HTML rico (TinyMCE) com profile `medical` do HTMLPurifier.
+     * Preserva formatação clínica (listas, tabelas, headings) e remove
+     * vetores de XSS (script, iframe, on*, javascript: URIs).
+     */
+    private function sanitizeHtml(string $value): string
     {
-        if ($number <= 0) {
-            return 'zero';
+        $value = trim($value);
+
+        if ($value === '') {
+            return '';
         }
 
-        if (class_exists(NumberFormatter::class)) {
-            $formatter = new NumberFormatter('pt_BR', NumberFormatter::SPELLOUT);
-            $formatted = $formatter->format($number);
-
-            if (is_string($formatted) && $formatted !== '') {
-                return $formatted;
-            }
-        }
-
-        return (string) $number;
+        return Purifier::clean($value, 'medical');
     }
 }

@@ -493,6 +493,7 @@ return [
         // General
         'select'          => 'Select…',
         'cancel'          => 'Cancel',
+        'close'           => 'Close',
         'not_informed'    => 'Not informed',
         'yes'             => 'Yes',
         'no'              => 'No',

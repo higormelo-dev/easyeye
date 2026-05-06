@@ -19,43 +19,43 @@ it('builds tiss xml with consultation and sadt guides', function () {
     ]);
 
     $version = new TissVersion([
-        'code' => '202603',
+        'code'           => '202603',
         'layout_version' => '04.03.00',
     ]);
 
     $consultationGuide = new TissGuide([
-        'guide_type' => TissGuideType::Consultation,
-        'guide_number_provider' => 'GUI-202604-000001',
-        'attendance_date' => '2026-04-04',
-        'beneficiary_name' => 'PACIENTE 01',
+        'guide_type'              => TissGuideType::Consultation,
+        'guide_number_provider'   => 'GUI-202604-000001',
+        'attendance_date'         => '2026-04-04',
+        'beneficiary_name'        => 'PACIENTE 01',
         'beneficiary_card_number' => '12345',
-        'total_amount' => 150.00,
+        'total_amount'            => 150.00,
     ]);
     $consultationGuide->setRelation('items', new Collection());
 
     $sadtGuide = new TissGuide([
-        'guide_type' => TissGuideType::Sadt,
-        'guide_number_provider' => 'GUI-202604-000002',
-        'attendance_date' => '2026-04-04',
-        'beneficiary_name' => 'PACIENTE 02',
+        'guide_type'              => TissGuideType::Sadt,
+        'guide_number_provider'   => 'GUI-202604-000002',
+        'attendance_date'         => '2026-04-04',
+        'beneficiary_name'        => 'PACIENTE 02',
         'beneficiary_card_number' => '67890',
-        'total_amount' => 200.00,
+        'total_amount'            => 200.00,
     ]);
 
     $sadtItem = new TissGuideItem([
-        'table_code' => '22',
-        'tuss_code' => '30301257',
-        'description' => 'TOMOGRAFIA DE COERÊNCIA ÓPTICA',
-        'quantity' => 1,
-        'unit_amount' => 200.00,
-        'total_amount' => 200.00,
+        'table_code'     => '22',
+        'tuss_code'      => '30301257',
+        'description'    => 'TOMOGRAFIA DE COERÊNCIA ÓPTICA',
+        'quantity'       => 1,
+        'unit_amount'    => 200.00,
+        'total_amount'   => 200.00,
         'execution_date' => '2026-04-04',
     ]);
 
     $sadtGuide->setRelation('items', new Collection([$sadtItem]));
 
     $batch = new TissBatch([
-        'batch_number' => 'LOT-202604-0001',
+        'batch_number'    => 'LOT-202604-0001',
         'reference_month' => '2026-04',
     ]);
 

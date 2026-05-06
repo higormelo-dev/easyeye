@@ -3,13 +3,26 @@
 use App\Jobs\Billing\{ExpireOverdueSubscriptionsJob, RenewSubscriptionJob, RetryFailedPaymentJob};
 use App\Models\Billing\BillingRetrySchedule;
 use App\Models\Subscription;
-use App\Services\TrialService;
+use App\Services\{ReportSettingService, TrialService};
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\{Artisan, Schedule};
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+// F4d — Backfill: sincroniza contents/variables das cópias adoptadas com os
+// templates globais. Idempotente. Roda em deploy quando há novos seeds.
+Artisan::command('reports:sync-adopted', function () {
+    $stats = app(ReportSettingService::class)->syncAdoptedContentsWithGlobal();
+
+    $this->info(sprintf(
+        'Sync concluído: %d settings com mudanças | %d contents criados | %d contents atualizados',
+        $stats['settings_synced'],
+        $stats['contents_created'],
+        $stats['contents_updated'],
+    ));
+})->purpose('Sincroniza contents/variables das cópias adoptadas com os templates globais (F4d backfill)');
 
 // Expira trials vencidos diariamente
 Schedule::call(function () {

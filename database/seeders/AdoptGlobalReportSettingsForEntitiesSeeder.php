@@ -20,8 +20,12 @@ class AdoptGlobalReportSettingsForEntitiesSeeder extends Seeder
             ->where('active', true)
             ->count();
 
-        $result = app(ReportSettingService::class)
-            ->adoptPublishedGlobalsForAllClientEntities();
+        $service = app(ReportSettingService::class);
+        $result  = $service->adoptPublishedGlobalsForAllClientEntities();
+
+        // F4d — Backfill idempotente: novos contents no global propagam para
+        // cópias adoptadas anteriormente (sem afetar customizações da clínica).
+        $syncStats = $service->syncAdoptedContentsWithGlobal();
 
         $adoptedAfter = ReportSetting::query()
             ->whereNotNull('entity_id')
@@ -53,6 +57,13 @@ class AdoptGlobalReportSettingsForEntitiesSeeder extends Seeder
             if ($globalTemplates === 0) {
                 $this->command->warn('Nenhum modelo global publicado/ativo encontrado para adoção.');
             }
+
+            $this->command->info(sprintf(
+                'Backfill F4d: %d settings com mudanças | %d contents criados | %d contents atualizados',
+                $syncStats['settings_synced'],
+                $syncStats['contents_created'],
+                $syncStats['contents_updated'],
+            ));
         }
     }
 }

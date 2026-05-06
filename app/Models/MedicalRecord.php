@@ -28,6 +28,7 @@ class MedicalRecord extends Model
         'patient_id',
         'doctor_id',
         'schedule_id',
+        'entity_id',
         // Exame físico — seleções
         'visual_acuity_type_id',
         'near_point_convergence_id',
@@ -93,28 +94,58 @@ class MedicalRecord extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Resolve entity_id + gera code sequencial por entidade.
+     *
+     * Multi-tenancy correto: entity_id é coluna direta (não derivada via
+     * schedule), permitindo prontuário sem agenda (walk-in/admin SaaS).
+     *
+     * Code generator usa transaction + lockForUpdate na última row do mesmo
+     * prefix/entity para mitigar race em saves concorrentes (clínica
+     * pequena, baixo throughput — lock pessimista é suficiente).
+     *
+     * Sem entity_id resolvível, fallback global (legado / fixtures de teste).
      */
     protected static function booted(): void
     {
         static::creating(function (self $record) {
-            if (blank($record->code)) {
-                $prefix   = 'PMR';
-                $entityId = Schedule::find($record->schedule_id)?->entity_id
+            if (blank($record->entity_id)) {
+                $record->entity_id = Schedule::find($record->schedule_id)?->entity_id
                     ?? session('selected_entity_id');
-
-                $lastRecord = static::withoutGlobalScopes()
-                    ->whereHas('schedule', fn ($q) => $q->where('entity_id', $entityId))
-                    ->where('code', 'like', $prefix . '-%')
-                    ->orderBy('code', 'desc')
-                    ->first();
-
-                $newNumber = $lastRecord
-                    ? (int) substr($lastRecord->code, strlen($prefix) + 1) + 1
-                    : 1;
-
-                $record->code = sprintf('%s-%010d', $prefix, $newNumber);
             }
+
+            if (blank($record->code)) {
+                $record->code = self::generateCodeForEntity(
+                    blank($record->entity_id) ? null : (string) $record->entity_id,
+                );
+            }
+        });
+    }
+
+    /**
+     * Gera próximo code sequencial `PMR-NNNNNNNNNN`.
+     * Filtra por entity quando id presente; fallback global caso contrário.
+     */
+    private static function generateCodeForEntity(?string $entityId): string
+    {
+        $prefix = 'PMR';
+
+        return \DB::transaction(function () use ($prefix, $entityId) {
+            $query = static::withoutGlobalScopes()
+                ->where('code', 'like', $prefix . '-%')
+                ->orderByDesc('code')
+                ->lockForUpdate();
+
+            if ($entityId !== null) {
+                $query->where('entity_id', $entityId);
+            }
+
+            $lastRecord = $query->first();
+
+            $newNumber = $lastRecord
+                ? (int) substr($lastRecord->code, strlen($prefix) + 1) + 1
+                : 1;
+
+            return sprintf('%s-%010d', $prefix, $newNumber);
         });
     }
 
@@ -148,6 +179,11 @@ class MedicalRecord extends Model
     public function schedule(): BelongsTo
     {
         return $this->belongsTo(Schedule::class, 'schedule_id');
+    }
+
+    public function entity(): BelongsTo
+    {
+        return $this->belongsTo(Entity::class, 'entity_id');
     }
 
     public function visualAcuityType(): BelongsTo

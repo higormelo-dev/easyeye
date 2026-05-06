@@ -42,6 +42,7 @@
     /* ── Grid ────────────────────────────────────────────────────── */
     .row   { display: table; width: 100%; margin-bottom: 4px; }
     .col   { display: table-cell; vertical-align: top; padding-right: 8px; }
+    .col-3 { width: 25%; }
     .col-4 { width: 33.33%; }
     .col-6 { width: 50%; }
     .col-12{ width: 100%; }
@@ -121,10 +122,22 @@
 <!-- ─── DADOS DO PACIENTE ─────────────────────────────────────────────────── -->
 <div class="section-title">{{ __('pdf.section_patient_data') }}</div>
 <div class="row">
-    <div class="col col-4">
+    <div class="col col-6">
         <span class="field-label">{{ __('pdf.name') }}</span>
         <span class="field-value">{{ $patient->person->full_name }}</span>
     </div>
+    <div class="col col-3">
+        <span class="field-label">{{ __('pdf.gender') }}</span>
+        <span class="field-value">{{ $patient->person->gender_label ?? '—' }}</span>
+    </div>
+    <div class="col col-3">
+        <span class="field-label">{{ __('pdf.age') }}</span>
+        <span class="field-value">
+            {{ $patient->person->age !== null ? __('pdf.age_years', ['years' => $patient->person->age]) : '—' }}
+        </span>
+    </div>
+</div>
+<div class="row">
     <div class="col col-4">
         <span class="field-label">{{ __('pdf.birth_date') }}</span>
         <span class="field-value">{{ $patient->person->birth_date?->isoFormat('L') ?? '—' }}</span>
@@ -133,6 +146,7 @@
         <span class="field-label">{{ __('pdf.code') }}</span>
         <span class="field-value">{{ $patient->code }}</span>
     </div>
+    <div class="col col-4"></div>
 </div>
 <div class="row">
     <div class="col col-4">

@@ -82,10 +82,118 @@
     top: 1rem;
 }
 
-/* Badge do médico com sombra e borda branca */
+/* Container vertical com linha central. */
+.timeline {
+    position: relative;
+    list-style: none;
+    padding: 20px 0;
+    margin: 0;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 3px;
+    margin-left: -1.5px;
+    background: linear-gradient(to bottom, #e3eef9 0%, #d0e4f7 50%, #e3eef9 100%);
+    border-radius: 2px;
+}
+
+/* Cada item ocupa linha inteira; clearfix p/ floats internos. */
+.timeline > li {
+    position: relative;
+    margin-bottom: 24px;
+    min-height: 60px;
+}
+
+.timeline > li::before,
+.timeline > li::after {
+    content: ' ';
+    display: table;
+}
+
+.timeline > li::after {
+    clear: both;
+}
+
+/* Panel: card com bico apontando p/ centro. */
+.timeline > li > .timeline-panel {
+    position: relative;
+    width: 46%;
+    float: left;
+    padding: 14px 18px;
+    background: #fff;
+    border: 1px solid #e6ebf2;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.timeline > li > .timeline-panel::before {
+    content: '';
+    position: absolute;
+    top: 24px;
+    right: -9px;
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+    border-left: 9px solid #e6ebf2;
+}
+
+.timeline > li > .timeline-panel::after {
+    content: '';
+    position: absolute;
+    top: 25px;
+    right: -8px;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 8px solid #fff;
+}
+
+/* Itens invertidos (par) apontam à esquerda. */
+.timeline > li.timeline-inverted > .timeline-panel {
+    float: right;
+}
+
+.timeline > li.timeline-inverted > .timeline-panel::before {
+    right: auto;
+    left: -9px;
+    border-left-width: 0;
+    border-right: 9px solid #e6ebf2;
+}
+
+.timeline > li.timeline-inverted > .timeline-panel::after {
+    right: auto;
+    left: -8px;
+    border-left-width: 0;
+    border-right: 8px solid #fff;
+}
+
+/* Badge circular sobre a linha vertical. */
 .timeline > li > .timeline-badge {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    margin-left: -22px;
+    border-radius: 50%;
+    overflow: hidden;
+    z-index: 1;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
     border: 2px solid #fff;
+}
+
+.timeline-heading h5,
+.timeline-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.timeline-body {
+    margin-top: 8px;
 }
 
 /* Animação de entrada dos itens ao serem appendados */

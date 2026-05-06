@@ -119,6 +119,26 @@ class People extends Model
     ];
 
     /**
+     * Idade calculada do birth_date. null quando birth_date ausente.
+     */
+    public function getAgeAttribute(): ?int
+    {
+        return $this->birth_date ? \Carbon\Carbon::parse($this->birth_date)->age : null;
+    }
+
+    /**
+     * Label do gênero (FEMININO/MASCULINO) ou null quando ausente/desconhecido.
+     */
+    public function getGenderLabelAttribute(): ?string
+    {
+        if ($this->gender === null) {
+            return null;
+        }
+
+        return self::$genders[(int) $this->gender] ?? null;
+    }
+
+    /**
      * Merital status of people
      *
      * 1 => 'Solteiro(a)',

@@ -27,7 +27,7 @@ use App\Http\Controllers\{
     MedicalRecordsController,
     SubscriptionExpiredController,
 };
-use App\Http\Controllers\{Cid10SearchController, TonometryPdfController};
+use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Manager\ManagerDashboardController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
@@ -177,6 +177,20 @@ Route::group(
             Route::get('cid10/search', Cid10SearchController::class)
                 ->name('cid10.search');
 
+            // F5 — Receituário de medicamentos (autocomplete + format-line)
+            Route::get('medicines/search', MedicineSearchController::class)
+                ->name('medicines.search');
+            Route::post('medication-prescription/format-line', MedicationPrescriptionFormatController::class)
+                ->name('medication-prescription.format-line');
+
+            // F6 — Solicitação de procedimentos (autocomplete + format-line)
+            Route::get('procedures/search', ProcedureSearchController::class)
+                ->name('procedures.search');
+            Route::get('indications/search', IndicationSearchController::class)
+                ->name('indications.search');
+            Route::post('procedure-solicitation/format-line', ProcedureSolicitationFormatController::class)
+                ->name('procedure-solicitation.format-line');
+
             Route::get(
                 'patients/{patient}/medicalrecords/ajaxlist',
                 [MedicalRecordsController::class, 'ajaxList'],
@@ -215,6 +229,22 @@ Route::group(
                 'patients/{patient}/medicalrecords/{medicalrecord}/quick-actions/{action}',
                 [MedicalRecordQuickActionsController::class, 'issue'],
             )->name('patients.medicalrecords.quick-actions.issue');
+            Route::get(
+                'patients/{patient}/medicalrecords/{medicalrecord}/exam-template/{exam}',
+                [MedicalRecordQuickActionsController::class, 'examTemplate'],
+            )->name('patients.medicalrecords.exam-template');
+
+            // F7 — preview "X (extenso) dias" para atestado médico
+            Route::post(
+                'medical-records/day-extension-preview',
+                [MedicalRecordQuickActionsController::class, 'dayExtensionPreview'],
+            )->name('medical-records.day-extension-preview');
+
+            // F9 — regras de validação client-safe do FormRequest do prontuário
+            Route::get(
+                'medical-records/validation-rules',
+                MedicalRecordValidationRulesController::class,
+            )->name('medical-records.validation-rules');
 
             // Documentações de prontuário
             Route::post(

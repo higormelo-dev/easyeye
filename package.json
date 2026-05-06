@@ -2,8 +2,10 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
-        "dev": "vite"
+        "build": "npm run tinymce:install && vite build",
+        "dev": "vite",
+        "tinymce:install": "rm -rf public/vendor/tinymce public/vendor/tinymce-langs && mkdir -p public/vendor/tinymce public/vendor/tinymce-langs/langs7 && cp -r node_modules/tinymce/. public/vendor/tinymce/ && cp node_modules/tinymce-i18n/langs7/pt_BR.js public/vendor/tinymce-langs/langs7/",
+        "postinstall": "npm run tinymce:install"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.7",
@@ -45,6 +47,8 @@
         "qrcode": "^1.5.4",
         "raphael": "^2.3.0",
         "simplebar": "^6.3.3",
-        "sweetalert2": "^11.15.3"
+        "sweetalert2": "^11.15.3",
+        "tinymce": "^8.5.0",
+        "tinymce-i18n": "^26.4.6"
     }
 }

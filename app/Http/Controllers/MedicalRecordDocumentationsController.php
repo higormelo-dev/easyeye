@@ -8,6 +8,7 @@ use App\Services\{MedicalRecordDocumentationService, MedicalRecordPdfService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response};
 use Illuminate\Support\Facades\Gate;
+use Mews\Purifier\Facades\Purifier;
 
 class MedicalRecordDocumentationsController extends Controller
 {
@@ -36,10 +37,15 @@ class MedicalRecordDocumentationsController extends Controller
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
         $this->assertContentBelongsToCurrentEntity($content);
 
+        // HTML rico do TinyMCE é renderizado em PDF + views (`{!! $content !!}`).
+        // Sanitizar antes de persistir blinda contra XSS persistente. Profile
+        // `medical` autoriza formatação clínica (listas, tabelas, headings).
+        $sanitized = Purifier::clean($validated['content'], 'medical');
+
         $documentation = $this->service->store(
             $medicalrecord,
             $content,
-            $validated['content'],
+            $sanitized,
             $validated['title'] ?? null,
         );
 

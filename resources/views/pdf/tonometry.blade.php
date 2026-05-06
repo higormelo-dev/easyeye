@@ -80,6 +80,12 @@
 <!-- ─── DADOS DO PACIENTE ─────────────────────────────────────────────────── -->
 <div class="patient-block">
     <strong>{{ __('pdf.patient') }}:</strong> {{ $patient->person->full_name }}
+    @if($patient->person->gender_label)
+     &nbsp;|&nbsp; <strong>{{ __('pdf.gender') }}:</strong> {{ $patient->person->gender_label }}
+    @endif
+    @if($patient->person->age !== null)
+     &nbsp;|&nbsp; <strong>{{ __('pdf.age') }}:</strong> {{ __('pdf.age_years', ['years' => $patient->person->age]) }}
+    @endif
     @if($patient->person->birth_date)
      &nbsp;|&nbsp; <strong>{{ __('pdf.birth') }}:</strong> {{ $patient->person->birth_date->isoFormat('L') }}
     @endif

@@ -6,17 +6,22 @@
 
 @section('content')
 <div class="pmr-screen">
-    <div class="pmr-toolbar mb-2">
-        <a href="{{ route('panel.patients.medicalrecords.index', $patient) }}" class="btn pmr-toolbar-btn">
-            <i class="fas fa-reply me-1"></i>Voltar
-        </a>
-        <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}" class="btn pmr-toolbar-btn pmr-toolbar-btn-new">
-            + Novo
-        </a>
-        <a href="{{ route('panel.patients.medicalrecords.pdf', [$patient, $medicalrecord]) }}"
-           target="_blank" class="btn pmr-toolbar-btn">
-            <i class="fas fa-file-pdf me-1"></i>PDF
-        </a>
+    {{-- ── Subnav (paridade com index/create) ──────────────────────────── --}}
+    <div class="row mb-3 align-items-center">
+        <div class="col-12 col-md-auto">
+            <div class="btn-group" role="group">
+                <a href="{{ route('panel.patients.medicalrecords.index', $patient) }}" class="btn btn-outline-white btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i>{{ __('actions.sidemenu.patients') }}
+                </a>
+                <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>{{ __('actions.new') }}
+                </a>
+                <a href="{{ route('panel.patients.medicalrecords.pdf', [$patient, $medicalrecord]) }}"
+                   target="_blank" class="btn btn-outline-white btn-sm">
+                    <i class="fas fa-file-pdf me-1"></i>PDF
+                </a>
+            </div>
+        </div>
     </div>
 
     <div class="row g-2">

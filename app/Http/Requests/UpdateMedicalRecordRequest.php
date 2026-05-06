@@ -40,6 +40,17 @@ class UpdateMedicalRecordRequest extends FormRequest
             }
         }
 
+        // diagnosis_cids chega serializado como JSON (input hidden do
+        // componente Alpine cid10Search). Decode para array antes da
+        // validação rodar a regra `array`.
+        if ($this->has('diagnosis_cids')) {
+            $cids = $this->input('diagnosis_cids');
+            if (is_string($cids)) {
+                $decoded                   = json_decode($cids, true);
+                $payload['diagnosis_cids'] = is_array($decoded) ? $decoded : [];
+            }
+        }
+
         if ($payload !== []) {
             $this->merge($payload);
         }

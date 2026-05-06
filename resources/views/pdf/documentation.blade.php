@@ -1,3 +1,7 @@
+@php
+    // Service passa $doc; alias mantido para legibilidade do restante do template.
+    $documentation = $doc;
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -85,12 +89,11 @@
 </head>
 <body>
 @php
-    // Variáveis derivadas de $doc p/ uso direto + repasse a partials.
-    $documentation = $doc;
-    $patient       = $doc->patient ?? null;
-    $doctor        = $doc->doctor  ?? null;
-    $entity        = $doc->medicalRecord?->schedule?->entity
-                  ?? \App\Models\Entity::find(session('selected_entity_id'));
+    // $documentation já aliasado no topo do arquivo. Aqui derivamos o resto.
+    $patient = $doc->patient ?? null;
+    $doctor  = $doc->doctor  ?? null;
+    $entity  = $doc->medicalRecord?->schedule?->entity
+            ?? \App\Models\Entity::find(session('selected_entity_id'));
 @endphp
 
 <!-- ─── CABEÇALHO ─────────────────────────────────────────────────────────── -->
@@ -110,14 +113,22 @@
 
 <!-- ─── TÍTULO DO DOCUMENTO ───────────────────────────────────────────────── -->
 <div class="doc-title-wrap">
-    <div class="doc-type-badge">{{ $documentation->getTypeLabel() }}</div><br>
+{{--    <div class="doc-type-badge">{{ $documentation->getTypeLabel() }}</div><br>--}}
     <div class="doc-title">{{ $documentation->title }}</div>
 </div>
 
 <!-- ─── DADOS DO PACIENTE ─────────────────────────────────────────────────── -->
-@if($setting->patient_name)
+{{-- Nome + gênero + idade são sempre exibidos (compliance clínico — paridade
+     entre PDFs do prontuário). Setting `patient_birth/address` controla
+     apenas campos extras opcionais. --}}
 <div class="patient-block">
     <strong>{{ __('pdf.patient') }}:</strong> {{ $patient->person->full_name }}
+    @if($patient->person->gender_label)
+     &nbsp;|&nbsp; <strong>{{ __('pdf.gender') }}:</strong> {{ $patient->person->gender_label }}
+    @endif
+    @if($patient->person->age !== null)
+     &nbsp;|&nbsp; <strong>{{ __('pdf.age') }}:</strong> {{ __('pdf.age_years', ['years' => $patient->person->age]) }}
+    @endif
     @if($setting->patient_birth && $patient->person->birth_date)
      &nbsp;|&nbsp; <strong>{{ __('pdf.birth') }}:</strong> {{ $patient->person->birth_date->isoFormat('L') }}
     @endif
@@ -126,10 +137,9 @@
     @endif
     &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ \Illuminate\Support\Carbon::now()->isoFormat('L') }}
 </div>
-@endif
 
 <!-- ─── CONTEÚDO ───────────────────────────────────────────────────────────── -->
-<div class="content-body">{!! nl2br(e($documentation->content)) !!}</div>
+<div class="content-body">{!! $documentation->content !!}</div>
 
 <!-- ─── ASSINATURA ─────────────────────────────────────────────────────────── -->
 @include('pdf._signature')

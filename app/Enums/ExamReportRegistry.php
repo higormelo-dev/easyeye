@@ -180,4 +180,118 @@ enum ExamReportRegistry: string
     {
         return $this->definition()['auto_populate'];
     }
+
+    /**
+     * Cases que devem aparecer no hub visual "Laudos de Exame" (F4b).
+     *
+     * Tonometry tem botão dedicado (impressão direta no bloco de tonometria);
+     * LensPrescription tem dropdown 4 modos no bloco de receituário óculos.
+     * Demais 15 casos formam o hub principal de laudos.
+     *
+     * @return array<int, self>
+     */
+    public static function examsForHub(): array
+    {
+        return array_values(array_filter(
+            self::cases(),
+            fn (self $case) => ! in_array($case, [self::Tonometry, self::LensPrescription], true),
+        ));
+    }
+
+    /**
+     * Ícone Font Awesome correspondente ao exame, p/ render do hub.
+     */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Ecografia               => 'fa-wave-square',
+            self::MicroscopiaEspecular    => 'fa-microscope',
+            self::Paquimetria             => 'fa-ruler-vertical',
+            self::Retinografia            => 'fa-eye',
+            self::Angiofluoresceinografia => 'fa-vial',
+            self::Oct                     => 'fa-layer-group',
+            self::Schirmer                => 'fa-tint',
+            self::Pentacam                => 'fa-circle-notch',
+            self::StressCurve             => 'fa-chart-line',
+            self::CornealTopography       => 'fa-mountain',
+            self::ComputerCampimetry      => 'fa-bullseye',
+            self::Gonioscopia             => 'fa-search-plus',
+            self::RetinalMapping          => 'fa-map',
+            self::OphthalmologicalReport  => 'fa-file-medical-alt',
+            self::BrancoDeclaration       => 'fa-file-signature',
+            default                       => 'fa-file-medical',
+        };
+    }
+
+    /**
+     * Subtipos clínicos de um exame (F4e).
+     *
+     * Quando um exame tem múltiplas variantes de laudo (ex: Pentacam),
+     * cada subtipo corresponde a um `ReportSettingContent.slug` distinto.
+     * UI exibe dropdown de seleção antes de abrir o editor.
+     *
+     * Exames sem subtipos retornam array vazio → card simples no hub.
+     *
+     * @return array<int, array{slug: string, label: string}>
+     */
+    public function subtypes(): array
+    {
+        return match ($this) {
+            self::Pentacam => [
+                ['slug' => 'padrao', 'label' => 'Padrão'],
+                ['slug' => 'ceratocone_oval', 'label' => 'Ceratocone Oval'],
+                ['slug' => 'ceratocone_bow_tie', 'label' => 'Ceratocone Bow Tie'],
+                ['slug' => 'ceratocone_avancado', 'label' => 'Ceratocone Avançado'],
+                ['slug' => 'laudo_refrativo', 'label' => 'Laudo Refrativo'],
+            ],
+            default => [],
+        };
+    }
+
+    public function hasSubtypes(): bool
+    {
+        return $this->subtypes() !== [];
+    }
+
+    /**
+     * Resolve o slug do `ReportSettingContent` a usar dado um subtipo do payload.
+     *
+     * Regras:
+     *  - Exame sem subtipos: ignora `$subtype`, sempre retorna `slug()` default.
+     *  - Subtipo válido: retorna o slug correspondente.
+     *  - Subtipo inválido/null em exame multi-variante: retorna `slug()` default
+     *    (fallback resiliente; UI sempre força escolha, mas API tolera ausência).
+     */
+    public function resolveSubtypeSlug(?string $subtype): string
+    {
+        if (! $this->hasSubtypes()) {
+            return $this->slug();
+        }
+
+        foreach ($this->subtypes() as $variant) {
+            if ($variant['slug'] === $subtype) {
+                return $variant['slug'];
+            }
+        }
+
+        return $this->slug();
+    }
+
+    /**
+     * Label do subtipo, se válido para o exame; null se não encontrado.
+     */
+    public function subtypeLabel(?string $subtype): ?string
+    {
+        if (! $this->hasSubtypes() || $subtype === null) {
+            return null;
+        }
+
+        foreach ($this->subtypes() as $variant) {
+            if ($variant['slug'] === $subtype) {
+                return $variant['label'];
+            }
+        }
+
+        return null;
+    }
 }

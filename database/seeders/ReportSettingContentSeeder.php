@@ -34,7 +34,12 @@ class ReportSettingContentSeeder extends Seeder
             }
 
             foreach ($entries as $entry) {
-                ReportSettingContent::firstOrCreate(
+                // updateOrCreate p/ que mudanças nos templates globais (ex: F4d)
+                // sejam aplicadas a cada execução do seeder. Customizações por
+                // entidade vivem nas cópias adotadas e NÃO são afetadas — o
+                // backfill (`reports:sync-adopted`) propaga por slug, preservando
+                // overrides locais que tenham slugs próprios.
+                ReportSettingContent::updateOrCreate(
                     [
                         'report_setting_id' => $setting->id,
                         'type'              => $entry['type'],
@@ -77,9 +82,10 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p>OD: Câmara Anterior Grau IV, Ângulo Aberto Grau IV com discreta pigmentação a nível de trabeculado, ausência de Goniosinéquias. Todas as estruturas do Seio Camerular são facilmente identificáveis.</p>'
-                        . '<p>OE: Câmara Anterior Grau IV, Ângulo Aberto Grau IV com discreta pigmentação a nível de trabeculado, ausência de Goniosinéquias. Todas as estruturas do Seio Camerular são facilmente identificáveis.</p>'
-                        . '<p><strong>Conclusão:</strong> ÂNGULO GRAU IV, PORÉM APRESENTA DISCRETOS DEPÓSITOS PIGMENTARES A NÍVEL DO TRABECULADO EM A/O. EXAME DENTRO DA NORMALIDADE.</p>',
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OD:</strong> {{GONIOSCOPIA_OD}}</p>'
+                        . '<p><strong>OE:</strong> {{GONIOSCOPIA_OE}}</p>'
+                        . '<p><strong>Conclusão:</strong> Os achados gonioscópicos descritos acima caracterizam o estado angular de cada olho. Correlacionar com pressão intra-ocular e papila óptica.</p>',
                 ],
             ],
 
@@ -102,7 +108,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>OLHO DIREITO</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<ul>'
                         . '<li>Segmento anterior: Ecos cristalinianos de baixa reflectividade.</li>'
                         . '<li>Vítreo: Câmara vítrea homogênea.</li>'
@@ -127,7 +134,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'completo',
                     'label'      => 'Completo',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>ACUIDADE VISUAL SEM CORREÇÃO</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>ACUIDADE VISUAL SEM CORREÇÃO</strong></p>'
                         . '<ul>'
                         . '<li>Olho Direito: A/V {{AVSC_OD}}</li>'
                         . '<li>Olho Esquerdo: A/V {{AVSC_OE}}</li>'
@@ -164,7 +172,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>OLHO DIREITO</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<p><em>Papila Óptica:</em> Normocorada, bordos nítidos e escavação fisiológica.</p>'
                         . '<p><em>Retina:</em> Morfologia vascular preservada com relação art./veia = 2/3, ausência de fenômenos vaso-espásticos e de fenômenos de cruzamentos patológicos (Gunn e Salus). Não se evidencia microangiopatia diabética. Reflexos maculares preservados. Umbo foveal bem visível. Periferia sem lesões degenerativas.</p>'
                         . '<p><em>Vítreo:</em> Ausência de sinerese. Estrutura fibrilar preservada. Vítreo aderido.</p>'
@@ -182,7 +191,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>MICROSCOPIA ESPECULAR DE CÓRNEA</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>MICROSCOPIA ESPECULAR DE CÓRNEA</strong></p>'
                         . '<p><em>Olho Direito</em></p>'
                         . '<ul>'
                         . '<li>Densidade Endotelial: 5515 céls/mm²</li>'
@@ -207,7 +217,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>PAQUIMETRIA CORNEANA</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>PAQUIMETRIA CORNEANA</strong></p>'
                         . '<p>Medidas medianas:</p>'
                         . '<ul>'
                         . '<li>Olho Direito: {{PAQUIMETRIA_OD}} μm</li>'
@@ -222,7 +233,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p>Exame realizado no campímetro computadorizado OCULUS Twinfield® 2, utilizando programa CLIP 24-2(SF).</p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p>Exame realizado no campímetro computadorizado OCULUS Twinfield® 2, utilizando programa CLIP 24-2(SF).</p>'
                         . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<ul>'
                         . '<li>Índice de confiabilidade: Aceitáveis</li>'
@@ -246,7 +258,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p>Análise da Curva Tensional indica Pressão Ocular Média acima de 18 mmHg, com índice de variação (desvio padrão) superior a 1,5.</p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>Tonometria registrada:</strong> OD {{TONOMETRIA_OD}} mmHg / OE {{TONOMETRIA_OE}} mmHg</p>'
+                        . '<p>Análise da Curva Tensional indica Pressão Ocular Média acima de 18 mmHg, com índice de variação (desvio padrão) superior a 1,5.</p>'
                         . '<p><strong>CONCLUSÃO:</strong> Curva Tensional apresenta parâmetros sugestivos de Glaucoma Crônico de Ângulo Aberto em A/O.</p>',
                 ],
             ],
@@ -257,7 +271,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>OLHO DIREITO</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<p>Meios: Transparentes e normais.</p>'
                         . '<p>Papila Óptica: Escavação, bordos, limites e coloração respeitando os padrões de normalidade. Faixa neural normal.</p>'
                         . '<p>Vasos: Contornos, calibre e trajeto dentro do padrão da normalidade; relação arteriovenosa respeitando padrões da normalidade.</p>'
@@ -280,7 +295,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>OLHO DIREITO</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<p>Meios: Transparentes e normais.</p>'
                         . '<p>Papila Óptica: Escavação, bordos, limites e coloração respeitando os padrões de normalidade. Faixa neural normal.</p>'
                         . '<p>Vasos: Contornos, calibre e trajeto dentro do padrão da normalidade; relação arteriovenosa respeitando padrões da normalidade.</p>'
@@ -318,7 +334,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p><strong>Olho Direito</strong></p>'
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>Olho Direito</strong></p>'
                         . '<ul>'
                         . '<li>Cavidade vítrea: sinal hiper-refletivo junto à superfície retiniana.</li>'
                         . '<li>Interface vítreo-retiniana-macular: superfície normo-reflexiva, sem sinais óbvios de tração vítreo-macular patológica.</li>'
@@ -348,12 +365,50 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '<p>Paciente apresenta intensa sintomatologia inerente ao olho seco para ambos os olhos, porém demais aspectos analisados para os dois olhos apresentam-se dentro dos limites da normalidade.</p>',
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p>Paciente apresenta intensa sintomatologia inerente ao olho seco para ambos os olhos, porém demais aspectos analisados para os dois olhos apresentam-se dentro dos limites da normalidade.</p>',
+                ],
+            ],
+
+            // ── TOPOGRAFIA CORNEANA ──────────────────────────────────────────────
+            'TOPOGRAFIA CORNEANA' => [
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'padrao',
+                    'label'      => 'Padrão',
+                    'sort_order' => 1,
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<ul>'
+                        . '<li>Qualidade do exame: boa.</li>'
+                        . '<li>Padrão topográfico: regular, com astigmatismo simétrico.</li>'
+                        . '<li>Ceratometria simulada: K1 e K2 dentro dos limites da normalidade.</li>'
+                        . '<li>Ausência de sinais de irregularidade ou ectasia corneana.</li>'
+                        . '</ul>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<ul>'
+                        . '<li>Qualidade do exame: boa.</li>'
+                        . '<li>Padrão topográfico: regular, com astigmatismo simétrico.</li>'
+                        . '<li>Ceratometria simulada: K1 e K2 dentro dos limites da normalidade.</li>'
+                        . '<li>Ausência de sinais de irregularidade ou ectasia corneana.</li>'
+                        . '</ul>'
+                        . '<p><strong>CONCLUSÃO:</strong> Topografia corneana dentro dos padrões da normalidade em ambos os olhos.</p>',
                 ],
             ],
 
             // ── PENTACAM ─────────────────────────────────────────────────────────
             'PENTACAM' => [
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'padrao',
+                    'label'      => 'Padrão',
+                    'sort_order' => 0,
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>PENTACAM — Análise Tomográfica da Córnea</strong></p>'
+                        . '<p><em>Olho Direito:</em> Mapas paquimétrico, elevação anterior/posterior, curvatura e Belin-Ambrósio dentro dos padrões da normalidade.</p>'
+                        . '<p><em>Olho Esquerdo:</em> Mapas paquimétrico, elevação anterior/posterior, curvatura e Belin-Ambrósio dentro dos padrões da normalidade.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Exame Pentacam dentro dos padrões da normalidade em ambos os olhos.</p>',
+                ],
                 [
                     'type'       => DocumentationType::Report,
                     'slug'       => 'ceratocone_oval',
@@ -555,7 +610,8 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'declaracao_medica',
                     'label'      => 'Declaração Médica',
                     'sort_order' => 1,
-                    'content'    => '<p>{{CONTEUDO_LIVRE}}</p>',
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p>{{CONTEUDO_LIVRE}}</p>',
                 ],
             ],
 

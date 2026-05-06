@@ -268,49 +268,147 @@
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    width: 64px;
-    min-height: 46px;
+    justify-content: flex-start;
+    /* Largura/altura fixas para uniformidade visual da bottom-bar.
+       min-height absorve diferenças entre labels 1 e 2 linhas, garantindo
+       baseline horizontal alinhado em todos os botões. */
+    width: 72px;
+    min-height: 58px;
     border: 0;
     background: transparent;
     border-radius: .3rem;
-    padding: 2px;
+    padding: 4px 2px;
     cursor: pointer;
     text-decoration: none;
     transition: transform .14s ease;
+    gap: 2px;
 }
 
 .pmr-doc-img-btn:hover {
     transform: translateY(-1px);
 }
 
-.pmr-doc-img-btn img {
-    width: 40px;
-    height: 30px;
+/* Slot do ícone: tamanho fixo para `<img>` E `<i>` (Font Awesome) — força
+   icones SVG e fonte ao mesmo footprint visual. !important sobrepõe estilos
+   inline `font-size:1.6rem` nos botões legados de quick-action. */
+.pmr-doc-img-btn img,
+.pmr-doc-img-btn > i {
+    width: 28px;
+    height: 28px;
+    line-height: 28px !important;
+    font-size: 1.4rem !important;
     object-fit: contain;
-    margin-bottom: 1px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
+/* Label: 2 linhas reservadas (line-height × 2) — botões com 1 linha
+   ("Medicamentos") e 2 linhas ("Atestado<br>Médico") ficam com mesma
+   altura total. white-space:normal default; nowrap só se label muito curto. */
 .pmr-doc-img-btn-label {
-    font-size: .52rem;
-    line-height: 1.02;
+    font-size: .58rem;
+    line-height: 1.1;
+    min-height: calc(.58rem * 1.1 * 2);
     text-align: center;
     color: #64748b;
     font-weight: 600;
-    max-width: 62px;
+    max-width: 70px;
+    word-break: break-word;
+    white-space: normal !important;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .pmr-doc-img-btn.pmr-doc-annexo .pmr-doc-img-btn-label {
     color: #b45309;
 }
 
-.pmr-doc-preview {
+/* Modifier para labels longas em 1 linha (ex: "Documentações"). Mantém
+   altura igual aos outros botões (min-height da base) — só expande largura. */
+.pmr-doc-img-btn.pmr-doc-img-btn-wide {
+    width: 96px;
+}
+
+.pmr-doc-img-btn.pmr-doc-img-btn-wide .pmr-doc-img-btn-label {
+    max-width: 92px;
+    -webkit-line-clamp: 1;
+    min-height: calc(.58rem * 1.1);
+    white-space: nowrap !important;
+}
+
+.pmr-doc-preview,
+.pmr-doc-img-btn:disabled,
+.pmr-doc-img-btn[disabled] {
     opacity: .42;
     pointer-events: none;
     cursor: not-allowed !important;
+}
+
+/* F4b — Hub de Laudos de Exame (cards) */
+.pmr-exam-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: .6rem .4rem;
+    min-height: 88px;
+    background: #fff;
+    border: 1px solid #e3eaf1;
+    border-radius: 10px;
+    color: #495057;
+    font-weight: 500;
+    transition: all .15s;
+}
+.pmr-exam-card:hover {
+    background: #f0f8ff;
+    border-color: #03a9f3;
+    color: #03a9f3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(3, 169, 243, .15);
+}
+.pmr-exam-card-icon {
+    font-size: 1.6rem;
+    color: #03a9f3;
+    margin-bottom: .35rem;
+}
+.pmr-exam-card-label {
+    font-size: .72rem;
+    line-height: 1.15;
+    text-align: center;
+    word-break: break-word;
+}
+/* F4e — card com subtipos: caret inline + visual cue de variantes */
+.pmr-exam-card.pmr-exam-card-multi {
+    position: relative;
+}
+.pmr-exam-card.pmr-exam-card-multi::after {
+    position: absolute;
+    bottom: 4px;
+    right: 6px;
+    font-size: .55rem;
+    color: #03a9f3;
+    opacity: .6;
+}
+.pmr-exam-card.pmr-exam-card-multi.dropdown-toggle::after {
+    margin-left: 0;
+    vertical-align: middle;
+}
+.pmr-exam-subtypes-menu {
+    min-width: 220px;
+    font-size: .82rem;
+}
+:root[data-bs-theme=dark] .pmr-exam-card {
+    background: #1f2933;
+    border-color: #2f3b47;
+    color: #c9d3dd;
+}
+:root[data-bs-theme=dark] .pmr-exam-card:hover {
+    background: #243340;
+    border-color: #03a9f3;
 }
 
 .pmr-save-btn {
@@ -610,16 +708,22 @@
     }
 
     .pmr-doc-img-btn {
-        width: 52px;
+        width: 60px;
+        min-height: 52px;
     }
 
-    .pmr-doc-img-btn img {
-        width: 34px;
-        height: 25px;
+    .pmr-doc-img-btn img,
+    .pmr-doc-img-btn > i {
+        width: 24px;
+        height: 24px;
+        line-height: 24px !important;
+        font-size: 1.2rem !important;
     }
 
     .pmr-doc-img-btn-label {
-        font-size: .48rem;
+        font-size: .54rem;
+        max-width: 58px;
+        min-height: calc(.54rem * 1.1 * 2);
     }
 }
 </style>

@@ -38,7 +38,7 @@ class TemplateVariableResolver
         $variables = $content->activeVariables()->orderBy('sort_order')->get();
 
         // 2. Construir mapa de substituição base (fallback do sistema)
-        $systemReplacements = $this->buildSystemReplacements($patient, $doctor, $entity);
+        $systemReplacements = $this->buildSystemReplacements($patient, $doctor, $entity, $medicalRecord);
 
         // 3. Resolver variáveis da tabela
         $tableReplacements = [];
@@ -97,6 +97,10 @@ class TemplateVariableResolver
             'data' => [
                 ['placeholder' => '{{DATA_ATUAL}}', 'label' => 'Data Atual', 'description' => 'Formato dd/mm/aaaa'],
                 ['placeholder' => '{{DATA_EXTENSO}}', 'label' => 'Data por Extenso', 'description' => 'Ex: segunda-feira, 3 de abril de 2026'],
+                ['placeholder' => '{{DATA_EXAME}}', 'label' => 'Data do Exame', 'description' => 'Data de criação do prontuário'],
+            ],
+            'auxiliares' => [
+                ['placeholder' => '{{CABECALHO_PACIENTE}}', 'label' => 'Cabeçalho do Paciente', 'description' => 'Bloco com nome, idade e data do exame (HTML)'],
             ],
         ];
     }
@@ -116,8 +120,13 @@ class TemplateVariableResolver
             'entity'         => $this->resolveEntity($variable, $entity),
             'date'           => $this->resolveDate($variable),
             'medical_record' => $this->resolveMedicalRecord($variable, $medicalRecord),
-            'custom'         => $variable->default_value ?? '',
-            default          => $variable->default_value,
+            // Custom sem default = placeholder de preenchimento externo
+            // (payload da quick-action). Retorna null p/ não substituir aqui;
+            // o caller (MedicalRecordQuickActionService) injeta o valor real.
+            'custom' => ($variable->default_value === null || $variable->default_value === '')
+                ? null
+                : $variable->default_value,
+            default => $variable->default_value,
         };
     }
 
@@ -202,15 +211,20 @@ class TemplateVariableResolver
      * Variáveis do sistema que estão sempre disponíveis como fallback,
      * mesmo sem entrada na tabela report_setting_variables.
      */
-    private function buildSystemReplacements(Patient $patient, Doctor $doctor, Entity $entity): array
+    private function buildSystemReplacements(Patient $patient, Doctor $doctor, Entity $entity, ?MedicalRecord $medicalRecord = null): array
     {
+        $patientName = $patient->person?->full_name ?? '';
+        $patientAge  = $patient->person?->birth_date
+            ? Carbon::parse($patient->person->birth_date)->age . ' anos'
+            : '';
+        $patientBirth = $patient->person?->birth_date?->format('d/m/Y') ?? '';
+        $examDate     = $medicalRecord?->created_at?->format('d/m/Y') ?? now()->format('d/m/Y');
+
         return [
-            '{{PACIENTE_NOME}}'            => $patient->person?->full_name ?? '',
+            '{{PACIENTE_NOME}}'            => $patientName,
             '{{PACIENTE_CPF}}'             => $patient->person?->cpf ?? '',
-            '{{PACIENTE_DATA_NASCIMENTO}}' => $patient->person?->birth_date?->format('d/m/Y') ?? '',
-            '{{PACIENTE_IDADE}}'           => $patient->person?->birth_date
-                ? Carbon::parse($patient->person->birth_date)->age . ' anos'
-                : '',
+            '{{PACIENTE_DATA_NASCIMENTO}}' => $patientBirth,
+            '{{PACIENTE_IDADE}}'           => $patientAge,
             '{{MEDICO_NOME}}'              => $doctor->person?->full_name ?? '',
             '{{MEDICO_CRM}}'               => $doctor->record ?? '',
             '{{MEDICO_CRM_ESPECIALIDADE}}' => $doctor->record_specialty ?? '',
@@ -219,6 +233,12 @@ class TemplateVariableResolver
             '{{CLINICA_TELEFONE}}'         => $entity->phone ?? '',
             '{{DATA_ATUAL}}'               => now()->format('d/m/Y'),
             '{{DATA_EXTENSO}}'             => now()->isoFormat('dddd, D [de] MMMM [de] YYYY'),
+            '{{DATA_EXAME}}'               => $examDate,
+            // {{CABECALHO_PACIENTE}} resolvido como vazio: o PDF blade
+            // renderiza patient-block próprio via $setting->patient_name,
+            // tornando o placeholder redundante (causava duplicação no PDF
+            // e poluição no editor TinyMCE com Paciente/Idade/Data).
+            '{{CABECALHO_PACIENTE}}'       => '',
         ];
     }
 }

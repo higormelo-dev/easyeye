@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, DataAccessPurpose};
+use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry};
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
@@ -110,9 +110,15 @@ class MedicalRecordsController extends Controller
     {
         $validated = $request->validated();
 
-        $this->service->store($validated, $patient);
+        $record = $this->service->store($validated, $patient);
 
-        return $this->redirectAfterSave($patient, $validated, __('actions.medical_records.saved'));
+        return $this->redirectAfterSave(
+            $patient,
+            $validated,
+            __('actions.medical_records.saved'),
+            $record,
+            $request->input('_post_save_action'),
+        );
     }
 
     /**
@@ -129,10 +135,13 @@ class MedicalRecordsController extends Controller
             'nearPointConvergence',
             'coverTestType',
             'colorVisionType',
-            'visualAcuityWithoutCorrectionRight',
-            'visualAcuityWithoutCorrectionLeft',
-            'visualAcuityWithCorrectionRight',
-            'visualAcuityWithCorrectionLeft',
+            // NOTA: relations do model nomeadas `visualAcuityTypeWith*` /
+            // `WitCorrection` (typo legado preservado por compat — não
+            // renomear sem migration). Eager-load usa nomes EXATOS do model.
+            'visualAcuityTypeWithoutCorrectionRight',
+            'visualAcuityTypeWithoutCorrectionLeft',
+            'visualAcuityTypeWitCorrectionRight',
+            'visualAcuityTypeWitCorrectionLeft',
             'additionType',
             'lensAway',
             'lensNear',
@@ -170,10 +179,10 @@ class MedicalRecordsController extends Controller
             'gonioscopy_right'       => $medicalrecord->gonioscopy_right,
             'gonioscopy_left'        => $medicalrecord->gonioscopy_left,
             // Refração
-            'visual_acuity_without_correction_right' => $medicalrecord->visualAcuityWithoutCorrectionRight?->name,
-            'visual_acuity_without_correction_left'  => $medicalrecord->visualAcuityWithoutCorrectionLeft?->name,
-            'visual_acuity_with_correction_right'    => $medicalrecord->visualAcuityWithCorrectionRight?->name,
-            'visual_acuity_with_correction_left'     => $medicalrecord->visualAcuityWithCorrectionLeft?->name,
+            'visual_acuity_without_correction_right' => $medicalrecord->visualAcuityTypeWithoutCorrectionRight?->name,
+            'visual_acuity_without_correction_left'  => $medicalrecord->visualAcuityTypeWithoutCorrectionLeft?->name,
+            'visual_acuity_with_correction_right'    => $medicalrecord->visualAcuityTypeWitCorrectionRight?->name,
+            'visual_acuity_with_correction_left'     => $medicalrecord->visualAcuityTypeWitCorrectionLeft?->name,
             'dynamic_spherical_right'                => $medicalrecord->dynamic_spherical_right,
             'dynamic_spherical_left'                 => $medicalrecord->dynamic_spherical_left,
             'dynamic_cylindrical_right'              => $medicalrecord->dynamic_cylindrical_right,
@@ -219,6 +228,21 @@ class MedicalRecordsController extends Controller
             'edit_url'      => route('panel.patients.medicalrecords.edit', [$patient, $medicalrecord]),
             'pdf_url'       => route('panel.patients.medicalrecords.pdf', [$patient, $medicalrecord]),
             'templates_url' => route('panel.patients.medicalrecords.templates', [$patient, $medicalrecord]),
+            // Labels i18n consumidos pelo `buildDetailHtml` no offcanvas.
+            'labels'        => [
+                'yes'           => __('actions.medical_records.yes'),
+                'no'            => __('actions.medical_records.no'),
+                'not_informed'  => __('actions.medical_records.not_informed'),
+                'complaint'     => __('actions.medical_records.complaint'),
+                'history'       => __('actions.medical_records.history'),
+                'diabetic'      => __('actions.medical_records.diabetic'),
+                'hypertensive'  => __('actions.medical_records.hypertensive'),
+                'glaucomatous'  => __('actions.medical_records.glaucomatous'),
+                'family'        => __('actions.medical_records.family'),
+                'tonometry'     => __('actions.medical_records.tonometry'),
+                'general_obs'   => __('actions.medical_records.general_obs'),
+                'lenses_obs'    => __('actions.medical_records.lenses_obs'),
+            ],
         ]);
     }
 
@@ -392,7 +416,13 @@ class MedicalRecordsController extends Controller
 
         $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $medicalrecord);
 
-        return response()->json(['content' => $resolved['html'], 'unresolved' => $resolved['unresolved']]);
+        // Strip placeholders restantes ({{CONTEUDO_LIVRE}}, {{LISTA_MEDICAMENTOS}}, etc.)
+        // que não são resolvidos pelo TemplateVariableResolver (são preenchidos
+        // dinamicamente via quick-actions). Em fluxo livre via select, médico
+        // edita manualmente — placeholder literal só polui o textarea.
+        $html = preg_replace('/\{\{[A-Z_][A-Z0-9_]*\}\}/u', '', $resolved['html']) ?? $resolved['html'];
+
+        return response()->json(['content' => $html, 'unresolved' => $resolved['unresolved']]);
     }
 
     /**
@@ -425,6 +455,15 @@ class MedicalRecordsController extends Controller
             'lenses'             => Lense::orderBy('name')->get(),
             'documentationTypes' => $this->documentationService->getTypes(),
             'availableTemplates' => $this->documentationService->getActiveTemplates($entityId),
+            'examReports'        => array_map(
+                fn (ExamReportRegistry $exam) => [
+                    'value'    => $exam->value,
+                    'label'    => $exam->label(),
+                    'icon'     => $exam->icon(),
+                    'subtypes' => $exam->subtypes(),
+                ],
+                ExamReportRegistry::examsForHub(),
+            ),
         ];
 
         $meta = [
@@ -447,20 +486,64 @@ class MedicalRecordsController extends Controller
     }
 
     /**
-     * Redireciona para a agenda quando o prontuário foi originado de um agendamento;
-     * caso contrário, segue para a listagem padrão de prontuários do paciente.
+     * Redireciona após save:
+     *   - Se schedule_id presente, volta à agenda.
+     *   - Se record recém-criado E user clicou ação documental no CREATE
+     *     (`_post_save_action`), redireciona para edit já com a ação no query
+     *     string — Alpine boota o modal correspondente automaticamente.
+     *   - Caso contrário, listagem padrão.
+     *
+     * Ações permitidas no allowlist espelham os botões da view CREATE; valores
+     * fora dele são silenciosamente ignorados (defesa contra request forjado).
      */
-    private function redirectAfterSave(Patient $patient, array $validated, string $message): RedirectResponse
-    {
+    private function redirectAfterSave(
+        Patient $patient,
+        array $validated,
+        string $message,
+        ?MedicalRecord $record = null,
+        ?string $postSaveAction = null,
+    ): RedirectResponse {
         if (! empty($validated['schedule_id'])) {
             return redirect()
                 ->route('panel.schedules.index')
                 ->with('message', $message);
         }
 
+        if ($record && $record->wasRecentlyCreated) {
+            $params = [$patient, $record];
+            $action = $this->normalizePostSaveAction($postSaveAction);
+
+            if ($action !== null) {
+                $params['action'] = $action;
+            }
+
+            return redirect()
+                ->route('panel.patients.medicalrecords.edit', $params)
+                ->with('message', $message);
+        }
+
         return redirect()
             ->route('panel.patients.medicalrecords.index', $patient)
             ->with('message', $message);
+    }
+
+    private function normalizePostSaveAction(?string $action): ?string
+    {
+        if ($action === null || $action === '') {
+            return null;
+        }
+
+        $allowed = [
+            'prescription',
+            'procedure',
+            'certificate',
+            'referral',
+            'report',
+            'exam-hub',
+            'annexo',
+        ];
+
+        return in_array($action, $allowed, true) ? $action : null;
     }
 
     private function assertTemplateBelongsToCurrentEntity(ReportSettingContent $content): void

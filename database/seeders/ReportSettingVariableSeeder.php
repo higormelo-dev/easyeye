@@ -142,6 +142,28 @@ class ReportSettingVariableSeeder extends Seeder
                 ],
             ],
 
+            // ── LAUDO DE GONIOSCOPIA ─────────────────────────────────────────
+            'LAUDO DE GONIOSCOPIA' => [
+                'padrao' => [
+                    ['placeholder' => '{{GONIOSCOPIA_OD}}', 'source_type' => 'medical_record', 'source_field' => 'gonioscopy_right'],
+                    ['placeholder' => '{{GONIOSCOPIA_OE}}', 'source_type' => 'medical_record', 'source_field' => 'gonioscopy_left'],
+                ],
+            ],
+
+            // ── CURVA TENSIONAL DIÁRIA ───────────────────────────────────────
+            'CURVA TENSIONAL DIÁRIA' => [
+                'padrao' => [
+                    ['placeholder' => '{{TONOMETRIA_OD}}', 'source_type' => 'medical_record', 'source_field' => 'tonometer_right'],
+                    ['placeholder' => '{{TONOMETRIA_OE}}', 'source_type' => 'medical_record', 'source_field' => 'tonometer_left'],
+                ],
+            ],
+
+            // ── MAPEAMENTO DE RETINA ─────────────────────────────────────────
+            // (sem variáveis específicas no template padrão; Texto livre.)
+
+            // ── TOPOGRAFIA CORNEANA ──────────────────────────────────────────
+            // (sem variáveis específicas no template padrão; Texto livre.)
+
             // ── LAUDO OFTALMOLÓGICO ──────────────────────────────────────────
             'LAUDO OFTALMOLÓGICO' => [
                 'completo' => array_merge(
