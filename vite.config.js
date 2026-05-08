@@ -3,6 +3,16 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 
 export default defineConfig({
+    server: {
+        // Escuta em todas as interfaces dentro do container Docker
+        host: '0.0.0.0',
+        port: 5173,
+        hmr: {
+            // Host que o BROWSER usa para conectar ao HMR (porta mapeada no host)
+            host: 'localhost',
+            port: 5173,
+        },
+    },
     plugins: [
         laravel({
             input: [

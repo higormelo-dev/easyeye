@@ -73,7 +73,8 @@ return [
     |
     */
 
-    'connection' => env('SESSION_CONNECTION'),
+    // 'connection' => env('SESSION_CONNECTION'),
+    'connection' => env('REDIS_SESSION_CONNECTION', 'session'),
 
     /*
     |--------------------------------------------------------------------------
