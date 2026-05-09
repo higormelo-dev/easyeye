@@ -12,7 +12,7 @@
         $hasFlags = $record->diabetic || $record->hypertensive || $record->glaucomatous;
     @endphp
 
-    <li class="{{ $inverted ? 'timeline-inverted' : '' }}">
+    <li class="{{ $inverted ? 'timeline-inverted' : '' }}" data-record-id="{{ $record->id }}">
 
         <div class="timeline-badge" style="background-color: {{ $doctorColor }};">
             <img src="{{ $photoUrl }}"

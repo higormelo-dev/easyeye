@@ -11,7 +11,7 @@
         <div class="col-12 col-md-auto">
             <div class="btn-group" role="group">
                 <a href="{{ route('panel.patients.medicalrecords.index', $patient) }}" class="btn btn-outline-white btn-sm">
-                    <i class="fas fa-arrow-left me-1"></i>{{ __('actions.sidemenu.patients') }}
+                    <i class="fas fa-arrow-left me-1"></i>{{ __('actions.sidemenu.medical_records') }}
                 </a>
                 <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus me-1"></i>{{ __('actions.new') }}
@@ -32,7 +32,7 @@
         </div>
 
         <div class="col-12 col-lg-9 col-xl-10">
-            <div class="card pmr-content-card overflow-hidden">
+            <div class="card pmr-content-card overflow-hidden bg-white">
                 <div class="d-flex align-items-center justify-content-between px-3 py-1 pmr-record-strip">
                     <span>
                         <i class="fas fa-file-medical-alt me-1"></i>{{ $medicalrecord->code }}

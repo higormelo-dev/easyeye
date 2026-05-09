@@ -56,6 +56,18 @@
           @else
           storeTonometryUrl: '',
           @endif
+          i18n: @js([
+              'complaint_required_title'  => __('actions.medical_records.complaint_required_title'),
+              'complaint_required_text'   => __('actions.medical_records.complaint_required_text'),
+              'doctor_required_title'     => __('actions.medical_records.doctor_required_title'),
+              'doctor_required_for_print' => __('actions.medical_records.doctor_required_for_print'),
+              'doctor_required_for_issue' => __('actions.medical_records.doctor_required_for_issue'),
+              'field_doctor'              => __('actions.medical_records.field_doctor'),
+              'field_complaint'           => __('actions.medical_records.field_complaint'),
+              'field_pachymetry_od'       => __('actions.medical_records.field_pachymetry_od'),
+              'field_pachymetry_oe'       => __('actions.medical_records.field_pachymetry_oe'),
+              'field_follow_up'           => __('actions.medical_records.field_follow_up'),
+          ]),
       })">
     @csrf
     @if($isEdit) @method('PUT') @endif
@@ -90,6 +102,22 @@
                 @endforeach
             </ul>
         </div>
+    @endif
+
+    {{-- Banner informativo: visível apenas no CREATE, some após o primeiro save.
+         Placeholders :complaint e :save_action são escapados individualmente
+         antes de receber o <strong> — nunca HTML em string de tradução. --}}
+    @if(! $isEdit)
+    @php
+        $createInfoHtml = __('messages.medical_records.create_info', [
+            'complaint'   => '<strong>' . e(__('actions.medical_records.complaint'))         . '</strong>',
+            'save_action' => '<strong>' . e(__('messages.medical_records.save_action')) . '</strong>',
+        ]);
+    @endphp
+    <div class="alert alert-info d-flex align-items-start gap-2 m-3 mb-0" role="alert">
+        <i class="fas fa-info-circle mt-1 flex-shrink-0"></i>
+        <span class="small">{!! $createInfoHtml !!}</span>
+    </div>
     @endif
 
     {{-- schedule_id: preserva vínculo com a agenda quando o prontuário é
@@ -131,7 +159,7 @@
     @endif
 
     {{-- Queixa principal (col-8) + Flags (col-4) na mesma linha --}}
-    <div class="pmr-section pmr-top-strip px-3 pt-2 pb-0">
+    <div class="pmr-section pmr-top-strip px-3 pt-2 pb-0 bg-white">
         {{-- Queixa principal + Switches --}}
         <div class="row g-2 align-items-start">
             <div class="col-12 col-lg-8">
@@ -142,6 +170,7 @@
             </div>
             {{-- Switches: Diabético / Hipertenso / Glaucomatoso --}}
             <div class="col-12 col-lg-4 pmr-risk-wrap">
+                <label class="pmr-label">{{ __('actions.medical_records.clinical_history') }}</label>
                 <div class="row g-1 pmr-risk-grid">
                     @foreach(['diabetic', 'hypertensive'] as $flag)
                     <div class="col-4 pmr-risk-item">
@@ -536,7 +565,7 @@
                         <input type="number" step="0.25" x-model.number="presbyopiaAddition"
                                class="form-control form-control-sm" placeholder="Add." title="{{ __('actions.medical_records.presbyopia_addition') }}">
                         <button type="button" class="btn btn-outline-secondary btn-sm"
-                                @click="calcPresbyopia()"
+                                @click="openPresbyopiaCalc()"
                                 title="{{ __('actions.medical_records.calc') }}">
                             <i class="fas fa-pencil-alt"></i>
                         </button>
@@ -796,147 +825,131 @@
          smart_oftal preservada, sem duplicação visual.
          ═══════════════════════════════════════════════════════════════════ --}}
     @php
-        // Todos os doc-types já são cobertos por quick-actions estruturadas
-        // (Medicamentos/Pterígio/Catarata/Atestados/Laudo) ou pelo Hub de
-        // Laudos de Exame. Loop de doc-types removido — barra inferior
-        // mantém apenas Hub + Anexo + Salvar.
+        // Separa "pode ver" de "pode usar":
+        // - $canSeeQuickActions: usuário tem permissão IssueReport — botões visíveis
+        // - $isEdit: prontuário já existe — botões ativos (clicáveis)
+        // No CREATE todos os botões aparecem desativados para sinalizar o que está disponível.
         $selectedEntityForQuickActions = \App\Models\Entity::find(session('selected_entity_id'));
-        $canQuickAction = $isEdit
-            && $selectedEntityForQuickActions
+        $canSeeQuickActions = $selectedEntityForQuickActions
             && auth()->user()?->can(\App\Enums\EntityGate::IssueReport->value, $selectedEntityForQuickActions);
+        $saveFirstTitle = __('actions.medical_records.save_first');
     @endphp
 
     <div class="pmr-bottom-bar px-3 py-2">
         <div class="d-flex flex-wrap gap-1 align-items-center">
-            {{-- ── Quick-actions estruturadas (paridade smart_oftal) ────────
-                 Só aparecem em EDIT com permissão IssueReport — exigem record
-                 persistido (FK quick_action.medical_record_id). ─────────── --}}
-            @if($canQuickAction)
+            {{-- ── Quick-actions (Medicamentos, Procedimentos, Pterígio…) ──────
+                 Visíveis a quem tem IssueReport; desativados em CREATE porque
+                 a FK medical_record_id ainda não existe. ──────────────────── --}}
+            @if($canSeeQuickActions)
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Receituário de Medicamentos"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Receituário de Medicamentos' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="openMedicationPrescription()">
                     <i class="fas fa-pills" style="font-size:1.6rem;color:#9c27b0;"></i>
                     <span class="pmr-doc-img-btn-label">Medicamentos</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Solicitação de Procedimentos"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Solicitação de Procedimentos' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="openProcedureSolicitation()">
                     <i class="fas fa-clipboard-list" style="font-size:1.6rem;color:#3f51b5;"></i>
                     <span class="pmr-doc-img-btn-label">Procedimentos</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Receituário de Pterígio"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Receituário de Pterígio' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="issueQuickAction('pterygium-prescription')">
                     <i class="fas fa-eye-low-vision" style="font-size:1.6rem;color:#ff5722;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Receituário<br>Pterígio</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Receituário de Catarata"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Receituário de Catarata' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="openCataractPrescription()">
                     <i class="fas fa-eye" style="font-size:1.6rem;color:#00bcd4;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Receituário<br>Catarata</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Teste do Olhinho"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Teste do Olhinho' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="issueQuickAction('test-eye')">
                     <i class="fas fa-baby" style="font-size:1.6rem;color:#e91e63;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Teste do<br>Olhinho</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Mapeamento de Retina"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Mapeamento de Retina' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="issueQuickAction('retinal-mapping')">
                     <i class="fas fa-bullseye" style="font-size:1.6rem;color:#673ab7;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Mapeamento<br>de Retina</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Atestado de Comparecimento"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Atestado de Comparecimento' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="openAttendanceCertificate()">
                     <i class="fas fa-user-check" style="font-size:1.6rem;color:#4caf50;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Atestado<br>Comparecim.</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Atestado Médico"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Atestado Médico' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="openMedicalCertificate()">
                     <i class="fas fa-stethoscope" style="font-size:1.6rem;color:#2196f3;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Atestado<br>Médico</span>
                 </button>
                 <button type="button" class="btn pmr-doc-img-btn"
-                        title="Laudo Oftalmológico"
-                        :disabled="quickActionBusy"
+                        title="{{ $isEdit ? 'Laudo Oftalmológico' : $saveFirstTitle }}"
+                        :disabled="!isEdit || quickActionBusy"
                         @click="issueQuickAction('ophthalmological-report')">
                     <i class="fas fa-vial-circle-check" style="font-size:1.6rem;color:#795548;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudo<br>Oftalmológ.</span>
                 </button>
-                {{-- Botão "Declaração Médica" removido — duplicava o card
-                     "Declaração em Branco" do Hub de Laudos de Exame
-                     (mesmo template `declaracao_medica`). Hub flow é canônico:
-                     usuário revisa no editor TinyMCE antes de salvar. --}}
             @endif
 
-            {{-- Hub + Anexo: presentes em ambos os modos (CREATE + EDIT). --}}
+            {{-- Hub de Laudos, Documentações e Anexo: sempre visíveis.
+                 Desativados em CREATE — prontuário não existe ainda. --}}
+            @if(! empty($examReports))
+            <button type="button" class="btn pmr-doc-img-btn"
+                    title="{{ $isEdit ? __('actions.medical_records.exam_hub_title') : $saveFirstTitle }}"
+                    :disabled="!isEdit"
+                    data-bs-toggle="modal" data-bs-target="#examHubModal">
+                <i class="fas fa-microscope" style="font-size:1.6rem;color:#03a9f3;"></i>
+                <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
+            </button>
+            @endif
+
+            <button type="button" class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
+                    title="{{ $isEdit ? __('actions.medical_records.documentations') : $saveFirstTitle }}"
+                    :disabled="!isEdit"
+                    data-bs-toggle="modal" data-bs-target="#documentationsModal">
+                <i class="fas fa-folder-open" style="font-size:1.6rem;color:#0288d1;"></i>
+                <span class="pmr-doc-img-btn-label">{{ __('actions.medical_records.documentations') }}</span>
+            </button>
+
+            {{-- Anexo: <label> funcional em EDIT; visual desativado em CREATE
+                 (<label disabled> não existe em HTML — usa classe Bootstrap). --}}
             @if($isEdit)
-                {{-- F4b: Hub visual de Laudos de Exame (15 cases do ExamReportRegistry) --}}
-                @if(! empty($examReports))
-                <button type="button" class="btn pmr-doc-img-btn" title="Laudos de Exame"
-                        data-bs-toggle="modal" data-bs-target="#examHubModal">
-                    <i class="fas fa-microscope" style="font-size:1.6rem;color:#03a9f3;"></i>
-                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
-                </button>
-                @endif
-
-                {{-- Lista de docs já emitidas (modal sob demanda).
-                     Modifier `.pmr-doc-img-btn-wide` expande width para
-                     comportar "Documentações" em linha única, sem split. --}}
-                <button type="button" class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
-                        title="{{ __('actions.medical_records.documentations') }}"
-                        data-bs-toggle="modal" data-bs-target="#documentationsModal">
-                    <i class="fas fa-folder-open" style="font-size:1.6rem;color:#0288d1;"></i>
-                    <span class="pmr-doc-img-btn-label">Documentações</span>
-                </button>
-
-                <label class="btn pmr-doc-img-btn pmr-doc-annexo" title="{{ __('actions.medical_records.upload_files') }}">
-                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
-                    <span class="pmr-doc-img-btn-label">Anexo</span>
-                    <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
-                           class="d-none" @change="uploadFiles($event.target.files)">
-                </label>
-
-                {{-- Progress só existe no DOM durante upload ativo. `<template x-if>`
-                     remove o nó completamente quando uploading=false (vs x-show
-                     que apenas oculta com display:none, mantendo o layout slot). --}}
-                <template x-if="uploading">
-                    <div class="d-flex align-items-center gap-1" style="min-width:80px;">
-                        <div class="progress flex-grow-1" style="height:4px;">
-                            <div class="progress-bar bg-info" :style="`width:${uploadProgress}%`"></div>
-                        </div>
-                        <small class="text-muted" x-text="`${uploadProgress}%`"></small>
+            <label class="btn pmr-doc-img-btn pmr-doc-annexo"
+                   title="{{ __('actions.medical_records.upload_files') }}">
+                <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                <span class="pmr-doc-img-btn-label">Anexo</span>
+                <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
+                       class="d-none" @change="uploadFiles($event.target.files)">
+            </label>
+            <template x-if="uploading">
+                <div class="d-flex align-items-center gap-1" style="min-width:80px;">
+                    <div class="progress flex-grow-1" style="height:4px;">
+                        <div class="progress-bar bg-info" :style="`width:${uploadProgress}%`"></div>
                     </div>
-                </template>
+                    <small class="text-muted" x-text="`${uploadProgress}%`"></small>
+                </div>
+            </template>
             @else
-                {{-- CREATE: Hub + Anexo via submitWithAction (save + open). --}}
-                @if(! empty($examReports))
-                <button type="button" class="btn pmr-doc-img-btn"
-                        title="Laudos de Exame — {{ __('actions.medical_records.save_first_then_action') }}"
-                        @click="submitWithAction('exam-hub')">
-                    <i class="fas fa-microscope" style="font-size:1.6rem;color:#03a9f3;"></i>
-                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
-                </button>
-                @endif
-
-                <button type="button" class="btn pmr-doc-img-btn pmr-doc-annexo"
-                        title="Anexo — {{ __('actions.medical_records.save_first_then_action') }}"
-                        @click="submitWithAction('annexo')">
-                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
-                    <span class="pmr-doc-img-btn-label">Anexo</span>
-                </button>
+            <span class="btn pmr-doc-img-btn disabled" aria-disabled="true"
+                  title="{{ $saveFirstTitle }}">
+                <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                <span class="pmr-doc-img-btn-label">Anexo</span>
+            </span>
             @endif
 
             {{-- Salvar — empurrado para a direita via ms-auto. --}}
@@ -1609,9 +1622,7 @@
             </div>
         </div>
     </div>
-    @endif
 
-    @if($isEdit && ! empty($examReports))
     <div class="modal fade" id="examHubModal" tabindex="-1" aria-labelledby="examHubModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
@@ -1694,6 +1705,45 @@
                     <iframe x-bind:src="tonometryPdfSrc"
                             style="width:100%;height:100%;border:none;display:block;"
                             title="Laudo de Tonômetria"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════════════════════
+         MODAL: Calcular Presbiopia — coleta observação de lentes antes do
+         cálculo. Disponível em CREATE e EDIT.
+         ═══════════════════════════════════════════════════════════════════════ --}}
+    <div class="modal fade" id="presbyopiaObsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title">
+                        <i class="fas fa-glasses me-2" style="color:#00bcd4;"></i>
+                        {{ __('actions.medical_records.presbyopia_obs_title') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('actions.medical_records.close') }}"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="pmr-label mb-1">{{ __('actions.medical_records.presbyopia_obs_label') }}</label>
+                    <textarea class="form-control form-control-sm"
+                              rows="4"
+                              maxlength="5000"
+                              placeholder="{{ __('actions.medical_records.presbyopia_obs_ph') }}"
+                              x-model="presbyopiaObsForm.content"></textarea>
+                    <small class="text-muted d-block mt-1">
+                        <span x-text="(presbyopiaObsForm.content || '').length"></span>/5000
+                    </small>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
+                        {{ __('actions.medical_records.cancel') }}
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm"
+                            @click="confirmPresbyopiaCalc()">
+                        <i class="fas fa-pencil-alt me-1"></i>
+                        {{ __('actions.medical_records.presbyopia_obs_confirm') }}
+                    </button>
                 </div>
             </div>
         </div>

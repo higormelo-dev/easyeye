@@ -4,6 +4,21 @@ Guia completo de configuração e operação do ambiente Docker do EasyEye.
 
 ---
 
+## O que é automático
+
+Ao executar `docker compose up -d`, os containers cuidam de tudo sozinhos:
+
+| Passo | Quem faz | Quando |
+|---|---|---|
+| `composer install` | `entrypoint.sh` (app) | `vendor/` ausente ou `composer.lock` atualizado |
+| `php artisan key:generate` | `entrypoint.sh` (app) | `APP_KEY` vazia no `.env` |
+| `php artisan migrate --force` | `entrypoint.sh` (app) | a cada inicialização do container `app` |
+| `npm install && npm run dev` | serviço `node` | a cada inicialização do container `node` |
+
+> **Seeds não rodam automaticamente** — execute uma vez manualmente após o primeiro `up` (veja o passo a passo abaixo).
+
+---
+
 ## Arquitetura
 
 ```
@@ -12,10 +27,13 @@ Browser
   ├── :8085 ──► nginx:1.27-alpine ──► easyeye_app (php-fpm:9000)
   │                                         │
   │                                    entrypoint.sh
-  │                                    composer install (se necessário)
-  │                                    php-fpm
+  │                                    ├── composer install (se necessário)
+  │                                    ├── key:generate   (se APP_KEY vazia)
+  │                                    ├── migrate --force
+  │                                    └── php-fpm
   │
   ├── :5173 ──► easyeye_node (Vite dev server + HMR)
+  │              └── npm install + npm run dev (automático)
   │
   └── [host Ubuntu]
         ├── PostgreSQL :5432  (acessado via host.docker.internal)
@@ -39,7 +57,7 @@ easyeye/
     ├── php/
     │   ├── custom.ini                  # Limites PHP (upload, memória, timezone)
     │   ├── opcache.ini                 # OPcache para performance
-    │   └── entrypoint.sh              # Script de inicialização do container
+    │   └── entrypoint.sh              # composer install + key:generate + migrate
     └── supervisor/
         ├── supervisord.conf            # Configuração base do Supervisor
         └── easyeye-worker.conf         # Definição dos processos de fila
@@ -52,7 +70,6 @@ easyeye/
 ### 1. Docker e Docker Compose
 
 ```bash
-# Verificar instalação
 docker --version          # >= 24.x
 docker compose version    # >= 2.x
 ```
@@ -66,14 +83,13 @@ O PostgreSQL roda no Ubuntu host, **não** em container.
 pg_lsclusters
 
 # Verificar se aceita conexões externas (deve retornar listen_addresses = '*')
-sudo grep "listen_addresses" /etc/postgresql/18/main/postgresql.conf
+sudo grep "listen_addresses" /etc/postgresql/*/main/postgresql.conf
 ```
 
 Se `listen_addresses` não for `'*'`, edite e reinicie:
 
 ```bash
-sudo nano /etc/postgresql/18/main/postgresql.conf
-# Altere para:
+sudo nano /etc/postgresql/*/main/postgresql.conf
 # listen_addresses = '*'
 
 sudo systemctl reload postgresql
@@ -82,14 +98,14 @@ sudo systemctl reload postgresql
 Adicione permissão para a rede Docker no `pg_hba.conf`:
 
 ```bash
-sudo nano /etc/postgresql/18/main/pg_hba.conf
+sudo nano /etc/postgresql/*/main/pg_hba.conf
 # Adicione ao final:
 # host    all    all    172.0.0.0/8    scram-sha-256
 
 sudo systemctl reload postgresql
 ```
 
-Crie o banco de dados:
+Crie o banco e o usuário:
 
 ```bash
 sudo -u postgres psql -c "CREATE DATABASE easyeye;"
@@ -107,15 +123,14 @@ systemctl is-active redis-server
 
 # Verificar se aceita conexões além de localhost
 redis-cli config get bind
-# Resultado esperado: bind  127.0.0.1 172.17.0.1
+# Esperado: bind  127.0.0.1 172.17.0.1
 ```
 
 Se retornar apenas `127.0.0.1`, configure:
 
 ```bash
 sudo nano /etc/redis/redis.conf
-# Altere: bind 127.0.0.1
-# Para:   bind 127.0.0.1 172.17.0.1
+# bind 127.0.0.1 172.17.0.1
 
 sudo systemctl restart redis-server
 ```
@@ -135,9 +150,10 @@ cp .env.example .env
 Edite as variáveis obrigatórias:
 
 ```env
-APP_KEY=          # gerado no passo 3
-DB_PASSWORD=      # senha do PostgreSQL
+DB_PASSWORD=sua_senha_postgres
 ```
+
+> `APP_KEY` pode ficar vazia — o `entrypoint.sh` gera automaticamente no primeiro `up`.
 
 Configurações Docker já pré-configuradas no `.env.example`:
 
@@ -146,13 +162,13 @@ Configurações Docker já pré-configuradas no `.env.example`:
 DB_HOST=host.docker.internal
 REDIS_HOST=host.docker.internal
 
-# Drivers otimizados para Redis
+# Drivers
 SESSION_DRIVER=redis
 QUEUE_CONNECTION=redis
 CACHE_STORE=redis
 
 # Separação de databases Redis
-REDIS_DB=0          # default / filas
+REDIS_DB=0          # filas
 REDIS_CACHE_DB=1    # cache
 REDIS_SESSION_DB=3  # sessões
 
@@ -176,32 +192,33 @@ docker compose build
 docker compose up -d
 ```
 
-O `entrypoint.sh` do container `app` roda `composer install` automaticamente
-se `vendor/` não existir ou se `composer.lock` for mais recente que `vendor/`.
+O `entrypoint.sh` executa automaticamente, nesta ordem:
+1. `composer install` (se necessário)
+2. `php artisan key:generate` (se `APP_KEY` estiver vazia)
+3. `php artisan migrate --force`
 
-### 4. Gerar a APP_KEY
+O serviço `node` executa `npm install && npm run dev` automaticamente.
 
-```bash
-docker compose run --rm artisan key:generate
-```
-
-### 5. Rodar as migrations e seeds
-
-As migrations **devem ser executadas antes** dos seeds — os seeds dependem
-das tabelas criadas pelas migrations.
+Acompanhe a inicialização:
 
 ```bash
-# Migrations + seeds em um único comando (recomendado)
-docker compose run --rm artisan migrate --seed
-
-# Ou separado, nesta ordem obrigatória:
-docker compose run --rm artisan migrate
-docker compose run --rm artisan db:seed
+docker compose logs -f app
 ```
 
-> Rodar `db:seed` sem `migrate` causa erro `relation "tabela" does not exist`.
+Aguarde a linha `[entrypoint] Executando migrations...` e a conclusão das migrations antes de acessar a aplicação.
 
-### 6. Verificar os serviços
+### 4. Seeds (opcional — apenas na primeira vez)
+
+Os seeds populam tabelas de referência (especialidades, CIDs, planos, etc.).
+Execute **uma única vez** após o primeiro `up`:
+
+```bash
+docker exec easyeye_app php artisan db:seed
+```
+
+> Não execute seeds repetidamente — a maioria não é idempotente e duplicará registros.
+
+### 5. Verificar os serviços
 
 ```bash
 docker compose ps
@@ -297,28 +314,30 @@ docker exec easyeye_worker cat /var/log/supervisor/easyeye-default.log
 ### Artisan
 
 ```bash
-# Qualquer comando artisan
-docker compose run --rm artisan migrate
-docker compose run --rm artisan migrate:rollback
-docker compose run --rm artisan db:seed
-docker compose run --rm artisan cache:clear
-docker compose run --rm artisan queue:failed
-docker compose run --rm artisan queue:retry all
-docker compose run --rm artisan tinker
+# Formato: docker exec easyeye_app php artisan <comando>
+
+docker exec easyeye_app php artisan migrate
+docker exec easyeye_app php artisan migrate:rollback
+docker exec easyeye_app php artisan db:seed
+docker exec easyeye_app php artisan cache:clear
+docker exec easyeye_app php artisan queue:failed
+docker exec easyeye_app php artisan queue:retry all
+docker exec easyeye_app php artisan tinker
 ```
 
 ### Composer
 
 ```bash
-# Instalar dependências
-docker compose run --rm composer install
+# Formato: docker exec easyeye_app composer <comando>
 
 # Adicionar pacote
-docker compose run --rm composer require vendor/pacote
+docker exec easyeye_app composer require vendor/pacote
 
 # Atualizar dependências (intencional — commitar composer.lock após)
-docker compose run --rm composer update
+docker exec easyeye_app composer update
 ```
+
+> `composer install` roda automaticamente no entrypoint — não é necessário executar manualmente.
 
 ### Frontend (Vite / Node)
 
@@ -328,7 +347,7 @@ docker compose run --rm composer update
 docker compose run --rm node npm run build
 
 # Instalar novo pacote npm
-docker compose exec node npm install nome-do-pacote
+docker exec easyeye_node npm install nome-do-pacote
 
 # Ver logs do Vite
 docker compose logs -f node
@@ -359,6 +378,7 @@ docker exec -it easyeye_node sh
 | `UID` | `1000` | UID do usuário (deve bater com o do host para evitar problemas de permissão) |
 | `GID` | `1000` | GID do grupo |
 | `QUEUE_CONNECTION_DOCKER` | `database` | Conexão de fila usada pelo worker no Docker |
+| `RUN_MIGRATIONS` | `true` (no serviço app) | Habilita `migrate --force` automático no entrypoint |
 
 ---
 
@@ -398,16 +418,44 @@ docker compose up -d --build
 
 ## Troubleshooting
 
+### 502 Bad Gateway após `docker compose up -d --build`
+
+Causa: ao recriar o container `app` com `--build`, o Docker atribui um novo IP ao container.
+O Nginx (que não foi recriado) tinha cacheado o IP antigo → Connection refused → 502.
+
+O `laravel.conf` já está configurado com o resolver DNS interno do Docker (`127.0.0.11 valid=10s`)
+e usa `set $phpfpm easyeye_app` para forçar re-resolução por request. Se ainda ocorrer,
+recarregue o Nginx manualmente:
+
+```bash
+docker exec easyeye_nginx nginx -s reload
+```
+
 ### Container app fica unhealthy
 
 ```bash
-docker logs easyeye_app
+docker compose logs app
 ```
 
 Causas comuns:
-- Extensão PHP faltando → adicionar ao `docker-php-ext-install` no Dockerfile e rebuildar
 - `composer install` falhando → verificar compatibilidade de pacotes com PHP 8.4
+- Migration falhando → banco inacessível ou credenciais erradas no `.env`
 - PostgreSQL/Redis inacessível → verificar `listen_addresses` e `pg_hba.conf`
+
+### Migrations falham no startup
+
+```bash
+# Ver erro exato
+docker compose logs app | grep -A5 "migrate"
+
+# Verificar conectividade com o banco a partir do container
+docker exec easyeye_app php artisan db:show
+```
+
+Causas comuns:
+- `DB_PASSWORD` incorreta no `.env`
+- PostgreSQL não aceita conexões da rede Docker (`pg_hba.conf`)
+- `listen_addresses` não configurado como `'*'` no `postgresql.conf`
 
 ### Vite manifest not found
 
@@ -422,6 +470,18 @@ docker compose logs node
 
 # Forçar build manual
 docker compose run --rm node npm run build
+```
+
+### HMR não recarrega / alterações não refletem no browser
+
+O Vite usa `inotify` por padrão, mas eventos de filesystem **não são propagados** do host para dentro de volumes montados no Docker/Linux. O `vite.config.js` já está configurado com `server.watch.usePolling: true` (intervalo 300 ms) para contornar isso — o watcher verifica os arquivos ativamente em vez de esperar por eventos do kernel.
+
+Se mesmo com polling o HMR não funcionar, verifique se o WebSocket do HMR está acessível:
+
+```bash
+# O browser precisa alcançar localhost:5173 — verifique se a porta está mapeada
+docker compose ps node
+# Esperado: 0.0.0.0:5173->5173/tcp
 ```
 
 ### Problemas de permissão em storage/

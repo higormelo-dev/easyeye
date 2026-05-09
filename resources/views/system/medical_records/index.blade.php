@@ -22,7 +22,6 @@
 
 <div class="row g-3"
      x-data="medicalRecordsList(@js(route('panel.patients.medicalrecords.ajaxlist', $patient)), @js(url('panel/patients/' . $patient->id . '/medicalrecords')))"
-     x-init="init()"
      x-on:show-record.window="openDetail($event.detail.id)">
 
     {{-- ── Coluna lateral: info do paciente ─────────────────────────────── --}}
@@ -33,7 +32,7 @@
     </div>
 
     {{-- ── Coluna principal: timeline ────────────────────────────────────── --}}
-    <div class="col-12 col-md-9">
+    <div class="col-12 col-sm-10 col-md-10 col-lg-10 col-xl-10">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">
@@ -130,14 +129,45 @@ function medicalRecordsList(ajaxUrl, baseUrl) {
         nextPage:    1,
         isEmpty:     false,
         observer:    null,
+        _renderedIds: new Set(),
 
         init() {
             this.fetchPage(1);
+
+            // bfcache: quando o navegador restaura a página via botão "voltar",
+            // o Alpine reinicializa mas o DOM já tem itens — recarrega do zero.
+            window.addEventListener('pageshow', (e) => {
+                if (e.persisted) {
+                    this._reset();
+                    this.fetchPage(1);
+                }
+            });
+        },
+
+        _reset() {
+            if (this.observer) {
+                this.observer.disconnect();
+                this.observer = null;
+            }
+            const list = document.getElementById('timeline-list');
+            if (list) list.innerHTML = '';
+            this._renderedIds = new Set();
+            this.hasMore     = true;
+            this.nextPage    = 1;
+            this.isEmpty     = false;
+            this.loading     = false;
+            this.loadingMore = false;
         },
 
         fetchPage(page) {
+            if (this.loading || this.loadingMore) return;
+
             if (page === 1) {
                 this.loading = true;
+                // Garante lista limpa no início (protege contra double-init e bfcache).
+                const list = document.getElementById('timeline-list');
+                if (list) { list.innerHTML = ''; }
+                this._renderedIds = new Set();
             } else {
                 this.loadingMore = true;
             }
@@ -148,8 +178,7 @@ function medicalRecordsList(ajaxUrl, baseUrl) {
             fetch(url)
                 .then(r => r.json())
                 .then(data => {
-                    document.getElementById('timeline-list')
-                        .insertAdjacentHTML('beforeend', data.html);
+                    this._appendUnique(data.html);
 
                     this.hasMore     = data.has_more;
                     this.nextPage    = data.next_page;
@@ -165,6 +194,28 @@ function medicalRecordsList(ajaxUrl, baseUrl) {
                         this.observer = null;
                     }
                 });
+        },
+
+        // Insere apenas itens cujo data-record-id ainda não está no DOM.
+        _appendUnique(html) {
+            const list = document.getElementById('timeline-list');
+            if (!list) return;
+
+            const tmp = document.createElement('ul');
+            tmp.innerHTML = html;
+
+            tmp.querySelectorAll('li[data-record-id]').forEach(li => {
+                const id = li.dataset.recordId;
+                if (!this._renderedIds.has(id)) {
+                    this._renderedIds.add(id);
+                    list.appendChild(li);
+                }
+            });
+
+            // Fallback: itens sem data-record-id são appendados normalmente.
+            tmp.querySelectorAll('li:not([data-record-id])').forEach(li => {
+                list.appendChild(li);
+            });
         },
 
         setupObserver() {

@@ -76,8 +76,8 @@ class StoreMedicalRecordRequest extends FormRequest
             'addition_type_id'                          => ['nullable', 'uuid', 'exists:addition_types,id'],
             'lens_away_id'                              => ['nullable', 'uuid', 'exists:lenses,id'],
             'lens_near_id'                              => ['nullable', 'uuid', 'exists:lenses,id'],
-            // Anamnese — CBO
-            'main_complaint'          => ['nullable', 'string', 'max:5000'],
+            // Anamnese — CBO (main_complaint obrigatória; mensagem em validation.custom.main_complaint.required)
+            'main_complaint'          => ['required', 'string', 'max:5000'],
             'hda'                     => ['nullable', 'string', 'max:10000'],
             'diabetic'                => ['nullable', 'boolean'],
             'diabetic_family'         => ['nullable', 'boolean'],
@@ -128,8 +128,8 @@ class StoreMedicalRecordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'doctor_id.required' => 'Selecione o médico responsável antes de salvar o prontuário.',
-            'doctor_id.exists'   => 'Médico selecionado não pertence à entidade ativa.',
+            'doctor_id.required'      => __('actions.medical_records.doctor_required_validation'),
+            'doctor_id.exists'        => __('actions.medical_records.doctor_exists_validation'),
         ];
     }
 }

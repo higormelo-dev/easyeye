@@ -12,6 +12,11 @@ export default defineConfig({
             host: 'localhost',
             port: 5173,
         },
+        // inotify não propaga eventos de volume montado no Docker/Linux — polling obrigatório
+        watch: {
+            usePolling: true,
+            interval: 300,
+        },
     },
     plugins: [
         laravel({

@@ -117,7 +117,6 @@ class MedicalRecordsController extends Controller
             $validated,
             __('actions.medical_records.saved'),
             $record,
-            $request->input('_post_save_action'),
         );
     }
 
@@ -488,13 +487,8 @@ class MedicalRecordsController extends Controller
     /**
      * Redireciona após save:
      *   - Se schedule_id presente, volta à agenda.
-     *   - Se record recém-criado E user clicou ação documental no CREATE
-     *     (`_post_save_action`), redireciona para edit já com a ação no query
-     *     string — Alpine boota o modal correspondente automaticamente.
+     *   - Se record recém-criado, redireciona para EDIT (sem ação pós-save).
      *   - Caso contrário, listagem padrão.
-     *
-     * Ações permitidas no allowlist espelham os botões da view CREATE; valores
-     * fora dele são silenciosamente ignorados (defesa contra request forjado).
      */
     private function redirectAfterSave(
         Patient $patient,
@@ -510,40 +504,14 @@ class MedicalRecordsController extends Controller
         }
 
         if ($record && $record->wasRecentlyCreated) {
-            $params = [$patient, $record];
-            $action = $this->normalizePostSaveAction($postSaveAction);
-
-            if ($action !== null) {
-                $params['action'] = $action;
-            }
-
             return redirect()
-                ->route('panel.patients.medicalrecords.edit', $params)
+                ->route('panel.patients.medicalrecords.edit', [$patient, $record])
                 ->with('message', $message);
         }
 
         return redirect()
             ->route('panel.patients.medicalrecords.index', $patient)
             ->with('message', $message);
-    }
-
-    private function normalizePostSaveAction(?string $action): ?string
-    {
-        if ($action === null || $action === '') {
-            return null;
-        }
-
-        $allowed = [
-            'prescription',
-            'procedure',
-            'certificate',
-            'referral',
-            'report',
-            'exam-hub',
-            'annexo',
-        ];
-
-        return in_array($action, $allowed, true) ? $action : null;
     }
 
     private function assertTemplateBelongsToCurrentEntity(ReportSettingContent $content): void

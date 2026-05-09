@@ -11,7 +11,7 @@ name: easyeye
 #
 # Para usar serviços em container no futuro, descomente os blocos
 # marcados com [DOCKER-DB] e [DOCKER-REDIS] e adicione de volta
-# os depends_on correspondentes nos serviços app, worker e artisan.
+# os depends_on correspondentes nos serviços app e worker.
 
 x-app-build: &app-build
   context: .
@@ -31,6 +31,8 @@ services:
       - ./:/var/www/html/app
     environment:
       QUEUE_CONNECTION: ${QUEUE_CONNECTION_DOCKER:-database}
+      # Habilita php artisan migrate --force automático no entrypoint
+      RUN_MIGRATIONS: "true"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -125,7 +127,7 @@ services:
   #     timeout: 5s
 
   # Vite dev server — HMR no browser via localhost:${VITE_PORT:-5173}
-  # Modo dev:   docker compose up node
+  # Modo dev:   docker compose up node  (sobe automaticamente com up -d)
   # Modo build: docker compose run --rm node npm run build
   node:
     image: node:22-alpine
@@ -139,35 +141,6 @@ services:
     command: sh -c "npm install --silent && npm run dev"
     ports:
       - "${VITE_PORT:-5173}:5173"
-    networks:
-      - easyeye-network
-
-  # Utilitários — ativados com: docker compose --profile tools run --rm <serviço>
-  composer:
-    build: *app-build
-    profiles: ["tools"]
-    working_dir: /var/www/html/app
-    volumes:
-      - ./:/var/www/html/app
-    entrypoint: ["composer"]
-    user: "${UID:-1000}:${GID:-1000}"
-    environment:
-      COMPOSER_HOME: /tmp/composer
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - easyeye-network
-
-  artisan:
-    build: *app-build
-    profiles: ["tools"]
-    working_dir: /var/www/html/app
-    volumes:
-      - ./:/var/www/html/app
-    entrypoint: ["php", "artisan"]
-    user: "${UID:-1000}:${GID:-1000}"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - easyeye-network
 

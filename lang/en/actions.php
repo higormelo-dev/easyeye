@@ -447,7 +447,11 @@ return [
         'cylindrical'         => 'Cylindrical',
         'axis'                => 'Axis',
         'addition'            => 'Addition',
-        'presbyopia_addition' => 'Presbyopia addition',
+        'presbyopia_addition'   => 'Presbyopia addition',
+        'presbyopia_obs_title'  => 'Calculate Presbyopia',
+        'presbyopia_obs_label'  => 'Lens observation (optional)',
+        'presbyopia_obs_ph'     => 'Enter the lens observation before calculating…',
+        'presbyopia_obs_confirm'=> 'Calculate',
         'calc'                => 'Calculate',
         'lens_away'           => 'Far',
         'lens_near'           => 'Near',
@@ -472,18 +476,21 @@ return [
         'days'                     => 'days',
 
         // Documents
-        'documentations'     => 'Documents',
-        'new_documentation'  => 'New Document',
-        'doc_type'           => 'Type',
-        'doc_title'          => 'Title',
-        'doc_title_ph'       => 'Document title',
-        'doc_date'           => 'Date',
-        'doc_actions'        => 'Actions',
-        'doc_content'        => 'Content',
-        'doc_content_ph'     => 'Document content…',
-        'no_documentations'  => 'No documents found.',
-        'select_template'    => 'Document template',
-        'save_documentation' => 'Save Document',
+        'documentations'        => 'Documents',
+        'new_documentation'     => 'New Document',
+        'doc_type'              => 'Type',
+        'doc_title'             => 'Title',
+        'doc_title_ph'          => 'Document title',
+        'doc_date'              => 'Date',
+        'doc_actions'           => 'Actions',
+        'doc_content'           => 'Content',
+        'doc_content_ph'        => 'Document content…',
+        'no_documentations'     => 'No documents found.',
+        'select_template'       => 'Document template',
+        'save_documentation'    => 'Save Document',
+        'exam_hub_title'        => 'Exam Reports',
+        'exam_hub_help'         => 'Select an exam to generate its report. Content will be pre-populated from the medical record data.',
+        'exam_template_missing' => 'No template registered for this exam at the active clinic. Register it in Settings → Document Templates.',
 
         // Files
         'upload_files' => 'Attach files',
@@ -519,6 +526,71 @@ return [
         'lens_prescription_static'  => 'Static',
         'lens_prescription_presdyn' => 'Presbyopia + Dynamic',
         'lens_prescription_presbyo' => 'Presbyopia',
+
+        // F9 — Client-side validation
+        'client_errors_title'    => 'Please fix the fields before saving',
+        'server_errors_title'    => 'Errors found while saving',
+        'save_first_then_action' => 'Saves the record and opens this action automatically',
+
+        // Action guards — Swal client-side
+        'doctor_required_title'      => 'Physician required',
+        'doctor_required_for_issue'  => 'Please select the responsible physician before issuing a document.',
+        'complaint_required_title'   => 'Chief complaint required',
+        'complaint_required_text'    => 'Please fill in the chief complaint before issuing documents or adding attachments.',
+
+        // Server-side validation messages (FormRequest messages())
+        'doctor_required_validation' => 'Please select the responsible physician before saving the medical record.',
+        'doctor_exists_validation'   => 'The selected physician does not belong to the active entity.',
+
+        // F9 — Field labels for client-side validation messages
+        'field_doctor'        => 'Physician',
+        'field_complaint'     => 'Chief complaint',
+        'field_pachymetry_od' => 'OD Pachymetry',
+        'field_pachymetry_oe' => 'OS Pachymetry',
+        'field_follow_up'     => 'Follow-up days',
+
+        // F7 — Medical certificates (modal builder)
+        'attendance_certificate_title' => 'Attendance Certificate',
+        'medical_certificate_title'    => 'Medical Certificate',
+        'certificate_obs_label'        => 'Additional notes (optional)',
+        'certificate_obs_ph'           => 'Free text appended at the end of the certificate…',
+        'certificate_emit'             => 'Issue Certificate',
+        'medical_cert_days_label'      => 'Days of leave',
+        'medical_cert_days_help'       => 'Written form is generated automatically.',
+        'medical_cert_days_preview'    => 'Preview',
+        'medical_cert_date_label'      => 'Certificate date',
+        'medical_cert_date_today'      => 'Today',
+
+        // F6 — Procedure solicitation (modal builder)
+        'procedure_title'            => 'Procedure Request',
+        'procedure_search_label'     => 'Add procedure',
+        'procedure_search_ph'        => 'Type at least 2 characters (e.g. phaco, mapping…)',
+        'procedure_type_label'       => 'Type',
+        'procedure_type_rotina'      => 'Routine',
+        'procedure_type_urgencia'    => 'Urgent',
+        'procedure_type_controle'    => 'Control',
+        'procedure_type_comparativo' => 'Comparative',
+        'procedure_indication_label' => 'Add indication',
+        'procedure_indication_ph'    => 'Type at least 2 characters (e.g. glaucoma, cataract…)',
+        'procedure_selected'         => 'Solicitation items',
+        'procedure_content'          => 'Solicitation content',
+        'procedure_emit'             => 'Issue Request',
+        'procedure_max_reached'      => 'Item limit reached. Please print this request before adding more.',
+
+        // F8 — Cataract prescription (parametrised modal)
+        'cataract_title'         => 'Cataract Prescription',
+        'cataract_eye_label'     => 'Eye to be operated',
+        'cataract_eye_right'     => 'Right Eye (OD)',
+        'cataract_eye_left'      => 'Left Eye (OS)',
+        'cataract_eye_both'      => 'Both Eyes (OU)',
+        'cataract_template'      => 'Prescription template',
+        'cataract_template_pre'  => 'Pre-operative',
+        'cataract_template_pos'  => 'Post-operative',
+        'cataract_template_inst' => 'Surgical instructions',
+        'cataract_date'          => 'Surgery date',
+        'cataract_hour'          => 'Surgery time',
+        'cataract_emit'          => 'Issue Prescription',
+        'cataract_help_inst'     => 'Date and time appear in the Surgical Instructions document.',
 
         // Clinical alerts
         'alert_self'   => 'Patient',

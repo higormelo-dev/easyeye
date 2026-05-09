@@ -447,7 +447,11 @@ return [
         'cylindrical'         => 'Cilíndrico',
         'axis'                => 'Eixo',
         'addition'            => 'Adição',
-        'presbyopia_addition' => 'Adição presbiopia',
+        'presbyopia_addition'   => 'Adição presbiopia',
+        'presbyopia_obs_title'  => 'Calcular Presbiopia',
+        'presbyopia_obs_label'  => 'Observação de lentes (opcional)',
+        'presbyopia_obs_ph'     => 'Informe a observação antes de calcular…',
+        'presbyopia_obs_confirm'=> 'Calcular',
         'calc'                => 'Calcular',
         'lens_away'           => 'Longe',
         'lens_near'           => 'Perto',
@@ -524,9 +528,26 @@ return [
         'lens_prescription_presbyo' => 'Presbiopia',
 
         // F9 — Validação client-side
-        'client_errors_title' => 'Verifique os campos antes de salvar',
-        'server_errors_title' => 'Erros encontrados ao salvar',
+        'client_errors_title'    => 'Verifique os campos antes de salvar',
+        'server_errors_title'    => 'Erros encontrados ao salvar',
         'save_first_then_action' => 'Salva o prontuário e abre esta ação automaticamente',
+
+        // Guardas de ação — Swal client-side
+        'doctor_required_title'      => 'Médico obrigatório',
+        'doctor_required_for_issue'  => 'Selecione o médico responsável antes de emitir o documento.',
+        'complaint_required_title'   => 'Queixa principal obrigatória',
+        'complaint_required_text'    => 'Preencha a queixa principal antes de emitir documentos ou adicionar anexos.',
+
+        // Mensagens de validação server-side (FormRequest messages())
+        'doctor_required_validation' => 'Selecione o médico responsável antes de salvar o prontuário.',
+        'doctor_exists_validation'   => 'Médico selecionado não pertence à entidade ativa.',
+
+        // F9 — Labels dos campos para mensagens de validação client-side
+        'field_doctor'        => 'Médico',
+        'field_complaint'     => 'Queixa principal',
+        'field_pachymetry_od' => 'Paquimetria OD',
+        'field_pachymetry_oe' => 'Paquimetria OE',
+        'field_follow_up'     => 'Dias para retorno',
 
         // F7 — Atestados editáveis (modal builder)
         'attendance_certificate_title' => 'Atestado de Comparecimento',

@@ -39,7 +39,11 @@ export default ({
     procedureFormatLineUrl = '',
     dayExtensionPreviewUrl = '',
     lensFormatUrl = '',
+    i18n = {},
 } = {}) => ({
+    // ── i18n strings (injectadas via Blade @js()) ───────────────────────
+    i18n,
+
     // ── Validação client-side (F9) ──────────────────────────────────────
     validationRulesUrl,
     validationRules: {},
@@ -154,6 +158,11 @@ export default ({
         hour_surgery: '',
     },
 
+    // ── Cálculo de Presbiopia — modal de observação de lentes ────────────
+    presbyopiaObsForm: {
+        content: '',
+    },
+
     // ── File upload state ───────────────────────────────────────────────
     uploadedFiles: [],
     uploading: false,
@@ -182,96 +191,8 @@ export default ({
 
         // TinyMCE no #docModal — load lazy, init/destroy por evento Bootstrap.
         initDocModalEditor(this);
-
-        // Após redirect post-save (CREATE → EDIT) com `?action=...`, dispara
-        // automaticamente o handler equivalente. Nextick para garantir que
-        // listeners Alpine (init de docModalEditor, openExam handlers, etc.)
-        // já estejam prontos.
-        if (this.isEdit) {
-            queueMicrotask(() => this._dispatchPostSaveAction());
-        }
     },
 
-    /**
-     * Lê `?action=` da URL atual e dispara o handler correspondente. Usado no
-     * fluxo CREATE → save → redirect para EDIT (opção 4 — sem drafts órfãos).
-     * Allowlist espelha o do controller `normalizePostSaveAction`.
-     */
-    _dispatchPostSaveAction() {
-        const params = new URLSearchParams(window.location.search);
-        const action = params.get('action');
-        if (!action) return;
-
-        const allowed = ['prescription', 'procedure', 'certificate', 'referral', 'report', 'exam-hub', 'annexo'];
-        if (!allowed.includes(action)) return;
-
-        // Limpa query da URL para não re-disparar em refresh.
-        params.delete('action');
-        const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : '') + window.location.hash;
-        window.history.replaceState({}, '', cleanUrl);
-
-        switch (action) {
-            case 'prescription':
-            case 'procedure':
-            case 'certificate':
-            case 'referral':
-            case 'report':
-                this.openNewDocByType(action);
-                break;
-            case 'exam-hub': {
-                const modalEl = document.getElementById('examHubModal');
-                if (modalEl && window.bootstrap) {
-                    window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
-                }
-                break;
-            }
-            case 'annexo': {
-                // Dispara click no input file escondido (label.pmr-doc-annexo > input[type=file]).
-                const fileInput = document.querySelector('label.pmr-doc-annexo input[type="file"]');
-                fileInput?.click();
-                break;
-            }
-        }
-    },
-
-    /**
-     * Submete o form CREATE marcando qual ação documental abrir após o save.
-     * Servidor valida tudo normalmente — em erro, user permanece no CREATE
-     * sem record criado (sem orphan, sem ruído de auditoria). Em sucesso,
-     * controller redireciona para EDIT com `?action=<X>` e `_dispatchPostSaveAction`
-     * acima abre o modal correspondente.
-     */
-    submitWithAction(action) {
-        // $root é o elemento com x-data (form#pmr-form). $el dentro de
-        // método chamado por @click no botão aponta para o botão, não o form.
-        const form = this.$root;
-        if (!form || form.tagName !== 'FORM') {
-            console.warn('[submitWithAction] form not found — verifique x-data root.');
-            return;
-        }
-
-        // Garante input único — clicks repetidos não acumulam hidden inputs.
-        let input = form.querySelector('input[name="_post_save_action"]');
-        if (!input) {
-            input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = '_post_save_action';
-            form.appendChild(input);
-        }
-        input.value = action;
-
-        // requestSubmit dispara `submit` event — F9 (validateBeforeSubmit) roda
-        // antes; em erro client-side, submit é cancelado e ação descartada.
-        form.requestSubmit();
-
-        // Se F9 bloqueou, remove hidden p/ evitar que o próximo Save manual
-        // execute a ação não desejada. Alert F9 já scrollou para o topo;
-        // garante feedback adicional no console p/ debug em dev.
-        if (this.hasClientErrors) {
-            console.info('[submitWithAction] bloqueado por F9 — corrija os campos antes:', this.clientErrors);
-            input.remove();
-        }
-    },
 
     async _fetchValidationRules() {
         if (!this.validationRulesUrl) return;
@@ -330,11 +251,11 @@ export default ({
         }
 
         const labels = {
-            doctor_id:        'Médico',
-            main_complaint:   'Queixa principal',
-            pachymetry_right: 'Paquimetria OD',
-            pachymetry_left:  'Paquimetria OE',
-            follow_up_days:   'Dias para retorno',
+            doctor_id:        this.i18n.field_doctor        ?? 'Physician',
+            main_complaint:   this.i18n.field_complaint     ?? 'Chief complaint',
+            pachymetry_right: this.i18n.field_pachymetry_od ?? 'OD Pachymetry',
+            pachymetry_left:  this.i18n.field_pachymetry_oe ?? 'OS Pachymetry',
+            follow_up_days:   this.i18n.field_follow_up     ?? 'Follow-up days',
         };
 
         const result = validatePayload(payload, this.validationRules, labels);
@@ -394,6 +315,30 @@ export default ({
     _pdfPreviewModal() {
         const el = document.getElementById('pdfPreviewModal');
         return el ? bootstrap.Modal.getOrCreateInstance(el) : null;
+    },
+
+    // ── Presbiopia — modal de observação ───────────────────────────────
+    _presbyopiaObsModal() {
+        const el = document.getElementById('presbyopiaObsModal');
+        return el ? bootstrap.Modal.getOrCreateInstance(el) : null;
+    },
+
+    openPresbyopiaCalc() {
+        // Pré-carrega o conteúdo atual do campo "Observação de lentes".
+        const existing = document.querySelector('[name="observation_of_lenses"]');
+        this.presbyopiaObsForm.content = existing?.value ?? '';
+        this._presbyopiaObsModal()?.show();
+    },
+
+    confirmPresbyopiaCalc() {
+        // Grava a observação no campo do formulário e dispara o cálculo.
+        const obs = document.querySelector('[name="observation_of_lenses"]');
+        if (obs) {
+            obs.value = this.presbyopiaObsForm.content;
+            obs.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        this._presbyopiaObsModal()?.hide();
+        this.calcPresbyopia();
     },
 
     openPdfPreview(url, title = '') {
@@ -525,11 +470,11 @@ export default ({
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Médico obrigatório',
-                    text: 'Selecione o médico responsável antes de imprimir.',
+                    title: this.i18n.doctor_required_title     ?? 'Physician required',
+                    text:  this.i18n.doctor_required_for_print ?? 'Please select the responsible physician before printing.',
                 });
             } else {
-                alert('Selecione o médico responsável antes de imprimir.');
+                alert(this.i18n.doctor_required_for_print ?? 'Please select the responsible physician before printing.');
             }
             return;
         }
@@ -914,11 +859,11 @@ export default ({
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     icon: 'warning',
-                    title: 'Médico obrigatório',
-                    text: 'Selecione o médico responsável antes de emitir o documento.',
+                    title: this.i18n.doctor_required_title     ?? 'Physician required',
+                    text:  this.i18n.doctor_required_for_issue ?? 'Please select the responsible physician before issuing a document.',
                 });
             } else {
-                alert('Selecione o médico responsável antes de emitir o documento.');
+                alert(this.i18n.doctor_required_for_issue ?? 'Please select the responsible physician before issuing a document.');
             }
             return;
         }

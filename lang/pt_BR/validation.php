@@ -351,6 +351,9 @@ return [
             'doctor_not_found'       => 'O médico selecionado não é válido ou não pertence a esta empresa.',
             'doctor_datetime_unique' => 'Já existe um agendamento para este médico neste horário.',
         ],
+        'main_complaint' => [
+            'required' => 'A queixa principal é obrigatória para salvar o prontuário.',
+        ],
     ],
     'at_least_one_required'   => 'Pelo menos um dos campos :fields deve ser selecionado.',
     'cnpj_already_registered' => 'Este CNPJ já está cadastrado.',

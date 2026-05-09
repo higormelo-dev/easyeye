@@ -342,6 +342,9 @@ return [
             'doctor_not_found'       => 'The selected doctor is invalid or does not belong to this company.',
             'doctor_datetime_unique' => 'There is already an appointment for this doctor at this time.',
         ],
+        'main_complaint' => [
+            'required' => 'The chief complaint is required to save the medical record.',
+        ],
     ],
     'at_least_one_required'   => 'At least one of the fields :fields must be selected.',
     'cnpj_already_registered' => 'This CNPJ is already registered.',
