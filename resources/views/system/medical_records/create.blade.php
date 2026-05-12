@@ -8,19 +8,14 @@
 <div class="pmr-screen">
     {{-- ── Subnav ──────────────────────────────────────────────────────────── --}}
     <div class="row mb-3 align-items-center">
-        <div class="col-12 col-sm-2 col-md-2 col-lg-2 col-xl-2">
+        <div class="col-12 col-auto">
             <div class="btn-group" role="group">
-                <a href="{{ route('panel.patients.index') }}" class="btn btn-outline-white btn-sm">
+                <a href="{{ route('panel.patients.medicalrecords.index', $patient) }}" class="btn btn-outline-white btn-sm">
                     <i class="fas fa-arrow-left me-1"></i>{{ __('actions.sidemenu.medical_records') }}
                 </a>
                 <a href="{{ route('panel.patients.medicalrecords.create', $patient) }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus me-1"></i>{{ __('actions.new') }}
                 </a>
-            </div>
-        </div>
-        <div class="col-12 col-sm-8 col-md-8 col-lg-8 col-xl-8">
-            <div class="alert alert-info mb-0 text-start" role="alert">
-                <i class="fas fa-info-circle me-1"></i>{!! __('messages.medical_records.create_info') !!}
             </div>
         </div>
     </div>

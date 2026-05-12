@@ -330,15 +330,19 @@ export default ({
         this._presbyopiaObsModal()?.show();
     },
 
-    confirmPresbyopiaCalc() {
-        // Grava a observação no campo do formulário e dispara o cálculo.
+    async confirmPresbyopiaCalc() {
+        // 1. Grava observação no campo do formulário.
         const obs = document.querySelector('[name="observation_of_lenses"]');
         if (obs) {
             obs.value = this.presbyopiaObsForm.content;
             obs.dispatchEvent(new Event('input', { bubbles: true }));
         }
+
+        // 2. Fecha o modal.
         this._presbyopiaObsModal()?.hide();
-        this.calcPresbyopia();
+
+        // 3. Calcula e preenche staticSphericalRight/Left no Alpine.
+        await this.calcPresbyopia();
     },
 
     openPdfPreview(url, title = '') {

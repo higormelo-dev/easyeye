@@ -231,4 +231,15 @@ export function initDocModalEditor(alpineCtx) {
             plugins: 'lists autolink wordcount searchreplace',
         },
     });
+
+    registerEditor(alpineCtx, {
+        modalId:   'presbyopiaObsModal',
+        selector:  '#presbyopia-obs-content',
+        statePath: 'presbyopiaObsForm.content',
+        config: {
+            height: 220,
+            toolbar: 'undo redo | bold italic underline | bullist numlist | searchreplace',
+            plugins: 'lists autolink wordcount searchreplace',
+        },
+    });
 }

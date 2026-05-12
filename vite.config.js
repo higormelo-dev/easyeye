@@ -53,6 +53,19 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    build: {
+        rollupOptions: {
+            output: {
+                // Declara jQuery/$ no topo de CADA chunk para que IIFEs legadas
+                // (morris.js, jquery-toast, jquery-sparkline, etc.) encontrem jQuery
+                // no escopo do chunk. window.jQuery é garantido pelo <script> síncrono
+                // no <head>. jquery-global.js NÃO pode declarar `const jQuery` no
+                // top-level pois conflita com este var — usa window.jQuery diretamente.
+                banner: 'var jQuery=window.jQuery,$=window.jQuery;',
+            },
+        },
+    },
+
     resolve: {
         alias: {
             // Single jQuery instance for all npm packages and template scripts.

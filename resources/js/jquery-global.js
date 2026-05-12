@@ -14,7 +14,9 @@
  */
 import '../../node_modules/jquery/dist/jquery.js';
 
-const jQuery = window.jQuery;
-window.$ = jQuery;
+// Não declarar `const jQuery` aqui: o banner do vite.config.js injeta
+// `var jQuery=window.jQuery` no topo de cada chunk — declarações duplicadas
+// causam erro de transpile no esbuild ("symbol already declared").
+window.$ = window.jQuery;
 
-export default jQuery;
+export default window.jQuery;

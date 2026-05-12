@@ -126,9 +126,10 @@ services:
   #     start_period: 20s
   #     timeout: 5s
 
-  # Vite dev server — HMR no browser via localhost:${VITE_PORT:-5173}
-  # Modo dev:   docker compose up node  (sobe automaticamente com up -d)
-  # Modo build: docker compose run --rm node npm run build
+  # Vite dev server com HMR.
+  # Browser acessa http://localhost:5173 via port mapping do Docker.
+  # server.host=0.0.0.0 e hmr.host=localhost estão em vite.config.js.
+  # CHOKIDAR_USEPOLLING=1: força polling porque inotify não propaga em bind mounts Docker/Linux.
   node:
     image: node:22-alpine
     container_name: easyeye_node
@@ -138,9 +139,12 @@ services:
       - ./:/var/www/html/app
       # Volume separado para node_modules evita conflito entre host e container
       - node_modules:/var/www/html/app/node_modules
-    command: sh -c "npm install --silent && npm run dev"
     ports:
       - "${VITE_PORT:-5173}:5173"
+    environment:
+      CHOKIDAR_USEPOLLING: "1"
+      CHOKIDAR_INTERVAL: "300"
+    command: sh -c "npm install --silent && npm run dev"
     networks:
       - easyeye-network
 

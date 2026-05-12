@@ -1720,20 +1720,16 @@
                 <div class="modal-header py-2">
                     <h6 class="modal-title">
                         <i class="fas fa-glasses me-2" style="color:#00bcd4;"></i>
-                        {{ __('actions.medical_records.presbyopia_obs_title') }}
+                        {{ __('actions.medical_records.lenses_obs') }}
                     </h6>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('actions.medical_records.close') }}"></button>
                 </div>
                 <div class="modal-body">
-                    <label class="pmr-label mb-1">{{ __('actions.medical_records.presbyopia_obs_label') }}</label>
-                    <textarea class="form-control form-control-sm"
-                              rows="4"
-                              maxlength="5000"
+                    <textarea id="presbyopia-obs-content"
+                              class="form-control form-control-sm"
+                              rows="6"
                               placeholder="{{ __('actions.medical_records.presbyopia_obs_ph') }}"
                               x-model="presbyopiaObsForm.content"></textarea>
-                    <small class="text-muted d-block mt-1">
-                        <span x-text="(presbyopiaObsForm.content || '').length"></span>/5000
-                    </small>
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">
@@ -1741,8 +1737,8 @@
                     </button>
                     <button type="button" class="btn btn-primary btn-sm"
                             @click="confirmPresbyopiaCalc()">
-                        <i class="fas fa-pencil-alt me-1"></i>
-                        {{ __('actions.medical_records.presbyopia_obs_confirm') }}
+                        <i class="fas fa-times me-1"></i>
+                        {{ __('actions.medical_records.close') }}
                     </button>
                 </div>
             </div>
