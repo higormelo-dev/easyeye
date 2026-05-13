@@ -627,6 +627,7 @@ return [
         'archived'         => 'Modelo arquivado com sucesso.',
         'adopted'          => 'Modelo adotado com sucesso.',
         'reimported'       => 'Conteúdo reimportado com sucesso.',
+        'preview_pdf'      => 'Preview PDF',
         'empty'            => 'Nenhum modelo cadastrado.',
         'templates'        => 'templates',
         'general'          => 'Configurações Gerais',

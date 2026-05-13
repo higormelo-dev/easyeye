@@ -62,6 +62,14 @@ class AuthenticatedSessionController extends Controller
             }
         }
 
+        // Usuários SaaS (non-client) não devem ser redirecionados para URLs que
+        // ficaram salvas como url.intended durante uma sessão de impersonação expirada.
+        if (!session('selected_entity_is_client', true)) {
+            session()->forget('url.intended');
+
+            return redirect()->route('panel.dashboard');
+        }
+
         return redirect()->intended(route('panel.dashboard', absolute: false));
     }
 

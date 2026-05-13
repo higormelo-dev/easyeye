@@ -78,6 +78,7 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
 
     // ── Modelos de Documento Globais ────────────────────────────────────────
     Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
+    Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');
     Route::post('report-settings/{report_setting}/publish', [ReportSettingsController::class, 'publish'])->name('report-settings.publish');
     Route::post('report-settings/{report_setting}/archive', [ReportSettingsController::class, 'archive'])->name('report-settings.archive');
     Route::resource('report-settings', ReportSettingsController::class)->except('show');

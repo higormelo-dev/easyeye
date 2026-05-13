@@ -132,6 +132,7 @@
             if (page < 1 || page > this.globalLastPage) return;
             this.globalPage = page;
         },
+
      }"
      x-init="init()">
 
@@ -350,6 +351,12 @@
                                             <i class="ti ti-refresh me-1"></i>{{ __('actions.report_settings.reimport') }}
                                         </button>
                                     </form>
+                                </template>
+                                <template x-if="s.preview_url">
+                                    <button type="button" class="btn btn-outline-info btn-sm"
+                                            @click="window.openPdfPreviewModal(s.preview_url)">
+                                        <i class="ti ti-file-search me-1"></i>{{ __('actions.report_settings.preview_pdf') }}
+                                    </button>
                                 </template>
                                 <a :href="s.edit_url" class="btn btn-outline-secondary btn-sm">
                                     <i class="ti ti-edit me-1"></i>{{ __('actions.edit') }}
@@ -596,6 +603,41 @@
     @endif
     {{-- ══ /Global Templates Available ══════════════════════════════════════════ --}}
 
+    {{-- ══ PDF Preview Modal ════════════════════════════════════════════════════ --}}
+    <div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl" style="max-width:960px;">
+            <div class="modal-content" style="height:88vh;">
+                <div class="modal-header py-2">
+                    <h6 class="modal-title mb-0">
+                        <i class="ti ti-file-search me-2 text-info"></i>{{ __('actions.report_settings.preview_pdf') }}
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"
+                            aria-label="{{ __('actions.close') }}"></button>
+                </div>
+                {{-- Fundo cinza escuro igual ao Chrome PDF viewer — a página branca fica centralizada naturalmente --}}
+                <div class="modal-body p-0 position-relative overflow-hidden" style="flex:1; min-height:0; background:#525659;">
+                    {{-- Overlay de loading --}}
+                    <div id="pdfPreviewLoading"
+                         class="position-absolute top-0 start-0 w-100 h-100 align-items-center justify-content-center"
+                         style="z-index:5; display:flex; background:#525659;">
+                        <div class="text-center" style="color:#ccc;">
+                            <div class="spinner-border mb-2" style="color:#aaa;" role="status">
+                                <span class="visually-hidden">{{ __('actions.loading') }}</span>
+                            </div>
+                            <div class="small">{{ __('actions.loading') }}...</div>
+                        </div>
+                    </div>
+                    {{-- src é gerenciado via blob URL criado no fetch --}}
+                    <iframe id="pdfPreviewFrame"
+                            src="about:blank"
+                            style="width:100%;height:100%;border:none;background:transparent;">
+                    </iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{-- ══ /PDF Preview Modal ═══════════════════════════════════════════════════ --}}
+
     {{-- ══ Global Template Preview Modal ═══════════════════════════════════════ --}}
     <div class="modal fade" id="globalTemplatePreviewModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -667,4 +709,30 @@
 
 @section('javascript')
     {{ $dataTable->scripts() }}
+    <script>
+        // Preview retorna HTML — iframe load event é confiável para HTML (diferente de PDF)
+        var _previewFrame = document.getElementById('pdfPreviewFrame');
+
+        _previewFrame.addEventListener('load', function () {
+            if (this.src && this.src !== 'about:blank') {
+                document.getElementById('pdfPreviewLoading').style.display = 'none';
+            }
+        });
+
+        window.openPdfPreviewModal = function (url) {
+            document.getElementById('pdfPreviewLoading').style.display = 'flex';
+            _previewFrame.src = url;
+            bootstrap.Modal.getOrCreateInstance(
+                document.getElementById('pdfPreviewModal')
+            ).show();
+        };
+
+        var _pdfModal = document.getElementById('pdfPreviewModal');
+        if (_pdfModal) {
+            _pdfModal.addEventListener('hidden.bs.modal', function () {
+                _previewFrame.src = 'about:blank';
+                document.getElementById('pdfPreviewLoading').style.display = 'flex';
+            });
+        }
+    </script>
 @endsection

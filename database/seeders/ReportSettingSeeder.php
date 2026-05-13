@@ -23,10 +23,10 @@ class ReportSettingSeeder extends Seeder
             'paper_size'        => PaperSize::A5,
             'font_family'       => 'Arial, Helvetica, sans-serif',
             'font_size'         => 12,
-            'margin_top'        => 3.5,
-            'margin_right'      => 1.0,
-            'margin_bottom'     => 1.5,
-            'margin_left'       => 1.0,
+            'margin_top'        => 0,
+            'margin_right'      => 1.5,
+            'margin_bottom'     => 0,
+            'margin_left'       => 1.5,
             'patient_font_size' => 16,
             'patient_alignment' => 'center',
             'patient_color'     => '#FF0000',
@@ -77,7 +77,7 @@ class ReportSettingSeeder extends Seeder
             ['title' => 'ESTUDO COMPUTADORIZADO DA LÁGRIMA', 'category' => 'exames-especializados'],
             ['title' => 'POTENCIAL DE ACUIDADE VISUAL', 'category' => 'exames-especializados'],
             // ── Prescrições ──────────────────────────────────────────────────
-            ['title' => 'PRESCRIÇÃO DE LENTES', 'category' => 'receituarios', 'margin_top' => 5.5],
+            ['title' => 'PRESCRIÇÃO DE LENTES', 'category' => 'receituarios'],
             ['title' => 'PRESCRIÇÃO DE MEDICAMENTOS', 'category' => 'receituarios'],
             ['title' => 'RECEITUÁRIO DE PTERÍGIO', 'category' => 'receituarios'],
             ['title' => 'RECEITUÁRIO DE CATARATA', 'category' => 'receituarios'],
@@ -107,15 +107,10 @@ class ReportSettingSeeder extends Seeder
                 $overrides['report_category_id'] = $categories[$categorySlug];
             }
 
-            $setting = ReportSetting::firstOrCreate(
+            ReportSetting::updateOrCreate(
                 ['title' => $title, 'entity_id' => null],
                 array_merge($defaults, $overrides),
             );
-
-            // Update category on existing records that don't have it
-            if ($setting->wasRecentlyCreated === false && ! $setting->report_category_id && isset($overrides['report_category_id'])) {
-                $setting->update(['report_category_id' => $overrides['report_category_id']]);
-            }
         }
     }
 }

@@ -61,17 +61,19 @@
     </li>
 @endif
 
-{{-- Relatórios --}}
-<li class="menu-title"><span>{{ __('actions.sidemenu.reports') ?? 'Relatórios' }}</span></li>
-<li>
-    <ul>
-        <li>
-            <a href="{{ route('panel.reports.index') }}" class="{{ request()->routeIs('panel.reports.*') ? 'active' : '' }}">
-                <i class="ti ti-chart-bar"></i><span>Relatórios</span>
-            </a>
-        </li>
-    </ul>
-</li>
+{{-- Relatórios — apenas admin e financial, espelhando entity.role:admin,financial da rota --}}
+@if(in_array(session('selected_entity_user_rule'), [ClientRule::Admin->value, ClientRule::Financial->value], true))
+    <li class="menu-title"><span>{{ __('actions.sidemenu.reports') ?? 'Relatórios' }}</span></li>
+    <li>
+        <ul>
+            <li>
+                <a href="{{ route('panel.reports.index') }}" class="{{ request()->routeIs('panel.reports.*') ? 'active' : '' }}">
+                    <i class="ti ti-chart-bar"></i><span>Relatórios</span>
+                </a>
+            </li>
+        </ul>
+    </li>
+@endif
 
 {{-- Configuração --}}
 @if(session()->get('selected_entity_user_rule') === ClientRule::Admin->value)

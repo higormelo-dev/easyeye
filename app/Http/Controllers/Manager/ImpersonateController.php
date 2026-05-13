@@ -52,6 +52,10 @@ class ImpersonateController extends Controller
 
         Gate::authorize(EntityGate::SaasImpersonate->value, $saasEntity);
 
+        // Garante que nenhuma url.intended do contexto atual "vaze" para após
+        // o logout/expiração de sessão ocorrida dentro da impersonação.
+        session()->forget('url.intended');
+
         // ── Salva o contexto original ────────────────────────────────────────
         session()->put('impersonating', [
             'entity_user_id'            => $entityUser->id,

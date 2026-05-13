@@ -55,7 +55,14 @@ class AuthenticatedEntityController extends Controller
             session(['selected_entity_doctor_id' => $entityUser->doctor->id]);
         }
 
-        return redirect()->intended(route('panel.dashboard', absolute: false));
+        // Usuários SaaS (non-client) não devem ser redirecionados para URLs que
+        // ficaram salvas como url.intended durante uma sessão de impersonação expirada.
+        if (!session('selected_entity_is_client', true)) {
+            session()->forget('url.intended');
 
+            return redirect()->route('panel.dashboard');
+        }
+
+        return redirect()->intended(route('panel.dashboard', absolute: false));
     }
 }

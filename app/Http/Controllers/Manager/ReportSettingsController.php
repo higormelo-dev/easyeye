@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Manager;
 use App\DataTables\Manager\ManagerReportSettingsDataTable;
 use App\DTOs\ActionPolicy;
 use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
+use Barryvdh\Snappy\Facades\SnappyPdf;
+use Illuminate\Http\Response;
 use App\Http\Controllers\Controller;
 use App\Models\{ReportCategory, ReportSetting};
 use App\Services\ReportSettingService;
@@ -76,6 +78,7 @@ class ReportSettingsController extends Controller
                 'adopted_count'  => $r->adoptedCopies()->count(),
                 'edit_url'       => route('panel.manager.report-settings.edit', $r),
                 'delete_url'     => route('panel.manager.report-settings.destroy', $r),
+                'preview_url'    => route('panel.manager.report-settings.preview', $r),
                 'publish_url'    => route('panel.manager.report-settings.publish', $r),
                 'archive_url'    => route('panel.manager.report-settings.archive', $r),
                 ...ActionPolicy::forManager($r)->toArray(),
@@ -142,6 +145,20 @@ class ReportSettingsController extends Controller
         return redirect()
             ->route('panel.manager.report-settings.index')
             ->with('message', __('actions.report_settings.deleted'));
+    }
+
+    /**
+     * Preview HTML do template — retorna HTML diretamente para o modal.
+     * Usar HTML em vez de PDF garante centralização consistente entre tamanhos
+     * de papel (A4/A5/etc.), sem depender do viewer nativo de PDF do browser.
+     */
+    public function preview(ReportSetting $reportSetting): \Illuminate\Contracts\View\View
+    {
+        $reportSetting->load([
+            'activeContents' => fn ($q) => $q->orderBy('sort_order')->orderBy('label'),
+        ]);
+
+        return view('pdf.report_setting_preview_html', compact('reportSetting'));
     }
 
     /**

@@ -58,7 +58,7 @@
     @endif
 
     <div style="display:inline-block; min-width:240px; text-align:center;">
-        <div style="height:40px;"></div>{{-- espaço para a assinatura física --}}
+        <div style="height:90px;"></div>{{-- espaço para carimbo e assinatura física --}}
         <div style="border-top:1px solid #333; width:240px; margin:0 auto 6px;"></div>
         @if($name)<div>{{ $name }}</div>@endif
         @if($crm)<div>CRM {{ $crm }}</div>@endif
