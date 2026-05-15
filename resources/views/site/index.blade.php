@@ -526,7 +526,7 @@
                             @else
                                 <span class="price-currency">R$</span>
                                 <span class="price-value">
-                                    {{ number_format((float) $plan->price, 0, ',', '.') }}
+                                    {{ number_format((float) $plan->price, 2, ',', '.') }}
                                 </span>
                                 <span class="price-period">{{ $plan->pricePeriodLabel() }}</span>
                             @endif
