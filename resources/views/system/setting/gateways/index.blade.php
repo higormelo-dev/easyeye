@@ -2,10 +2,11 @@
 
 @section('breadcrumb')
     @include('components.breadcrumbs', [
+        'meta'        => ['breadcrumb_title' => false],
         'breadcrumbs' => [
             ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
             ['label' => 'Gateways de Pagamento', 'url' => route('panel.setting.gateways.index'), 'active' => true],
-        ]
+        ],
     ])
 @endsection
 

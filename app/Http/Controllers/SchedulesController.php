@@ -6,6 +6,7 @@ use App\Enums\{ClientRule, PatientMood, ScheduleSituation};
 use App\Http\Requests\ScheduleRequest;
 use App\Jobs\NotifyScheduleChangeJob;
 use App\Models\{Covenant, Doctor, IrisType, People, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
+use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
 use App\Services\ScheduleService;
 use Carbon\Carbon;
@@ -84,7 +85,7 @@ class SchedulesController extends Controller
             'statesOfBrazil',
             'skinTypes',
             'irisTypes',
-            'patientCovenants'
+            'patientCovenants',
         ));
     }
 
@@ -195,7 +196,7 @@ class SchedulesController extends Controller
                 'recurrence_group_id' => $recurrenceGroupId,
                 'recurrence_type'     => $recurrenceGroupId ? $recurrenceType : null,
                 'recurrence_until'    => $recurrenceGroupId ? $recurrenceUntil : null,
-            ]
+            ],
         );
 
         try {
@@ -234,7 +235,7 @@ class SchedulesController extends Controller
         NotifyScheduleChangeJob::dispatch($schedule->id, ScheduleNotification::EVENT_CREATED);
 
         return response()->json([
-            'message' => 'Agendamento criado com sucesso.',
+            'message' => __('schedules.created'),
             'data'    => $schedule,
         ], 201);
     }
@@ -256,7 +257,7 @@ class SchedulesController extends Controller
         Cache::forget("waiting_room:{$schedule->entity_id}");
 
         return response()->json([
-            'message' => 'Agendamento atualizado com sucesso.',
+            'message' => __('schedules.updated'),
             'data'    => $schedule->fresh(),
         ]);
     }
@@ -271,7 +272,7 @@ class SchedulesController extends Controller
         Cache::forget("waiting_room:{$entityId}");
 
         return response()->json([
-            'message' => 'Agendamento excluído com sucesso.',
+            'message' => __('schedules.deleted'),
         ]);
     }
 
@@ -283,11 +284,11 @@ class SchedulesController extends Controller
         $notes     = $request->string('notes')->trim()->value() ?: null;
 
         if ($schedule->situation->isTerminal()) {
-            return response()->json(['message' => 'Agendamento já finalizado e não pode ser alterado.'], 422);
+            return response()->json(['message' => __('schedules.already_finalized')], 422);
         }
 
-        if (!in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
-            return response()->json(['message' => 'Transição de situação não permitida.'], 422);
+        if (! in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
+            return response()->json(['message' => __('schedules.invalid_transition')], 422);
         }
 
         $data = ['situation' => $situation->value];
@@ -327,7 +328,7 @@ class SchedulesController extends Controller
         }
 
         return response()->json([
-            'message'   => 'Situação atualizada.',
+            'message'   => __('schedules.situation_updated'),
             'situation' => $situation->value,
             'label'     => $situation->label(),
             'badge'     => $situation->badgeClass(),
@@ -349,7 +350,7 @@ class SchedulesController extends Controller
 
         $errors = $this->service->validateSlot($doctorId, $dateTime);
 
-        if (!empty($errors)) {
+        if (! empty($errors)) {
             return response()->json(['message' => $errors[0]], 422);
         }
 
@@ -369,7 +370,7 @@ class SchedulesController extends Controller
             'active'             => true,
         ]);
 
-        $cancelNote    = 'Reagendado para ' . $newSchedule->code;
+        $cancelNote    = __('schedules.reschedule_note', ['code' => $newSchedule->code]);
         $fromSituation = $schedule->situation;
 
         $schedule->update([
@@ -389,7 +390,7 @@ class SchedulesController extends Controller
         Cache::forget("waiting_room:{$schedule->entity_id}");
 
         return response()->json([
-            'message'      => 'Reagendamento realizado com sucesso.',
+            'message'      => __('schedules.rescheduled'),
             'new_schedule' => $newSchedule,
         ], 201);
     }
@@ -414,10 +415,10 @@ class SchedulesController extends Controller
             $entityUserId,
         );
 
-        $message = "Atualizado {$result['updated']} agendamento(s).";
+        $message = __('schedules.bulk_updated', ['updated' => $result['updated']]);
 
         if ($result['skipped'] > 0) {
-            $message .= " {$result['skipped']} ignorado(s) (conflito de horário ou restrição de escala).";
+            $message .= ' ' . __('schedules.bulk_skipped_sched', ['skipped' => $result['skipped']]);
         }
 
         // ── Notifica cada paciente afetado pelo reagendamento ─────────────────
@@ -454,10 +455,10 @@ class SchedulesController extends Controller
             $notes,
         );
 
-        $message = "Atualizado {$result['updated']} agendamento(s).";
+        $message = __('schedules.bulk_updated', ['updated' => $result['updated']]);
 
         if ($result['skipped'] > 0) {
-            $message .= " {$result['skipped']} ignorado(s) (transição não permitida).";
+            $message .= ' ' . __('schedules.bulk_skipped_trans', ['skipped' => $result['skipped']]);
         }
 
         // ── Notifica cada paciente afetado pela mudança de situação ───────────
@@ -490,7 +491,7 @@ class SchedulesController extends Controller
 
         $schedule->update(['patient_mood' => $request->input('mood')]);
 
-        return response()->json(['message' => 'Humor atualizado.']);
+        return response()->json(['message' => __('schedules.mood_updated')]);
     }
 
     /**
@@ -532,13 +533,13 @@ class SchedulesController extends Controller
             ->select('doctors.*')
             ->first();
 
-        if (!$doctor) {
+        if (! $doctor) {
             return response()->json(['has_schedule' => false, 'interval' => 15, 'slots' => []]);
         }
 
         $date        = Carbon::parse($request->input('date'));
         $slots       = $this->service->getAvailableSlots($doctor, $date);
-        $hasSchedule = !empty($slots) || \App\Models\DoctorWorkSchedule::where('doctor_id', $doctorId)->exists();
+        $hasSchedule = ! empty($slots) || DoctorWorkSchedule::where('doctor_id', $doctorId)->exists();
 
         return response()->json([
             'has_schedule' => $hasSchedule,
@@ -570,7 +571,7 @@ class SchedulesController extends Controller
 
             $errors = $this->service->validateSlot($base->doctor_id, $current);
 
-            if (!empty($errors)) {
+            if (! empty($errors)) {
                 continue;
             }
 
@@ -599,7 +600,7 @@ class SchedulesController extends Controller
         abort_if(
             $schedule->entity_id !== session()->get('selected_entity_id'),
             403,
-            'Acesso não autorizado a este agendamento.'
+            __('schedules.unauthorized'),
         );
     }
 

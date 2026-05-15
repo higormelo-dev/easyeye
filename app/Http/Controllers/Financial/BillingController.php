@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Controllers\Financial;
 
@@ -9,25 +9,24 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\{BillingBatchRequest, BillingIndividualRequest};
 use App\Models\{BillingBatch, BillingClaim, Covenant, Entity, Schedule};
 use App\Services\Financial\BillingService;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\{DB, Gate, Storage};
 
 class BillingController extends Controller
 {
     public function __construct(
-        private readonly BillingService $billingService
+        private readonly BillingService $billingService,
     ) {
         $this->titleController = 'Faturamento TISS';
     }
 
     public function index(Request $request)
     {
-        $entity = $this->authorizeFinancial();
+        $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
 
         $from = (string) $request->input('from', now()->startOfMonth()->toDateString());
-        $to = (string) $request->input('to', now()->toDateString());
+        $to   = (string) $request->input('to', now()->toDateString());
 
         $eligibleSchedulesQuery = Schedule::query()
             ->with(['patient.person', 'doctor', 'covenant', 'visitType'])
@@ -49,7 +48,7 @@ class BillingController extends Controller
             ->all();
 
         $eligibleSchedules = $eligibleSchedulesQuery
-            ->when(!empty($alreadyBilledScheduleIds), fn ($q) => $q->whereNotIn('id', $alreadyBilledScheduleIds))
+            ->when(! empty($alreadyBilledScheduleIds), fn ($q) => $q->whereNotIn('id', $alreadyBilledScheduleIds))
             ->orderBy('date_time')
             ->limit(200)
             ->get();
@@ -93,18 +92,18 @@ class BillingController extends Controller
                 ->get();
         }
 
-        $tissVersionOptions = ['202603', '202601'];
-        $tissLayoutOptions = ['04.03.00', '01.06.00'];
+        $tissVersionOptions  = ['202603', '202601'];
+        $tissLayoutOptions   = ['04.03.00', '01.06.00'];
         $selectedTissVersion = (string) $request->input('tiss_version', '202603');
-        $selectedTissLayout = (string) $request->input('tiss_layout_version', '04.03.00');
+        $selectedTissLayout  = (string) $request->input('tiss_layout_version', '04.03.00');
 
         $meta = [
-            'title' => 'Faturamento TISS',
-            'action' => 'Financeiro',
+            'title'       => __('financial.billing.title'),
+            'action'      => __('financial.financial'),
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Financeiro', 'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => 'Faturamento TISS', 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.billing.breadcrumb'), 'url' => 'javascript:void(0)', 'active' => true],
             ],
         ];
 
@@ -119,7 +118,7 @@ class BillingController extends Controller
             'tissVersionOptions',
             'tissLayoutOptions',
             'selectedTissVersion',
-            'selectedTissLayout'
+            'selectedTissLayout',
         ));
     }
 
@@ -129,7 +128,7 @@ class BillingController extends Controller
 
         $this->billingService->createIndividual($request->validated());
 
-        return back()->with('message', 'Guia individual criada com sucesso.');
+        return back()->with('message', __('financial.billing.individual_created'));
     }
 
     public function storeBatch(BillingBatchRequest $request): RedirectResponse
@@ -138,7 +137,7 @@ class BillingController extends Controller
 
         $batch = $this->billingService->createBatch($request->validated());
 
-        return back()->with('message', "Lote {$batch->code} criado com sucesso.");
+        return back()->with('message', __('financial.billing.batch_created', ['code' => $batch->code]));
     }
 
     public function submitBatch(BillingBatch $batch): RedirectResponse
@@ -147,21 +146,21 @@ class BillingController extends Controller
 
         $batch = $this->billingService->submitBatch($batch);
 
-        return back()->with('message', "Lote {$batch->code} enviado para faturamento.");
+        return back()->with('message', __('financial.billing.batch_submitted', ['code' => $batch->code]));
     }
 
     public function exportBatchXml(BillingBatch $batch)
     {
         $this->authorizeFinancial();
 
-        if (blank($batch->xml_path) || !Storage::disk('local')->exists($batch->xml_path)) {
+        if (blank($batch->xml_path) || ! Storage::disk('local')->exists($batch->xml_path)) {
             $batch = $this->billingService->generateBatchXml($batch);
         }
 
         return Storage::disk('local')->download(
             $batch->xml_path,
             mb_strtolower($batch->code) . '.xml',
-            ['Content-Type' => 'application/xml']
+            ['Content-Type' => 'application/xml'],
         );
     }
 
@@ -170,15 +169,15 @@ class BillingController extends Controller
         $this->authorizeFinancial();
 
         $validated = $request->validate([
-            'paid_amount' => ['nullable', 'numeric', 'min:0'],
-            'paid_at' => ['nullable', 'date'],
+            'paid_amount'    => ['nullable', 'numeric', 'min:0'],
+            'paid_at'        => ['nullable', 'date'],
             'payment_method' => ['nullable', 'string', 'max:40'],
-            'notes' => ['nullable', 'string', 'max:1000'],
+            'notes'          => ['nullable', 'string', 'max:1000'],
         ]);
 
         $this->billingService->markClaimPaid($claim, $validated);
 
-        return back()->with('message', "Guia {$claim->code} marcada como paga.");
+        return back()->with('message', __('financial.billing.claim_paid', ['code' => $claim->code]));
     }
 
     public function markClaimDenied(Request $request, BillingClaim $claim): RedirectResponse
@@ -187,12 +186,12 @@ class BillingController extends Controller
 
         $validated = $request->validate([
             'glosa_amount' => ['nullable', 'numeric', 'min:0'],
-            'notes' => ['nullable', 'string', 'max:1000'],
+            'notes'        => ['nullable', 'string', 'max:1000'],
         ]);
 
         $this->billingService->markClaimDenied($claim, $validated);
 
-        return back()->with('message', "Guia {$claim->code} marcada como glosada.");
+        return back()->with('message', __('financial.billing.claim_denied', ['code' => $claim->code]));
     }
 
     private function authorizeFinancial(): Entity

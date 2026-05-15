@@ -347,5 +347,6 @@
         resetTimers();
     })();
     </script>
+    @stack('scripts')
 </body>
 </html>

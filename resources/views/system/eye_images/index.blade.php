@@ -18,7 +18,7 @@
                     <div class="col-12 col-sm-4 col-md-3">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><i class="fa fa-search"></i></span>
-                            <input type="text" class="form-control" placeholder="Nome ou código do paciente..."
+                            <input type="text" class="form-control" placeholder="{{ __('eye_images.search_placeholder') }}"
                                 x-model="search" @keydown.escape="search = ''">
                             <button class="btn btn-outline-secondary" type="button" x-show="search" x-cloak
                                 @click="search = ''">
@@ -31,11 +31,11 @@
                     <div class="col-6 col-sm-3 col-md-2">
                         <select class="form-select form-select-sm" :value="period"
                             @change="changePeriod($event.target.value)">
-                            <option value="hoje">Hoje</option>
-                            <option value="7">Últimos 7 dias</option>
-                            <option value="15">Últimos 15 dias</option>
-                            <option value="30">Últimos 30 dias</option>
-                            <option value="90">Últimos 90 dias</option>
+                            <option value="hoje">{{ __('eye_images.period_today') }}</option>
+                            <option value="7">{{ __('eye_images.period_7') }}</option>
+                            <option value="15">{{ __('eye_images.period_15') }}</option>
+                            <option value="30">{{ __('eye_images.period_30') }}</option>
+                            <option value="90">{{ __('eye_images.period_90') }}</option>
                         </select>
                     </div>
 
@@ -45,7 +45,7 @@
                             :class="showFilters ? 'btn-primary' : 'btn-outline-secondary'"
                             @click="showFilters = !showFilters">
                             <i class="fa fa-filter me-1"></i>
-                            Filtros
+                            {{ __('eye_images.filters_btn') }}
                             <i class="fa fa-chevron-down ms-1" x-show="!showFilters"></i>
                             <i class="fa fa-chevron-up ms-1" x-show="showFilters" x-cloak></i>
                         </button>
@@ -66,11 +66,11 @@
                     {{-- Lateralidade --}}
                     <div class="col-auto">
                         <div class="d-flex align-items-center gap-2">
-                            <span class="text-muted small fw-semibold" style="white-space:nowrap;">Olho:</span>
+                            <span class="text-muted small fw-semibold" style="white-space:nowrap;">{{ __('eye_images.eye_label') }}</span>
                             <div class="btn-group btn-group-sm" role="group">
                                 <input type="radio" class="btn-check" name="f-lat" id="f-lat-all" value=""
                                     x-model="laterality">
-                                <label class="btn btn-outline-secondary" for="f-lat-all">Todos</label>
+                                <label class="btn btn-outline-secondary" for="f-lat-all">{{ __('eye_images.all') }}</label>
 
                                 <input type="radio" class="btn-check" name="f-lat" id="f-lat-od" value="od"
                                     x-model="laterality">
@@ -90,7 +90,7 @@
                     {{-- Tipo de exame --}}
                     <div class="col-12 col-sm-6 col-md-3">
                         <select class="form-select form-select-sm" x-model="examTypeId">
-                            <option value="">Todos os exames</option>
+                            <option value="">{{ __('eye_images.all_exams') }}</option>
                             <template x-for="t in availableExamTypes" :key="t.id">
                                 <option :value="t.id" x-text="t.name"></option>
                             </template>
@@ -100,11 +100,11 @@
                     {{-- Status --}}
                     <div class="col-12 col-sm-6 col-md-2">
                         <select class="form-select form-select-sm" x-model="examStatus">
-                            <option value="">Todos os status</option>
-                            <option value="solicitado">Solicitado</option>
-                            <option value="realizado">Realizado</option>
-                            <option value="laudado">Laudado</option>
-                            <option value="cancelado">Cancelado</option>
+                            <option value="">{{ __('eye_images.all_statuses') }}</option>
+                            <option value="solicitado">{{ __('eye_images.status_requested') }}</option>
+                            <option value="realizado">{{ __('eye_images.status_done') }}</option>
+                            <option value="laudado">{{ __('eye_images.status_reported') }}</option>
+                            <option value="cancelado">{{ __('eye_images.status_cancelled') }}</option>
                         </select>
                     </div>
 
@@ -112,7 +112,7 @@
                     <div class="col-12 col-sm-6 col-md-3">
                         <select class="form-select form-select-sm" :value="doctorId"
                             @change="setDoctor($event.target.value)">
-                            <option value="">Todos os médicos</option>
+                            <option value="">{{ __('eye_images.all_doctors') }}</option>
                             @foreach ($doctors as $doctor)
                                 <option value="{{ $doctor->id }}">{{ $doctor->person->full_name ?? '—' }}</option>
                             @endforeach
@@ -122,7 +122,7 @@
                     {{-- Limpar filtros avançados --}}
                     <div class="col-auto">
                         <button type="button" class="btn btn-sm btn-outline-secondary" @click="clearFilters()">
-                            <i class="fa fa-times me-1"></i> Limpar
+                            <i class="fa fa-times me-1"></i> {{ __('eye_images.clear_btn') }}
                         </button>
                     </div>
 
@@ -140,7 +140,7 @@
                     <div class="card-body p-2">
 
                         {{-- Pacientes ------------------------------------------------- --}}
-                        <h6 class="font-bold text-uppercase px-1 mb-1 mt-3">Pacientes</h6>
+                        <h6 class="font-bold text-uppercase px-1 mb-1 mt-3">{{ __('eye_images.patients_title') }}</h6>
                         <hr class="mt-0 mb-2">
 
                         {{-- Spinner --}}
@@ -152,7 +152,7 @@
                         <div x-show="!loading" style="max-height:420px;overflow-y:auto;overflow-x:hidden;">
 
                             <template x-if="filteredPatients.length === 0">
-                                <p class="text-muted text-center small py-3 mb-0">Nenhum paciente.</p>
+                                <p class="text-muted text-center small py-3 mb-0">{{ __('eye_images.no_patients') }}</p>
                             </template>
 
                             <template x-for="patient in filteredPatients" :key="patient.id">
@@ -189,7 +189,7 @@
                         </div>
 
                         <div x-show="!loading" class="text-muted px-1 mt-1" style="font-size:.65rem;"
-                            x-text="filteredPatients.length + ' paciente(s)'"></div>
+                            x-text="filteredPatients.length + ' {{ __('eye_images.patients_count_suffix') }}'"></div>
 
                     </div>
                 </div>
@@ -215,7 +215,7 @@
                                 <a :href="`{{ rtrim(route('panel.patients.medicalrecords.index', ['patient' => '__ID__']), '') }}`
                                 .replace('__ID__', selectedPatient.id)"
                                     target="_blank" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">
-                                    Prontuário <i class="fa fa-external-link ms-1"></i>
+                                    {{ __('eye_images.medical_record') }} <i class="fa fa-external-link ms-1"></i>
                                 </a>
                             </span>
                         </template>
@@ -226,22 +226,22 @@
                         class="d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-body-secondary">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                             :disabled="selectedExamIds.length === 0" @click="openViewerModal(selectedExamsData)">
-                            <i class="fa fa-images me-1"></i>Visualizar selecionadas
+                            <i class="fa fa-images me-1"></i>{{ __('eye_images.view_selected') }}
                             <span class="badge bg-primary ms-1" x-show="selectedExamIds.length > 0"
                                 x-text="selectedExamIds.length"></span>
                         </button>
                         <button type="button" class="btn btn-sm btn-outline-secondary"
                             @click="openViewerModal(selectedPatient.exams)">
-                            <i class="fa fa-th me-1"></i>Visualizar todas
+                            <i class="fa fa-th me-1"></i>{{ __('eye_images.view_all') }}
                         </button>
                         <div class="vr opacity-25"></div>
                         <button type="button" class="btn btn-sm btn-outline-dark"
                             @click="openPrintModal(selectedPatient.exams, true)">
-                            <i class="fa fa-print me-1"></i>Imprimir
+                            <i class="fa fa-print me-1"></i>{{ __('eye_images.print_btn') }}
                         </button>
                         <div class="flex-grow-1"></div>
                         <span class="text-muted" style="font-size:.7rem;" x-show="selectedExamIds.length > 0"
-                            x-text="selectedExamIds.length + ' selecionado(s)'"></span>
+                            x-text="selectedExamIds.length + ' {{ __('eye_images.selected_suffix') }}'"></span>
                     </div>
 
                     <div class="card-body">
@@ -250,7 +250,7 @@
                         <template x-if="!selectedPatient">
                             <div class="text-center py-5 text-muted">
                                 <i class="ti ti-eye" style="font-size:3rem;opacity:.3;"></i>
-                                <p class="mt-3 mb-0">Selecione um paciente na lateral para visualizar os exames.</p>
+                                <p class="mt-3 mb-0">{{ __('eye_images.select_patient_hint') }}</p>
                             </div>
                         </template>
 
@@ -264,13 +264,12 @@
                                     {{-- Spinner de URLs --}}
                                     <div x-show="urlsLoading" x-cloak class="text-center py-3">
                                         <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
-                                        <p class="text-muted small mt-1 mb-0">Carregando imagens…</p>
+                                        <p class="text-muted small mt-1 mb-0">{{ __('eye_images.loading_images') }}</p>
                                     </div>
 
                                     {{-- Vazio --}}
                                     <template x-if="filteredExams.length === 0 && !urlsLoading">
-                                        <p class="text-muted text-center small py-4">Nenhum exame para os filtros
-                                            selecionados.</p>
+                                        <p class="text-muted text-center small py-4">{{ __('eye_images.no_exams') }}</p>
                                     </template>
 
                                     {{-- Grupos: data + equipamento + tipo --}}
@@ -316,7 +315,7 @@
                                                             :class="groupLatActive(group, 'all') ? 'btn-secondary' :
                                                                 'btn-outline-secondary'"
                                                             style="font-size:.6rem;"
-                                                            @click.stop="selectExamByLaterality(group, 'all')">Todos</button>
+                                                            @click.stop="selectExamByLaterality(group, 'all')">{{ __('eye_images.all') }}</button>
                                                     </div>
 
                                                     <div class="vr opacity-25 mx-1"></div>
@@ -325,14 +324,14 @@
                                                     <button type="button"
                                                         class="btn btn-sm py-0 px-2 btn-outline-secondary"
                                                         style="font-size:.6rem;" title="Upload de imagem">
-                                                        <i class="fa fa-upload me-1"></i>Upload
+                                                        <i class="fa fa-upload me-1"></i>{{ __('eye_images.upload_btn') }}
                                                     </button>
 
                                                     {{-- Download --}}
                                                     <button type="button"
                                                         class="btn btn-sm py-0 px-2 btn-outline-secondary"
                                                         style="font-size:.6rem;" title="Download das imagens">
-                                                        <i class="fa fa-download me-1"></i>Download
+                                                        <i class="fa fa-download me-1"></i>{{ __('eye_images.download_btn') }}
                                                     </button>
 
                                                 </div>
@@ -536,7 +535,7 @@
                                 <div x-show="!viewerPanelExams[pi-1] && !viewerPanelLoading[pi-1]"
                                     class="text-center text-muted">
                                     <i class="ti ti-photo" style="font-size:2.5rem;opacity:.12;"></i>
-                                    <p class="mt-1 mb-0" style="font-size:.65rem;opacity:.35;" x-text="'Painel ' + pi">
+                                    <p class="mt-1 mb-0" style="font-size:.65rem;opacity:.35;" x-text="'{{ __('eye_images.panel_prefix') }}' + pi">
                                     </p>
                                 </div>
 
@@ -544,13 +543,13 @@
                                 <div x-show="viewerPanelExams[pi-1] && !viewerPanelUrls[pi-1] && !viewerPanelLoading[pi-1] && !viewerPanelBroken[pi-1]"
                                     x-cloak class="text-center text-muted">
                                     <i class="ti ti-photo-off" style="font-size:2rem;opacity:.3;"></i>
-                                    <p class="mt-1 mb-0" style="font-size:.65rem;">Sem imagem</p>
+                                    <p class="mt-1 mb-0" style="font-size:.65rem;">{{ __('eye_images.no_image') }}</p>
                                 </div>
 
                                 {{-- Arquivo não encontrado --}}
                                 <div x-show="viewerPanelBroken[pi-1]" x-cloak class="text-center text-muted">
                                     <i class="ti ti-photo-off" style="font-size:2rem;opacity:.3;"></i>
-                                    <p class="mt-1 mb-0" style="font-size:.65rem;">Não encontrado</p>
+                                    <p class="mt-1 mb-0" style="font-size:.65rem;">{{ __('eye_images.not_found') }}</p>
                                 </div>
 
                                 {{-- Imagem principal --}}
@@ -586,7 +585,7 @@
                                     </span>
                                 </template>
                                 <template x-if="!viewerPanelExams[pi-1]">
-                                    <span class="text-secondary" style="opacity:.3;" x-text="'Painel ' + pi"></span>
+                                    <span class="text-secondary" style="opacity:.3;" x-text="'{{ __('eye_images.panel_prefix') }}' + pi"></span>
                                 </template>
                             </div>
 
@@ -708,23 +707,23 @@
                 <button type="button" class="btn btn-sm"
                     :class="printOrientation === 'portrait' ? 'btn-light' : 'btn-outline-secondary'"
                     style="font-size:.72rem;" @click="printOrientation = 'portrait'">
-                    <i class="fa fa-file me-1"></i>Retrato
+                    <i class="fa fa-file me-1"></i>{{ __('eye_images.portrait') }}
                 </button>
                 <button type="button" class="btn btn-sm"
                     :class="printOrientation === 'landscape' ? 'btn-light' : 'btn-outline-secondary'"
                     style="font-size:.72rem;" @click="printOrientation = 'landscape'">
-                    <i class="fa fa-file me-1" style="transform:rotate(90deg);display:inline-block;"></i>Paisagem
+                    <i class="fa fa-file me-1" style="transform:rotate(90deg);display:inline-block;"></i>{{ __('eye_images.landscape') }}
                 </button>
 
                 <div class="vr opacity-25 mx-1"></div>
 
                 <button type="button" class="btn btn-sm btn-warning text-dark fw-semibold" style="font-size:.72rem;"
                     @click="printReport()">
-                    <i class="fa fa-print me-1"></i>Imprimir
+                    <i class="fa fa-print me-1"></i>{{ __('eye_images.print_btn') }}
                 </button>
                 <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" style="font-size:.72rem;"
                     @click="showPrintModal = false">
-                    <i class="fa fa-times me-1"></i>Fechar
+                    <i class="fa fa-times me-1"></i>{{ __('eye_images.close_btn') }}
                 </button>
 
             </div>
@@ -748,7 +747,7 @@
                                 x-text="[EI_ENTITY.telephone, EI_ENTITY.cellphone].filter(Boolean).join(' | ')"></div>
                         </div>
                         <div class="text-end">
-                            <div style="font-size:.72rem;color:#555;">Data do relatório:</div>
+                            <div style="font-size:.72rem;color:#555;">{{ __('eye_images.report_date') }}</div>
                             <div style="font-size:.85rem;font-weight:600;"
                                 x-text="new Date().toLocaleDateString('pt-BR')"></div>
                         </div>
@@ -1023,9 +1022,9 @@
 
                     statusLabel(exam) {
                         return {
-                            solicitado: 'Solicitado',
-                            realizado: 'Realizado',
-                            cancelado: 'Cancelado'
+                            solicitado: '{{ __('eye_images.status_requested') }}',
+                            realizado:  '{{ __('eye_images.status_done') }}',
+                            cancelado:  '{{ __('eye_images.status_cancelled') }}'
                         } [this.deriveStatus(exam)] ?? '—';
                     },
 

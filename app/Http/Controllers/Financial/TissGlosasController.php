@@ -52,11 +52,11 @@ class TissGlosasController extends Controller
             ->sortByDesc('open');
 
         $meta = [
-            'title'       => 'Conciliação de Glosas',
+            'title'       => __('financial.glosas.title'),
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Financeiro', 'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => 'Conciliação de Glosas', 'url' => 'javascript:void(0);', 'active' => true],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.glosas.title'), 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];
 
@@ -76,12 +76,12 @@ class TissGlosasController extends Controller
     public function appeal(Request $request, TissGlosa $glosa): RedirectResponse
     {
         abort_if((string) $glosa->entity_id !== session('selected_entity_id'), 403);
-        abort_if(! $glosa->status->isActionable(), 409, 'Esta glosa não pode ser recorrida no estado atual.');
+        abort_if(! $glosa->status->isActionable(), 409, __('financial.glosas.cannot_appeal'));
 
         $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ], [
-            'reason.required' => 'Informe o motivo do recurso.',
+            'reason.required' => __('financial.glosas.reason_required'),
         ]);
 
         $appeal = ($this->openAppeal)($glosa, [
@@ -91,6 +91,6 @@ class TissGlosasController extends Controller
 
         return redirect()
             ->route('panel.financial.tiss.glosas.index')
-            ->with('message', "Recurso {$appeal->appeal_number} aberto com sucesso.");
+            ->with('message', __('financial.glosas.appeal_success', ['number' => $appeal->appeal_number]));
     }
 }

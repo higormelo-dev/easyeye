@@ -9,17 +9,17 @@
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Período inicial</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_from') }}</label>
                     <input type="date" name="from" value="{{ $from }}" class="form-control form-control-sm">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Período final</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_to') }}</label>
                     <input type="date" name="to" value="{{ $to }}" class="form-control form-control-sm">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Convênio</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.billing.covenant_label') }}</label>
                     <select name="covenant_id" class="form-select form-select-sm">
-                        <option value="">Todos</option>
+                        <option value="">{{ __('financial.billing.all') }}</option>
                         @foreach($covenants as $covenant)
                             <option value="{{ $covenant->id }}" @selected(request('covenant_id') === $covenant->id)>
                                 {{ $covenant->name }}
@@ -28,22 +28,22 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Status das guias</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.billing.claim_status_label') }}</label>
                     <select name="claim_status" class="form-select form-select-sm">
-                        <option value="">Todos</option>
-                        <option value="draft" @selected(request('claim_status') === 'draft')>Rascunho</option>
-                        <option value="submitted" @selected(request('claim_status') === 'submitted')>Enviado</option>
-                        <option value="paid" @selected(request('claim_status') === 'paid')>Pago</option>
-                        <option value="denied" @selected(request('claim_status') === 'denied')>Glosado</option>
-                        <option value="cancelled" @selected(request('claim_status') === 'cancelled')>Cancelado</option>
+                        <option value="">{{ __('financial.billing.all') }}</option>
+                        <option value="draft"     @selected(request('claim_status') === 'draft')>{{ __('financial.billing.status_draft') }}</option>
+                        <option value="submitted" @selected(request('claim_status') === 'submitted')>{{ __('financial.billing.status_submitted') }}</option>
+                        <option value="paid"      @selected(request('claim_status') === 'paid')>{{ __('financial.billing.status_paid') }}</option>
+                        <option value="denied"    @selected(request('claim_status') === 'denied')>{{ __('financial.billing.status_denied') }}</option>
+                        <option value="cancelled" @selected(request('claim_status') === 'cancelled')>{{ __('financial.billing.status_cancelled') }}</option>
                     </select>
                 </div>
                 <div class="col-auto ms-auto">
                     <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="ti ti-filter me-1"></i> Filtrar
+                        <i class="ti ti-filter me-1"></i> {{ __('financial.filter') }}
                     </button>
                     <a href="{{ route('panel.financial.billing.index') }}" class="btn btn-outline-secondary btn-sm ms-1">
-                        <i class="ti ti-x me-1"></i> Limpar
+                        <i class="ti ti-x me-1"></i> {{ __('financial.clear') }}
                     </a>
                 </div>
             </form>
@@ -54,56 +54,56 @@
         <div class="col-lg-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-header bg-transparent fw-semibold">
-                    Faturamento individual
+                    {{ __('financial.billing.individual_title') }}
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ route('panel.financial.billing.individual.store') }}" class="row g-2">
                         @csrf
                         <div class="col-12">
-                            <label class="form-label small fw-semibold">Agendamento atendido</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.attended_schedule') }}</label>
                             <select name="schedule_id" class="form-select form-select-sm" required>
-                                <option value="">Selecione...</option>
+                                <option value="">{{ __('financial.billing.select') }}</option>
                                 @foreach($eligibleSchedules as $schedule)
                                     <option value="{{ $schedule->id }}">
-                                        {{ $schedule->date_time?->format('d/m/Y H:i') }} - {{ $schedule->patient?->person?->full_name ?? $schedule->full_name }} ({{ $schedule->covenant?->name ?? 'Sem convênio' }})
+                                        {{ $schedule->date_time?->format('d/m/Y H:i') }} - {{ $schedule->patient?->person?->full_name ?? $schedule->full_name }} ({{ $schedule->covenant?->name ?? __('financial.billing.no_covenant') }})
                                     </option>
                                 @endforeach
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Qtde</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.quantity') }}</label>
                             <input type="number" name="quantity" min="1" value="1" class="form-control form-control-sm" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Valor unitário (R$)</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.unit_price') }}</label>
                             <input type="number" name="unit_price" min="0" step="0.01" class="form-control form-control-sm" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Vencimento</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.due_date') }}</label>
                             <input type="date" name="due_date" class="form-control form-control-sm">
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Status inicial</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.initial_status') }}</label>
                             <select name="status" class="form-select form-select-sm">
-                                <option value="draft">Rascunho</option>
-                                <option value="submitted">Enviado</option>
+                                <option value="draft">{{ __('financial.billing.status_draft') }}</option>
+                                <option value="submitted">{{ __('financial.billing.status_submitted') }}</option>
                             </select>
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Código TUSS</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.tuss_code') }}</label>
                             <input type="text" name="tuss_code" value="10101012" class="form-control form-control-sm">
                         </div>
                         <div class="col-6">
-                            <label class="form-label small fw-semibold">Autorização</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.authorization') }}</label>
                             <input type="text" name="authorization_code" class="form-control form-control-sm">
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-semibold">Descrição procedimento</label>
+                            <label class="form-label small fw-semibold">{{ __('financial.billing.procedure_desc') }}</label>
                             <input type="text" name="procedure_description" value="CONSULTA OFTALMOLOGICA" class="form-control form-control-sm">
                         </div>
                         <div class="col-12">
                             <button type="submit" class="btn btn-primary btn-sm w-100">
-                                <i class="ti ti-plus me-1"></i> Criar guia individual
+                                <i class="ti ti-plus me-1"></i> {{ __('financial.billing.create_individual') }}
                             </button>
                         </div>
                     </form>
@@ -116,41 +116,41 @@
                 @csrf
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-header bg-transparent fw-semibold">
-                        Faturamento em lote (TISS)
+                        {{ __('financial.billing.batch_title') }}
                     </div>
                     <div class="card-body">
                         <div class="row g-2">
                             <div class="col-md-4">
-                                <label class="form-label small fw-semibold">Convênio</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.covenant_label') }}</label>
                                 <select name="covenant_id" class="form-select form-select-sm" required>
-                                    <option value="">Selecione...</option>
+                                    <option value="">{{ __('financial.billing.select') }}</option>
                                     @foreach($covenants as $covenant)
                                         <option value="{{ $covenant->id }}">{{ $covenant->name }}</option>
                                     @endforeach
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small fw-semibold">Qtde</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.quantity') }}</label>
                                 <input type="number" name="quantity" min="1" value="1" class="form-control form-control-sm" required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Valor unitário (R$)</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.unit_price') }}</label>
                                 <input type="number" name="unit_price" min="0" step="0.01" class="form-control form-control-sm" required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Vencimento</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.due_date') }}</label>
                                 <input type="date" name="due_date" class="form-control form-control-sm">
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Período de</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.period_from') }}</label>
                                 <input type="date" name="date_from" value="{{ $from }}" class="form-control form-control-sm" required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Período até</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.period_to') }}</label>
                                 <input type="date" name="date_until" value="{{ $to }}" class="form-control form-control-sm" required>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Versão TISS</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.tiss_version') }}</label>
                                 <select name="tiss_version" class="form-select form-select-sm">
                                     @foreach($tissVersionOptions as $version)
                                         <option value="{{ $version }}" @selected(old('tiss_version', $selectedTissVersion) === $version)>{{ $version }}</option>
@@ -158,7 +158,7 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
-                                <label class="form-label small fw-semibold">Layout comunicação</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.tiss_layout') }}</label>
                                 <select name="tiss_layout_version" class="form-select form-select-sm">
                                     @foreach($tissLayoutOptions as $layout)
                                         <option value="{{ $layout }}" @selected(old('tiss_layout_version', $selectedTissLayout) === $layout)>{{ $layout }}</option>
@@ -166,11 +166,11 @@
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small fw-semibold">Código TUSS</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.tuss_code') }}</label>
                                 <input type="text" name="tuss_code" value="10101012" class="form-control form-control-sm">
                             </div>
                             <div class="col-md-8">
-                                <label class="form-label small fw-semibold">Descrição procedimento</label>
+                                <label class="form-label small fw-semibold">{{ __('financial.billing.procedure_desc') }}</label>
                                 <input type="text" name="procedure_description" value="CONSULTA OFTALMOLOGICA" class="form-control form-control-sm">
                             </div>
                         </div>
@@ -178,8 +178,8 @@
                         <hr>
 
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="mb-0">Agendamentos elegíveis ({{ $eligibleSchedules->count() }})</h6>
-                            <small class="text-muted">Marque para faturar no lote. Se não marcar, o sistema usa todos elegíveis no período.</small>
+                            <h6 class="mb-0">{{ __('financial.billing.eligible_count', ['count' => $eligibleSchedules->count()]) }}</h6>
+                            <small class="text-muted">{{ __('financial.billing.eligible_hint') }}</small>
                         </div>
 
                         <div class="table-responsive border rounded">
@@ -189,11 +189,11 @@
                                         <th style="width:32px;">
                                             <input type="checkbox" onclick="document.querySelectorAll('.schedule-check').forEach(el => el.checked = this.checked);">
                                         </th>
-                                        <th>Data</th>
-                                        <th>Paciente</th>
-                                        <th>Médico</th>
-                                        <th>Convênio</th>
-                                        <th>Código agenda</th>
+                                        <th>{{ __('financial.billing.col_date') }}</th>
+                                        <th>{{ __('financial.billing.col_patient') }}</th>
+                                        <th>{{ __('financial.billing.col_doctor') }}</th>
+                                        <th>{{ __('financial.billing.covenant_label') }}</th>
+                                        <th>{{ __('financial.billing.col_schedule_code') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -211,7 +211,7 @@
                                     @empty
                                         <tr>
                                             <td colspan="6" class="text-center text-muted py-3">
-                                                Nenhum agendamento elegível para faturar no período.
+                                                {{ __('financial.billing.no_eligible') }}
                                             </td>
                                         </tr>
                                     @endforelse
@@ -221,7 +221,7 @@
                     </div>
                     <div class="card-footer bg-transparent d-flex justify-content-end">
                         <button type="submit" class="btn btn-success btn-sm">
-                            <i class="ti ti-stack-2 me-1"></i> Criar lote TISS
+                            <i class="ti ti-stack-2 me-1"></i> {{ __('financial.billing.create_batch') }}
                         </button>
                     </div>
                 </div>
@@ -232,17 +232,17 @@
     <div class="row g-3">
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-transparent fw-semibold">Guias de faturamento</div>
+                <div class="card-header bg-transparent fw-semibold">{{ __('financial.billing.claims_title') }}</div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Guia</th>
-                                <th>Data</th>
-                                <th>Paciente</th>
-                                <th>Convênio</th>
-                                <th class="text-end">Valor</th>
-                                <th>Status</th>
+                                <th>{{ __('financial.billing.col_guide') }}</th>
+                                <th>{{ __('financial.billing.col_date') }}</th>
+                                <th>{{ __('financial.billing.col_patient') }}</th>
+                                <th>{{ __('financial.billing.covenant_label') }}</th>
+                                <th class="text-end">{{ __('financial.billing.col_value') }}</th>
+                                <th>{{ __('financial.billing.col_status') }}</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -263,20 +263,20 @@
                                         @if($claim->status->value !== 'paid')
                                             <form method="POST" action="{{ route('panel.financial.billing.claims.paid', $claim) }}" class="d-inline">
                                                 @csrf
-                                                <button class="btn btn-outline-success btn-xs" type="submit">Pagar</button>
+                                                <button class="btn btn-outline-success btn-xs" type="submit">{{ __('financial.billing.pay_btn') }}</button>
                                             </form>
                                         @endif
                                         @if(!in_array($claim->status->value, ['paid', 'denied', 'cancelled'], true))
                                             <form method="POST" action="{{ route('panel.financial.billing.claims.denied', $claim) }}" class="d-inline">
                                                 @csrf
-                                                <button class="btn btn-outline-danger btn-xs" type="submit">Glosar</button>
+                                                <button class="btn btn-outline-danger btn-xs" type="submit">{{ __('financial.billing.deny_btn') }}</button>
                                             </form>
                                         @endif
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted py-4">Nenhuma guia encontrada.</td>
+                                    <td colspan="7" class="text-center text-muted py-4">{{ __('financial.billing.no_claims') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -287,16 +287,16 @@
 
         <div class="col-lg-5">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-transparent fw-semibold">Lotes TISS</div>
+                <div class="card-header bg-transparent fw-semibold">{{ __('financial.billing.batches_title') }}</div>
                 <div class="table-responsive">
                     <table class="table table-sm table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Lote</th>
-                                <th>Convênio</th>
-                                <th>Guias</th>
-                                <th class="text-end">Valor</th>
-                                <th>Status</th>
+                                <th>{{ __('financial.billing.col_batch') }}</th>
+                                <th>{{ __('financial.billing.covenant_label') }}</th>
+                                <th>{{ __('financial.billing.col_guides') }}</th>
+                                <th class="text-end">{{ __('financial.billing.col_value') }}</th>
+                                <th>{{ __('financial.billing.col_status') }}</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -316,7 +316,7 @@
                                         @if($batch->status->value === 'draft')
                                             <form method="POST" action="{{ route('panel.financial.billing.batches.submit', $batch) }}" class="d-inline">
                                                 @csrf
-                                                <button class="btn btn-outline-primary btn-xs" type="submit">Enviar</button>
+                                                <button class="btn btn-outline-primary btn-xs" type="submit">{{ __('financial.billing.submit_btn') }}</button>
                                             </form>
                                         @endif
                                         <a href="{{ route('panel.financial.billing.batches.xml', $batch) }}"
@@ -327,7 +327,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">Nenhum lote encontrado.</td>
+                                    <td colspan="6" class="text-center text-muted py-4">{{ __('financial.billing.no_batches') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>

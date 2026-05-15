@@ -93,7 +93,7 @@
     <button type="button"
             class="btn btn-sm btn-outline-primary position-relative mb-2"
             @click="toggle()">
-        <i class="fas fa-bullhorn me-1"></i> Mural de Recados
+        <i class="fas fa-bullhorn me-1"></i> {{ __('schedules.notices_title') }}
         <span x-show="unreadCount > 0" x-cloak
               class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
               x-text="unreadCount"
@@ -106,17 +106,17 @@
         {{-- Cabeçalho --}}
         <div class="d-flex align-items-center justify-content-between px-3 py-2 bg-primary text-white rounded-top">
             <span class="fw-semibold small">
-                <i class="fas fa-bullhorn me-1"></i> Mural de Recados
+                <i class="fas fa-bullhorn me-1"></i> {{ __('schedules.notices_title') }}
                 <span x-show="unreadCount > 0" x-cloak
                       class="badge bg-warning text-dark ms-1"
-                      x-text="unreadCount + ' não lido(s)'"
+                      x-text="unreadCount + ' {{ __('schedules.notices_unread') }}'"
                       style="font-size:.65rem;"></span>
             </span>
             <div class="d-flex gap-2">
                 <button type="button"
                         class="btn btn-sm btn-light py-0"
                         @click="showForm = ! showForm">
-                    <i class="fas fa-plus me-1"></i><span style="font-size:.8rem;">Novo</span>
+                    <i class="fas fa-plus me-1"></i><span style="font-size:.8rem;">{{ __('schedules.notices_new') }}</span>
                 </button>
                 <button type="button" class="btn-close btn-close-white" @click="noticesOpen = false"></button>
             </div>
@@ -127,31 +127,31 @@
             <textarea class="form-control form-control-sm mb-2"
                       rows="2"
                       x-model="newContent"
-                      placeholder="Digite o recado…"
+                      placeholder="{{ __('schedules.notices_placeholder') }}"
                       maxlength="1000"></textarea>
             <div class="d-flex align-items-center gap-3 flex-wrap">
                 <div class="form-check form-check-inline mb-0">
                     <input class="form-check-input" type="checkbox" id="notice-urgent" x-model="newUrgent">
                     <label class="form-check-label small text-danger fw-semibold" for="notice-urgent">
-                        <i class="fas fa-exclamation-triangle me-1"></i> Urgente
+                        <i class="fas fa-exclamation-triangle me-1"></i> {{ __('schedules.notices_urgent') }}
                     </label>
                 </div>
                 <div class="d-flex align-items-center float-end gap-1">
-                    <label class="small text-muted mb-0">Expira em:</label>
+                    <label class="small text-muted mb-0">{{ __('schedules.notices_expires') }}</label>
                     <input type="date" class="form-control form-control-sm" x-model="newExpires" style="max-width:150px;">
                 </div>
                 <div class="ms-auto d-flex gap-2">
                     <button type="button"
                             class="btn btn-sm btn-outline-secondary"
                             @click="showForm = false">
-                        Cancelar
+                        {{ __('schedules.notices_cancel') }}
                     </button>
                     <button type="button"
                             class="btn btn-sm btn-primary"
                             :disabled="saving || ! newContent.trim()"
                             @click="saveNotice()">
                         <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
-                        Publicar
+                        {{ __('schedules.notices_publish') }}
                     </button>
                 </div>
             </div>
@@ -159,12 +159,12 @@
 
         {{-- Lista de recados --}}
         <div x-show="loading" x-cloak class="text-center py-3 text-muted small">
-            <span class="spinner-border spinner-border-sm me-1"></span> Carregando…
+            <span class="spinner-border spinner-border-sm me-1"></span> {{ __('schedules.notices_loading') }}
         </div>
 
         <template x-if="! loading && notices.length === 0">
             <p class="text-muted text-center py-3 mb-0 small">
-                <i class="fas fa-check-circle me-1"></i> Nenhum recado no momento.
+                <i class="fas fa-check-circle me-1"></i> {{ __('schedules.notices_empty') }}
             </p>
         </template>
 
@@ -180,7 +180,7 @@
                         {{-- Ícones de alerta e pin --}}
                         <div class="flex-shrink-0 pt-1" style="width:20px;">
                             <template x-if="notice.is_urgent">
-                                <i class="fas fa-exclamation-triangle text-danger" title="Urgente"></i>
+                                <i class="fas fa-exclamation-triangle text-danger" title="{{ __('schedules.notices_urgent') }}"></i>
                             </template>
                             <template x-if="notice.pinned && ! notice.is_urgent">
                                 <i class="fas fa-thumbtack text-primary" title="Fixado"></i>
@@ -196,7 +196,7 @@
                                 <span x-text="notice.created_at"></span>
                                 <template x-if="notice.expires_at">
                                     <span class="ms-1">
-                                        &middot; expira <span x-text="notice.expires_at"></span>
+                                        &middot; {{ __('schedules.notices_expires_at') }} <span x-text="notice.expires_at"></span>
                                     </span>
                                 </template>
                             </div>
@@ -210,7 +210,7 @@
                                     x-show="! notice.is_read"
                                     @click="markRead(notice)"
                                     title="Marcar como lido">
-                                <i class="fas fa-check"></i> Li
+                                <i class="fas fa-check"></i> {{ __('schedules.notices_read_btn') }}
                             </button>
                             <span x-show="notice.is_read"
                                   class="text-success"

@@ -60,6 +60,12 @@ return [
     'empty_schedules' => 'Nenhuma consulta agendada para hoje.',
     'empty_patients'  => 'Nenhum paciente cadastrado.',
 
+    // Activation / Setup
+    'activation_title'     => 'Configure sua clínica',
+    'activation_subtitle'  => 'Complete os passos para aproveitar ao máximo o sistema.',
+    'activation_done'      => 'setup concluído',
+    'activation_completed_on' => 'Concluído em',
+
     // Demo
     'demo_title'       => 'Ambiente de demonstração',
     'demo_description' => 'Popule dados de teste ou redefina o ambiente para demonstrações.',

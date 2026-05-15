@@ -100,19 +100,19 @@
             @endif
             @if($schedule->confirmed_at)
                 <tr>
-                    <th>Confirmado em</th>
+                    <th>{{ __('schedules.show_confirmed_at') }}</th>
                     <td>{{ $schedule->confirmed_at->format('d/m/Y H:i') }}</td>
                 </tr>
             @endif
             @if($schedule->notes)
                 <tr>
-                    <th>Observações</th>
+                    <th>{{ __('schedules.show_notes') }}</th>
                     <td>{{ $schedule->notes }}</td>
                 </tr>
             @endif
             @if($schedule->cancellation_reason)
                 <tr>
-                    <th>Motivo do cancelamento</th>
+                    <th>{{ __('schedules.show_cancel_reason') }}</th>
                     <td class="text-danger">{{ $schedule->cancellation_reason }}</td>
                 </tr>
             @endif
@@ -126,15 +126,15 @@
     {{-- Histórico de situações --}}
     @if($schedule->situationLogs->isNotEmpty())
         <hr>
-        <h6 class="fw-semibold mb-2"><i class="fas fa-history me-1"></i>Histórico</h6>
+        <h6 class="fw-semibold mb-2"><i class="fas fa-history me-1"></i>{{ __('schedules.show_history') }}</h6>
         <table class="table table-sm">
             <thead class="table-light">
                 <tr>
-                    <th>De</th>
-                    <th>Para</th>
-                    <th>Por</th>
-                    <th>Quando</th>
-                    <th>Obs.</th>
+                    <th>{{ __('schedules.show_from') }}</th>
+                    <th>{{ __('schedules.show_to') }}</th>
+                    <th>{{ __('schedules.show_by') }}</th>
+                    <th>{{ __('schedules.show_when') }}</th>
+                    <th>{{ __('schedules.show_obs') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -163,4 +163,3 @@
         </table>
     @endif
 </fieldset>
-

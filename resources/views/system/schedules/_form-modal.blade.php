@@ -14,15 +14,15 @@
         @include('system.schedules._form-modal')
     </div>
 --}}
-<x-crud-modal id="scheduleModal" title="Agendamento">
+<x-crud-modal id="scheduleModal" title="{{ __('schedules.form_title') }}">
     <x-slot:body>
         <div class="row g-3">
 
             {{-- Médico --}}
             <div class="col-md-6">
-                <label class="form-label">Médico <span class="text-danger">*</span></label>
+                <label class="form-label">{{ __('schedules.form_doctor') }} <span class="text-danger">*</span></label>
                 <select class="form-select" :class="{ 'is-invalid': hasError('doctor_id') }" x-model="form.doctor_id">
-                    <option value="">Selecione...</option>
+                    <option value="">{{ __('schedules.form_select') }}</option>
                     @foreach($doctors as $doctor)
                         <option value="{{ $doctor->id }}">{{ $doctor->user_name }}</option>
                     @endforeach
@@ -42,7 +42,7 @@
                  x-modelable="doctorId"
                  x-model="form.doctor_id">
 
-                <label class="form-label">Data e Hora <span class="text-danger">*</span></label>
+                <label class="form-label">{{ __('schedules.form_date_time') }} <span class="text-danger">*</span></label>
 
                 {{-- Seletor de data --}}
                 <input type="date"
@@ -53,7 +53,7 @@
 
                 {{-- Carregando --}}
                 <div x-show="loadingSlots" x-cloak class="text-muted small py-1">
-                    <span class="spinner-border spinner-border-sm me-1"></span> Carregando horários…
+                    <span class="spinner-border spinner-border-sm me-1"></span> {{ __('schedules.form_loading_slots') }}
                 </div>
 
                 {{-- Grid de slots (médico com escala) --}}
@@ -79,7 +79,7 @@
                 {{-- Médico não atende neste dia --}}
                 <template x-if="! loadingSlots && hasSchedule && slots.length === 0 && selectedDate">
                     <p class="text-muted small mt-1 mb-0">
-                        <i class="fas fa-calendar-times me-1"></i> Médico não atende neste dia.
+                        <i class="fas fa-calendar-times me-1"></i> {{ __('schedules.form_no_slots') }}
                     </p>
                 </template>
 
@@ -101,7 +101,7 @@
                         </div>
                         <small class="text-muted mt-2 d-block">
                             <i class="fas fa-info-circle me-1"></i>
-                            Intervalo de <span x-text="interval"></span> min (sem escala definida)
+                            {{ __('schedules.form_interval_hint') }} <span x-text="interval"></span> {{ __('schedules.form_no_scale') }}
                         </small>
                     </div>
                 </template>
@@ -122,7 +122,7 @@
                  )"
                  x-init="$nextTick(() => document.getElementById('scheduleModal').addEventListener('hidden.bs.modal', () => reset()))">
 
-                <label class="form-label">Paciente</label>
+                <label class="form-label">{{ __('schedules.form_patient') }}</label>
 
                 {{-- Paciente já selecionado --}}
                 <template x-if="selectedPatient">
@@ -142,7 +142,7 @@
                            x-model="query"
                            @input.debounce.300ms="search()"
                            @blur="closeResults()"
-                           placeholder="Buscar por nome, CPF ou celular…">
+                           placeholder="{{ __('schedules.form_patient_search') }}">
 
                     {{-- Spinner --}}
                     <span x-show="searching" x-cloak
@@ -166,7 +166,7 @@
                             style="cursor:pointer"
                             @mousedown.prevent="prefillCreate()">
                             <i class="fas fa-plus-circle me-1"></i>
-                            Cadastrar "<span x-text="query"></span>"
+                            {{ __('schedules.form_register') }} "<span x-text="query"></span>"
                         </li>
                     </ul>
 
@@ -178,27 +178,27 @@
                             style="cursor:pointer"
                             @mousedown.prevent="prefillCreate()">
                             <i class="fas fa-plus-circle me-1"></i>
-                            Cadastrar "<span x-text="query"></span>"
+                            {{ __('schedules.form_register') }} "<span x-text="query"></span>"
                         </li>
                     </ul>
                 </div>
 
                 {{-- Formulário de cadastro rápido --}}
                 <div x-show="showCreate" x-cloak class="card card-body bg-light mt-2 p-3">
-                    <p class="mb-2 fw-semibold small">Cadastro rápido de paciente</p>
+                    <p class="mb-2 fw-semibold small">{{ __('schedules.form_quick_register') }}</p>
                     <div class="row g-2">
                         <div class="col-md-7">
                             <input type="text"
                                    class="form-control form-control-sm"
                                    x-model="newPatient.name"
-                                   placeholder="Nome completo *">
+                                   placeholder="{{ __('schedules.form_full_name') }} *">
                         </div>
                         <div class="col-md-5">
                             <input type="text"
                                    class="form-control form-control-sm"
                                    x-model="newPatient.cellphone"
                                    x-mask-br="'cel'" maxlength="15"
-                                   placeholder="Celular *">
+                                   placeholder="{{ __('schedules.form_cellphone') }} *">
                         </div>
                     </div>
                     <div class="d-flex gap-2 mt-2">
@@ -207,12 +207,12 @@
                                 :disabled="creating"
                                 @click="createAndLink()">
                             <span x-show="creating" class="spinner-border spinner-border-sm me-1"></span>
-                            Salvar e vincular
+                            {{ __('schedules.form_save_link') }}
                         </button>
                         <button type="button"
                                 class="btn btn-sm btn-outline-secondary"
                                 @click="showCreate = false">
-                            Cancelar
+                            {{ __('schedules.form_cancel') }}
                         </button>
                     </div>
                 </div>
@@ -221,12 +221,12 @@
 
             {{-- Nome completo (preenchido pela busca ou manualmente) --}}
             <div class="col-md-12">
-                <label class="form-label">Nome completo <span class="text-danger">*</span></label>
+                <label class="form-label">{{ __('schedules.form_full_name') }} <span class="text-danger">*</span></label>
                 <input type="text"
                        class="form-control"
                        :class="{ 'is-invalid': hasError('full_name') }"
                        x-model="form.full_name"
-                       placeholder="Nome do paciente">
+                       placeholder="{{ __('schedules.form_patient_name') }}">
                 <div class="invalid-feedback" x-text="firstError('full_name')"></div>
             </div>
 
@@ -238,14 +238,14 @@
 
                 <label class="form-label small fw-semibold">
                     <i class="fas fa-door-open me-1 text-secondary"></i>
-                    Recursos (Sala / Equipamento)
-                    <span class="text-muted fw-normal ms-1">— opcional</span>
+                    {{ __('schedules.form_resources') }}
+                    <span class="text-muted fw-normal ms-1">{{ __('schedules.form_resources_opt') }}</span>
                 </label>
 
                 {{-- Nenhum recurso cadastrado --}}
                 <div x-show="form.resources_available.length === 0 && form.date_time"
                      class="text-muted small">
-                    <i class="fas fa-info-circle me-1"></i> Nenhum recurso cadastrado na clínica.
+                    <i class="fas fa-info-circle me-1"></i> {{ __('schedules.form_no_resources') }}
                 </div>
 
                 {{-- Lista de recursos com disponibilidade --}}
@@ -266,7 +266,7 @@
                             <span x-text="resource.name"></span>
                             <span class="badge ms-1"
                                   :class="resource.available ? 'bg-success' : 'bg-danger'"
-                                  x-text="resource.available ? 'Livre' : 'Ocupado'"
+                                  x-text="resource.available ? '{{ __('schedules.form_free') }}' : '{{ __('schedules.form_busy') }}'"
                                   style="font-size:.68rem;"></span>
                         </label>
                     </template>
@@ -276,9 +276,9 @@
 
             {{-- Convênio --}}
             <div class="col-md-6">
-                <label class="form-label">Convênio</label>
+                <label class="form-label">{{ __('schedules.form_covenant') }}</label>
                 <select class="form-select" x-model="form.covenant_id">
-                    <option value="">Nenhum</option>
+                    <option value="">{{ __('schedules.form_none') }}</option>
                     @foreach($covenants as $covenant)
                         <option value="{{ $covenant->id }}">{{ $covenant->name }}</option>
                     @endforeach
@@ -287,9 +287,9 @@
 
             {{-- Tipo de visita --}}
             <div class="col-md-6">
-                <label class="form-label">Tipo de consulta</label>
+                <label class="form-label">{{ __('schedules.form_visit_type') }}</label>
                 <select class="form-select" x-model="form.visit_id">
-                    <option value="">Nenhum</option>
+                    <option value="">{{ __('schedules.form_none') }}</option>
                     @foreach($visitTypes as $type)
                         <option value="{{ $type->id }}">{{ $type->name }}</option>
                     @endforeach
@@ -298,13 +298,13 @@
 
             {{-- Telefone --}}
             <div class="col-md-6">
-                <label class="form-label">Telefone</label>
+                <label class="form-label">{{ __('schedules.form_telephone') }}</label>
                 <input type="text" class="form-control" x-model="form.telephone" x-mask-br="'tel'" maxlength="14" placeholder="(00) 0000-0000">
             </div>
 
             {{-- Celular --}}
             <div class="col-md-6">
-                <label class="form-label">Celular</label>
+                <label class="form-label">{{ __('schedules.form_cellphone') }}</label>
                 <input type="text" class="form-control" x-model="form.cellphone" x-mask-br="'cel'" maxlength="15" placeholder="(00) 00000-0000">
             </div>
 
@@ -313,18 +313,18 @@
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="scheduleWhatsapp" x-model="form.cellphone_whatsapp">
                     <label class="form-check-label" for="scheduleWhatsapp">
-                        <i class="fab fa-whatsapp text-success"></i> Celular é WhatsApp
+                        <i class="fab fa-whatsapp text-success"></i> {{ __('schedules.form_whatsapp') }}
                     </label>
                 </div>
             </div>
 
             {{-- Observações --}}
             <div class="col-md-12">
-                <label class="form-label">Observações</label>
+                <label class="form-label">{{ __('schedules.form_notes') }}</label>
                 <textarea class="form-control"
                           x-model="form.notes"
                           rows="2"
-                          placeholder="Informações adicionais sobre o agendamento..."></textarea>
+                          placeholder="{{ __('schedules.form_notes_ph') }}"></textarea>
             </div>
 
             {{-- Recorrência --}}
@@ -332,19 +332,19 @@
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="schedRecurrence" x-model="form.use_recurrence">
                     <label class="form-check-label" for="schedRecurrence">
-                        <i class="fas fa-redo me-1 text-secondary"></i> Repetir agendamento
+                        <i class="fas fa-redo me-1 text-secondary"></i> {{ __('schedules.form_recurrence') }}
                     </label>
                 </div>
                 <div x-show="form.use_recurrence" x-cloak class="row g-2 mt-1 ps-1">
                     <div class="col-md-5">
-                        <label class="form-label small mb-1">Frequência</label>
+                        <label class="form-label small mb-1">{{ __('schedules.form_rec_freq') }}</label>
                         <select class="form-select form-select-sm" x-model="form.recurrence_type">
-                            <option value="weekly">Semanal</option>
-                            <option value="monthly">Mensal</option>
+                            <option value="weekly">{{ __('schedules.form_weekly') }}</option>
+                            <option value="monthly">{{ __('schedules.form_monthly') }}</option>
                         </select>
                     </div>
                     <div class="col-md-7">
-                        <label class="form-label small mb-1">Repetir até <span class="text-danger">*</span></label>
+                        <label class="form-label small mb-1">{{ __('schedules.form_rec_until') }} <span class="text-danger">*</span></label>
                         <input type="date"
                                class="form-control form-control-sm"
                                x-model="form.recurrence_until"
@@ -353,7 +353,7 @@
                     <div class="col-12">
                         <small class="text-muted">
                             <i class="fas fa-info-circle me-1"></i>
-                            Slots já ocupados serão automaticamente ignorados.
+                            {{ __('schedules.form_rec_hint') }}
                         </small>
                     </div>
                 </div>

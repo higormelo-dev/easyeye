@@ -9,20 +9,20 @@
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Período inicial</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_from') }}</label>
                     <input type="date" name="from" class="form-control form-control-sm" value="{{ $from }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Período final</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_to') }}</label>
                     <input type="date" name="to" class="form-control form-control-sm" value="{{ $to }}">
                 </div>
                 <div class="col-auto ms-auto">
                     <button class="btn btn-primary btn-sm" type="submit">
-                        <i class="ti ti-filter me-1"></i> Filtrar
+                        <i class="ti ti-filter me-1"></i> {{ __('financial.filter') }}
                     </button>
                     <div class="btn-group ms-1">
                         <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="ti ti-download me-1"></i> Exportar
+                            <i class="ti ti-download me-1"></i> {{ __('financial.export') }}
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><a class="dropdown-item" href="{{ route('panel.financial.reports.cash-flow.export', array_merge(request()->query(), ['format' => 'csv'])) }}">CSV</a></li>
@@ -40,7 +40,7 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total de receitas</div>
+                    <div class="text-muted small">{{ __('financial.cashflow.total_income') }}</div>
                     <div class="fs-3 fw-bold text-success">R$ {{ number_format($summary['income'], 2, ',', '.') }}</div>
                 </div>
             </div>
@@ -48,7 +48,7 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total de despesas</div>
+                    <div class="text-muted small">{{ __('financial.cashflow.total_expense') }}</div>
                     <div class="fs-3 fw-bold text-danger">R$ {{ number_format($summary['expense'], 2, ',', '.') }}</div>
                 </div>
             </div>
@@ -56,7 +56,7 @@
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Saldo do período</div>
+                    <div class="text-muted small">{{ __('financial.cashflow.period_balance') }}</div>
                     <div class="fs-3 fw-bold {{ $summary['balance'] >= 0 ? 'text-primary' : 'text-danger' }}">
                         R$ {{ number_format($summary['balance'], 2, ',', '.') }}
                     </div>
@@ -68,14 +68,14 @@
     <div class="row g-3 mb-4">
         <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-transparent fw-semibold">Composição por categoria</div>
+                <div class="card-header bg-transparent fw-semibold">{{ __('financial.cashflow.category_breakdown') }}</div>
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Categoria</th>
-                                <th>Tipo</th>
-                                <th class="text-end">Valor</th>
+                                <th>{{ __('financial.cashflow.col_category') }}</th>
+                                <th>{{ __('financial.cashflow.col_type') }}</th>
+                                <th class="text-end">{{ __('financial.cashflow.col_value') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -84,14 +84,14 @@
                                     <td>{{ $row['category'] }}</td>
                                     <td>
                                         <span class="badge {{ $row['type'] === 'income' ? 'bg-success' : 'bg-danger' }}">
-                                            {{ $row['type'] === 'income' ? 'Receita' : 'Despesa' }}
+                                            {{ $row['type'] === 'income' ? __('financial.cashflow.type_income') : __('financial.cashflow.type_expense') }}
                                         </span>
                                     </td>
                                     <td class="text-end">R$ {{ number_format($row['total'], 2, ',', '.') }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="3" class="text-center text-muted py-3">Sem dados no período.</td>
+                                    <td colspan="3" class="text-center text-muted py-3">{{ __('financial.cashflow.no_data') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -101,15 +101,15 @@
         </div>
         <div class="col-md-6">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-transparent fw-semibold">Evolução diária</div>
+                <div class="card-header bg-transparent fw-semibold">{{ __('financial.cashflow.daily_evolution') }}</div>
                 <div class="table-responsive">
                     <table class="table table-sm mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Dia</th>
-                                <th class="text-end">Receitas</th>
-                                <th class="text-end">Despesas</th>
-                                <th class="text-end">Saldo</th>
+                                <th>{{ __('financial.cashflow.col_day') }}</th>
+                                <th class="text-end">{{ __('financial.cashflow.col_income') }}</th>
+                                <th class="text-end">{{ __('financial.cashflow.col_expense') }}</th>
+                                <th class="text-end">{{ __('financial.cashflow.col_balance') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -124,7 +124,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-3">Sem dados no período.</td>
+                                    <td colspan="4" class="text-center text-muted py-3">{{ __('financial.cashflow.no_data') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -135,18 +135,18 @@
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-transparent fw-semibold">Detalhamento de lançamentos</div>
+        <div class="card-header bg-transparent fw-semibold">{{ __('financial.cashflow.entry_detail') }}</div>
         <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Data</th>
-                        <th>Código</th>
-                        <th>Descrição</th>
-                        <th>Categoria</th>
-                        <th>Tipo</th>
-                        <th>Status</th>
-                        <th class="text-end">Valor</th>
+                        <th>{{ __('financial.cashflow.col_date') }}</th>
+                        <th>{{ __('financial.cashflow.col_code') }}</th>
+                        <th>{{ __('financial.cashflow.col_description') }}</th>
+                        <th>{{ __('financial.cashflow.col_category') }}</th>
+                        <th>{{ __('financial.cashflow.col_type') }}</th>
+                        <th>{{ __('financial.cashflow.col_status') }}</th>
+                        <th class="text-end">{{ __('financial.cashflow.col_value') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -168,7 +168,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">Nenhum lançamento encontrado.</td>
+                            <td colspan="7" class="text-center text-muted py-4">{{ __('financial.cashflow.no_entries') }}</td>
                         </tr>
                     @endforelse
                 </tbody>

@@ -4,11 +4,11 @@
 --}}
 @php
     $typeLabels = [
-        'meeting'     => 'Reunião',
-        'maintenance' => 'Manutenção',
-        'personal'    => 'Pessoal',
-        'training'    => 'Treinamento',
-        'other'       => 'Outro',
+        'meeting'     => __('schedules.event_meeting'),
+        'maintenance' => __('schedules.event_maintenance'),
+        'personal'    => __('schedules.event_personal'),
+        'training'    => __('schedules.event_training'),
+        'other'       => __('schedules.event_other'),
     ];
     $typeLabel = $typeLabels[$event->type] ?? $event->type;
     $color     = $event->color ?? '#6c757d';
@@ -61,7 +61,7 @@
 
             {{-- Badge "Compromisso" --}}
             <div class="flex-shrink-0">
-                <span class="badge bg-secondary" style="font-size:.68rem;">Compromisso</span>
+                <span class="badge bg-secondary" style="font-size:.68rem;">{{ __('schedules.event_badge') }}</span>
             </div>
 
         </div>

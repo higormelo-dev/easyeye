@@ -15,15 +15,15 @@
         <div class="d-flex align-items-center justify-content-between mb-3">
             <div>
                 <h6 class="mb-0 fw-semibold">
-                    <i class="fas fa-rocket text-{{ $color }} me-2"></i>Configure sua clínica
+                    <i class="fas fa-rocket text-{{ $color }} me-2"></i>{{ __('dashboard.activation_title') }}
                 </h6>
                 <p class="text-muted small mb-0">
-                    Complete os passos para aproveitar ao máximo o sistema.
+                    {{ __('dashboard.activation_subtitle') }}
                 </p>
             </div>
             <div class="text-end">
                 <span class="fs-4 fw-bold text-{{ $color }}">{{ $score }}%</span>
-                <div class="text-muted" style="font-size: 0.7rem;">setup concluído</div>
+                <div class="text-muted" style="font-size: 0.7rem;">{{ __('dashboard.activation_done') }}</div>
             </div>
         </div>
 
@@ -37,7 +37,7 @@
             @foreach($progress as $item)
                 @if($item['completed'])
                     <span class="badge bg-success d-flex align-items-center float-end gap-1 py-2 px-3"
-                          title="Concluído em {{ $item['completed_at'] ? \Carbon\Carbon::parse($item['completed_at'])->format('d/m/Y') : '' }}">
+                          title="{{ __('dashboard.activation_completed_on') }} {{ $item['completed_at'] ? \Carbon\Carbon::parse($item['completed_at'])->format('d/m/Y') : '' }}">
                         <i class="fas fa-check fa-xs"></i>
                         {{ $item['label'] }}
                     </span>

@@ -1,16 +1,15 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Controllers\Financial;
 
-use Barryvdh\Snappy\Facades\SnappyPdf;
 use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
 use App\Models\{BillingClaim, Entity, FinancialCashEntry};
 use App\Services\Financial\CashFlowService;
-use Illuminate\Http\Response;
-use Illuminate\Http\Request;
+use Barryvdh\Snappy\Facades\SnappyPdf;
+use Illuminate\Http\{Request, Response};
 use Illuminate\Support\Facades\Gate;
 use Throwable;
 use ZipArchive;
@@ -18,35 +17,18 @@ use ZipArchive;
 class FinancialReportsController extends Controller
 {
     public function __construct(
-        private readonly CashFlowService $cashFlowService
+        private readonly CashFlowService $cashFlowService,
     ) {
         $this->titleController = 'Relatórios Financeiros';
     }
 
-    public function index()
-    {
-        $this->authorizeFinancial();
-
-        $meta = [
-            'title' => 'Relatórios Financeiros',
-            'action' => 'Financeiro',
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Financeiro', 'url' => route('panel.financial.reports.index'), 'active' => false],
-                ['label' => 'Relatórios Financeiros', 'url' => 'javascript:void(0)', 'active' => true],
-            ],
-        ];
-
-        return view('system.financial.reports.index', compact('meta'));
-    }
-
     public function cashFlow(Request $request)
     {
-        $entity = $this->authorizeFinancial();
+        $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
 
         $from = (string) $request->input('from', now()->startOfMonth()->toDateString());
-        $to = (string) $request->input('to', now()->toDateString());
+        $to   = (string) $request->input('to', now()->toDateString());
 
         $entries = FinancialCashEntry::query()
             ->with(['category', 'covenant'])
@@ -66,8 +48,8 @@ class FinancialReportsController extends Controller
 
                 return [
                     'category' => $category,
-                    'type' => $type,
-                    'total' => (float) $group->sum('amount'),
+                    'type'     => $type,
+                    'total'    => (float) $group->sum('amount'),
                 ];
             })
             ->values()
@@ -77,19 +59,19 @@ class FinancialReportsController extends Controller
         $byDay = $entries
             ->groupBy(fn ($entry) => $entry->entry_date->format('Y-m-d'))
             ->map(fn ($group, $day) => [
-                'day' => $day,
-                'income' => (float) $group->where('type', 'income')->sum('amount'),
+                'day'     => $day,
+                'income'  => (float) $group->where('type', 'income')->sum('amount'),
                 'expense' => (float) $group->where('type', 'expense')->sum('amount'),
             ])
             ->values();
 
         $meta = [
-            'title' => 'Relatório de Fluxo de Caixa',
-            'action' => 'Financeiro',
+            'title'       => __('financial.cashflow.title'),
+            'action'      => __('financial.financial'),
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Relatórios Financeiros', 'url' => route('panel.financial.reports.index'), 'active' => false],
-                ['label' => 'Fluxo de Caixa', 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.bi.index'), 'active' => false],
+                ['label' => __('financial.cashflow.breadcrumb'), 'url' => 'javascript:void(0)', 'active' => true],
             ],
         ];
 
@@ -100,17 +82,17 @@ class FinancialReportsController extends Controller
             'byCategory',
             'byDay',
             'from',
-            'to'
+            'to',
         ));
     }
 
     public function covenants(Request $request)
     {
-        $entity = $this->authorizeFinancial();
+        $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
 
         $from = (string) $request->input('from', now()->startOfMonth()->toDateString());
-        $to = (string) $request->input('to', now()->toDateString());
+        $to   = (string) $request->input('to', now()->toDateString());
 
         $claims = BillingClaim::query()
             ->with(['covenant', 'batch', 'patient.person'])
@@ -123,7 +105,7 @@ class FinancialReportsController extends Controller
         $summary = [
             'total_claims' => $claims->count(),
             'total_amount' => (float) $claims->sum('amount'),
-            'total_paid' => (float) $claims
+            'total_paid'   => (float) $claims
                 ->filter(fn ($claim) => $claim->status->value === 'paid')
                 ->sum('paid_amount'),
             'total_denied' => (float) $claims->sum('glosa_amount'),
@@ -133,22 +115,22 @@ class FinancialReportsController extends Controller
             ->groupBy(fn ($claim) => $claim->covenant?->name ?? 'Sem convênio')
             ->map(fn ($group, $name) => [
                 'covenant' => $name,
-                'claims' => $group->count(),
-                'amount' => (float) $group->sum('amount'),
-                'paid' => (float) $group->sum('paid_amount'),
-                'denied' => (float) $group->sum('glosa_amount'),
+                'claims'   => $group->count(),
+                'amount'   => (float) $group->sum('amount'),
+                'paid'     => (float) $group->sum('paid_amount'),
+                'denied'   => (float) $group->sum('glosa_amount'),
             ])
             ->values()
             ->sortByDesc('amount')
             ->values();
 
         $meta = [
-            'title' => 'Relatório de Faturamento por Convênio',
-            'action' => 'Financeiro',
+            'title'       => __('financial.covenants.title'),
+            'action'      => __('financial.financial'),
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Relatórios Financeiros', 'url' => route('panel.financial.reports.index'), 'active' => false],
-                ['label' => 'Faturamento Convênios', 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.bi.index'), 'active' => false],
+                ['label' => __('financial.covenants.breadcrumb'), 'url' => 'javascript:void(0)', 'active' => true],
             ],
         ];
 
@@ -158,17 +140,17 @@ class FinancialReportsController extends Controller
             'summary',
             'byCovenant',
             'from',
-            'to'
+            'to',
         ));
     }
 
     public function exportCashFlowCsv(Request $request)
     {
-        $entity = $this->authorizeFinancial();
+        $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
 
         $from = (string) $request->input('from', now()->startOfMonth()->toDateString());
-        $to = (string) $request->input('to', now()->toDateString());
+        $to   = (string) $request->input('to', now()->toDateString());
 
         $entries = FinancialCashEntry::query()
             ->with(['category', 'covenant'])
@@ -180,9 +162,9 @@ class FinancialReportsController extends Controller
             ->get();
 
         $summary = $this->cashFlowService->summary($entityId, $from, $to);
-        $rows = $this->cashFlowExportRows($entries);
+        $rows    = $this->cashFlowExportRows($entries);
 
-        $format = $this->normalizeExportFormat((string) $request->input('format', 'csv'));
+        $format       = $this->normalizeExportFormat((string) $request->input('format', 'csv'));
         $baseFilename = "fluxo_caixa_{$from}_{$to}";
 
         return match ($format) {
@@ -194,19 +176,19 @@ class FinancialReportsController extends Controller
                 to: $to,
                 filename: "{$baseFilename}.pdf",
             ),
-            'xls' => $this->xlsResponse($rows, "{$baseFilename}.xls"),
-            'xlsx' => $this->xlsxResponse($rows, "{$baseFilename}.xlsx"),
+            'xls'   => $this->xlsResponse($rows, "{$baseFilename}.xls"),
+            'xlsx'  => $this->xlsxResponse($rows, "{$baseFilename}.xlsx"),
             default => $this->csvResponse($rows, "{$baseFilename}.csv"),
         };
     }
 
     public function exportCovenantsCsv(Request $request)
     {
-        $entity = $this->authorizeFinancial();
+        $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
 
         $from = (string) $request->input('from', now()->startOfMonth()->toDateString());
-        $to = (string) $request->input('to', now()->toDateString());
+        $to   = (string) $request->input('to', now()->toDateString());
 
         $claims = BillingClaim::query()
             ->with(['covenant', 'patient.person'])
@@ -216,7 +198,7 @@ class FinancialReportsController extends Controller
             ->orderBy('attendance_date')
             ->get();
 
-        $rows = [];
+        $rows   = [];
         $rows[] = ['Data atendimento', 'Guia', 'Convênio', 'Paciente', 'Status', 'Valor', 'Glosa', 'Pago'];
 
         foreach ($claims as $claim) {
@@ -256,7 +238,7 @@ class FinancialReportsController extends Controller
         fclose($stream);
 
         return response($content, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Type'        => 'text/csv; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
@@ -266,7 +248,7 @@ class FinancialReportsController extends Controller
         $content = $this->renderXlsXml($rows);
 
         return response($content, 200, [
-            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Type'        => 'application/vnd.ms-excel; charset=UTF-8',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
@@ -280,7 +262,7 @@ class FinancialReportsController extends Controller
         $content = $this->renderXlsx($rows);
 
         return response($content, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
@@ -295,11 +277,11 @@ class FinancialReportsController extends Controller
     ) {
         try {
             return SnappyPdf::loadView('pdf.financial_cashflow', [
-                'entity' => $entity,
-                'entries' => $entries,
-                'summary' => $summary,
-                'from' => $from,
-                'to' => $to,
+                'entity'      => $entity,
+                'entries'     => $entries,
+                'summary'     => $summary,
+                'from'        => $from,
+                'to'          => $to,
                 'generatedAt' => now(),
             ])->setPaper('a4')->setOrientation('landscape')->download($filename);
         } catch (Throwable) {
@@ -312,7 +294,7 @@ class FinancialReportsController extends Controller
         $format = mb_strtolower(trim($format));
 
         return match ($format) {
-            'xsl' => 'xls', // compatibilidade com typo comum
+            'xsl'   => 'xls', // compatibilidade com typo comum
             'excel' => 'xlsx',
             default => in_array($format, ['csv', 'xls', 'xlsx', 'pdf'], true) ? $format : 'csv',
         };
@@ -320,7 +302,7 @@ class FinancialReportsController extends Controller
 
     private function cashFlowExportRows($entries): array
     {
-        $rows = [];
+        $rows   = [];
         $rows[] = ['Data', 'Código', 'Descrição', 'Tipo', 'Status', 'Categoria', 'Convênio', 'Valor'];
 
         foreach ($entries as $entry) {
@@ -341,7 +323,7 @@ class FinancialReportsController extends Controller
 
     private function renderXlsXml(array $rows): string
     {
-        $xml = [];
+        $xml   = [];
         $xml[] = '<?xml version="1.0"?>';
         $xml[] = '<?mso-application progid="Excel.Sheet"?>';
         $xml[] = '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"';
@@ -356,15 +338,15 @@ class FinancialReportsController extends Controller
 
             foreach ($row as $cell) {
                 $isNumeric = is_int($cell) || is_float($cell);
-                $type = $isNumeric ? 'Number' : 'String';
-                $value = $isNumeric
+                $type      = $isNumeric ? 'Number' : 'String';
+                $value     = $isNumeric
                     ? (string) $cell
                     : htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
 
                 $xml[] = sprintf(
                     '<Cell><Data ss:Type="%s">%s</Data></Cell>',
                     $type,
-                    $value
+                    $value,
                 );
             }
 
@@ -411,25 +393,26 @@ class FinancialReportsController extends Controller
 
     private function xlsxSheetXml(array $rows): string
     {
-        $lines = [];
+        $lines   = [];
         $lines[] = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
         $lines[] = '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
         $lines[] = '<sheetData>';
 
         foreach ($rows as $rowIndex => $row) {
             $excelRow = $rowIndex + 1;
-            $lines[] = sprintf('<row r="%d">', $excelRow);
+            $lines[]  = sprintf('<row r="%d">', $excelRow);
 
             foreach (array_values($row) as $columnIndex => $cell) {
-                $column = $this->excelColumnLetter($columnIndex + 1);
+                $column  = $this->excelColumnLetter($columnIndex + 1);
                 $cellRef = $column . $excelRow;
 
                 if (is_int($cell) || is_float($cell)) {
                     $lines[] = sprintf('<c r="%s"><v>%s</v></c>', $cellRef, $cell);
+
                     continue;
                 }
 
-                $value = htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
+                $value   = htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
                 $lines[] = sprintf('<c r="%s" t="inlineStr"><is><t>%s</t></is></c>', $cellRef, $value);
             }
 
@@ -447,7 +430,7 @@ class FinancialReportsController extends Controller
         $letter = '';
 
         while ($number > 0) {
-            $mod = ($number - 1) % 26;
+            $mod    = ($number - 1) % 26;
             $letter = chr(65 + $mod) . $letter;
             $number = intdiv($number - 1, 26);
         }

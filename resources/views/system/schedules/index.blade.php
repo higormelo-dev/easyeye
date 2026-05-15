@@ -87,7 +87,7 @@
                                 class="btn btn-warning btn-sm position-relative"
                                 @click="toggleWaitingPanel()"
                                 title="Lista de espera">
-                            <i class="fas fa-hourglass-half me-1"></i> Lista de Espera
+                            <i class="fas fa-hourglass-half me-1"></i> {{ __('schedules.toolbar_waiting_list') }}
                             <span x-show="waitingCount > 0" x-cloak
                                   class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                                   x-text="waitingCount"></span>
@@ -97,7 +97,7 @@
                                 data-bs-toggle="modal"
                                 data-bs-target="#waitingListModal"
                                 title="Adicionar à lista de espera">
-                            <i class="fas fa-plus me-1"></i> Fila
+                            <i class="fas fa-plus me-1"></i> {{ __('schedules.toolbar_queue') }}
                         </button>
                     @endif
                 </div>
@@ -112,7 +112,7 @@
                                 x-show="! selectionMode"
                                 @click="toggleSelectionMode()"
                                 title="Selecionar agendamentos para ação em massa">
-                            <i class="fas fa-check-square me-1"></i> Selecionar
+                            <i class="fas fa-check-square me-1"></i> {{ __('schedules.toolbar_select') }}
                         </button>
                     @endif
 
@@ -124,45 +124,45 @@
                                 class="btn btn-outline-white btn-sm"
                                 @click="clearSelection()"
                                 title="Sair do modo de seleção">
-                            <i class="fas fa-times me-1"></i> Cancelar
+                            <i class="fas fa-times me-1"></i> {{ __('schedules.toolbar_cancel') }}
                         </button>
                         <button type="button"
                                 class="btn btn-outline-white btn-sm"
                                 @click="toggleSelectAll()"
                                 title="Selecionar / desselecionar todos">
                             <i class="fas me-1" :class="isAllSelected() ? 'fa-check-square' : 'fa-square'"></i>
-                            Todos
+                            {{ __('schedules.toolbar_all') }}
                         </button>
                         <span class="text-muted small fw-semibold"
-                              x-text="selectedIds.length + ' selecionado(s)'"></span>
+                              x-text="selectedIds.length + ' {{ __('schedules.toolbar_selected') }}'"></span>
                         <div class="vr"></div>
                         <button type="button"
                                 id="btn-bulk-confirm"
                                 class="btn btn-info btn-sm"
                                 :disabled="selectedIds.length === 0"
                                 title="Confirmar agendamentos selecionados">
-                            <i class="fas fa-check-circle me-1"></i> Confirmar
+                            <i class="fas fa-check-circle me-1"></i> {{ __('schedules.toolbar_confirm') }}
                         </button>
                         <button type="button"
                                 id="btn-bulk-noshow"
                                 class="btn btn-warning btn-sm text-dark"
                                 :disabled="selectedIds.length === 0"
                                 title="Marcar como Faltou">
-                            <i class="fas fa-user-times me-1"></i> Faltou
+                            <i class="fas fa-user-times me-1"></i> {{ __('schedules.toolbar_noshow') }}
                         </button>
                         <button type="button"
                                 id="btn-bulk-cancel"
                                 class="btn btn-danger btn-sm"
                                 :disabled="selectedIds.length === 0"
                                 title="Cancelar agendamentos selecionados">
-                            <i class="fas fa-ban me-1"></i> Cancelar
+                            <i class="fas fa-ban me-1"></i> {{ __('schedules.toolbar_cancel') }}
                         </button>
                         <button type="button"
                                 id="btn-bulk-reschedule"
                                 class="btn btn-secondary btn-sm"
                                 :disabled="selectedIds.length === 0"
                                 title="Alterar data dos agendamentos selecionados">
-                            <i class="fas fa-calendar-alt me-1"></i> Alterar Data
+                            <i class="fas fa-calendar-alt me-1"></i> {{ __('schedules.toolbar_change_date') }}
                         </button>
                     </div>
 
@@ -204,7 +204,7 @@
                             {{-- Médicos ------------------------------------------- --}}
                             @if(session()->get('selected_entity_user_rule') !== 'doctor')
                                 @if(count($doctors))
-                                    <h6 class="font-bold mt-5 text-uppercase">Médicos</h6>
+                                    <h6 class="font-bold mt-5 text-uppercase">{{ __('schedules.sidebar_doctors') }}</h6>
                                     <hr>
 
                                     {{-- Todos os médicos --}}
@@ -224,8 +224,8 @@
                                             <button type="button"
                                                     class="btn btn-link p-0 text-decoration-none fw-bold text-dark d-block w-100 text-start"
                                                     @click="setDoctor('tudo')">
-                                                <span class="d-block">TUDO</span>
-                                                <small class="d-block text-muted fw-normal">Selecionar todos</small>
+                                                <span class="d-block">{{ __('schedules.sidebar_all') }}</span>
+                                                <small class="d-block text-muted fw-normal">{{ __('schedules.sidebar_select_all') }}</small>
                                             </button>
                                         </div>
                                     </div>
@@ -265,7 +265,7 @@
                             @endif
 
                             {{-- Turno — ícones no lugar do <select> --------------- --}}
-                            <h6 class="font-bold mt-5 text-uppercase">Horário</h6>
+                            <h6 class="font-bold mt-5 text-uppercase">{{ __('schedules.sidebar_time') }}</h6>
                             <hr>
                             <div class="d-flex w-100 border rounded overflow-hidden" role="group" aria-label="Selecionar turno" style="border-color:#e2e8f0!important;">
 
@@ -277,7 +277,7 @@
                                         @click="setBout(1)"
                                         title="Exibir todos os horários">
                                     <i class="fas fa-th d-block" style="font-size:1.1rem;"></i>
-                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">TUDO</span>
+                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">{{ __('schedules.sidebar_all') }}</span>
                                     <span class="d-block mt-1"
                                           :style="{ height: '4px', background: bout == 1 ? 'rgba(255,255,255,.5)' : '#6c757d' }"></span>
                                 </button>
@@ -290,7 +290,7 @@
                                         @click="setBout(2)"
                                         title="Manhã">
                                     <i class="fas fa-sun d-block" style="font-size:1.1rem;"></i>
-                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">MANHÃ</span>
+                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">{{ __('schedules.sidebar_morning') }}</span>
                                     <span class="d-block mt-1"
                                           :style="{ height: '4px', background: bout == 2 ? 'rgba(255,255,255,.5)' : '#f5a623' }"></span>
                                 </button>
@@ -303,7 +303,7 @@
                                         @click="setBout(3)"
                                         title="Tarde">
                                     <i class="fas fa-cloud-sun d-block" style="font-size:1.1rem;"></i>
-                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">TARDE</span>
+                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">{{ __('schedules.sidebar_afternoon') }}</span>
                                     <span class="d-block mt-1"
                                           :style="{ height: '4px', background: bout == 3 ? 'rgba(255,255,255,.5)' : '#1976d2' }"></span>
                                 </button>
@@ -316,7 +316,7 @@
                                         @click="setBout(4)"
                                         title="Noite">
                                     <i class="fas fa-moon d-block" style="font-size:1.1rem;"></i>
-                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">NOITE</span>
+                                    <span class="d-block" style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">{{ __('schedules.sidebar_evening') }}</span>
                                     <span class="d-block mt-1"
                                           :style="{ height: '4px', background: bout == 4 ? 'rgba(255,255,255,.5)' : '#adb5bd' }"></span>
                                 </button>
@@ -341,7 +341,7 @@
                             <div x-show="showWaitingPanel" x-cloak class="mb-3 border border-warning rounded">
                                 <div class="d-flex align-items-center justify-content-between px-3 py-2 bg-warning rounded-top">
                                     <span class="fw-semibold">
-                                        <i class="fas fa-hourglass-half me-2"></i> Lista de Espera
+                                        <i class="fas fa-hourglass-half me-2"></i> {{ __('schedules.waiting_title') }}
                                         <span class="badge bg-dark ms-2" x-text="waitingCount"></span>
                                     </span>
                                     <div class="d-flex gap-2 align-items-center">
@@ -349,7 +349,7 @@
                                                 class="btn btn-sm btn-dark"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#waitingListModal">
-                                            <i class="fas fa-plus me-1"></i> Adicionar
+                                            <i class="fas fa-plus me-1"></i> {{ __('schedules.waiting_add') }}
                                         </button>
                                         <button type="button" class="btn-close" @click="toggleWaitingPanel()"></button>
                                     </div>
@@ -357,7 +357,7 @@
 
                                 <template x-if="waitingEntries.length === 0">
                                     <p class="text-muted text-center py-3 mb-0 small">
-                                        <i class="fas fa-check-circle me-1"></i> Nenhum paciente na lista de espera.
+                                        <i class="fas fa-check-circle me-1"></i> {{ __('schedules.waiting_empty') }}
                                     </p>
                                 </template>
 
@@ -403,7 +403,7 @@
                                                         <i class="fas fa-calendar me-1"></i>
                                                         <span x-text="entry.preferred_date_from"></span>
                                                         <template x-if="entry.preferred_date_until">
-                                                            <span> até <span x-text="entry.preferred_date_until"></span></span>
+                                                            <span> {{ __('schedules.waiting_until') }} <span x-text="entry.preferred_date_until"></span></span>
                                                         </template>
                                                     </div>
                                                     <template x-if="entry.notes">
@@ -437,7 +437,7 @@
                             {{-- Spinner ------------------------------------------- --}}
                             <div x-show="loading" x-cloak class="text-center py-4">
                                 <div class="spinner-border text-info" role="status">
-                                    <span class="visually-hidden">Carregando…</span>
+                                    <span class="visually-hidden">{{ __('schedules.loading') }}</span>
                                 </div>
                             </div>
 
@@ -472,7 +472,7 @@
     @vite(['resources/js/system/schedules.js'])
     <script>
     window.schedulesLang = {
-        rescheduleSuccess:  @js(__('actions.reschedule_success')),
+        rescheduleSuccess:   @js(__('actions.reschedule_success')),
         rescheduleErrorDate: @js(__('actions.reschedule_error_date')),
     };
     </script>

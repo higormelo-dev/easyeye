@@ -8,6 +8,7 @@ use App\Http\Controllers\{
     EyeImagesController,
     Financial\BillingController as FinancialBillingController,
     Financial\CashFlowController,
+    Financial\ClinicBiController,
     Financial\FinancialReportsController,
     Financial\TissGlosasController,
     Financial\TissGuidePreValidateController,
@@ -318,6 +319,9 @@ Route::group(
             Route::get('reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('reports.absenteeism');
 
             Route::prefix('financial')->as('financial.')->group(function () {
+                // Dashboard Gerencial (BI)
+                Route::get('bi', [ClinicBiController::class, 'index'])->name('bi.index');
+
                 // Fluxo de caixa
                 Route::get('cash-flow', [CashFlowController::class, 'index'])->name('cash-flow.index');
                 Route::post('cash-flow', [CashFlowController::class, 'store'])->name('cash-flow.store');
@@ -340,8 +344,7 @@ Route::group(
                 Route::get('tiss/glosas', [TissGlosasController::class, 'index'])->name('tiss.glosas.index');
                 Route::post('tiss/glosas/{glosa}/appeal', [TissGlosasController::class, 'appeal'])->name('tiss.glosas.appeal');
 
-                // Relatórios financeiros
-                Route::get('reports', [FinancialReportsController::class, 'index'])->name('reports.index');
+                // Relatórios financeiros (exportação com drill-down)
                 Route::get('reports/cash-flow', [FinancialReportsController::class, 'cashFlow'])->name('reports.cash-flow');
                 Route::get('reports/covenants', [FinancialReportsController::class, 'covenants'])->name('reports.covenants');
                 Route::get('reports/cash-flow/export', [FinancialReportsController::class, 'exportCashFlowCsv'])->name('reports.cash-flow.export');

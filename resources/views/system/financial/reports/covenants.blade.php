@@ -9,19 +9,19 @@
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Período inicial</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_from') }}</label>
                     <input type="date" name="from" class="form-control form-control-sm" value="{{ $from }}">
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold">Período final</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_to') }}</label>
                     <input type="date" name="to" class="form-control form-control-sm" value="{{ $to }}">
                 </div>
                 <div class="col-auto ms-auto">
                     <button class="btn btn-primary btn-sm" type="submit">
-                        <i class="ti ti-filter me-1"></i> Filtrar
+                        <i class="ti ti-filter me-1"></i> {{ __('financial.filter') }}
                     </button>
                     <a href="{{ route('panel.financial.reports.covenants.export', request()->query()) }}" class="btn btn-outline-secondary btn-sm ms-1">
-                        <i class="ti ti-download me-1"></i> Exportar CSV
+                        <i class="ti ti-download me-1"></i> {{ __('financial.export_csv') }}
                     </a>
                 </div>
             </form>
@@ -32,7 +32,7 @@
         <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Total de guias</div>
+                    <div class="text-muted small">{{ __('financial.covenants.total_claims') }}</div>
                     <div class="fs-3 fw-bold">{{ $summary['total_claims'] }}</div>
                 </div>
             </div>
@@ -40,7 +40,7 @@
         <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Valor faturado</div>
+                    <div class="text-muted small">{{ __('financial.covenants.billed_value') }}</div>
                     <div class="fs-3 fw-bold text-primary">R$ {{ number_format($summary['total_amount'], 2, ',', '.') }}</div>
                 </div>
             </div>
@@ -48,7 +48,7 @@
         <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Valor recebido</div>
+                    <div class="text-muted small">{{ __('financial.covenants.received_value') }}</div>
                     <div class="fs-3 fw-bold text-success">R$ {{ number_format($summary['total_paid'], 2, ',', '.') }}</div>
                 </div>
             </div>
@@ -56,7 +56,7 @@
         <div class="col-md-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
-                    <div class="text-muted small">Glosas</div>
+                    <div class="text-muted small">{{ __('financial.covenants.glosa_value') }}</div>
                     <div class="fs-3 fw-bold text-danger">R$ {{ number_format($summary['total_denied'], 2, ',', '.') }}</div>
                 </div>
             </div>
@@ -64,16 +64,16 @@
     </div>
 
     <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header bg-transparent fw-semibold">Consolidado por convênio</div>
+        <div class="card-header bg-transparent fw-semibold">{{ __('financial.covenants.by_covenant') }}</div>
         <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Convênio</th>
-                        <th class="text-center">Guias</th>
-                        <th class="text-end">Faturado</th>
-                        <th class="text-end">Recebido</th>
-                        <th class="text-end">Glosa</th>
+                        <th>{{ __('financial.covenants.col_covenant') }}</th>
+                        <th class="text-center">{{ __('financial.covenants.col_guides') }}</th>
+                        <th class="text-end">{{ __('financial.covenants.col_billed') }}</th>
+                        <th class="text-end">{{ __('financial.covenants.col_received') }}</th>
+                        <th class="text-end">{{ __('financial.covenants.col_glosa') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -87,7 +87,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-4">Sem dados para o período.</td>
+                            <td colspan="5" class="text-center text-muted py-4">{{ __('financial.covenants.no_data') }}</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -96,20 +96,20 @@
     </div>
 
     <div class="card border-0 shadow-sm">
-        <div class="card-header bg-transparent fw-semibold">Detalhamento de guias</div>
+        <div class="card-header bg-transparent fw-semibold">{{ __('financial.covenants.guide_detail') }}</div>
         <div class="table-responsive">
             <table class="table table-sm table-hover mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Data</th>
-                        <th>Guia</th>
-                        <th>Lote</th>
-                        <th>Paciente</th>
-                        <th>Convênio</th>
-                        <th>Status</th>
-                        <th class="text-end">Faturado</th>
-                        <th class="text-end">Pago</th>
-                        <th class="text-end">Glosa</th>
+                        <th>{{ __('financial.covenants.col_date') }}</th>
+                        <th>{{ __('financial.covenants.col_guide') }}</th>
+                        <th>{{ __('financial.covenants.col_batch') }}</th>
+                        <th>{{ __('financial.covenants.col_patient') }}</th>
+                        <th>{{ __('financial.covenants.col_covenant') }}</th>
+                        <th>{{ __('financial.covenants.col_status') }}</th>
+                        <th class="text-end">{{ __('financial.covenants.col_billed') }}</th>
+                        <th class="text-end">{{ __('financial.covenants.col_paid') }}</th>
+                        <th class="text-end">{{ __('financial.covenants.col_glosa') }}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -131,7 +131,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="text-center text-muted py-4">Nenhuma guia encontrada.</td>
+                            <td colspan="9" class="text-center text-muted py-4">{{ __('financial.covenants.no_guides') }}</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -139,4 +139,3 @@
         </div>
     </div>
 @endsection
-

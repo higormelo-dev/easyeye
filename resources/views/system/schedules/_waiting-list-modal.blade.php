@@ -42,7 +42,7 @@
                  bootstrap.Modal.getInstance(document.getElementById('waitingListModal'))?.hide();
                  window.dispatchEvent(new CustomEvent('waiting-list-saved', { detail: data.data }));
                  if (window.showSuccessToast) showSuccessToast(data.message);
-             } catch { if (window.showErrorToast) showErrorToast('Erro de conexão.'); }
+             } catch { if (window.showErrorToast) showErrorToast('{{ __('schedules.wl_conn_error') }}'); }
              finally  { this.saving = false; }
          }
      }"
@@ -55,9 +55,9 @@
             {{-- Header --}}
             <div class="modal-header bg-warning">
                 <h5 class="modal-title fw-semibold fs-6" id="waitingListModalLabel">
-                    <i class="fas fa-hourglass-half me-2"></i> Lista de Espera
+                    <i class="fas fa-hourglass-half me-2"></i> {{ __('schedules.wl_title') }}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('schedules.wl_cancel') }}"></button>
             </div>
 
             <div class="modal-body p-4">
@@ -65,11 +65,11 @@
 
                     {{-- Médico --}}
                     <div class="col-md-6">
-                        <label class="form-label">Médico <span class="text-danger">*</span></label>
+                        <label class="form-label">{{ __('schedules.wl_doctor') }} <span class="text-danger">*</span></label>
                         <select class="form-select"
                                 :class="{ 'is-invalid': hasError('doctor_id') }"
                                 x-model="form.doctor_id">
-                            <option value="">Selecione...</option>
+                            <option value="">{{ __('schedules.form_select') }}</option>
                             @foreach($doctors as $doctor)
                                 <option value="{{ $doctor->id }}">{{ $doctor->user_name }}</option>
                             @endforeach
@@ -79,21 +79,21 @@
 
                     {{-- Período preferido --}}
                     <div class="col-md-6">
-                        <label class="form-label">Período preferido
-                            <small class="text-muted fw-normal">— opcional</small>
+                        <label class="form-label">{{ __('schedules.wl_period') }}
+                            <small class="text-muted fw-normal">{{ __('schedules.wl_period_opt') }}</small>
                         </label>
                         <div class="input-group input-group-sm">
                             <input type="date"
                                    class="form-control"
                                    :class="{ 'is-invalid': hasError('preferred_date_from') }"
                                    x-model="form.preferred_date_from"
-                                   placeholder="De">
-                            <span class="input-group-text">até</span>
+                                   placeholder="{{ __('schedules.wl_from') }}">
+                            <span class="input-group-text">{{ __('schedules.wl_until') }}</span>
                             <input type="date"
                                    class="form-control"
                                    :class="{ 'is-invalid': hasError('preferred_date_until') }"
                                    x-model="form.preferred_date_until"
-                                   placeholder="Até">
+                                   placeholder="{{ __('schedules.wl_until') }}">
                         </div>
                         <div class="invalid-feedback d-block"
                              x-show="hasError('preferred_date_from') || hasError('preferred_date_until')"
@@ -109,7 +109,7 @@
                          )"
                          x-init="$nextTick(() => document.getElementById('waitingListModal').addEventListener('hidden.bs.modal', () => reset()))">
 
-                        <label class="form-label">Paciente</label>
+                        <label class="form-label">{{ __('schedules.wl_patient') }}</label>
 
                         <template x-if="selectedPatient">
                             <div class="d-flex align-items-center gap-2 mb-1">
@@ -127,7 +127,7 @@
                                    x-model="query"
                                    @input.debounce.300ms="search()"
                                    @blur="closeResults()"
-                                   placeholder="Buscar por nome, CPF ou celular…">
+                                   placeholder="{{ __('schedules.wl_patient_search') }}">
                             <span x-show="searching" x-cloak
                                   class="position-absolute top-50 end-0 translate-middle-y pe-3">
                                 <span class="spinner-border spinner-border-sm text-secondary"></span>
@@ -147,7 +147,7 @@
                                     style="cursor:pointer"
                                     @mousedown.prevent="prefillCreate()">
                                     <i class="fas fa-plus-circle me-1"></i>
-                                    Cadastrar "<span x-text="query"></span>"
+                                    {{ __('schedules.wl_register') }} "<span x-text="query"></span>"
                                 </li>
                             </ul>
                             <ul x-show="showResults && !results.length && query.length >= 2 && !searching" x-cloak
@@ -157,33 +157,33 @@
                                     style="cursor:pointer"
                                     @mousedown.prevent="prefillCreate()">
                                     <i class="fas fa-plus-circle me-1"></i>
-                                    Cadastrar "<span x-text="query"></span>"
+                                    {{ __('schedules.wl_register') }} "<span x-text="query"></span>"
                                 </li>
                             </ul>
                         </div>
 
                         {{-- Cadastro rápido --}}
                         <div x-show="showCreate" x-cloak class="card card-body bg-light mt-2 p-3">
-                            <p class="mb-2 fw-semibold small">Cadastro rápido de paciente</p>
+                            <p class="mb-2 fw-semibold small">{{ __('schedules.wl_quick_register') }}</p>
                             <div class="row g-2">
                                 <div class="col-md-7">
                                     <input type="text" class="form-control form-control-sm"
-                                           x-model="newPatient.name" placeholder="Nome completo *">
+                                           x-model="newPatient.name" placeholder="{{ __('schedules.wl_full_name') }} *">
                                 </div>
                                 <div class="col-md-5">
                                     <input type="text" class="form-control form-control-sm"
                                            x-model="newPatient.cellphone" x-mask-br="'cel'" maxlength="15"
-                                           placeholder="Celular *">
+                                           placeholder="{{ __('schedules.wl_cellphone') }} *">
                                 </div>
                             </div>
                             <div class="d-flex gap-2 mt-2">
                                 <button type="button" class="btn btn-sm btn-primary"
                                         :disabled="creating" @click="createAndLink()">
                                     <span x-show="creating" class="spinner-border spinner-border-sm me-1"></span>
-                                    Salvar e vincular
+                                    {{ __('schedules.wl_save_link') }}
                                 </button>
                                 <button type="button" class="btn btn-sm btn-outline-secondary"
-                                        @click="showCreate = false">Cancelar</button>
+                                        @click="showCreate = false">{{ __('schedules.wl_cancel') }}</button>
                             </div>
                         </div>
 
@@ -191,20 +191,20 @@
 
                     {{-- Nome completo --}}
                     <div class="col-md-12">
-                        <label class="form-label">Nome completo <span class="text-danger">*</span></label>
+                        <label class="form-label">{{ __('schedules.wl_full_name') }} <span class="text-danger">*</span></label>
                         <input type="text"
                                class="form-control"
                                :class="{ 'is-invalid': hasError('full_name') }"
                                x-model="form.full_name"
-                               placeholder="Nome do paciente">
+                               placeholder="{{ __('schedules.wl_patient_name') }}">
                         <div class="invalid-feedback" x-text="firstError('full_name')"></div>
                     </div>
 
                     {{-- Convênio --}}
                     <div class="col-md-6">
-                        <label class="form-label">Convênio</label>
+                        <label class="form-label">{{ __('schedules.wl_covenant') }}</label>
                         <select class="form-select" x-model="form.covenant_id">
-                            <option value="">Nenhum</option>
+                            <option value="">{{ __('schedules.wl_none') }}</option>
                             @foreach($covenants as $covenant)
                                 <option value="{{ $covenant->id }}">{{ $covenant->name }}</option>
                             @endforeach
@@ -213,9 +213,9 @@
 
                     {{-- Tipo de consulta --}}
                     <div class="col-md-6">
-                        <label class="form-label">Tipo de consulta</label>
+                        <label class="form-label">{{ __('schedules.wl_visit_type') }}</label>
                         <select class="form-select" x-model="form.visit_id">
-                            <option value="">Nenhum</option>
+                            <option value="">{{ __('schedules.wl_none') }}</option>
                             @foreach($visitTypes as $type)
                                 <option value="{{ $type->id }}">{{ $type->name }}</option>
                             @endforeach
@@ -224,7 +224,7 @@
 
                     {{-- Telefone --}}
                     <div class="col-md-6">
-                        <label class="form-label">Telefone</label>
+                        <label class="form-label">{{ __('schedules.wl_telephone') }}</label>
                         <input type="text" class="form-control"
                                x-model="form.telephone" x-mask-br="'tel'" maxlength="14"
                                placeholder="(00) 0000-0000">
@@ -232,7 +232,7 @@
 
                     {{-- Celular --}}
                     <div class="col-md-6">
-                        <label class="form-label">Celular</label>
+                        <label class="form-label">{{ __('schedules.wl_cellphone') }}</label>
                         <input type="text" class="form-control"
                                x-model="form.cellphone" x-mask-br="'cel'" maxlength="15"
                                placeholder="(00) 00000-0000">
@@ -244,26 +244,26 @@
                             <input class="form-check-input" type="checkbox"
                                    id="wlWhatsapp" x-model="form.cellphone_whatsapp">
                             <label class="form-check-label" for="wlWhatsapp">
-                                <i class="fab fa-whatsapp text-success"></i> Celular é WhatsApp
+                                <i class="fab fa-whatsapp text-success"></i> {{ __('schedules.wl_whatsapp') }}
                             </label>
                         </div>
                     </div>
 
                     {{-- Observações --}}
                     <div class="col-12">
-                        <label class="form-label">Observações</label>
+                        <label class="form-label">{{ __('schedules.wl_notes') }}</label>
                         <textarea class="form-control" x-model="form.notes" rows="2"
-                                  placeholder="Motivo da consulta, urgência..."></textarea>
+                                  placeholder="{{ __('schedules.wl_notes_ph') }}"></textarea>
                     </div>
 
                 </div>
             </div>
 
             <div class="modal-footer border-top">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{{ __('schedules.wl_cancel') }}</button>
                 <button type="button" class="btn btn-warning px-4" @click="save()" :disabled="saving">
                     <span x-show="saving" class="spinner-border spinner-border-sm me-1"></span>
-                    <i class="fas fa-hourglass-half me-1"></i> Adicionar à Lista
+                    <i class="fas fa-hourglass-half me-1"></i> {{ __('schedules.wl_add_btn') }}
                 </button>
             </div>
 

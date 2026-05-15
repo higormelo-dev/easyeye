@@ -19,19 +19,19 @@
         <div class="card-body">
             <form method="GET" class="row g-3 align-items-end">
                 <div class="col-md-4">
-                    <label class="form-label small fw-semibold">Período inicial</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_from') }}</label>
                     <input type="date" name="from" value="{{ $from->toDateString() }}" class="form-control form-control-sm">
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small fw-semibold">Período final</label>
+                    <label class="form-label small fw-semibold">{{ __('financial.period_to') }}</label>
                     <input type="date" name="to" value="{{ $to->toDateString() }}" class="form-control form-control-sm">
                 </div>
                 <div class="col-auto ms-auto d-flex gap-2">
                     <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="ti ti-filter me-1"></i> Filtrar
+                        <i class="ti ti-filter me-1"></i> {{ __('financial.filter') }}
                     </button>
                     <a href="{{ route('panel.financial.tiss.glosas.index') }}" class="btn btn-outline-secondary btn-sm">
-                        <i class="ti ti-x me-1"></i> Limpar
+                        <i class="ti ti-x me-1"></i> {{ __('financial.clear') }}
                     </a>
                 </div>
             </form>
@@ -43,36 +43,36 @@
         <div class="col-6 col-lg-3">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body text-center py-4">
-                    <div class="text-muted small mb-1">Total glosado</div>
+                    <div class="text-muted small mb-1">{{ __('financial.glosas.total_glosa') }}</div>
                     <div class="fs-4 fw-bold text-dark">R$ {{ number_format((float) $totalAmount, 2, ',', '.') }}</div>
-                    <div class="text-muted small mt-1">{{ $glosas->count() }} glosa(s)</div>
+                    <div class="text-muted small mt-1">{{ $glosas->count() }} {{ __('financial.glosas.glosa_count') }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-lg-3">
             <div class="card border-0 shadow-sm h-100 border-start border-danger border-3">
                 <div class="card-body text-center py-4">
-                    <div class="text-muted small mb-1">Em aberto</div>
+                    <div class="text-muted small mb-1">{{ __('financial.glosas.open_amount') }}</div>
                     <div class="fs-4 fw-bold text-danger">R$ {{ number_format((float) $openAmount, 2, ',', '.') }}</div>
-                    <div class="text-muted small mt-1">{{ $glosas->where('status', \App\Domains\Tiss\Enums\TissGlosaStatus::Open)->count() }} glosa(s)</div>
+                    <div class="text-muted small mt-1">{{ $glosas->where('status', \App\Domains\Tiss\Enums\TissGlosaStatus::Open)->count() }} {{ __('financial.glosas.glosa_count') }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-lg-3">
             <div class="card border-0 shadow-sm h-100 border-start border-warning border-3">
                 <div class="card-body text-center py-4">
-                    <div class="text-muted small mb-1">Recorridas</div>
+                    <div class="text-muted small mb-1">{{ __('financial.glosas.appealed') }}</div>
                     <div class="fs-4 fw-bold text-warning">R$ {{ number_format((float) $appealedAmount, 2, ',', '.') }}</div>
-                    <div class="text-muted small mt-1">{{ $glosas->where('status', \App\Domains\Tiss\Enums\TissGlosaStatus::Appealed)->count() }} glosa(s)</div>
+                    <div class="text-muted small mt-1">{{ $glosas->where('status', \App\Domains\Tiss\Enums\TissGlosaStatus::Appealed)->count() }} {{ __('financial.glosas.glosa_count') }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-lg-3">
             <div class="card border-0 shadow-sm h-100 border-start border-success border-3">
                 <div class="card-body text-center py-4">
-                    <div class="text-muted small mb-1">Recuperado</div>
+                    <div class="text-muted small mb-1">{{ __('financial.glosas.recovered') }}</div>
                     <div class="fs-4 fw-bold text-success">R$ {{ number_format((float) $recoveredAmount, 2, ',', '.') }}</div>
-                    <div class="text-muted small mt-1">recursos aceitos</div>
+                    <div class="text-muted small mt-1">{{ __('financial.glosas.accepted_appeals') }}</div>
                 </div>
             </div>
         </div>
@@ -82,17 +82,17 @@
     @if($byOperator->isNotEmpty())
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-transparent fw-semibold">
-                <i class="ti ti-building-hospital me-2 text-muted"></i>Resumo por convênio
+                <i class="ti ti-building-hospital me-2 text-muted"></i>{{ __('financial.glosas.by_covenant') }}
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Convênio</th>
-                                <th class="text-end">Total glosado</th>
-                                <th class="text-end">Em aberto</th>
-                                <th class="text-center">Glosas</th>
+                                <th>{{ __('financial.glosas.col_covenant') }}</th>
+                                <th class="text-end">{{ __('financial.glosas.col_total') }}</th>
+                                <th class="text-end">{{ __('financial.glosas.col_open') }}</th>
+                                <th class="text-center">{{ __('financial.glosas.col_count') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -122,10 +122,10 @@
     {{-- Glosa Table --}}
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
-            <span class="fw-semibold"><i class="ti ti-file-invoice me-2 text-muted"></i>Glosas do período</span>
+            <span class="fw-semibold"><i class="ti ti-file-invoice me-2 text-muted"></i>{{ __('financial.glosas.period_glosas') }}</span>
             @if($openAmount > 0)
                 <span class="badge bg-danger">
-                    R$ {{ number_format((float) $openAmount, 2, ',', '.') }} em aberto — clique em "Recorrer" para contestar
+                    R$ {{ number_format((float) $openAmount, 2, ',', '.') }} {{ __('financial.glosas.open_badge') }}
                 </span>
             @endif
         </div>
@@ -133,7 +133,7 @@
         @if($glosas->isEmpty())
             <div class="card-body text-center py-5 text-muted">
                 <i class="ti ti-circle-check fs-1 d-block mb-2 text-success"></i>
-                Nenhuma glosa encontrada no período selecionado.
+                {{ __('financial.glosas.empty') }}
             </div>
         @else
             <div class="card-body p-0">
@@ -141,13 +141,13 @@
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Data</th>
-                                <th>Convênio</th>
-                                <th>Guia</th>
-                                <th>Código</th>
-                                <th>Motivo</th>
-                                <th class="text-end">Valor</th>
-                                <th class="text-center">Status</th>
+                                <th>{{ __('financial.glosas.col_date') }}</th>
+                                <th>{{ __('financial.glosas.col_covenant') }}</th>
+                                <th>{{ __('financial.glosas.col_guide') }}</th>
+                                <th>{{ __('financial.glosas.col_code') }}</th>
+                                <th>{{ __('financial.glosas.col_reason') }}</th>
+                                <th class="text-end">{{ __('financial.glosas.col_value') }}</th>
+                                <th class="text-center">{{ __('financial.glosas.col_status') }}</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -185,7 +185,7 @@
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#appealModal-{{ $glosa->id }}"
                                             >
-                                                <i class="ti ti-gavel me-1"></i> Recorrer
+                                                <i class="ti ti-gavel me-1"></i> {{ __('financial.glosas.appeal_btn') }}
                                             </button>
                                         @elseif($glosa->appeals->isNotEmpty())
                                             <span class="text-muted small">
@@ -210,7 +210,7 @@
                 <div class="modal-content border-0 shadow">
                     <div class="modal-header border-0 pb-0">
                         <h5 class="modal-title" id="appealLabel-{{ $glosa->id }}">
-                            <i class="ti ti-gavel me-2 text-danger"></i>Recurso de Glosa
+                            <i class="ti ti-gavel me-2 text-danger"></i>{{ __('financial.glosas.appeal_title') }}
                         </h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
@@ -218,23 +218,23 @@
                         @csrf
                         <div class="modal-body">
                             <div class="alert alert-danger mb-3 py-2 small">
-                                <strong>{{ $glosa->operator?->trade_name ?? $glosa->operator?->name ?? 'Convênio' }}</strong>
-                                glosou <strong>R$ {{ number_format((float) $glosa->amount, 2, ',', '.') }}</strong>
+                                <strong>{{ $glosa->operator?->trade_name ?? $glosa->operator?->name ?? __('financial.glosas.col_covenant') }}</strong>
+                                {{ __('financial.glosas.appealed_by') }} <strong>R$ {{ number_format((float) $glosa->amount, 2, ',', '.') }}</strong>
                                 em {{ $glosa->identified_at->format('d/m/Y') }}
-                                @if($glosa->glosa_code) — Código <code>{{ $glosa->glosa_code }}</code>@endif
+                                @if($glosa->glosa_code) — {{ __('financial.glosas.col_code') }} <code>{{ $glosa->glosa_code }}</code>@endif
                             </div>
                             @if($glosa->glosa_description)
                                 <p class="small text-muted mb-3">
-                                    <strong>Motivo informado:</strong> {{ $glosa->glosa_description }}
+                                    <strong>{{ __('financial.glosas.reason_label') }}</strong> {{ $glosa->glosa_description }}
                                 </p>
                             @endif
                             <div class="mb-3">
-                                <label class="form-label fw-semibold">Justificativa do recurso <span class="text-danger">*</span></label>
+                                <label class="form-label fw-semibold">{{ __('financial.glosas.justification_label') }} <span class="text-danger">*</span></label>
                                 <textarea
                                     name="reason"
                                     class="form-control @error('reason') is-invalid @enderror"
                                     rows="4"
-                                    placeholder="Descreva o motivo pelo qual esta glosa é indevida e os documentos que sustentam o recurso..."
+                                    placeholder="{{ __('financial.glosas.justification_placeholder') }}"
                                     required
                                 >{{ old('reason') }}</textarea>
                                 @error('reason')
@@ -243,13 +243,13 @@
                             </div>
                             <p class="small text-muted mb-0">
                                 <i class="ti ti-info-circle me-1"></i>
-                                Um número de recurso será gerado automaticamente (formato REC-AAAAMM-NNNNN).
+                                {{ __('financial.glosas.appeal_number_hint') }}
                             </p>
                         </div>
                         <div class="modal-footer border-0 pt-0">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">{{ __('financial.glosas.cancel_btn') }}</button>
                             <button type="submit" class="btn btn-danger btn-sm">
-                                <i class="ti ti-send me-1"></i> Abrir Recurso
+                                <i class="ti ti-send me-1"></i> {{ __('financial.glosas.submit_appeal') }}
                             </button>
                         </div>
                     </form>

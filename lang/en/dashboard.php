@@ -60,6 +60,12 @@ return [
     'empty_schedules' => 'No appointments scheduled for today.',
     'empty_patients'  => 'No patients registered.',
 
+    // Activation / Setup
+    'activation_title'        => 'Set up your clinic',
+    'activation_subtitle'     => 'Complete the steps to get the most out of the system.',
+    'activation_done'         => 'setup complete',
+    'activation_completed_on' => 'Completed on',
+
     // Demo
     'demo_title'       => 'Demo environment',
     'demo_description' => 'Populate test data or reset the environment for demonstrations.',
