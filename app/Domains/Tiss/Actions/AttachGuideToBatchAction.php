@@ -6,7 +6,7 @@ namespace App\Domains\Tiss\Actions;
 
 use App\Domains\Tiss\Enums\TissGuideStatus;
 use App\Domains\Tiss\Models\{TissBatch, TissBatchGuide, TissGuide};
-use App\Domains\Tiss\Services\LogTissStatusTransitionService;
+use App\Domains\Tiss\Services\{LogTissStatusTransitionService, PreValidateTissGuideService};
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -14,6 +14,7 @@ class AttachGuideToBatchAction
 {
     public function __construct(
         private readonly LogTissStatusTransitionService $logStatusTransitionService,
+        private readonly PreValidateTissGuideService $preValidator,
     ) {
     }
 
@@ -25,6 +26,16 @@ class AttachGuideToBatchAction
 
         if ((string) $batch->operator_id !== (string) $guide->operator_id) {
             throw new InvalidArgumentException('Guia e lote devem pertencer à mesma operadora.');
+        }
+
+        $validation = $this->preValidator->validate($guide);
+
+        $guide->update(['errors' => $validation->isEmpty() ? null : $validation->toArray()]);
+
+        if ($validation->hasErrors()) {
+            throw new InvalidArgumentException(
+                "A guia possui pendências que causarão glosa:\n" . $validation->errorMessages(),
+            );
         }
 
         return DB::transaction(function () use ($batch, $guide): TissBatchGuide {

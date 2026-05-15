@@ -31,10 +31,14 @@ return [
         'contact_support' => 'Dúvidas? Entre em contato:',
     ],
 
+    'feature_not_included'  => 'O recurso ":feature" não está disponível no seu plano atual. Faça upgrade para continuar.',
+    'feature_limit_reached' => 'O limite de ":feature" foi atingido (:limit). Faça upgrade do plano para continuar.',
+
     'features' => [
         'max_users'              => 'Máximo de usuários',
         'max_patients'           => 'Máximo de pacientes',
         'max_doctors'            => 'Máximo de médicos',
+        'max_storage_gb'         => 'Armazenamento (GB)',
         'has_ai_exam_assistant'  => 'Assistente de IA para exames',
         'has_ai_report_drafting' => 'Redação de laudos com IA',
         'has_api_integrator'     => 'Acesso à API de integradores',

@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Enums\FeatureKey;
-use App\Models\{Doctor, EntityUser, FeatureUsage, Patient};
+use App\Models\{Doctor, EntityUser, FeatureUsage, MedicalRecordFile, Patient};
 
 /**
  * Responsável por ler e registrar o consumo de features por empresa.
@@ -31,6 +31,7 @@ class UsageMeterService
             FeatureKey::MaxUsers            => $this->countUsers($entityId),
             FeatureKey::MaxPatients         => $this->countPatients($entityId),
             FeatureKey::MaxDoctors          => $this->countDoctors($entityId),
+            FeatureKey::MaxStorageGB        => $this->countStorageGB($entityId),
             FeatureKey::AiMonthlyCredits    => $this->getMonthlyUsage($entityId, $feature),
             FeatureKey::ApiMonthlyExamSends => $this->getMonthlyUsage($entityId, $feature),
             default                         => 0,
@@ -75,6 +76,15 @@ class UsageMeterService
             ->decrement('used', $amount);
     }
 
+    /**
+     * Uso atual em bytes, com precisão para o check de quota no momento do upload.
+     * Não conta arquivos soft-deletados (usuário não os acessa, mas audit mantém no disco).
+     */
+    public function getStorageUsedBytes(string $entityId): int
+    {
+        return (int) $this->sumStorageBytes($entityId);
+    }
+
     // ── Counters de domínio ───────────────────────────────────────────────────
 
     private function countUsers(string $entityId): int
@@ -96,6 +106,19 @@ class UsageMeterService
         return Doctor::whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
             ->whereNull('deleted_at')
             ->count();
+    }
+
+    /** Retorna uso em GB (floor) para exibição no FeatureStatus. */
+    private function countStorageGB(string $entityId): int
+    {
+        return (int) floor($this->sumStorageBytes($entityId) / (1024 * 1024 * 1024));
+    }
+
+    private function sumStorageBytes(string $entityId): float|int
+    {
+        return MedicalRecordFile::whereHas('patient', fn ($q) => $q->where('entity_id', $entityId))
+            ->whereNull('deleted_at')
+            ->sum('file_size');
     }
 
     // ── Leitura de feature_usages ─────────────────────────────────────────────

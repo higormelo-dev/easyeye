@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{DataAccessPurpose, EntityGate};
+use App\Enums\{DataAccessPurpose, EntityGate, FeatureKey};
+use App\Exceptions\FeatureDeniedException;
 use App\Models\{Entity, MedicalRecord, MedicalRecordFile, Patient};
+use App\Services\{FeatureGateService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response, StreamedResponse};
 use Illuminate\Support\Facades\Gate;
@@ -13,6 +15,12 @@ use Illuminate\Support\Str;
 class MedicalRecordFilesController extends Controller
 {
     use LogsDataAccess;
+
+    public function __construct(
+        private readonly FeatureGateService $featureGate,
+        private readonly UsageMeterService $usageMeter,
+    ) {
+    }
 
     /**
      * Upload one or more files attached to a medical record.
@@ -26,6 +34,8 @@ class MedicalRecordFilesController extends Controller
             'files'   => ['required', 'array', 'min:1', 'max:10'],
             'files.*' => ['file', 'max:10240', 'mimes:jpg,jpeg,png,gif,webp,pdf,doc,docx'],
         ]);
+
+        $this->enforceStorageQuota($request);
 
         $saved = [];
 
@@ -97,6 +107,32 @@ class MedicalRecordFilesController extends Controller
     {
         $entityId = session('selected_entity_id');
         Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail($entityId));
+    }
+
+    /**
+     * Bloqueia o upload quando a soma dos novos arquivos ultrapassaria o limite
+     * de armazenamento configurado no plano. Opera em bytes para máxima precisão —
+     * o valor em GB exposto no FeatureStatus é floor do total, mas o bloqueio
+     * respeita o limite exato.
+     *
+     * @throws FeatureDeniedException
+     */
+    private function enforceStorageQuota(Request $request): void
+    {
+        $entityId = session('selected_entity_id');
+        $status   = $this->featureGate->status($entityId, FeatureKey::MaxStorageGB);
+
+        if ($status->isUnlimited) {
+            return;
+        }
+
+        $limitBytes = $status->limit * 1024 * 1024 * 1024;
+        $usedBytes  = $this->usageMeter->getStorageUsedBytes($entityId);
+        $newBytes   = collect($request->file('files'))->sum(fn ($f) => $f->getSize());
+
+        if ($usedBytes + $newBytes > $limitBytes) {
+            throw new FeatureDeniedException(FeatureKey::MaxStorageGB, $status);
+        }
     }
 
     private function assertRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalRecord): void

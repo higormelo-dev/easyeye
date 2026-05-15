@@ -6,7 +6,7 @@ namespace App\Domains\Tiss\Actions;
 
 use App\Domains\Tiss\Enums\TissBatchStatus;
 use App\Domains\Tiss\Models\TissBatch;
-use App\Domains\Tiss\Services\LogTissStatusTransitionService;
+use App\Domains\Tiss\Services\{LogTissStatusTransitionService, PreValidateTissGuideService};
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -14,6 +14,7 @@ class CloseTissBatchAction
 {
     public function __construct(
         private readonly LogTissStatusTransitionService $logStatusTransitionService,
+        private readonly PreValidateTissGuideService $preValidator,
     ) {
     }
 
@@ -27,6 +28,20 @@ class CloseTissBatchAction
 
         if ((int) $batch->guides_count === 0) {
             throw new InvalidArgumentException('Não é possível fechar um lote sem guias.');
+        }
+
+        $guides  = $batch->guides()->with(['operator', 'contract', 'items'])->get();
+        $results = $this->preValidator->validateMany($guides);
+
+        $guidesWithErrors = collect($results)->filter(fn ($r) => $r->hasErrors());
+
+        if ($guidesWithErrors->isNotEmpty()) {
+            $count  = $guidesWithErrors->count();
+            $plural = $count === 1 ? 'guia possui pendência' : 'guias possuem pendências';
+
+            throw new InvalidArgumentException(
+                "{$count} {$plural} crítica(s) que causarão glosa. Corrija antes de fechar o lote.",
+            );
         }
 
         return DB::transaction(function () use ($batch): TissBatch {

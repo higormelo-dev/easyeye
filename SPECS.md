@@ -89,6 +89,8 @@ Arquitetura modular em monólito Laravel, orientada a domínio de negócio (clí
 1. `SubscriptionService`, `TrialService`, `FeatureGateService`, `UsageMeterService`.
 2. `PatientService`, `DoctorService`, `ScheduleService`, `MedicalRecordService`.
 3. `ReportSettingService`, `TemplateVariableResolver`.
+4. `MedicationPrescriptionService`, `ProcedureSolicitationService`, `SurgerySchedulingDocService`.
+5. `PatientImportService`, `DayExtensionService`.
 
 ### 5.2 Serviços de Compliance
 1. `MedicalRecordSignatureService`, `DataAccessLogService`, `AuditService`, `VersionService`.

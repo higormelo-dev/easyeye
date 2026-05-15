@@ -11,9 +11,10 @@ namespace App\Enums;
 enum FeatureKey: string
 {
     // Limites quantitativos (integer, 0 = ilimitado)
-    case MaxUsers    = 'max_users';
-    case MaxPatients = 'max_patients';
-    case MaxDoctors  = 'max_doctors';
+    case MaxUsers      = 'max_users';
+    case MaxPatients   = 'max_patients';
+    case MaxDoctors    = 'max_doctors';
+    case MaxStorageGB  = 'max_storage_gb'; // Armazenamento total em GB (0 = ilimitado)
 
     // Features booleanas
     case HasAiExamAssistant  = 'has_ai_exam_assistant';
@@ -32,6 +33,7 @@ enum FeatureKey: string
             self::MaxUsers            => __('subscriptions.features.max_users'),
             self::MaxPatients         => __('subscriptions.features.max_patients'),
             self::MaxDoctors          => __('subscriptions.features.max_doctors'),
+            self::MaxStorageGB        => __('subscriptions.features.max_storage_gb'),
             self::HasAiExamAssistant  => __('subscriptions.features.has_ai_exam_assistant'),
             self::HasAiReportDrafting => __('subscriptions.features.has_ai_report_drafting'),
             self::HasApiIntegrator    => __('subscriptions.features.has_api_integrator'),

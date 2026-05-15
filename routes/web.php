@@ -9,8 +9,11 @@ use App\Http\Controllers\{
     Financial\BillingController as FinancialBillingController,
     Financial\CashFlowController,
     Financial\FinancialReportsController,
+    Financial\TissGlosasController,
+    Financial\TissGuidePreValidateController,
     LocaleController,
     NoticesController,
+    PatientImportsController,
     PatientsController,
     ProfileController,
     ReportsController,
@@ -165,6 +168,14 @@ Route::group(
             Route::get('patients/cards', [PatientsController::class, 'cards'])->name('patients.cards');
             Route::get('patients/search', [PatientsController::class, 'search'])->name('patients.search');
             Route::post('patients/quick', [PatientsController::class, 'quickStore'])->name('patients.quick');
+            // Importação em lote — rotas específicas antes do resource para não conflitar com {patient}
+            Route::get('patients/import', [PatientImportsController::class, 'index'])->name('patients.import.index');
+            Route::post('patients/import', [PatientImportsController::class, 'store'])->name('patients.import.store');
+            Route::get('patients/import/template', [PatientImportsController::class, 'template'])->name('patients.import.template');
+            Route::post('patients/import/{patientImport}/confirm', [PatientImportsController::class, 'confirm'])->name('patients.import.confirm');
+            Route::delete('patients/import/{patientImport}/cancel', [PatientImportsController::class, 'cancel'])->name('patients.import.cancel');
+            Route::get('patients/import/{patientImport}/status', [PatientImportsController::class, 'status'])->name('patients.import.status');
+            Route::get('patients/import/{patientImport}/errors', [PatientImportsController::class, 'errors'])->name('patients.import.errors');
             Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
             Route::resource('patients', PatientsController::class);
         });
@@ -321,6 +332,13 @@ Route::group(
                 Route::get('billing/batches/{batch}/xml', [FinancialBillingController::class, 'exportBatchXml'])->name('billing.batches.xml');
                 Route::post('billing/claims/{claim}/paid', [FinancialBillingController::class, 'markClaimPaid'])->name('billing.claims.paid');
                 Route::post('billing/claims/{claim}/denied', [FinancialBillingController::class, 'markClaimDenied'])->name('billing.claims.denied');
+
+                // Pré-validação TISS (motor anti-glosa)
+                Route::get('tiss/guides/{guide}/pre-validate', TissGuidePreValidateController::class)->name('tiss.guides.pre-validate');
+
+                // Conciliação de glosas
+                Route::get('tiss/glosas', [TissGlosasController::class, 'index'])->name('tiss.glosas.index');
+                Route::post('tiss/glosas/{glosa}/appeal', [TissGlosasController::class, 'appeal'])->name('tiss.glosas.appeal');
 
                 // Relatórios financeiros
                 Route::get('reports', [FinancialReportsController::class, 'index'])->name('reports.index');

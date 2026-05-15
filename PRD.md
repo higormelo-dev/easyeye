@@ -34,13 +34,17 @@ Produto já cobre operação de ponta a ponta do tenant clínico e operação Sa
 2. Agenda clínica com slots, bloqueios, reagendamento e atualização de situação/humor.
 3. Lista de espera e eventos de agenda não clínicos.
 4. Agenda de recursos (salas/equipamentos) com horários e bloqueios.
+5. Gestão de avisos internos para comunicação entre equipes.
 
 ### 4.3 Prontuário e Documentação
 1. Prontuário oftalmológico com CRUD completo por paciente.
 2. Documentações anexas e arquivos de prontuário.
-3. Emissão de PDF de prontuário e tonometria.
+3. Emissão de PDF de prontuário, tonometria e receitas.
 4. Ações rápidas de documentação e preview por template.
 5. Busca CID-10 e cálculo auxiliar de presbiopia.
+6. Prescrição de medicamentos com catálogo de apresentações e posologias.
+7. Solicitação de procedimentos e workflow de agendamento cirúrgico.
+8. Importação em lote de pacientes com mapeamento de campos.
 
 ### 4.4 Compliance Clínico e LGPD
 1. Assinatura de prontuário com hash e bloqueio de edição.

@@ -23,6 +23,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxUsers->value            => '3',
                     FeatureKey::MaxPatients->value         => '200',
                     FeatureKey::MaxDoctors->value          => '2',
+                    FeatureKey::MaxStorageGB->value        => '5',
                     FeatureKey::HasAiExamAssistant->value  => '0',
                     FeatureKey::HasAiReportDrafting->value => '0',
                     FeatureKey::HasApiIntegrator->value    => '0',
@@ -42,6 +43,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxUsers->value            => '10',
                     FeatureKey::MaxPatients->value         => '2000',
                     FeatureKey::MaxDoctors->value          => '5',
+                    FeatureKey::MaxStorageGB->value        => '20',
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '0',
                     FeatureKey::HasApiIntegrator->value    => '1',
@@ -61,6 +63,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxUsers->value            => '0', // ilimitado
                     FeatureKey::MaxPatients->value         => '0', // ilimitado
                     FeatureKey::MaxDoctors->value          => '0', // ilimitado
+                    FeatureKey::MaxStorageGB->value        => '0', // ilimitado
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '1',
                     FeatureKey::HasApiIntegrator->value    => '1',
