@@ -6,22 +6,22 @@
 </li>
 <li>
     <a href="{{ route('panel.manager.plans.index') }}" class="{{ request()->routeIs('panel.manager.plans.*') ? 'active' : '' }}">
-        <i class="ti ti-package"></i><span>Planos</span>
+        <i class="ti ti-package"></i><span>{{ __('actions.sidemenu.plans') }}</span>
     </a>
 </li>
 <li>
     <a href="{{ route('panel.manager.subscriptions.index') }}" class="{{ request()->routeIs('panel.manager.subscriptions.*') ? 'active' : '' }}">
-        <i class="ti ti-file-invoice"></i><span>Assinaturas</span>
+        <i class="ti ti-file-invoice"></i><span>{{ __('actions.sidemenu.subscriptions') }}</span>
     </a>
 </li>
 <li>
     <a href="{{ route('panel.manager.gateways.index') }}" class="{{ request()->routeIs('panel.manager.gateways.*') ? 'active' : '' }}">
-        <i class="ti ti-credit-card"></i><span>Gateways</span>
+        <i class="ti ti-credit-card"></i><span>{{ __('actions.sidemenu.gateways') }}</span>
     </a>
 </li>
 <li>
     <a href="{{ route('panel.accesscontrol.users.index') }}" class="{{ request()->routeIs('panel.accesscontrol.users.*') ? 'active' : '' }}">
-        <i class="ti ti-users-group"></i><span>Usuários</span>
+        <i class="ti ti-users-group"></i><span>{{ __('actions.sidemenu.users') }}</span>
     </a>
 </li>
 <li>

@@ -32,11 +32,23 @@ class Plan extends Model
         return [
             'price'         => 'decimal:2',
             'active'        => 'boolean',
+            'is_featured'   => 'boolean',
             'billing_cycle' => BillingCycle::class,
             'created_at'    => 'datetime',
             'updated_at'    => 'datetime',
             'deleted_at'    => 'datetime',
         ];
+    }
+
+    public function pricePeriodLabel(): string
+    {
+        return match ($this->billing_cycle) {
+            BillingCycle::Monthly    => '/mês',
+            BillingCycle::Quarterly  => '/trimestre',
+            BillingCycle::Semiannual => '/semestre',
+            BillingCycle::Yearly     => '/ano',
+            BillingCycle::Lifetime   => '/vitalício',
+        };
     }
 
     public function features(): HasMany

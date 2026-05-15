@@ -42,7 +42,7 @@
             <li>
                 <a href="{{ route('panel.financial.bi.index') }}"
                    class="{{ request()->routeIs('panel.financial.bi.*') ? 'active' : '' }}">
-                    <i class="ti ti-layout-dashboard"></i> Dashboard Gerencial
+                    <i class="ti ti-layout-dashboard"></i> {{ __('actions.sidemenu.management_dashboard') }}
                 </a>
             </li>
             <li>
@@ -60,19 +60,19 @@
             <li>
                 <a href="{{ route('panel.financial.tiss.glosas.index') }}"
                    class="{{ request()->routeIs('panel.financial.tiss.glosas.*') ? 'active' : '' }}">
-                    <i class="ti ti-gavel"></i> Glosas TISS
+                    <i class="ti ti-gavel"></i> {{ __('actions.sidemenu.tiss_glosas') }}
                 </a>
             </li>
             <li>
                 <a href="{{ route('panel.financial.reports.cash-flow') }}"
                    class="{{ request()->routeIs('panel.financial.reports.cash-flow*') ? 'active' : '' }}">
-                    <i class="ti ti-chart-arcs"></i> Rel. Fluxo de Caixa
+                    <i class="ti ti-chart-arcs"></i> {{ __('actions.sidemenu.report_cash_flow') }}
                 </a>
             </li>
             <li>
                 <a href="{{ route('panel.financial.reports.covenants') }}"
                    class="{{ request()->routeIs('panel.financial.reports.covenants*') ? 'active' : '' }}">
-                    <i class="ti ti-report-money"></i> Rel. Faturamento
+                    <i class="ti ti-report-money"></i> {{ __('actions.sidemenu.report_billing') }}
                 </a>
             </li>
         </ul>
@@ -84,17 +84,17 @@
     <li class="menu-title"><span>{{ __('actions.sidemenu.reports') ?? 'Relatórios' }}</span></li>
     <li>
         <a href="{{ route('panel.reports.index') }}" class="{{ request()->routeIs('panel.reports.*') ? 'active' : '' }}">
-            <i class="ti ti-chart-bar"></i><span>Relatórios</span>
+            <i class="ti ti-chart-bar"></i><span>{{ __('actions.sidemenu.reports') }}</span>
         </a>
     </li>
 @endif
 
 {{-- Configuração --}}
 @if(session()->get('selected_entity_user_rule') === ClientRule::Admin->value)
-    <li class="menu-title"><span>Configuração</span></li>
+    <li class="menu-title"><span>{{ __('actions.sidemenu.settings') }}</span></li>
     <li class="submenu">
         <a href="javascript:void(0);" class="{{ request()->routeIs('panel.setting.*') ? 'active subdrop' : '' }}">
-            <i class="ti ti-settings"></i><span>Configuração</span>
+            <i class="ti ti-settings"></i><span>{{ __('actions.sidemenu.settings') }}</span>
             <span class="menu-arrow"></span>
         </a>
         <ul style="{{ request()->routeIs('panel.setting.*') ? 'display:block;' : '' }}">
@@ -160,7 +160,7 @@
             </li>
             <li>
                 <a href="{{ route('panel.setting.gateways.index') }}" class="{{ request()->routeIs('panel.setting.gateways.*') ? 'active' : '' }}">
-                    Gateways de Pagamento
+                    {{ __('actions.sidemenu.payment_gateways') }}
                 </a>
             </li>
             <li>
@@ -172,7 +172,7 @@
     </li>
 
     {{-- Controle de Acesso --}}
-    <li class="menu-title"><span>Controle de Acesso</span></li>
+    <li class="menu-title"><span>{{ __('actions.sidemenu.access_control') }}</span></li>
     <li>
         <a href="{{ route('panel.accesscontrol.users.index') }}" class="{{ request()->routeIs('panel.accesscontrol.users.*') ? 'active' : '' }}">
             <i class="ti ti-users-group"></i><span>{{ __('actions.users') }}</span>

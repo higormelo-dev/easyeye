@@ -29,6 +29,7 @@ use App\Http\Controllers\{
     MedicalRecordFilesController,
     MedicalRecordQuickActionsController,
     MedicalRecordsController,
+    SiteController,
     SubscriptionExpiredController,
 };
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
@@ -60,7 +61,8 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/locale/user', [LocaleController::class, 'clearUserLocale'])->name('locale.user.clear');
 });
 
-Route::get('/', function () {
+Route::get('/', [SiteController::class, 'index'])->name('site.home');
+Route::get('/go', function () {
     if (Auth::check() && session()->has('selected_entity_user_id')
         && session()->has('selected_entity_id')) {
         return redirect()->route('panel.dashboard');
@@ -75,7 +77,7 @@ Route::get('/', function () {
     }
 
     return redirect()->route('login');
-});
+})->name('go');
 
 // Página exibida quando a assinatura está inativa/expirada
 Route::get('/subscription/expired', SubscriptionExpiredController::class)
