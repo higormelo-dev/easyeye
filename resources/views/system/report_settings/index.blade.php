@@ -20,7 +20,7 @@
                 'show_header'    => (bool) $gt->show_header,
                 'show_signature' => (bool) $gt->show_signature,
                 'show_footer'    => (bool) $gt->show_footer,
-                'preview_url'    => route('panel.setting.report-settings.show', $gt),
+                'preview_url'    => route('panel.setting.report-settings.preview', $gt),
                 'adopt_url'      => route('panel.setting.report-settings.adopt', $gt),
             ];
         })->values()->all()
@@ -495,7 +495,7 @@
                                 <div class="d-inline-flex align-items-center gap-1">
                                     <button type="button"
                                             class="btn btn-outline-secondary btn-sm"
-                                            @click="openGlobalTemplatePreview(gt.preview_url)">
+                                            @click="window.openPdfPreviewModal(gt.preview_url)">
                                         <i class="ti ti-eye me-1"></i>{{ __('actions.view') }}
                                     </button>
                                     <form :action="gt.adopt_url" method="POST"
@@ -558,7 +558,7 @@
                             <div class="card-footer bg-transparent border-top-0 d-flex gap-2 justify-content-end">
                                 <button type="button"
                                         class="btn btn-outline-secondary btn-sm"
-                                        @click="openGlobalTemplatePreview(gt.preview_url)">
+                                        @click="window.openPdfPreviewModal(gt.preview_url)">
                                     <i class="ti ti-eye me-1"></i>{{ __('actions.view') }}
                                 </button>
                                 <form :action="gt.adopt_url" method="POST"

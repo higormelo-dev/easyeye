@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\DocumentationType;
 use App\Models\{ReportSetting, ReportSettingContent};
+use App\Services\ReportSettingService;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -55,6 +56,10 @@ class ReportSettingContentSeeder extends Seeder
                 );
             }
         }
+
+        // Propaga mudanças de conteúdo dos templates globais para todas as
+        // cópias adotadas pelas clínicas (idempotente — preserva customizações).
+        app(ReportSettingService::class)->syncAdoptedContentsWithGlobal();
     }
 
     /** @return array<string, list<array{type: DocumentationType, slug: string, label: string, sort_order: int, content: string}>> */
@@ -108,7 +113,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<ul>'
                         . '<li>Segmento anterior: Ecos cristalinianos de baixa reflectividade.</li>'
@@ -134,7 +141,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'completo',
                     'label'      => 'Completo',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>ACUIDADE VISUAL SEM CORREÇÃO</strong></p>'
                         . '<ul>'
                         . '<li>Olho Direito: A/V {{AVSC_OD}}</li>'
@@ -172,7 +181,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<p><em>Papila Óptica:</em> Normocorada, bordos nítidos e escavação fisiológica.</p>'
                         . '<p><em>Retina:</em> Morfologia vascular preservada com relação art./veia = 2/3, ausência de fenômenos vaso-espásticos e de fenômenos de cruzamentos patológicos (Gunn e Salus). Não se evidencia microangiopatia diabética. Reflexos maculares preservados. Umbo foveal bem visível. Periferia sem lesões degenerativas.</p>'
@@ -191,7 +202,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>MICROSCOPIA ESPECULAR DE CÓRNEA</strong></p>'
                         . '<p><em>Olho Direito</em></p>'
                         . '<ul>'
@@ -233,7 +246,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p>Exame realizado no campímetro computadorizado OCULUS Twinfield® 2, utilizando programa CLIP 24-2(SF).</p>'
                         . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<ul>'
@@ -271,7 +286,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<p>Meios: Transparentes e normais.</p>'
                         . '<p>Papila Óptica: Escavação, bordos, limites e coloração respeitando os padrões de normalidade. Faixa neural normal.</p>'
@@ -295,7 +312,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<p>Meios: Transparentes e normais.</p>'
                         . '<p>Papila Óptica: Escavação, bordos, limites e coloração respeitando os padrões de normalidade. Faixa neural normal.</p>'
@@ -334,7 +353,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>Olho Direito</strong></p>'
                         . '<ul>'
                         . '<li>Cavidade vítrea: sinal hiper-refletivo junto à superfície retiniana.</li>'
@@ -377,7 +398,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>OLHO DIREITO</strong></p>'
                         . '<ul>'
                         . '<li>Qualidade do exame: boa.</li>'
@@ -403,7 +426,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'padrao',
                     'label'      => 'Padrão',
                     'sort_order' => 0,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p><strong>PENTACAM — Análise Tomográfica da Córnea</strong></p>'
                         . '<p><em>Olho Direito:</em> Mapas paquimétrico, elevação anterior/posterior, curvatura e Belin-Ambrósio dentro dos padrões da normalidade.</p>'
                         . '<p><em>Olho Esquerdo:</em> Mapas paquimétrico, elevação anterior/posterior, curvatura e Belin-Ambrósio dentro dos padrões da normalidade.</p>'
@@ -428,7 +453,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'ceratocone_avancado',
                     'label'      => 'Ceratocone Avançado',
                     'sort_order' => 3,
-                    'content'    => '<p><strong>Mapa Geral</strong></p>'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '<p><strong>Mapa Geral</strong></p>'
                         . '<ul>'
                         . '<li>Qualidade do exame: boa.</li>'
                         . '<li>Superfície anterior da córnea: astigmatismo irregular de 7.0D.</li>'
@@ -458,7 +485,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'laudo_refrativo',
                     'label'      => 'Laudo Refrativo',
                     'sort_order' => 4,
-                    'content'    => '<p><strong>LAUDO REFRATIVO — Mapa Geral</strong></p>'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '<p><strong>LAUDO REFRATIVO — Mapa Geral</strong></p>'
                         . '<ul>'
                         . '<li>Qualidade do exame: boa.</li>'
                         . '<li>Superfície anterior da córnea: astigmatismo regular oblíquo, com assimetria inferior, de 2.4D.</li>'
@@ -610,7 +639,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'declaracao_medica',
                     'label'      => 'Declaração Médica',
                     'sort_order' => 1,
-                    'content'    => '{{CABECALHO_PACIENTE}}'
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
                         . '<p>{{CONTEUDO_LIVRE}}</p>',
                 ],
             ],
@@ -688,7 +719,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'afastamento',
                     'label'      => 'Afastamento',
                     'sort_order' => 1,
-                    'content'    => '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} está sob meus cuidados médicos, devendo o(a) mesmo(a) ser afastado(a) de suas atividades profissionais por um período de {{DIAS_AFASTAMENTO}} ({{DIAS_AFASTAMENTO_EXTENSO}}) dia(s), a partir de {{DATA_ATUAL}}, por motivo de tratamento oftalmológico.</p>',
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} está sob meus cuidados médicos, devendo o(a) mesmo(a) ser afastado(a) de suas atividades profissionais por um período de {{DIAS_AFASTAMENTO}} ({{DIAS_AFASTAMENTO_EXTENSO}}) dia(s), a partir de {{DATA_ATUAL}}, por motivo de tratamento oftalmológico.</p>',
                 ],
             ],
 
@@ -698,7 +731,9 @@ class ReportSettingContentSeeder extends Seeder
                     'slug'       => 'comparecimento',
                     'label'      => 'Comparecimento',
                     'sort_order' => 1,
-                    'content'    => '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} esteve nesta clínica sob meus cuidados médicos no dia {{DATA_ATUAL}}, para procedimentos clínicos oftalmológicos.</p>',
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '<p>Atesto para os devidos fins de direito que {{PACIENTE_NOME}} esteve nesta clínica sob meus cuidados médicos no dia {{DATA_ATUAL}}, para procedimentos clínicos oftalmológicos.</p>',
                 ],
             ],
 

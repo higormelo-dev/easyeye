@@ -98,6 +98,7 @@ class TemplateVariableResolver
                 ['placeholder' => '{{DATA_ATUAL}}', 'label' => 'Data Atual', 'description' => 'Formato dd/mm/aaaa'],
                 ['placeholder' => '{{DATA_EXTENSO}}', 'label' => 'Data por Extenso', 'description' => 'Ex: segunda-feira, 3 de abril de 2026'],
                 ['placeholder' => '{{DATA_EXAME}}', 'label' => 'Data do Exame', 'description' => 'Data de criação do prontuário'],
+                ['placeholder' => '{{LOCAL_DATA}}', 'label' => 'Local e Data', 'description' => 'Cidade/UF e data por extenso (ex: São Paulo/SP, 13 de maio de 2026)'],
             ],
             'auxiliares' => [
                 ['placeholder' => '{{CABECALHO_PACIENTE}}', 'label' => 'Cabeçalho do Paciente', 'description' => 'Bloco com nome, idade e data do exame (HTML)'],
@@ -192,6 +193,15 @@ class TemplateVariableResolver
         return $variable->default_value ?? '';
     }
 
+    private function buildLocalDate(Entity $entity): string
+    {
+        $parts = array_filter([(string) ($entity->city ?? ''), (string) ($entity->state ?? '')]);
+        $local = implode('/', $parts);
+        $date  = now()->isoFormat('D [de] MMMM [de] YYYY');
+
+        return $local !== '' ? "{$local}, {$date}" : $date;
+    }
+
     private function resolveNestedField(object $model, ?string $field): ?string
     {
         if (! $field) {
@@ -234,6 +244,7 @@ class TemplateVariableResolver
             '{{DATA_ATUAL}}'               => now()->format('d/m/Y'),
             '{{DATA_EXTENSO}}'             => now()->isoFormat('dddd, D [de] MMMM [de] YYYY'),
             '{{DATA_EXAME}}'               => $examDate,
+            '{{LOCAL_DATA}}'               => $this->buildLocalDate($entity),
             // {{CABECALHO_PACIENTE}} resolvido como vazio: o PDF blade
             // renderiza patient-block próprio via $setting->patient_name,
             // tornando o placeholder redundante (causava duplicação no PDF

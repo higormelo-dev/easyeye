@@ -77,6 +77,7 @@ class ReportSettingsController extends Controller
                 'has_update'     => $r->hasUpdateAvailable(),
                 'source_version' => $r->source_version,
                 'category'       => $r->category?->name,
+                'preview_url'    => route('panel.setting.report-settings.preview', $r),
                 'edit_url'       => route('panel.setting.report-settings.edit', $r),
                 'delete_url'     => route('panel.setting.report-settings.destroy', $r),
                 'reimport_url'   => $r->isAdopted() ? route('panel.setting.report-settings.reimport', $r) : null,
@@ -119,6 +120,21 @@ class ReportSettingsController extends Controller
         return redirect()
             ->route('panel.setting.report-settings.index')
             ->with('message', __('actions.report_settings.saved'));
+    }
+
+    /**
+     * Preview HTML do template — exibido no modal da clínica.
+     * Aplica a mesma autorização de show() mas retorna HTML em vez de JSON.
+     */
+    public function preview(ReportSetting $reportSetting): \Illuminate\Contracts\View\View
+    {
+        $this->assertCanPreviewTemplate($reportSetting);
+
+        $reportSetting->load([
+            'activeContents' => fn ($q) => $q->orderBy('sort_order')->orderBy('label'),
+        ]);
+
+        return view('pdf.report_setting_preview_html', compact('reportSetting'));
     }
 
     /**

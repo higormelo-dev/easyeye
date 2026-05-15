@@ -35,10 +35,13 @@ class MedicalRecordDocumentationService
         return ReportSetting::with(['contents' => fn ($q) => $q->where('active', true)])
             ->where(fn ($q) => $q->where('entity_id', $entityId)->orWhereNull('entity_id'))
             ->where('active', true)
+            // Exclui antecipadamente settings sem conteúdo ativo, para que o groupBy
+            // não deixe uma cópia adotada vazia "ganhar" sobre o global que tem conteúdo.
+            ->whereHas('contents', fn ($q) => $q->where('active', true))
+            // Settings da entidade têm prioridade sobre globais de mesmo título.
             ->orderByRaw('CASE WHEN entity_id IS NULL THEN 1 ELSE 0 END')
             ->orderBy('title')
             ->get()
-            // Se existir versão da entidade, prioriza sobre template global do mesmo título.
             ->groupBy('title')
             ->map(fn ($group) => $group->first())
             ->map(fn ($setting) => [

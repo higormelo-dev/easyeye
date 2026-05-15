@@ -25,7 +25,7 @@ use Illuminate\Database\Seeder;
  *   {{PACIENTE_NOME}}, {{PACIENTE_CPF}}, {{PACIENTE_DATA_NASCIMENTO}},
  *   {{PACIENTE_IDADE}}, {{MEDICO_NOME}}, {{MEDICO_CRM}},
  *   {{MEDICO_CRM_ESPECIALIDADE}}, {{CLINICA_NOME}}, {{CLINICA_ENDERECO}},
- *   {{CLINICA_TELEFONE}}, {{DATA_ATUAL}}, {{DATA_EXTENSO}}.
+ *   {{CLINICA_TELEFONE}}, {{DATA_ATUAL}}, {{DATA_EXTENSO}}, {{LOCAL_DATA}}.
  *
  * Variáveis de prontuário (source_type=medical_record) são resolvidas pela
  * camada de negócio ao construir o documento a partir do exame/consulta.

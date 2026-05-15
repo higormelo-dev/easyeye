@@ -65,26 +65,23 @@
     /* ── Content ─────────────────────────────────────────────────── */
     .content-body {
         min-height: 240px;
-        white-space: pre-wrap;
         word-break: break-word;
         font-size: {{ $setting->font_size ?? 11 }}pt;
         line-height: 1.6;
+    }
+    .content-body p  { margin-bottom: 0.6em; }
+    .content-body br { display: block; margin-bottom: 0; }
+    .pmr-observations {
+        margin-top: 1.5em;
+        padding-top: 0.8em;
+        border-top: 1px solid #ddd;
     }
 
     /* ── Signature ───────────────────────────────────────────────── */
     .signature-block { margin-top: 40px; text-align: center; font-size: 9.5pt; }
     .signature-line  { border-top: 1px solid #333; display: inline-block; width: 200px; margin-bottom: 4px; }
 
-    /* ── Footer ──────────────────────────────────────────────────── */
-    .footer {
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        font-size: 8pt;
-        color: #aaa;
-        text-align: center;
-        padding-top: 4px;
-        border-top: 1px solid #e0e0e0;
-    }
+    /* Rodapé gerenciado via --footer-html no MedicalRecordPdfService (não inline) */
 </style>
 </head>
 <body>
@@ -97,16 +94,30 @@
 @endphp
 
 <!-- ─── CABEÇALHO ─────────────────────────────────────────────────────────── -->
-@if($setting->show_logo)
+@php
+    // Usa show_header (campo novo do formulário). Fallback para show_logo (campo
+    // legado) para compatibilidade com registros gerados antes da migração de campos.
+    $showHeader = $setting->show_header ?? $setting->show_logo ?? false;
+@endphp
+@if($showHeader)
 <div class="header">
+    @if($setting->header_show_logo ?? true)
     <div class="header-logo">
-        @if($entity->logo_path)
+        @if($entity?->logo_path)
         <img src="{{ public_path('storage/' . $entity->logo_path) }}" alt="">
         @endif
     </div>
+    @endif
     <div class="header-info">
-        <h1>{{ $entity->name }}</h1>
-        <p>{{ $entity->address_full ?? '' }}</p>
+        @if($setting->header_show_name ?? true)
+        <h1>{{ $entity?->name }}</h1>
+        @endif
+        @if(($setting->header_show_address ?? false) && $entity?->address_full)
+        <p>{{ $entity->address_full }}</p>
+        @endif
+        @if(($setting->header_show_phone ?? false) && ($entity?->telephone || $entity?->cellphone))
+        <p>{{ $entity->telephone ?? $entity->cellphone }}</p>
+        @endif
     </div>
 </div>
 @endif
@@ -144,13 +155,7 @@
 <!-- ─── ASSINATURA ─────────────────────────────────────────────────────────── -->
 @include('pdf._signature')
 
-<!-- ─── RODAPÉ ─────────────────────────────────────────────────────────────── -->
-@if($setting->show_footer)
-<div class="footer">
-    {{ $setting->footer_text ?? $entity->name }}
-    &nbsp;·&nbsp; {{ __('pdf.issued_at') }} {{ \Illuminate\Support\Carbon::now()->isoFormat('L LT') }}
-</div>
-@endif
+{{-- Rodapé renderizado via --footer-html no MedicalRecordPdfService::buildDocumentationFooterFile() --}}
 
 </body>
 </html>

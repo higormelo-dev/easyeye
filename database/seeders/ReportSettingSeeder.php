@@ -23,7 +23,7 @@ class ReportSettingSeeder extends Seeder
             'paper_size'        => PaperSize::A5,
             'font_family'       => 'Arial, Helvetica, sans-serif',
             'font_size'         => 12,
-            'margin_top'        => 0,
+            'margin_top'        => 0.5,
             'margin_right'      => 1.5,
             'margin_bottom'     => 0,
             'margin_left'       => 1.5,
@@ -112,5 +112,38 @@ class ReportSettingSeeder extends Seeder
                 array_merge($defaults, $overrides),
             );
         }
+
+        // Propaga as configurações de layout dos globais para todas as cópias
+        // adotadas pelas clínicas. Garante que mudanças no padrão do sistema
+        // (margens, papel, cabeçalho, rodapé) reflitam nas entidades automaticamente.
+        $this->syncLayoutToAdoptedCopies();
+    }
+
+    /**
+     * Campos de layout que o sistema gerencia e propaga para cópias adotadas.
+     * Campos de conteúdo (title, contents, variables) são gerenciados pelo ReportSettingService.
+     */
+    private function syncLayoutToAdoptedCopies(): void
+    {
+        $layoutFields = [
+            'paper_size', 'font_family', 'font_size',
+            'margin_top', 'margin_right', 'margin_bottom', 'margin_left',
+            'patient_font_size', 'patient_alignment', 'patient_color',
+            'show_header', 'header_show_logo', 'header_show_name',
+            'header_show_address', 'header_show_phone',
+            'show_signature', 'signature_show_name', 'signature_show_crm',
+            'signature_show_rqe', 'signature_bottom', 'signature_alignment',
+            'show_logo', 'show_footer', 'footer_show_address', 'footer_show_phone',
+        ];
+
+        ReportSetting::whereNull('entity_id')
+            ->where('active', true)
+            ->each(function (ReportSetting $global) use ($layoutFields) {
+                $config = $global->only($layoutFields);
+
+                ReportSetting::whereNotNull('entity_id')
+                    ->where('source_setting_id', $global->id)
+                    ->update($config);
+            });
     }
 }

@@ -5,11 +5,13 @@
     $lenses, $documentationTypes, $availableTemplates,
     $medicalrecord (null em create)
 --}}
+@php use App\Enums\ClientRule; @endphp
 @php
-    $r      = $medicalrecord ?? null;
-    $old    = fn (string $field, $default = '') => old($field, $r?->$field ?? $default);
-    $oldId  = fn (string $field) => old($field, $r?->$field ?? '');
-    $isEdit = (bool) $r;
+    $r        = $medicalrecord ?? null;
+    $old      = fn (string $field, $default = '') => old($field, $r?->$field ?? $default);
+    $oldId    = fn (string $field) => old($field, $r?->$field ?? '');
+    $isEdit   = (bool) $r;
+    $isDoctor = session('selected_entity_user_rule') === ClientRule::Doctor->value;
 @endphp
 
 <form id="pmr-form"
@@ -897,18 +899,11 @@
                     <i class="fas fa-stethoscope" style="font-size:1.6rem;color:#2196f3;"></i>
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Atestado<br>Médico</span>
                 </button>
-                <button type="button" class="btn pmr-doc-img-btn"
-                        title="{{ $isEdit ? 'Laudo Oftalmológico' : $saveFirstTitle }}"
-                        :disabled="!isEdit || quickActionBusy"
-                        @click="issueQuickAction('ophthalmological-report')">
-                    <i class="fas fa-vial-circle-check" style="font-size:1.6rem;color:#795548;"></i>
-                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudo<br>Oftalmológ.</span>
-                </button>
+
             @endif
 
-            {{-- Hub de Laudos, Documentações e Anexo: sempre visíveis.
-                 Desativados em CREATE — prontuário não existe ainda. --}}
-            @if(! empty($examReports))
+            {{-- Laudos de Exame: apenas para médicos --}}
+            @if($isDoctor && ! empty($examReports))
             <button type="button" class="btn pmr-doc-img-btn"
                     title="{{ $isEdit ? __('actions.medical_records.exam_hub_title') : $saveFirstTitle }}"
                     :disabled="!isEdit"
@@ -926,30 +921,31 @@
                 <span class="pmr-doc-img-btn-label">{{ __('actions.medical_records.documentations') }}</span>
             </button>
 
-            {{-- Anexo: <label> funcional em EDIT; visual desativado em CREATE
-                 (<label disabled> não existe em HTML — usa classe Bootstrap). --}}
-            @if($isEdit)
-            <label class="btn pmr-doc-img-btn pmr-doc-annexo"
-                   title="{{ __('actions.medical_records.upload_files') }}">
-                <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
-                <span class="pmr-doc-img-btn-label">Anexo</span>
-                <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
-                       class="d-none" @change="uploadFiles($event.target.files)">
-            </label>
-            <template x-if="uploading">
-                <div class="d-flex align-items-center gap-1" style="min-width:80px;">
-                    <div class="progress flex-grow-1" style="height:4px;">
-                        <div class="progress-bar bg-info" :style="`width:${uploadProgress}%`"></div>
+            {{-- Anexo: apenas para médicos --}}
+            @if($isDoctor)
+                @if($isEdit)
+                <label class="btn pmr-doc-img-btn pmr-doc-annexo"
+                       title="{{ __('actions.medical_records.upload_files') }}">
+                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                    <span class="pmr-doc-img-btn-label">Anexo</span>
+                    <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
+                           class="d-none" @change="uploadFiles($event.target.files)">
+                </label>
+                <template x-if="uploading">
+                    <div class="d-flex align-items-center gap-1" style="min-width:80px;">
+                        <div class="progress flex-grow-1" style="height:4px;">
+                            <div class="progress-bar bg-info" :style="`width:${uploadProgress}%`"></div>
+                        </div>
+                        <small class="text-muted" x-text="`${uploadProgress}%`"></small>
                     </div>
-                    <small class="text-muted" x-text="`${uploadProgress}%`"></small>
-                </div>
-            </template>
-            @else
-            <span class="btn pmr-doc-img-btn disabled" aria-disabled="true"
-                  title="{{ $saveFirstTitle }}">
-                <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
-                <span class="pmr-doc-img-btn-label">Anexo</span>
-            </span>
+                </template>
+                @else
+                <span class="btn pmr-doc-img-btn disabled" aria-disabled="true"
+                      title="{{ $saveFirstTitle }}">
+                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                    <span class="pmr-doc-img-btn-label">Anexo</span>
+                </span>
+                @endif
             @endif
 
             {{-- Salvar — empurrado para a direita via ms-auto. --}}

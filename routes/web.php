@@ -394,6 +394,7 @@ Route::group(
 
                 // Modelos de documentação (receituários, atestados, etc.)
                 Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
+                Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');
                 Route::post('report-settings/{report_setting}/adopt', [ReportSettingsController::class, 'adopt'])->name('report-settings.adopt');
                 Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');
                 Route::resource('report-settings', ReportSettingsController::class);
