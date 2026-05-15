@@ -105,21 +105,42 @@
             display: flex; align-items: center; justify-content: space-between; gap: 16px;
         }
 
-        /* Logo — duas versões: escura (scrolled) e branca (topo) */
+        /* Logo — cross-fade suave entre versão escura (scrolled) e branca (topo) */
         .nav-logo {
-            display: flex; align-items: center; gap: 10px;
-            text-decoration: none; font-weight: 800; font-size: 22px;
-            color: var(--navy); transition: color .35s;
+            display: flex; align-items: center;
+            text-decoration: none;
         }
-        .nav-logo img { height: 32px; }
-        .nav-logo span { color: var(--teal); }
-        .logo-v-dark  { display: block; }
-        .logo-v-white { display: none; }
+        /*
+         * Container relativo: a logo-v-dark fica em fluxo normal e define
+         * a largura/altura do wrapper. A logo-v-white é absoluta e sobrepõe.
+         */
+        .nav-logo-imgs {
+            position: relative;
+            display: inline-block;
+            line-height: 0;
+        }
+        /* logo escura — em fluxo, define o tamanho do container */
+        .logo-v-dark {
+            display: block;
+            height: 32px;
+            width: auto;
+            opacity: 1;
+            transition: opacity .35s ease;
+        }
+        /* logo branca — sobreposta à escura via position absolute */
+        .logo-v-white {
+            display: block;
+            height: 32px;
+            width: auto;
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity .35s ease;
+        }
 
-        /* Estado inicial — navbar transparente sobre hero escuro */
-        #navbar:not(.scrolled) .nav-logo { color: #fff; }
-        #navbar:not(.scrolled) .logo-v-dark  { display: none; }
-        #navbar:not(.scrolled) .logo-v-white { display: block; }
+        /* topo (navbar transparente): branca visível, escura invisível */
+        #navbar:not(.scrolled) .logo-v-dark  { opacity: 0; }
+        #navbar:not(.scrolled) .logo-v-white { opacity: 1; }
 
         /* Links */
         .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
@@ -215,6 +236,15 @@
             .nav-mobile-btn { display: block; }
         }
 
+        /* logo no footer — sem troca, sempre branca sobre fundo escuro */
+        .footer-brand .nav-logo img {
+            height: 32px;
+            width: auto;
+            display: block;
+            position: static;
+            opacity: 1 !important;
+        }
+
         /* ─── FOOTER ─── */
         footer { background: #0a1628; padding: 64px 0 32px; }
         .footer-inner {
@@ -263,13 +293,16 @@
     <nav id="navbar" x-data="{ open: false }">
         <div class="container">
             <div class="nav-inner">
-                <a href="{{ route('site.home') }}" class="nav-logo">
-                    <img src="{{ asset('system/images/logo-small.svg') }}"
-                         alt="{{ config('app.name', 'EasyEye') }}"
-                         class="logo-v-dark">
-                    <img src="{{ asset('system/images/logo-white.svg') }}"
-                         alt="{{ config('app.name', 'EasyEye') }}"
-                         class="logo-v-white">
+                <a href="{{ route('site.home') }}" class="nav-logo" aria-label="{{ config('app.name', 'EasyEye') }}">
+                    <span class="nav-logo-imgs">
+                        <img src="{{ asset('system/images/logo.svg') }}"
+                             alt="{{ config('app.name', 'EasyEye') }}"
+                             class="logo-v-dark">
+                        <img src="{{ asset('system/images/logo-white.svg') }}"
+                             alt=""
+                             class="logo-v-white"
+                             aria-hidden="true">
+                    </span>
                 </a>
 
                 <ul class="nav-links">
