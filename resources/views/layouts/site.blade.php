@@ -270,7 +270,6 @@
                     <img src="{{ asset('system/images/logo-white.svg') }}"
                          alt="{{ config('app.name', 'EasyEye') }}"
                          class="logo-v-white">
-                    Easy<span>Eye</span>
                 </a>
 
                 <ul class="nav-links">
@@ -363,7 +362,6 @@
                 <div class="footer-brand">
                     <a href="{{ route('site.home') }}" class="nav-logo">
                         <img src="{{ asset('system/images/logo-small.svg') }}" alt="{{ config('app.name', 'EasyEye') }}">
-                        Easy<span>Eye</span>
                     </a>
                     <p>{{ __('site.footer.tagline') }}</p>
                     <div class="footer-social">

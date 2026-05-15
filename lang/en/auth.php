@@ -88,10 +88,23 @@ return [
         'or'                     => 'or',
         'quick_start'            => 'Start with plan',
 
+        /* additional fields */
+        'phone'                  => 'Phone',
+
+        /* left panel metrics */
+        'metric_clinics'         => 'clinics',
+
         /* JS validations */
         'email_taken'            => 'This e-mail is already registered.',
         'field_required'         => 'This field is required.',
         'passwords_mismatch'     => 'Passwords do not match.',
+
+        /* password strength */
+        'strength_very_weak'     => 'Very weak',
+        'strength_weak'          => 'Weak',
+        'strength_fair'          => 'Fair',
+        'strength_strong'        => 'Strong',
+        'strength_very_strong'   => 'Very strong',
     ],
 
     'forgot_password' => [

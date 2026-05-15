@@ -17,21 +17,47 @@ export default function registerWizard(plansJson, trialDays) {
             password: '',
             password_confirmation: '',
             company_name: '',
+            company_phone: '',
             company_cnpj: '',
             plan_id: plans.length ? plans[0].id : '',
         },
 
+        /* ─── Plano selecionado ─── */
         get currentPlan() {
             return plans.find(p => p.id === this.selectedPlan) || null;
         },
 
-        plans() {
-            return plans;
+        /* ─── Força da senha ─── */
+        get passwordStrength() {
+            const p = this.form.password;
+            if (!p) return 0;
+            let score = 0;
+            if (p.length >= 8)           score++;
+            if (p.length >= 12)          score++;
+            if (/[A-Z]/.test(p))         score++;
+            if (/[0-9]/.test(p))         score++;
+            if (/[^A-Za-z0-9]/.test(p))  score++;
+            return score; // 0–5
         },
+
+        get passwordStrengthLabel() {
+            const l = window._trans?.strength_labels
+                ?? ['', 'Muito fraca', 'Fraca', 'Razoável', 'Forte', 'Muito forte'];
+            return l[this.passwordStrength] ?? '';
+        },
+
+        get passwordStrengthColor() {
+            return ['', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06d6a0'][this.passwordStrength] ?? '';
+        },
+
+        /* ─── Planos ─── */
+        plans() { return plans; },
 
         selectPlan(planId) {
             this.selectedPlan = planId;
             this.form.plan_id = planId;
+            const idx = plans.findIndex(p => p.id === planId);
+            if (idx >= 0) this.carouselIndex = idx;
         },
 
         prevSlide() {
@@ -58,19 +84,20 @@ export default function registerWizard(plansJson, trialDays) {
             this.submit();
         },
 
+        /* ─── Verificação de e-mail ─── */
         async checkEmailAvailability() {
             if (!this.form.email || !this.form.email.includes('@')) return;
             this.emailChecking = true;
             this.emailAvailable = null;
             try {
-                const res = await fetch(
+                const res  = await fetch(
                     `/register/check-email?email=${encodeURIComponent(this.form.email)}`,
                     { headers: { Accept: 'application/json' } }
                 );
                 const data = await res.json();
                 this.emailAvailable = data.available;
                 if (!data.available) {
-                    this.errors.email = [window._trans?.email_taken || 'E-mail já cadastrado.'];
+                    this.errors.email = [window._trans?.email_taken ?? 'E-mail já cadastrado.'];
                 } else {
                     delete this.errors.email;
                 }
@@ -81,25 +108,26 @@ export default function registerWizard(plansJson, trialDays) {
             }
         },
 
+        /* ─── Validação etapa 1 ─── */
         validateStep1() {
-            const t    = window._trans || {};
-            const req  = t.field_required     || 'Campo obrigatório.';
+            const t   = window._trans ?? {};
+            const req = t.field_required ?? 'Campo obrigatório.';
             const errs = {};
             if (!this.form.name.trim())  errs.name = [req];
             if (!this.form.email.trim()) errs.email = [req];
-            else if (this.emailAvailable === false) errs.email = [t.email_taken || 'E-mail já cadastrado.'];
+            else if (this.emailAvailable === false) errs.email = [t.email_taken ?? 'E-mail já cadastrado.'];
             if (!this.form.password)     errs.password = [req];
             if (this.form.password !== this.form.password_confirmation) {
-                errs.password_confirmation = [t.passwords_mismatch || 'As senhas não conferem.'];
+                errs.password_confirmation = [t.passwords_mismatch ?? 'As senhas não conferem.'];
             }
             this.errors = errs;
             return Object.keys(errs).length === 0;
         },
 
         nextStep() {
-            if (this.validateStep1()) {
-                this.step = 2;
-            }
+            if (!this.validateStep1()) return;
+            this.step = 2;
+            this.$nextTick(() => document.getElementById('reg-company-name')?.focus());
         },
 
         prevStep() {
@@ -108,37 +136,34 @@ export default function registerWizard(plansJson, trialDays) {
         },
 
         firstError(field) {
-            return this.errors[field] ? this.errors[field][0] : null;
+            return this.errors[field]?.[0] ?? null;
         },
 
+        /* ─── Submissão ─── */
         async submit() {
             this.errors = {};
             this.loading = true;
             try {
-                const res = await fetch('/register', {
+                const res  = await fetch('/register', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                        'Content-Type':  'application/json',
+                        Accept:          'application/json',
+                        'X-CSRF-TOKEN':  document.querySelector('meta[name="csrf-token"]').content,
                     },
                     body: JSON.stringify(this.form),
                 });
-
                 const data = await res.json();
 
                 if (!res.ok) {
-                    this.errors = data.errors || {};
+                    this.errors = data.errors ?? {};
                     const step1Fields = ['name', 'email', 'password', 'password_confirmation'];
-                    if (step1Fields.some(f => this.errors[f])) {
-                        this.step = 1;
-                    }
+                    if (step1Fields.some(f => this.errors[f])) this.step = 1;
                     return;
                 }
-
                 window.location.href = data.redirect;
             } catch {
-                // network error – keep loading = false
+                // erro de rede — não altera loading para não bloquear UI
             } finally {
                 this.loading = false;
             }

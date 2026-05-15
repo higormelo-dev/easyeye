@@ -86,10 +86,23 @@ return [
         'or'                     => 'ou',
         'quick_start'            => 'Começar com o plano',
 
+        /* campos adicionais */
+        'phone'                  => 'Telefone',
+
+        /* métricas do painel esquerdo */
+        'metric_clinics'         => 'clínicas',
+
         /* validações JS */
         'email_taken'            => 'Este e-mail já está cadastrado.',
         'field_required'         => 'Campo obrigatório.',
         'passwords_mismatch'     => 'As senhas não conferem.',
+
+        /* força da senha */
+        'strength_very_weak'     => 'Muito fraca',
+        'strength_weak'          => 'Fraca',
+        'strength_fair'          => 'Razoável',
+        'strength_strong'        => 'Forte',
+        'strength_very_strong'   => 'Muito forte',
     ],
 
     'forgot_password' => [

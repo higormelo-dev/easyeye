@@ -1,127 +1,210 @@
 @extends('layouts.site')
 
 @section('title', __('auth.register.meta_title', ['app' => config('app.name', 'EasyEye')]))
-@section('description', __('auth.register.meta_description'))
+@section('description', __('auth.register.meta_description', ['days' => $trialDays]))
 
 {{-- Vite já fornece o Alpine.js via app.js — suprime o CDN do layout --}}
 @section('alpinejs')@endsection
 
 @push('styles')
 <style>
-    /* ─── ESTRUTURA GERAL ─── */
-    .reg-page {
-        padding-top: 70px; /* clearance do navbar fixo */
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
+    /* ─── HERO DO REGISTRO ─── */
+    .reg-hero {
+        background: linear-gradient(135deg, #0F2551 0%, #1B3A6B 50%, #0F2551 100%);
+        padding: 120px 0 72px;
+        position: relative;
+        overflow: hidden;
     }
 
-    .reg-body {
-        flex: 1;
-        display: grid;
-        grid-template-columns: 400px 1fr;
+    .reg-hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.025'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
     }
 
-    /* ─── PAINEL ESQUERDO — MARKETING ─── */
-    .reg-left {
-        background: linear-gradient(160deg, var(--navy) 0%, #0d1f47 100%);
-        padding: 52px 44px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        position: sticky;
-        top: 70px;
-        height: calc(100vh - 70px);
-        overflow-y: auto;
+    .reg-hero-blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: .2;
     }
 
-    .reg-left-headline {
-        font-size: clamp(24px, 2.8vw, 32px);
-        font-weight: 800;
+    .reg-hero-blob-1 { width: 400px; height: 400px; top: -120px; right: -60px; background: var(--teal); }
+    .reg-hero-blob-2 { width: 280px; height: 280px; bottom: -80px; left: 8%; background: #6c63ff; }
+
+    .reg-hero-inner {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        max-width: 680px;
+        margin: 0 auto;
+    }
+
+    .reg-hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(0,180,216,.15);
+        color: var(--teal);
+        border: 1px solid rgba(0,180,216,.3);
+        padding: 6px 16px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+
+    .reg-hero-title {
+        font-size: clamp(28px, 4.5vw, 48px);
+        font-weight: 900;
         color: #fff;
-        line-height: 1.2;
-        margin-bottom: 8px;
+        line-height: 1.1;
         letter-spacing: -.02em;
+        margin-bottom: 16px;
     }
 
-    .reg-left-headline em {
+    .reg-hero-title em {
         font-style: normal;
         color: var(--teal);
     }
 
-    .reg-left-sub {
-        font-size: 15px;
-        color: rgba(255,255,255,.6);
-        line-height: 1.6;
+    .reg-hero-sub {
+        font-size: 17px;
+        color: rgba(255,255,255,.7);
+        line-height: 1.7;
         margin-bottom: 36px;
     }
 
+    /* Métricas da hero */
+    .reg-hero-metrics {
+        display: inline-flex;
+        align-items: stretch;
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .reg-hero-metric {
+        padding: 14px 24px;
+        text-align: center;
+        border-right: 1px solid rgba(255,255,255,.1);
+    }
+
+    .reg-hero-metric:last-child { border-right: none; }
+
+    .reg-hero-metric-val {
+        display: block;
+        font-size: 22px;
+        font-weight: 900;
+        color: var(--teal);
+        line-height: 1;
+        margin-bottom: 4px;
+    }
+
+    .reg-hero-metric-label {
+        font-size: 11px;
+        color: rgba(255,255,255,.45);
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        font-weight: 600;
+    }
+
+    /* ─── SEÇÃO DO FORMULÁRIO ─── */
+    .reg-section {
+        background: var(--bg);
+        padding: 64px 0 80px;
+    }
+
+    .reg-layout {
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        gap: 48px;
+        align-items: start;
+    }
+
+    /* ─── COLUNA DE MARKETING ─── */
+    .reg-marketing { padding-top: 8px; }
+
+    .reg-marketing-headline {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--navy);
+        margin-bottom: 8px;
+        line-height: 1.25;
+    }
+
+    .reg-marketing-sub {
+        font-size: 15px;
+        color: var(--text-muted);
+        line-height: 1.65;
+        margin-bottom: 32px;
+    }
+
+    /* Benefícios */
     .reg-benefits {
         list-style: none;
         display: flex;
         flex-direction: column;
         gap: 16px;
-        margin-bottom: 40px;
+        margin-bottom: 36px;
     }
 
     .reg-benefit {
         display: flex;
         align-items: flex-start;
-        gap: 12px;
+        gap: 14px;
     }
 
     .reg-benefit-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 8px;
-        background: rgba(0,180,216,.15);
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: rgba(0,180,216,.1);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 15px;
+        font-size: 18px;
         color: var(--teal);
         flex-shrink: 0;
-        margin-top: 1px;
+        margin-top: 2px;
     }
 
     .reg-benefit-text strong {
         display: block;
         font-size: 14px;
         font-weight: 700;
-        color: #fff;
-        margin-bottom: 2px;
+        color: var(--navy);
+        margin-bottom: 3px;
     }
 
     .reg-benefit-text span {
         font-size: 13px;
-        color: rgba(255,255,255,.5);
-        line-height: 1.5;
+        color: var(--text-muted);
+        line-height: 1.55;
     }
 
-    .reg-left-divider {
-        height: 1px;
-        background: rgba(255,255,255,.1);
-        margin-bottom: 28px;
-    }
-
+    /* Testemunho */
     .reg-testimonial {
-        background: rgba(255,255,255,.05);
-        border: 1px solid rgba(255,255,255,.1);
-        border-radius: 12px;
-        padding: 20px;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 22px 24px;
+        box-shadow: var(--shadow);
     }
 
     .reg-testimonial-stars {
         color: #f59e0b;
-        font-size: 12px;
+        font-size: 13px;
         margin-bottom: 10px;
         letter-spacing: 2px;
     }
 
     .reg-testimonial-text {
-        font-size: 13px;
-        color: rgba(255,255,255,.7);
-        line-height: 1.6;
+        font-size: 14px;
+        color: var(--text);
+        line-height: 1.65;
         font-style: italic;
         margin-bottom: 14px;
     }
@@ -129,62 +212,74 @@
     .reg-testimonial-author {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12px;
     }
 
     .reg-testimonial-avatar {
-        width: 34px;
-        height: 34px;
+        width: 40px;
+        height: 40px;
         border-radius: 50%;
         background: linear-gradient(135deg, var(--teal), #6c63ff);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 700;
         color: #fff;
         flex-shrink: 0;
     }
 
     .reg-testimonial-name {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 700;
-        color: #fff;
+        color: var(--navy);
     }
 
     .reg-testimonial-role {
         font-size: 12px;
-        color: rgba(255,255,255,.45);
+        color: var(--text-muted);
     }
 
-    /* ─── PAINEL DIREITO — FORMULÁRIO ─── */
-    .reg-right {
-        background: var(--bg);
+    /* Trust strip abaixo do depoimento */
+    .reg-trust {
         display: flex;
-        align-items: flex-start;
-        justify-content: center;
-        padding: 48px 24px 64px;
+        align-items: center;
+        gap: 20px;
+        margin-top: 24px;
+        flex-wrap: wrap;
     }
 
+    .reg-trust-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-muted);
+        font-weight: 600;
+        letter-spacing: .02em;
+    }
+
+    .reg-trust-item i { color: var(--mint); font-size: 14px; }
+
+    /* ─── CARD DO FORMULÁRIO ─── */
     .reg-card {
         background: #fff;
         border-radius: var(--radius-lg);
         border: 1px solid var(--border);
-        box-shadow: var(--shadow);
-        padding: 40px 36px;
-        width: 100%;
-        max-width: 460px;
+        box-shadow: var(--shadow-lg);
+        padding: 36px 32px;
+        position: sticky;
+        top: 90px;
     }
 
-    .reg-card-header {
-        margin-bottom: 28px;
-    }
+    .reg-card-header { margin-bottom: 20px; }
 
     .reg-card-title {
-        font-size: 22px;
+        font-size: 20px;
         font-weight: 800;
         color: var(--navy);
         margin-bottom: 4px;
+        line-height: 1.2;
     }
 
     .reg-card-subtitle {
@@ -192,27 +287,11 @@
         color: var(--text-muted);
     }
 
-    /* Faixa mobile — aparece só em telas pequenas */
-    .reg-mobile-banner {
-        display: none;
-        background: var(--navy);
-        padding: 14px 20px;
-        text-align: center;
-    }
-
-    .reg-mobile-banner span {
-        font-size: 13px;
-        color: rgba(255,255,255,.8);
-    }
-
-    .reg-mobile-banner strong { color: var(--teal); }
-
     /* ─── STEP INDICATOR ─── */
     .step-indicator {
         display: flex;
         align-items: center;
-        gap: 0;
-        margin-bottom: 28px;
+        margin-bottom: 10px;
     }
 
     .step-item {
@@ -260,8 +339,24 @@
         margin: 0 8px;
     }
 
-    /* ─── CAMPOS DO FORMULÁRIO ─── */
-    .reg-field { margin-bottom: 18px; }
+    /* ─── BARRA DE PROGRESSO ─── */
+    .reg-progress {
+        height: 3px;
+        border-radius: 4px;
+        background: var(--border);
+        margin-bottom: 22px;
+        overflow: hidden;
+    }
+
+    .reg-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--teal), var(--mint));
+        border-radius: 4px;
+        transition: width .4s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* ─── CAMPOS ─── */
+    .reg-field { margin-bottom: 16px; }
 
     .reg-label {
         display: block;
@@ -303,7 +398,6 @@
         margin-top: 5px;
     }
 
-    /* Input com ícone/botão à direita */
     .reg-input-group {
         display: flex;
         align-items: stretch;
@@ -336,9 +430,7 @@
         transition: border-color .18s;
     }
 
-    .reg-input-group:focus-within .reg-input-addon {
-        border-color: var(--teal);
-    }
+    .reg-input-group:focus-within .reg-input-addon { border-color: var(--teal); }
 
     .reg-toggle-btn {
         display: flex;
@@ -362,8 +454,37 @@
         border-color: var(--navy);
     }
 
-    .reg-input-group:focus-within .reg-toggle-btn {
-        border-color: var(--teal);
+    .reg-input-group:focus-within .reg-toggle-btn { border-color: var(--teal); }
+
+    /* ─── FORÇA DA SENHA ─── */
+    .pwd-strength {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 8px;
+    }
+
+    .pwd-bars {
+        display: flex;
+        gap: 4px;
+        flex: 1;
+    }
+
+    .pwd-bar {
+        flex: 1;
+        height: 4px;
+        border-radius: 4px;
+        background: var(--border);
+        transition: background .25s;
+    }
+
+    .pwd-strength-label {
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        min-width: 72px;
+        text-align: right;
+        transition: color .25s;
     }
 
     /* ─── BOTÕES ─── */
@@ -383,10 +504,7 @@
         transition: all .2s;
     }
 
-    .reg-btn-primary {
-        background: var(--teal);
-        color: #fff;
-    }
+    .reg-btn-primary { background: var(--teal); color: #fff; }
 
     .reg-btn-primary:hover:not(:disabled) {
         background: #0096b5;
@@ -430,8 +548,7 @@
         content: '';
         position: absolute;
         top: 50%;
-        left: 0;
-        right: 0;
+        left: 0; right: 0;
         height: 1px;
         background: var(--border);
     }
@@ -447,7 +564,7 @@
     /* ─── FOOTER DO CARD ─── */
     .reg-card-footer {
         text-align: center;
-        margin-top: 20px;
+        margin-top: 18px;
         font-size: 14px;
         color: var(--text-muted);
     }
@@ -460,129 +577,111 @@
 
     .reg-card-footer a:hover { text-decoration: underline; }
 
-    /* ─── PLANOS ─── */
-    .plan-card {
-        border: 2px solid var(--teal);
-        border-radius: 12px;
-        padding: 20px 16px;
-        text-align: center;
-        box-shadow: 0 0 0 3px rgba(0,180,216,.1);
-        background: #fff;
+    /* Trust strip no card */
+    .reg-card-trust {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--border);
+        flex-wrap: wrap;
     }
 
-    .plan-trial-badge {
-        display: inline-block;
-        background: var(--mint);
-        color: #fff;
+    .reg-card-trust-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
         font-size: 11px;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    /* ─── PLANOS ─── */
+    .plan-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .plan-grid-card {
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 10px;
+        text-align: center;
+        cursor: pointer;
+        transition: all .2s;
+        background: #fff;
+        user-select: none;
+    }
+
+    .plan-grid-card:hover {
+        border-color: var(--teal);
+        box-shadow: 0 0 0 3px rgba(0,180,216,.08);
+    }
+
+    .plan-grid-card.selected {
+        border-color: var(--teal);
+        background: rgba(0,180,216,.03);
+        box-shadow: 0 0 0 3px rgba(0,180,216,.12);
+    }
+
+    .plan-grid-badge {
+        display: inline-block;
+        background: rgba(0,180,216,.1);
+        color: var(--teal);
+        font-size: 10px;
         font-weight: 700;
-        padding: 3px 10px;
+        padding: 2px 7px;
         border-radius: 20px;
-        margin-bottom: 8px;
+        margin-bottom: 5px;
         letter-spacing: .02em;
     }
 
-    .plan-name {
-        font-size: 17px;
+    .plan-grid-name {
+        font-size: 12px;
         font-weight: 800;
         color: var(--navy);
-        margin-bottom: 2px;
+        margin-bottom: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
-    .plan-price {
-        font-size: 26px;
+    .plan-grid-price {
+        font-size: 15px;
         font-weight: 900;
         color: var(--teal);
-        margin-bottom: 2px;
+        line-height: 1;
     }
 
-    .plan-price small {
-        font-size: 13px;
-        font-weight: 400;
+    .plan-grid-cycle {
+        font-size: 10px;
         color: var(--text-muted);
+        margin-top: 2px;
     }
 
-    .plan-description {
-        font-size: 13px;
-        color: var(--text-muted);
-        margin: 4px 0 0;
-        line-height: 1.4;
+    .plan-detail {
+        border: 1.5px solid rgba(0,180,216,.3);
+        border-radius: 10px;
+        padding: 12px 14px;
+        background: rgba(0,180,216,.02);
     }
 
     .plan-features {
         list-style: none;
         padding: 0;
-        margin: 12px 0 0;
-        text-align: left;
+        margin: 0;
         font-size: 13px;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 5px;
     }
 
     .plan-features li { color: var(--text-muted); }
     .plan-features .feat-val { font-weight: 700; color: var(--navy); }
-
-    .plan-carousel-wrap {
-        position: relative;
-        padding: 0 36px;
-    }
-
-    .carousel-btn {
-        position: absolute;
-        top: 50%;
-        transform: translateY(-50%);
-        background: #fff;
-        border: 1.5px solid var(--border);
-        border-radius: 50%;
-        width: 30px;
-        height: 30px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        color: var(--text-muted);
-        font-size: 18px;
-        line-height: 1;
-        transition: all .15s;
-        z-index: 1;
-        padding: 0;
-    }
-
-    .carousel-btn:hover:not(:disabled) {
-        background: var(--navy);
-        border-color: var(--navy);
-        color: #fff;
-    }
-
-    .carousel-btn:disabled { opacity: .25; cursor: default; pointer-events: none; }
-    .carousel-btn-prev { left: 0; }
-    .carousel-btn-next { right: 0; }
-
-    .carousel-dots {
-        display: flex;
-        justify-content: center;
-        gap: 6px;
-        margin-top: 10px;
-    }
-
-    .carousel-dots .dot {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: var(--border);
-        cursor: pointer;
-        transition: background .2s;
-    }
-
-    .carousel-dots .dot.active { background: var(--teal); }
-
-    .carousel-counter {
-        font-size: 12px;
-        color: var(--text-muted);
-        text-align: center;
-        margin-top: 4px;
-    }
 
     /* ─── QUICK START ─── */
     .reg-quick-start {
@@ -615,88 +714,148 @@
 
     /* ─── RESPONSIVO ─── */
     @media (max-width: 1023px) {
-        .reg-body { grid-template-columns: 1fr; }
-        .reg-left { display: none; }
-        .reg-mobile-banner { display: block; }
-        .reg-right { padding: 24px 16px 48px; }
-        .reg-card { padding: 28px 20px; }
+        .reg-layout {
+            grid-template-columns: 1fr;
+        }
+
+        .reg-marketing {
+            order: 2;
+        }
+
+        .reg-card {
+            position: static;
+            order: 1;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .reg-hero { padding: 100px 0 52px; }
+        .reg-hero-metrics { flex-direction: column; width: 100%; }
+        .reg-hero-metric { border-right: none; border-bottom: 1px solid rgba(255,255,255,.1); }
+        .reg-hero-metric:last-child { border-bottom: none; }
+        .reg-section { padding: 36px 0 56px; }
+        .reg-card { padding: 24px 18px; }
+        .plan-grid { grid-template-columns: 1fr 1fr; }
     }
 </style>
 @endpush
 
 @section('content')
 
-<div class="reg-page">
+{{-- ═══════ HERO ═══════ --}}
+<section class="reg-hero hero">
+    <div class="reg-hero-blob reg-hero-blob-1"></div>
+    <div class="reg-hero-blob reg-hero-blob-2"></div>
 
-    {{-- Faixa mobile (substitui painel esquerdo) --}}
-    <div class="reg-mobile-banner">
-        <span>
-            <strong>14 {{ __('auth.register.days_free') }}</strong>
-            &bull; {{ __('auth.register.no_card') }}
-            &bull; {{ __('auth.register.setup_fast') }}
-        </span>
-    </div>
+    <div class="container">
+        <div class="reg-hero-inner">
+            <div class="reg-hero-badge">
+                <i class="bi bi-stars"></i>
+                {{ $trialDays }} {{ __('auth.register.days_free') }}
+                &bull; {{ __('auth.register.no_card') }}
+                &bull; {{ __('auth.register.setup_fast') }}
+            </div>
 
-    <div class="reg-body">
-
-        {{-- ═══════ PAINEL ESQUERDO — MARKETING ═══════ --}}
-        <div class="reg-left">
-            <p class="reg-left-headline">
+            <h1 class="reg-hero-title">
                 {{ __('auth.register.left_headline') }}<br>
                 <em>{{ __('auth.register.left_headline_em') }}</em>
-            </p>
-            <p class="reg-left-sub">{{ __('auth.register.left_sub') }}</p>
+            </h1>
 
-            <ul class="reg-benefits">
-                <li class="reg-benefit">
-                    <div class="reg-benefit-icon"><i class="bi bi-gift"></i></div>
-                    <div class="reg-benefit-text">
-                        <strong>{{ __('auth.register.benefit_trial_title') }}</strong>
-                        <span>{{ __('auth.register.benefit_trial_text', ['days' => $trialDays]) }}</span>
-                    </div>
-                </li>
-                <li class="reg-benefit">
-                    <div class="reg-benefit-icon"><i class="bi bi-lightning-charge"></i></div>
-                    <div class="reg-benefit-text">
-                        <strong>{{ __('auth.register.benefit_setup_title') }}</strong>
-                        <span>{{ __('auth.register.benefit_setup_text') }}</span>
-                    </div>
-                </li>
-                <li class="reg-benefit">
-                    <div class="reg-benefit-icon"><i class="bi bi-headset"></i></div>
-                    <div class="reg-benefit-text">
-                        <strong>{{ __('auth.register.benefit_support_title') }}</strong>
-                        <span>{{ __('auth.register.benefit_support_text') }}</span>
-                    </div>
-                </li>
-                <li class="reg-benefit">
-                    <div class="reg-benefit-icon"><i class="bi bi-shield-check"></i></div>
-                    <div class="reg-benefit-text">
-                        <strong>{{ __('auth.register.benefit_lgpd_title') }}</strong>
-                        <span>{{ __('auth.register.benefit_lgpd_text') }}</span>
-                    </div>
-                </li>
-            </ul>
+            <p class="reg-hero-sub">{{ __('auth.register.left_sub') }}</p>
 
-            <div class="reg-left-divider"></div>
-
-            <div class="reg-testimonial">
-                <div class="reg-testimonial-stars">★★★★★</div>
-                <p class="reg-testimonial-text">
-                    "{{ __('auth.register.testimonial_text') }}"
-                </p>
-                <div class="reg-testimonial-author">
-                    <div class="reg-testimonial-avatar">DR</div>
-                    <div>
-                        <div class="reg-testimonial-name">{{ __('auth.register.testimonial_name') }}</div>
-                        <div class="reg-testimonial-role">{{ __('auth.register.testimonial_role') }}</div>
-                    </div>
+            <div class="reg-hero-metrics">
+                <div class="reg-hero-metric">
+                    <span class="reg-hero-metric-val">500+</span>
+                    <span class="reg-hero-metric-label">{{ __('auth.register.metric_clinics') }}</span>
+                </div>
+                <div class="reg-hero-metric">
+                    <span class="reg-hero-metric-val">{{ $trialDays }}</span>
+                    <span class="reg-hero-metric-label">{{ __('auth.register.days_free') }}</span>
+                </div>
+                <div class="reg-hero-metric">
+                    <span class="reg-hero-metric-val">97%</span>
+                    <span class="reg-hero-metric-label">NPS</span>
                 </div>
             </div>
         </div>
+    </div>
+</section>
 
-        {{-- ═══════ PAINEL DIREITO — FORMULÁRIO ═══════ --}}
-        <div class="reg-right">
+{{-- ═══════ SEÇÃO DO FORMULÁRIO ═══════ --}}
+<section class="reg-section">
+    <div class="container">
+        <div class="reg-layout">
+
+            {{-- ── COLUNA DE MARKETING ── --}}
+            <div class="reg-marketing">
+
+                <h2 class="reg-marketing-headline">
+                    {{ __('auth.register.step1_title') }}
+                </h2>
+                <p class="reg-marketing-sub">
+                    {{ __('auth.register.left_sub') }}
+                </p>
+
+                <ul class="reg-benefits">
+                    <li class="reg-benefit">
+                        <div class="reg-benefit-icon"><i class="bi bi-gift"></i></div>
+                        <div class="reg-benefit-text">
+                            <strong>{{ __('auth.register.benefit_trial_title', ['days' => $trialDays]) }}</strong>
+                            <span>{{ __('auth.register.benefit_trial_text') }}</span>
+                        </div>
+                    </li>
+                    <li class="reg-benefit">
+                        <div class="reg-benefit-icon"><i class="bi bi-lightning-charge"></i></div>
+                        <div class="reg-benefit-text">
+                            <strong>{{ __('auth.register.benefit_setup_title') }}</strong>
+                            <span>{{ __('auth.register.benefit_setup_text') }}</span>
+                        </div>
+                    </li>
+                    <li class="reg-benefit">
+                        <div class="reg-benefit-icon"><i class="bi bi-headset"></i></div>
+                        <div class="reg-benefit-text">
+                            <strong>{{ __('auth.register.benefit_support_title') }}</strong>
+                            <span>{{ __('auth.register.benefit_support_text') }}</span>
+                        </div>
+                    </li>
+                    <li class="reg-benefit">
+                        <div class="reg-benefit-icon"><i class="bi bi-shield-check"></i></div>
+                        <div class="reg-benefit-text">
+                            <strong>{{ __('auth.register.benefit_lgpd_title') }}</strong>
+                            <span>{{ __('auth.register.benefit_lgpd_text') }}</span>
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="reg-testimonial">
+                    <div class="reg-testimonial-stars">★★★★★</div>
+                    <p class="reg-testimonial-text">"{{ __('auth.register.testimonial_text') }}"</p>
+                    <div class="reg-testimonial-author">
+                        <div class="reg-testimonial-avatar">DR</div>
+                        <div>
+                            <div class="reg-testimonial-name">{{ __('auth.register.testimonial_name') }}</div>
+                            <div class="reg-testimonial-role">{{ __('auth.register.testimonial_role') }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reg-trust">
+                    <div class="reg-trust-item">
+                        <i class="bi bi-lock-fill"></i> <span>SSL 256-bit</span>
+                    </div>
+                    <div class="reg-trust-item">
+                        <i class="bi bi-shield-check"></i> <span>LGPD</span>
+                    </div>
+                    <div class="reg-trust-item">
+                        <i class="bi bi-award"></i> <span>CFM</span>
+                    </div>
+                    <div class="reg-trust-item">
+                        <i class="bi bi-emoji-smile"></i> <span>97% NPS</span>
+                    </div>
+                </div>
+            </div>
+
+            {{-- ── CARD DO FORMULÁRIO ── --}}
             <div class="reg-card">
 
                 @php
@@ -722,24 +881,24 @@
 
                 <div x-data="registerWizard({{ $plansData }}, {{ $trialDays }})">
 
-                    {{-- ── Cabeçalho ── --}}
+                    {{-- Cabeçalho --}}
                     <div class="reg-card-header">
                         <div class="reg-card-title">
                             <span x-show="step === 1">{{ __('auth.register.step1_title') }}</span>
-                            <span x-show="step === 2">{{ __('auth.register.step2_title') }}</span>
+                            <span x-show="step === 2" x-cloak>{{ __('auth.register.step2_title') }}</span>
                         </div>
                         <div class="reg-card-subtitle">
                             <span x-show="step === 1">{{ __('auth.register.step1_subtitle', ['days' => $trialDays]) }}</span>
-                            <span x-show="step === 2">{{ __('auth.register.step2_subtitle') }}</span>
+                            <span x-show="step === 2" x-cloak>{{ __('auth.register.step2_subtitle') }}</span>
                         </div>
                     </div>
 
-                    {{-- ── Indicador de etapas ── --}}
+                    {{-- Indicador de etapas --}}
                     <div class="step-indicator">
                         <div class="step-item" :class="{ active: step === 1, done: step > 1 }">
                             <span class="step-num">
                                 <span x-show="step <= 1">1</span>
-                                <span x-show="step > 1"><i class="bi bi-check2" style="font-size:13px;"></i></span>
+                                <span x-show="step > 1" x-cloak><i class="bi bi-check2" style="font-size:13px;"></i></span>
                             </span>
                             <span>{{ __('auth.register.step_personal') }}</span>
                         </div>
@@ -750,7 +909,13 @@
                         </div>
                     </div>
 
-                    {{-- ══════════════════════════ ETAPA 1 ══════════════════════════ --}}
+                    {{-- Barra de progresso --}}
+                    <div class="reg-progress">
+                        <div class="reg-progress-fill"
+                             :style="'width:' + (step === 1 ? '50' : '100') + '%'"></div>
+                    </div>
+
+                    {{-- ══════════ ETAPA 1 ══════════ --}}
                     <div x-show="step === 1"
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 translate-y-1"
@@ -760,8 +925,7 @@
 
                             <div class="reg-field">
                                 <label class="reg-label">
-                                    {{ __('auth.register.name') }}
-                                    <span class="req">*</span>
+                                    {{ __('auth.register.name') }} <span class="req">*</span>
                                 </label>
                                 <input type="text"
                                        class="reg-input"
@@ -774,8 +938,7 @@
 
                             <div class="reg-field">
                                 <label class="reg-label">
-                                    {{ __('auth.register.email') }}
-                                    <span class="req">*</span>
+                                    {{ __('auth.register.email') }} <span class="req">*</span>
                                 </label>
                                 <div class="reg-input-group">
                                     <input type="email"
@@ -788,19 +951,14 @@
                                            @blur="checkEmailAvailability"
                                            autocomplete="username">
                                     <div class="reg-input-addon">
-                                        <i class="bi ee-spin"
-                                           style="color:var(--text-muted)"
-                                           x-show="emailChecking"
-                                           x-cloak>
+                                        <span x-show="emailChecking" class="ee-spin" style="color:var(--text-muted);display:flex;">
                                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                                 <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
                                             </svg>
-                                        </i>
-                                        <i class="bi bi-check-circle-fill"
-                                           style="color:var(--mint)"
+                                        </span>
+                                        <i class="bi bi-check-circle-fill" style="color:var(--mint)"
                                            x-show="emailAvailable === true && !emailChecking"></i>
-                                        <i class="bi bi-x-circle-fill"
-                                           style="color:#ef4444"
+                                        <i class="bi bi-x-circle-fill" style="color:#ef4444"
                                            x-show="emailAvailable === false && !emailChecking"></i>
                                         <i class="bi bi-envelope"
                                            x-show="emailAvailable === null && !emailChecking"></i>
@@ -811,8 +969,7 @@
 
                             <div class="reg-field" x-data="{ showPass: false }">
                                 <label class="reg-label">
-                                    {{ __('auth.register.password') }}
-                                    <span class="req">*</span>
+                                    {{ __('auth.register.password') }} <span class="req">*</span>
                                 </label>
                                 <div class="reg-input-group">
                                     <input :type="showPass ? 'text' : 'password'"
@@ -825,12 +982,22 @@
                                     </button>
                                 </div>
                                 <span class="reg-error" x-show="errors.password" x-text="firstError('password')"></span>
+                                <div class="pwd-strength" x-show="form.password && form.password.length > 0">
+                                    <div class="pwd-bars">
+                                        <template x-for="i in [1,2,3,4,5]">
+                                            <div class="pwd-bar"
+                                                 :style="i <= passwordStrength ? 'background:' + passwordStrengthColor : ''"></div>
+                                        </template>
+                                    </div>
+                                    <span class="pwd-strength-label"
+                                          :style="'color:' + passwordStrengthColor"
+                                          x-text="passwordStrengthLabel"></span>
+                                </div>
                             </div>
 
                             <div class="reg-field" x-data="{ showConfirm: false }">
                                 <label class="reg-label">
-                                    {{ __('auth.register.confirm_password') }}
-                                    <span class="req">*</span>
+                                    {{ __('auth.register.confirm_password') }} <span class="req">*</span>
                                 </label>
                                 <div class="reg-input-group">
                                     <input :type="showConfirm ? 'text' : 'password'"
@@ -859,8 +1026,9 @@
                     </div>
                     {{-- FIM ETAPA 1 --}}
 
-                    {{-- ══════════════════════════ ETAPA 2 ══════════════════════════ --}}
+                    {{-- ══════════ ETAPA 2 ══════════ --}}
                     <div x-show="step === 2"
+                         x-cloak
                          x-transition:enter="transition ease-out duration-200"
                          x-transition:enter-start="opacity-0 translate-y-1"
                          x-transition:enter-end="opacity-100 translate-y-0">
@@ -869,15 +1037,27 @@
 
                             <div class="reg-field">
                                 <label class="reg-label">
-                                    {{ __('auth.register.company_name') }}
-                                    <span class="req">*</span>
+                                    {{ __('auth.register.company_name') }} <span class="req">*</span>
                                 </label>
-                                <input type="text"
+                                <input id="reg-company-name"
+                                       type="text"
                                        class="reg-input"
                                        :class="{ 'is-error': errors.company_name }"
                                        x-model="form.company_name"
                                        autocomplete="organization">
                                 <span class="reg-error" x-show="errors.company_name" x-text="firstError('company_name')"></span>
+                            </div>
+
+                            <div class="reg-field">
+                                <label class="reg-label">
+                                    {{ __('auth.register.phone') }}
+                                    <span class="opt">({{ __('auth.register.optional') }})</span>
+                                </label>
+                                <input type="tel"
+                                       class="reg-input"
+                                       x-model="form.company_phone"
+                                       autocomplete="tel"
+                                       placeholder="(00) 00000-0000">
                             </div>
 
                             <div class="reg-field">
@@ -899,67 +1079,39 @@
                                 <div class="reg-field">
                                     <label class="reg-label">{{ __('auth.register.choose_plan') }}</label>
 
-                                    <div class="plan-carousel-wrap">
-                                        <button type="button"
-                                                class="carousel-btn carousel-btn-prev"
-                                                @click="prevSlide"
-                                                :disabled="carouselIndex === 0"
-                                                x-show="plans().length > 1">&#8249;</button>
-
-                                        <template x-for="(plan, index) in plans()" :key="plan.id">
-                                            <div class="plan-card"
-                                                 x-show="carouselIndex === index"
-                                                 x-transition:enter="transition ease-out duration-150"
-                                                 x-transition:enter-start="opacity-0"
-                                                 x-transition:enter-end="opacity-100">
-
-                                                <div>
-                                                    <span class="plan-trial-badge">
-                                                        <span x-text="trialDays"></span> {{ __('auth.register.days_free') }}
-                                                    </span>
+                                    <div class="plan-grid">
+                                        <template x-for="plan in plans()" :key="plan.id">
+                                            <div class="plan-grid-card"
+                                                 :class="{ selected: selectedPlan === plan.id }"
+                                                 @click="selectPlan(plan.id)">
+                                                <div class="plan-grid-badge">
+                                                    <span x-text="trialDays"></span> {{ __('auth.register.days_free') }}
                                                 </div>
-                                                <div class="plan-name" x-text="plan.name"></div>
-                                                <div class="plan-price">
-                                                    R$ <span x-text="plan.price"></span>
-                                                    <small>/ <span x-text="plan.billing_cycle"></span></small>
-                                                </div>
-                                                <p class="plan-description" x-text="plan.description" x-show="plan.description"></p>
-
-                                                <ul class="plan-features" x-show="plan.features.length > 0">
-                                                    <template x-for="feat in plan.features" :key="feat.key">
-                                                        <li>
-                                                            <template x-if="feat.bool">
-                                                                <span :style="feat.value === '1' ? 'color:var(--mint)' : 'color:#ef4444'"
-                                                                      x-text="feat.value === '1' ? '✓' : '✗'"></span>
-                                                            </template>
-                                                            <template x-if="!feat.bool">
-                                                                <span class="feat-val" x-text="feat.display_value"></span>
-                                                            </template>
-                                                            <span x-text="' ' + feat.label"></span>
-                                                        </li>
-                                                    </template>
-                                                </ul>
+                                                <div class="plan-grid-name" x-text="plan.name"></div>
+                                                <div class="plan-grid-price">R$ <span x-text="plan.price"></span></div>
+                                                <div class="plan-grid-cycle">/ <span x-text="plan.billing_cycle"></span></div>
                                             </div>
                                         </template>
-
-                                        <button type="button"
-                                                class="carousel-btn carousel-btn-next"
-                                                @click="nextSlide"
-                                                :disabled="carouselIndex === plans().length - 1"
-                                                x-show="plans().length > 1">&#8250;</button>
                                     </div>
 
-                                    <div class="carousel-dots" x-show="plans().length > 1">
-                                        <template x-for="(plan, index) in plans()" :key="plan.id">
-                                            <span class="dot"
-                                                  :class="{ active: carouselIndex === index }"
-                                                  @click="goToSlide(index)"></span>
-                                        </template>
-                                    </div>
-
-                                    <div class="carousel-counter" x-show="plans().length > 1">
-                                        <span x-text="carouselIndex + 1"></span> / <span x-text="plans().length"></span>
-                                    </div>
+                                    <template x-if="currentPlan && currentPlan.features.length > 0">
+                                        <div class="plan-detail">
+                                            <ul class="plan-features">
+                                                <template x-for="feat in currentPlan.features" :key="feat.key">
+                                                    <li>
+                                                        <template x-if="feat.bool">
+                                                            <span :style="feat.value === '1' ? 'color:var(--mint)' : 'color:#ef4444'"
+                                                                  x-text="feat.value === '1' ? '✓' : '✗'"></span>
+                                                        </template>
+                                                        <template x-if="!feat.bool">
+                                                            <span class="feat-val" x-text="feat.display_value"></span>
+                                                        </template>
+                                                        <span x-text="' ' + feat.label"></span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </div>
+                                    </template>
                                 </div>
                             @endif
 
@@ -967,17 +1119,12 @@
                                 <button type="button" class="reg-btn reg-btn-secondary" @click="prevStep">
                                     <i class="bi bi-arrow-left"></i> {{ __('auth.register.back') }}
                                 </button>
-                                <button type="submit"
-                                        class="reg-btn reg-btn-primary"
-                                        :disabled="loading">
+                                <button type="submit" class="reg-btn reg-btn-primary" :disabled="loading">
                                     <span x-show="!loading">
                                         {{ __('auth.register.start_trial') }}
-                                        <template x-if="currentPlan">
-                                            — <span x-text="currentPlan.name"></span>
-                                        </template>
                                         <i class="bi bi-rocket-takeoff"></i>
                                     </span>
-                                    <span x-show="loading">
+                                    <span x-show="loading" x-cloak>
                                         <i class="bi bi-arrow-repeat ee-spin"></i>
                                         {{ __('auth.register.processing') }}
                                     </span>
@@ -999,22 +1146,48 @@
                     </div>
                     {{-- FIM ETAPA 2 --}}
 
+                    <div class="reg-card-trust">
+                        <div class="reg-card-trust-item">
+                            <i class="bi bi-lock-fill"></i> <span>SSL</span>
+                        </div>
+                        <div class="reg-card-trust-item">
+                            <i class="bi bi-shield-check"></i> <span>LGPD</span>
+                        </div>
+                        <div class="reg-card-trust-item">
+                            <i class="bi bi-award"></i> <span>CFM</span>
+                        </div>
+                        <div class="reg-card-trust-item">
+                            <i class="bi bi-emoji-smile"></i> <span>97% NPS</span>
+                        </div>
+                    </div>
+
                 </div>
             </div>
-        </div>
-        {{-- FIM PAINEL DIREITO --}}
+            {{-- FIM CARD --}}
 
+        </div>
     </div>
-</div>
+</section>
 
 @endsection
 
 @push('scripts')
+    @php
+        $strengthLabels = [
+            '',
+            __('auth.register.strength_very_weak'),
+            __('auth.register.strength_weak'),
+            __('auth.register.strength_fair'),
+            __('auth.register.strength_strong'),
+            __('auth.register.strength_very_strong'),
+        ];
+    @endphp
     <script>
         window._trans = {
             email_taken:        '{{ __('auth.register.email_taken') }}',
             field_required:     '{{ __('auth.register.field_required') }}',
             passwords_mismatch: '{{ __('auth.register.passwords_mismatch') }}',
+            strength_labels:    {!! json_encode($strengthLabels, JSON_UNESCAPED_UNICODE) !!},
         };
     </script>
     @vite(['resources/js/app.js'])
