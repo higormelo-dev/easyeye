@@ -211,6 +211,77 @@
     .pricing-features li.disabled { opacity: .5; }
     .btn-featured { background: var(--teal); color: #fff; border: none; }
     .btn-featured:hover { background: #00a0c2; }
+
+    /* ── Callout de créditos de IA ── */
+    .pricing-ai-callout {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 20px;
+        background: rgba(0,180,216,.06);
+        border: 1px solid rgba(0,180,216,.2);
+    }
+    .pricing-ai-callout.no-ai {
+        background: rgba(100,116,139,.05);
+        border-color: rgba(100,116,139,.15);
+    }
+    .pricing-card.featured .pricing-ai-callout {
+        background: rgba(255,255,255,.08);
+        border-color: rgba(255,255,255,.18);
+    }
+    .pricing-ai-callout-icon {
+        font-size: 20px;
+        color: var(--teal);
+        flex-shrink: 0;
+        line-height: 1;
+        margin-top: 1px;
+    }
+    .pricing-ai-callout.no-ai .pricing-ai-callout-icon { color: var(--text-muted); }
+    .pricing-card.featured .pricing-ai-callout-icon { color: var(--teal-lt); }
+    .pricing-ai-callout-body {}
+    .pricing-ai-callout-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--navy);
+        line-height: 1.3;
+    }
+    .pricing-card.featured .pricing-ai-callout-title { color: #fff; }
+    .pricing-ai-callout.no-ai .pricing-ai-callout-title { color: var(--text-muted); }
+    .pricing-ai-callout-sub {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 3px;
+        line-height: 1.5;
+    }
+    .pricing-card.featured .pricing-ai-callout-sub { color: rgba(255,255,255,.5); }
+
+    /* ── Nota de rodapé de créditos ── */
+    .pricing-credit-note {
+        margin-top: 36px;
+        padding: 18px 24px;
+        background: var(--bg);
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .pricing-credit-note i {
+        font-size: 20px;
+        color: var(--teal);
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+    .pricing-credit-note p {
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.65;
+        margin: 0;
+    }
+    .pricing-credit-note strong { color: var(--navy); }
+
     @media (max-width: 900px) {
         .pricing-grid { grid-template-columns: 1fr; max-width: 400px; margin: 0 auto; }
         .pricing-card.featured { transform: scale(1); }
@@ -541,7 +612,7 @@
                             </div>
                         @endif
 
-                        @if($plan->features->isNotEmpty())
+@if($plan->features->isNotEmpty())
                             <ul class="pricing-features">
                                 @foreach($plan->features as $feature)
                                     @php
@@ -580,6 +651,18 @@
                         @endif
                     </div>
                 @endforeach
+            </div>
+
+            {{-- ── Nota explicativa sobre créditos de IA ── --}}
+            <div class="pricing-credit-note">
+                <i class="bi bi-info-circle-fill"></i>
+                <p>
+                    <strong>Como funcionam os créditos de IA?</strong>
+                    Cada crédito corresponde a 1 análise de exame ou 1 rascunho de laudo gerado pelo assistente.
+                    Os créditos são renovados mensalmente e não acumulam entre ciclos.
+                    Ao atingir o limite do plano, é possível adquirir <strong>pacotes de recarga avulsos</strong>
+                    sem interromper o atendimento.
+                </p>
             </div>
         @endif
     </div>

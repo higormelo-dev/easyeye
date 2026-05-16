@@ -70,7 +70,7 @@ class PlanFeature extends Model
             FeatureKey::MaxPatients         => $n === 0 ? 'Pacientes ilimitados'              : "Até {$n} pacientes",
             FeatureKey::MaxUsers            => $n === 0 ? 'Usuários ilimitados'               : "Até {$n} usuários",
             FeatureKey::MaxStorageGB        => $n === 0 ? 'Armazenamento ilimitado'           : "{$n} GB de armazenamento",
-            FeatureKey::AiMonthlyCredits    => $n === 0 ? 'Créditos de IA ilimitados'        : "{$n} créditos de IA/mês",
+            FeatureKey::AiMonthlyCredits    => $n === 0 ? 'Sem créditos de IA'               : "{$n} créditos de IA/mês",
             FeatureKey::ApiMonthlyExamSends => $n === 0 ? 'Envios de exame ilimitados'       : "Até {$n} envios via API/mês",
             default                         => $n === 0 ? $feature->label() . ' ilimitado(a)' : $feature->label() . ': ' . $n,
         };
