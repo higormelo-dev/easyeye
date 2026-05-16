@@ -125,4 +125,23 @@ return [
         'link_sent'   => 'Um novo link de verificação foi enviado para o seu e-mail.',
         'resend'      => 'Reenviar e-mail de verificação',
     ],
+
+    'panel_fp' => [
+        'title'         => 'Recupere seu acesso',
+        'subtitle'      => 'Em poucos minutos você terá acesso novamente à sua clínica.',
+        'step_1'        => 'Informe o e-mail cadastrado na sua conta',
+        'step_2'        => 'Receba o link de redefinição no seu e-mail',
+        'step_3'        => 'Crie uma nova senha e acesse o sistema',
+        'security_note' => 'Link válido por 60 minutos',
+        'link_expiry'   => 'Link expira em 60 min',
+    ],
+
+    'panel' => [
+        'feature_schedule'   => 'Agenda inteligente com confirmação automática',
+        'feature_record'     => 'Prontuário oftalmológico completo e digital',
+        'feature_tiss'       => 'Faturamento TISS 3.06 homologado ANS',
+        'feature_compliance' => 'Compliance CFM & LGPD integrado',
+        'quote_text'         => 'O EasyEye transformou nossa clínica. O faturamento TISS que levava dias agora é feito em horas.',
+        'quote_author'       => 'Dr. Ricardo Mendes — Clínica Visão SP',
+    ],
 ];

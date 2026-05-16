@@ -127,4 +127,23 @@ return [
         'link_sent'   => 'A new verification link has been sent to your email address.',
         'resend'      => 'Resend Verification Email',
     ],
+
+    'panel_fp' => [
+        'title'         => 'Recover your access',
+        'subtitle'      => 'In just a few minutes you will be back in your clinic.',
+        'step_1'        => 'Enter the email address linked to your account',
+        'step_2'        => 'Receive the reset link in your inbox',
+        'step_3'        => 'Create a new password and sign in',
+        'security_note' => 'Link valid for 60 minutes',
+        'link_expiry'   => 'Link expires in 60 min',
+    ],
+
+    'panel' => [
+        'feature_schedule'   => 'Smart scheduling with automatic confirmation',
+        'feature_record'     => 'Complete digital ophthalmology records',
+        'feature_tiss'       => 'TISS 3.06 billing, ANS certified',
+        'feature_compliance' => 'CFM & LGPD compliance built in',
+        'quote_text'         => 'EasyEye transformed our clinic. TISS billing that used to take days now takes hours.',
+        'quote_author'       => 'Dr. Ricardo Mendes — Clínica Visão SP',
+    ],
 ];

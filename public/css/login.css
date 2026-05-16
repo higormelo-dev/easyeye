@@ -1,0 +1,449 @@
+/*
+ * EasyEye — Login Page Styles
+ * Complementa o layout guest.blade.php exclusivamente para /login.
+ * Não modifica estilos globais do sistema.
+ */
+
+/* ═══════════════════════════════════════════════════════════
+   PAINEL ESQUERDO — Branding, Features & Social Proof
+═══════════════════════════════════════════════════════════ */
+
+.ee-login-illustration-side {
+    background: linear-gradient(145deg, #0F2551 0%, #1B3A6B 55%, #0c1e45 100%) !important;
+    position: relative;
+    overflow: hidden;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+}
+
+/* Padrão de pontos subtil */
+.ee-login-illustration-side::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Ccircle cx='20' cy='20' r='2'/%3E%3C/g%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Blob teal superior-direito */
+.ee-login-illustration-side::after {
+    content: '';
+    position: absolute;
+    width: 520px;
+    height: 520px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,180,216,.18) 0%, transparent 68%);
+    top: -180px;
+    right: -160px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Blob roxo inferior-esquerdo (via elemento filho) */
+.ee-login-panel-blob {
+    position: absolute;
+    width: 380px;
+    height: 380px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(108,99,255,.14) 0%, transparent 70%);
+    bottom: -120px;
+    left: -80px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Container principal do painel */
+.ee-login-panel {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    padding: 3rem 3.5rem;
+}
+
+/* Logo branca no topo do painel */
+.ee-login-panel-logo {
+    width: 150px;
+    margin-bottom: 2.5rem;
+    opacity: .92;
+}
+
+/* Ilustração central */
+.ee-login-panel-img {
+    width: 100%;
+    max-width: 320px;
+    filter: drop-shadow(0 20px 40px rgba(0,0,0,.45));
+    margin-bottom: 2.25rem;
+}
+
+/* Lista de features */
+.ee-login-features {
+    display: flex;
+    flex-direction: column;
+    gap: .55rem;
+    width: 100%;
+    max-width: 390px;
+    margin-bottom: 2rem;
+}
+
+.ee-login-feature {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .6rem .9rem;
+    background: rgba(255,255,255,.055);
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: 10px;
+    transition: background .2s;
+}
+
+.ee-login-feature:hover {
+    background: rgba(255,255,255,.09);
+}
+
+.ee-login-feature-ico {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    background: rgba(0,180,216,.18);
+    color: #4dd8f0;
+}
+
+.ee-login-feature span {
+    font-size: .82rem;
+    font-weight: 500;
+    color: rgba(255,255,255,.82);
+    line-height: 1.3;
+}
+
+/* Citação / depoimento */
+.ee-login-quote {
+    width: 100%;
+    max-width: 390px;
+    border-left: 3px solid rgba(0,180,216,.5);
+    padding: .55rem 0 .55rem 1rem;
+}
+
+.ee-login-quote p {
+    font-size: .8rem;
+    color: rgba(255,255,255,.55);
+    font-style: italic;
+    line-height: 1.6;
+    margin-bottom: .3rem;
+}
+
+.ee-login-quote cite {
+    font-size: .74rem;
+    color: rgba(255,255,255,.35);
+    font-style: normal;
+    font-weight: 600;
+}
+
+/* Dark mode: painel já é escuro por natureza */
+[data-bs-theme="dark"] .ee-login-illustration-side {
+    background: linear-gradient(145deg, #090f1e 0%, #0e1d38 55%, #070c18 100%) !important;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   PAINEL DIREITO — Formulário
+═══════════════════════════════════════════════════════════ */
+
+.ee-login-form-side {
+    background: #f4f7fb !important;
+}
+
+[data-bs-theme="dark"] .ee-login-form-side {
+    background: #0d1117 !important;
+}
+
+/* Card */
+.ee-login-card {
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 8px 40px rgba(15,37,81,.09) !important;
+    background: #ffffff !important;
+    transition: box-shadow .3s;
+}
+
+.ee-login-card:hover {
+    box-shadow: 0 14px 52px rgba(15,37,81,.13) !important;
+}
+
+[data-bs-theme="dark"] .ee-login-card {
+    background: #161b27 !important;
+    border-color: #252d42 !important;
+    box-shadow: 0 8px 40px rgba(0,0,0,.32) !important;
+}
+
+/* Card body */
+.ee-login-card-body {
+    padding: 2rem 2.1rem 1.6rem !important;
+}
+
+/* Logo */
+.ee-login-brand {
+    width: 155px !important;
+}
+
+/* Título */
+.ee-login-title {
+    font-size: 1.6rem !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    letter-spacing: -.025em !important;
+    margin-bottom: .25rem !important;
+    line-height: 1.2 !important;
+}
+
+[data-bs-theme="dark"] .ee-login-title {
+    color: #e2e8f0 !important;
+}
+
+/* Subtítulo */
+.ee-login-subtitle {
+    color: #64748b !important;
+    font-size: .875rem !important;
+    margin-bottom: 1.35rem !important;
+    line-height: 1.55 !important;
+}
+
+[data-bs-theme="dark"] .ee-login-subtitle {
+    color: #94a3b8 !important;
+}
+
+/* Labels */
+.ee-login-form .form-label {
+    font-size: .8125rem !important;
+    font-weight: 600 !important;
+    color: #374151 !important;
+    margin-bottom: .4rem !important;
+    letter-spacing: .005em !important;
+}
+
+[data-bs-theme="dark"] .ee-login-form .form-label {
+    color: #cbd5e1 !important;
+}
+
+/* Ícone do input-group */
+.ee-login-form .input-group-text {
+    background: #f8fafc !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-right: 0 !important;
+    border-radius: 10px 0 0 10px !important;
+    color: #94a3b8 !important;
+    min-height: 44px !important;
+    transition: border-color .18s, background .18s, color .18s;
+}
+
+/* Campo de texto */
+.ee-login-form .form-control {
+    border: 1.5px solid #e2e8f0 !important;
+    border-left: 0 !important;
+    min-height: 44px !important;
+    border-radius: 0 10px 10px 0 !important;
+    font-size: .9rem !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    transition: border-color .18s, background .18s, box-shadow .18s;
+}
+
+/* Foco: destaca o grupo inteiro com teal */
+.ee-login-form .input-group:focus-within .input-group-text {
+    border-color: #00B4D8 !important;
+    background: #ffffff !important;
+    color: #00B4D8 !important;
+}
+
+.ee-login-form .input-group:focus-within .form-control {
+    border-color: #00B4D8 !important;
+    background: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(0,180,216,.1) !important;
+    outline: none !important;
+}
+
+.ee-login-form .form-control:focus {
+    box-shadow: none !important;
+}
+
+/* Dark — inputs */
+[data-bs-theme="dark"] .ee-login-form .input-group-text {
+    background: #1e2535 !important;
+    border-color: #2d3a52 !important;
+    color: #64748b !important;
+}
+
+[data-bs-theme="dark"] .ee-login-form .form-control {
+    background: #1e2535 !important;
+    border-color: #2d3a52 !important;
+    color: #e2e8f0 !important;
+}
+
+[data-bs-theme="dark"] .ee-login-form .input-group:focus-within .input-group-text {
+    background: #242d3f !important;
+    border-color: #00B4D8 !important;
+    color: #00B4D8 !important;
+}
+
+[data-bs-theme="dark"] .ee-login-form .input-group:focus-within .form-control {
+    background: #242d3f !important;
+    border-color: #00B4D8 !important;
+    box-shadow: 0 0 0 3px rgba(0,180,216,.08) !important;
+}
+
+/* Password: remove borda direita */
+.ee-login-form .input-group .form-control.border-end-0 {
+    border-right: 0 !important;
+    border-radius: 0 !important;
+}
+
+/* Botão olho (toggle password) */
+.ee-login-form .input-group .btn {
+    border: 1.5px solid #e2e8f0 !important;
+    border-left: 0 !important;
+    border-radius: 0 10px 10px 0 !important;
+    min-height: 44px !important;
+    background: #f8fafc !important;
+    color: #94a3b8 !important;
+    transition: border-color .18s, background .18s, color .18s;
+}
+
+.ee-login-form .input-group:focus-within .btn {
+    border-color: #00B4D8 !important;
+    background: #ffffff !important;
+    color: #00B4D8 !important;
+}
+
+[data-bs-theme="dark"] .ee-login-form .input-group .btn {
+    background: #1e2535 !important;
+    border-color: #2d3a52 !important;
+    color: #64748b !important;
+}
+
+[data-bs-theme="dark"] .ee-login-form .input-group:focus-within .btn {
+    background: #242d3f !important;
+    border-color: #00B4D8 !important;
+    color: #00B4D8 !important;
+}
+
+/* Checkbox lembrar-me */
+.ee-login-form .form-check-input:checked {
+    background-color: #00B4D8 !important;
+    border-color: #00B4D8 !important;
+}
+
+/* "Esqueceu a senha?" */
+.ee-login-forgot {
+    color: #00B4D8 !important;
+    font-size: .84rem !important;
+    font-weight: 600 !important;
+    text-decoration: none !important;
+}
+
+.ee-login-forgot:hover {
+    color: #0096b5 !important;
+    text-decoration: underline !important;
+}
+
+/* Botão Entrar */
+.ee-login-submit {
+    min-height: 46px !important;
+    border-radius: 10px !important;
+    background: linear-gradient(135deg, #0F2551 0%, #1B3A6B 100%) !important;
+    border: none !important;
+    font-weight: 700 !important;
+    font-size: .9375rem !important;
+    letter-spacing: .02em !important;
+    transition: transform .18s, box-shadow .18s !important;
+    box-shadow: 0 4px 16px rgba(15,37,81,.28) !important;
+}
+
+.ee-login-submit:hover,
+.ee-login-submit:focus-visible {
+    background: linear-gradient(135deg, #0c1d42 0%, #152e5a 100%) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 8px 28px rgba(15,37,81,.38) !important;
+}
+
+.ee-login-submit:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 8px rgba(15,37,81,.25) !important;
+}
+
+/* "Não tem conta?" */
+.ee-login-register {
+    font-size: .875rem !important;
+    color: #64748b !important;
+    margin-top: .15rem;
+}
+
+.ee-login-register a {
+    color: #00B4D8 !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+}
+
+.ee-login-register a:hover {
+    color: #0096b5 !important;
+    text-decoration: underline !important;
+}
+
+[data-bs-theme="dark"] .ee-login-register {
+    color: #94a3b8 !important;
+}
+
+/* Copyright */
+.ee-login-copy {
+    font-size: .8rem !important;
+    color: #94a3b8 !important;
+    margin-top: 1.2rem !important;
+}
+
+[data-bs-theme="dark"] .ee-login-copy {
+    color: #475569 !important;
+}
+
+/* ─── Trust badges ─── */
+.ee-login-trust {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    border-top: 1px solid #f1f5f9;
+    padding-top: .85rem;
+    margin-top: .5rem;
+}
+
+.ee-login-trust-item {
+    display: flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .7rem;
+    font-weight: 600;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+.ee-login-trust-item i {
+    font-size: .82rem;
+    color: #06D6A0;
+}
+
+[data-bs-theme="dark"] .ee-login-trust {
+    border-color: #1e2535;
+}
+
+[data-bs-theme="dark"] .ee-login-trust-item {
+    color: #475569;
+}

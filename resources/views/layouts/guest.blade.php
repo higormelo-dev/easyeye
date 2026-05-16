@@ -209,7 +209,11 @@
             @if($isLoginIllustration)
                 <div class="row g-0 min-vh-100">
                     <div class="col-lg-7 d-none d-lg-flex align-items-center justify-content-center ee-login-illustration-side">
-                        <img src="{{ $heroImage }}" class="img-fluid ee-login-illustration-image" alt="{{ $heroTitle }}">
+                        @if(View::hasSection('auth_left_panel'))
+                            @yield('auth_left_panel')
+                        @else
+                            <img src="{{ $heroImage }}" class="img-fluid ee-login-illustration-image" alt="{{ $heroTitle }}">
+                        @endif
                     </div>
                     <div class="col-12 col-lg-5 d-flex align-items-center justify-content-center px-3 px-md-4 py-4 ee-login-form-side">
                         <div class="w-100 ee-auth-shell ee-login-shell">
@@ -255,7 +259,11 @@
             @elseif($isRegisterIllustration)
                 <div class="row g-0 min-vh-100">
                     <div class="col-lg-7 d-none d-lg-flex align-items-center justify-content-center ee-auth-illustration-side">
-                        <img src="{{ $heroImage }}" class="img-fluid ee-auth-illustration-image" alt="{{ $heroTitle }}">
+                        @if(View::hasSection('auth_left_panel'))
+                            @yield('auth_left_panel')
+                        @else
+                            <img src="{{ $heroImage }}" class="img-fluid ee-auth-illustration-image" alt="{{ $heroTitle }}">
+                        @endif
                     </div>
                     <div class="col-12 col-lg-5 d-flex align-items-center justify-content-center px-3 px-md-4 py-4 ee-auth-form-side">
                         <div class="w-100 ee-auth-shell ee-auth-illustration-shell">
