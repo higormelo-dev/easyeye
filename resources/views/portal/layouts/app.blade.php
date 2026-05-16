@@ -9,7 +9,7 @@
     <link rel="shortcut icon" href="{{ asset('system/images/favicon.png') }}">
     <style>[x-cloak] { display: none !important; }</style>
     <script src="{{ asset('js/jquery.min.js') }}"></script>
-    @vite(['resources/css/vendor.css', 'resources/css/app.css', 'resources/js/vendor.js', 'resources/js/app.js'])
+    @vite(['resources/css/vendor.css', 'resources/css/system.scss', 'resources/js/vendor.js', 'resources/js/app.js'])
 </head>
 <body class="bg-light">
 

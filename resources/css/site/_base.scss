@@ -1,0 +1,141 @@
+@use 'variables' as *;
+
+// ─── Reset ───────────────────────────────────────────────────
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    color: $text;
+    background: $bg-white;
+    -webkit-font-smoothing: antialiased;
+}
+
+// ─── Container ───────────────────────────────────────────────
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+// ─── Botões ──────────────────────────────────────────────────
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    transition: all .2s;
+
+    &-lg { padding: 16px 32px; font-size: 16px; }
+
+    &-primary {
+        background: $teal;
+        color: #fff;
+
+        &:hover {
+            background: $teal-dark;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba($teal, .35);
+        }
+    }
+
+    &-outline {
+        background: transparent;
+        color: $navy;
+        border: 2px solid $navy-mid;
+
+        &:hover { background: $navy; color: #fff; }
+    }
+
+    &-outline-white {
+        background: transparent;
+        color: #fff;
+        border: 2px solid rgba(#fff, .5);
+
+        &:hover { background: rgba(#fff, .1); border-color: #fff; }
+    }
+
+    &-featured {
+        background: $teal;
+        color: #fff;
+        border: none;
+
+        &:hover { background: #00a0c2; }
+    }
+}
+
+// ─── Tipografia de seção ──────────────────────────────────────
+.badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba($teal, .12);
+    color: $teal;
+    border: 1px solid rgba($teal, .25);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.section-label {
+    display: inline-block;
+    background: rgba($teal, .1);
+    color: $blue;
+    padding: 4px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.section-title {
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    line-height: 1.15;
+    color: $navy;
+    margin-bottom: 16px;
+}
+
+.section-sub {
+    font-size: 17px;
+    color: $text-muted;
+    line-height: 1.7;
+    max-width: 600px;
+}
+
+.text-center {
+    text-align: center;
+
+    .section-sub { margin: 0 auto; }
+}
+
+// ─── Ícones coloridos (reutilizados em features e contact) ────
+.icon-blue   { background: rgba($blue, .1);   color: $blue; }
+.icon-teal   { background: rgba($teal, .1);   color: $teal; }
+.icon-mint   { background: rgba($mint, .1);   color: $mint; }
+.icon-purple { background: rgba($purple, .1); color: $purple; }
+.icon-orange { background: rgba($orange, .1); color: $orange; }
+.icon-red    { background: rgba($red, .1);    color: $red; }
+
+// ─── Transições Vue ───────────────────────────────────────────
+.fade-enter-active,
+.fade-leave-active { transition: opacity .2s; }
+
+.fade-enter-from,
+.fade-leave-to { opacity: 0; }

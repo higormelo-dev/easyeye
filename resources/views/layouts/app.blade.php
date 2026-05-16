@@ -15,7 +15,7 @@
     {{-- jQuery loaded synchronously so Yajra DataTables inline scripts ($dataTable->scripts()) --}}
     {{-- can use $ before Vite ES modules (which are deferred) execute. --}}
     <script src="{{ asset('js/jquery.min.js') }}"></script>
-    @vite(['resources/css/vendor.css', 'resources/css/app.css', 'resources/js/vendor.js', 'resources/js/app.js'])
+    @vite(['resources/css/vendor.css', 'resources/css/system.scss', 'resources/js/vendor.js', 'resources/js/app.js'])
     @stack('styles')
 </head>
 @php

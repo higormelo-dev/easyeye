@@ -39,5 +39,4 @@
 /* ── Morris.js ─────────────────────────────────────────────────────────────── */
 @import 'morris.js/morris.css';
 
-/* ── Theme CSS (Preclinic) ─────────────────────────────────────────────────── */
-@import './preclinic-style.css';
+/* Preclinic theme CSS agora compilado de SCSS em resources/css/system.scss */

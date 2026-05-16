@@ -1,0 +1,4 @@
+// Auth pages load Bootstrap 5 via vendor.css.
+// This file exports the design-token CSS custom properties (--teal, --navy, etc.)
+// so inline styles like `color: var(--teal)` work on auth pages too.
+@use 'site/variables';
