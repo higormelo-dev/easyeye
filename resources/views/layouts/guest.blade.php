@@ -218,41 +218,6 @@
                     <div class="col-12 col-lg-5 d-flex align-items-center justify-content-center px-3 px-md-4 py-4 ee-login-form-side">
                         <div class="w-100 ee-auth-shell ee-login-shell">
                             @yield('content')
-
-                                    <div class="d-flex align-items-center justify-content-center gap-1 mt-3">
-                                @unless($hideLocale)
-                                    <div class="dropdown">
-                                        <button type="button"
-                                                class="btn btn-link btn-sm text-muted text-decoration-none dropdown-toggle"
-                                                data-bs-toggle="dropdown" aria-expanded="false"
-                                                style="font-size:.8rem;">
-                                            @if($currentLocale)
-                                                {{ $currentLocale['flag'] }} {{ $currentLocale['native'] }}
-                                            @else
-                                                {{ app()->getLocale() }}
-                                            @endif
-                                        </button>
-                                        <ul class="dropdown-menu dropdown-menu-end" style="min-width:0">
-                                            @foreach(\App\Http\Middleware\SetLocale::getSupportedLocales() as $code => $locale)
-                                                <li>
-                                                    <a href="{{ route('locale.switch', $code) }}"
-                                                       class="dropdown-item {{ app()->getLocale() === $code ? 'active fw-semibold' : '' }}"
-                                                       style="font-size:.85rem;">
-                                                        {{ $locale['flag'] }} {{ $locale['native'] }}
-                                                    </a>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                @endunless
-                                <button type="button"
-                                        class="btn btn-link btn-sm text-muted p-1 ee-guest-dark-toggle"
-                                        title="{{ __('actions.switch') }}"
-                                        style="font-size:1rem; line-height:1;">
-                                    <i class="ti ti-moon ee-dark-icon-moon"></i>
-                                    <i class="ti ti-sun ee-dark-icon-sun"></i>
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -323,7 +288,7 @@
                                 </div>
                             </div>
 
-                            <p class="text-dark text-center mt-3 mb-0">
+                            <p class="text-center mt-3 mb-0 ee-guest-copy">
                                 &copy; {{ \Carbon\Carbon::now()->year }} {{ config('app.name', 'EasyEye') }}
                             </p>
                         </div>

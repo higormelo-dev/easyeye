@@ -6,7 +6,7 @@
 @section('auth_hero_image', asset('system/images/auth/forgot-illustration-img.png'))
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/forgot-password.css') }}">
+<link rel="stylesheet" href="{{ asset('css/guest.css') }}">
 @endpush
 
 {{-- ═══ Painel esquerdo — branding + recovery steps ═══ --}}

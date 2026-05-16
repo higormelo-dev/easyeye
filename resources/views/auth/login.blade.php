@@ -6,7 +6,7 @@
 @section('auth_hero_image', asset('system/images/icons/log-illustration-img-01.png'))
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/login.css') }}">
+<link rel="stylesheet" href="{{ asset('css/guest.css') }}">
 @endpush
 
 {{-- ═══ Painel esquerdo — branding + features + social proof ═══ --}}
@@ -163,7 +163,7 @@
             </form>
 
             @php $currentLocale = \App\Http\Middleware\SetLocale::getSupportedLocales()[app()->getLocale()] ?? null; @endphp
-            <div class="border-top pt-3 mt-3 d-flex align-items-center justify-content-center gap-1">
+            <div class="border-top pt-3 mt-4 d-flex align-items-center justify-content-center gap-1">
                 <div class="dropdown">
                     <button type="button"
                             class="btn btn-link btn-sm text-muted text-decoration-none dropdown-toggle"
@@ -189,7 +189,7 @@
                 </div>
                 <button type="button"
                         class="btn btn-link btn-sm text-muted p-1 ee-guest-dark-toggle"
-                        title="{{ __('actions.switch') }}"
+                        title="Trocar"
                         style="font-size:1rem; line-height:1;">
                     <i class="ti ti-moon ee-dark-icon-moon"></i>
                     <i class="ti ti-sun ee-dark-icon-sun"></i>
