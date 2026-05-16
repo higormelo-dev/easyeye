@@ -41,9 +41,31 @@ return [
         'max_storage_gb'         => 'Armazenamento (GB)',
         'has_ai_exam_assistant'  => 'Assistente de IA para exames',
         'has_ai_report_drafting' => 'Redação de laudos com IA',
-        'has_api_integrator'     => 'Acesso à API de integradores',
+        'has_api_integrator'     => 'Integração com equipamentos oftalmológicos',
         'ai_monthly_credits'     => 'Créditos mensais de IA',
         'api_monthly_exam_sends' => 'Envios de exames pela API (mensal)',
-        'plan_upgrade_required'  => 'Seu plano não inclui acesso à API de integradores. Faça upgrade para continuar.',
+        'plan_upgrade_required'  => 'Seu plano não inclui integração com equipamentos. Faça upgrade para continuar.',
+
+        /* Textos de exibição em cards de precificação */
+        'max_doctors_unlimited'       => 'Médicos ilimitados',
+        'max_doctors_count'           => 'Até :n médico(s)',
+        'max_patients_unlimited'      => 'Pacientes ilimitados',
+        'max_patients_count'          => 'Até :n pacientes',
+        'max_users_unlimited'         => 'Usuários ilimitados',
+        'max_users_count'             => 'Até :n usuários',
+        'max_storage_unlimited'       => 'Armazenamento ilimitado',
+        'max_storage_count'           => ':n GB de armazenamento',
+        'ai_credits_none'             => 'Sem créditos de IA',
+        'ai_credits_count'            => ':n créditos de IA/mês',
+        'api_exam_sends_unlimited'    => 'Envios de exame ilimitados',
+        'api_exam_sends_count'        => 'Até :n envios via API/mês',
+        'generic_unlimited'           => ':label ilimitado(a)',
+        'generic_count'               => ':label: :n',
+    ],
+
+    'pricing_credit_note' => [
+        'title'  => 'Como funcionam os créditos de IA?',
+        'body'   => 'Cada crédito corresponde a 1 análise de exame ou 1 rascunho de laudo gerado pelo assistente. Os créditos são renovados mensalmente e não acumulam entre ciclos.',
+        'topup'  => 'Ao atingir o limite do plano, é possível adquirir <strong>pacotes de recarga avulsos</strong> sem interromper o atendimento.',
     ],
 ];

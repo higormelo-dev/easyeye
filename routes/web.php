@@ -62,6 +62,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::get('/', [SiteController::class, 'index'])->name('site.home');
+Route::post('/contato', [SiteController::class, 'contactStore'])->name('contact.store');
 Route::get('/go', function () {
     if (Auth::check() && session()->has('selected_entity_user_id')
         && session()->has('selected_entity_id')) {

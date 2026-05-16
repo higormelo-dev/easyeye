@@ -46,9 +46,9 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxStorageGB->value        => '5',
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '0',
-                    FeatureKey::HasApiIntegrator->value    => '1',
+                    FeatureKey::HasApiIntegrator->value    => '0',
                     FeatureKey::AiMonthlyCredits->value    => '30',  // degustação — excedente R$ 2,50/crédito
-                    FeatureKey::ApiMonthlyExamSends->value => '300',
+                    FeatureKey::ApiMonthlyExamSends->value => '0',
                 ],
             ],
             [

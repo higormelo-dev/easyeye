@@ -301,6 +301,121 @@
     .faq-question i { font-size: 18px; color: var(--text-muted); flex-shrink: 0; }
     .faq-answer { padding: 0 24px; font-size: 15px; color: var(--text-muted); line-height: 1.7; }
 
+    /* ─── CONTACT ─── */
+    .contact { padding: 100px 0; background: var(--bg); }
+    .contact-header { text-align: center; margin-bottom: 60px; }
+    .contact-headline {
+        font-size: clamp(24px, 3.5vw, 40px);
+        font-weight: 900; color: var(--navy); line-height: 1.15; margin-bottom: 12px;
+    }
+    .contact-headline em { font-style: normal; color: var(--teal); }
+    .contact-subline { font-size: 17px; color: var(--text-muted); max-width: 560px; margin: 0 auto; }
+
+    .contact-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 60px; }
+    .contact-card {
+        background: var(--bg-white); border-radius: var(--radius-lg); padding: 32px;
+        border: 1px solid var(--border); transition: all .25s;
+    }
+    .contact-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+    .contact-card.highlight { background: var(--navy); border-color: var(--navy); }
+    .contact-card-icon {
+        width: 56px; height: 56px; border-radius: 16px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 26px; margin-bottom: 20px;
+    }
+    .contact-card h3 { font-size: 18px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+    .contact-card.highlight h3 { color: #fff; }
+    .contact-card-desc { font-size: 14px; color: var(--text-muted); line-height: 1.65; margin-bottom: 16px; }
+    .contact-card.highlight .contact-card-desc { color: rgba(255,255,255,.65); }
+    .contact-card-meta {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 13px; color: var(--text-muted); margin-bottom: 8px;
+    }
+    .contact-card.highlight .contact-card-meta { color: rgba(255,255,255,.5); }
+    .contact-card-meta i { color: var(--mint); flex-shrink: 0; }
+    .contact-card-badge {
+        display: inline-block; background: var(--teal); color: #fff;
+        font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
+        letter-spacing: .06em; text-transform: uppercase; margin-bottom: 16px;
+    }
+
+    .contact-main { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: start; margin-bottom: 60px; }
+    .contact-form-box {
+        background: var(--bg-white); border-radius: var(--radius-lg); padding: 40px;
+        border: 1px solid var(--border); box-shadow: var(--shadow);
+    }
+    .contact-form-box h3 { font-size: 22px; font-weight: 800; color: var(--navy); margin-bottom: 6px; }
+    .contact-form-box > p { font-size: 15px; color: var(--text-muted); margin-bottom: 28px; }
+    .cf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .cf-group { margin-bottom: 18px; }
+    .cf-group label { display: block; font-size: 13px; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
+    .cf-control {
+        width: 100%; padding: 11px 14px; border-radius: 8px;
+        border: 1.5px solid var(--border); font-size: 14px; color: var(--text);
+        background: var(--bg); transition: border-color .18s, box-shadow .18s;
+        font-family: inherit; outline: none; -webkit-appearance: none; appearance: none;
+    }
+    .cf-control:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,180,216,.12); background: #fff; }
+    .cf-check { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 24px; }
+    .cf-check input { margin-top: 2px; accent-color: var(--teal); flex-shrink: 0; width: 16px; height: 16px; cursor: pointer; }
+    .cf-check label { font-size: 13px; color: var(--text-muted); line-height: 1.5; cursor: pointer; }
+    .cf-check a { color: var(--teal); text-decoration: none; }
+    .cf-check a:hover { text-decoration: underline; }
+    .cf-submit {
+        width: 100%; padding: 14px; border-radius: 8px;
+        background: var(--teal); color: #fff; border: none;
+        font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        transition: background .2s, transform .2s, box-shadow .2s;
+    }
+    .cf-submit:hover:not(:disabled) { background: #0096b5; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,180,216,.35); }
+    .cf-submit:disabled { opacity: .55; cursor: not-allowed; }
+    .cf-spin { animation: cfSpin .7s linear infinite; display: inline-block; }
+    @keyframes cfSpin { to { transform: rotate(360deg); } }
+
+    .contact-aside { padding-top: 8px; }
+    .contact-aside-item { display: flex; gap: 16px; margin-bottom: 28px; align-items: flex-start; }
+    .contact-aside-icon {
+        width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .contact-aside-item h4 { font-size: 15px; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .contact-aside-item p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+    .contact-aside-item a { color: var(--teal); text-decoration: none; font-weight: 600; }
+    .contact-aside-item a:hover { text-decoration: underline; }
+    .contact-aside-divider { border: none; border-top: 1px solid var(--border); margin: 28px 0; }
+    .contact-aside-quote {
+        background: rgba(0,180,216,.06); border-left: 3px solid var(--teal);
+        border-radius: 0 10px 10px 0; padding: 16px 20px;
+    }
+    .contact-aside-quote p { font-size: 14px; color: var(--text); font-style: italic; line-height: 1.7; margin-bottom: 8px; }
+    .contact-aside-quote span { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+    .contact-trust {
+        display: flex; align-items: center; justify-content: center; gap: 40px; flex-wrap: wrap;
+        border-top: 1px solid var(--border); padding-top: 40px;
+    }
+    .contact-trust-item { display: flex; align-items: center; gap: 8px; }
+    .contact-trust-item i { font-size: 18px; color: var(--mint); }
+    .contact-trust-item span { font-size: 14px; font-weight: 600; color: var(--navy); }
+
+    .cf-success {
+        text-align: center; padding: 40px 20px;
+    }
+    .cf-success-icon {
+        width: 76px; height: 76px; border-radius: 50%;
+        background: rgba(6,214,160,.1); display: flex; align-items: center; justify-content: center;
+        margin: 0 auto 20px; font-size: 34px; color: var(--mint);
+    }
+    .cf-success h3 { font-size: 22px; font-weight: 800; color: var(--navy); margin-bottom: 10px; }
+    .cf-success p { font-size: 15px; color: var(--text-muted); max-width: 340px; margin: 0 auto; }
+
+    @media (max-width: 960px) {
+        .contact-cards { grid-template-columns: 1fr; }
+        .contact-main  { grid-template-columns: 1fr; gap: 36px; }
+        .cf-row        { grid-template-columns: 1fr; }
+    }
+
     /* ─── CTA FINAL ─── */
     .cta-final {
         padding: 100px 0;
@@ -657,11 +772,9 @@
             <div class="pricing-credit-note">
                 <i class="bi bi-info-circle-fill"></i>
                 <p>
-                    <strong>Como funcionam os créditos de IA?</strong>
-                    Cada crédito corresponde a 1 análise de exame ou 1 rascunho de laudo gerado pelo assistente.
-                    Os créditos são renovados mensalmente e não acumulam entre ciclos.
-                    Ao atingir o limite do plano, é possível adquirir <strong>pacotes de recarga avulsos</strong>
-                    sem interromper o atendimento.
+                    <strong>{{ __('subscriptions.pricing_credit_note.title') }}</strong>
+                    {{ __('subscriptions.pricing_credit_note.body') }}
+                    {!! __('subscriptions.pricing_credit_note.topup') !!}
                 </p>
             </div>
         @endif
@@ -693,6 +806,278 @@
     </div>
 </section>
 {{-- ═══════════════════ END FAQ ═══════════════════ --}}
+
+{{-- ═══════════════════ CONTACT ═══════════════════ --}}
+<section class="contact" id="contato">
+    <div class="container">
+
+        {{-- Header --}}
+        <div class="contact-header">
+            <span class="section-label">{{ __('site.contact.label') }}</span>
+            <h2 class="contact-headline">
+                {{ __('site.contact.headline_pre') }} <em>EasyEye</em>?<br>
+                {{ __('site.contact.headline_post') }}
+            </h2>
+            <p class="contact-subline">{{ __('site.contact.subtitle') }}</p>
+        </div>
+
+        {{-- Três cards de canais --}}
+        <div class="contact-cards">
+
+            {{-- Vendas --}}
+            <div class="contact-card">
+                <div class="contact-card-icon icon-teal">
+                    <i class="bi bi-whatsapp"></i>
+                </div>
+                <h3>{{ __('site.contact.sales.title') }}</h3>
+                <p class="contact-card-desc">{{ __('site.contact.sales.desc') }}</p>
+                <div class="contact-card-meta">
+                    <i class="bi bi-clock"></i>
+                    {{ __('site.contact.sales.hours') }}
+                </div>
+                <div class="contact-card-meta" style="margin-bottom:20px;">
+                    <i class="bi bi-whatsapp"></i>
+                    {{ __('site.contact.sales.channel') }}
+                </div>
+                <a href="https://wa.me/5500000000000" target="_blank" rel="noopener noreferrer"
+                   class="btn btn-primary" style="width:100%;justify-content:center;">
+                    <i class="bi bi-whatsapp"></i> {{ __('site.contact.sales.cta') }}
+                </a>
+            </div>
+
+            {{-- Suporte --}}
+            <div class="contact-card">
+                <div class="contact-card-icon icon-blue">
+                    <i class="bi bi-headset"></i>
+                </div>
+                <h3>{{ __('site.contact.support.title') }}</h3>
+                <p class="contact-card-desc">{{ __('site.contact.support.desc') }}</p>
+                <div class="contact-card-meta">
+                    <i class="bi bi-clock"></i>
+                    {{ __('site.contact.support.hours') }}
+                </div>
+                <div class="contact-card-meta" style="margin-bottom:20px;">
+                    <i class="bi bi-envelope"></i>
+                    {{ __('site.contact.support.channel') }}
+                </div>
+                <a href="mailto:{{ __('site.contact.support.channel') }}"
+                   class="btn btn-outline" style="width:100%;justify-content:center;">
+                    <i class="bi bi-envelope"></i> {{ __('site.contact.support.cta') }}
+                </a>
+            </div>
+
+            {{-- Comece grátis --}}
+            <div class="contact-card highlight">
+                <div class="contact-card-badge">{{ __('site.contact.trial.badge') }}</div>
+                <div class="contact-card-icon" style="background:rgba(255,255,255,.1);color:var(--teal);">
+                    <i class="bi bi-rocket-takeoff"></i>
+                </div>
+                <h3>{{ __('site.contact.trial.title') }}</h3>
+                @php $trialDays = $plans->filter(fn($p) => $p->trial_days)->min('trial_days') ?? 14; @endphp
+                <p class="contact-card-desc">{{ __('site.contact.trial.desc', ['days' => $trialDays]) }}</p>
+                <div class="contact-card-meta" style="margin-bottom:20px;">
+                    <i class="bi bi-check-circle-fill"></i>
+                    {{ __('site.contact.trial.note') }}
+                </div>
+                <a href="{{ route('register') }}"
+                   class="btn" style="background:var(--teal);color:#fff;width:100%;justify-content:center;">
+                    {{ __('site.contact.trial.cta') }} <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+
+        </div>
+
+        {{-- Formulário + Informações de contato --}}
+        <div class="contact-main">
+
+            {{-- Formulário --}}
+            <div class="contact-form-box"
+                 x-data="{
+                     f: { name:'', email:'', phone:'', is_client:'', role:'', segment:'', terms: false },
+                     sent: false,
+                     sending: false,
+                     async submit() {
+                         if (!this.f.terms || this.sending) return;
+                         this.sending = true;
+                         try {
+                             const res = await fetch('{{ route('contact.store') }}', {
+                                 method: 'POST',
+                                 headers: {
+                                     'Content-Type': 'application/json',
+                                     'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                     'Accept': 'application/json',
+                                 },
+                                 body: JSON.stringify(this.f),
+                             });
+                             if (res.ok) this.sent = true;
+                         } catch(e) {
+                             this.sent = true;
+                         } finally {
+                             this.sending = false;
+                         }
+                     }
+                 }">
+
+                {{-- Estado: sucesso --}}
+                <div x-show="sent" class="cf-success" x-cloak>
+                    <div class="cf-success-icon"><i class="bi bi-check2-circle"></i></div>
+                    <h3>{{ __('site.contact.form.success_title') }}</h3>
+                    <p>{{ __('site.contact.form.success_body') }}</p>
+                </div>
+
+                {{-- Estado: formulário --}}
+                <div x-show="!sent">
+                    <h3>{{ __('site.contact.form.title') }}</h3>
+                    <p>{{ __('site.contact.form.subtitle') }}</p>
+
+                    <form @submit.prevent="submit" novalidate>
+                        <div class="cf-row">
+                            <div class="cf-group">
+                                <label for="cf-name">{{ __('site.contact.form.name') }} *</label>
+                                <input id="cf-name" type="text" class="cf-control" x-model="f.name"
+                                       placeholder="{{ __('site.contact.form.name_ph') }}" required>
+                            </div>
+                            <div class="cf-group">
+                                <label for="cf-email">{{ __('site.contact.form.email') }} *</label>
+                                <input id="cf-email" type="email" class="cf-control" x-model="f.email"
+                                       placeholder="seu@email.com.br" required>
+                            </div>
+                        </div>
+
+                        <div class="cf-group">
+                            <label for="cf-phone">{{ __('site.contact.form.phone') }} *</label>
+                            <input id="cf-phone" type="tel" class="cf-control" x-model="f.phone"
+                                   placeholder="(00) 00000-0000" required>
+                        </div>
+
+                        <div class="cf-row">
+                            <div class="cf-group">
+                                <label for="cf-client">{{ __('site.contact.form.is_client') }}</label>
+                                <select id="cf-client" class="cf-control" x-model="f.is_client">
+                                    <option value="">{{ __('site.contact.form.select') }}</option>
+                                    @foreach(__('site.contact.form.is_client_opts') as $opt)
+                                    <option value="{{ $opt }}">{{ $opt }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="cf-group">
+                                <label for="cf-role">{{ __('site.contact.form.role') }}</label>
+                                <select id="cf-role" class="cf-control" x-model="f.role">
+                                    <option value="">{{ __('site.contact.form.select') }}</option>
+                                    @foreach(__('site.contact.form.role_opts') as $opt)
+                                    <option value="{{ $opt }}">{{ $opt }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="cf-group">
+                            <label for="cf-segment">{{ __('site.contact.form.segment') }}</label>
+                            <select id="cf-segment" class="cf-control" x-model="f.segment">
+                                <option value="">{{ __('site.contact.form.select') }}</option>
+                                @foreach(__('site.contact.form.segment_opts') as $opt)
+                                <option value="{{ $opt }}">{{ $opt }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="cf-check">
+                            <input type="checkbox" id="cf-terms" x-model="f.terms" required>
+                            <label for="cf-terms">{!! __('site.contact.form.terms') !!}</label>
+                        </div>
+
+                        <button type="submit" class="cf-submit" :disabled="!f.terms || sending">
+                            <i class="bi" :class="sending ? 'bi-arrow-repeat cf-spin' : 'bi-send'"></i>
+                            <span x-text="sending ? '{{ __('site.contact.form.sending') }}' : '{{ __('site.contact.form.submit') }}'"></span>
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+
+            {{-- Informações de contato --}}
+            <div class="contact-aside">
+                <div class="contact-aside-item">
+                    <div class="contact-aside-icon icon-teal">
+                        <i class="bi bi-whatsapp"></i>
+                    </div>
+                    <div>
+                        <h4>WhatsApp</h4>
+                        <p>
+                            <a href="https://wa.me/5500000000000" target="_blank" rel="noopener noreferrer">
+                                (00) 00000-0000
+                            </a><br>
+                            {{ __('site.contact.sales.hours') }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="contact-aside-item">
+                    <div class="contact-aside-icon icon-blue">
+                        <i class="bi bi-envelope"></i>
+                    </div>
+                    <div>
+                        <h4>E-mail</h4>
+                        <p>
+                            <a href="mailto:contato@easyeye.com.br">contato@easyeye.com.br</a><br>
+                            <a href="mailto:suporte@easyeye.com.br">suporte@easyeye.com.br</a>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="contact-aside-item">
+                    <div class="contact-aside-icon icon-mint">
+                        <i class="bi bi-clock"></i>
+                    </div>
+                    <div>
+                        <h4>{{ __('site.contact.aside.hours_title') }}</h4>
+                        <p>{{ __('site.contact.aside.hours_body') }}</p>
+                    </div>
+                </div>
+
+                <div class="contact-aside-item">
+                    <div class="contact-aside-icon icon-purple">
+                        <i class="bi bi-chat-dots"></i>
+                    </div>
+                    <div>
+                        <h4>{{ __('site.contact.aside.chat_title') }}</h4>
+                        <p>{{ __('site.contact.aside.chat_body') }}</p>
+                    </div>
+                </div>
+
+                <hr class="contact-aside-divider">
+
+                <div class="contact-aside-quote">
+                    <p>"{{ __('site.contact.aside.quote_text') }}"</p>
+                    <span>{{ __('site.contact.aside.quote_author') }}</span>
+                </div>
+            </div>
+
+        </div>
+
+        {{-- Trust badges --}}
+        <div class="contact-trust">
+            <div class="contact-trust-item">
+                <i class="bi bi-lock-fill"></i>
+                <span>{{ __('site.contact.trust_ssl') }}</span>
+            </div>
+            <div class="contact-trust-item">
+                <i class="bi bi-shield-fill-check"></i>
+                <span>{{ __('site.contact.trust_lgpd') }}</span>
+            </div>
+            <div class="contact-trust-item">
+                <i class="bi bi-patch-check-fill"></i>
+                <span>{{ __('site.contact.trust_cfm') }}</span>
+            </div>
+            <div class="contact-trust-item">
+                <i class="bi bi-star-fill" style="color:#f59e0b;"></i>
+                <span>{{ __('site.contact.trust_nps') }}</span>
+            </div>
+        </div>
+
+    </div>
+</section>
+{{-- ═══════════════════ END CONTACT ═══════════════════ --}}
 
 {{-- ═══════════════════ CTA FINAL ═══════════════════ --}}
 <section class="cta-final">

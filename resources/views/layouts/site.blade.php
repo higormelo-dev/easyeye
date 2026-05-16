@@ -143,11 +143,12 @@
         #navbar:not(.scrolled) .logo-v-white { opacity: 1; }
 
         /* Links */
-        .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
+        .nav-links { display: flex; align-items: center; gap: 2px; list-style: none; }
         .nav-links a {
-            padding: 8px 14px; border-radius: 6px;
-            color: #3a4a6b; font-weight: 500; font-size: 15px;
+            padding: 8px 10px; border-radius: 6px;
+            color: #3a4a6b; font-weight: 500; font-size: 14px;
             text-decoration: none; transition: color .2s, background .2s;
+            white-space: nowrap;
         }
         .nav-links a:hover { color: var(--navy); background: rgba(15,37,81,.06); }
         #navbar:not(.scrolled) .nav-links a { color: rgba(255,255,255,.85); }
@@ -311,6 +312,7 @@
                     <li><a href="{{ route('site.home') }}#precos">{{ __('site.nav.pricing') }}</a></li>
                     <li><a href="{{ route('site.home') }}#depoimentos">{{ __('site.nav.testimonials') }}</a></li>
                     <li><a href="{{ route('site.home') }}#faq">{{ __('site.nav.faq') }}</a></li>
+                    <li><a href="{{ route('site.home') }}#contato">{{ __('site.nav.contact') }}</a></li>
                 </ul>
 
                 <div class="nav-right">
@@ -362,6 +364,7 @@
                 <li><a href="{{ route('site.home') }}#precos"          @click="open=false">{{ __('site.nav.pricing') }}</a></li>
                 <li><a href="{{ route('site.home') }}#depoimentos"     @click="open=false">{{ __('site.nav.testimonials') }}</a></li>
                 <li><a href="{{ route('site.home') }}#faq"             @click="open=false">{{ __('site.nav.faq') }}</a></li>
+                <li><a href="{{ route('site.home') }}#contato"         @click="open=false">{{ __('site.nav.contact') }}</a></li>
             </ul>
 
             {{-- Idiomas no mobile --}}
@@ -433,7 +436,7 @@
                         <li><a href="#">{{ __('site.footer.about') }}</a></li>
                         <li><a href="#">{{ __('site.footer.blog') }}</a></li>
                         <li><a href="#">{{ __('site.footer.partners') }}</a></li>
-                        <li><a href="mailto:contato@easyeye.com.br">{{ __('site.footer.contact') }}</a></li>
+                        <li><a href="{{ route('site.home') }}#contato">{{ __('site.footer.contact') }}</a></li>
                         <li><a href="#">{{ __('site.footer.careers') }}</a></li>
                     </ul>
                 </div>
