@@ -5,8 +5,8 @@
 @section('auth_page_subtitle', __('Confirmação necessária'))
 @section('auth_hero_title', __('auth.verify_email.title'))
 @section('auth_hero_text', __('Valide seu e-mail para liberar todos os recursos da clínica.'))
-@section('auth_hero_image', asset('system/images/auth/email-verification-illustration-img.png'))
-@section('auth_cover_image', asset('system/images/auth/cover-imgs-1.png'))
+@section('auth_hero_image', Vite::asset('resources/img/system/auth/email-verification-illustration-img.png'))
+@section('auth_cover_image', Vite::asset('resources/img/system/auth/cover-imgs-1.png'))
 
 @section('content')
     <p class="text-muted mb-4" style="font-size:.9rem;">

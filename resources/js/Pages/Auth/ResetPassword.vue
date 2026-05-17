@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import resetIllustrationImg from '@img/system/auth/reset-illustration-img.png';
 
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
@@ -33,7 +34,7 @@ function submit() {
     <GuestLayout
         :app-name="appName"
         :title="t.reset_password?.title"
-        :illustration-src="'/system/images/auth/reset-illustration-img.png'"
+        :illustration-src="resetIllustrationImg"
     >
         <div v-if="form.errors.email" class="alert alert-danger mb-3 py-2">
             <i class="ti ti-alert-circle me-1"></i> {{ form.errors.email }}

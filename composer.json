@@ -24,6 +24,7 @@
     "predis/predis": "^3.2",
     "sentry/sentry-laravel": "^4.24",
     "spatie/laravel-html": "^3.12",
+    "tightenco/ziggy": "^2.6",
     "yajra/laravel-datatables-buttons": "^12.0",
     "yajra/laravel-datatables-html": "^12.0",
     "yajra/laravel-datatables-oracle": "^12.0"

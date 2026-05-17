@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\DataTables\DoctorsDataTable;
 use App\DTOs\ActionPolicy;
 use App\Enums\EntityGate;
 use App\Http\Requests\DoctorRequest;
 use App\Http\Resources\{DoctorResource, EntityUserResource};
 use App\Models\{Doctor, Entity, EntityUser, Patient, People, User};
 use App\Services\DoctorService;
-use Illuminate\Contracts\View\{Factory, View};
+use Illuminate\Contracts\View\{View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\{DB, Gate};
+use Illuminate\Support\Facades\{DB, Gate, Storage, Vite};
+use Inertia\{Inertia, Response};
 
 class DoctorsController extends Controller
 {
@@ -65,7 +65,7 @@ class DoctorsController extends Controller
         $entityId = session()->get('selected_entity_id');
 
         $data = $doctors->map(function (Doctor $d) use ($entityId) {
-            $userPhotoPath = 'system/images/users/' . $d->user_id . '.jpg';
+            $userPhotoPath = 'users/' . $d->user_id . '.jpg';
 
             return [
                 'id'        => $d->id,
@@ -73,9 +73,9 @@ class DoctorsController extends Controller
                 'code'      => $d->code,
                 'record'    => $d->record,
                 'email'     => $d->email,
-                'photo_url' => file_exists(public_path($userPhotoPath))
-                    ? asset($userPhotoPath)
-                    : asset('system/images/team.png'),
+                'photo_url' => Storage::disk('public')->exists($userPhotoPath)
+                    ? Storage::disk('public')->url($userPhotoPath)
+                    : Vite::asset('resources/img/system/team.png'),
                 ...ActionPolicy::from($d, $entityId)->toArray(),
             ];
         });
@@ -94,64 +94,106 @@ class DoctorsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(DoctorsDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(Request $request): Response
     {
-        $meta = [
-            'title'            => $this->titleController,
-            'breadcrumb_title' => false,
-            'total_doctors'    => Doctor::query()
+        $entityId = session('selected_entity_id');
+        $search   = $request->string('search')->trim()->value();
+        $sortBy   = $request->string('sort', 'created_at')->value();
+        $sortDir  = $request->string('direction', 'desc')->value();
+
+        $allowedSorts = ['created_at', 'full_name', 'email', 'code', 'record'];
+        $sortBy       = in_array($sortBy, $allowedSorts, true) ? $sortBy : 'created_at';
+        $sortDir      = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
+
+        $query = Doctor::query()
+            ->select(
+                'doctors.*',
+                'entity_users.entity_id',
+                'entity_users.user_id',
+                'users.name as full_name',
+                'users.email',
+            )
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->join('users', 'entity_users.user_id', '=', 'users.id')
+            ->join('people', 'doctors.person_id', '=', 'people.id')
+            ->where('entity_users.entity_id', $entityId);
+
+        if ($search !== '') {
+            $lower = mb_strtolower($search, 'UTF-8');
+            $query->where(
+                fn ($q) => $q
+                    ->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(doctors.code) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(doctors.record) LIKE ?', ["%{$lower}%"]),
+            );
+        }
+
+        $dbCol = match ($sortBy) {
+            'full_name' => 'users.name',
+            'email'     => 'users.email',
+            default     => "doctors.{$sortBy}",
+        };
+        $query->orderBy($dbCol, $sortDir);
+
+        $doctors = $query->paginate(15)->withQueryString();
+
+        return Inertia::render('Panel/Doctors/Index', [
+            'doctors'      => $doctors->through(fn ($d) => $this->toTableRow($d, $entityId)),
+            'totalDoctors' => fn () => Doctor::query()
                 ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-                ->where('entity_users.entity_id', session('selected_entity_id'))
+                ->where('entity_users.entity_id', $entityId)
                 ->count(),
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.accesscontrol.users.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+            'filters'         => $request->only(['search', 'sort', 'direction']),
+        ]);
+    }
+
+    private function toTableRow(Doctor $d, string $entityId): array
+    {
+        $policy        = ActionPolicy::from($d, $entityId);
+        $userPhotoPath = 'users/' . $d->user_id . '.jpg';
+
+        return [
+            'id'               => $d->id,
+            'code'             => $d->code,
+            'record'           => $d->record,
+            'record_specialty' => $d->record_specialty,
+            'color'            => $d->color,
+            'active'           => (bool) $d->active,
+            'deleted_at'       => $d->deleted_at,
+            'created_at'       => $d->created_at?->format('d/m/Y'),
+            'full_name'        => $d->full_name,
+            'email'            => $d->email,
+            'user_id'          => $d->user_id,
+            'photo_url'        => Storage::disk('public')->exists($userPhotoPath)
+                ? Storage::disk('public')->url($userPhotoPath)
+                : Vite::asset('resources/img/system/team.png'),
+            'work_schedule_url' => route('panel.doctors.work-schedule.index', $d->id),
+            'mode'              => $policy->mode,
+            'is_owned'          => $policy->isOwned,
+            'is_global'         => $policy->isGlobal,
+            'deleted'           => $policy->deleted,
         ];
-
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
-        $storeUrl        = route('panel.doctors.store');
-        $baseUrl         = url('panel/doctors');
-
-        return $dataTable->render('system.doctors.index', compact(
-            'meta',
-            'genders',
-            'maritalStatuses',
-            'statesOfBrazil',
-            'storeUrl',
-            'baseUrl',
-        ));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(DoctorRequest $request): JsonResponse
+    public function store(DoctorRequest $request): JsonResponse|RedirectResponse
     {
         Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
 
         $entityUser = $this->service->create($request);
+        $message    = $this->getCreateMessage();
 
-        return response()->json([
-            'message' => $this->getCreateMessage(),
-            'data'    => new EntityUserResource($entityUser),
-        ]);
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $message, 'data' => new EntityUserResource($entityUser)]);
+        }
+
+        return redirect()->route('panel.doctors.index')->with('success', $message);
     }
 
     /**

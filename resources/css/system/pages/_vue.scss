@@ -1153,3 +1153,55 @@
 .offcanvas-body[data-simplebar] {
   scrollbar-width: none;
 }
+
+/* ── Live status bar (shared across polling pages) ─────────────────────── */
+.db-live-bar {
+    padding: .375rem .75rem;
+    background: var(--ee-surface, #fff);
+    border: 1px solid var(--ee-border, #e2e8f0);
+    border-radius: var(--ee-radius, .625rem);
+}
+
+.db-live-badge {
+    background: #fee2e2;
+    color: #991b1b;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+}
+
+.db-live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #ef4444;
+    display: inline-block;
+    animation: dbLivePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dbLivePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: .45; transform: scale(.75); }
+}
+
+.db-spin {
+    display: inline-block;
+    animation: dbSpin .8s linear infinite;
+}
+
+@keyframes dbSpin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+:root[data-bs-theme=dark] .db-live-bar {
+    background: #0f1729;
+    border-color: #24344e;
+}
+
+:root[data-bs-theme=dark] .db-live-badge {
+    background: #450a0a;
+    color: #fca5a5;
+}

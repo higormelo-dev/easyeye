@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\{Doctor, DoctorWorkSchedule, ScheduleBlock};
 use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{DB, Storage, Vite};
 
 class DoctorWorkScheduleController extends Controller
 {
@@ -43,10 +43,10 @@ class DoctorWorkScheduleController extends Controller
         }
 
         $userId    = $doctor->entityUser->user_id;
-        $photoPath = 'system/images/users/' . $userId . '.jpg';
-        $photoUrl  = file_exists(public_path($photoPath))
-            ? asset($photoPath)
-            : asset('system/images/team.png');
+        $photoPath = 'users/' . $userId . '.jpg';
+        $photoUrl  = Storage::disk('public')->exists($photoPath)
+            ? Storage::disk('public')->url($photoPath)
+            : Vite::asset('resources/img/system/team.png');
 
         $blocks = ScheduleBlock::where('doctor_id', $doctor->id)
             ->where('ends_at', '>=', now())

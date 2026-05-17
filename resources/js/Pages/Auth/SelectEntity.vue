@@ -1,6 +1,7 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import twostepIllustrationImg from '@img/system/auth/twostep-verification-illustration-img.png';
 
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
@@ -27,7 +28,7 @@ function logout() {
         :app-name="appName"
         :title="t.select_entity"
         subtitle="Selecione a clínica para continuar"
-        :illustration-src="'/system/images/auth/twostep-verification-illustration-img.png'"
+        :illustration-src="twostepIllustrationImg"
     >
         <div v-if="form.errors.entity_user_id" class="alert alert-danger mb-4">
             {{ form.errors.entity_user_id }}

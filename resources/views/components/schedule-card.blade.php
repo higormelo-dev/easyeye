@@ -6,7 +6,7 @@
 @php
     $photo = $schedule->patient_id && $schedule->patient?->photo
         ? asset('storage/images/patient/' . $schedule->patient->photo)
-        : asset('system/images/team.png');
+        : Vite::asset('resources/img/system/team.png');
 
     $altName = $schedule->patient_id
         ? $schedule->patient->full_name

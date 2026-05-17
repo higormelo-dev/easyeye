@@ -2,6 +2,7 @@
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import emailVerificationImg from '@img/system/auth/email-verification-illustration-img.png';
 
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
@@ -30,7 +31,7 @@ function logout() {
         :app-name="appName"
         :title="t.verify_email?.title"
         subtitle="Confirmação necessária"
-        :illustration-src="'/system/images/auth/email-verification-illustration-img.png'"
+        :illustration-src="emailVerificationImg"
     >
         <p class="text-muted mb-4" style="font-size:.9rem;">{{ t.verify_email?.description }}</p>
 

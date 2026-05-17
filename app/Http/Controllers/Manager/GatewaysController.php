@@ -9,6 +9,7 @@ use App\Models\Entity;
 use App\Services\Billing\GatewayDefaultService;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
+use Inertia\{Inertia, Response};
 
 class GatewaysController extends Controller
 {
@@ -17,7 +18,7 @@ class GatewaysController extends Controller
     ) {
     }
 
-    public function index(): \Illuminate\View\View
+    public function index(): Response
     {
         $gateways = Gateway::query()
             ->withCount([
@@ -34,22 +35,13 @@ class GatewaysController extends Controller
 
         $defaultGateway = $this->defaultService->getDefault();
 
-        $meta = [
-            'title'       => __('gateways.title'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('gateways.breadcrumb'), 'url' => route('panel.manager.gateways.index'), 'active' => true],
-            ],
-        ];
-
-        return view('system.manager.gateways.index', compact('gateways', 'defaultGateway', 'meta'));
+        return Inertia::render('Panel/Manager/Gateways/Index', [
+            'gateways'       => $gateways->map(fn ($g) => $this->toRow($g))->values(),
+            'defaultGateway' => $defaultGateway ? $this->toRow($defaultGateway) : null,
+            't'              => trans('gateways'),
+        ]);
     }
 
-    /**
-     * Define um gateway como padrão do sistema para billing de assinaturas.
-     * Valida: gateway ativo + credencial ativa.
-     * A troca é atômica e invalida o cache automaticamente.
-     */
     public function setDefault(Gateway $gateway): JsonResponse
     {
         try {
@@ -64,10 +56,6 @@ class GatewaysController extends Controller
         ]);
     }
 
-    /**
-     * Lista as credenciais globais de billing (scope=global, sem entity_id).
-     * Nunca retorna os valores das chaves — apenas metadados.
-     */
     public function credentials(Gateway $gateway): JsonResponse
     {
         $credentials = $gateway->credentials()
@@ -90,15 +78,10 @@ class GatewaysController extends Controller
         return response()->json(['data' => $credentials]);
     }
 
-    /**
-     * Ativa ou desativa um gateway globalmente.
-     * Se o gateway desativado for o padrão, limpa o flag is_default.
-     */
     public function toggleActive(Gateway $gateway): JsonResponse
     {
         $gateway->update(['active' => ! $gateway->active]);
 
-        // Se desativou o gateway padrão, remove o flag e invalida cache
         if (! $gateway->active && $gateway->is_default) {
             $gateway->update(['is_default' => false]);
             $this->defaultService->forgetCache();
@@ -110,9 +93,6 @@ class GatewaysController extends Controller
         ]);
     }
 
-    /**
-     * Atualiza a prioridade de um gateway (menor = maior prioridade / gateway primário).
-     */
     public function updatePriority(Request $request, Gateway $gateway): JsonResponse
     {
         $request->validate([
@@ -120,18 +100,11 @@ class GatewaysController extends Controller
         ]);
 
         $gateway->update(['priority' => $request->priority]);
-
-        // Invalida cache de fallback (que usa priority como desempate)
         $this->defaultService->forgetCache();
 
         return response()->json(['message' => __('gateways.priority_updated')]);
     }
 
-    /**
-     * Salva credenciais globais de billing para um gateway.
-     * Cria nova entrada — nunca atualiza a existente (imutabilidade de credenciais).
-     * A credencial anterior é desativada automaticamente.
-     */
     public function storeCredential(Request $request, Gateway $gateway): JsonResponse
     {
         $request->validate([
@@ -161,18 +134,11 @@ class GatewaysController extends Controller
         ]);
 
         Cache::forget("gateway_credential:{$gateway->code}:global");
-
-        // Nova credencial pode habilitar este gateway como candidato a padrão no fallback
         $this->defaultService->forgetCache();
 
-        return response()->json([
-            'message' => __('gateways.credential_saved'),
-        ]);
+        return response()->json(['message' => __('gateways.credential_saved')]);
     }
 
-    /**
-     * Revoga (desativa) uma credencial global específica.
-     */
     public function revokeCredential(Gateway $gateway, GatewayCredential $credential): JsonResponse
     {
         if ($credential->gateway_id !== $gateway->id) {
@@ -182,16 +148,11 @@ class GatewaysController extends Controller
         $credential->update(['active' => false]);
 
         Cache::forget("gateway_credential:{$gateway->code}:global");
-
-        // Revogar credencial pode invalidar o padrão atual
         $this->defaultService->forgetCache();
 
         return response()->json(['message' => __('gateways.credential_revoked')]);
     }
 
-    /**
-     * Lista todas as clínicas (entities clientes) com seu status de acesso ao gateway.
-     */
     public function entityAccess(Gateway $gateway): JsonResponse
     {
         $entities = Entity::query()
@@ -216,10 +177,6 @@ class GatewaysController extends Controller
         return response()->json(['data' => $data]);
     }
 
-    /**
-     * Habilita ou desabilita o acesso de uma clínica a um gateway (toggle).
-     * Cria o registro se não existir; atualiza se já existir.
-     */
     public function toggleEntityAccess(Gateway $gateway, Entity $entity): JsonResponse
     {
         if ($entity->isSaas()) {
@@ -240,5 +197,42 @@ class GatewaysController extends Controller
                 ? __('gateways.gateway_enabled_for', ['gateway' => $gateway->name, 'entity' => $entity->name])
                 : __('gateways.gateway_disabled_for', ['gateway' => $gateway->name, 'entity' => $entity->name]),
         ]);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function toRow(Gateway $g): array
+    {
+        $credCount   = $g->active_credentials_count  ?? 0;
+        $clinicCount = $g->entities_with_access_count ?? 0;
+
+        return [
+            'id'                        => $g->id,
+            'code'                      => $g->code,
+            'name'                      => $g->name,
+            'active'                    => (bool) $g->active,
+            'is_default'                => (bool) $g->is_default,
+            'priority'                  => $g->priority,
+            'supports_subscriptions'    => (bool) $g->supports_subscriptions,
+            'supports_one_time_charges' => (bool) $g->supports_one_time_charges,
+            'supports_refunds'          => (bool) $g->supports_refunds,
+            'supports_webhooks'         => (bool) $g->supports_webhooks,
+            'active_credentials_count'  => $credCount,
+            'credentials_label'         => $credCount > 0
+                ? trans_choice('gateways.credentials_active', $credCount, ['count' => $credCount])
+                : null,
+            'entities_with_access_count' => $clinicCount,
+            'clinics_label'              => $clinicCount > 0
+                ? trans_choice('gateways.clinics_count', $clinicCount, ['count' => $clinicCount])
+                : null,
+            'can_be_default'             => (bool) $g->active && $credCount > 0,
+            // Route URLs
+            'set_default_url'       => route('panel.manager.gateways.set-default',    $g),
+            'toggle_active_url'     => route('panel.manager.gateways.toggle-active',  $g),
+            'priority_url'          => route('panel.manager.gateways.priority',        $g),
+            'credentials_url'       => route('panel.manager.gateways.credentials',     $g),
+            'credentials_store_url' => route('panel.manager.gateways.credentials.store', $g),
+            'entity_access_url'     => route('panel.manager.gateways.entity-access',   $g),
+        ];
     }
 }

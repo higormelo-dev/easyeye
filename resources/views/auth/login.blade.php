@@ -3,10 +3,10 @@
 @section('auth_layout', 'login-illustration')
 @section('auth_hide_locale', '1')
 @section('auth_hero_title', __('auth.sign_in'))
-@section('auth_hero_image', asset('system/images/icons/log-illustration-img-01.png'))
+@section('auth_hero_image', Vite::asset('resources/img/system/icons/log-illustration-img-01.png'))
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/guest.css') }}">
+@vite('resources/css/auth.scss')
 @endpush
 
 {{-- ═══ Painel esquerdo — branding + features + social proof ═══ --}}
@@ -14,11 +14,11 @@
 <div class="ee-login-panel-blob"></div>
 <div class="ee-login-panel">
 
-    <img src="{{ asset('system/images/logo-white.svg') }}"
+    <img src="{{ Vite::asset('resources/img/system/logo-white.svg') }}"
          alt="{{ config('app.name') }}"
          class="ee-login-panel-logo">
 
-    <img src="{{ asset('system/images/icons/log-illustration-img-01.png') }}"
+    <img src="{{ Vite::asset('resources/img/system/icons/log-illustration-img-01.png') }}"
          alt="{{ config('app.name') }}"
          class="ee-login-panel-img">
 
@@ -53,7 +53,7 @@
 @section('content')
     <div class="text-center mb-4">
         <a href="{{ route('login') }}" class="d-inline-block">
-            <img src="{{ asset('system/images/icons/logo.svg') }}"
+            <img src="{{ Vite::asset('resources/img/system/icons/logo.svg') }}"
                  class="img-fluid ee-login-brand"
                  alt="{{ config('app.name') }}">
         </a>

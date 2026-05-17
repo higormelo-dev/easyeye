@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use Illuminate\Http\{RedirectResponse, Request};
-use Illuminate\Support\Facades\{Auth, Redirect};
+use Illuminate\Support\Facades\{Auth, Redirect, Storage, Vite};
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -15,13 +15,13 @@ class ProfileController extends Controller
     public function edit(Request $request): View
     {
         $user          = $request->user();
-        $userPhotoPath = 'system/images/users/' . $user->id . '.jpg';
+        $userPhotoPath = 'users/' . $user->id . '.jpg';
 
         return view('profile.edit', [
             'user'         => $user,
-            'userPhotoUrl' => file_exists(public_path($userPhotoPath))
-                ? asset($userPhotoPath) . '?v=' . filemtime(public_path($userPhotoPath))
-                : asset('system/images/team.png'),
+            'userPhotoUrl' => Storage::disk('public')->exists($userPhotoPath)
+                ? Storage::disk('public')->url($userPhotoPath) . '?v=' . Storage::disk('public')->lastModified($userPhotoPath)
+                : Vite::asset('resources/img/system/team.png'),
             'meta' => [
                 'title'       => __('actions.edit_profile'),
                 'breadcrumbs' => [
@@ -46,12 +46,7 @@ class ProfileController extends Controller
         $request->user()->save();
 
         if ($request->hasFile('photo')) {
-            $dir = public_path('system/images/users');
-
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-            $request->file('photo')->move($dir, $request->user()->id . '.jpg');
+            $request->file('photo')->storeAs('users', $request->user()->id . '.jpg', 'public');
         }
 
         return Redirect::route('panel.profile.edit')->with('status', 'profile-updated');

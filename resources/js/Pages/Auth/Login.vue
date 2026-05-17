@@ -2,6 +2,9 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import logoWhiteSvg from '@img/system/logo-white.svg';
+import illustrationImg from '@img/system/icons/log-illustration-img-01.png';
+import logoSvg from '@img/system/icons/logo.svg';
 
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
@@ -36,8 +39,8 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                 <div class="ee-login-panel-blob ee-login-panel-blob-1"></div>
                 <div class="ee-login-panel-blob ee-login-panel-blob-2"></div>
 
-                <img :src="'/system/images/logo-white.svg'" :alt="appName" class="ee-login-panel-logo">
-                <img :src="'/system/images/icons/log-illustration-img-01.png'" :alt="appName" class="ee-login-panel-img">
+                <img :src="logoWhiteSvg" :alt="appName" class="ee-login-panel-logo">
+                <img :src="illustrationImg" :alt="appName" class="ee-login-panel-img">
 
                 <div class="ee-login-features">
                     <div class="ee-login-feature">
@@ -68,7 +71,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
         <!-- ── Right: login form ── -->
         <div class="text-center mb-4">
             <a href="/login" class="d-inline-block">
-                <img :src="'/system/images/icons/logo.svg'" class="img-fluid ee-login-brand" :alt="appName">
+                <img :src="logoSvg" class="img-fluid ee-login-brand" :alt="appName">
             </a>
         </div>
 

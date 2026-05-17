@@ -34,7 +34,7 @@
                         $photoPath = 'system/images/users/' . $userId . '.jpg';
                         $photoUrl  = $userId && file_exists(public_path($photoPath))
                             ? asset($photoPath)
-                            : asset('system/images/team.png');
+                            : Vite::asset('resources/img/system/team.png');
                         $color     = $doctor->color ?: '#6c757d';
                     @endphp
                     <img src="{{ $photoUrl }}" alt="{{ $doctorName }}"

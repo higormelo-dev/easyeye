@@ -7,7 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'EasyEye') }}</title>
     <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ asset('system/images/favicon.png') }}">
+    <link rel="shortcut icon" href="{{ Vite::asset('resources/img/system/favicon.png') }}">
     <!-- Theme Config Js (must run before paint to avoid flash) -->
     <script src="{{ asset('js/preclinic-theme-script.js') }}"></script>
     {{-- Vendor + App bundles (all CSS/JS via npm/Vite) --}}
@@ -19,10 +19,10 @@
     @stack('styles')
 </head>
 @php
-    $userPhotoPath = 'system/images/users/' . auth()->id() . '.jpg';
-    $userPhotoUrl  = file_exists(public_path($userPhotoPath))
-        ? asset($userPhotoPath)
-        : asset('system/images/team.png');
+    $userPhotoPath = 'users/' . auth()->id() . '.jpg';
+    $userPhotoUrl  = \Illuminate\Support\Facades\Storage::disk('public')->exists($userPhotoPath)
+        ? \Illuminate\Support\Facades\Storage::disk('public')->url($userPhotoPath)
+        : Vite::asset('resources/img/system/team.png');
 @endphp
 <body>
     <!-- Start Main Wrapper -->
@@ -35,11 +35,11 @@
                     <!-- Logo -->
                     <a href="{{ route('panel.dashboard') }}" class="logo">
                         <span class="logo-light">
-                            <span class="logo-lg"><img src="{{ asset('system/images/logo.svg') }}" alt="{{ config('app.name') }}"></span>
-                            <span class="logo-sm"><img src="{{ asset('system/images/logo-small.svg') }}" alt="{{ config('app.name') }}"></span>
+                            <span class="logo-lg"><img src="{{ Vite::asset('resources/img/system/logo.svg') }}" alt="{{ config('app.name') }}"></span>
+                            <span class="logo-sm"><img src="{{ Vite::asset('resources/img/system/logo-small.svg') }}" alt="{{ config('app.name') }}"></span>
                         </span>
                         <span class="logo-dark">
-                            <span class="logo-lg"><img src="{{ asset('system/images/logo-white.svg') }}" alt="{{ config('app.name') }}"></span>
+                            <span class="logo-lg"><img src="{{ Vite::asset('resources/img/system/logo-white.svg') }}" alt="{{ config('app.name') }}"></span>
                         </span>
                     </a>
                     <!-- Sidebar Mobile Button -->
@@ -143,13 +143,13 @@
             <div class="sidebar-logo">
                 <div>
                     <a href="{{ route('panel.dashboard') }}" class="logo logo-normal">
-                        <img src="{{ asset('system/images/logo.svg') }}" alt="{{ config('app.name') }}">
+                        <img src="{{ Vite::asset('resources/img/system/logo.svg') }}" alt="{{ config('app.name') }}">
                     </a>
                     <a href="{{ route('panel.dashboard') }}" class="logo-small">
-                        <img src="{{ asset('system/images/logo-small.svg') }}" alt="{{ config('app.name') }}">
+                        <img src="{{ Vite::asset('resources/img/system/logo-small.svg') }}" alt="{{ config('app.name') }}">
                     </a>
                     <a href="{{ route('panel.dashboard') }}" class="dark-logo">
-                        <img src="{{ asset('system/images/logo-white.svg') }}" alt="{{ config('app.name') }}">
+                        <img src="{{ Vite::asset('resources/img/system/logo-white.svg') }}" alt="{{ config('app.name') }}">
                     </a>
                 </div>
                 <button class="sidenav-toggle-btn btn border-0 p-0 active" id="toggle_btn">

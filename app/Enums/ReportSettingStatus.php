@@ -20,9 +20,9 @@ enum ReportSettingStatus: string
     public function badgeClass(): string
     {
         return match ($this) {
-            self::Draft     => 'bg-warning text-dark',
-            self::Published => 'bg-success',
-            self::Archived  => 'bg-secondary',
+            self::Draft     => 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
+            self::Published => 'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
+            self::Archived  => 'badge-soft-secondary rounded fs-13 fw-medium',
         };
     }
 

@@ -7,7 +7,7 @@
         $photoPath   = 'system/images/users/' . $userId . '.jpg';
         $photoUrl    = $userId && file_exists(public_path($photoPath))
             ? asset($photoPath)
-            : asset('system/images/team.png');
+            : Vite::asset('resources/img/system/team.png');
         $inverted = $i % 2 !== 0;
         $hasFlags = $record->diabetic || $record->hypertensive || $record->glaucomatous;
     @endphp

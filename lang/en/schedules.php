@@ -3,6 +3,34 @@
 declare(strict_types=1);
 
 return [
+    // Page / navigation
+    'page_title'        => 'Schedule',
+    'breadcrumb_home'   => 'Dashboard',
+    'breadcrumb_current'=> 'Schedule',
+    'btn_new'           => 'New',
+    'search_placeholder'=> 'Search patient…',
+    'saving'            => 'Saving…',
+    'cancel_title'      => 'Cancel appointment',
+
+    // Bulk selection toolbar
+    'btn_select'              => 'Select',
+    'btn_cancel_select'       => 'Cancel selection',
+    'btn_bulk_confirm'        => 'Confirm',
+    'btn_bulk_noshow'         => 'No-show',
+    'btn_bulk_cancel'         => 'Cancel',
+    'btn_bulk_change_date'    => 'Change Date',
+    'selected_count'          => 'selected',
+    'bulk_cancel_title'       => 'Cancel selected appointments',
+    'bulk_change_date_title'  => 'Bulk reschedule',
+    'bulk_change_date_hint'   => 'Time is optional — if left empty keeps the original time of each appointment.',
+    'btn_today'               => 'Today',
+
+    // Live status bar
+    'live_label'     => 'LIVE',
+    'live_refreshing'=> 'Refreshing…',
+    'last_updated_at'=> 'Updated at',
+    'btn_refresh'    => 'Refresh',
+
     // List / index
     'empty'   => 'No appointments found for the selected filters.',
     'loading' => 'Loading…',
@@ -28,10 +56,13 @@ return [
     'sidebar_evening'    => 'EVENING',
 
     // Waiting panel
-    'waiting_title' => 'Waiting List',
-    'waiting_add'   => 'Add',
-    'waiting_empty' => 'No patients on the waiting list.',
-    'waiting_until' => 'to',
+    'waiting_title'       => 'Waiting List',
+    'waiting_add'         => 'Add',
+    'waiting_empty'       => 'No patients on the waiting list.',
+    'waiting_until'       => 'to',
+    'waiting_schedule_btn'=> 'Schedule',
+    'waiting_remove_btn'  => 'Remove',
+    'waiting_add_queue'   => 'Add to Queue',
 
     // Notices panel
     'notices_title'       => 'Notice Board',
@@ -48,14 +79,24 @@ return [
     'notices_read_btn'    => 'Read',
 
     // Form modal (create/edit schedule)
-    'form_title'          => 'Appointment',
-    'form_doctor'         => 'Doctor',
-    'form_select'         => 'Select...',
-    'form_date_time'      => 'Date and Time',
-    'form_loading_slots'  => 'Loading slots…',
-    'form_no_slots'       => 'Doctor is not available on this day.',
-    'form_interval_hint'  => 'Interval of',
-    'form_no_scale'       => 'min (no schedule defined)',
+    'form_title'               => 'Appointment',
+    'form_doctor'              => 'Doctor',
+    'form_select'              => 'Select...',
+    'form_date_time'           => 'Date and Time',
+    'form_date'                => 'Date',
+    'form_loading_slots'       => 'Loading slots…',
+    'form_no_slots'            => 'Doctor is not available on this day.',
+    'form_no_schedule_day'     => 'Doctor has no schedule for this day of the week.',
+    'form_select_doctor_first' => 'Select a doctor to see available slots.',
+    'form_select_date_first'   => 'Select a date to see available slots.',
+    'form_interval_hint'       => ':min min intervals',
+    'form_morning'             => 'Morning',
+    'form_afternoon'           => 'Afternoon',
+    'form_evening'             => 'Evening',
+    'form_slots_available'     => 'available',
+    'form_slot_occupied'       => 'Busy',
+    'form_manual_override'     => 'Enter time manually',
+    'form_no_scale'            => 'min (no schedule defined)',
     'form_patient'        => 'Patient',
     'form_patient_search' => 'Search by name, CPF or phone…',
     'form_register'       => 'Register',

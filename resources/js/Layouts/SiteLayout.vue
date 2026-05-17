@@ -6,8 +6,8 @@
                 <div class="nav-inner">
                     <a :href="routes.siteHome" class="nav-logo" :aria-label="appName">
                         <span class="nav-logo-imgs">
-                            <img :src="asset('system/images/logo.svg')" :alt="appName" class="logo-v-dark">
-                            <img :src="asset('system/images/logo-white.svg')" alt="" class="logo-v-white" aria-hidden="true">
+                            <img :src="logoSvg" :alt="appName" class="logo-v-dark">
+                            <img :src="logoWhiteSvg" alt="" class="logo-v-white" aria-hidden="true">
                         </span>
                     </a>
 
@@ -102,7 +102,7 @@
                 <div class="footer-inner">
                     <div class="footer-brand">
                         <a :href="routes.siteHome" class="nav-logo">
-                            <img :src="asset('system/images/logo-small.svg')" :alt="appName">
+                            <img :src="logoSmallSvg" :alt="appName">
                         </a>
                         <p>{{ t.footer.tagline }}</p>
                         <div class="footer-social">
@@ -164,6 +164,9 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import logoSvg from '@img/system/logo.svg';
+import logoWhiteSvg from '@img/system/logo-white.svg';
+import logoSmallSvg from '@img/system/logo-small.svg';
 
 const props = defineProps({
     t: { type: Object, required: true },
@@ -182,9 +185,6 @@ const mobileOpen = ref(false);
 const langSwitcher = ref(null);
 const currentYear = new Date().getFullYear();
 
-function asset(path) {
-    return '/' + path;
-}
 
 function onScroll() {
     isScrolled.value = props.hasHero ? window.scrollY > 20 : true;

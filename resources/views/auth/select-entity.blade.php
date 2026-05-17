@@ -5,8 +5,8 @@
 @section('auth_page_subtitle', __('Selecione a clínica para continuar'))
 @section('auth_hero_title', __('Acesso Multiempresa'))
 @section('auth_hero_text', __('Escolha a empresa correta para manter os dados segregados e seguros.'))
-@section('auth_hero_image', asset('system/images/auth/twostep-verification-illustration-img.png'))
-@section('auth_cover_image', asset('system/images/auth/cover-imgs-2.png'))
+@section('auth_hero_image', Vite::asset('resources/img/system/auth/twostep-verification-illustration-img.png'))
+@section('auth_cover_image', Vite::asset('resources/img/system/auth/cover-imgs-2.png'))
 
 @section('content')
     <form method="POST" action="{{ route('selectentity.store') }}" class="form-horizontal form-material">

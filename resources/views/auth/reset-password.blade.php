@@ -5,8 +5,8 @@
 @section('auth_page_subtitle', __('auth.back_to_login'))
 @section('auth_hero_title', __('auth.reset_password.title'))
 @section('auth_hero_text', __('Defina sua nova senha para continuar com segurança.'))
-@section('auth_hero_image', asset('system/images/auth/reset-illustration-img.png'))
-@section('auth_cover_image', asset('system/images/auth/cover-imgs-2.png'))
+@section('auth_hero_image', Vite::asset('resources/img/system/auth/reset-illustration-img.png'))
+@section('auth_cover_image', Vite::asset('resources/img/system/auth/cover-imgs-2.png'))
 
 @section('content')
     <form method="POST" action="{{ route('password.store') }}" class="form-horizontal form-material">

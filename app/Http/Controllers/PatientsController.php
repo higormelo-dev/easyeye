@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\DataTables\PatientsDataTable;
 use App\DTOs\ActionPolicy;
 use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
 use App\Services\PatientService;
-use Illuminate\Contracts\View\{Factory, View};
+use Illuminate\Contracts\View\{View};
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\{DB, Storage};
+use Illuminate\Support\Facades\{DB, Storage, Vite};
+use Inertia\{Inertia, Response};
 
 class PatientsController extends Controller
 {
@@ -33,48 +33,84 @@ class PatientsController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(PatientsDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(Request $request): Response
     {
-        $meta = [
-            'title'            => $this->titleController,
-            'breadcrumb_title' => false,
-            'total_patients'   => Patient::where('entity_id', session('selected_entity_id'))->count(),
-            'action'           => __('actions.records'),
-            'breadcrumbs'      => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.patients.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.patients'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
+        $entityId = session('selected_entity_id');
+        $search   = $request->string('search')->trim()->value();
+        $sortBy   = $request->string('sort', 'created_at')->value();
+        $sortDir  = $request->string('direction', 'desc')->value();
+
+        $allowedSorts = ['created_at', 'full_name', 'code', 'cellphone'];
+        $sortBy       = in_array($sortBy, $allowedSorts, true) ? $sortBy : 'created_at';
+        $sortDir      = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
+
+        $query = Patient::query()
+            ->withTrashed()
+            ->select('patients.*', 'people.full_name', 'people.gender', 'people.cellphone', 'people.whatsapp')
+            ->join('people', 'patients.person_id', '=', 'people.id')
+            ->where(
+                fn ($q) => $q
+                    ->where('patients.entity_id', $entityId)
+                    ->orWhere(fn ($q) => $q->whereNull('patients.entity_id')->whereNull('patients.deleted_at')),
+            );
+
+        if ($search !== '') {
+            $lower = mb_strtolower($search, 'UTF-8');
+            $query->where(
+                fn ($q) => $q
+                    ->whereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(patients.code) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(people.cellphone) LIKE ?', ["%{$lower}%"]),
+            );
+        }
+
+        $dbCol = match ($sortBy) {
+            'full_name' => 'people.full_name',
+            'cellphone' => 'people.cellphone',
+            default     => "patients.{$sortBy}",
+        };
+        $query->orderBy($dbCol, $sortDir);
+
+        $patients = $query->paginate(15)->withQueryString();
+
+        return Inertia::render('Panel/Patients/Index', [
+            'patients'        => $patients->through(fn ($p) => $this->toTableRow($p, $entityId)),
+            'totalPatients'   => fn () => Patient::where('entity_id', $entityId)->count(),
+            'covenants'       => fn () => Covenant::all()->map(fn ($c) => ['id' => $c->id, 'name' => $c->name])->values()->toArray(),
+            'skinTypes'       => fn () => SkinType::all()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->toArray(),
+            'irisTypes'       => fn () => IrisType::all()->map(fn ($i) => ['id' => $i->id, 'name' => $i->name])->values()->toArray(),
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+            'filters'         => $request->only(['search', 'sort', 'direction']),
+        ]);
+    }
+
+    private function toTableRow(Patient $p, string $entityId): array
+    {
+        $policy   = ActionPolicy::from($p, $entityId);
+        $photoUrl = ($p->photo && Storage::disk('public')->exists('images/patient/' . $p->photo))
+            ? asset('storage/images/patient/' . $p->photo)
+            : Vite::asset('resources/img/system/team.png');
+
+        return [
+            'id'                  => $p->id,
+            'code'                => $p->code,
+            'full_name'           => $p->full_name,
+            'gender'              => $p->gender,
+            'gender_label'        => People::$genders[(int) $p->gender] ?? null,
+            'cellphone'           => $p->cellphone,
+            'whatsapp'            => (bool) $p->whatsapp,
+            'active'              => (bool) $p->active,
+            'deleted_at'          => $p->deleted_at,
+            'created_at'          => $p->created_at?->format('d/m/Y'),
+            'photo_url'           => $photoUrl,
+            'medical_records_url' => route('panel.patients.medicalrecords.index', $p->id),
+            'mode'                => $policy->mode,
+            'is_owned'            => $policy->isOwned,
+            'is_global'           => $policy->isGlobal,
+            'deleted'             => $policy->deleted,
         ];
-
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
-        $covenants       = Covenant::all()->pluck('name', 'id')->toArray();
-        $skinTypes       = SkinType::all()->pluck('name', 'id')->toArray();
-        $irisTypes       = IrisType::all()->pluck('name', 'id')->toArray();
-
-        return $dataTable->render('system.patients.index', compact(
-            'meta',
-            'genders',
-            'maritalStatuses',
-            'statesOfBrazil',
-            'covenants',
-            'skinTypes',
-            'irisTypes',
-        ));
     }
 
     /**
@@ -118,7 +154,7 @@ class PatientsController extends Controller
                 : null,
             'photo_url' => $p->photo && Storage::disk('public')->exists('images/patient/' . $p->photo)
                 ? asset('storage/images/patient/' . $p->photo)
-                : asset('system/images/team.png'),
+                : Vite::asset('resources/img/system/team.png'),
             'skin'                => $p->skinType?->name,
             'iris'                => $p->irisType?->name,
             'covenant'            => $p->covenant?->name,

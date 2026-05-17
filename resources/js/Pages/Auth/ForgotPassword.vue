@@ -2,6 +2,8 @@
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import forgotIllustrationImg from '@img/system/auth/forgot-illustration-img.png';
+import logoWhiteSvg from '@img/system/logo-white.svg';
 
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
@@ -24,12 +26,12 @@ function submit() {
     <GuestLayout
         :app-name="appName"
         :title="t.forgot_password?.title"
-        :illustration-src="'/system/images/auth/forgot-illustration-img.png'"
+        :illustration-src="forgotIllustrationImg"
     >
         <!-- ── Left panel: steps ── -->
         <template #left-panel>
             <div class="ee-fp-dark-panel">
-                <img :src="'/system/images/logo-white.svg'" :alt="appName" style="height:32px; margin-bottom:2.5rem;">
+                <img :src="logoWhiteSvg" :alt="appName" style="height:32px; margin-bottom:2.5rem;">
 
                 <div
                     class="rounded-circle d-flex align-items-center justify-content-center mb-4"

@@ -8,6 +8,7 @@ use App\Models\Partner;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Auth;
 use Inertia\{Inertia, Response};
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -22,7 +23,7 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): RedirectResponse|HttpResponse
     {
         $request->authenticate();
 
@@ -36,7 +37,7 @@ class AuthenticatedSessionController extends Controller
         if ($partnerRecord) {
             session(['portal_partner_id' => $partnerRecord->id]);
 
-            return redirect()->route('portal.dashboard');
+            return $this->redirectForInertia($request, route('portal.dashboard'));
         }
 
         $entityUsers = Auth::user()->entityUsers()->with('entity')
@@ -64,10 +65,10 @@ class AuthenticatedSessionController extends Controller
 
         // Usuários SaaS (non-client) não devem ser redirecionados para URLs que
         // ficaram salvas como url.intended durante uma sessão de impersonação expirada.
-        if (!session('selected_entity_is_client', true)) {
+        if (! session('selected_entity_is_client', true)) {
             session()->forget('url.intended');
 
-            return redirect()->route('panel.dashboard');
+            return $this->redirectForInertia($request, route('panel.dashboard'));
         }
 
         return redirect()->intended(route('panel.dashboard', absolute: false));
@@ -85,5 +86,14 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
+    }
+
+    private function redirectForInertia(Request $request, string $url): RedirectResponse|HttpResponse
+    {
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($url);
+        }
+
+        return redirect()->to($url);
     }
 }

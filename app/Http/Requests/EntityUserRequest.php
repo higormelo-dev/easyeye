@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\EntityGate;
 use App\Models\{Entity, EntityUser};
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -13,22 +14,29 @@ class EntityUserRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
+     *
+     * Client entities  → gate ManageUsers (admin do cliente).
+     * SaaS entities    → gate SaasAdminPanel (admin do SaaS gerencia o próprio time).
      */
     public function authorize(): bool
     {
         $entity = Entity::find(session('selected_entity_id'));
 
-        if (!$entity) {
+        if (! $entity) {
             return false;
         }
 
-        return Gate::allows(EntityGate::ManageUsers->value, $entity);
+        $gate = $entity->isClient()
+            ? EntityGate::ManageUsers->value
+            : EntityGate::SaasAdminPanel->value;
+
+        return Gate::allows($gate, $entity);
     }
 
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -40,11 +48,7 @@ class EntityUserRequest extends FormRequest
             'email',
             'max:255',
             Rule::unique('users', 'email')
-                ->ignore($this->getIgnoredUserId(), 'id')
-                ->where(function ($query) {
-                    $query->where('entity_id', session('selected_entity_id'))
-                        ->whereNull('deleted_at');
-                }),
+                ->ignore($this->getIgnoredUserId(), 'id'),
         ];
         $rules['rule'] = [
             'required_without:type_method',

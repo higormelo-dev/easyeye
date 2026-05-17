@@ -17,7 +17,7 @@ class EntityRequest extends FormRequest
         $entityId = $this->route('entity');
 
         return [
-            'name'      => ['required', 'string', 'max:150'],
+            'name'      => ['required_without:type_method', 'string', 'max:150'],
             'subdomain' => [
                 'nullable', 'string', 'max:100', 'alpha_dash',
                 Rule::unique('entities', 'subdomain')->ignore($entityId),
@@ -36,9 +36,10 @@ class EntityRequest extends FormRequest
             'district'               => ['nullable', 'string', 'max:100'],
             // Localização obrigatória — usada em PDFs clínicos. Sistema é multi-idioma:
             // state pode ser sigla (UF brasileira) ou nome completo (estados estrangeiros).
-            'city'              => ['required', 'string', 'max:100'],
-            'state'             => ['required', 'string', 'max:50'],
-            'country'           => ['required', 'string', 'max:50'],
+            // required_without:type_method: campos opcionais em partial updates (ex: toggle active).
+            'city'              => ['required_without:type_method', 'string', 'max:100'],
+            'state'             => ['required_without:type_method', 'string', 'max:50'],
+            'country'           => ['required_without:type_method', 'string', 'max:50'],
             'schedule_interval' => ['integer', 'in:15,20,30'],
             'active'            => ['boolean'],
         ];

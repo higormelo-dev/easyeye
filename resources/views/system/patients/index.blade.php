@@ -34,7 +34,7 @@
     @include('system.patients._form-modal')
 
     {{-- patientViewToggle --}}
-    <div x-data="patientViewToggle(@js(route('panel.patients.cards')), @js(asset('system/images/team.png')))"
+    <div x-data="patientViewToggle(@js(route('panel.patients.cards')), @js(Vite::asset('resources/img/system/team.png')))"
          x-init="init()"
          @patient-saved.window="reloadCurrentView()">
 

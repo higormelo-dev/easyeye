@@ -209,7 +209,7 @@
 
                                     {{-- Todos os médicos --}}
                                     <div class="d-flex align-items-center mb-3">
-                                        @php $fallback = asset('system/images/team.png'); @endphp
+                                        @php $fallback = Vite::asset('resources/img/system/team.png'); @endphp
                                         <button type="button"
                                                 class="btn p-0 border-0 bg-transparent"
                                                 @click="setDoctor('tudo')"
@@ -235,7 +235,7 @@
                                             $photoPath = 'system/images/users/' . $doc->user_id . '.jpg';
                                             $photoUrl  = file_exists(public_path($photoPath))
                                                 ? asset($photoPath)
-                                                : asset('system/images/team.png');
+                                                : Vite::asset('resources/img/system/team.png');
                                             $color     = $doc->color ?: '#6c757d';
                                         @endphp
                                         <div class="d-flex align-items-center mb-3">

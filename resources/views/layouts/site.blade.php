@@ -10,7 +10,7 @@
     <meta property="og:description" content="@yield('og_description', __('site.meta.og_description'))">
     <meta property="og:type"        content="website">
     <title>@yield('title', __('site.meta.title'))</title>
-    <link rel="shortcut icon" href="{{ asset('system/images/favicon.png') }}">
+    <link rel="shortcut icon" href="{{ Vite::asset('resources/img/system/favicon.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -296,10 +296,10 @@
             <div class="nav-inner">
                 <a href="{{ route('site.home') }}" class="nav-logo" aria-label="{{ config('app.name', 'EasyEye') }}">
                     <span class="nav-logo-imgs">
-                        <img src="{{ asset('system/images/logo.svg') }}"
+                        <img src="{{ Vite::asset('resources/img/system/logo.svg') }}"
                              alt="{{ config('app.name', 'EasyEye') }}"
                              class="logo-v-dark">
-                        <img src="{{ asset('system/images/logo-white.svg') }}"
+                        <img src="{{ Vite::asset('resources/img/system/logo-white.svg') }}"
                              alt=""
                              class="logo-v-white"
                              aria-hidden="true">
@@ -397,7 +397,7 @@
             <div class="footer-inner">
                 <div class="footer-brand">
                     <a href="{{ route('site.home') }}" class="nav-logo">
-                        <img src="{{ asset('system/images/logo-small.svg') }}" alt="{{ config('app.name', 'EasyEye') }}">
+                        <img src="{{ Vite::asset('resources/img/system/logo-small.svg') }}" alt="{{ config('app.name', 'EasyEye') }}">
                     </a>
                     <p>{{ __('site.footer.tagline') }}</p>
                     <div class="footer-social">

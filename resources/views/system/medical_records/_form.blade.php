@@ -926,7 +926,7 @@
                 @if($isEdit)
                 <label class="btn pmr-doc-img-btn pmr-doc-annexo"
                        title="{{ __('actions.medical_records.upload_files') }}">
-                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                    <img src="{{ Vite::asset('resources/img/system/medical_records/annexo.svg') }}" alt="Anexo">
                     <span class="pmr-doc-img-btn-label">Anexo</span>
                     <input type="file" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx"
                            class="d-none" @change="uploadFiles($event.target.files)">
@@ -942,7 +942,7 @@
                 @else
                 <span class="btn pmr-doc-img-btn disabled" aria-disabled="true"
                       title="{{ $saveFirstTitle }}">
-                    <img src="{{ asset('system/images/medical_records/annexo.svg') }}" alt="Anexo">
+                    <img src="{{ Vite::asset('resources/img/system/medical_records/annexo.svg') }}" alt="Anexo">
                     <span class="pmr-doc-img-btn-label">Anexo</span>
                 </span>
                 @endif

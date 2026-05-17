@@ -4,24 +4,22 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import vue from '@vitejs/plugin-vue';
 
-// Copia resources/img/{system,site} → public/{system,site}/images preservando
-// a estrutura de subpastas. Não apaga arquivos já existentes no destino (ex:
-// public/system/images/users/ com fotos de usuário geradas em runtime).
-const copyImages = () => ({
-    name: 'ee-copy-images',
-    buildStart() {
-        fs.cpSync('resources/img/system', 'public/system/images', { recursive: true });
-        if (fs.existsSync('resources/img/site')) {
-            fs.cpSync('resources/img/site', 'public/site/images', { recursive: true });
+// Coleta todos os arquivos de imagem de um ou mais diretórios para o input do Vite,
+// garantindo que apareçam no manifest e que Vite::asset() funcione no Blade.
+const getImageInputs = (...dirs) => {
+    const exts = /\.(svg|png|jpg|jpeg|webp|gif|ico)$/;
+    const result = [];
+    const walk = (d) => {
+        if (!fs.existsSync(d)) return;
+        for (const entry of fs.readdirSync(d, { withFileTypes: true })) {
+            const full = path.join(d, entry.name);
+            if (entry.isDirectory()) walk(full);
+            else if (exts.test(entry.name)) result.push(full);
         }
-    },
-    closeBundle() {
-        fs.cpSync('resources/img/system', 'public/system/images', { recursive: true });
-        if (fs.existsSync('resources/img/site')) {
-            fs.cpSync('resources/img/site', 'public/site/images', { recursive: true });
-        }
-    },
-});
+    };
+    dirs.forEach(walk);
+    return result;
+};
 
 export default defineConfig({
     server: {
@@ -40,18 +38,20 @@ export default defineConfig({
         },
     },
     plugins: [
-        copyImages(),
         vue(),
         laravel({
             input: [
+                ...getImageInputs('resources/img/system', 'resources/img/site'),
                 'resources/css/site.scss',
                 'resources/css/system.scss',
+                'resources/css/auth.scss',
                 'resources/js/site.js',
                 'resources/css/vendor.css',
                 'resources/css/dashboard.css',
                 'resources/css/manager-dashboard.css',
                 'resources/js/vendor.js',
                 'resources/js/app.js',
+                'resources/js/panel.js',
                 'resources/js/system/auxiliary_functions.js',
                 'resources/js/auth/login.js',
                 'resources/js/auth/register.js',
@@ -96,7 +96,8 @@ export default defineConfig({
             // Single jQuery instance for all npm packages and template scripts.
             // jquery-global.js imports from the npm package and exposes window.$ / window.jQuery.
             jquery: path.resolve('./resources/js/jquery-global.js'),
-            '@': path.resolve('./resources/js'),
+            '@img': path.resolve('./resources/img'),
+        '@': path.resolve('./resources/js'),
         },
     },
 });

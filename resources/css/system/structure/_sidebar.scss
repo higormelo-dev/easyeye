@@ -849,6 +849,29 @@
     }
 }
 
+// Avatar compacto exibido apenas quando o sidebar está minimizado
+.sidebar-mini-avatar {
+    display: none;
+    justify-content: center;
+    padding: 4px 0 12px;
+
+    .avatar {
+        background-color: $primary;
+    }
+}
+
+.mini-sidebar {
+    .sidebar-mini-avatar {
+        display: flex;
+    }
+}
+
+.expand-menu.mini-sidebar {
+    .sidebar-mini-avatar {
+        display: none;
+    }
+}
+
 [data-layout="full-width"]{
     .mobile-btn{
         display: block;

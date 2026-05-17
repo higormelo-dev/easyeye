@@ -3,6 +3,34 @@
 declare(strict_types=1);
 
 return [
+    // Page / navigation
+    'page_title'        => 'Agenda',
+    'breadcrumb_home'   => 'Dashboard',
+    'breadcrumb_current'=> 'Agenda',
+    'btn_new'           => 'Novo',
+    'search_placeholder'=> 'Buscar paciente…',
+    'saving'            => 'Salvando…',
+    'cancel_title'      => 'Cancelar agendamento',
+
+    // Bulk selection toolbar
+    'btn_select'              => 'Selecionar',
+    'btn_cancel_select'       => 'Cancelar seleção',
+    'btn_bulk_confirm'        => 'Confirmar',
+    'btn_bulk_noshow'         => 'Faltou',
+    'btn_bulk_cancel'         => 'Cancelar',
+    'btn_bulk_change_date'    => 'Alterar Data',
+    'selected_count'          => 'selecionado(s)',
+    'bulk_cancel_title'       => 'Cancelar agendamentos selecionados',
+    'bulk_change_date_title'  => 'Alterar data em massa',
+    'bulk_change_date_hint'   => 'Hora opcional — se não preenchida mantém o horário original de cada agendamento.',
+    'btn_today'               => 'Hoje',
+
+    // Live status bar
+    'live_label'     => 'AO VIVO',
+    'live_refreshing'=> 'Atualizando…',
+    'last_updated_at'=> 'Atualizado às',
+    'btn_refresh'    => 'Atualizar',
+
     // List / index
     'empty'   => 'Nenhum agendamento encontrado para os filtros selecionados.',
     'loading' => 'Carregando…',
@@ -28,10 +56,13 @@ return [
     'sidebar_evening'    => 'NOITE',
 
     // Waiting panel
-    'waiting_title' => 'Lista de Espera',
-    'waiting_add'   => 'Adicionar',
-    'waiting_empty' => 'Nenhum paciente na lista de espera.',
-    'waiting_until' => 'até',
+    'waiting_title'       => 'Lista de Espera',
+    'waiting_add'         => 'Adicionar',
+    'waiting_empty'       => 'Nenhum paciente na lista de espera.',
+    'waiting_until'       => 'até',
+    'waiting_schedule_btn'=> 'Agendar',
+    'waiting_remove_btn'  => 'Remover',
+    'waiting_add_queue'   => 'Adicionar à Fila',
 
     // Notices panel
     'notices_title'       => 'Mural de Recados',
@@ -48,14 +79,24 @@ return [
     'notices_read_btn'    => 'Li',
 
     // Form modal (create/edit schedule)
-    'form_title'          => 'Agendamento',
-    'form_doctor'         => 'Médico',
-    'form_select'         => 'Selecione...',
-    'form_date_time'      => 'Data e Hora',
-    'form_loading_slots'  => 'Carregando horários…',
-    'form_no_slots'       => 'Médico não atende neste dia.',
-    'form_interval_hint'  => 'Intervalo de',
-    'form_no_scale'       => 'min (sem escala definida)',
+    'form_title'               => 'Agendamento',
+    'form_doctor'              => 'Médico',
+    'form_select'              => 'Selecione...',
+    'form_date_time'           => 'Data e Hora',
+    'form_date'                => 'Data',
+    'form_loading_slots'       => 'Carregando horários…',
+    'form_no_slots'            => 'Médico não atende neste dia.',
+    'form_no_schedule_day'     => 'Médico sem escala para este dia da semana.',
+    'form_select_doctor_first' => 'Selecione um médico para ver os horários disponíveis.',
+    'form_select_date_first'   => 'Selecione a data para ver os horários disponíveis.',
+    'form_interval_hint'       => 'Intervalo de :min min',
+    'form_morning'             => 'Manhã',
+    'form_afternoon'           => 'Tarde',
+    'form_evening'             => 'Noite',
+    'form_slots_available'     => 'disponíveis',
+    'form_slot_occupied'       => 'Ocupado',
+    'form_manual_override'     => 'Inserir horário manualmente',
+    'form_no_scale'            => 'min (sem escala definida)',
     'form_patient'        => 'Paciente',
     'form_patient_search' => 'Buscar por nome, CPF ou celular…',
     'form_register'       => 'Cadastrar',

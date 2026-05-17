@@ -7,7 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'EasyEye') }}</title>
     <!-- Favicon -->
-    <link rel="shortcut icon" href="{{ asset('system/images/favicon.png') }}">
+    <link rel="shortcut icon" href="{{ Vite::asset('resources/img/system/favicon.png') }}">
     <!-- Apply guest dark mode before paint to avoid flash -->
     <script>(function(){var t=localStorage.getItem('ee-guest-theme');if(t==='dark'){document.documentElement.setAttribute('data-bs-theme','dark');}})();</script>
     <!-- Theme Config Js (must run before paint to avoid flash) -->
@@ -194,8 +194,8 @@
         $pageSubtitle = trim($__env->yieldContent('auth_page_subtitle')) ?: '';
         $heroTitle    = trim($__env->yieldContent('auth_hero_title')) ?: config('app.name', 'EasyEye');
         $heroText     = trim($__env->yieldContent('auth_hero_text')) ?: __('Sistema médico completo para sua clínica');
-        $heroImage    = trim($__env->yieldContent('auth_hero_image')) ?: asset('system/images/auth/reg-illustration-img.png');
-        $coverImage   = trim($__env->yieldContent('auth_cover_image')) ?: asset('system/images/auth/cover-imgs-1.png');
+        $heroImage    = trim($__env->yieldContent('auth_hero_image')) ?: Vite::asset('resources/img/system/auth/reg-illustration-img.png');
+        $coverImage   = trim($__env->yieldContent('auth_cover_image')) ?: Vite::asset('resources/img/system/auth/cover-imgs-1.png');
         $authLayout   = trim($__env->yieldContent('auth_layout')) ?: 'default';
         $hideHeader   = trim($__env->yieldContent('auth_hide_header')) === '1';
         $hideLocale   = trim($__env->yieldContent('auth_hide_locale')) === '1';
@@ -234,7 +234,7 @@
                         <div class="w-100 ee-auth-shell ee-auth-illustration-shell">
                             <div class="text-center mb-4">
                                 <a href="{{ route('login') }}" class="d-inline-block">
-                                    <img src="{{ asset('system/images/icons/logo.svg') }}" class="img-fluid ee-auth-brand" alt="{{ config('app.name') }}">
+                                    <img src="{{ Vite::asset('resources/img/system/icons/logo.svg') }}" class="img-fluid ee-auth-brand" alt="{{ config('app.name') }}">
                                 </a>
                             </div>
 
@@ -301,7 +301,7 @@
                             @unless($hideHeader)
                                 <div class="text-center mb-4 ee-auth-header">
                                     <a href="{{ route('login') }}" class="d-inline-block mb-2">
-                                        <img src="{{ asset('system/images/logo.svg') }}" class="img-fluid" alt="{{ config('app.name') }}">
+                                        <img src="{{ Vite::asset('resources/img/system/logo.svg') }}" class="img-fluid" alt="{{ config('app.name') }}">
                                     </a>
                                     <h4>{{ $pageTitle }}</h4>
                                     @if($pageSubtitle !== '')
@@ -358,8 +358,8 @@
                     </div>
 
                     <div class="col-lg-7 d-none d-lg-block position-relative login-backgrounds">
-                        <img src="{{ asset('system/images/auth/auth-bg-top.png') }}" alt="" class="element-01">
-                        <img src="{{ asset('system/images/auth/auth-bg-bot.png') }}" alt="" class="element-02">
+                        <img src="{{ Vite::asset('resources/img/system/auth/auth-bg-top.png') }}" alt="" class="element-01">
+                        <img src="{{ Vite::asset('resources/img/system/auth/auth-bg-bot.png') }}" alt="" class="element-02">
                         <img src="{{ $coverImage }}" alt="" class="cover-img">
                         <div class="authentication-card h-100 d-flex align-items-center justify-content-center">
                             <div class="authen-overlay-item text-center mx-auto">

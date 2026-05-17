@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\ScheduleSituation;
 use App\Http\Controllers\{
     ComplianceController,
     DoctorWorkScheduleController,
@@ -34,6 +33,7 @@ use App\Http\Controllers\{
 };
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Manager\ManagerDashboardController;
+use App\Http\Controllers\PanelDashboardController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
     CovenantsController,
@@ -48,8 +48,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisitTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\ReportSettingsController;
-use App\Models\{Doctor, Entity, Patient, Schedule};
-use App\Services\ActivationService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Route};
 
 // Rota para trocar o idioma (sem autenticação necessária)
@@ -95,60 +94,12 @@ Route::group(
         Route::get('/', function () {
             return redirect()->route('panel.dashboard');
         });
-        Route::get('/dashboard', function () {
+        Route::get('/dashboard', function (Request $request) {
             if (! session()->get('selected_entity_is_client')) {
                 return app()->call(ManagerDashboardController::class);
             }
 
-            $entityId   = session('selected_entity_id');
-            $today      = now()->toDateString();
-            $doneValues = [
-                ScheduleSituation::Attended->value,
-                ScheduleSituation::NoShow->value,
-                ScheduleSituation::Cancelled->value,
-            ];
-
-            $stats = [
-                'entity_name'    => Entity::find($entityId)?->name ?? config('app.name'),
-                'total_patients' => Patient::where('entity_id', $entityId)
-                    ->where('active', true)
-                    ->count(),
-                'today_count' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->count(),
-                'total_doctors' => Doctor::query()
-                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                    ->where('entity_users.entity_id', $entityId)
-                    ->where('doctors.active', true)
-                    ->count(),
-                'pending_today' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->whereNotIn('situation', $doneValues)
-                    ->count(),
-                'attended_today' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->where('situation', ScheduleSituation::Attended->value)
-                    ->count(),
-                'cancelled_today' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->whereIn('situation', [
-                        ScheduleSituation::NoShow->value,
-                        ScheduleSituation::Cancelled->value,
-                    ])
-                    ->count(),
-                'recent_patients' => Patient::with('person')
-                    ->where('entity_id', $entityId)
-                    ->where('active', true)
-                    ->orderByDesc('created_at')
-                    ->limit(8)
-                    ->get(),
-            ];
-
-            $activationSvc   = app(ActivationService::class);
-            $activation      = $activationSvc->getProgress($entityId);
-            $activationScore = $activationSvc->getScore($entityId);
-
-            return view('system.dashboard', compact('stats', 'activation', 'activationScore'));
+            return app(PanelDashboardController::class)($request);
         })->name('dashboard');
 
         Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');

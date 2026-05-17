@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import twostepIllustrationImg from '@img/system/auth/twostep-verification-illustration-img.png';
 
 const props = defineProps({
     appName: { type: String, default: 'EasyEye' },
@@ -25,7 +26,7 @@ function submit() {
         :app-name="appName"
         title="Área Segura"
         subtitle="Confirme sua identidade"
-        :illustration-src="'/system/images/auth/twostep-verification-illustration-img.png'"
+        :illustration-src="twostepIllustrationImg"
     >
         <p class="text-muted mb-4" style="font-size:.9rem;">
             Por segurança, confirme sua senha antes de continuar.

@@ -33,7 +33,7 @@
     @include('system.doctors._form-modal')
 
     {{-- doctorViewToggle --}}
-    <div x-data="doctorViewToggle(@js(route('panel.doctors.cards')), @js(asset('system/images/team.png')))"
+    <div x-data="doctorViewToggle(@js(route('panel.doctors.cards')), @js(Vite::asset('resources/img/system/team.png')))"
          x-init="init()">
 
         {{-- ══ Page Header ══════════════════════════════════════════════════════ --}}

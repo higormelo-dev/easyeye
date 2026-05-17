@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\DataTables\UsersDataTable;
 use App\DTOs\ActionPolicy;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
 use App\Models\{EntityUser, User};
 use App\Services\EntityUserService;
-use Illuminate\Contracts\View\{Factory, View};
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{DB, Storage, Vite};
+use Inertia\{Inertia, Response};
 
 class UsersController extends Controller
 {
@@ -59,16 +59,18 @@ class UsersController extends Controller
         $rolesMap = $isClient ? User::$rolesOfClients : User::$rolesOfManager;
 
         $data = $entityUsers->map(function (EntityUser $eu) use ($rolesMap, $entityId) {
-            $userPhotoPath = 'system/images/users/' . $eu->user_id . '.jpg';
+            $userPhotoPath = 'users/' . $eu->user_id . '.jpg';
 
             return [
                 'id'         => $eu->id,
                 'full_name'  => $eu->name,
                 'email'      => $eu->email,
                 'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
-                'photo_url'  => file_exists(public_path($userPhotoPath))
-                    ? asset($userPhotoPath)
-                    : asset('system/images/team.png'),
+                'photo_url'  => Storage::disk('public')->exists($userPhotoPath)
+                    ? Storage::disk('public')->url($userPhotoPath)
+                    : Vite::asset('resources/img/system/team.png'),
+                'is_owner' => (bool) $eu->is_owner,
+                'is_self'  => $eu->user_id === auth()->id(),
                 ...ActionPolicy::from($eu, $entityId)->toArray(),
             ];
         });
@@ -87,54 +89,88 @@ class UsersController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(UsersDataTable $dataTable): Factory|Application|View|JsonResponse
+    public function index(Request $request): Response
     {
-        $meta = [
-            'title'            => $this->titleController,
-            'breadcrumb_title' => false,
-            'total'            => EntityUser::query()
-                ->where('entity_id', session('selected_entity_id'))
-                ->whereNot('rule', 'doctor')
-                ->count(),
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $this->titleController,
-                    'url'    => route('panel.accesscontrol.users.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.records'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
+        $entityId = session('selected_entity_id');
+        $isClient = (bool) session('selected_entity_is_client');
+        $search   = $request->string('search')->trim()->value();
+        $sortBy   = $request->string('sort', 'created_at')->value();
+        $sortDir  = $request->string('direction', 'desc')->value();
 
-        return $dataTable->render('system.users.index', compact('meta'));
+        $allowedSorts = ['created_at', 'name', 'email', 'rule'];
+        $sortBy       = in_array($sortBy, $allowedSorts, true) ? $sortBy : 'created_at';
+        $sortDir      = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
+
+        $rolesMap = $isClient ? User::$rolesOfClients : User::$rolesOfManager;
+
+        $query = EntityUser::query()
+            ->withTrashed()
+            ->select('entity_users.*', 'users.name', 'users.email')
+            ->join('users', 'entity_users.user_id', '=', 'users.id')
+            ->where('entity_users.entity_id', $entityId)
+            ->whereNot('entity_users.rule', 'doctor');
+
+        if ($search !== '') {
+            $lower = mb_strtolower($search, 'UTF-8');
+            $query->where(
+                fn ($q) => $q
+                    ->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]),
+            );
+        }
+
+        $dbCol = match ($sortBy) {
+            'name'  => 'users.name',
+            'email' => 'users.email',
+            'rule'  => 'entity_users.rule',
+            default => 'entity_users.created_at',
+        };
+        $query->orderBy($dbCol, $sortDir);
+
+        $users = $query->paginate(15)->withQueryString();
+
+        return Inertia::render('Panel/Users/Index', [
+            'users'    => $users->through(fn ($eu) => $this->toTableRow($eu, $entityId, $rolesMap)),
+            'total'    => fn () => EntityUser::where('entity_id', $entityId)->whereNot('rule', 'doctor')->count(),
+            'roles'    => $rolesMap,
+            'isClient' => $isClient,
+            'filters'  => $request->only(['search', 'sort', 'direction']),
+            't'        => trans('access_control'),
+        ]);
     }
 
     /**
      * Show the form for creating a new resource.
+     * Redirect to index — create is now handled inline via offcanvas modal.
      */
-    public function create()
+    public function create(): RedirectResponse
     {
-        $roles = ['' => 'Selecione uma opção'];
+        return redirect()->route('panel.accesscontrol.users.index');
+    }
 
-        if (! session()->get('selected_entity_is_client')) {
-            $roles = array_merge($roles, User::$rolesOfManager);
-        } else {
-            $clientRoles = User::$rolesOfClients;
-            unset($clientRoles['doctor']);
-            $roles = array_merge($roles, $clientRoles);
-        }
+    private function toTableRow(EntityUser $eu, string $entityId, array $rolesMap): array
+    {
+        $policy        = ActionPolicy::from($eu, $entityId);
+        $userPhotoPath = 'users/' . $eu->user_id . '.jpg';
 
-        return view('system.users.form', compact('roles'));
+        return [
+            'id'         => $eu->id,
+            'user_id'    => $eu->user_id,
+            'name'       => $eu->name,
+            'email'      => $eu->email,
+            'rule'       => $eu->rule,
+            'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
+            'active'     => (bool) $eu->active,
+            'deleted_at' => $eu->deleted_at,
+            'created_at' => $eu->created_at?->format('d/m/Y'),
+            'photo_url'  => Storage::disk('public')->exists($userPhotoPath)
+                ? Storage::disk('public')->url($userPhotoPath)
+                : Vite::asset('resources/img/system/team.png'),
+            'mode'     => $policy->mode,
+            'deleted'  => $policy->deleted,
+            'is_owner' => (bool) $eu->is_owner,
+            'is_self'  => $eu->user_id === auth()->id(),
+        ];
     }
 
     /**
@@ -165,8 +201,16 @@ class UsersController extends Controller
         $record = $this->service->findByIdOrCode($id);
 
         if (request()->wantsJson()) {
+            $record->loadMissing('user');
+
             return response()->json([
-                'data' => new EntityUserResource($record),
+                'data' => [
+                    'id'     => $record->id,
+                    'name'   => $record->user?->name ?? '',
+                    'email'  => $record->user?->email ?? '',
+                    'rule'   => $record->rule,
+                    'active' => (bool) $record->active,
+                ],
             ]);
         }
 
@@ -227,6 +271,14 @@ class UsersController extends Controller
     public function destroy(string $id): Application|View|JsonResponse
     {
         $record = $this->service->findByIdOrCode($id);
+
+        if ($record->is_owner) {
+            abort(403, trans('access_control.owner_protected'));
+        }
+
+        if ($record->user_id === auth()->id()) {
+            abort(403, trans('access_control.self_protected'));
+        }
 
         return DB::transaction(function () use ($record) {
             $messageReturn = $this->getDeleteMessage();

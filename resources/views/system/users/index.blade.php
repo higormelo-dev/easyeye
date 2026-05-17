@@ -100,7 +100,7 @@
                                              :alt="item.full_name"
                                              class="rounded-circle"
                                              width="48" height="48"
-                                             x-on:error="$el.src = '{{ asset('system/images/team.png') }}'">
+                                             x-on:error="$el.src = '{{ Vite::asset('resources/img/system/team.png') }}'">
                                     </div>
                                     <div class="flex-grow-1">
                                         <h5 class="mb-1" x-text="item.full_name"></h5>

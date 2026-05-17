@@ -4,7 +4,7 @@
         : null;
     $photo = $photoPath && file_exists(public_path($photoPath))
         ? asset($photoPath)
-        : asset('system/images/team.png');
+        : Vite::asset('resources/img/system/team.png');
 @endphp
 
 <div class="card mb-0">

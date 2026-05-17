@@ -3,10 +3,10 @@
 @section('auth_layout', 'register-illustration')
 @section('auth_hide_header', '1')
 @section('auth_hero_title', __('auth.forgot_password.title'))
-@section('auth_hero_image', asset('system/images/auth/forgot-illustration-img.png'))
+@section('auth_hero_image', Vite::asset('resources/img/system/auth/forgot-illustration-img.png'))
 
 @push('styles')
-<link rel="stylesheet" href="{{ asset('css/guest.css') }}">
+@vite('resources/css/auth.scss')
 @endpush
 
 {{-- ═══ Painel esquerdo — branding + recovery steps ═══ --}}
@@ -14,7 +14,7 @@
 <div class="ee-fp-panel-blob"></div>
 <div class="ee-fp-panel">
 
-    <img src="{{ asset('system/images/logo-white.svg') }}"
+    <img src="{{ Vite::asset('resources/img/system/logo-white.svg') }}"
          alt="{{ config('app.name') }}"
          class="ee-fp-panel-logo">
 

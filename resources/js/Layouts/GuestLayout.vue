@@ -1,12 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { usePage } from '@inertiajs/vue3';
+import regIllustrationImg from '@img/system/auth/reg-illustration-img.png';
+import logoIconSvg from '@img/system/icons/logo.svg';
 
 const props = defineProps({
     layoutMode: { type: String, default: 'illustration' }, // 'login-illustration' | 'illustration'
     title: { type: String, default: '' },
     subtitle: { type: String, default: '' },
-    illustrationSrc: { type: String, default: '/system/images/auth/reg-illustration-img.png' },
+    illustrationSrc: { type: String, default: () => regIllustrationImg },
     appName: { type: String, default: 'EasyEye' },
 });
 
@@ -126,7 +128,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside));
                         <div class="w-100 ee-auth-shell ee-auth-illustration-shell">
                             <div class="text-center mb-4">
                                 <a href="/login" class="d-inline-block">
-                                    <img :src="'/system/images/icons/logo.svg'" class="img-fluid ee-auth-brand" :alt="appName">
+                                    <img :src="logoIconSvg" class="img-fluid ee-auth-brand" :alt="appName">
                                 </a>
                             </div>
                             <div class="card ee-auth-illustration-card">

@@ -113,6 +113,14 @@ return Application::configure(basePath: dirname(__DIR__))
                     'message' => $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error',
                 ], $e->getStatusCode());
             }
+
+            // Inertia requests: redireciona de volta com flash de erro em vez de
+            // retornar HTML puro, que seria exibido como modal overlay no frontend.
+            if ($request->hasHeader('X-Inertia')) {
+                $message = $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error';
+
+                return redirect()->back()->with('error', $message);
+            }
         });
 
         $exceptions->render(function (Throwable $e, $request) {

@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 class EntityUserService
 {
     /**
-     * Create a new doctor with all related entities
+     * Create a new doctor with all related entities.
      */
     public function create(EntityUserRequest $request): EntityUser
     {
@@ -23,10 +23,20 @@ class EntityUserService
     }
 
     /**
-     * Update existing doctor and related entities
+     * Update existing doctor and related entities.
      */
     public function update(EntityUser $entityUser, EntityUserRequest $request): EntityUser
     {
+        // Proprietário não pode ser desativado nem ter seu perfil alterado
+        if ($entityUser->is_owner) {
+            abort(403, trans('access_control.owner_protected'));
+        }
+
+        // Usuário não pode desativar a si mesmo
+        if ($request->has('active') && ! $request->boolean('active') && $entityUser->user_id === auth()->id()) {
+            abort(403, trans('access_control.self_protected'));
+        }
+
         return DB::transaction(function () use ($entityUser, $request) {
             $data = [];
 
@@ -40,7 +50,7 @@ class EntityUserService
 
             $entityUser->update($data);
 
-            if (!$request->has('type_method')) {
+            if (! $request->has('type_method')) {
                 $this->updateUser($entityUser->user, $request);
             }
 
@@ -49,7 +59,7 @@ class EntityUserService
     }
 
     /**
-     * Find by ID or Code including soft-deleted records
+     * Find by ID or Code including soft-deleted records.
      */
     public function findByIdOrCode(string $idOrCode): ?EntityUser
     {
@@ -60,7 +70,7 @@ class EntityUserService
             ->when(
                 Str::isUuid($idOrCode),
                 static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
+                static fn ($q) => $q->where('code', $idOrCode),
             )
             ->firstOrFail();
 
@@ -68,7 +78,7 @@ class EntityUserService
     }
 
     /**
-     * Find or create user
+     * Find or create user.
      */
     private function findOrCreateUser(EntityUserRequest $request): User
     {
@@ -81,7 +91,7 @@ class EntityUserService
             }
 
             $existingUser->update([
-                'name'     => $request->nickname,
+                'name'     => $request->name,
                 'password' => $request->password,
             ]);
             $existingUser->markEmailAsVerified();
@@ -91,7 +101,7 @@ class EntityUserService
 
         /** @var User $user */
         $user = User::create([
-            'name'     => $request->nickname,
+            'name'     => $request->name,
             'email'    => $request->email,
             'password' => $request->password,
         ]);
@@ -101,7 +111,7 @@ class EntityUserService
     }
 
     /**
-     * Find or create entity user
+     * Find or create entity user.
      */
     private function findOrCreateEntityUser(User $user): EntityUser
     {
@@ -133,12 +143,12 @@ class EntityUserService
     }
 
     /**
-     * Update user data
+     * Update user data.
      */
     private function updateUser(User $user, Request $request): void
     {
         $user->update([
-            'name'  => $request->nickname,
+            'name'  => $request->name,
             'email' => $request->email,
         ]);
     }
