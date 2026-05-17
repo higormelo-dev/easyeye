@@ -36,7 +36,7 @@ watch(search, (val) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
         router.get(
-            route('panel.manager.subscriptions.index'),
+            route('manager.subscriptions.index'),
             { search: val, sort: props.filters.sort, direction: props.filters.direction },
             { preserveState: true, preserveScroll: true, replace: true },
         );
@@ -45,7 +45,7 @@ watch(search, (val) => {
 
 function onSort({ sort, direction }) {
     router.get(
-        route('panel.manager.subscriptions.index'),
+        route('manager.subscriptions.index'),
         { search: search.value, sort, direction },
         { preserveState: true, preserveScroll: true },
     );
@@ -85,7 +85,7 @@ async function onCancel(s) {
         `${props.t.confirm_cancel_title}\n\n${props.t.confirm_cancel_text}`
     )) return;
 
-    const res = await fetch(route('panel.manager.subscriptions.cancel'), {
+    const res = await fetch(route('manager.subscriptions.cancel'), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -113,7 +113,7 @@ async function onBlock(s) {
 
     if (!confirm(msg)) return;
 
-    const res = await fetch(route('panel.manager.subscriptions.block-access'), {
+    const res = await fetch(route('manager.subscriptions.block-access'), {
         method: 'PATCH',
         headers: {
             'Content-Type': 'application/json',
@@ -139,7 +139,7 @@ const settingsSaving   = ref(false);
 async function saveSettings() {
     settingsSaving.value = true;
     try {
-        const res = await fetch(route('panel.manager.subscriptions.settings'), {
+        const res = await fetch(route('manager.subscriptions.settings'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -241,7 +241,7 @@ const breadcrumbs = [
             />
             <SubscriptionCards
                 v-else
-                :cards-url="route('panel.manager.subscriptions.cards')"
+                :cards-url="route('manager.subscriptions.cards')"
                 :initial-search="search"
                 :t="t"
                 @view="openDetail"

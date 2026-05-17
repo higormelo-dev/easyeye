@@ -14,7 +14,7 @@ class HandleInertiaRequests extends Middleware
 
     public function rootView(Request $request): string
     {
-        if ($request->routeIs('panel.*')) {
+        if ($request->routeIs('panel.*') || $request->routeIs('manager.*')) {
             return 'panel-app';
         }
 
@@ -51,7 +51,7 @@ class HandleInertiaRequests extends Middleware
 
             'auth' => fn () => $this->authProps($request),
 
-            'nav' => fn () => $request->routeIs('panel.*') && $request->user()
+            'nav' => fn () => ($request->routeIs('panel.*') || $request->routeIs('manager.*')) && $request->user()
                 ? PanelNavigation::build()
                 : [],
         ];

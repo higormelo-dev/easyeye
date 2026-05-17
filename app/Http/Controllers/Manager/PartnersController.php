@@ -68,7 +68,7 @@ class PartnersController extends Controller
                 'status_badge' => $c->status->badgeClass(),
                 'due_at'       => $c->due_at?->format('d/m/Y'),
                 'is_pending'   => $c->status === CommissionStatus::Pending,
-                'pay_url'      => route('panel.manager.partners.commission.pay', $c),
+                'pay_url'      => route('manager.partners.commission.pay', $c),
             ]),
             'partnerTypes' => collect(PartnerType::cases())->map(fn ($t) => [
                 'value'        => $t->value,
@@ -126,7 +126,7 @@ class PartnersController extends Controller
                 'status_label' => $l->status->label(),
                 'status_badge' => $l->status->badgeClass(),
                 'is_active'    => $l->status->isActive(),
-                'advance_url'  => route('panel.manager.partners.leads.advance', [$partner, $l]),
+                'advance_url'  => route('manager.partners.leads.advance', [$partner, $l]),
                 'created_at'   => $l->created_at->format('d/m/Y'),
             ]);
 
@@ -145,7 +145,7 @@ class PartnersController extends Controller
                 'status_badge' => $c->status->badgeClass(),
                 'due_at'       => $c->due_at?->format('d/m/Y'),
                 'is_pending'   => $c->status === CommissionStatus::Pending,
-                'pay_url'      => route('panel.manager.partners.commission.pay', $c),
+                'pay_url'      => route('manager.partners.commission.pay', $c),
             ]);
 
         $statusBadge = match ($partner->status) {
@@ -171,8 +171,8 @@ class PartnersController extends Controller
                 'created_at'      => $partner->created_at->format('d/m/Y'),
                 'leads_total'     => $partner->leads()->count(),
                 'commissions_total' => $partner->commissions()->count(),
-                'edit_url'        => route('panel.manager.partners.edit-data', $partner),
-                'update_url'      => route('panel.manager.partners.update', $partner),
+                'edit_url'        => route('manager.partners.edit-data', $partner),
+                'update_url'      => route('manager.partners.update', $partner),
             ],
             'leads'       => $leads,
             'commissions' => $commissions,
@@ -265,10 +265,10 @@ class PartnersController extends Controller
             'commissions_count' => $p->commissions_count ?? 0,
             'pending_fmt'     => 'R$ ' . number_format((float) ($p->pending_amount ?? 0), 2, ',', '.'),
             'paid_fmt'        => 'R$ ' . number_format((float) ($p->paid_amount ?? 0), 2, ',', '.'),
-            'show_url'        => route('panel.manager.partners.show', $p),
-            'edit_data_url'   => route('panel.manager.partners.edit-data', $p),
-            'update_url'      => route('panel.manager.partners.update', $p),
-            'destroy_url'     => route('panel.manager.partners.destroy', $p),
+            'show_url'        => route('manager.partners.show', $p),
+            'edit_data_url'   => route('manager.partners.edit-data', $p),
+            'update_url'      => route('manager.partners.update', $p),
+            'destroy_url'     => route('manager.partners.destroy', $p),
         ];
     }
 }

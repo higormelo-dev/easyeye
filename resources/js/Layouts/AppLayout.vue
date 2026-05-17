@@ -149,7 +149,7 @@ function logout() {
 
 // ── Impersonation exit ─────────────────────────────────────────────────────
 function exitImpersonation() {
-    router.delete(route('panel.manager.impersonate.destroy'));
+    router.delete(route('manager.impersonate.destroy'));
 }
 </script>
 

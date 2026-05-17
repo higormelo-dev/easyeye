@@ -306,6 +306,32 @@
     "manager_dashboard.leads_funnel": "Funil de Leads",
     "manager_dashboard.referral_codes": "Códigos de Indicação Ativos",
     "manager_dashboard.referral_events": "Eventos de Indicação",
+
+    "manager_dashboard.kpi_arr": "ARR Estimado",
+    "manager_dashboard.kpi_arpu": "ARPU",
+    "manager_dashboard.kpi_churn_rate": "Churn Rate (mês)",
+    "manager_dashboard.kpi_revenue_at_risk": "Receita em Risco",
+    "manager_dashboard.active_subs": "assinaturas ativas",
+    "manager_dashboard.cancelled_this_month": "cancelamentos/mês",
+    "manager_dashboard.all_clear": "Tudo ok",
+
+    "manager_dashboard.chart_mrr_trend": "MRR — Tendência 12 Meses",
+    "manager_dashboard.chart_mrr_label": "MRR Estimado (R$)",
+
+    "manager_dashboard.conversion_funnel_title": "Funil de Conversão",
+    "manager_dashboard.last_90d": "Últimos 90 dias",
+    "manager_dashboard.funnel_leads": "Leads",
+    "manager_dashboard.funnel_trials": "Trials",
+    "manager_dashboard.funnel_active": "Pagos (Ativos)",
+    "manager_dashboard.funnel_base": "base",
+    "manager_dashboard.funnel_converted": "converteram",
+    "manager_dashboard.funnel_from_leads": "dos leads",
+    "manager_dashboard.funnel_from_trials": "dos trials",
+    "manager_dashboard.conv_90d_title": "Conversão — trials finalizados (90d)",
+    "manager_dashboard.conv_trials_ended": "Trials encerrados",
+    "manager_dashboard.conv_converted": "Convertidos",
+    "manager_dashboard.conv_rate": "Taxa",
+
     "report_settings.status.draft": "Rascunho",
     "report_settings.status.published": "Publicado",
     "report_settings.status.archived": "Arquivado"

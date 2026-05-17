@@ -83,8 +83,8 @@ class EntitiesController extends Controller
                 'state'                         => $r->state,
                 'entity_users_count'            => $r->entity_users_count,
                 'entity_user_integrators_count' => $r->entity_user_integrators_count,
-                'users_url'                     => route('panel.manager.entities.users', $r->id),
-                'user_integrators_url'          => route('panel.manager.entities.user-integrators.index', $r->id),
+                'users_url'                     => route('manager.entities.users', $r->id),
+                'user_integrators_url'          => route('manager.entities.user-integrators.index', $r->id),
                 ...ActionPolicy::forManager($r)->toArray(),
             ]),
             'meta' => [
@@ -165,7 +165,7 @@ class EntitiesController extends Controller
             ]);
         }
 
-        return redirect(route('panel.manager.entities.index'))
+        return redirect(route('manager.entities.index'))
             ->with('success', $this->titleController . ' cadastrada com sucesso.');
     }
 
@@ -181,7 +181,7 @@ class EntitiesController extends Controller
             ]);
         }
 
-        return redirect(route('panel.manager.entities.index'))
+        return redirect(route('manager.entities.index'))
             ->with('success', $this->titleController . ' atualizada com sucesso.');
     }
 
@@ -197,7 +197,7 @@ class EntitiesController extends Controller
             ]);
         }
 
-        return redirect(route('panel.manager.entities.index'))
+        return redirect(route('manager.entities.index'))
             ->with('success', $this->titleController . ' removida com sucesso.');
     }
 
@@ -218,8 +218,8 @@ class EntitiesController extends Controller
             'created_at'                    => $e->created_at?->format('d/m/Y'),
             'entity_users_count'            => (int) $e->entity_users_count,
             'entity_user_integrators_count' => (int) $e->entity_user_integrators_count,
-            'users_url'                     => route('panel.manager.entities.users', $e->id),
-            'user_integrators_url'          => route('panel.manager.entities.user-integrators.index', $e->id),
+            'users_url'                     => route('manager.entities.users', $e->id),
+            'user_integrators_url'          => route('manager.entities.user-integrators.index', $e->id),
             'mode'                          => $policy->mode,
             'deleted'                       => $policy->deleted,
         ];

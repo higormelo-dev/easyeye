@@ -28,7 +28,7 @@ watch(search, (val) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
         router.get(
-            route('panel.manager.entities.index'),
+            route('manager.entities.index'),
             { search: val, sort: props.filters.sort, direction: props.filters.direction },
             { preserveState: true, preserveScroll: true, replace: true },
         );
@@ -37,7 +37,7 @@ watch(search, (val) => {
 
 function onSort({ sort, direction }) {
     router.get(
-        route('panel.manager.entities.index'),
+        route('manager.entities.index'),
         { search: search.value, sort, direction },
         { preserveState: true, preserveScroll: true },
     );
@@ -61,12 +61,12 @@ function closeDetail()  { detailOpen.value = false; detailId.value = null; }
 // ── Actions ───────────────────────────────────────────────────────────────────
 function onDelete(id) {
     if (!confirm(props.t.confirm_delete ?? 'Tem certeza?')) return;
-    router.delete(route('panel.manager.entities.destroy', id), { preserveScroll: true });
+    router.delete(route('manager.entities.destroy', id), { preserveScroll: true });
 }
 
 function onToggleActive(id, currentActive) {
     router.put(
-        route('panel.manager.entities.update', id),
+        route('manager.entities.update', id),
         { active: !currentActive, type_method: 'toggle' },
         { preserveScroll: true },
     );
@@ -120,7 +120,7 @@ const breadcrumbs = [
             />
             <EntityCards
                 v-else
-                :cards-url="route('panel.manager.entities.cards')"
+                :cards-url="route('manager.entities.cards')"
                 :initial-search="search"
                 :t="t"
                 @view="openDetail"

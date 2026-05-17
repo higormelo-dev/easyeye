@@ -37,7 +37,7 @@ function resetForm() {
 async function loadEditData(id) {
     loading.value = true;
     try {
-        const res  = await fetch(route('panel.manager.plans.show', id));
+        const res  = await fetch(route('manager.plans.show', id));
         const json = await res.json();
         const d    = json.data;
         form.name          = d.name         ?? '';
@@ -59,8 +59,8 @@ watch(() => props.open, async (val) => {
 function submit() {
     const opts = { preserveScroll: true, onSuccess: () => emit('close') };
     isEdit.value
-        ? form.put(route('panel.manager.plans.update', props.planId), opts)
-        : form.post(route('panel.manager.plans.store'), opts);
+        ? form.put(route('manager.plans.update', props.planId), opts)
+        : form.post(route('manager.plans.store'), opts);
 }
 
 const booleanFeatures = computed(() => props.features.filter(f => f.is_boolean));

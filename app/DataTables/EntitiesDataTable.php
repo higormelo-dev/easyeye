@@ -97,13 +97,13 @@ class EntitiesDataTable extends BaseDataTable
         }
 
         $usersItem = $record->entity_users_count > 0
-            ? '<li><a class="dropdown-item" href="' . route('panel.manager.entities.users', $record->id) . '">
+            ? '<li><a class="dropdown-item" href="' . route('manager.entities.users', $record->id) . '">
                 <i class="ti ti-users me-1"></i>Usuários</a></li>'
             : '<li><span class="dropdown-item text-muted disabled" aria-disabled="true">
                 <i class="ti ti-users me-1"></i>Usuários</span></li>';
 
         $userIntegratorsItem = $record->entity_user_integrators_count > 0
-            ? '<li><a class="dropdown-item" href="' . route('panel.manager.entities.user-integrators.index', $record->id) . '">
+            ? '<li><a class="dropdown-item" href="' . route('manager.entities.user-integrators.index', $record->id) . '">
                 <i class="ti ti-user-cog me-1"></i>Usuários Integradores</a></li>'
             : '<li><span class="dropdown-item text-muted disabled" aria-disabled="true">
                 <i class="ti ti-user-cog me-1"></i>Usuários Integradores</span></li>';

@@ -15,7 +15,7 @@ const plan    = ref(null);
 async function loadDetail(id) {
     loading.value = true; plan.value = null;
     try {
-        const res  = await fetch(route('panel.manager.plans.show', id));
+        const res  = await fetch(route('manager.plans.show', id));
         const json = await res.json();
         plan.value = json.data;
     } finally {

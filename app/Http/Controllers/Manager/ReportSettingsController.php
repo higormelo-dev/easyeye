@@ -57,7 +57,7 @@ class ReportSettingsController extends Controller
                 'sort'        => $sort,
                 'direction'   => $direction,
             ],
-            'cardsUrl'       => route('panel.manager.report-settings.cards'),
+            'cardsUrl'       => route('manager.report-settings.cards'),
             't'              => trans('manager_report_settings'),
         ]);
     }
@@ -110,7 +110,7 @@ class ReportSettingsController extends Controller
         }
 
         return redirect()
-            ->route('panel.manager.report-settings.index')
+            ->route('manager.report-settings.index')
             ->with('message', __('actions.report_settings.saved'));
     }
 
@@ -127,7 +127,7 @@ class ReportSettingsController extends Controller
         }
 
         return redirect()
-            ->route('panel.manager.report-settings.index')
+            ->route('manager.report-settings.index')
             ->with('message', __('actions.report_settings.updated'));
     }
 
@@ -140,7 +140,7 @@ class ReportSettingsController extends Controller
         }
 
         return redirect()
-            ->route('panel.manager.report-settings.index')
+            ->route('manager.report-settings.index')
             ->with('message', __('actions.report_settings.deleted'));
     }
 
@@ -162,7 +162,7 @@ class ReportSettingsController extends Controller
         }
 
         return redirect()
-            ->route('panel.manager.report-settings.index')
+            ->route('manager.report-settings.index')
             ->with('message', __('actions.report_settings.published'));
     }
 
@@ -175,7 +175,7 @@ class ReportSettingsController extends Controller
         }
 
         return redirect()
-            ->route('panel.manager.report-settings.index')
+            ->route('manager.report-settings.index')
             ->with('message', __('actions.report_settings.archived'));
     }
 
@@ -196,9 +196,9 @@ class ReportSettingsController extends Controller
             'version'        => $r->version,
             'category'       => $r->category?->name,
             'adopted_count'  => $r->adopted_copies_count ?? 0,
-            'preview_url'    => route('panel.manager.report-settings.preview', $r),
-            'publish_url'    => route('panel.manager.report-settings.publish', $r),
-            'archive_url'    => route('panel.manager.report-settings.archive', $r),
+            'preview_url'    => route('manager.report-settings.preview', $r),
+            'publish_url'    => route('manager.report-settings.publish', $r),
+            'archive_url'    => route('manager.report-settings.archive', $r),
             ...ActionPolicy::forManager($r)->toArray(),
         ];
     }
@@ -218,9 +218,9 @@ class ReportSettingsController extends Controller
             'version'        => $r->version,
             'category'       => $r->category?->name,
             'adopted_count'  => $r->adopted_copies_count ?? 0,
-            'preview_url'    => route('panel.manager.report-settings.preview', $r),
-            'publish_url'    => route('panel.manager.report-settings.publish', $r),
-            'archive_url'    => route('panel.manager.report-settings.archive', $r),
+            'preview_url'    => route('manager.report-settings.preview', $r),
+            'publish_url'    => route('manager.report-settings.publish', $r),
+            'archive_url'    => route('manager.report-settings.archive', $r),
             ...ActionPolicy::forManager($r)->toArray(),
         ];
     }

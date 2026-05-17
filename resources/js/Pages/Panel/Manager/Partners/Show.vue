@@ -78,7 +78,7 @@ async function payCommission(commission) {
 // ── Pagination ────────────────────────────────────────────────────────────────
 function goLeadsPage(page) {
     router.get(
-        route('panel.manager.partners.show', props.partner.id),
+        route('manager.partners.show', props.partner.id),
         { leads_page: page, commissions_page: props.commissions.meta?.current_page ?? 1 },
         { preserveState: true, preserveScroll: true },
     );
@@ -87,7 +87,7 @@ function goLeadsPage(page) {
 
 function goCommissionsPage(page) {
     router.get(
-        route('panel.manager.partners.show', props.partner.id),
+        route('manager.partners.show', props.partner.id),
         { leads_page: props.leads.meta?.current_page ?? 1, commissions_page: page },
         { preserveState: true, preserveScroll: true },
     );
@@ -112,7 +112,7 @@ function showToast(msg, type = 'success') {
 
 const breadcrumbs = computed(() => [
     { label: props.t.breadcrumb_home    ?? 'Dashboard', url: route('panel.dashboard'), active: false },
-    { label: props.t.breadcrumb_current ?? 'Parceiros', url: route('panel.manager.partners.index'), active: false },
+    { label: props.t.breadcrumb_current ?? 'Parceiros', url: route('manager.partners.index'), active: false },
     { label: props.partner.name,                        url: '#', active: true },
 ]);
 </script>
@@ -139,7 +139,7 @@ const breadcrumbs = computed(() => [
                     <div class="text-muted small mt-1">{{ partner.email }}</div>
                 </div>
                 <div class="d-flex gap-2">
-                    <a :href="route('panel.manager.partners.index')" class="btn btn-outline-secondary btn-sm">
+                    <a :href="route('manager.partners.index')" class="btn btn-outline-secondary btn-sm">
                         <i class="ti ti-arrow-left me-1"></i>{{ t.back }}
                     </a>
                     <button type="button" class="btn btn-primary btn-sm" @click="formOpen = true">

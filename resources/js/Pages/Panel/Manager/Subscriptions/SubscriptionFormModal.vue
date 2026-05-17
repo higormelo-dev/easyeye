@@ -26,7 +26,7 @@ function resetForm() {
 async function loadData(id) {
     loading.value = true;
     try {
-        const res  = await fetch(route('panel.manager.subscriptions.show', id));
+        const res  = await fetch(route('manager.subscriptions.show', id));
         const json = await res.json();
         const d    = json.data;
         form.value = {
@@ -49,7 +49,7 @@ async function submit() {
     saving.value = true;
     errors.value = {};
     try {
-        const res = await fetch(route('panel.manager.subscriptions.update', props.subscriptionId), {
+        const res = await fetch(route('manager.subscriptions.update', props.subscriptionId), {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',

@@ -135,7 +135,7 @@ class PlansController extends Controller
             return response()->json(['message' => 'Plano criado com sucesso.', 'data' => $plan->load('features')], 201);
         }
 
-        return redirect()->route('panel.manager.plans.index')
+        return redirect()->route('manager.plans.index')
             ->with('success', 'Plano criado com sucesso.');
     }
 
@@ -150,7 +150,7 @@ class PlansController extends Controller
                 return response()->json(['message' => 'Status do plano atualizado.']);
             }
 
-            return redirect()->route('panel.manager.plans.index')
+            return redirect()->route('manager.plans.index')
                 ->with('success', 'Status do plano atualizado.');
         }
 
@@ -170,7 +170,7 @@ class PlansController extends Controller
             return response()->json(['message' => 'Plano atualizado com sucesso.', 'data' => $plan->fresh('features')]);
         }
 
-        return redirect()->route('panel.manager.plans.index')
+        return redirect()->route('manager.plans.index')
             ->with('success', 'Plano atualizado com sucesso.');
     }
 
@@ -182,7 +182,7 @@ class PlansController extends Controller
             return response()->json(['message' => 'Plano removido com sucesso.']);
         }
 
-        return redirect()->route('panel.manager.plans.index')
+        return redirect()->route('manager.plans.index')
             ->with('success', 'Plano removido com sucesso.');
     }
 

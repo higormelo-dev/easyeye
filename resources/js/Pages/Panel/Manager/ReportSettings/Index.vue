@@ -35,7 +35,7 @@ function applyFilters() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
         router.get(
-            route('panel.manager.report-settings.index'),
+            route('manager.report-settings.index'),
             {
                 search:      search.value,
                 status:      statusFilter.value,
@@ -54,7 +54,7 @@ watch(categoryFilter, applyFilters);
 
 function onSort({ sort, direction }) {
     router.get(
-        route('panel.manager.report-settings.index'),
+        route('manager.report-settings.index'),
         {
             search:      search.value,
             status:      statusFilter.value,
@@ -97,7 +97,7 @@ async function onArchive(r) {
 async function onDelete(r) {
     if (!confirm(props.t.confirm_delete)) return;
 
-    const res = await fetch(route('panel.manager.report-settings.destroy', r.id), {
+    const res = await fetch(route('manager.report-settings.destroy', r.id), {
         method: 'DELETE',
         headers: {
             'Accept':       'application/json',

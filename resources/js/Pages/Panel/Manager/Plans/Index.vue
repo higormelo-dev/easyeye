@@ -30,7 +30,7 @@ watch(search, (val) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
         router.get(
-            route('panel.manager.plans.index'),
+            route('manager.plans.index'),
             { search: val, sort: props.filters.sort, direction: props.filters.direction },
             { preserveState: true, preserveScroll: true, replace: true },
         );
@@ -39,7 +39,7 @@ watch(search, (val) => {
 
 function onSort({ sort, direction }) {
     router.get(
-        route('panel.manager.plans.index'),
+        route('manager.plans.index'),
         { search: search.value, sort, direction },
         { preserveState: true, preserveScroll: true },
     );
@@ -63,12 +63,12 @@ function closeDetail()  { detailOpen.value = false; detailId.value = null; }
 // ── Actions ───────────────────────────────────────────────────────────────────
 function onDelete(id) {
     if (!confirm(props.t.confirm_delete ?? 'Tem certeza?')) return;
-    router.delete(route('panel.manager.plans.destroy', id), { preserveScroll: true });
+    router.delete(route('manager.plans.destroy', id), { preserveScroll: true });
 }
 
 function onToggleActive(id, currentActive) {
     router.put(
-        route('panel.manager.plans.update', id),
+        route('manager.plans.update', id),
         { active: !currentActive },
         { preserveScroll: true },
     );
@@ -122,7 +122,7 @@ const breadcrumbs = [
             />
             <PlanCards
                 v-else
-                :cards-url="route('panel.manager.plans.cards')"
+                :cards-url="route('manager.plans.cards')"
                 :initial-search="search"
                 :t="t"
                 @view="openDetail"

@@ -110,7 +110,7 @@ class EntityIntegratorsDataTable extends BaseDataTable
         }
 
         $equipmentsItem = $record->equipments_count > 0
-            ? '<li><a class="dropdown-item" href="' . route('panel.manager.entities.user-integrators.integrators.equipments.index', [$this->entityId, $this->userIntegratorId, $record->id]) . '">
+            ? '<li><a class="dropdown-item" href="' . route('manager.entities.user-integrators.integrators.equipments.index', [$this->entityId, $this->userIntegratorId, $record->id]) . '">
                 <i class="ti ti-settings me-1"></i>' . __('actions.equipments') . '</a></li>'
             : '<li><span class="dropdown-item text-muted disabled" aria-disabled="true">
                 <i class="ti ti-settings me-1"></i>' . __('actions.equipments') . '</span></li>';

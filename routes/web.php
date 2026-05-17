@@ -32,7 +32,6 @@ use App\Http\Controllers\{
     SubscriptionExpiredController,
 };
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
-use App\Http\Controllers\Manager\ManagerDashboardController;
 use App\Http\Controllers\PanelDashboardController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
@@ -94,9 +93,10 @@ Route::group(
         Route::get('/', function () {
             return redirect()->route('panel.dashboard');
         });
+        // Dashboard exclusivo para clínicas (usuários SaaS são redirecionados para /panel/manager/dashboard)
         Route::get('/dashboard', function (Request $request) {
             if (! session()->get('selected_entity_is_client')) {
-                return app()->call(ManagerDashboardController::class);
+                return redirect()->route('manager.dashboard');
             }
 
             return app(PanelDashboardController::class)($request);
@@ -382,13 +382,12 @@ Route::group(
             });
         });
 
-        require __DIR__ . '/manager.php';
-
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
     },
 );
 
+require __DIR__ . '/manager.php';
 require __DIR__ . '/portal.php';
 require __DIR__ . '/auth.php';

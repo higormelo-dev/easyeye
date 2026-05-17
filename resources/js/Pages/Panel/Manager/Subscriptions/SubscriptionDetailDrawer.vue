@@ -33,7 +33,7 @@ async function loadDetail(id) {
     retriesLoaded.value  = false;
 
     try {
-        const res  = await fetch(route('panel.manager.subscriptions.show', id));
+        const res  = await fetch(route('manager.subscriptions.show', id));
         const json = await res.json();
         subscription.value = json.data;
     } finally {
@@ -45,7 +45,7 @@ async function loadInvoices() {
     if (invoicesLoaded.value) return;
     invoicesLoading.value = true;
     try {
-        const res  = await fetch(route('panel.manager.subscriptions.invoices', props.subscriptionId));
+        const res  = await fetch(route('manager.subscriptions.invoices', props.subscriptionId));
         const json = await res.json();
         invoices.value      = json.data ?? [];
         invoicesLoaded.value = true;
@@ -58,7 +58,7 @@ async function loadRetries() {
     if (retriesLoaded.value) return;
     retriesLoading.value = true;
     try {
-        const res  = await fetch(route('panel.manager.subscriptions.retries', props.subscriptionId));
+        const res  = await fetch(route('manager.subscriptions.retries', props.subscriptionId));
         const json = await res.json();
         retries.value      = json.data ?? [];
         retriesLoaded.value = true;

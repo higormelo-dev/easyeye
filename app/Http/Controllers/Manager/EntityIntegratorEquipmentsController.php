@@ -36,10 +36,10 @@ class EntityIntegratorEquipmentsController extends Controller
             'total'       => EntityIntegratorEquipment::where('integrator_id', $integratorModel->id)->count(),
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.entities'), 'url' => route('panel.manager.entities.index'), 'active' => false],
-                ['label' => __('actions.user_integrators'), 'url' => route('panel.manager.entities.user-integrators.index', $entityId), 'active' => false],
-                ['label' => __('actions.integrators'), 'url' => route('panel.manager.entities.user-integrators.integrators.index', [$entityId, $userIntegrator]), 'active' => false],
-                ['label' => $this->titleController, 'url' => route('panel.manager.entities.user-integrators.integrators.equipments.index', [$entityId, $userIntegrator, $integratorModel->id]), 'active' => false],
+                ['label' => __('actions.sidemenu.entities'), 'url' => route('manager.entities.index'), 'active' => false],
+                ['label' => __('actions.user_integrators'), 'url' => route('manager.entities.user-integrators.index', $entityId), 'active' => false],
+                ['label' => __('actions.integrators'), 'url' => route('manager.entities.user-integrators.integrators.index', [$entityId, $userIntegrator]), 'active' => false],
+                ['label' => $this->titleController, 'url' => route('manager.entities.user-integrators.integrators.equipments.index', [$entityId, $userIntegrator, $integratorModel->id]), 'active' => false],
                 ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
             ],
         ];

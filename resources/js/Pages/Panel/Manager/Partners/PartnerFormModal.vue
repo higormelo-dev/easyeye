@@ -77,7 +77,7 @@ async function submit() {
     saving.value = true;
     errors.value = {};
     try {
-        const url    = isEdit.value ? props.updateUrl : route('panel.manager.partners.store');
+        const url    = isEdit.value ? props.updateUrl : route('manager.partners.store');
         const method = isEdit.value ? 'PUT' : 'POST';
 
         const res = await fetch(url, {

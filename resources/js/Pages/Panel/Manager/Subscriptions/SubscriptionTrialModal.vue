@@ -24,7 +24,7 @@ async function submit() {
     saving.value = true;
     error.value  = '';
     try {
-        const res = await fetch(route('panel.manager.subscriptions.trial'), {
+        const res = await fetch(route('manager.subscriptions.trial'), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

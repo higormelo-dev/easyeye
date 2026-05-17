@@ -8,6 +8,7 @@ use App\Http\Controllers\Manager\{
     EntityUsersController,
     GatewaysController,
     ImpersonateController,
+    ManagerDashboardController,
     PartnersController,
     PlansController,
     ReportSettingsController,
@@ -15,46 +16,58 @@ use App\Http\Controllers\Manager\{
 };
 use Illuminate\Support\Facades\Route;
 
-Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
-    // ── Empresas ───────────────────────────────────────────────────────────
+// ── Painel administrativo do SaaS ─────────────────────────────────────────────
+// URL base : /panel/manager
+// Middleware: auth, verified, entity.selected, saas.admin, admin.audit, throttle:30,1
+// Nomes    : manager.*  (separados do panel.* das clínicas)
+// ─────────────────────────────────────────────────────────────────────────────
+Route::group([
+    'prefix'     => 'panel/manager',
+    'as'         => 'manager.',
+    'middleware' => ['auth', 'verified', 'entity.selected', 'saas.admin', 'admin.audit', 'throttle:30,1'],
+], static function () {
+
+    // ── Dashboard ──────────────────────────────────────────────────────────────
+    Route::get('/', fn () => redirect()->route('manager.dashboard'));
+    Route::get('/dashboard', ManagerDashboardController::class)->name('dashboard');
+
+    // ── Empresas (Clínicas) ────────────────────────────────────────────────────
     Route::get('entities/cards', [EntitiesController::class, 'cards'])->name('entities.cards');
     Route::get('entities/{entity}/edit-data', [EntitiesController::class, 'editData'])->name('entities.edit-data');
     Route::get('entities/{entity}/users', [EntityUsersController::class, 'index'])->name('entities.users');
     Route::resource('entities', EntitiesController::class)->except('create', 'edit');
 
-    // ── Usuários Integradores ──────────────────────────────────────────────
+    // ── Usuários Integradores ──────────────────────────────────────────────────
     Route::get('entities/{entity}/user-integrators/{userIntegrator}/edit-data', [EntityUserIntegratorsController::class, 'editData'])->name('entities.user-integrators.edit-data');
     Route::patch('entities/{entity}/user-integrators/{userIntegrator}/activate', [EntityUserIntegratorsController::class, 'activate'])->name('entities.user-integrators.activate');
     Route::put('entities/{entity}/user-integrators/{userIntegrator}/restore', [EntityUserIntegratorsController::class, 'restore'])->name('entities.user-integrators.restore');
     Route::resource('entities.user-integrators', EntityUserIntegratorsController::class)->except('create', 'edit');
 
-    // ── Integradores (sob Usuário Integrador) ─────────────────────────────
+    // ── Integradores (sob Usuário Integrador) ──────────────────────────────────
     Route::get('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/edit-data', [EntityIntegratorsController::class, 'editData'])->name('entities.user-integrators.integrators.edit-data');
     Route::patch('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/activate', [EntityIntegratorsController::class, 'activate'])->name('entities.user-integrators.integrators.activate');
     Route::put('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/restore', [EntityIntegratorsController::class, 'restore'])->name('entities.user-integrators.integrators.restore');
     Route::resource('entities.user-integrators.integrators', EntityIntegratorsController::class)->except('create', 'edit');
 
-    // ── Equipamentos ───────────────────────────────────────────────────────
+    // ── Equipamentos ───────────────────────────────────────────────────────────
     Route::resource('entities.user-integrators.integrators.equipments', EntityIntegratorEquipmentsController::class)->only('index', 'show');
 
-    // ── Impersonação ("usar como este") ────────────────────────────────────
-    Route::post('entities/{entity}/impersonate/{entityUser}', [ImpersonateController::class, 'store'])
-        ->name('entities.impersonate');
-    Route::delete('impersonate', [ImpersonateController::class, 'destroy'])
-        ->name('impersonate.destroy');
+    // ── Impersonação ───────────────────────────────────────────────────────────
+    Route::post('entities/{entity}/impersonate/{entityUser}', [ImpersonateController::class, 'store'])->name('entities.impersonate');
+    Route::delete('impersonate', [ImpersonateController::class, 'destroy'])->name('impersonate.destroy');
 
-    // ── Planos ─────────────────────────────────────────────────────────────
+    // ── Planos ─────────────────────────────────────────────────────────────────
     Route::get('plans/cards', [PlansController::class, 'cards'])->name('plans.cards');
     Route::resource('plans', PlansController::class)->except('create', 'edit');
 
-    // ── Parceiros ──────────────────────────────────────────────────────────
+    // ── Parceiros ──────────────────────────────────────────────────────────────
     Route::get('partners/{partner}/edit-data', [PartnersController::class, 'editData'])->name('partners.edit-data');
     Route::get('partners/{partner}', [PartnersController::class, 'show'])->name('partners.show');
     Route::patch('partners/{partner}/leads/{lead}/advance', [PartnersController::class, 'advanceLead'])->name('partners.leads.advance');
     Route::patch('partners/commissions/{commission}/pay', [PartnersController::class, 'payCommission'])->name('partners.commission.pay');
     Route::resource('partners', PartnersController::class)->except('create', 'edit', 'show');
 
-    // ── Gateways de Pagamento ──────────────────────────────────────────────
+    // ── Gateways de Pagamento ──────────────────────────────────────────────────
     Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');
     Route::patch('gateways/{gateway}/set-default', [GatewaysController::class, 'setDefault'])->name('gateways.set-default');
     Route::patch('gateways/{gateway}/toggle-active', [GatewaysController::class, 'toggleActive'])->name('gateways.toggle-active');
@@ -65,7 +78,7 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     Route::get('gateways/{gateway}/entity-access', [GatewaysController::class, 'entityAccess'])->name('gateways.entity-access');
     Route::patch('gateways/{gateway}/entity-access/{entity}', [GatewaysController::class, 'toggleEntityAccess'])->name('gateways.entity-access.toggle');
 
-    // ── Assinaturas ────────────────────────────────────────────────────────
+    // ── Assinaturas ────────────────────────────────────────────────────────────
     Route::get('subscriptions/cards', [SubscriptionsController::class, 'cards'])->name('subscriptions.cards');
     Route::post('subscriptions/activate', [SubscriptionsController::class, 'activate'])->name('subscriptions.activate');
     Route::post('subscriptions/trial', [SubscriptionsController::class, 'startTrial'])->name('subscriptions.trial');
@@ -76,7 +89,7 @@ Route::group(['prefix' => 'manager', 'as' => 'manager.'], static function () {
     Route::get('subscriptions/{subscription}/retries', [SubscriptionsController::class, 'retries'])->name('subscriptions.retries');
     Route::resource('subscriptions', SubscriptionsController::class)->only('index', 'show', 'update');
 
-    // ── Modelos de Documento Globais ────────────────────────────────────────
+    // ── Modelos de Documento Globais ───────────────────────────────────────────
     Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
     Route::get('report-settings/{report_setting}/show-data', [ReportSettingsController::class, 'show'])->name('report-settings.show');
     Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');

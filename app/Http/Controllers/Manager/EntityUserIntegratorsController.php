@@ -32,7 +32,7 @@ class EntityUserIntegratorsController extends Controller
             'breadcrumb_title' => false,
             'breadcrumbs'      => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Empresas', 'url' => route('panel.manager.entities.index'), 'active' => false],
+                ['label' => 'Empresas', 'url' => route('manager.entities.index'), 'active' => false],
                 ['label' => $entityModel->name, 'url' => 'javascript:void(0);', 'active' => false],
                 ['label' => $this->titleController, 'url' => 'javascript:void(0);', 'active' => true],
             ],

@@ -18,7 +18,7 @@ const { tx } = useTrans(() => props.t);
 async function loadDetail(id) {
     loading.value = true; entity.value = null;
     try {
-        const res  = await fetch(route('panel.manager.entities.show', id));
+        const res  = await fetch(route('manager.entities.show', id));
         const json = await res.json();
         entity.value = json.data;
     } finally {

@@ -33,6 +33,7 @@
         "@tabler/icons-webfont": "^3.41.0",
         "@vitejs/plugin-vue": "^6.0.7",
         "bootstrap": "^5.3.8",
+        "chart.js": "^4.5.1",
         "datatables.net": "~2.3",
         "datatables.net-bs5": "~2.3",
         "datatables.net-responsive": "~3.0",

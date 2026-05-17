@@ -60,7 +60,7 @@ function resetForm() {
 async function loadRecord(id) {
     loading.value = true;
     try {
-        const res  = await fetch(route('panel.manager.report-settings.show', id));
+        const res  = await fetch(route('manager.report-settings.show', id));
         const json = await res.json();
         const d    = json.data;
         form.value = {
@@ -106,8 +106,8 @@ async function submit() {
     errors.value = {};
     try {
         const url    = isEdit.value
-            ? route('panel.manager.report-settings.update', props.recordId)
-            : route('panel.manager.report-settings.store');
+            ? route('manager.report-settings.update', props.recordId)
+            : route('manager.report-settings.store');
         const method = isEdit.value ? 'PUT' : 'POST';
 
         const res = await fetch(url, {

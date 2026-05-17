@@ -109,7 +109,7 @@ class ImpersonateController extends Controller
         session()->forget('impersonating');
 
         return redirect()
-            ->route('panel.manager.entities.index')
+            ->route('manager.entities.index')
             ->with('success', __('actions.impersonate.ended'));
     }
 }

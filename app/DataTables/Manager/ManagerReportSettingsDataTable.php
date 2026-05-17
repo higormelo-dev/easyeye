@@ -86,9 +86,9 @@ class ManagerReportSettingsDataTable extends BaseDataTable
 
     private function buildManagerActionButtons(ReportSetting $record): string
     {
-        $editUrl    = route('panel.manager.report-settings.edit', $record);
-        $previewUrl = route('panel.manager.report-settings.preview', $record);
-        $deleteUrl  = route('panel.manager.report-settings.destroy', $record);
+        $editUrl    = route('manager.report-settings.edit', $record);
+        $previewUrl = route('manager.report-settings.preview', $record);
+        $deleteUrl  = route('manager.report-settings.destroy', $record);
 
         return '
             <div class="d-flex justify-content-end gap-1">

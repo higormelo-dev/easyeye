@@ -72,7 +72,7 @@ class GatewaysController extends Controller
                 'valid_to'   => $c->valid_to?->format('d/m/Y'),
                 'created_at' => $c->created_at->format('d/m/Y H:i'),
                 'has_secret' => ! empty($c->credentials),
-                'revoke_url' => route('panel.manager.gateways.credentials.revoke', [$gateway, $c]),
+                'revoke_url' => route('manager.gateways.credentials.revoke', [$gateway, $c]),
             ]);
 
         return response()->json(['data' => $credentials]);
@@ -171,7 +171,7 @@ class GatewaysController extends Controller
             'code'       => $e->code,
             'name'       => $e->name,
             'enabled'    => $accessMap->get((string) $e->id, false),
-            'toggle_url' => route('panel.manager.gateways.entity-access.toggle', [$gateway, $e]),
+            'toggle_url' => route('manager.gateways.entity-access.toggle', [$gateway, $e]),
         ]);
 
         return response()->json(['data' => $data]);
@@ -227,12 +227,12 @@ class GatewaysController extends Controller
                 : null,
             'can_be_default'             => (bool) $g->active && $credCount > 0,
             // Route URLs
-            'set_default_url'       => route('panel.manager.gateways.set-default',    $g),
-            'toggle_active_url'     => route('panel.manager.gateways.toggle-active',  $g),
-            'priority_url'          => route('panel.manager.gateways.priority',        $g),
-            'credentials_url'       => route('panel.manager.gateways.credentials',     $g),
-            'credentials_store_url' => route('panel.manager.gateways.credentials.store', $g),
-            'entity_access_url'     => route('panel.manager.gateways.entity-access',   $g),
+            'set_default_url'       => route('manager.gateways.set-default',    $g),
+            'toggle_active_url'     => route('manager.gateways.toggle-active',  $g),
+            'priority_url'          => route('manager.gateways.priority',        $g),
+            'credentials_url'       => route('manager.gateways.credentials',     $g),
+            'credentials_store_url' => route('manager.gateways.credentials.store', $g),
+            'entity_access_url'     => route('manager.gateways.entity-access',   $g),
         ];
     }
 }

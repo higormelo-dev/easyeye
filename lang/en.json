@@ -305,5 +305,30 @@
     "manager_dashboard.commissions_pending": "Pending Commissions",
     "manager_dashboard.leads_funnel": "Leads Funnel",
     "manager_dashboard.referral_codes": "Active Referral Codes",
-    "manager_dashboard.referral_events": "Referral Events"
+    "manager_dashboard.referral_events": "Referral Events",
+
+    "manager_dashboard.kpi_arr": "Estimated ARR",
+    "manager_dashboard.kpi_arpu": "ARPU",
+    "manager_dashboard.kpi_churn_rate": "Churn Rate (month)",
+    "manager_dashboard.kpi_revenue_at_risk": "Revenue at Risk",
+    "manager_dashboard.active_subs": "active subscriptions",
+    "manager_dashboard.cancelled_this_month": "cancellations/month",
+    "manager_dashboard.all_clear": "All clear",
+
+    "manager_dashboard.chart_mrr_trend": "MRR — 12-Month Trend",
+    "manager_dashboard.chart_mrr_label": "Estimated MRR (R$)",
+
+    "manager_dashboard.conversion_funnel_title": "Conversion Funnel",
+    "manager_dashboard.last_90d": "Last 90 days",
+    "manager_dashboard.funnel_leads": "Leads",
+    "manager_dashboard.funnel_trials": "Trials",
+    "manager_dashboard.funnel_active": "Paid (Active)",
+    "manager_dashboard.funnel_base": "base",
+    "manager_dashboard.funnel_converted": "converted",
+    "manager_dashboard.funnel_from_leads": "of leads",
+    "manager_dashboard.funnel_from_trials": "of trials",
+    "manager_dashboard.conv_90d_title": "Conversion — ended trials (90d)",
+    "manager_dashboard.conv_trials_ended": "Ended trials",
+    "manager_dashboard.conv_converted": "Converted",
+    "manager_dashboard.conv_rate": "Rate"
 }

@@ -10,9 +10,11 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     EnsureEntityRole,
     EnsureEntitySelected,
     EnsureIsPartner,
+    EnsureSaasAdmin,
     EnsureUserBelongsToEntity,
     HandleImpersonation,
     HandleInertiaRequests,
+    LogAdminAccess,
     ParseMultipartFormData,
     RequireTermsAcceptance,
     SetLocale};
@@ -46,6 +48,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api.plan'             => ApiCheckPlanAccess::class,
             'terms.accepted'       => RequireTermsAcceptance::class,
             'partner'              => EnsureIsPartner::class,
+            'saas.admin'           => EnsureSaasAdmin::class,
+            'admin.audit'          => LogAdminAccess::class,
         ]);
 
         // Adiciona o SetLocale, HandleImpersonation e HandleInertiaRequests ao grupo web

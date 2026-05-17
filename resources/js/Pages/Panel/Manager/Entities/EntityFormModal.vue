@@ -32,7 +32,7 @@ function resetForm() {
 async function loadEditData(id) {
     loading.value = true;
     try {
-        const res  = await fetch(route('panel.manager.entities.edit-data', id));
+        const res  = await fetch(route('manager.entities.edit-data', id));
         const json = await res.json();
         Object.keys(form).forEach(k => { if (k in json.data && json.data[k] !== null) form[k] = json.data[k]; });
     } finally {
@@ -47,8 +47,8 @@ watch(() => props.open, async (val) => {
 function submit() {
     const opts = { preserveScroll: true, onSuccess: () => emit('close') };
     isEdit.value
-        ? form.put(route('panel.manager.entities.update', props.entityId), opts)
-        : form.post(route('panel.manager.entities.store'), opts);
+        ? form.put(route('manager.entities.update', props.entityId), opts)
+        : form.post(route('manager.entities.store'), opts);
 }
 
 async function lookupCep() {
