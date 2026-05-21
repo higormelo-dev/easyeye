@@ -10,6 +10,7 @@ import SubscriptionDetailDrawer from './SubscriptionDetailDrawer.vue';
 import SubscriptionFormModal   from './SubscriptionFormModal.vue';
 import SubscriptionActivateModal from './SubscriptionActivateModal.vue';
 import SubscriptionTrialModal  from './SubscriptionTrialModal.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 
 const props = defineProps({
     subscriptions: { type: Object, required: true },
@@ -79,57 +80,102 @@ const trialSubscription = ref(null);
 function openTrial(s) { trialSubscription.value = s; trialOpen.value = true; }
 function closeTrial()  { trialOpen.value = false; trialSubscription.value = null; }
 
-// ── Cancel ────────────────────────────────────────────────────────────────────
-async function onCancel(s) {
-    if (!confirm(
-        `${props.t.confirm_cancel_title}\n\n${props.t.confirm_cancel_text}`
-    )) return;
+// ── Reason confirmation modal ──────────────────────────────────────────────────
+// Pattern: ações destrutivas abrem este modal genérico (com textarea para reason);
+// no @confirm enviamos o body com reason incluída.
+const reasonModal = ref({
+    open:     false,
+    saving:   false,
+    title:    '',
+    message:  '',
+    confirmLabel: '',
+    confirmVariant: 'danger',
+    onConfirm: null,           // (reason: string) => Promise<void>
+});
 
-    const res = await fetch(route('manager.subscriptions.cancel'), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-            'Accept': 'application/json',
-        },
-        body: JSON.stringify({ entity_id: s.entity_id }),
-    });
+function openReasonModal(config) {
+    reasonModal.value = {
+        open:     true,
+        saving:   false,
+        title:    config.title    ?? '',
+        message:  config.message  ?? '',
+        confirmLabel: config.confirmLabel ?? '',
+        confirmVariant: config.confirmVariant ?? 'danger',
+        onConfirm: config.onConfirm,
+    };
+}
 
-    const json = await res.json();
-    if (res.ok) {
-        showToast(json.message, 'success');
-        router.reload({ only: ['subscriptions', 'total'] });
-    } else {
-        showToast(json.message ?? 'Erro', 'error');
+function closeReasonModal() {
+    if (reasonModal.value.saving) return;
+    reasonModal.value.open = false;
+}
+
+async function handleReasonConfirm(reason) {
+    if (!reasonModal.value.onConfirm) return;
+    reasonModal.value.saving = true;
+    try {
+        await reasonModal.value.onConfirm(reason);
+        reasonModal.value.open = false;
+    } finally {
+        reasonModal.value.saving = false;
     }
 }
 
-// ── Block / Unblock ───────────────────────────────────────────────────────────
-async function onBlock(s) {
-    const blocking = s.entity_active;
-    const msg      = blocking
-        ? `${props.t.confirm_block_title}\n\n${props.t.confirm_block_text}`
-        : `${props.t.confirm_unblock_title}\n\n${props.t.confirm_unblock_text}`;
+// ── Cancel ────────────────────────────────────────────────────────────────────
+function onCancel(s) {
+    openReasonModal({
+        title: props.t.confirm_cancel_title,
+        message: props.t.confirm_cancel_text,
+        confirmVariant: 'danger',
+        async onConfirm(reason) {
+            const res = await fetch(route('manager.subscriptions.cancel'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ entity_id: s.entity_id, reason }),
+            });
 
-    if (!confirm(msg)) return;
-
-    const res = await fetch(route('manager.subscriptions.block-access'), {
-        method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-            'Accept': 'application/json',
+            const json = await res.json();
+            if (res.ok) {
+                showToast(json.message, 'success');
+                router.reload({ only: ['subscriptions', 'total'] });
+            } else {
+                showToast(json.message ?? 'Erro', 'error');
+            }
         },
-        body: JSON.stringify({ entity_id: s.entity_id, active: !blocking }),
     });
+}
 
-    const json = await res.json();
-    if (res.ok) {
-        showToast(json.message, 'success');
-        router.reload({ only: ['subscriptions', 'total'] });
-    } else {
-        showToast(json.message ?? 'Erro', 'error');
-    }
+// ── Block / Unblock ───────────────────────────────────────────────────────────
+function onBlock(s) {
+    const blocking = s.entity_active;
+    openReasonModal({
+        title: blocking ? props.t.confirm_block_title   : props.t.confirm_unblock_title,
+        message: blocking ? props.t.confirm_block_text  : props.t.confirm_unblock_text,
+        confirmVariant: blocking ? 'danger' : 'warning',
+        async onConfirm(reason) {
+            const res = await fetch(route('manager.subscriptions.block-access'), {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ entity_id: s.entity_id, active: !blocking, reason }),
+            });
+
+            const json = await res.json();
+            if (res.ok) {
+                showToast(json.message, 'success');
+                router.reload({ only: ['subscriptions', 'total'] });
+            } else {
+                showToast(json.message ?? 'Erro', 'error');
+            }
+        },
+    });
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
@@ -178,10 +224,10 @@ const breadcrumbs = [
             <PageHeader
                 :title="t.page_title"
                 :total="total"
-                :total-label="t.total_label"
                 :view="view"
                 :view-table-title="t.view_table"
                 :view-cards-title="t.view_cards"
+                :show-view-toggle="true"
                 @set-view="setView"
             />
 
@@ -295,6 +341,18 @@ const breadcrumbs = [
             :t="t"
             @close="closeTrial"
             @saved="closeTrial"
+        />
+
+        <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-label="reasonModal.confirmLabel"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
         />
 
     </AppLayout>

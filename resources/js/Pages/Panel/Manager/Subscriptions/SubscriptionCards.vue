@@ -4,6 +4,9 @@ import { router } from '@inertiajs/vue3';
 import LoadingSpinner    from '@/Components/Panel/LoadingSpinner.vue';
 import BillingStateBadge from '@/Components/Panel/BillingStateBadge.vue';
 import CardsPagination   from '@/Components/Panel/CardsPagination.vue';
+import ActionDropdown    from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup   from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -118,49 +121,46 @@ defineExpose({ fetchCards });
                     <hr class="my-2">
 
                     <!-- Ações -->
-                    <div class="d-flex justify-content-end gap-1">
-                        <button
-                            class="btn btn-xs btn-outline-secondary"
+                    <ActionIconGroup align="end" gap="tight">
+                        <ActionIconButton
+                            icon="ti ti-eye"
                             :title="t.action_view"
                             @click="$emit('view', s.id)"
-                        ><i class="ti ti-eye"></i></button>
-
-                        <button
-                            class="btn btn-xs btn-outline-secondary"
+                        />
+                        <ActionIconButton
+                            icon="ti ti-edit"
                             :title="t.action_edit"
                             @click="$emit('edit', s.id)"
-                        ><i class="ti ti-edit"></i></button>
-
-                        <div class="dropdown">
-                            <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="dropdown">
-                                <i class="ti ti-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end p-2" style="min-width:180px;">
-                                <li>
-                                    <button class="dropdown-item rounded-1 text-success" @click="$emit('activate', s)">
-                                        <i class="ti ti-player-play me-1"></i> {{ t.action_activate }}
-                                    </button>
-                                </li>
-                                <li>
-                                    <button class="dropdown-item rounded-1 text-info" @click="$emit('trial', s)">
-                                        <i class="ti ti-clock-play me-1"></i> {{ t.action_trial }}
-                                    </button>
-                                </li>
-                                <li v-if="s.is_accessible">
-                                    <button class="dropdown-item rounded-1 text-warning" @click="$emit('cancel', s)">
-                                        <i class="ti ti-ban me-1"></i> {{ t.action_cancel }}
-                                    </button>
-                                </li>
-                                <li><hr class="dropdown-divider my-1"></li>
-                                <li>
-                                    <button class="dropdown-item rounded-1" @click="$emit('block', s)">
-                                        <i :class="`ti me-1 ${s.entity_active ? 'ti-lock' : 'ti-lock-open'}`"></i>
-                                        {{ s.entity_active ? t.action_block : t.action_unblock }}
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                        />
+                        <ActionDropdown
+                            :min-width="180"
+                            btn-class="ee-action-icon ee-action-icon--default"
+                            icon="ti ti-dots-vertical"
+                        >
+                            <li>
+                                <button class="dropdown-item rounded-1 text-success" @click="$emit('activate', s)">
+                                    <i class="ti ti-player-play me-1"></i> {{ t.action_activate }}
+                                </button>
+                            </li>
+                            <li>
+                                <button class="dropdown-item rounded-1 text-info" @click="$emit('trial', s)">
+                                    <i class="ti ti-clock-play me-1"></i> {{ t.action_trial }}
+                                </button>
+                            </li>
+                            <li v-if="s.is_accessible">
+                                <button class="dropdown-item rounded-1 text-warning" @click="$emit('cancel', s)">
+                                    <i class="ti ti-ban me-1"></i> {{ t.action_cancel }}
+                                </button>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li>
+                                <button class="dropdown-item rounded-1" @click="$emit('block', s)">
+                                    <i :class="`ti me-1 ${s.entity_active ? 'ti-lock' : 'ti-lock-open'}`"></i>
+                                    {{ s.entity_active ? t.action_block : t.action_unblock }}
+                                </button>
+                            </li>
+                        </ActionDropdown>
+                    </ActionIconGroup>
                 </div>
             </div>
         </div>

@@ -2,50 +2,61 @@
 
 namespace App\Http\Controllers\Setting;
 
-use App\DataTables\ReportSettingsDataTable;
 use App\DTOs\ActionPolicy;
 use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
 use App\Http\Controllers\Controller;
 use App\Models\{ReportCategory, ReportSetting};
 use App\Services\ReportSettingService;
-use Illuminate\Contracts\View\{Factory, View};
-use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class ReportSettingsController extends Controller
 {
     public function __construct(
-        private readonly ReportSettingsDataTable $dataTable,
         private readonly ReportSettingService $service,
     ) {
     }
 
-    /**
-     * List all templates for the selected entity.
-     */
-    public function index(): mixed
+    public function index(): InertiaResponse
     {
-        $entityId = session('selected_entity_id');
-        $this->service->adoptPublishedGlobalsForEntity((string) $entityId);
-        $total      = ReportSetting::forEntity($entityId)->count();
-        $categories = ReportCategory::active()->ordered()->get();
+        $entityId = (string) session('selected_entity_id');
+        $this->service->adoptPublishedGlobalsForEntity($entityId);
 
-        $globalTemplates = $this->service->getPublishedGlobalTemplates();
+        $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
-        $meta = [
-            'title'            => __('actions.report_settings.title'),
-            'total'            => $total,
-            'cardsUrl'         => route('panel.setting.report-settings.cards'),
-            'breadcrumb_title' => false,
-            'isManager'        => false,
-            'breadcrumbs'      => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.settings'), 'url' => 'javascript:void(0);', 'active' => false],
-                ['label' => __('actions.report_settings.title'), 'url' => route('panel.setting.report-settings.index'), 'active' => true],
+        $records = ReportSetting::forEntity($entityId)
+            ->with('category')
+            ->orderBy('title')
+            ->get();
+
+        return Inertia::render('Panel/Settings/ReportSettings/Index', [
+            'breadcrumbs' => [
+                ['label' => __('actions.sidemenu.dashboard'),     'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.settings'),      'url' => '#',                     'active' => false],
+                ['label' => __('actions.report_settings.title'),  'url' => '#',                     'active' => true],
             ],
-        ];
-
-        return $this->dataTable->render('system.report_settings.index', compact('meta', 'categories', 'globalTemplates'));
+            'categories' => $categories,
+            'items'      => $records->map(fn (ReportSetting $r) => array_merge([
+                'id'             => (string) $r->id,
+                'title'          => $r->title,
+                'description'    => $r->description,
+                'paper_size'     => $r->paper_size instanceof \BackedEnum ? $r->paper_size->value : (string) $r->paper_size,
+                'show_header'    => (bool) $r->show_header,
+                'show_signature' => (bool) $r->show_signature,
+                'show_footer'    => (bool) $r->show_footer,
+                'is_adopted'     => $r->isAdopted(),
+                'has_update'     => $r->hasUpdateAvailable(),
+                'source_version' => $r->source_version,
+                'category'       => $r->category?->name,
+                'preview_url'    => route('panel.setting.report-settings.preview', $r),
+                'edit_url'       => route('panel.setting.report-settings.edit', $r),
+                'destroy_url'    => route('panel.setting.report-settings.destroy', $r),
+                'reimport_url'   => $r->isAdopted() ? route('panel.setting.report-settings.reimport', $r) : null,
+            ], ActionPolicy::from($r, $entityId)->toArray())),
+            'urls' => [
+                'create' => route('panel.setting.report-settings.create'),
+            ],
+        ]);
     }
 
     /**
@@ -92,15 +103,22 @@ class ReportSettingsController extends Controller
         ]);
     }
 
-    /**
-     * Show the form to create a new template.
-     */
-    public function create(): Factory|Application|View
+    public function create(): InertiaResponse
     {
-        $categories = ReportCategory::active()->ordered()->get();
-        $meta       = $this->buildMeta(__('actions.report_settings.create'));
+        $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
-        return view('system.report_settings.form', compact('meta', 'categories'));
+        return Inertia::render('Panel/Settings/ReportSettings/Form', [
+            'breadcrumbs'    => $this->buildBreadcrumbs(__('actions.report_settings.create')),
+            'mode'           => 'create',
+            'reportSetting'  => null,
+            'categories'     => $categories,
+            'paper_sizes'    => array_map(fn (string $v) => ['value' => $v, 'label' => $v], PaperSize::values()),
+            'documentation_types' => array_map(fn (string $v) => ['value' => $v, 'label' => $v], DocumentationType::values()),
+            'urls' => [
+                'store' => route('panel.setting.report-settings.store'),
+                'index' => route('panel.setting.report-settings.index'),
+            ],
+        ]);
     }
 
     /**
@@ -171,16 +189,57 @@ class ReportSettingsController extends Controller
         ]);
     }
 
-    /**
-     * Show form for editing a template.
-     */
-    public function edit(ReportSetting $reportSetting): Factory|Application|View
+    public function edit(ReportSetting $reportSetting): InertiaResponse
     {
         $reportSetting->load('contents.variables');
-        $categories = ReportCategory::active()->ordered()->get();
-        $meta       = $this->buildMeta(__('actions.report_settings.edit'));
+        $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
-        return view('system.report_settings.form', compact('meta', 'reportSetting', 'categories'));
+        return Inertia::render('Panel/Settings/ReportSettings/Form', [
+            'breadcrumbs'   => $this->buildBreadcrumbs(__('actions.report_settings.edit')),
+            'mode'          => 'edit',
+            'reportSetting' => [
+                'id'                 => (string) $reportSetting->id,
+                'title'              => $reportSetting->title,
+                'description'        => $reportSetting->description,
+                'report_category_id' => $reportSetting->report_category_id,
+                'paper_size'         => $reportSetting->paper_size instanceof \BackedEnum
+                    ? $reportSetting->paper_size->value : (string) $reportSetting->paper_size,
+                'font_family'   => $reportSetting->font_family,
+                'font_size'     => $reportSetting->font_size,
+                'margin_top'    => (float) $reportSetting->margin_top,
+                'margin_right'  => (float) $reportSetting->margin_right,
+                'margin_bottom' => (float) $reportSetting->margin_bottom,
+                'margin_left'   => (float) $reportSetting->margin_left,
+                'show_header'         => (bool) $reportSetting->show_header,
+                'header_show_logo'    => (bool) $reportSetting->header_show_logo,
+                'header_show_name'    => (bool) $reportSetting->header_show_name,
+                'header_show_address' => (bool) $reportSetting->header_show_address,
+                'header_show_phone'   => (bool) $reportSetting->header_show_phone,
+                'show_signature'      => (bool) $reportSetting->show_signature,
+                'signature_show_name' => (bool) $reportSetting->signature_show_name,
+                'signature_show_crm'  => (bool) $reportSetting->signature_show_crm,
+                'signature_show_rqe'  => (bool) $reportSetting->signature_show_rqe,
+                'show_footer'         => (bool) $reportSetting->show_footer,
+                'footer_text'         => $reportSetting->footer_text,
+                'footer_show_address' => (bool) $reportSetting->footer_show_address,
+                'footer_show_phone'   => (bool) $reportSetting->footer_show_phone,
+                'active'              => (bool) $reportSetting->active,
+                'contents'            => $reportSetting->contents->map(fn ($c) => [
+                    'id'      => $c->id,
+                    'type'    => $c->type instanceof \BackedEnum ? $c->type->value : (string) $c->type,
+                    'label'   => $c->label,
+                    'content' => $c->content,
+                    'active'  => (bool) $c->active,
+                ])->values(),
+            ],
+            'categories'          => $categories,
+            'paper_sizes'         => array_map(fn (string $v) => ['value' => $v, 'label' => $v], PaperSize::values()),
+            'documentation_types' => array_map(fn (string $v) => ['value' => $v, 'label' => $v], DocumentationType::values()),
+            'urls' => [
+                'update' => route('panel.setting.report-settings.update', $reportSetting),
+                'index'  => route('panel.setting.report-settings.index'),
+            ],
+        ]);
     }
 
     /**
@@ -278,17 +337,13 @@ class ReportSettingsController extends Controller
         ]);
     }
 
-    private function buildMeta(string $pageTitle): array
+    private function buildBreadcrumbs(string $pageTitle): array
     {
         return [
-            'title'       => $pageTitle,
-            'action'      => $pageTitle,
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.settings'), 'url' => 'javascript:void(0);', 'active' => false],
-                ['label' => __('actions.report_settings.title'), 'url' => route('panel.setting.report-settings.index'), 'active' => false],
-                ['label' => $pageTitle, 'url' => 'javascript:void(0);', 'active' => true],
-            ],
+            ['label' => __('actions.sidemenu.dashboard'),     'url' => route('panel.dashboard'),                          'active' => false],
+            ['label' => __('actions.sidemenu.settings'),      'url' => '#',                                                'active' => false],
+            ['label' => __('actions.report_settings.title'),  'url' => route('panel.setting.report-settings.index'),       'active' => false],
+            ['label' => $pageTitle,                           'url' => '#',                                                'active' => true],
         ];
     }
 

@@ -14,8 +14,14 @@
         font-size: {{ $setting->font_size ?? 11 }}pt;
         color: #1a1a1a;
         line-height: 1.55;
+        /*
+           Signature agora está em fluxo normal (não-fixed) — não precisamos
+           reservar 130px de padding-bottom. O margin-bottom configurado já
+           cobre o espaço necessário; o --footer-html (wkhtmltopdf option)
+           renderiza no espaço de margem inferior reservado pelo PDF engine.
+        */
         padding: {{ $setting->margin_top ?? 20 }}mm {{ $setting->margin_right ?? 15 }}mm
-                 calc({{ $setting->margin_bottom ?? 20 }}mm + 130px) {{ $setting->margin_left ?? 15 }}mm;
+                 {{ $setting->margin_bottom ?? 20 }}mm {{ $setting->margin_left ?? 15 }}mm;
     }
 
     /* ── Header ─────────────────────────────────────────────────── */
@@ -71,11 +77,23 @@
     }
     .content-body p  { margin-bottom: 0.6em; }
     .content-body br { display: block; margin-bottom: 0; }
+
+    /*
+       Bloco de observações livres anexado pelo médico (Atestados, etc.).
+       NÃO usar `page-break-inside: avoid` aqui — wkhtmltopdf 0.12.6 suprime
+       o conteúdo quando o bloco fica perto do final da página (interage mal
+       com o spacer/footer fixed do signature).
+    */
     .pmr-observations {
         margin-top: 1.5em;
         padding-top: 0.8em;
-        border-top: 1px solid #ddd;
+        border-top: 1px solid #999;
     }
+    .pmr-observations p { margin-bottom: 0.5em; }
+    .pmr-observations strong { color: #1976d2; }
+    .pmr-observations ul,
+    .pmr-observations ol { padding-left: 1.5em; margin-bottom: 0.5em; }
+    .pmr-observations li { margin-bottom: 0.25em; }
 
     /* ── Signature ───────────────────────────────────────────────── */
     .signature-block { margin-top: 40px; text-align: center; font-size: 9.5pt; }
@@ -149,11 +167,23 @@
     &nbsp;|&nbsp; <strong>{{ __('pdf.date') }}:</strong> {{ \Illuminate\Support\Carbon::now()->isoFormat('L') }}
 </div>
 
-<!-- ─── CONTEÚDO ───────────────────────────────────────────────────────────── -->
-<div class="content-body">{!! $documentation->content !!}</div>
+<!-- ─── CONTEÚDO ─────────────────────────────────────────────────────────────
+     `contentForRender()` remove o cabeçalho de data resolvido (CIDADE, DD de MÊS de YYYY)
+     do topo do conteúdo. A data continua aparecendo no bloco de assinatura abaixo —
+     evita duplicação visual e mantém o banco intocado (auditoria preservada).
+-->
+<div class="content-body">{!! $documentation->contentForRender() !!}</div>
 
-<!-- ─── ASSINATURA ─────────────────────────────────────────────────────────── -->
-@include('pdf._signature')
+<!--
+    ─── ASSINATURA ─────────────────────────────────────────────────────────────
+    Em documentos curtos (receituários, atestados, laudos), preferimos assinatura
+    em FLUXO NORMAL. Motivo: `position: fixed` do signature interage mal com
+    wkhtmltopdf 0.12.6 quando o conteúdo principal tem blocos adicionais
+    (ex.: observações livres em atestados via TinyMCE) — fragmenta o fluxo
+    fazendo conteúdo aparecer DEPOIS do bloco de assinatura.
+    Em fluxo normal, a assinatura sempre vem após o conteúdo completo.
+-->
+@include('pdf._signature', ['fixedPosition' => false])
 
 {{-- Rodapé renderizado via --footer-html no MedicalRecordPdfService::buildDocumentationFooterFile() --}}
 

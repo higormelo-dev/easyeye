@@ -1,11 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Models\{Entity, Plan, Subscription};
 use App\Services\SubscriptionService;
-use Illuminate\Contracts\View\{Factory, View};
-use Illuminate\Foundation\Application;
+use Illuminate\Http\RedirectResponse;
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class SubscriptionExpiredController extends Controller
 {
@@ -14,7 +16,7 @@ class SubscriptionExpiredController extends Controller
     ) {
     }
 
-    public function __invoke(): Factory|Application|View
+    public function __invoke(): InertiaResponse|RedirectResponse
     {
         $entityId = session('selected_entity_id');
         $entity   = $entityId ? Entity::find($entityId) : null;
@@ -24,23 +26,41 @@ class SubscriptionExpiredController extends Controller
             return redirect()->route('panel.dashboard');
         }
 
-        // Busca a última assinatura para contexto
         $lastSubscription = $entity
             ? Subscription::forEntity($entity->id)->with('plan')->latest()->first()
             : null;
 
-        // Planos disponíveis para upgrade, ordenados
         $plans = Plan::active()
             ->with('features')
             ->orderBy('sort_order')
             ->get()
-            ->map(function (Plan $plan) {
-                return [
-                    'model'        => $plan,
-                    'features_map' => $plan->features->keyBy('feature')->map->value,
-                ];
-            });
+            ->map(fn (Plan $plan) => [
+                'id'             => $plan->id,
+                'name'           => $plan->name,
+                'description'    => $plan->description,
+                'price'          => (float) $plan->price,
+                'billing_cycle'  => $plan->billing_cycle instanceof \BackedEnum
+                    ? $plan->billing_cycle->value
+                    : $plan->billing_cycle,
+                'features_map'   => $plan->features->keyBy('feature')->map->value,
+            ]);
 
-        return view('subscription.expired', compact('entity', 'lastSubscription', 'plans'));
+        return Inertia::render('Panel/SubscriptionExpired', [
+            'entity' => $entity ? [
+                'id'   => (string) $entity->id,
+                'name' => $entity->name,
+            ] : null,
+            'lastSubscription' => $lastSubscription ? [
+                'plan_name'  => $lastSubscription->plan?->name,
+                'ends_at'    => $lastSubscription->ends_at?->format('d/m/Y'),
+                'status'     => $lastSubscription->status instanceof \BackedEnum
+                    ? $lastSubscription->status->value
+                    : $lastSubscription->status,
+            ] : null,
+            'plans' => $plans,
+            'urls'  => [
+                'logout' => route('logout'),
+            ],
+        ]);
     }
 }

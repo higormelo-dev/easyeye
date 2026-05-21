@@ -181,5 +181,25 @@ class AuthServiceProvider extends ServiceProvider
 
             return $user->hasRoleInEntity($entity, ClientRule::Admin);
         });
+
+        /**
+         * Gerenciar configurações de SEGURANÇA da entity (2FA obrigatório,
+         * futuras políticas de senha/sessão).
+         *
+         * Aceita DOIS contextos:
+         *  1) Entity cliente (clínica) — admin da clínica configura para sua empresa.
+         *  2) Entity SaaS — admin SaaS configura para a própria entidade SaaS,
+         *     forçando 2FA nos admins/financial/support do sistema.
+         *
+         * Não é um gate só de cliente nem só de SaaS — é gerenciamento da
+         * postura de segurança da empresa, válido em ambos os lados.
+         */
+        Gate::define(EntityGate::ManageSecuritySettings->value, function (User $user, Entity $entity): bool {
+            if ($entity->isSaas()) {
+                return $user->hasRoleInEntity($entity, SaasRule::Admin);
+            }
+
+            return $user->hasRoleInEntity($entity, ClientRule::Admin);
+        });
     }
 }

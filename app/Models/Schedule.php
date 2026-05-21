@@ -144,7 +144,12 @@ class Schedule extends Model
 
     public function resources(): BelongsToMany
     {
-        return $this->belongsToMany(ClinicResource::class, 'schedule_resources');
+        return $this->belongsToMany(
+            ClinicResource::class,
+            'schedule_resources',
+            'schedule_id',
+            'resource_id',
+        );
     }
 
     protected function fullName(): Attribute

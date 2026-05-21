@@ -1,7 +1,9 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
     open:     { type: Boolean, required: true },
@@ -23,6 +25,67 @@ const form = useForm({
     schedule_interval: 15, active: true,
 });
 
+// ── 2FA: estado lido via show() do Manager (separado do useForm para não
+// confundir o submit principal, que não muda 2FA — ele tem endpoint próprio).
+const twoFactor = ref({
+    requires:   false,
+    enabled_at: null,
+    enabled_by: null,
+});
+
+const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+
+async function loadTwoFactorState(id) {
+    try {
+        const res  = await fetch(route('manager.entities.show', id), {
+            headers: { Accept: 'application/json' },
+        });
+        const json = await res.json();
+        twoFactor.value = {
+            requires:   !!json.data.requires_two_factor,
+            enabled_at: json.data.two_factor_enabled_at,
+            enabled_by: json.data.two_factor_enabled_by,
+        };
+    } catch { /* silent */ }
+}
+
+function toggleTwoFactor() {
+    const enabling = !twoFactor.value.requires;
+
+    openReasonModal({
+        title: enabling
+            ? (props.t.form_2fa_toggle_enable  ?? 'Ativar 2FA obrigatório')
+            : (props.t.form_2fa_toggle_disable ?? 'Desativar 2FA obrigatório'),
+        message: enabling
+            ? (props.t.form_2fa_modal_enable  ?? '')
+            : (props.t.form_2fa_modal_disable ?? ''),
+        confirmVariant: enabling ? 'primary' : 'danger',
+        async onConfirm(reason) {
+            const res = await fetch(route('manager.entities.two-factor.toggle', props.entityId), {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept':       'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                body: JSON.stringify({ enabled: enabling, reason }),
+            });
+            const json = await res.json();
+            if (res.ok) {
+                twoFactor.value = {
+                    requires:   !!json.data.requires_two_factor,
+                    enabled_at: json.data.two_factor_enabled_at,
+                    enabled_by: json.data.two_factor_enabled_by ?? null,
+                };
+                if (window.showSuccessToast) window.showSuccessToast(json.message);
+                router.reload({ only: ['entities'] });
+            } else if (window.showErrorToast) {
+                window.showErrorToast(json.message ?? 'Erro');
+            }
+        },
+    });
+}
+
 function resetForm() {
     form.reset(); form.clearErrors();
     form.country = 'Brasil'; form.schedule_interval = 15;
@@ -41,7 +104,13 @@ async function loadEditData(id) {
 }
 
 watch(() => props.open, async (val) => {
-    if (val) { resetForm(); if (props.entityId) await loadEditData(props.entityId); }
+    if (val) {
+        resetForm();
+        if (props.entityId) {
+            await loadEditData(props.entityId);
+            await loadTwoFactorState(props.entityId);
+        }
+    }
 });
 
 function submit() {
@@ -106,6 +175,14 @@ const tabErrors = computed(() => ({
                     <button class="nav-link" :class="{ active: activeTab==='config', 'text-danger': tabErrors.config }" @click="activeTab='config'">
                         <i class="ti ti-settings me-1"></i> {{ t.tab_config }}
                         <i v-if="tabErrors.config" class="ti ti-alert-circle text-danger ms-1 fs-12"></i>
+                    </button>
+                </li>
+                <li v-if="isEdit" class="nav-item">
+                    <button class="nav-link" :class="{ active: activeTab==='security' }" @click="activeTab='security'">
+                        <i class="ti ti-shield-lock me-1"></i> {{ t.form_section_security ?? 'Segurança' }}
+                        <span v-if="twoFactor.requires" class="badge badge-soft-success rounded text-success border border-success fs-11 ms-1">
+                            2FA
+                        </span>
                     </button>
                 </li>
             </ul>
@@ -229,7 +306,61 @@ const tabErrors = computed(() => ({
                     <i class="ti ti-info-circle me-1"></i> {{ t.config_info_after_create }}
                 </div>
             </div>
+
+            <!-- TAB: Segurança (só em edição — entity precisa existir para ter 2FA) -->
+            <div v-if="isEdit" v-show="activeTab === 'security'">
+                <div class="card border-0 bg-light">
+                    <div class="card-body">
+                        <div class="d-flex align-items-start gap-3 mb-3">
+                            <div class="flex-shrink-0">
+                                <i class="ti ti-shield-lock-filled fs-1"
+                                   :class="twoFactor.requires ? 'text-success' : 'text-muted'"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="fw-semibold mb-1">
+                                    {{ t.form_2fa_label ?? 'Exigir 2FA para todos os usuários' }}
+                                    <span v-if="twoFactor.requires"
+                                          class="badge badge-soft-success rounded text-success border border-success ms-1">
+                                        Ativo
+                                    </span>
+                                    <span v-else class="badge badge-soft-secondary rounded ms-1">
+                                        Inativo
+                                    </span>
+                                </h6>
+                                <p class="text-muted small mb-2">{{ t.form_2fa_hint }}</p>
+
+                                <p v-if="twoFactor.requires && twoFactor.enabled_at" class="small text-muted mb-0">
+                                    <i class="ti ti-history me-1"></i>
+                                    {{ (t.form_2fa_enabled_at ?? 'Ativado em :date por :user')
+                                        ?.replace(':date', twoFactor.enabled_at)
+                                        ?.replace(':user', twoFactor.enabled_by ?? '—') }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            :class="`btn btn-sm ${twoFactor.requires ? 'btn-outline-danger' : 'btn-primary'}`"
+                            @click="toggleTwoFactor"
+                        >
+                            <i :class="`ti me-1 ${twoFactor.requires ? 'ti-shield-off' : 'ti-shield-check'}`"></i>
+                            {{ twoFactor.requires ? t.form_2fa_toggle_disable : t.form_2fa_toggle_enable }}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </form>
+
+        <!-- Confirmação com reason (LGPD/CFM) — só usado pelo toggle 2FA -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
+        />
 
         <!-- Footer -->
         <template #footer>

@@ -3,6 +3,9 @@ import { computed } from 'vue';
 import SortableTh      from '@/Components/Panel/SortableTh.vue';
 import StatusBadge     from '@/Components/Panel/StatusBadge.vue';
 import TablePagination from '@/Components/Panel/TablePagination.vue';
+import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     plans:   { type: Object, required: true },
@@ -78,37 +81,35 @@ function onSort(payload) { emit('sort', payload); }
                         />
                     </td>
                     <td class="text-end">
-                        <div class="d-flex align-items-center justify-content-end gap-1">
-                            <button
-                                class="btn btn-sm btn-outline-secondary"
+                        <ActionIconGroup align="end" gap="tight">
+                            <ActionIconButton
+                                icon="ti ti-eye"
                                 :title="t.action_view"
                                 @click="$emit('view', p.id)"
-                            ><i class="ti ti-eye"></i></button>
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-                                    <i class="ti ti-dots-vertical"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end p-2">
-                                    <li>
-                                        <button class="dropdown-item rounded-1" @click="$emit('edit', p.id)">
-                                            <i class="ti ti-edit me-1"></i> {{ t.action_edit }}
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button class="dropdown-item rounded-1" @click="$emit('toggleActive', p.id, p.active)">
-                                            <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                            {{ p.active ? t.action_deactivate : t.action_activate }}
-                                        </button>
-                                    </li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', p.id)">
-                                            <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
-                                        </button>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
+                            />
+                            <ActionDropdown
+                                btn-class="ee-action-icon ee-action-icon--default"
+                                icon="ti ti-dots-vertical"
+                            >
+                                <li>
+                                    <button class="dropdown-item rounded-1" @click="$emit('edit', p.id)">
+                                        <i class="ti ti-edit me-1"></i> {{ t.action_edit }}
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item rounded-1" @click="$emit('toggleActive', p.id, p.active)">
+                                        <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
+                                        {{ p.active ? t.action_deactivate : t.action_activate }}
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', p.id)">
+                                        <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
+                                    </button>
+                                </li>
+                            </ActionDropdown>
+                        </ActionIconGroup>
                     </td>
                 </tr>
             </tbody>

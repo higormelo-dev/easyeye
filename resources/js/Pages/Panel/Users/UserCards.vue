@@ -1,6 +1,8 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -88,45 +90,35 @@ onUnmounted(() => removeSuccessListener?.());
                     <hr class="my-2">
 
                     <!-- Actions -->
-                    <div class="d-flex justify-content-end gap-1">
-                        <!-- Restore -->
-                        <template v-if="u.mode === 'restore'">
-                            <button
-                                class="btn btn-xs btn-outline-secondary"
-                                :title="t.btn_restore"
-                                @click="$emit('restore', u.id)"
-                            >
-                                <i class="ti ti-recycle"></i>
-                            </button>
-                        </template>
+                    <ActionIconGroup align="end" gap="tight">
+                        <ActionIconButton
+                            v-if="u.mode === 'restore'"
+                            icon="ti ti-recycle"
+                            :title="t.btn_restore"
+                            @click="$emit('restore', u.id)"
+                        />
 
-                        <!-- Full -->
                         <template v-else-if="u.mode === 'full'">
-                            <button
-                                class="btn btn-xs btn-outline-secondary"
+                            <ActionIconButton
+                                icon="ti ti-edit"
                                 :title="t.btn_edit"
                                 @click="$emit('edit', u.id)"
-                            >
-                                <i class="ti ti-edit"></i>
-                            </button>
+                            />
                             <template v-if="!u.is_owner && !u.is_self">
-                                <button
-                                    class="btn btn-xs btn-outline-secondary"
+                                <ActionIconButton
+                                    :icon="`ti ${u.active ? 'ti-lock-open' : 'ti-lock'}`"
                                     :title="u.active ? t.btn_deactivate : t.btn_activate"
                                     @click="$emit('toggle-active', u.id, u.active)"
-                                >
-                                    <i :class="`ti ${u.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                </button>
-                                <button
-                                    class="btn btn-xs btn-outline-danger"
+                                />
+                                <ActionIconButton
+                                    icon="ti ti-trash"
                                     :title="t.btn_delete"
+                                    variant="danger"
                                     @click="$emit('delete', u.id)"
-                                >
-                                    <i class="ti ti-trash"></i>
-                                </button>
+                                />
                             </template>
                         </template>
-                    </div>
+                    </ActionIconGroup>
                 </div>
             </div>
         </div>

@@ -4,6 +4,9 @@
 // ── Preclinic design system ────────────────────────────────────────────────────
 @use 'system/main';
 
+// ── Estilos do prontuário (migrado de _form-styles.blade.php) ─────────────────
+@use 'system/medical-records';
+
 // ── EasyEye — overrides de tokens de marca ────────────────────────────────────
 // Preclinic default: --primary #2E37A4 (indigo). Mantido para o painel.
 // Personalize aqui se quiser alinhar com as cores da landing page.

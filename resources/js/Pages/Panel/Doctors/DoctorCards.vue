@@ -1,6 +1,8 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -73,17 +75,24 @@ onUnmounted(() => removeSuccessListener?.());
                         <div><strong>Especialidade:</strong> {{ d.record_specialty ?? '—' }}</div>
                     </div>
                     <hr class="my-2">
-                    <div class="d-flex justify-content-end gap-1" v-if="d.mode === 'full'">
-                        <button class="btn btn-xs btn-outline-secondary" @click="$emit('edit', d.id)">
-                            <i class="ti ti-edit"></i>
-                        </button>
-                        <button class="btn btn-xs btn-outline-secondary" @click="$emit('toggleActive', d.id, d.active)">
-                            <i :class="`ti ${d.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                        </button>
-                        <button class="btn btn-xs btn-outline-danger" @click="$emit('delete', d.id)">
-                            <i class="ti ti-trash"></i>
-                        </button>
-                    </div>
+                    <ActionIconGroup v-if="d.mode === 'full'" align="end" gap="tight">
+                        <ActionIconButton
+                            icon="ti ti-edit"
+                            title="Editar"
+                            @click="$emit('edit', d.id)"
+                        />
+                        <ActionIconButton
+                            :icon="`ti ${d.active ? 'ti-lock-open' : 'ti-lock'}`"
+                            :title="d.active ? 'Desativar' : 'Ativar'"
+                            @click="$emit('toggleActive', d.id, d.active)"
+                        />
+                        <ActionIconButton
+                            icon="ti ti-trash"
+                            title="Excluir"
+                            variant="danger"
+                            @click="$emit('delete', d.id)"
+                        />
+                    </ActionIconGroup>
                 </div>
             </div>
         </div>

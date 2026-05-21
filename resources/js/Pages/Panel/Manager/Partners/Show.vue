@@ -4,6 +4,8 @@ import { router, Link }             from '@inertiajs/vue3';
 import AppLayout                    from '@/Layouts/AppLayout.vue';
 import PartnerFormModal             from './PartnerFormModal.vue';
 import LiveStatusBar                from '@/Components/Panel/LiveStatusBar.vue';
+import ConfirmationWithReasonModal  from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 import { useDashboardPolling }      from '@/composables/useDashboardPolling.js';
 
 const props = defineProps({
@@ -52,27 +54,35 @@ async function advanceLead(lead, newStatus) {
     }
 }
 
-// ── Pay commission ────────────────────────────────────────────────────────────
+// ── Pay commission (com justificativa LGPD/CFM) ────────────────────────────────
 const payingId = ref(null);
+const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
 
-async function payCommission(commission) {
-    if (!confirm(props.t.confirm_pay)) return;
-
-    payingId.value = commission.id;
-    try {
-        const res = await fetch(commission.pay_url, {
-            method: 'PATCH',
-            headers: {
-                'Accept':       'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-            },
-        });
-        const json = await res.json();
-        showToast(json.message, res.ok ? 'success' : 'error');
-        if (res.ok) router.reload({ only: ['commissions', 'partner'] });
-    } finally {
-        payingId.value = null;
-    }
+function payCommission(commission) {
+    openReasonModal({
+        title: props.t.confirm_pay_title ?? 'Pagar comissão',
+        message: props.t.confirm_pay ?? '',
+        confirmVariant: 'primary',
+        async onConfirm(reason) {
+            payingId.value = commission.id;
+            try {
+                const res = await fetch(commission.pay_url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept':       'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                    },
+                    body: JSON.stringify({ reason }),
+                });
+                const json = await res.json();
+                showToast(json.message, res.ok ? 'success' : 'error');
+                if (res.ok) router.reload({ only: ['commissions', 'partner'] });
+            } finally {
+                payingId.value = null;
+            }
+        },
+    });
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
@@ -410,6 +420,17 @@ const breadcrumbs = computed(() => [
             :t="t"
             @close="formOpen = false"
             @saved="formOpen = false; router.reload({ only: ['partner'] })"
+        />
+
+        <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
         />
 
     </AppLayout>

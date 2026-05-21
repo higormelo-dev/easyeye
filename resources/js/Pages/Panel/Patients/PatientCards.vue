@@ -1,6 +1,9 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -91,82 +94,71 @@ onUnmounted(() => removeSuccessListener?.());
 
                     <hr class="my-2">
 
-                    <div class="d-flex align-items-center justify-content-end gap-1">
+                    <ActionIconGroup align="end" gap="tight">
                         <!-- RESTORE -->
                         <template v-if="p.mode === 'restore'">
-                            <button
-                                class="btn btn-sm btn-outline-secondary"
+                            <ActionIconButton
+                                icon="ti ti-recycle"
                                 title="Restaurar"
                                 @click="$emit('restore', p.id)"
-                            >
-                                <i class="ti ti-recycle"></i>
-                            </button>
+                            />
                         </template>
 
                         <!-- VIEW ONLY -->
                         <template v-else-if="p.mode === 'view_only'">
-                            <button
-                                class="btn btn-sm btn-outline-secondary"
+                            <ActionIconButton
+                                icon="ti ti-eye"
+                                title="Visualizar"
                                 @click="$emit('view', p.id)"
-                            >
-                                <i class="ti ti-eye"></i>
-                            </button>
+                            />
                         </template>
 
                         <!-- FULL -->
                         <template v-else-if="p.mode === 'full'">
-                            <button
-                                class="btn btn-sm btn-outline-secondary"
+                            <ActionIconButton
+                                icon="ti ti-eye"
                                 title="Visualizar"
                                 @click="$emit('view', p.id)"
-                            >
-                                <i class="ti ti-eye"></i>
-                            </button>
-                            <a
-                                :href="p.medical_records_url"
-                                class="btn btn-sm btn-outline-info"
+                            />
+                            <ActionIconButton
+                                icon="ti ti-stethoscope"
                                 title="Prontuário"
+                                variant="info"
+                                :href="p.medical_records_url"
+                            />
+                            <ActionDropdown
+                                btn-class="ee-action-icon ee-action-icon--default"
+                                icon="ti ti-dots-vertical"
                             >
-                                <i class="ti ti-stethoscope"></i>
-                            </a>
-                            <div class="dropdown">
-                                <button
-                                    class="btn btn-sm btn-outline-secondary"
-                                    data-bs-toggle="dropdown"
-                                >
-                                    <i class="ti ti-dots-vertical"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end p-2">
-                                    <li>
-                                        <button
-                                            class="dropdown-item rounded-1"
-                                            @click="$emit('edit', p.id)"
-                                        >
-                                            <i class="ti ti-edit me-1"></i> Editar
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button
-                                            class="dropdown-item rounded-1"
-                                            @click="$emit('toggleActive', p.id, p.active)"
-                                        >
-                                            <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                            {{ p.active ? 'Desativar' : 'Ativar' }}
-                                        </button>
-                                    </li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <button
-                                            class="dropdown-item rounded-1 text-danger"
-                                            @click="$emit('delete', p.id)"
-                                        >
-                                            <i class="ti ti-trash me-1"></i> Excluir
-                                        </button>
-                                    </li>
-                                </ul>
-                            </div>
+                                <li>
+                                    <button
+                                        class="dropdown-item rounded-1"
+                                        @click="$emit('edit', p.id)"
+                                    >
+                                        <i class="ti ti-edit me-1"></i> Editar
+                                    </button>
+                                </li>
+                                <li>
+                                    <button
+                                        class="dropdown-item rounded-1"
+                                        @click="$emit('toggleActive', p.id, p.active)"
+                                    >
+                                        <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
+                                        {{ p.active ? 'Desativar' : 'Ativar' }}
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button
+                                        class="dropdown-item rounded-1 text-danger"
+                                        @click="$emit('delete', p.id)"
+                                    >
+                                        <i class="ti ti-trash me-1"></i> Excluir
+                                    </button>
+                                </li>
+                            </ActionDropdown>
                         </template>
-                    </div>
+                    </ActionIconGroup>
                 </div>
             </div>
         </div>

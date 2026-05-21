@@ -8,6 +8,8 @@ import EntityTable        from './EntityTable.vue';
 import EntityCards        from './EntityCards.vue';
 import EntityFormModal    from './EntityFormModal.vue';
 import EntityDetailDrawer from './EntityDetailDrawer.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
     entities: { type: Object, required: true },
@@ -59,9 +61,25 @@ function openDetail(id) { detailId.value = id; detailOpen.value = true; }
 function closeDetail()  { detailOpen.value = false; detailId.value = null; }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
+const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+
 function onDelete(id) {
-    if (!confirm(props.t.confirm_delete ?? 'Tem certeza?')) return;
-    router.delete(route('manager.entities.destroy', id), { preserveScroll: true });
+    openReasonModal({
+        title: props.t.confirm_delete_title ?? props.t.confirm_delete ?? 'Excluir empresa',
+        message: props.t.confirm_delete_text ?? 'Esta ação remove a empresa do sistema (soft delete).',
+        confirmVariant: 'danger',
+        async onConfirm(reason) {
+            // Inertia preserva o método DELETE com body via `data`.
+            await new Promise((resolve, reject) => {
+                router.delete(route('manager.entities.destroy', id), {
+                    data: { reason },
+                    preserveScroll: true,
+                    onSuccess: resolve,
+                    onError: reject,
+                });
+            });
+        },
+    });
 }
 
 function onToggleActive(id, currentActive) {
@@ -86,10 +104,10 @@ const breadcrumbs = [
             <PageHeader
                 :title="t.page_title"
                 :total="total"
-                :total-label="t.total_label"
                 :view="view"
                 :view-table-title="t.view_table"
                 :view-cards-title="t.view_cards"
+                :show-view-toggle="true"
                 @set-view="setView"
             >
                 <template #actions>
@@ -145,6 +163,17 @@ const breadcrumbs = [
             :t="t"
             @close="closeDetail"
             @edit="(id) => { closeDetail(); openEdit(id); }"
+        />
+
+        <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
         />
     </AppLayout>
 </template>

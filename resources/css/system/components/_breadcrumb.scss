@@ -112,6 +112,37 @@
 .embedded-breadcrumb:before {
 	opacity: 0.7;
 }
+
+// App breadcrumb — separador » e item ativo com badge colorido
+.app-breadcrumb {
+    --bs-breadcrumb-divider: "»";
+
+    .breadcrumb-item + .breadcrumb-item::before {
+        content: "»";
+        font-family: inherit;
+        color: $body-color;
+        opacity: 0.5;
+        padding: 0 6px;
+    }
+
+    .breadcrumb-item a {
+        color: $body-color;
+        text-decoration: none;
+        font-size: 0.82rem;
+        &:hover { color: $primary; }
+    }
+
+    .breadcrumb-active-badge {
+        display: inline-block;
+        background-color: $primary;
+        color: #fff;
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 2px 10px;
+        border-radius: 4px;
+        line-height: 1.5;
+    }
+}
 [data-theme-mode="dark"] {
 	.embedded-breadcrumb:before {
 		filter: invert(1);

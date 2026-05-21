@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domains\AI\Models\AiRun;
 use App\Enums\DocumentationType;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -22,6 +23,7 @@ class MedicalRecordDocumentation extends Model
         'report_setting_id',
         'report_setting_content_id',
         'template_version',
+        'ai_run_id',
         'type',
         'title',
         'content',
@@ -62,11 +64,45 @@ class MedicalRecordDocumentation extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /**
+     * Execução de IA que originou esta documentação (quando aplicável).
+     * Permite auditoria CFM/LGPD: ver prompt, modelo, custo e médico que aprovou.
+     */
+    public function aiRun(): BelongsTo
+    {
+        return $this->belongsTo(AiRun::class, 'ai_run_id');
+    }
+
     public function getTypeLabel(): string
     {
         return $this->type instanceof DocumentationType
             ? $this->type->label()
             : (string) $this->type;
+    }
+
+    /**
+     * Retorna o `content` HTML para renderização em PDF, removendo o cabeçalho
+     * de data resolvido (`<p text-align:right>CIDADE/UF, DD de MÊS de YYYY</p>`
+     * + `<p>&nbsp;</p>` espaçador).
+     *
+     * Motivo: a data e localização já são renderizadas no bloco de assinatura
+     * do PDF (`_signature.blade.php`) via `Carbon::isoFormat('LL')` +
+     * `LocationFormatter`. Manter no topo duplica a informação e polui.
+     *
+     * O campo `content` no banco fica intocado (preserva trilha de auditoria);
+     * o strip só acontece na hora de renderizar.
+     *
+     * Idempotente: se o conteúdo já não tem o cabeçalho, retorna inalterado.
+     */
+    public function contentForRender(): string
+    {
+        $html = (string) ($this->content ?? '');
+
+        // Pareia: <p ... text-align:right ...>...</p> seguido opcionalmente
+        // do <p>&nbsp;</p> espaçador, apenas no INÍCIO do conteúdo.
+        $pattern = '/^\s*<p\s+[^>]*text-align\s*:\s*right[^>]*>[^<]*<\/p>\s*(?:<p[^>]*>&nbsp;<\/p>)?\s*/iu';
+
+        return preg_replace($pattern, '', $html, 1) ?? $html;
     }
 
     /**

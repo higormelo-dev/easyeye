@@ -77,7 +77,7 @@ class AuthenticatedSessionController extends Controller
     /**
      * Destroy an authenticated session.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request): RedirectResponse|HttpResponse
     {
         Auth::guard('web')->logout();
 
@@ -85,7 +85,11 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        // Inertia::location força full-page reload — necessário porque o rootView
+        // muda de 'panel-app' (CSS do painel) para 'app' (CSS do site público).
+        // Um redirect() simples faria o Inertia navegar via SPA, mantendo os
+        // assets CSS/JS do painel no DOM e quebrando a formatação do site.
+        return Inertia::location('/');
     }
 
     private function redirectForInertia(Request $request, string $url): RedirectResponse|HttpResponse

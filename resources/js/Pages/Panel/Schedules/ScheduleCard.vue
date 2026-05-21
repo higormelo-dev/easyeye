@@ -1,5 +1,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     item:          { type: Object,  required: true },
@@ -13,6 +16,7 @@ const props = defineProps({
 
 const emit = defineEmits([
     'toggle-select',
+    'view',
     'edit',
     'reschedule',
     'cancel',
@@ -141,17 +145,20 @@ function onSituationClick(trans) {
                 </div>
 
                 <!-- Actions -->
-                <div class="d-flex align-items-center gap-1 flex-shrink-0" @click.stop>
+                <div class="d-flex align-items-center flex-shrink-0" style="gap: 8px;" @click.stop>
 
-                    <!-- Situation dropdown -->
-                    <div v-if="!item.is_terminal && isStaff && item.allowed_transitions.length > 0" class="btn-group">
-                        <button type="button"
-                                class="btn btn-light btn-sm dropdown-toggle"
-                                data-bs-toggle="dropdown"
-                                aria-expanded="false">
-                            <i class="fas fa-list-ul"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                    <!-- Grupo 1: controles de estado (situação + humor) -->
+                    <ActionIconGroup
+                        v-if="!item.is_terminal && isStaff && ((item.allowed_transitions.length > 0) || item.patient_id)"
+                        gap="tight"
+                    >
+                        <!-- Situation dropdown -->
+                        <ActionDropdown
+                            v-if="item.allowed_transitions.length > 0"
+                            icon="fas fa-list-ul"
+                            btn-class="ee-action-icon ee-action-icon--default"
+                            :title="t.dropdown_situation ?? 'Alterar situação'"
+                        >
                             <li v-for="trans in item.allowed_transitions" :key="trans.value">
                                 <button type="button"
                                         class="dropdown-item"
@@ -161,23 +168,19 @@ function onSituationClick(trans) {
                                     {{ trans.label.toUpperCase() }}
                                 </button>
                             </li>
-                        </ul>
-                    </div>
+                        </ActionDropdown>
 
-                    <!-- Mood dropdown -->
-                    <div v-if="!item.is_terminal && isStaff && item.patient_id" class="dropdown">
-                        <button type="button"
-                                class="btn btn-light btn-sm dropdown-toggle"
-                                data-bs-toggle="dropdown"
-                                aria-expanded="false">
-                            <i class="fas"
-                               :class="item.patient_mood ? item.patient_mood.icon : 'fa-theater-masks'"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <!-- Mood dropdown -->
+                        <ActionDropdown
+                            v-if="item.patient_id"
+                            :icon="'fas ' + (item.patient_mood ? item.patient_mood.icon : 'fa-theater-masks')"
+                            btn-class="ee-action-icon ee-action-icon--default"
+                            :title="t.dropdown_mood ?? 'Humor do paciente'"
+                        >
                             <li>
                                 <button type="button" class="dropdown-item"
                                         @click="emit('change-mood', { item, mood: null })">
-                                    <i class="fas fa-times text-muted me-2"></i> Limpar
+                                    <i class="fas fa-times text-muted me-2"></i> {{ t.dropdown_mood_clear ?? 'Limpar' }}
                                 </button>
                             </li>
                             <li><hr class="dropdown-divider"></li>
@@ -189,55 +192,58 @@ function onSituationClick(trans) {
                                     {{ m.label }}
                                 </button>
                             </li>
-                        </ul>
-                    </div>
+                        </ActionDropdown>
+                    </ActionIconGroup>
 
-                    <div v-if="!item.is_terminal" class="vr mx-1 d-none d-sm-block"></div>
+                    <!-- Grupo 2: navegação/edição do agendamento -->
+                    <ActionIconGroup gap="tight">
+                        <!-- Edit -->
+                        <ActionIconButton
+                            v-if="!item.is_terminal"
+                            icon="fas fa-edit"
+                            :title="t.btn_edit ?? 'Editar'"
+                            @click="emit('edit', item)"
+                        />
 
-                    <!-- Edit -->
-                    <button v-if="!item.is_terminal"
-                            type="button"
-                            class="btn btn-light btn-sm"
-                            @click="emit('edit', item)">
-                        <i class="fas fa-edit"></i>
-                    </button>
+                        <!-- Patient record -->
+                        <ActionIconButton
+                            v-if="item.patient_url"
+                            icon="fas fa-address-card"
+                            :title="t.btn_patient ?? 'Cadastro do paciente'"
+                            :href="item.patient_url"
+                        />
 
-                    <!-- Patient record -->
-                    <a v-if="item.patient_url"
-                       :href="item.patient_url"
-                       class="btn btn-light btn-sm">
-                        <i class="fas fa-address-card"></i>
-                    </a>
+                        <!-- Medical records -->
+                        <ActionIconButton
+                            v-if="item.medical_records_url"
+                            icon="fas fa-file-medical"
+                            :title="t.btn_medical_records ?? 'Prontuário'"
+                            variant="info"
+                            :href="item.medical_records_url"
+                        />
 
-                    <!-- Medical records -->
-                    <a v-if="item.medical_records_url"
-                       :href="item.medical_records_url"
-                       class="btn btn-light btn-sm">
-                        <i class="fas fa-file-medical"></i>
-                    </a>
+                        <!-- View -->
+                        <ActionIconButton
+                            icon="fas fa-eye"
+                            :title="t.btn_view ?? 'Visualizar'"
+                            @click="emit('view', item)"
+                        />
 
-                    <!-- View -->
-                    <a :href="item.show_url" class="btn btn-light btn-sm">
-                        <i class="fas fa-eye"></i>
-                    </a>
-
-                    <!-- More (reschedule) -->
-                    <div v-if="!item.is_terminal && isStaff" class="dropdown">
-                        <button type="button"
-                                class="btn btn-outline-light btn-sm"
-                                data-bs-toggle="dropdown"
-                                aria-expanded="false">
-                            <i class="fas fa-ellipsis-v"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                        <!-- More (reschedule) -->
+                        <ActionDropdown
+                            v-if="!item.is_terminal && isStaff"
+                            icon="fas fa-ellipsis-v"
+                            btn-class="ee-action-icon ee-action-icon--default"
+                            :title="t.dropdown_more ?? 'Mais ações'"
+                        >
                             <li>
                                 <button type="button" class="dropdown-item"
                                         @click="emit('reschedule', item)">
-                                    <i class="fas fa-calendar-alt me-2"></i>Reagendar
+                                    <i class="fas fa-calendar-alt me-2"></i>{{ t.btn_reschedule ?? 'Reagendar' }}
                                 </button>
                             </li>
-                        </ul>
-                    </div>
+                        </ActionDropdown>
+                    </ActionIconGroup>
 
                 </div>
             </div>

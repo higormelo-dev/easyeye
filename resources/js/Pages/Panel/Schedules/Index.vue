@@ -1,11 +1,13 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, watch, defineAsyncComponent } from 'vue';
 import { router }               from '@inertiajs/vue3';
 import AppLayout                from '@/Layouts/AppLayout.vue';
-import LiveStatusBar            from '@/Components/Panel/LiveStatusBar.vue';
 import ScheduleCard             from './ScheduleCard.vue';
 import EventCard                from './EventCard.vue';
 import ScheduleFormModal        from './ScheduleFormModal.vue';
+
+// Lazy: FullCalendar (~77 kB gz) só é carregado quando o utilizador activa a vista calendário.
+const CalendarView = defineAsyncComponent(() => import('./CalendarView.vue'));
 import RescheduleModal          from './RescheduleModal.vue';
 import CancelModal              from './CancelModal.vue';
 import BulkCancelModal          from './BulkCancelModal.vue';
@@ -13,7 +15,9 @@ import BulkRescheduleModal      from './BulkRescheduleModal.vue';
 import NoticesPanel             from './NoticesPanel.vue';
 import WaitingListPanel         from './WaitingListPanel.vue';
 import WaitingListFormModal     from './WaitingListFormModal.vue';
+import ScheduleDetailDrawer     from './ScheduleDetailDrawer.vue';
 import { useDashboardPolling }  from '@/composables/useDashboardPolling.js';
+import MiniCalendar             from '@/Components/Panel/MiniCalendar.vue';
 
 const props = defineProps({
     scheduleItems: { type: Array,   default: () => [] },
@@ -29,7 +33,18 @@ const props = defineProps({
 });
 
 // ── Polling ────────────────────────────────────────────────────────────────────
-const { isRefreshing, lastUpdated, refresh } = useDashboardPolling(['scheduleItems'], 30_000);
+useDashboardPolling(['scheduleItems'], 30_000);
+
+// ── View mode (list | calendar) — persistido no localStorage ──────────────────
+const viewMode = ref(localStorage.getItem('schedules_view_mode') ?? 'list');
+
+watch(viewMode, (mode) => {
+    localStorage.setItem('schedules_view_mode', mode);
+    if (mode === 'calendar') {
+        selectionMode.value = false;
+        selectedIds.value   = [];
+    }
+});
 
 // ── Filters ────────────────────────────────────────────────────────────────────
 const date   = ref(props.filters.date   ?? new Date().toISOString().substring(0, 10));
@@ -56,22 +71,12 @@ function setDoctor(id) { doctor.value = id; applyFilters(true); }
 function setBout(b)    { bout.value   = b;  applyFilters(true); }
 
 // ── Date navigation ────────────────────────────────────────────────────────────
-function addDays(d, n) {
-    const dt = new Date(d + 'T12:00:00');
-    dt.setDate(dt.getDate() + n);
-    return dt.toISOString().substring(0, 10);
-}
+function goToDate(d) { date.value = d; applyFilters(true); }
 
-function prevDay()  { date.value = addDays(date.value, -1); applyFilters(true); }
-function nextDay()  { date.value = addDays(date.value, +1); applyFilters(true); }
-function goToday()  { date.value = new Date().toISOString().substring(0, 10); applyFilters(true); }
-
-const dateFormatted = computed(() => {
-    const locale = window.sessionLocale ?? 'pt-BR';
-    return new Date(date.value + 'T12:00:00').toLocaleDateString(locale, {
-        weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-    });
-});
+// ── Locale para o MiniCalendar (resolvido fora do template — `window` não é exposto) ──
+const sessionLocale = (typeof window !== 'undefined' && window.sessionLocale)
+    ? window.sessionLocale
+    : 'pt-BR';
 
 // ── Painel de recados ──────────────────────────────────────────────────────────
 const noticesPanelRef = ref(null);
@@ -173,11 +178,37 @@ async function openEdit(item) {
     formOpen.value    = true;
 }
 
+// ── Detail drawer ──────────────────────────────────────────────────────────────
+const detailOpen       = ref(false);
+const viewScheduleId   = ref(null);
+
+function onView(item) {
+    viewScheduleId.value = item.id;
+    detailOpen.value     = true;
+}
+
+function closeDetail() {
+    detailOpen.value     = false;
+    viewScheduleId.value = null;
+}
+
 function onSaved() {
     formOpen.value     = false;
     editSchedule.value = null;
     prefillData.value  = null;
     router.reload({ only: ['scheduleItems'] });
+}
+
+// ── Interação com CalendarView ─────────────────────────────────────────────────
+async function onCalendarEventClick(item) {
+    if (item.type !== 'schedule') return;
+    await openEdit(item);
+}
+
+function onCalendarSlotClick({ datetime }) {
+    editSchedule.value = null;
+    prefillData.value  = { date_time: datetime };
+    formOpen.value     = true;
 }
 
 // ── Reschedule modal ───────────────────────────────────────────────────────────
@@ -256,26 +287,33 @@ const breadcrumbs = [
                  ════════════════════════════════════════════════════════════ -->
             <div class="d-flex align-items-center gap-2 pb-3 mb-0 border-bottom flex-wrap">
 
-                <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                    <i class="fas fa-plus me-1"></i>{{ t.btn_new }}
-                </button>
+                <div class="d-flex align-items-center gap-2 me-auto">
+                    <h4 class="mb-0 fw-bold">{{ t.page_title }}</h4>
+                    <span style="font-size:.78rem;font-weight:600;color:#0d6efd;background:#eff4ff;border:1.5px solid #0d6efd;border-radius:20px;padding:2px 12px;white-space:nowrap;line-height:1.6;">Total: {{ scheduleItems.length }}</span>
+                </div>
 
-                <!-- Navegação de datas — empurrada para a direita -->
-                <div class="ms-auto d-flex align-items-center gap-1">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="prevDay">
-                        <i class="fas fa-chevron-left"></i>
+                <!-- Toggle lista / calendário -->
+                <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center border-0"
+                            :class="viewMode === 'list' ? 'bg-light' : 'bg-white'"
+                            :title="t.view_list"
+                            @click="viewMode = 'list'">
+                        <i class="ti ti-list fs-14 text-body"></i>
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="goToday">
-                        {{ t.btn_today }}
-                    </button>
-                    <input v-model="date" type="date"
-                           class="form-control form-control-sm"
-                           style="max-width:155px;"
-                           @change="applyFilters(true)">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @click="nextDay">
-                        <i class="fas fa-chevron-right"></i>
+                    <button type="button"
+                            class="rounded p-1 d-flex align-items-center border-0"
+                            :class="viewMode === 'calendar' ? 'bg-light' : 'bg-white'"
+                            :title="t.view_calendar"
+                            @click="viewMode = 'calendar'">
+                        <i class="ti ti-calendar fs-14 text-body"></i>
                     </button>
                 </div>
+
+                <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
+                    <i class="ti ti-plus me-1"></i>{{ t.btn_new }}
+                </button>
+
             </div>
 
             <!-- ════════════════════════════════════════════════════════════
@@ -338,7 +376,7 @@ const breadcrumbs = [
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
-                        <button v-if="isStaff"
+                        <button v-if="isStaff && viewMode === 'list'"
                                 type="button"
                                 class="btn btn-sm btn-outline-secondary flex-shrink-0"
                                 @click="toggleSelectionMode">
@@ -391,19 +429,6 @@ const breadcrumbs = [
             </div>
 
             <!-- ════════════════════════════════════════════════════════════
-                 Data e status ao vivo — linha compacta
-                 ════════════════════════════════════════════════════════════ -->
-            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                <h5 class="fw-bold text-capitalize mb-0">{{ dateFormatted }}</h5>
-                <LiveStatusBar
-                    :is-refreshing="isRefreshing"
-                    :last-updated="lastUpdated"
-                    :t="t"
-                    @refresh="refresh"
-                />
-            </div>
-
-            <!-- ════════════════════════════════════════════════════════════
                  Painéis colapsíveis (abrem abaixo da barra, largura total)
                  ════════════════════════════════════════════════════════════ -->
             <NoticesPanel
@@ -426,102 +451,132 @@ const breadcrumbs = [
                  ════════════════════════════════════════════════════════════ -->
             <div class="row g-3">
 
-                <!-- Sidebar médicos + turno -->
-                <div v-if="!isDoctor && doctors.length > 0" class="col-12 col-md-3">
+                <!-- Sidebar — sempre visível para não-médicos -->
+                <div v-if="!isDoctor" class="col-12 col-md-3">
                     <div class="card">
                         <div class="card-body">
 
-                            <!-- Turno -->
-                            <h6 class="fw-bold text-uppercase mb-2">{{ t.sidebar_time }}</h6>
-                            <div class="d-flex w-100 border rounded overflow-hidden mb-4" role="group">
-                                <button
-                                    v-for="(icon, b) in { 1: 'fa-th', 2: 'fa-sun', 3: 'fa-cloud-sun', 4: 'fa-moon' }"
-                                    :key="b"
-                                    type="button"
-                                    class="flex-fill btn btn-sm rounded-0 border-0 py-2 px-1 text-center"
-                                    :class="bout == b ? 'btn-dark' : 'btn-light'"
-                                    @click="setBout(Number(b))">
-                                    <i class="fas d-block" :class="icon" style="font-size:1rem;"></i>
-                                    <span class="d-block"
-                                          style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">
-                                        {{ { 1: t.sidebar_all, 2: t.sidebar_morning, 3: t.sidebar_afternoon, 4: t.sidebar_evening }[b] }}
-                                    </span>
-                                </button>
-                            </div>
+                            <!-- Mini calendário mensal -->
+                            <MiniCalendar
+                                :model-value="date"
+                                :locale="sessionLocale"
+                                @update:model-value="goToDate"
+                            />
 
-                            <!-- Médicos -->
-                            <h6 class="fw-bold text-uppercase mb-2">{{ t.sidebar_doctors }}</h6>
+                            <!-- Médicos + Turno — só quando há médicos cadastrados -->
+                            <template v-if="doctors.length > 0">
+                                <hr class="my-3">
 
-                            <!-- Todos -->
-                            <div class="d-flex align-items-center mb-3 gap-2"
-                                 style="cursor:pointer;"
-                                 @click="setDoctor('tudo')">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                                     style="width:42px;height:42px;"
-                                     :style="{ border: doctor === 'tudo' ? '2px solid #333' : '1px solid #ccc' }">
-                                    <i class="fas fa-users text-muted"></i>
-                                </div>
-                                <div>
-                                    <div class="fw-bold small">{{ t.sidebar_all }}</div>
-                                    <div class="text-muted" style="font-size:.75rem;">{{ t.sidebar_select_all }}</div>
-                                </div>
-                            </div>
+                                <!-- Médicos -->
+                                <h6 class="fw-bold text-uppercase mb-2">{{ t.sidebar_doctors }}</h6>
 
-                            <div v-for="d in doctors"
-                                 :key="d.id"
-                                 class="d-flex align-items-center mb-3 gap-2"
-                                 style="cursor:pointer;"
-                                 @click="setDoctor(d.id)">
-                                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 overflow-hidden"
-                                     style="width:42px;height:42px;"
-                                     :style="{ border: doctor === d.id ? `2px solid ${d.color}` : `1px solid ${d.color}` }">
-                                    <img v-if="d.photo_url" :src="d.photo_url" :alt="d.name"
-                                         style="width:100%;height:100%;object-fit:cover;">
-                                    <i v-else class="fas fa-user" :style="{ color: d.color }"></i>
+                                <!-- Todos -->
+                                <div class="d-flex align-items-center mb-3 gap-2"
+                                     style="cursor:pointer;"
+                                     @click="setDoctor('tudo')">
+                                    <div class="rounded d-flex align-items-center justify-content-center flex-shrink-0"
+                                         style="width:42px;height:42px;"
+                                         :style="{ border: doctor === 'tudo' ? '2px solid #333' : '1px solid #ccc' }">
+                                        <i class="fas fa-users text-muted"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold small">{{ t.sidebar_all }}</div>
+                                        <div class="text-muted" style="font-size:.75rem;">{{ t.sidebar_select_all }}</div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <div class="fw-semibold small" :style="{ color: d.color }">{{ d.name }}</div>
-                                    <div class="text-muted" style="font-size:.72rem;">{{ d.record }}</div>
+
+                                <div v-for="d in doctors"
+                                     :key="d.id"
+                                     class="d-flex align-items-center mb-3 gap-2"
+                                     style="cursor:pointer;"
+                                     @click="setDoctor(d.id)">
+                                    <div class="rounded d-flex align-items-center justify-content-center flex-shrink-0 overflow-hidden"
+                                         style="width:42px;height:42px;"
+                                         :style="{ border: doctor === d.id ? `2px solid ${d.color}` : `1px solid ${d.color}` }">
+                                        <img v-if="d.photo_url" :src="d.photo_url" :alt="d.name"
+                                             style="width:100%;height:100%;object-fit:cover;">
+                                        <i v-else class="fas fa-user" :style="{ color: d.color }"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold small" :style="{ color: d.color }">{{ d.name }}</div>
+                                        <div class="text-muted" style="font-size:.72rem;">{{ d.record }}</div>
+                                    </div>
                                 </div>
-                            </div>
+
+                                <hr class="my-3">
+
+                                <!-- Turno -->
+                                <h6 class="fw-bold text-uppercase mb-2">{{ t.sidebar_time }}</h6>
+                                <div class="d-flex w-100 border rounded overflow-hidden" role="group">
+                                    <button
+                                        v-for="(icon, b) in { 1: 'fa-th', 2: 'fa-sun', 3: 'fa-cloud-sun', 4: 'fa-moon' }"
+                                        :key="b"
+                                        type="button"
+                                        class="flex-fill btn btn-sm rounded-0 border-0 py-2 px-1 text-center"
+                                        :class="bout == b ? 'btn-dark' : 'btn-light'"
+                                        @click="setBout(Number(b))">
+                                        <i class="fas d-block" :class="icon" style="font-size:1rem;"></i>
+                                        <span class="d-block"
+                                              style="font-size:.6rem;font-weight:700;letter-spacing:.05em;margin-top:.2rem;">
+                                            {{ { 1: t.sidebar_all, 2: t.sidebar_morning, 3: t.sidebar_afternoon, 4: t.sidebar_evening }[b] }}
+                                        </span>
+                                    </button>
+                                </div>
+                            </template>
 
                         </div>
                     </div>
                 </div>
 
                 <!-- Coluna principal de agendamentos -->
-                <div :class="(!isDoctor && doctors.length > 0) ? 'col-12 col-md-9' : 'col-12'">
+                <div :class="!isDoctor ? 'col-12 col-md-9' : 'col-12'">
 
-                    <!-- Estado vazio -->
-                    <div v-if="scheduleItems.length === 0" class="text-center py-5 text-muted">
-                        <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
-                        <p>{{ t.empty }}</p>
-                        <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                            <i class="fas fa-plus me-1"></i>{{ t.btn_new }}
-                        </button>
-                    </div>
+                    <!-- ── Vista calendário ───────────────────────────────── -->
+                    <CalendarView
+                        v-if="viewMode === 'calendar'"
+                        :schedule-items="scheduleItems"
+                        :date="date"
+                        :t="t"
+                        @event-click="onCalendarEventClick"
+                        @slot-click="onCalendarSlotClick"
+                    />
 
-                    <!-- Itens -->
+                    <!-- ── Vista lista ────────────────────────────────────── -->
                     <template v-else>
-                        <template v-for="item in scheduleItems" :key="item.id">
-                            <ScheduleCard
-                                v-if="item.type === 'schedule'"
-                                :item="item"
-                                :is-staff="isStaff"
-                                :is-doctor="isDoctor"
-                                :moods="moods"
-                                :selection-mode="selectionMode"
-                                :selected="isSelected(item.id)"
-                                :t="t"
-                                @toggle-select="toggleSelect"
-                                @edit="openEdit"
-                                @reschedule="openReschedule"
-                                @cancel="openCancel"
-                                @change-situation="onChangeSituation"
-                                @change-mood="onChangeMood"
-                            />
-                            <EventCard v-else :item="item" :t="t" />
+
+                        <!-- Estado vazio -->
+                        <div v-if="scheduleItems.length === 0" class="text-center py-5 text-muted">
+                            <i class="fas fa-calendar-times fa-3x mb-3 opacity-25"></i>
+                            <p>{{ t.empty }}</p>
+                            <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
+                                <i class="fas fa-plus me-1"></i>{{ t.btn_new }}
+                            </button>
+                        </div>
+
+                        <!-- Itens -->
+                        <template v-else>
+                            <template v-for="item in scheduleItems" :key="item.id">
+                                <ScheduleCard
+                                    v-if="item.type === 'schedule'"
+                                    :item="item"
+                                    :is-staff="isStaff"
+                                    :is-doctor="isDoctor"
+                                    :moods="moods"
+                                    :selection-mode="selectionMode"
+                                    :selected="isSelected(item.id)"
+                                    :t="t"
+                                    @toggle-select="toggleSelect"
+                                    @view="onView"
+                                    @edit="openEdit"
+                                    @reschedule="openReschedule"
+                                    @cancel="openCancel"
+                                    @change-situation="onChangeSituation"
+                                    @change-mood="onChangeMood"
+                                />
+                                <EventCard v-else :item="item" :t="t" />
+                            </template>
                         </template>
+
                     </template>
 
                 </div>
@@ -584,6 +639,14 @@ const breadcrumbs = [
             :t="t"
             @close="wlFormOpen = false"
             @saved="onWlSaved"
+        />
+
+        <!-- ── Schedule Detail Drawer ─────────────────────────────────────── -->
+        <ScheduleDetailDrawer
+            :open="detailOpen"
+            :schedule-id="viewScheduleId"
+            :t="t"
+            @close="closeDetail"
         />
 
     </AppLayout>

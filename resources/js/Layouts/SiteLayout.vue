@@ -4,7 +4,14 @@
         <nav id="navbar" :class="{ scrolled: isScrolled }">
             <div class="container">
                 <div class="nav-inner">
-                    <a :href="routes.siteHome" class="nav-logo" :aria-label="appName">
+                    <a
+                        :href="routes.siteHome"
+                        class="nav-logo"
+                        :aria-label="appName"
+                        v-motion
+                        :initial="{ opacity: 0, x: -10 }"
+                        :enter="{ opacity: 1, x: 0, transition: { duration: 600, delay: 50 } }"
+                    >
                         <span class="nav-logo-imgs">
                             <img :src="logoSvg" :alt="appName" class="logo-v-dark">
                             <img :src="logoWhiteSvg" alt="" class="logo-v-white" aria-hidden="true">
@@ -47,10 +54,26 @@
                             </Transition>
                         </div>
 
-                        <a :href="routes.go" class="btn btn-outline" style="padding:10px 20px;font-size:14px;">
+                        <a
+                            :href="routes.go"
+                            class="btn btn-outline"
+                            style="padding:10px 20px;font-size:14px;"
+                            v-motion
+                            :initial="{ opacity: 0, y: -8 }"
+                            :enter="{ opacity: 1, y: 0, transition: { duration: 400, delay: 200 } }"
+                            :hovered="{ y: -2, transition: { duration: 200 } }"
+                        >
                             <i class="bi bi-box-arrow-in-right"></i> {{ t.nav.login }}
                         </a>
-                        <a :href="routes.register" class="btn btn-primary" style="padding:10px 20px;font-size:14px;">
+                        <a
+                            :href="routes.register"
+                            class="btn btn-primary"
+                            style="padding:10px 20px;font-size:14px;"
+                            v-motion
+                            :initial="{ opacity: 0, y: -8 }"
+                            :enter="{ opacity: 1, y: 0, transition: { duration: 400, delay: 300 } }"
+                            :hovered="{ y: -2, scale: 1.03, transition: { duration: 200 } }"
+                        >
                             {{ t.nav.get_started }} <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>

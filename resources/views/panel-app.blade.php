@@ -10,42 +10,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'EasyEye') }}</title>
-    <link rel="shortcut icon" href="{{ Vite::asset('resources/img/system/favicon.png') }}">
+    {{-- Favicon: SVG escalonável (browsers modernos) + ICO fallback + PNG 192 PWA --}}
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('favicon-192.png') }}">
     {{-- Theme config: executa antes do paint para evitar flash de tema --}}
     <script src="{{ asset('js/preclinic-theme-script.js') }}"></script>
-    <style>[x-cloak] { display: none !important; }</style>
-    {{-- jQuery síncrono: DataTables inline scripts ($dataTable->scripts()) precisam de $ antes dos ES modules --}}
+    {{-- jQuery síncrono: vendor.js + alguns plugins Bootstrap dependem de $ global
+         disponível antes dos ES modules executarem. --}}
     <script src="{{ asset('js/jquery.min.js') }}"></script>
     @routes
     @vite(['resources/css/vendor.css', 'resources/css/system.scss', 'resources/js/vendor.js', 'resources/js/panel.js'])
     @inertiaHead
 </head>
 <body>
-    {{-- Traduções expostas globalmente para DataTables e helpers JS legados --}}
+    {{-- Globals consumidos por componentes Vue (AppLayout, Patients/Index,
+         Schedules/CalendarView, LiveStatusBar, SlotPicker). --}}
     <script>
         window.translations = {
-            datatable: {
-                "sEmptyTable":    "{{ __('actions.datatable.sEmptyTable') }}",
-                "sProcessing":    "{{ __('actions.datatable.sProcessing') }}",
-                "sLengthMenu":    "{{ __('actions.datatable.sLengthMenu') }}",
-                "sZeroRecords":   "{{ __('actions.datatable.sZeroRecords') }}",
-                "sInfo":          "{{ __('actions.datatable.sInfo') }}",
-                "sInfoEmpty":     "{{ __('actions.datatable.sInfoEmpty') }}",
-                "sInfoFiltered":  "{{ __('actions.datatable.sInfoFiltered') }}",
-                "sInfoPostFix":   "",
-                "sSearch":        "{{ __('actions.datatable.sSearch') }}",
-                "sUrl":           "",
-                "oPaginate": {
-                    "sFirst":    "{{ __('actions.datatable.oPaginate.sFirst') }}",
-                    "sPrevious": "{{ __('actions.datatable.oPaginate.sPrevious') }}",
-                    "sNext":     "{{ __('actions.datatable.oPaginate.sNext') }}",
-                    "sLast":     "{{ __('actions.datatable.oPaginate.sLast') }}"
-                },
-                "oAria": {
-                    "sSortAscending":  "{{ __('actions.datatable.oAria.sSortAscending') }}",
-                    "sSortDescending": "{{ __('actions.datatable.oAria.sSortDescending') }}"
-                }
-            },
             messages: {
                 "register":             "{{ __('actions.messages.register') }}",
                 "edit":                 "{{ __('actions.messages.edit') }}",
@@ -74,7 +56,6 @@
                 "nearpointconvergence": "{{ mb_convert_case(__('actions.nearpointconvergence'), MB_CASE_LOWER, 'UTF-8') }}"
             }
         };
-        window.dataTableTranslations = window.translations.datatable;
         window.sessionLifetimeMs = {{ config('session.lifetime') * 60 * 1000 }};
         window.sessionLocale     = '{{ str_replace('_', '-', app()->getLocale()) }}';
     </script>

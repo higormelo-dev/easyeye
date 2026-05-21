@@ -33,6 +33,7 @@ return [
     'active_subs'          => 'active subscriptions',
     'cancelled_this_month' => 'cancellations/month',
     'all_clear'            => 'All clear',
+    'past_due'             => 'Past due',
 
     // Charts
     'chart_mrr_trend'    => 'MRR — 12-Month Trend',

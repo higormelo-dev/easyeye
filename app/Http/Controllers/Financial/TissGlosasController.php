@@ -8,8 +8,8 @@ use App\Domains\Tiss\Actions\OpenGlosaAppealAction;
 use App\Domains\Tiss\Enums\TissGlosaStatus;
 use App\Domains\Tiss\Models\TissGlosa;
 use App\Http\Controllers\Controller;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\{RedirectResponse, Request};
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class TissGlosasController extends Controller
 {
@@ -18,7 +18,7 @@ class TissGlosasController extends Controller
     ) {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): InertiaResponse
     {
         $entityId = session('selected_entity_id');
 
@@ -51,26 +51,37 @@ class TissGlosasController extends Controller
             ])
             ->sortByDesc('open');
 
-        $meta = [
-            'title'       => __('financial.glosas.title'),
+        return Inertia::render('Panel/Financial/Tiss/GlosasIndex', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => __('financial.glosas.title'), 'url' => 'javascript:void(0);', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                'active' => false],
+                ['label' => __('financial.financial'),        'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.glosas.title'),     'url' => '#',                                    'active' => true],
             ],
-        ];
-
-        return view('system.financial.tiss.glosas.index', compact(
-            'meta',
-            'glosas',
-            'from',
-            'to',
-            'totalAmount',
-            'openAmount',
-            'appealedAmount',
-            'recoveredAmount',
-            'byOperator',
-        ));
+            'filters' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
+            'summary' => [
+                'total'     => (float) $totalAmount,
+                'open'      => (float) $openAmount,
+                'appealed'  => (float) $appealedAmount,
+                'recovered' => (float) $recoveredAmount,
+                'count'     => $glosas->count(),
+            ],
+            'glosas' => $glosas->map(fn (TissGlosa $g) => [
+                'id'            => (string) $g->id,
+                'identified_at' => $g->identified_at?->format('d/m/Y'),
+                'operator_name' => $g->operator?->trade_name ?? $g->operator?->name,
+                'guide_number'  => $g->guide?->guide_number,
+                'reason_code'   => $g->reason_code,
+                'reason_text'   => $g->reason_text,
+                'amount'        => (float) $g->amount,
+                'status'        => $g->status->value,
+                'status_label'  => $g->status->label(),
+                'is_actionable' => $g->status->isActionable(),
+                'appeals_count' => $g->appeals->count(),
+                'appeal_url'    => route('panel.financial.tiss.glosas.appeal', $g->id),
+            ]),
+            'byOperator' => $byOperator->values()->all(),
+            't'          => trans('financial'),
+        ]);
     }
 
     public function appeal(Request $request, TissGlosa $glosa): RedirectResponse

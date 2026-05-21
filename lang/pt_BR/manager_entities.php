@@ -135,4 +135,23 @@ return [
     'detail_schedule_interval'       => 'Intervalo de consulta',
     'detail_interval_minutes'        => ':value minutos',
     'detail_registered_at'           => 'Cadastro',
+
+    // ── Hardening: 2FA por empresa ───────────────────────────────────────────
+    'section_security'         => 'Segurança',
+    'detail_2fa_required'      => 'Exige 2FA',
+    'detail_2fa_yes'           => 'Sim — todos os usuários',
+    'detail_2fa_no'            => 'Não — opcional por usuário',
+    'detail_2fa_enabled_at'    => 'Ativado em',
+    'detail_2fa_enabled_by'    => 'Ativado por',
+    'badge_2fa_required_hint'  => 'Esta empresa exige 2FA de todos os usuários',
+
+    // ── Form: seção Segurança ────────────────────────────────────────────────
+    'form_section_security'    => 'Segurança',
+    'form_2fa_label'           => 'Exigir 2FA para todos os usuários',
+    'form_2fa_hint'            => 'Quando ativado, todos os usuários desta empresa precisarão configurar autenticação em dois fatores.',
+    'form_2fa_enabled_at'      => 'Ativado em :date por :user',
+    'form_2fa_toggle_enable'   => 'Ativar 2FA obrigatório',
+    'form_2fa_toggle_disable'  => 'Desativar 2FA obrigatório',
+    'form_2fa_modal_enable'    => 'Justifique por que está ATIVANDO 2FA obrigatório nesta empresa (LGPD/CFM).',
+    'form_2fa_modal_disable'   => 'Justifique por que está DESATIVANDO 2FA obrigatório nesta empresa (LGPD/CFM).',
 ];

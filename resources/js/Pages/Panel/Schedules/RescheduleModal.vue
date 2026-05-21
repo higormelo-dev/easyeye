@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue';
+import SlotPicker from '@/Components/Panel/SlotPicker.vue';
 
 const props = defineProps({
     item:    { type: Object, default: null },
@@ -9,11 +10,13 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'rescheduled']);
 
-const dateTime = ref('');
-const doctorId = ref('');
-const saving   = ref(false);
-const errorMsg = ref('');
-let bsModal    = null;
+const dateTime      = ref('');
+const doctorId      = ref('');
+const saving        = ref(false);
+const errorMsg      = ref('');
+const modalOpen     = ref(false);
+const slotPickerRef = ref(null);
+let bsModal         = null;
 
 watch(() => props.item, async (val) => {
     if (val) {
@@ -21,7 +24,9 @@ watch(() => props.item, async (val) => {
         doctorId.value = val.doctor_id ?? '';
         errorMsg.value = '';
         saving.value   = false;
+        modalOpen.value = true;
         await nextTick();
+        slotPickerRef.value?.reset();
         if (! bsModal) {
             bsModal = new bootstrap.Modal(document.getElementById('rescheduleModal'));
         }
@@ -57,6 +62,7 @@ async function onConfirm() {
 }
 
 function onHidden() {
+    modalOpen.value = false;
     emit('close');
 }
 </script>
@@ -80,10 +86,6 @@ function onHidden() {
                         <div v-if="item" class="mb-3 text-muted small">
                             {{ item.time }} — <strong>{{ item.name }}</strong>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">{{ t.reschedule_datetime }}</label>
-                            <input v-model="dateTime" type="datetime-local" class="form-control">
-                        </div>
                         <div v-if="doctors.length > 1" class="mb-3">
                             <label class="form-label fw-semibold">{{ t.reschedule_doctor }}</label>
                             <select v-model="doctorId" class="form-select">
@@ -91,6 +93,14 @@ function onHidden() {
                                 <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
                             </select>
                         </div>
+                        <SlotPicker
+                            v-if="modalOpen"
+                            ref="slotPickerRef"
+                            v-model="dateTime"
+                            :doctor-id="doctorId"
+                            :schedule-id="item?.id ?? null"
+                            :t="t"
+                        />
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">

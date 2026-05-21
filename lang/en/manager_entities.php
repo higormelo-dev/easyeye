@@ -135,4 +135,21 @@ return [
     'detail_schedule_interval'       => 'Appointment interval',
     'detail_interval_minutes'        => ':value minutes',
     'detail_registered_at'           => 'Registered',
+
+    'section_security'         => 'Security',
+    'detail_2fa_required'      => 'Requires 2FA',
+    'detail_2fa_yes'           => 'Yes — all users',
+    'detail_2fa_no'            => 'No — optional per user',
+    'detail_2fa_enabled_at'    => 'Enabled at',
+    'detail_2fa_enabled_by'    => 'Enabled by',
+    'badge_2fa_required_hint'  => 'This company requires 2FA from all users',
+
+    'form_section_security'    => 'Security',
+    'form_2fa_label'           => 'Require 2FA for all users',
+    'form_2fa_hint'            => 'When enabled, all users of this company must set up two-factor authentication.',
+    'form_2fa_enabled_at'      => 'Enabled at :date by :user',
+    'form_2fa_toggle_enable'   => 'Enable required 2FA',
+    'form_2fa_toggle_disable'  => 'Disable required 2FA',
+    'form_2fa_modal_enable'    => 'Justify why you are ENABLING required 2FA for this company (LGPD/CFM).',
+    'form_2fa_modal_disable'   => 'Justify why you are DISABLING required 2FA for this company (LGPD/CFM).',
 ];

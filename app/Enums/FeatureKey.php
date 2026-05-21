@@ -17,9 +17,11 @@ enum FeatureKey: string
     case MaxStorageGB  = 'max_storage_gb'; // Armazenamento total em GB (0 = ilimitado)
 
     // Features booleanas
-    case HasAiExamAssistant  = 'has_ai_exam_assistant';
-    case HasAiReportDrafting = 'has_ai_report_drafting';
-    case HasApiIntegrator    = 'has_api_integrator';
+    case HasAiExamAssistant     = 'has_ai_exam_assistant';
+    case HasAiReportDrafting    = 'has_ai_report_drafting';
+    case HasAiConsensus         = 'has_ai_consensus';
+    case HasApiIntegrator       = 'has_api_integrator';
+    case HasOwnPaymentGateways  = 'has_own_payment_gateways';
 
     // Limites mensais de créditos IA (integer, 0 = ilimitado)
     case AiMonthlyCredits = 'ai_monthly_credits';
@@ -34,9 +36,11 @@ enum FeatureKey: string
             self::MaxPatients         => __('subscriptions.features.max_patients'),
             self::MaxDoctors          => __('subscriptions.features.max_doctors'),
             self::MaxStorageGB        => __('subscriptions.features.max_storage_gb'),
-            self::HasAiExamAssistant  => __('subscriptions.features.has_ai_exam_assistant'),
-            self::HasAiReportDrafting => __('subscriptions.features.has_ai_report_drafting'),
-            self::HasApiIntegrator    => __('subscriptions.features.has_api_integrator'),
+            self::HasAiExamAssistant    => __('subscriptions.features.has_ai_exam_assistant'),
+            self::HasAiReportDrafting   => __('subscriptions.features.has_ai_report_drafting'),
+            self::HasAiConsensus        => __('subscriptions.features.has_ai_consensus'),
+            self::HasApiIntegrator      => __('subscriptions.features.has_api_integrator'),
+            self::HasOwnPaymentGateways => __('subscriptions.features.has_own_payment_gateways'),
             self::AiMonthlyCredits    => __('subscriptions.features.ai_monthly_credits'),
             self::ApiMonthlyExamSends => __('subscriptions.features.api_monthly_exam_sends'),
         };
@@ -48,7 +52,9 @@ enum FeatureKey: string
         return in_array($this, [
             self::HasAiExamAssistant,
             self::HasAiReportDrafting,
+            self::HasAiConsensus,
             self::HasApiIntegrator,
+            self::HasOwnPaymentGateways,
         ]);
     }
 

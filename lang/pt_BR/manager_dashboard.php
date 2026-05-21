@@ -33,6 +33,7 @@ return [
     'active_subs'          => 'assinaturas ativas',
     'cancelled_this_month' => 'cancelamentos/mês',
     'all_clear'            => 'Tudo ok',
+    'past_due'             => 'Em atraso',
 
     // Gráficos
     'chart_mrr_trend'    => 'MRR — Tendência 12 Meses',

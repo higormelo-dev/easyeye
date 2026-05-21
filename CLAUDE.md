@@ -4,7 +4,7 @@ Guia operacional para agentes (Claude/Codex) neste repositório.
 
 ## Contexto do Projeto
 
-**EasyEye** é SaaS multi-tenant para oftalmologia, rodando em **Laravel 12** com UI em **Blade + Alpine.js + Vite**.
+**EasyEye** é SaaS multi-tenant para oftalmologia, rodando em **Laravel 12** com UI em **Vue 3 + Inertia.js + Vite**.
 
 Foco atual sistema:
 1. Operação clínica completa (pacientes, médicos, agenda, prontuário).
@@ -15,10 +15,12 @@ Foco atual sistema:
 ## Stack Atual
 
 1. Backend: PHP 8.4 runtime, Laravel 12.x.
-2. Frontend: Blade, Alpine.js, Bootstrap 5, Tailwind CSS, DataTables.
-3. Banco: SQLite default local/test; suporte MySQL/MariaDB/PostgreSQL/SQL Server.
-4. Filas/cache: queue default `database`; Redis disponível e usado em fluxos específicos.
-5. Observabilidade: Sentry habilitado em `production` e `testing`.
+2. Frontend: **Vue 3 (Composition API + `<script setup>`) + Inertia.js + Bootstrap 5 + Tailwind CSS**.
+3. Blade só sobrevive como entry-point Inertia (`app/panel-app/guest-app/portal-app`) e templates server-side de PDF (`resources/views/pdf/`).
+4. Banco: PostgreSQL via `host.docker.internal` (rodando no host); suporte SQLite/MySQL/MariaDB/SQL Server.
+5. Filas/cache: queue default `database`; Redis em container `easyeye_redis`.
+6. Observabilidade: Sentry habilitado em `production` e `testing`.
+7. Rich-text editor: TinyMCE 8 via wrapper Vue `Components/Panel/TinyMceEditor.vue`.
 
 ## Comandos Comuns
 
@@ -124,10 +126,16 @@ Estado atual: ~367 rotas registradas.
 
 ## Frontend e Padrões UI
 
-1. Layout principal: `resources/views/layouts/app.blade.php`.
-2. Alpine components registrados em `resources/js/app.js`.
-3. Vendor JS em `resources/js/vendor.js` (ordem importa para DataTables/plugins).
-4. DataTables server-side com Yajra em múltiplos módulos (`app/DataTables/*`).
+1. Entry-points Inertia: `resources/views/{app,panel-app,guest-app,portal-app}.blade.php`. Cada controller usa `Inertia::render()` apontando para `resources/js/Pages/...`.
+2. Layouts Vue: `resources/js/Layouts/{AppLayout,GuestLayout,PortalLayout}.vue`.
+3. Páginas por área: `resources/js/Pages/{Site,Auth,Panel,Portal}/...`.
+4. Componentes compartilhados: `resources/js/Components/Panel/...` (PageHeader, ActionIconButton, OffcanvasPanel, TinyMceEditor, TablePagination, etc.).
+5. Estado de formulário: sempre `useForm` do `@inertiajs/vue3`. Multipart precisa `forceFormData: true`.
+6. Navegação: `<Link>` para SPA, `router.get/post` para programático, `window.location` apenas para asset/PDF externo.
+7. Bundles Vite: `vendor.js` (jQuery + Bootstrap plugins legados), `panel.js` (Inertia app painel), `site.js` (landing + auth + portal).
+8. Rich text: usar `<TinyMceEditor v-model="content" />` — wrapper Vue do TinyMCE 8.
+9. SCSS modular em `resources/css/system/_*.scss` e `system.scss` como entry.
+10. **Não usar Alpine.js, Yajra DataTables ou Blade fora de PDFs/entry-points** — removidos do projeto.
 
 ## Convenções de Implementação
 
@@ -136,6 +144,7 @@ Estado atual: ~367 rotas registradas.
 3. Preservar `entity_id` em queries e policies.
 4. Usar enums/gates existentes antes de criar novos status/strings.
 5. Em mudanças de prontuário/compliance, validar impacto em assinatura/versionamento/auditoria.
+6. Toda nova tela do painel: `Inertia::render('Panel/<Modulo>/<Tela>', $props)` + página Vue equivalente.
 
 ## Testes Relevantes para Regressão
 
@@ -152,7 +161,9 @@ Executar ao mexer em ACL/subscription/billing/TISS/compliance:
 ## Pontos de Atenção
 
 1. `route:list --columns` não existe no Laravel 12 deste projeto.
-2. Muitas telas dependem de DataTables + jQuery global; cuidado ao alterar ordem de scripts.
+2. Docker via Snap tem bind-mount estagnado: edits no host podem não propagar para o container. Fix: `docker compose rm -f -s app node ssr && docker compose up -d`. Migrar para Docker Engine nativo resolve em definitivo.
 3. Multi-tenancy por sessão: jobs/CLI precisam resolver entidade explicitamente quando necessário.
 4. Ajustes em billing podem afetar webhook idempotency e retry/circuit breaker.
 5. Ajustes em templates clínicos afetam emissão de documentação e histórico de versões.
+6. PostgreSQL aceita conexões da subnet Docker `172.16.0.0/12` (`pg_hba.conf`). Mudanças na rede podem exigir liberação adicional.
+7. Redis em container (`easyeye_redis`) — `.env` deve apontar `REDIS_HOST=redis`.

@@ -238,6 +238,30 @@ Acesse: **http://localhost:8085**
 
 ---
 
+## Testes de IA
+
+Para evitar diferenças de DNS/DB entre host e container, rode os testes de IA sempre pelo container `app`.
+
+```bash
+# Execução completa (feature + unit de IA)
+make test-ai
+
+# Apenas feature
+make test-ai-feature
+
+# Apenas unit
+make test-ai-unit
+```
+
+Alternativas equivalentes:
+
+```bash
+./scripts/test-ai.sh
+composer test:ai
+```
+
+---
+
 ## Serviços
 
 | Container | Imagem | Porta | Função |

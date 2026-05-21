@@ -193,6 +193,12 @@ class MedicalRecordQuickActionsController extends Controller
         // placeholder literal só polui o textarea.
         $html = preg_replace('/\{\{[A-Z_][A-Z0-9_]*\}\}/u', '', $resolved['html']) ?? $resolved['html'];
 
+        // Remove cabeçalho de data resolvido (`<p text-align:right>CIDADE, DATA</p>`
+        // + `<p>&nbsp;</p>`) que vem do template — a data já é renderizada no
+        // bloco de assinatura do PDF (`_signature.blade.php`); manter no textarea
+        // duplica visualmente e polui o editor.
+        $html = $this->stripResolvedDateHeader($html);
+
         return response()->json([
             'exam_type'    => $registry->value,
             'subtype'      => $subtype,
@@ -232,5 +238,18 @@ class MedicalRecordQuickActionsController extends Controller
     private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void
     {
         abort_if($medicalrecord->patient_id !== $patient->id, 404);
+    }
+
+    /**
+     * Remove o `<p style="text-align:right">{LOCAL_DATA resolvido}</p>` + o
+     * `<p>&nbsp;</p>` espaçador no INÍCIO do HTML — a data já será renderizada
+     * no bloco de assinatura do PDF. Padrão pareia qualquer cidade/data, sem
+     * hardcoded de mês/local, e só age no início do conteúdo.
+     */
+    private function stripResolvedDateHeader(string $html): string
+    {
+        $pattern = '/^\s*<p\s+[^>]*text-align\s*:\s*right[^>]*>[^<]*<\/p>\s*(?:<p[^>]*>&nbsp;<\/p>)?\s*/iu';
+
+        return preg_replace($pattern, '', $html, 1) ?? $html;
     }
 }

@@ -194,55 +194,42 @@ class UsersController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Display the specified resource (JSON only — UI via Vue/Inertia).
      */
-    public function show(string $id): Application|View|JsonResponse|EntityUserResource
+    public function show(string $id): JsonResponse|RedirectResponse
     {
-        $record = $this->service->findByIdOrCode($id);
-
-        if (request()->wantsJson()) {
-            $record->loadMissing('user');
-
-            return response()->json([
-                'data' => [
-                    'id'     => $record->id,
-                    'name'   => $record->user?->name ?? '',
-                    'email'  => $record->user?->email ?? '',
-                    'rule'   => $record->rule,
-                    'active' => (bool) $record->active,
-                ],
-            ]);
+        if (!request()->wantsJson()) {
+            return redirect()->route('panel.accesscontrol.users.index');
         }
 
-        return view(
-            'system.users.show',
-            compact('record'),
-        );
+        $record = $this->service->findByIdOrCode($id);
+        $record->loadMissing('user');
+
+        return response()->json([
+            'data' => [
+                'id'     => $record->id,
+                'name'   => $record->user?->name ?? '',
+                'email'  => $record->user?->email ?? '',
+                'rule'   => $record->rule,
+                'active' => (bool) $record->active,
+            ],
+        ]);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Return user data for the edit modal (JSON only — UI via Vue/Inertia).
      */
-    public function edit(string $id): Application|View|JsonResponse|EntityUserResource
+    public function edit(string $id): JsonResponse|RedirectResponse
     {
+        if (!request()->wantsJson()) {
+            return redirect()->route('panel.accesscontrol.users.index');
+        }
+
         $record = $this->service->findByIdOrCode($id);
-        $roles  = ['' => 'Selecione uma opção'];
 
-        if (! session()->get('selected_entity_is_client')) {
-            $roles = array_merge($roles, User::$rolesOfManager);
-        } else {
-            $clientRoles = User::$rolesOfClients;
-            unset($clientRoles['doctor']);
-            $roles = array_merge($roles, $clientRoles);
-        }
-
-        if (request()->wantsJson()) {
-            return response()->json([
-                'data' => new EntityUserResource($record),
-            ]);
-        }
-
-        return view('system.users.form', compact('record', 'roles'));
+        return response()->json([
+            'data' => new EntityUserResource($record),
+        ]);
     }
 
     /**

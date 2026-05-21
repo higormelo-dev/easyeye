@@ -139,3 +139,51 @@ function createScheduleForEntity(\App\Models\Entity $entity, array $attrs = []):
 
     return compact('schedule', 'doctor');
 }
+
+/**
+ * Sessão padrão de um EntityUser navegando o painel da clínica.
+ * Inclui as chaves que o middleware entity.selected espera para resolver o tenant.
+ */
+function panelSession($entityUser): array
+{
+    return [
+        'selected_entity_id'        => $entityUser->entity_id,
+        'selected_entity_user_id'   => $entityUser->id,
+        'selected_entity_user_rule' => $entityUser->rule,
+        'selected_entity_is_client' => true,
+    ];
+}
+
+/**
+ * Headers de uma request Inertia. Inclui X-Inertia-Version computado pelo middleware
+ * para evitar 409 (version mismatch) em testes que disparam GET com X-Inertia.
+ */
+function inertiaHeaders(): array
+{
+    $middleware = app(\App\Http\Middleware\HandleInertiaRequests::class);
+    $version    = $middleware->version(request()) ?? '';
+
+    return [
+        'X-Inertia'         => 'true',
+        'X-Inertia-Version' => $version,
+        'X-Requested-With'  => 'XMLHttpRequest',
+    ];
+}
+
+/**
+ * Payload mínimo válido para POST /panel/ai/runs (cria uma execução de IA).
+ */
+function baseRunPayload(): array
+{
+    return [
+        'workflow'          => 'report_drafting',
+        'mode'              => \App\Enums\AI\AiRunMode::Validated->value,
+        'risk_level'        => \App\Enums\AI\AiRiskLevel::Medium->value,
+        'user_prompt'       => 'Gerar rascunho clínico com linguagem de apoio para revisão médica.',
+        'system_prompt'     => 'Você é um assistente de apoio clínico.',
+        'context'           => ['specialty' => 'ophthalmology'],
+        'attachments'       => [],
+        'expects_json'      => false,
+        'max_output_tokens' => 700,
+    ];
+}

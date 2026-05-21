@@ -8,6 +8,8 @@ import PlanTable        from './PlanTable.vue';
 import PlanCards        from './PlanCards.vue';
 import PlanFormModal    from './PlanFormModal.vue';
 import PlanDetailDrawer from './PlanDetailDrawer.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
     plans:         { type: Object, required: true },
@@ -61,9 +63,24 @@ function openDetail(id) { detailId.value = id; detailOpen.value = true; }
 function closeDetail()  { detailOpen.value = false; detailId.value = null; }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
+const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+
 function onDelete(id) {
-    if (!confirm(props.t.confirm_delete ?? 'Tem certeza?')) return;
-    router.delete(route('manager.plans.destroy', id), { preserveScroll: true });
+    openReasonModal({
+        title: props.t.confirm_delete_title ?? props.t.confirm_delete ?? 'Excluir plano',
+        message: props.t.confirm_delete_text ?? 'Esta ação não pode ser desfeita silenciosamente.',
+        confirmVariant: 'danger',
+        async onConfirm(reason) {
+            await new Promise((resolve, reject) => {
+                router.delete(route('manager.plans.destroy', id), {
+                    data: { reason },
+                    preserveScroll: true,
+                    onSuccess: resolve,
+                    onError: reject,
+                });
+            });
+        },
+    });
 }
 
 function onToggleActive(id, currentActive) {
@@ -88,10 +105,10 @@ const breadcrumbs = [
             <PageHeader
                 :title="t.page_title"
                 :total="total"
-                :total-label="t.total_label"
                 :view="view"
                 :view-table-title="t.view_table"
                 :view-cards-title="t.view_cards"
+                :show-view-toggle="true"
                 @set-view="setView"
             >
                 <template #actions>
@@ -149,6 +166,17 @@ const breadcrumbs = [
             :t="t"
             @close="closeDetail"
             @edit="(id) => { closeDetail(); openEdit(id); }"
+        />
+
+        <!-- Confirmação destrutiva com justificativa -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
         />
     </AppLayout>
 </template>

@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\SubscriptionRequest;
 use App\Models\Billing\{BillingRetrySchedule, Invoice};
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
+use App\Services\Audit\AuditLogger;
 use App\Services\Billing\{BillingCancellationService, BillingSubscriptionOrchestrator};
 use App\Services\{SubscriptionService, TrialService};
 use Illuminate\Http\{JsonResponse, Request};
@@ -21,6 +22,7 @@ class SubscriptionsController extends Controller
         private readonly TrialService $trialService,
         private readonly BillingSubscriptionOrchestrator $billingSubscriptionOrchestrator,
         private readonly BillingCancellationService $billingCancellationService,
+        private readonly AuditLogger $audit,
     ) {
     }
 
@@ -227,6 +229,11 @@ class SubscriptionsController extends Controller
         $request->validate([
             'entity_id' => ['required', 'uuid', 'exists:entities,id'],
             'active'    => ['required', 'boolean'],
+            'reason'    => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
         ]);
 
         $entity = Entity::findOrFail($request->entity_id);
@@ -234,6 +241,18 @@ class SubscriptionsController extends Controller
 
         $entity->update(['active' => $active]);
         $entity->entityUsers()->update(['active' => $active]);
+
+        // Audit estruturado: trace por que o acesso foi alterado.
+        $this->audit->recordAdminAction(
+            event: $active ? 'manager.entity.unblock' : 'manager.entity.block',
+            targetEntityId: (string) $entity->id,
+            targetUserId: null,
+            auditableType: 'entity',
+            auditableId: (string) $entity->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: ['active' => $active, 'cascaded_to_entity_users' => true],
+            request: $request,
+        );
 
         $message = $active ? 'Acesso desbloqueado com sucesso.' : 'Acesso bloqueado com sucesso.';
 
@@ -289,6 +308,11 @@ class SubscriptionsController extends Controller
     {
         $request->validate([
             'entity_id' => ['required', 'uuid', 'exists:entities,id'],
+            'reason'    => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
         ]);
 
         $entity       = Entity::findOrFail($request->entity_id);
@@ -298,12 +322,31 @@ class SubscriptionsController extends Controller
             return response()->json(['message' => 'Nenhuma assinatura ativa encontrada.'], 404);
         }
 
+        $oldStatus = $subscription->status->value;
+
         $subscription = $this->billingCancellationService->cancel(
             subscription: $subscription,
             entity: $entity,
             reason: CancellationReason::AdminAction,
             source: 'manager',
             cancelAtGateway: true,
+        );
+
+        // Audit estruturado da ação destrutiva, com a justificativa do admin.
+        $this->audit->recordAdminAction(
+            event: 'manager.subscription.cancel',
+            targetEntityId: (string) $entity->id,
+            targetUserId: null,
+            auditableType: 'subscription',
+            auditableId: (string) $subscription->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: [
+                'cancellation_reason' => CancellationReason::AdminAction->value,
+                'cancel_at_gateway'   => true,
+                'new_status'          => $subscription->status->value,
+            ],
+            request: $request,
+            oldValues: ['status' => $oldStatus],
         );
 
         return response()->json([

@@ -3,6 +3,9 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import LoadingSpinner  from '@/Components/Panel/LoadingSpinner.vue';
 import CardsPagination from '@/Components/Panel/CardsPagination.vue';
+import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -119,52 +122,49 @@ defineExpose({ fetchCards });
                     <hr class="my-2">
 
                     <!-- Actions -->
-                    <div class="d-flex justify-content-end gap-1">
-                        <button
-                            class="btn btn-xs btn-outline-secondary"
+                    <ActionIconGroup align="end" gap="tight">
+                        <ActionIconButton
+                            icon="ti ti-file-search"
                             :title="t.action_preview"
                             @click="$emit('preview', r)"
-                        ><i class="ti ti-file-search"></i></button>
-
-                        <button
-                            class="btn btn-xs btn-outline-secondary"
+                        />
+                        <ActionIconButton
+                            icon="ti ti-edit"
                             :title="t.action_edit"
                             @click="$emit('edit', r.id)"
-                        ><i class="ti ti-edit"></i></button>
-
-                        <div class="dropdown">
-                            <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="dropdown">
-                                <i class="ti ti-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end p-2" style="min-width:160px;">
-                                <li v-if="r.status === 'draft' || r.status === 'archived'">
-                                    <button
-                                        class="dropdown-item rounded-1 text-success"
-                                        @click="$emit('publish', r)"
-                                    >
-                                        <i class="ti ti-send me-1"></i> {{ t.action_publish }}
-                                    </button>
-                                </li>
-                                <li v-if="r.status === 'published'">
-                                    <button
-                                        class="dropdown-item rounded-1 text-warning"
-                                        @click="$emit('archive', r)"
-                                    >
-                                        <i class="ti ti-archive me-1"></i> {{ t.action_archive }}
-                                    </button>
-                                </li>
-                                <li><hr class="dropdown-divider my-1"></li>
-                                <li>
-                                    <button
-                                        class="dropdown-item rounded-1 text-danger"
-                                        @click="$emit('delete', r)"
-                                    >
-                                        <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                        />
+                        <ActionDropdown
+                            :min-width="160"
+                            btn-class="ee-action-icon ee-action-icon--default"
+                            icon="ti ti-dots-vertical"
+                        >
+                            <li v-if="r.status === 'draft' || r.status === 'archived'">
+                                <button
+                                    class="dropdown-item rounded-1 text-success"
+                                    @click="$emit('publish', r)"
+                                >
+                                    <i class="ti ti-send me-1"></i> {{ t.action_publish }}
+                                </button>
+                            </li>
+                            <li v-if="r.status === 'published'">
+                                <button
+                                    class="dropdown-item rounded-1 text-warning"
+                                    @click="$emit('archive', r)"
+                                >
+                                    <i class="ti ti-archive me-1"></i> {{ t.action_archive }}
+                                </button>
+                            </li>
+                            <li><hr class="dropdown-divider my-1"></li>
+                            <li>
+                                <button
+                                    class="dropdown-item rounded-1 text-danger"
+                                    @click="$emit('delete', r)"
+                                >
+                                    <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
+                                </button>
+                            </li>
+                        </ActionDropdown>
+                    </ActionIconGroup>
                 </div>
             </div>
         </div>

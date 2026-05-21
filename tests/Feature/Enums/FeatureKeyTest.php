@@ -7,6 +7,7 @@ use App\Enums\FeatureKey;
 test('features booleanas retornam isBoolean true', function () {
     expect(FeatureKey::HasAiExamAssistant->isBoolean())->toBeTrue();
     expect(FeatureKey::HasAiReportDrafting->isBoolean())->toBeTrue();
+    expect(FeatureKey::HasAiConsensus->isBoolean())->toBeTrue();
     expect(FeatureKey::HasApiIntegrator->isBoolean())->toBeTrue();
 });
 

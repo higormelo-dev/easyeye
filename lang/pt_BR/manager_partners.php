@@ -110,4 +110,17 @@ return [
     'partner_deleted'    => 'Parceiro removido com sucesso.',
     'commission_paid'    => 'Comissão marcada como paga.',
     'lead_advanced'      => 'Status do lead atualizado.',
+
+    // Export PDF / Excel
+    'export'                  => 'Exportar',
+    'export_filters'          => 'Filtros do relatório',
+    'export_from'             => 'De',
+    'export_to'               => 'Até',
+    'export_status'           => 'Status (comissões)',
+    'export_status_all'       => 'Todos',
+    'export_status_pending'   => 'Pendentes',
+    'export_status_paid'      => 'Pagas',
+    'export_status_cancelled' => 'Canceladas',
+    'export_pdf'              => 'Exportar PDF',
+    'export_excel'            => 'Exportar Excel',
 ];

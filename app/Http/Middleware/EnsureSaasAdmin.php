@@ -19,9 +19,20 @@ class EnsureSaasAdmin
                 : redirect()->route('login');
         }
 
-        // Rejeita usuários com entidade-cliente selecionada (clínicas)
+        // Rejeita usuários com entidade-cliente selecionada (clínicas).
+        // Durante impersonação, redireciona suavemente para o painel próprio em vez
+        // de abortar com 403 — a UI continua bloqueada, mas o UX fica limpo
+        // (sem banner de erro preso após a navegação).
         if (session('selected_entity_is_client')) {
-            abort(403, 'Área restrita ao administrador do SaaS.');
+            $message = __('http-statuses.custom.403_saas_admin_only');
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $message], 403);
+            }
+
+            return redirect()
+                ->route('panel.dashboard')
+                ->with('error', $message);
         }
 
         // Rejeita usuários sem entidade na sessão

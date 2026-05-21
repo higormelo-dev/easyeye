@@ -11,7 +11,7 @@ use App\Notifications\ScheduleNotification;
 use App\Services\ScheduleService;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\{Rule, ValidationException};
@@ -74,93 +74,100 @@ class SchedulesController extends Controller
         ]);
     }
 
-    /**
-     * Return the rendered schedule list partial (AJAX).
-     */
-    public function ajaxList(Request $request)
-    {
-        $entityId = session()->get('selected_entity_id');
-        $date     = Carbon::createFromFormat('d/m/Y', $request->string('date')->toString());
-        $doctor   = $request->string('doctor')->toString();
-        $bout     = $request->integer('bout');
-        $search   = $request->string('search')->trim()->value();
-
-        $query = $this->model->query()
-            ->with(['doctor', 'covenant', 'patient.person', 'visitType'])
-            ->leftJoin('patients', 'patients.id', '=', 'schedules.patient_id')
-            ->leftJoin('people', 'people.id', '=', 'patients.person_id')
-            ->where('schedules.entity_id', $entityId)
-            ->whereDate('schedules.date_time', $date)
-            ->select('schedules.*');
-
-        $loggedDoctor = $this->loggedDoctor();
-
-        if ($loggedDoctor) {
-            $query->where('schedules.doctor_id', $loggedDoctor->id);
-        } elseif ($doctor !== 'tudo') {
-            $query->where('schedules.doctor_id', $doctor);
-        }
-
-        if ($search) {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower) {
-                $q->whereRaw('LOWER(schedules.full_name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"]);
-            });
-        }
-
-        match ($bout) {
-            2       => $query->whereTime('date_time', '<', '13:00:00'),
-            3       => $query->whereTime('date_time', '>=', '13:00:00')->whereTime('date_time', '<', '18:00:00'),
-            4       => $query->whereTime('date_time', '>=', '18:00:00'),
-            default => null,
-        };
-
-        $schedules = $query->orderBy('date_time')->get();
-
-        // ── Compromissos não-clínicos do dia ──────────────────────────────────
-        $eventQuery = ScheduleEvent::with('doctor')
-            ->where('entity_id', $entityId)
-            ->whereDate('starts_at', $date)
-            ->whereNull('deleted_at');
-
-        if ($loggedDoctor) {
-            $eventQuery->where(function ($q) use ($loggedDoctor) {
-                $q->where('doctor_id', $loggedDoctor->id)->orWhereNull('doctor_id');
-            });
-        } elseif ($doctor !== 'tudo') {
-            $eventQuery->where(function ($q) use ($doctor) {
-                $q->where('doctor_id', $doctor)->orWhereNull('doctor_id');
-            });
-        }
-
-        match ($bout) {
-            2       => $eventQuery->whereTime('starts_at', '<', '13:00:00'),
-            3       => $eventQuery->whereTime('starts_at', '>=', '13:00:00')->whereTime('starts_at', '<', '18:00:00'),
-            4       => $eventQuery->whereTime('starts_at', '>=', '18:00:00'),
-            default => null,
-        };
-
-        $events = $eventQuery->orderBy('starts_at')->get();
-
-        return view('system.schedules.list', compact('schedules', 'events'));
-    }
-
-    public function show(Schedule $schedule): mixed
+    public function show(Schedule $schedule): JsonResponse|RedirectResponse
     {
         $this->authorizeSchedule($schedule);
 
-        $schedule->load(['doctor.entityUser.user', 'patient.person', 'covenant', 'visitType', 'situationLogs.entityUser.user', 'resources']);
-
-        if (request()->wantsJson()) {
-            return response()->json([
-                'data' => array_merge($schedule->toArray(), [
-                    'date_time' => $schedule->date_time->format('Y-m-d\TH:i'),
-                ]),
+        // Visualização agora é exclusivamente via drawer modal na própria index.
+        // Acesso direto à URL redireciona, preservando preservando o filtro de data do agendamento.
+        if (!request()->wantsJson()) {
+            return redirect()->route('panel.schedules.index', [
+                'date' => $schedule->date_time->format('Y-m-d'),
             ]);
         }
 
-        return view('system.schedules.show', compact('schedule'));
+        $schedule->load([
+            'doctor.entityUser.user',
+            'patient.person',
+            'covenant',
+            'visitType',
+            'situationLogs.entityUser.user',
+            'resources',
+        ]);
+
+        $patient = $schedule->patient;
+        $doctor  = $schedule->doctor;
+
+        return response()->json(['data' => [
+            // ── Identificação ─────────────────────────────────────────────
+            'id'                   => $schedule->id,
+            'code'                 => $schedule->code,
+            'date_time'            => $schedule->date_time->format('d/m/Y H:i'),
+            'date_time_iso'        => $schedule->date_time->format('Y-m-d\TH:i'),
+            'date'                 => $schedule->date_time->format('d/m/Y'),
+            'time'                 => $schedule->date_time->format('H:i'),
+
+            // ── Paciente ──────────────────────────────────────────────────
+            'patient_id'           => $schedule->patient_id,
+            'patient_name'         => $patient ? $patient->person->full_name : $schedule->full_name,
+            'patient_code'         => $patient?->present()->getCode(),
+            'patient_is_registered' => (bool) $patient,
+            'medical_records_url'  => $patient
+                ? route('panel.patients.medicalrecords.index', $patient->id)
+                : null,
+
+            // ── Médico ────────────────────────────────────────────────────
+            'doctor_id'            => $schedule->doctor_id,
+            'doctor_name'          => $doctor?->entityUser?->user?->name,
+            'doctor_code'          => $doctor?->code,
+            'doctor_record'        => $doctor?->record,
+            'doctor_color'         => $doctor?->color,
+
+            // ── Atendimento ───────────────────────────────────────────────
+            'covenant_name'        => $schedule->covenant?->name,
+            'visit_type_name'      => $schedule->visitType?->name,
+
+            // ── Situação ──────────────────────────────────────────────────
+            'situation'            => $schedule->situation->value,
+            'situation_label'      => $schedule->situation->label(),
+            'situation_badge'      => $schedule->situation->badgeClass(),
+            'situation_icon'       => $schedule->situation->icon(),
+
+            // ── Contato ───────────────────────────────────────────────────
+            'telephone'            => $schedule->telephone,
+            'cellphone'            => $schedule->cellphone,
+            'cellphone_whatsapp'   => (bool) $schedule->cellphone_whatsapp,
+
+            // ── Tempos ────────────────────────────────────────────────────
+            'arrived_at'           => $schedule->arrived_at?->format('d/m/Y H:i'),
+            'confirmed_at'         => $schedule->confirmed_at?->format('d/m/Y H:i'),
+            'created_at'           => $schedule->created_at?->format('d/m/Y H:i'),
+
+            // ── Textos livres ─────────────────────────────────────────────
+            'notes'                => $schedule->notes,
+            'cancellation_reason'  => $schedule->cancellation_reason,
+
+            // ── Recursos vinculados ───────────────────────────────────────
+            'resources'            => $schedule->resources->map(fn ($r) => [
+                'id'          => $r->id,
+                'code'        => $r->code,
+                'name'        => $r->name,
+                'type'        => $r->type,
+                'description' => $r->description,
+            ])->values(),
+
+            // ── Histórico de situações ────────────────────────────────────
+            'situation_logs'       => $schedule->situationLogs->map(fn ($log) => [
+                'id'          => $log->id,
+                'from_label'  => $log->from_situation?->label(),
+                'from_badge'  => $log->from_situation?->badgeClass(),
+                'to_label'    => $log->to_situation->label(),
+                'to_badge'    => $log->to_situation->badgeClass(),
+                'user_name'   => $log->entityUser?->user?->name,
+                'created_at'  => $log->created_at?->format('d/m/Y H:i'),
+                'notes'       => $log->notes,
+            ])->values(),
+        ]]);
     }
 
     public function store(ScheduleRequest $request): JsonResponse
