@@ -66,6 +66,15 @@ return [
     'activation_done'      => 'setup concluído',
     'activation_completed_on' => 'Concluído em',
 
+    // Live / Polling
+    'live_label'       => 'Ao vivo',
+    'live_refreshing'  => 'Atualizando...',
+    'last_updated_at'  => 'Atualizado às',
+    'btn_refresh'      => 'Atualizar',
+
+    // Agenda de hoje
+    'section_schedule_today' => 'Agenda de hoje',
+
     // Demo
     'demo_title'       => 'Ambiente de demonstração',
     'demo_description' => 'Popule dados de teste ou redefina o ambiente para demonstrações.',

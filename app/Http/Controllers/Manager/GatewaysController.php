@@ -6,18 +6,22 @@ use App\Enums\Billing\CredentialScope;
 use App\Http\Controllers\Controller;
 use App\Models\Billing\{EntityGatewayAccess, Gateway, GatewayCredential};
 use App\Models\Entity;
+use App\Services\Audit\AuditLogger;
 use App\Services\Billing\GatewayDefaultService;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
+use Inertia\{Inertia, Response};
+use InvalidArgumentException;
 
 class GatewaysController extends Controller
 {
     public function __construct(
         private readonly GatewayDefaultService $defaultService,
+        private readonly AuditLogger $audit,
     ) {
     }
 
-    public function index(): \Illuminate\View\View
+    public function index(): Response
     {
         $gateways = Gateway::query()
             ->withCount([
@@ -34,27 +38,18 @@ class GatewaysController extends Controller
 
         $defaultGateway = $this->defaultService->getDefault();
 
-        $meta = [
-            'title'       => __('gateways.title'),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('gateways.breadcrumb'), 'url' => route('panel.manager.gateways.index'), 'active' => true],
-            ],
-        ];
-
-        return view('system.manager.gateways.index', compact('gateways', 'defaultGateway', 'meta'));
+        return Inertia::render('Panel/Manager/Gateways/Index', [
+            'gateways'       => $gateways->map(fn ($g) => $this->toRow($g))->values(),
+            'defaultGateway' => $defaultGateway ? $this->toRow($defaultGateway) : null,
+            't'              => trans('gateways'),
+        ]);
     }
 
-    /**
-     * Define um gateway como padrão do sistema para billing de assinaturas.
-     * Valida: gateway ativo + credencial ativa.
-     * A troca é atômica e invalida o cache automaticamente.
-     */
     public function setDefault(Gateway $gateway): JsonResponse
     {
         try {
             $this->defaultService->setDefault($gateway);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
@@ -64,10 +59,6 @@ class GatewaysController extends Controller
         ]);
     }
 
-    /**
-     * Lista as credenciais globais de billing (scope=global, sem entity_id).
-     * Nunca retorna os valores das chaves — apenas metadados.
-     */
     public function credentials(Gateway $gateway): JsonResponse
     {
         $credentials = $gateway->credentials()
@@ -84,21 +75,16 @@ class GatewaysController extends Controller
                 'valid_to'   => $c->valid_to?->format('d/m/Y'),
                 'created_at' => $c->created_at->format('d/m/Y H:i'),
                 'has_secret' => ! empty($c->credentials),
-                'revoke_url' => route('panel.manager.gateways.credentials.revoke', [$gateway, $c]),
+                'revoke_url' => route('manager.gateways.credentials.revoke', [$gateway, $c]),
             ]);
 
         return response()->json(['data' => $credentials]);
     }
 
-    /**
-     * Ativa ou desativa um gateway globalmente.
-     * Se o gateway desativado for o padrão, limpa o flag is_default.
-     */
     public function toggleActive(Gateway $gateway): JsonResponse
     {
         $gateway->update(['active' => ! $gateway->active]);
 
-        // Se desativou o gateway padrão, remove o flag e invalida cache
         if (! $gateway->active && $gateway->is_default) {
             $gateway->update(['is_default' => false]);
             $this->defaultService->forgetCache();
@@ -110,9 +96,6 @@ class GatewaysController extends Controller
         ]);
     }
 
-    /**
-     * Atualiza a prioridade de um gateway (menor = maior prioridade / gateway primário).
-     */
     public function updatePriority(Request $request, Gateway $gateway): JsonResponse
     {
         $request->validate([
@@ -120,18 +103,11 @@ class GatewaysController extends Controller
         ]);
 
         $gateway->update(['priority' => $request->priority]);
-
-        // Invalida cache de fallback (que usa priority como desempate)
         $this->defaultService->forgetCache();
 
         return response()->json(['message' => __('gateways.priority_updated')]);
     }
 
-    /**
-     * Salva credenciais globais de billing para um gateway.
-     * Cria nova entrada — nunca atualiza a existente (imutabilidade de credenciais).
-     * A credencial anterior é desativada automaticamente.
-     */
     public function storeCredential(Request $request, Gateway $gateway): JsonResponse
     {
         $request->validate([
@@ -140,15 +116,21 @@ class GatewaysController extends Controller
             'webhook_secret' => ['nullable', 'string'],
             'valid_from'     => ['nullable', 'date'],
             'valid_to'       => ['nullable', 'date', 'after:valid_from'],
+            'reason'         => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
         ]);
 
-        GatewayCredential::query()
+        // Revoga credenciais globais anteriores (rotação automática).
+        $oldCount = GatewayCredential::query()
             ->where('gateway_id', $gateway->id)
             ->whereNull('entity_id')
             ->where('active', true)
             ->update(['active' => false]);
 
-        GatewayCredential::query()->create([
+        $credential = GatewayCredential::query()->create([
             'gateway_id'     => $gateway->id,
             'entity_id'      => null,
             'scope'          => CredentialScope::Global->value,
@@ -161,37 +143,71 @@ class GatewaysController extends Controller
         ]);
 
         Cache::forget("gateway_credential:{$gateway->code}:global");
-
-        // Nova credencial pode habilitar este gateway como candidato a padrão no fallback
         $this->defaultService->forgetCache();
 
-        return response()->json([
-            'message' => __('gateways.credential_saved'),
-        ]);
+        // Audit: rotação de credencial é evento crítico — registra qual gateway,
+        // qual credential (UUID), e quantas anteriores foram revogadas em cascata.
+        // NUNCA registramos o secret no audit log (defesa em profundidade).
+        $this->audit->recordAdminAction(
+            event: 'manager.gateway.credential.store',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'gateway_credential',
+            auditableId: (string) $credential->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: [
+                'gateway_code'         => $gateway->code,
+                'gateway_id'           => $gateway->id,
+                'credential_label'     => $credential->label,
+                'scope'                => CredentialScope::Global->value,
+                'cascaded_revocations' => $oldCount,
+                'has_webhook_secret'   => $request->filled('webhook_secret'),
+                'valid_from'           => $request->valid_from,
+                'valid_to'             => $request->valid_to,
+            ],
+            request: $request,
+        );
+
+        return response()->json(['message' => __('gateways.credential_saved')]);
     }
 
-    /**
-     * Revoga (desativa) uma credencial global específica.
-     */
-    public function revokeCredential(Gateway $gateway, GatewayCredential $credential): JsonResponse
+    public function revokeCredential(Request $request, Gateway $gateway, GatewayCredential $credential): JsonResponse
     {
         if ($credential->gateway_id !== $gateway->id) {
             abort(404);
         }
 
+        $request->validate([
+            'reason' => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
         $credential->update(['active' => false]);
 
         Cache::forget("gateway_credential:{$gateway->code}:global");
-
-        // Revogar credencial pode invalidar o padrão atual
         $this->defaultService->forgetCache();
+
+        $this->audit->recordAdminAction(
+            event: 'manager.gateway.credential.revoke',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'gateway_credential',
+            auditableId: (string) $credential->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: [
+                'gateway_code'     => $gateway->code,
+                'gateway_id'       => $gateway->id,
+                'credential_label' => $credential->label,
+            ],
+            request: $request,
+        );
 
         return response()->json(['message' => __('gateways.credential_revoked')]);
     }
 
-    /**
-     * Lista todas as clínicas (entities clientes) com seu status de acesso ao gateway.
-     */
     public function entityAccess(Gateway $gateway): JsonResponse
     {
         $entities = Entity::query()
@@ -210,16 +226,12 @@ class GatewaysController extends Controller
             'code'       => $e->code,
             'name'       => $e->name,
             'enabled'    => $accessMap->get((string) $e->id, false),
-            'toggle_url' => route('panel.manager.gateways.entity-access.toggle', [$gateway, $e]),
+            'toggle_url' => route('manager.gateways.entity-access.toggle', [$gateway, $e]),
         ]);
 
         return response()->json(['data' => $data]);
     }
 
-    /**
-     * Habilita ou desabilita o acesso de uma clínica a um gateway (toggle).
-     * Cria o registro se não existir; atualiza se já existir.
-     */
     public function toggleEntityAccess(Gateway $gateway, Entity $entity): JsonResponse
     {
         if ($entity->isSaas()) {
@@ -240,5 +252,42 @@ class GatewaysController extends Controller
                 ? __('gateways.gateway_enabled_for', ['gateway' => $gateway->name, 'entity' => $entity->name])
                 : __('gateways.gateway_disabled_for', ['gateway' => $gateway->name, 'entity' => $entity->name]),
         ]);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function toRow(Gateway $g): array
+    {
+        $credCount   = $g->active_credentials_count ?? 0;
+        $clinicCount = $g->entities_with_access_count ?? 0;
+
+        return [
+            'id'                        => $g->id,
+            'code'                      => $g->code,
+            'name'                      => $g->name,
+            'active'                    => (bool) $g->active,
+            'is_default'                => (bool) $g->is_default,
+            'priority'                  => $g->priority,
+            'supports_subscriptions'    => (bool) $g->supports_subscriptions,
+            'supports_one_time_charges' => (bool) $g->supports_one_time_charges,
+            'supports_refunds'          => (bool) $g->supports_refunds,
+            'supports_webhooks'         => (bool) $g->supports_webhooks,
+            'active_credentials_count'  => $credCount,
+            'credentials_label'         => $credCount > 0
+                ? trans_choice('gateways.credentials_active', $credCount, ['count' => $credCount])
+                : null,
+            'entities_with_access_count' => $clinicCount,
+            'clinics_label'              => $clinicCount > 0
+                ? trans_choice('gateways.clinics_count', $clinicCount, ['count' => $clinicCount])
+                : null,
+            'can_be_default' => (bool) $g->active && $credCount > 0,
+            // Route URLs
+            'set_default_url'       => route('manager.gateways.set-default', $g),
+            'toggle_active_url'     => route('manager.gateways.toggle-active', $g),
+            'priority_url'          => route('manager.gateways.priority', $g),
+            'credentials_url'       => route('manager.gateways.credentials', $g),
+            'credentials_store_url' => route('manager.gateways.credentials.store', $g),
+            'entity_access_url'     => route('manager.gateways.entity-access', $g),
+        ];
     }
 }

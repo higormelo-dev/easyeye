@@ -9,25 +9,26 @@ use App\Models\{AuditLog, DataAccessLog, Entity};
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Inertia\{Inertia, Response as InertiaResponse};
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ComplianceController extends Controller
 {
-    public function index()
+    public function index(): InertiaResponse
     {
         Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
 
-        $meta = [
-            'title'       => 'Compliance & Auditoria',
-            'action'      => 'Logs de Auditoria e Acesso',
+        return Inertia::render('Panel/Compliance/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
-                ['label' => 'Compliance & Auditoria', 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),      'active' => false],
+                ['label' => __('actions.sidemenu.reports'),   'url' => route('panel.reports.index'), 'active' => false],
+                ['label' => 'Compliance & Auditoria',         'url' => '#',                          'active' => true],
             ],
-        ];
-
-        return view('system.reports.compliance', compact('meta'));
+            'exports' => [
+                'audit'        => route('panel.reports.compliance.audit'),
+                'data_access'  => route('panel.reports.compliance.access'),
+            ],
+        ]);
     }
 
     public function exportAuditLogs(Request $request): StreamedResponse

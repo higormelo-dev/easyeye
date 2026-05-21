@@ -7,22 +7,23 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Models\Partner;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
+use Inertia\{Inertia, Response};
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class AuthenticatedSessionController extends Controller
 {
-    /**
-     * Display the login view.
-     */
-    public function create(): View
+    public function create(): Response
     {
-        return view('auth.login');
+        return Inertia::render('Auth/Login', [
+            'appName' => config('app.name', 'EasyEye'),
+            't'       => trans('auth'),
+        ])->rootView('guest-app');
     }
 
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): RedirectResponse|HttpResponse
     {
         $request->authenticate();
 
@@ -36,7 +37,7 @@ class AuthenticatedSessionController extends Controller
         if ($partnerRecord) {
             session(['portal_partner_id' => $partnerRecord->id]);
 
-            return redirect()->route('portal.dashboard');
+            return $this->redirectForInertia($request, route('portal.dashboard'));
         }
 
         $entityUsers = Auth::user()->entityUsers()->with('entity')
@@ -64,10 +65,10 @@ class AuthenticatedSessionController extends Controller
 
         // Usuários SaaS (non-client) não devem ser redirecionados para URLs que
         // ficaram salvas como url.intended durante uma sessão de impersonação expirada.
-        if (!session('selected_entity_is_client', true)) {
+        if (! session('selected_entity_is_client', true)) {
             session()->forget('url.intended');
 
-            return redirect()->route('panel.dashboard');
+            return $this->redirectForInertia($request, route('panel.dashboard'));
         }
 
         return redirect()->intended(route('panel.dashboard', absolute: false));
@@ -76,7 +77,7 @@ class AuthenticatedSessionController extends Controller
     /**
      * Destroy an authenticated session.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request): RedirectResponse|HttpResponse
     {
         Auth::guard('web')->logout();
 
@@ -84,6 +85,19 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        // Inertia::location força full-page reload — necessário porque o rootView
+        // muda de 'panel-app' (CSS do painel) para 'app' (CSS do site público).
+        // Um redirect() simples faria o Inertia navegar via SPA, mantendo os
+        // assets CSS/JS do painel no DOM e quebrando a formatação do site.
+        return Inertia::location('/');
+    }
+
+    private function redirectForInertia(Request $request, string $url): RedirectResponse|HttpResponse
+    {
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($url);
+        }
+
+        return redirect()->to($url);
     }
 }

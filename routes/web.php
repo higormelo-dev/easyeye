@@ -1,7 +1,8 @@
 <?php
 
-use App\Enums\ScheduleSituation;
 use App\Http\Controllers\{
+    AiCreditPurchasesController,
+    AiRunsController,
     ComplianceController,
     DoctorWorkScheduleController,
     DoctorsController,
@@ -33,7 +34,8 @@ use App\Http\Controllers\{
     SubscriptionExpiredController,
 };
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
-use App\Http\Controllers\Manager\ManagerDashboardController;
+use App\Http\Controllers\PanelDashboardController;
+use App\Http\Controllers\Security\TwoFactorController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
     CovenantsController,
@@ -47,9 +49,9 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     TenantGatewayController,
     VisitTypesController,
     VisualAcuityTypesController};
-use App\Http\Controllers\Setting\ReportSettingsController;
-use App\Models\{Doctor, Entity, Patient, Schedule};
-use App\Services\ActivationService;
+use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
+use App\Http\Middleware\SetLocale;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Route};
 
 // Rota para trocar o idioma (sem autenticação necessária)
@@ -63,6 +65,41 @@ Route::middleware(['auth'])->group(function () {
 
 Route::get('/', [SiteController::class, 'index'])->name('site.home');
 Route::post('/contato', [SiteController::class, 'contactStore'])->name('contact.store');
+
+// SEO: Sitemap XML dinâmico
+Route::get('/sitemap.xml', function () {
+    $baseUrl = rtrim(config('app.url'), '/');
+    $locales = SetLocale::SUPPORTED_LOCALES;
+    $now     = now()->toW3cString();
+
+    $urls = [
+        ['loc' => $baseUrl . '/', 'priority' => '1.0', 'changefreq' => 'weekly'],
+    ];
+
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>' . PHP_EOL;
+    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . PHP_EOL;
+    $xml .= '        xmlns:xhtml="http://www.w3.org/1999/xhtml">' . PHP_EOL;
+
+    foreach ($urls as $entry) {
+        $xml .= '  <url>' . PHP_EOL;
+        $xml .= '    <loc>' . htmlspecialchars($entry['loc']) . '</loc>' . PHP_EOL;
+
+        foreach ($locales as $code => $meta) {
+            $hreflang = str_replace('_', '-', $code);
+            $href     = $entry['loc'] . '?lang=' . $code;
+            $xml .= '    <xhtml:link rel="alternate" hreflang="' . $hreflang . '" href="' . htmlspecialchars($href) . '"/>' . PHP_EOL;
+        }
+
+        $xml .= '    <lastmod>' . $now . '</lastmod>' . PHP_EOL;
+        $xml .= '    <changefreq>' . $entry['changefreq'] . '</changefreq>' . PHP_EOL;
+        $xml .= '    <priority>' . $entry['priority'] . '</priority>' . PHP_EOL;
+        $xml .= '  </url>' . PHP_EOL;
+    }
+
+    $xml .= '</urlset>';
+
+    return response($xml, 200)->header('Content-Type', 'application/xml');
+})->name('sitemap');
 Route::get('/go', function () {
     if (Auth::check() && session()->has('selected_entity_user_id')
         && session()->has('selected_entity_id')) {
@@ -90,65 +127,20 @@ Route::post('/session/ping', function () {
 })->middleware(['auth'])->name('session.ping');
 
 Route::group(
-    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'entity.selected'], 'as' => 'panel.'],
+    // 2fa entra DEPOIS de entity.selected (precisa da entity na sessão para
+    // decidir se exige 2FA via Entity.requires_two_factor).
+    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'entity.selected', '2fa'], 'as' => 'panel.'],
     function () {
         Route::get('/', function () {
             return redirect()->route('panel.dashboard');
         });
-        Route::get('/dashboard', function () {
+        // Dashboard exclusivo para clínicas (usuários SaaS são redirecionados para /panel/manager/dashboard)
+        Route::get('/dashboard', function (Request $request) {
             if (! session()->get('selected_entity_is_client')) {
-                return app()->call(ManagerDashboardController::class);
+                return redirect()->route('manager.dashboard');
             }
 
-            $entityId   = session('selected_entity_id');
-            $today      = now()->toDateString();
-            $doneValues = [
-                ScheduleSituation::Attended->value,
-                ScheduleSituation::NoShow->value,
-                ScheduleSituation::Cancelled->value,
-            ];
-
-            $stats = [
-                'entity_name'    => Entity::find($entityId)?->name ?? config('app.name'),
-                'total_patients' => Patient::where('entity_id', $entityId)
-                    ->where('active', true)
-                    ->count(),
-                'today_count' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->count(),
-                'total_doctors' => Doctor::query()
-                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                    ->where('entity_users.entity_id', $entityId)
-                    ->where('doctors.active', true)
-                    ->count(),
-                'pending_today' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->whereNotIn('situation', $doneValues)
-                    ->count(),
-                'attended_today' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->where('situation', ScheduleSituation::Attended->value)
-                    ->count(),
-                'cancelled_today' => Schedule::where('entity_id', $entityId)
-                    ->whereDate('date_time', $today)
-                    ->whereIn('situation', [
-                        ScheduleSituation::NoShow->value,
-                        ScheduleSituation::Cancelled->value,
-                    ])
-                    ->count(),
-                'recent_patients' => Patient::with('person')
-                    ->where('entity_id', $entityId)
-                    ->where('active', true)
-                    ->orderByDesc('created_at')
-                    ->limit(8)
-                    ->get(),
-            ];
-
-            $activationSvc   = app(ActivationService::class);
-            $activation      = $activationSvc->getProgress($entityId);
-            $activationScore = $activationSvc->getScore($entityId);
-
-            return view('system.dashboard', compact('stats', 'activation', 'activationScore'));
+            return app(PanelDashboardController::class)($request);
         })->name('dashboard');
 
         Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');
@@ -218,8 +210,28 @@ Route::group(
                 'medicalrecords/lens-format',
                 [MedicalRecordsController::class, 'lensFormat'],
             )->name('medicalrecords.lens-format');
+            // ── Prontuário: ordem IMPORTA ─────────────────────────────────────
+            // ATENÇÃO: a ordem das declarações abaixo é crítica.
+            //
+            // O `show` usa pattern `/medicalrecords/{medicalrecord}` — se for
+            // declarado ANTES de `create`, a URL `/medicalrecords/create` é
+            // capturada pelo `show` tentando bindar "create" como ID do model,
+            // resultando em "No query results for model MedicalRecord [create]".
+            //
+            // Por isso registramos as rotas write (que incluem `create`/`edit`
+            // com path estático) PRIMEIRO, deixando `show`/`index` por último.
+
+            // Escrita exclusiva para médico (CFM Res. 2.227/2018 — apenas médico
+            // habilitado pode redigir, alterar e excluir prontuário clínico).
+            Route::middleware('entity.role:doctor')->group(function () {
+                Route::resource('patients.medicalrecords', MedicalRecordsController::class)
+                    ->only(['create', 'store', 'edit', 'update', 'destroy']);
+            });
+
+            // Leitura aberta para admin/doctor/secretary — útil para admin/secretária
+            // consultar histórico clínico do paciente sem poder editar.
             Route::resource('patients.medicalrecords', MedicalRecordsController::class)
-                ->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+                ->only(['index', 'show']);
             Route::patch(
                 'patients/{patient}/medicalrecords/{medicalrecord}/restore',
                 [MedicalRecordsController::class, 'restore'],
@@ -248,6 +260,30 @@ Route::group(
                 'patients/{patient}/medicalrecords/{medicalrecord}/exam-template/{exam}',
                 [MedicalRecordQuickActionsController::class, 'examTemplate'],
             )->name('patients.medicalrecords.exam-template');
+
+            // Endpoints de IA usados pelos modais clínicos (prontuário/eye images).
+            // Rate limits por (user_id + entity_id) — definidos em AppServiceProvider.
+            Route::prefix('ai')->group(function () {
+                // Tela única de consumo + compra de créditos + monitor de execuções.
+                // URL canônica: /panel/ai/usage. Sem rota raiz /panel/ai — dashboard
+                // analítico antigo descontinuado.
+                Route::get('usage', [AiRunsController::class, 'index'])->name('ai-runs.index');
+                Route::post('credit-purchases', [AiCreditPurchasesController::class, 'store'])
+                    ->middleware('throttle:ai-store')
+                    ->name('ai-credit-purchases.store');
+
+                Route::as('ai-runs.')->group(function () {
+                    Route::post('runs/estimate', [AiRunsController::class, 'estimate'])
+                        ->middleware('throttle:ai-estimate')->name('estimate');
+                    Route::post('runs', [AiRunsController::class, 'store'])
+                        ->middleware('throttle:ai-store')->name('store');
+                    Route::get('runs/{aiRun}', [AiRunsController::class, 'show'])->name('show');
+                    Route::post('runs/{aiRun}/approve', [AiRunsController::class, 'approve'])
+                        ->middleware('throttle:ai-decision')->name('approve');
+                    Route::post('runs/{aiRun}/reject', [AiRunsController::class, 'reject'])
+                        ->middleware('throttle:ai-decision')->name('reject');
+                });
+            });
 
             // F7 — preview "X (extenso) dias" para atestado médico
             Route::post(
@@ -368,6 +404,12 @@ Route::group(
             });
 
             Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
+                // ── Segurança da empresa (2FA opt-in/out) ────────────────────
+                Route::get('security', [SecurityController::class, 'index'])->name('security.index');
+                Route::patch('security/two-factor', [SecurityController::class, 'toggleTwoFactor'])
+                    ->middleware('throttle:manager-destructive') // ação rara e de alto impacto
+                    ->name('security.two-factor.toggle');
+
                 Route::get('covenants/cards', [CovenantsController::class, 'cards'])->name('covenants.cards');
                 Route::resource('covenants', CovenantsController::class);
                 Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])->name('covenants.restore');
@@ -424,14 +466,17 @@ Route::group(
                 Route::resource('report-settings', ReportSettingsController::class);
 
                 // ── Gateways de Pagamento do Tenant ────────────────────────
-                Route::get('gateways', [TenantGatewayController::class, 'index'])->name('gateways.index');
-                Route::get('gateways/{gateway}/credentials', [TenantGatewayController::class, 'credentials'])->name('gateways.credentials');
-                Route::post('gateways/{gateway}/credentials', [TenantGatewayController::class, 'storeCredential'])->name('gateways.credentials.store');
-                Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [TenantGatewayController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
+                // Feature `has_own_payment_gateways` libera a clínica a cadastrar
+                // gateways próprios (Asaas, MP, etc.). Padrão off — a clínica usa
+                // o gateway centralizado do SaaS para suas cobranças (covenants).
+                Route::middleware('feature:has_own_payment_gateways')->group(function () {
+                    Route::get('gateways', [TenantGatewayController::class, 'index'])->name('gateways.index');
+                    Route::get('gateways/{gateway}/credentials', [TenantGatewayController::class, 'credentials'])->name('gateways.credentials');
+                    Route::post('gateways/{gateway}/credentials', [TenantGatewayController::class, 'storeCredential'])->name('gateways.credentials.store');
+                    Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [TenantGatewayController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
+                });
             });
         });
-
-        require __DIR__ . '/manager.php';
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -439,5 +484,18 @@ Route::group(
     },
 );
 
+// 2FA: rotas DEVEM ficar fora dos grupos protegidos por `2fa` (catch-22).
+// Estão sob auth+verified — usuário precisa estar logado para configurar.
+Route::middleware(['auth', 'verified'])->prefix('security/two-factor')->name('security.two-factor.')->group(function () {
+    Route::get('/setup', [TwoFactorController::class, 'setup'])->name('setup');
+    Route::post('/setup', [TwoFactorController::class, 'regenerateSecret'])->name('setup.store');
+    Route::post('/confirm', [TwoFactorController::class, 'confirm'])->name('confirm');
+    Route::get('/verify', [TwoFactorController::class, 'verify'])->name('verify');
+    Route::post('/verify', [TwoFactorController::class, 'verifyStore'])
+        ->middleware('throttle:6,1') // 6 tentativas/min — defesa anti-brute-force
+        ->name('verify.store');
+});
+
+require __DIR__ . '/manager.php';
 require __DIR__ . '/portal.php';
 require __DIR__ . '/auth.php';

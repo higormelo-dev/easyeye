@@ -12,23 +12,17 @@ enum PartnerLeadStatus: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::New       => 'Novo',
-            self::Contacted => 'Contactado',
-            self::Trial     => 'Em Trial',
-            self::Converted => 'Convertido',
-            self::Lost      => 'Perdido',
-        };
+        return __('partners.lead_status.' . $this->value);
     }
 
     public function badgeClass(): string
     {
         return match ($this) {
-            self::New       => 'bg-secondary',
-            self::Contacted => 'bg-info',
-            self::Trial     => 'bg-warning text-dark',
-            self::Converted => 'bg-success',
-            self::Lost      => 'bg-danger',
+            self::New       => 'badge-soft-secondary rounded fs-13 fw-medium',
+            self::Contacted => 'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
+            self::Trial     => 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
+            self::Converted => 'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
+            self::Lost      => 'badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium',
         };
     }
 

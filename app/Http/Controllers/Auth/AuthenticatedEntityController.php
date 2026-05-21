@@ -6,14 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\SelectEntityRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\View\View;
+use Inertia\{Inertia, Response};
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class AuthenticatedEntityController extends Controller
 {
-    /**
-     * Display the login view.
-     */
-    public function create(): View
+    public function create(): Response
     {
         $entities    = [];
         $entityUsers = Auth::user()->entityUsers->where('active', true);
@@ -21,23 +19,22 @@ class AuthenticatedEntityController extends Controller
 
         if (count($entityUsers) > 1) {
             foreach ($entityUsers as $entityUser) {
-                $entityUserRule = '';
-
-                if (app()->environment(['local', 'testing'])) {
-                    $entityUserRule .= $entityUser->rule === 'admin' ? '*' : '';
-                }
-
-                $entities[$entityUser->id] = trim(sprintf('%s %s', $entityUser->entity->name, $entityUserRule));
+                $suffix                    = app()->environment(['local', 'testing']) && $entityUser->rule === 'admin' ? ' *' : '';
+                $entities[$entityUser->id] = trim($entityUser->entity->name . $suffix);
             }
         }
 
-        return view('auth.select-entity', compact('entities'));
+        return Inertia::render('Auth/SelectEntity', [
+            'appName'  => config('app.name', 'EasyEye'),
+            't'        => trans('auth'),
+            'entities' => $entities,
+        ])->rootView('guest-app');
     }
 
     /**
      * Handle an incoming authentication request.
      */
-    public function store(SelectEntityRequest $request)
+    public function store(SelectEntityRequest $request): HttpResponse
     {
         $entityUser = Auth::user()->entityUsers()->with('entity')->find($request->entity_user_id);
 
@@ -57,12 +54,23 @@ class AuthenticatedEntityController extends Controller
 
         // Usuários SaaS (non-client) não devem ser redirecionados para URLs que
         // ficaram salvas como url.intended durante uma sessão de impersonação expirada.
-        if (!session('selected_entity_is_client', true)) {
+        if (! session('selected_entity_is_client', true)) {
             session()->forget('url.intended');
 
-            return redirect()->route('panel.dashboard');
+            return $this->redirectToPanelDashboard($request);
         }
 
         return redirect()->intended(route('panel.dashboard', absolute: false));
+    }
+
+    private function redirectToPanelDashboard(Request $request): HttpResponse
+    {
+        $dashboardUrl = route('panel.dashboard');
+
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($dashboardUrl);
+        }
+
+        return redirect()->to($dashboardUrl);
     }
 }

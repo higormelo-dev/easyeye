@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Setting;
 
 use App\Enums\Billing\CredentialScope;
@@ -7,17 +9,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Billing\{Gateway, GatewayCredential};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class TenantGatewayController extends Controller
 {
-    /**
-     * Lista os gateways disponíveis para esta clínica.
-     *
-     * Somente gateways:
-     *   - ativos globalmente (gateways.active = true)
-     *   - com acesso habilitado para esta clínica pelo SaaS owner (entity_gateway_access.enabled = true)
-     */
-    public function index(): \Illuminate\View\View
+    public function index(): InertiaResponse
     {
         $entityId = (string) session('selected_entity_id');
 
@@ -36,7 +32,22 @@ class TenantGatewayController extends Controller
             ->orderBy('priority')
             ->get();
 
-        return view('system.setting.gateways.index', compact('gateways', 'entityId'));
+        return Inertia::render('Panel/Settings/Gateways/Index', [
+            'breadcrumbs' => [
+                ['label' => __('actions.sidemenu.dashboard'),       'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.payment_gateways'),'url' => '#',                     'active' => true],
+            ],
+            'gateways' => $gateways->map(fn (Gateway $g) => [
+                'id'                       => (string) $g->id,
+                'code'                     => $g->code,
+                'name'                     => $g->name,
+                'priority'                 => $g->priority,
+                'credentials_count'        => (int) $g->credentials_count,
+                'has_active_credential'    => $g->credentials_count > 0,
+                'credentials_url'          => route('panel.setting.gateways.credentials',       $g->id),
+                'credentials_store_url'    => route('panel.setting.gateways.credentials.store',$g->id),
+            ]),
+        ]);
     }
 
     /**

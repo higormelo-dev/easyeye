@@ -15,12 +15,7 @@ enum PartnerType: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Distributor => 'Distribuidor de Equipamentos',
-            self::Association => 'Associação Médica',
-            self::Consultant  => 'Consultor',
-            self::Agency      => 'Agência',
-        };
+        return __('partners.type.' . $this->value);
     }
 
     /** Taxa de comissão padrão por tipo (%) */

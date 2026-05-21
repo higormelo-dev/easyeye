@@ -54,4 +54,13 @@ enum EntityGate: string
 
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';
+
+    /**
+     * Gerenciar configurações de SEGURANÇA da entity (admin de entity cliente
+     * OU admin de entity SaaS). 2FA obrigatório, política de senha futura, etc.
+     *
+     * Diferente de ManageSettings — este aceita admin SaaS na própria entity
+     * SaaS (que é onde o admin gerencia 2FA dos próprios admins SaaS).
+     */
+    case ManageSecuritySettings = 'entity.manage-security-settings';
 }

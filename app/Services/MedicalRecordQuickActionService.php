@@ -105,8 +105,17 @@ class MedicalRecordQuickActionService
         $isHtml = $raw !== strip_tags($raw);
         $body   = $isHtml ? $this->sanitizeHtml($raw) : nl2br(e($raw));
 
-        return $html . '<div class="pmr-observations"><p><strong>Observações:</strong></p>'
-            . $body . '</div>';
+        // ESTRUTURA INLINE INTENCIONAL — usamos `<hr>` separador e inline styles
+        // em vez de `border-top` num div container. Motivo: o wkhtmltopdf 0.12.6
+        // tem bug onde `border-top` em container próximo a um `position: fixed`
+        // (como o bloco de assinatura) reordena o fluxo: parte do conteúdo
+        // aparece, parte é posicionada APÓS o bloco fixed. `<hr>` + `<p>`
+        // soltos no fluxo (sem container com border) são renderizados na
+        // ordem correta pelo wkhtmltopdf.
+        return $html
+            . '<hr style="border:0;border-top:1px solid #999;margin:1.4em 0 0.6em;width:100%;">'
+            . '<p style="margin:0 0 0.4em;"><strong style="color:#1976d2;">Observações:</strong></p>'
+            . '<div>' . $body . '</div>';
     }
 
     /**

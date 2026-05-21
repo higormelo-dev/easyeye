@@ -8,9 +8,9 @@ use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
 use App\Models\Entity;
 use App\Services\Financial\ClinicBiService;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class ClinicBiController extends Controller
 {
@@ -19,7 +19,7 @@ class ClinicBiController extends Controller
     ) {
     }
 
-    public function index(Request $request): View
+    public function index(Request $request): InertiaResponse
     {
         $entity = Entity::query()->findOrFail(session('selected_entity_id'));
         Gate::authorize(EntityGate::ViewFinancial->value, $entity);
@@ -30,22 +30,17 @@ class ClinicBiController extends Controller
         $summary = $this->biService->summary((string) $entity->id, $from, $to);
         $trend   = $this->biService->monthlyTrend((string) $entity->id);
 
-        $meta = [
-            'title'       => __('financial.bi.title'),
+        return Inertia::render('Panel/Financial/Bi/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => __('financial.bi.title'), 'url' => 'javascript:void(0);', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),                'active' => false],
+                ['label' => __('financial.financial'),         'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.bi.title'),          'url' => '#',                                    'active' => true],
             ],
-        ];
-
-        return view('system.financial.bi.index', compact(
-            'meta',
-            'entity',
-            'from',
-            'to',
-            'summary',
-            'trend',
-        ));
+            'entity'  => ['id' => $entity->id, 'name' => $entity->name],
+            'filters' => ['from' => $from, 'to' => $to],
+            'summary' => $summary,
+            'trend'   => $trend,
+            't'       => trans('financial'),
+        ]);
     }
 }

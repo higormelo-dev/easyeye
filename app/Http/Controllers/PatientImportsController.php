@@ -6,10 +6,10 @@ use App\Enums\{FeatureKey, ImportStatus};
 use App\Jobs\ProcessPatientImportJob;
 use App\Models\{PatientImport};
 use App\Services\{FeatureGateService, PatientImportService};
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Inertia\{Inertia, Response as InertiaResponse};
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PatientImportsController extends Controller
@@ -20,12 +20,9 @@ class PatientImportsController extends Controller
     ) {
     }
 
-    /**
-     * Página de upload + histórico de importações.
-     */
-    public function index(): View
+    public function index(): InertiaResponse
     {
-        $entityId   = session('selected_entity_id');
+        $entityId   = (string) session('selected_entity_id');
         $planStatus = $this->featureGate->status($entityId, FeatureKey::MaxPatients);
 
         $imports = PatientImport::where('entity_id', $entityId)
@@ -34,18 +31,65 @@ class PatientImportsController extends Controller
             ->limit(20)
             ->get();
 
-        $pendingImport = $imports->first(fn ($i) => in_array($i->status->value, ['pending', 'processing']));
+        $pendingImport = $imports->first(fn ($i) => \in_array($i->status->value, ['pending', 'processing'], true));
 
-        $meta = [
-            'title'       => __('imports.patients.title'),
+        return Inertia::render('Panel/Patients/Import', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.patients'), 'url' => route('panel.patients.index'), 'active' => false],
-                ['label' => __('imports.patients.title'), 'url' => 'javascript:void(0);', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),       'active' => false],
+                ['label' => __('actions.sidemenu.patients'),   'url' => route('panel.patients.index'),  'active' => false],
+                ['label' => __('imports.patients.title'),      'url' => '#',                            'active' => true],
+            ],
+            'imports' => $imports->map(fn (PatientImport $i) => $this->serializeImport($i)),
+            'pending_import' => $pendingImport ? $this->serializeImport($pendingImport) : null,
+            'preview_id'     => session('import_preview_id'),
+            'plan_status'    => [
+                'max'       => $planStatus['max']       ?? null,
+                'used'      => $planStatus['used']      ?? 0,
+                'available' => $planStatus['available'] ?? null,
+            ],
+            'urls' => [
+                'store'    => route('panel.patients.import.store'),
+                'template' => route('panel.patients.import.template'),
+                'patients' => route('panel.patients.index'),
+            ],
+            't' => trans('imports.patients'),
+        ]);
+    }
+
+    /**
+     * Serialização compartilhada (lista e item pendente).
+     */
+    private function serializeImport(PatientImport $i): array
+    {
+        return [
+            'id'              => (string) $i->id,
+            'original_name'   => $i->original_name,
+            'status'          => $i->status->value,
+            'status_label'    => $i->status->label(),
+            'status_color'    => $i->status->color(),
+            'is_done'         => $i->status->isDone(),
+            'is_pending'      => $i->status->value === 'pending',
+            'created_at'      => $i->created_at?->format('d/m/Y H:i'),
+            'confirmed_at'    => $i->confirmed_at?->format('d/m/Y H:i'),
+            'total_rows'      => (int) $i->total_rows,
+            'processed_rows'  => (int) $i->processed_rows,
+            'imported_rows'   => (int) $i->imported_rows,
+            'skipped_rows'    => (int) $i->skipped_rows,
+            'error_rows'      => (int) $i->error_rows,
+            'progress'        => $i->progressPercent(),
+            'abort_reason'    => $i->abort_reason,
+            'user_name'       => $i->user?->name,
+            'preview'         => $i->preview,
+            'has_errors_file' => $i->errors_file_path !== null,
+            'urls' => [
+                'status'  => route('panel.patients.import.status',  $i->id),
+                'confirm' => route('panel.patients.import.confirm', $i->id),
+                'cancel'  => route('panel.patients.import.cancel',  $i->id),
+                'errors'  => $i->errors_file_path
+                    ? route('panel.patients.import.errors', $i->id)
+                    : null,
             ],
         ];
-
-        return view('system.patients.import', compact('meta', 'imports', 'planStatus', 'pendingImport'));
     }
 
     /**

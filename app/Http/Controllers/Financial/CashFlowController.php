@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class CashFlowController extends Controller
 {
@@ -22,13 +23,13 @@ class CashFlowController extends Controller
         $this->titleController = 'Lançamento financeiro';
     }
 
-    public function index(Request $request)
+    public function index(Request $request): InertiaResponse
     {
-        $entity = $this->authorizeFinancial();
+        $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
 
         $from = (string) $request->input('from', now()->startOfMonth()->toDateString());
-        $to = (string) $request->input('to', now()->toDateString());
+        $to   = (string) $request->input('to', now()->toDateString());
 
         $query = FinancialCashEntry::query()
             ->with(['category', 'covenant', 'billingClaim'])
@@ -39,11 +40,9 @@ class CashFlowController extends Controller
         if ($request->filled('type')) {
             $query->where('type', $request->input('type'));
         }
-
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
-
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->input('category_id'));
         }
@@ -52,34 +51,48 @@ class CashFlowController extends Controller
             ->orderByDesc('entry_date')
             ->orderByDesc('created_at')
             ->paginate(30)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn (FinancialCashEntry $e) => [
+                'id'             => $e->id,
+                'entry_date'     => $e->entry_date?->format('Y-m-d'),
+                'description'    => $e->description,
+                'type'           => $e->type instanceof \BackedEnum ? $e->type->value : $e->type,
+                'status'         => $e->status instanceof \BackedEnum ? $e->status->value : $e->status,
+                'amount'         => (float) $e->amount,
+                'category_name'  => $e->category?->name,
+                'category_id'    => $e->category_id,
+                'covenant_name'  => $e->covenant?->name,
+                'covenant_id'    => $e->covenant_id,
+                'has_claim'      => $e->billingClaim !== null,
+                'notes'          => $e->notes,
+            ]);
 
         $categories = FinancialCategory::query()
             ->availableForEntity($entityId)
             ->orderBy('type')
             ->orderBy('name')
-            ->get();
+            ->get(['id', 'name', 'type']);
 
         $summary = $this->cashFlowService->summary($entityId, $from, $to);
 
-        $meta = [
-            'title' => 'Fluxo de Caixa',
-            'action' => 'Financeiro',
+        return Inertia::render('Panel/Financial/CashFlow/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => 'Financeiro', 'url' => route('panel.financial.cash-flow.index'), 'active' => false],
-                ['label' => 'Fluxo de Caixa', 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),               'active' => false],
+                ['label' => 'Financeiro',                     'url' => route('panel.financial.cash-flow.index'), 'active' => false],
+                ['label' => 'Fluxo de Caixa',                 'url' => '#',                                     'active' => true],
             ],
-        ];
-
-        return view('system.financial.cashflow.index', compact(
-            'meta',
-            'entries',
-            'categories',
-            'summary',
-            'from',
-            'to'
-        ));
+            'entries'    => $entries,
+            'categories' => $categories,
+            'summary'    => $summary,
+            'filters'    => [
+                'from'        => $from,
+                'to'          => $to,
+                'type'        => $request->input('type'),
+                'status'      => $request->input('status'),
+                'category_id' => $request->input('category_id'),
+            ],
+            't' => trans('financial'),
+        ]);
     }
 
     public function store(CashEntryRequest $request): RedirectResponse|JsonResponse

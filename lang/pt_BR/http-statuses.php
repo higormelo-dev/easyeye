@@ -82,8 +82,9 @@ return [
     '599'          => 'Erro de tempo limite de conexão de rede',
     'unknownError' => 'Erro Desconhecido',
     'custom'       => [
-        '404_model'   => 'Registro não encontrado',
-        '404_route'   => 'Rota não encontrada',
-        '422_request' => 'Dados de validação inválidos',
+        '404_model'           => 'Registro não encontrado',
+        '404_route'           => 'Rota não encontrada',
+        '422_request'         => 'Dados de validação inválidos',
+        '403_saas_admin_only' => 'Esta área é exclusiva do administrador do SaaS.',
     ],
 ];

@@ -1,62 +1,62 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Controllers\Manager;
 
 use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
 use App\Models\{Entity, EntityUser};
-use Illuminate\Http\RedirectResponse;
+use App\Services\Audit\AuditLogger;
+use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Gate;
 
 /**
  * Gerencia sessões de "usar como este" (impersonação) no painel do SaaS.
  *
- * Apenas admin e support da entity SaaS podem iniciar uma sessão.
- * O usuário pode encerrar a qualquer momento e retorna ao seu contexto original.
- *
- * Rotas:
- *   POST   /panel/manager/entities/{entity}/impersonate/{entityUser}  → store()
- *   DELETE /panel/manager/impersonate                                  → destroy()
+ * Hardening LGPD/CFM:
+ *  - Toda transição (start/end) emite evento estruturado em `audit_logs`
+ *    via AuditLogger, capturando ator real (admin), alvo (paciente do
+ *    sistema impersonado), entity da clínica e contexto da sessão.
+ *  - Impersonação aninhada bloqueada.
+ *  - Só entities clientes podem ser impersonadas (não a SaaS).
  */
 class ImpersonateController extends Controller
 {
+    public function __construct(
+        protected AuditLogger $audit,
+    ) {
+    }
+
     /**
-     * Inicia a sessão de impersonação.
-     *
-     * O EntityUser recebido é o vínculo do usuário-alvo na entity cliente.
-     * O gate verifica que o solicitante é admin ou support da entity SaaS.
+     * Inicia a sessão de impersonação. O EntityUser recebido é o vínculo
+     * do usuário-alvo na entity cliente. O gate verifica que o solicitante
+     * é admin ou support da entity SaaS.
      */
-    public function store(Entity $entity, EntityUser $entityUser): RedirectResponse
+    public function store(Entity $entity, EntityUser $entityUser, Request $request): RedirectResponse
     {
-        // Impersonação aninhada não é permitida
         if (session()->has('impersonating')) {
             return back()->withErrors([
                 'impersonate' => __('actions.impersonate.already_active'),
             ]);
         }
 
-        // Só entities clientes podem ter usuários impersonados
         abort_if($entity->isSaas(), 403, __('actions.impersonate.only_clients'));
-
-        // O EntityUser deve pertencer à entity da rota (segurança)
         abort_if((string) $entityUser->entity_id !== (string) $entity->id, 404);
-
-        // O vínculo deve estar ativo
-        abort_if(!$entityUser->active, 403, __('actions.impersonate.user_inactive'));
+        abort_if(! $entityUser->active, 403, __('actions.impersonate.user_inactive'));
 
         // O usuário real (ainda não houve troca) deve ser admin/support do SaaS
-        // A SaaS entity é a entity ativa na sessão atual (antes da impersonação)
         $saasEntity = Entity::findOrFail(session('selected_entity_id'));
-
         Gate::authorize(EntityGate::SaasImpersonate->value, $saasEntity);
 
-        // Garante que nenhuma url.intended do contexto atual "vaze" para após
-        // o logout/expiração de sessão ocorrida dentro da impersonação.
+        // ── AUDIT: registra início antes da troca de contexto ───────────────
+        // Carregamos o relacionamento user explicitamente para garantir que
+        // o nome do impersonado esteja no log mesmo após a troca de sessão.
+        $entityUser->loadMissing('user');
+        $this->audit->recordImpersonationStart($entity, $entityUser, $request);
+
         session()->forget('url.intended');
 
-        // ── Salva o contexto original ────────────────────────────────────────
         session()->put('impersonating', [
             'entity_user_id'            => $entityUser->id,
             'impersonated_user_name'    => $entityUser->user->name,
@@ -70,7 +70,6 @@ class ImpersonateController extends Controller
             'original_user_rule'        => session('user_rule'),
         ]);
 
-        // ── Troca o contexto de sessão para a entity cliente ─────────────────
         session([
             'selected_entity_id'        => $entity->id,
             'selected_entity_user_id'   => $entityUser->id,
@@ -89,15 +88,16 @@ class ImpersonateController extends Controller
     /**
      * Encerra a sessão de impersonação e restaura o contexto original.
      */
-    public function destroy(): RedirectResponse
+    public function destroy(Request $request): RedirectResponse
     {
-        if (!session()->has('impersonating')) {
+        if (! session()->has('impersonating')) {
             return redirect()->route('panel.dashboard');
         }
 
         $original = session('impersonating');
 
-        // ── Restaura o contexto do usuário real ──────────────────────────────
+        // Restaura o contexto do usuário real ANTES do audit log, para que
+        // o evento de fim seja registrado com o ator correto (admin real).
         session([
             'selected_entity_id'        => $original['original_entity_id'],
             'selected_entity_user_id'   => $original['original_entity_user_id'],
@@ -106,10 +106,13 @@ class ImpersonateController extends Controller
             'user_rule'                 => $original['original_user_rule'],
         ]);
 
+        // ── AUDIT: registra fim depois da restauração ───────────────────────
+        $this->audit->recordImpersonationEnd($original, $request);
+
         session()->forget('impersonating');
 
         return redirect()
-            ->route('panel.manager.entities.index')
+            ->route('manager.entities.index')
             ->with('success', __('actions.impersonate.ended'));
     }
 }

@@ -1,0 +1,372 @@
+//
+// buttons.scss
+// Clean & Modern Button System — EasyEye
+//
+
+@use "../variables" as *;
+@use "../utils/mixins" as *;
+@use "sass:map";
+
+// ─── Base Button ──────────────────────────────────────────────────────────────
+// O tamanho base replica o visual da página de Agenda (schedules).
+// Todos os botões do sistema ficam compactos e uniformes.
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	font-size: 13px;
+	font-weight: 500;
+	padding: 5px 12px;
+	border-radius: 7px;
+	box-shadow: none;
+	border-width: 1px;
+	letter-spacing: 0.01em;
+	line-height: 1.5;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	cursor: pointer;
+	white-space: nowrap;
+
+	&:focus-visible {
+		outline: 2px solid rgba(var(--primary-rgb), 0.4);
+		outline-offset: 2px;
+	}
+
+	// ─── Icon Button ──────────────────────────────────────────────────────
+	&-icon {
+		position: relative;
+		display: inline-flex;
+		justify-content: center;
+		align-items: center;
+		height: 30px;
+		width: 30px;
+		padding: 0;
+		font-size: 13px;
+		border-radius: 7px;
+
+		:is(i, svg, img) {
+			vertical-align: middle;
+		}
+		&.btn-xs {
+			height: 22px;
+    		width: 22px;
+			font-size: 11px;
+			border-radius: 6px;
+		}
+		&.btn-sm {
+			height: calc(0.6rem + 1.5em + 2px);
+    		width: calc(0.6rem + 1.5em + 2px);
+			border-radius: 7px;
+		}
+
+		&.btn-lg {
+			height: calc(1.3rem + 1.5em + 2px);
+   			width: calc(1.3rem + 1.5em + 2px);
+			border-radius: 8px;
+		}
+	}
+
+	// ─── Sizes ────────────────────────────────────────────────────────────
+	&.btn-xs {
+		font-size: 11px;
+		padding: 2px 7px;
+		border-radius: 6px;
+		font-weight: 500;
+		gap: 4px;
+	}
+
+	// btn-sm herda as mesmas proporções do base (consistência com schedules)
+	&.btn-sm {
+		font-size: 13px;
+		padding: 5px 12px;
+		border-radius: 7px;
+		font-weight: 500;
+		gap: 5px;
+	}
+
+	&.btn-lg {
+		font-size: 14px;
+		padding: 8px 16px;
+		border-radius: 8px;
+		font-weight: 600;
+		gap: 6px;
+	}
+
+	&.btn-outline-white {
+		border-color: $border-color;
+	}
+}
+
+// ─── Disabled State ───────────────────────────────────────────────────────────
+.btn.disabled, .btn:disabled, fieldset:disabled .btn {
+	background-color: $white;
+	border-color: $border-color;
+	color: $gray-900;
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+.btn-check:checked+.btn, .btn.active, .btn.show, .btn:first-child:active, :not(.btn-check)+.btn:active {
+	background-color: $white;
+	border-color: $border-color;
+	color: $gray-900;
+}
+
+// ─── Solid Buttons ────────────────────────────────────────────────────────────
+@each $state in map.keys($theme-colors) {
+	.btn-#{$state} {
+		color: #fff;
+		background-color: var(--#{$state});
+		border-color: var(--#{$state});
+		&:hover, &:active, &.active, &.show {
+			color: #fff;
+			background-color: var(--#{$state}-hover);
+			border-color: var(--#{$state}-hover);
+			transform: translateY(-1px);
+			box-shadow: 0 2px 8px rgba(var(--#{$state}-rgb, 0, 0, 0), 0.2);
+		}
+		&.disabled, &:disabled {
+			color: #fff;
+			background-color: var(--#{$state});
+			border-color: var(--#{$state});
+			transform: none;
+			box-shadow: none;
+		}
+	}
+	.btn-check:checked + .btn-#{$state},  .btn-#{$state}:first-child:active, :not(.btn-check) + .btn-#{$state}:active, .btn-check+.btn-#{$state}:hover {
+		background-color: var(--#{$state}-hover);
+		border-color: var(--#{$state}-hover);
+		color: #fff;
+	}
+}
+.btn-light {
+	color: $gray-900 !important;
+	background-color: var(--light);
+	border-color: $border-color;
+	&:hover, &:active, &.active {
+		color: $gray-900 !important;
+		background-color: var(--light-hover);
+		border-color: var(--gray-200);
+	}
+	&.disabled, &:disabled {
+		color: $gray-900 !important;
+	}
+}
+.btn-dark {
+	background-color: #0B0D0E;
+	border-color: #0B0D0E;
+	&:hover {
+		background-color: $gray-700;
+		border-color: $gray-700;
+		transform: translateY(-1px);
+	}
+}
+.btn-white {
+	background-color: $white;
+	border-color: $border-color;
+	color: $gray-900;
+	&:hover, &.disabled, &:disabled {
+		color: $gray-900;
+		background-color: $light;
+		border-color: $border-color;
+	}
+	&:active, &.active {
+		color: #fff;
+		background-color: $primary;
+		border-color: $primary;
+	}
+}
+
+// ─── Outline Buttons ──────────────────────────────────────────────────────────
+@each $state in map.keys($theme-colors) {
+	.btn-outline-#{$state} {
+		color: var(--#{$state});
+		background-color: transparent;
+		border-color: var(--#{$state});
+		&:hover, &:active, &.active {
+			color: #{$white};
+			background-color: var(--#{$state});
+			border-color: var(--#{$state});
+			transform: translateY(-1px);
+		}
+		&.disabled, &:disabled {
+			color: var(--#{$state});
+			background-color: transparent;
+			transform: none;
+		}
+	}
+	.btn-check:checked + .btn-outline-#{$state},  .btn-outline-#{$state}:first-child:active, :not(.btn-check) + .btn-outline-#{$state}:active,
+	.btn-check+.btn-outline-#{$state}:hover {
+		background-color: var(--#{$state}-hover);
+		border-color: var(--#{$state}-hover);
+		color: #{$white};
+	}
+}
+.btn-outline-light {
+	color: $gray-900 !important;
+	border-color: $border-color;
+	&:hover, &:active, &.active, &.disabled, &:disabled {
+		color: $gray-900 !important;
+	}
+}
+
+// ─── Soft Buttons (tinted background, no border) ─────────────────────────────
+@each $state in map.keys($theme-colors) {
+	.btn-soft-#{$state} {
+		color: var(--#{$state});
+		background-color: var(--#{$state}-transparent);
+		border-color: transparent;
+		&:hover, &:active, &.active {
+			color: #{$white};
+			background-color: var(--#{$state});
+			border-color: var(--#{$state});
+			transform: translateY(-1px);
+		}
+		&.disabled, &:disabled {
+			color: var(--#{$state});
+			background-color: var(--#{$state}-transparent);
+			transform: none;
+		}
+	}
+}
+.btn-soft-light {
+	color: $gray-900 !important;
+	&:hover, &:active, &.active, &.disabled, &:disabled {
+		color: $gray-900 !important;
+	}
+}
+
+// ─── Ghost Button (text-only, subtle hover) ──────────────────────────────────
+.btn-ghost {
+	background: transparent;
+	border-color: transparent;
+	color: $gray-600;
+	&:hover {
+		background: var(--light);
+		color: $gray-900;
+	}
+}
+
+// ─── Animation Buttons ───────────────────────────────────────────────────────
+.btn-effect {
+	position: relative;
+	cursor: pointer;
+	display: inline-block;
+	overflow: hidden;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	-webkit-tap-highlight-color: transparent
+}
+
+.btn-animation {
+	overflow: hidden;
+	transition: border-color .25s, background-color .25s;
+	transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+	position: relative;
+
+	&::after {
+		content: attr(data-text);
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		top: 0;
+		left: 0;
+		opacity: 0;
+		transform: translate3d(0, 25%, 0);
+		padding: 0.5rem 0.85rem;
+		transition: opacity .25s, transform .25s;
+		transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+	}
+
+	&>span {
+		display: block;
+		transition: opacity .25s, transform .25s;
+		transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+	}
+
+	&:hover {
+		&::after {
+			opacity: 1;
+			transform: translate3d(0, 0, 0);
+		}
+	}
+}
+
+.btn-animation:hover>span {
+	opacity: 0;
+	transform: translate3d(0, -25%, 0)
+}
+
+.btn-primary {
+	&.btn-animation:is(:hover, :focus, :active, :focus-visible) {
+		color: $primary !important;
+		border-color: $primary !important;
+		background-color: rgba($primary-rgb, .1)
+	}
+}
+
+.btn-secondary {
+	&.btn-animation:is(:hover, :focus, :active, :focus-visible) {
+		color: $secondary !important;
+		border-color: $secondary !important;
+		background-color: rgba($secondary, .1)
+	}
+}
+
+.btn-warning {
+	&.btn-animation:is(:hover, :focus, :active, :focus-visible) {
+		color: $warning !important;
+		background-color: rgba($warning, .1)
+	}
+}
+
+.btn-danger {
+	&.btn-animation:is(:hover, :focus, :active, :focus-visible) {
+		color: $danger !important;
+		background-color: rgba($danger, .1)
+	}
+}
+
+.btn-info {
+	&.btn-animation:is(:hover, :focus, :active, :focus-visible) {
+		color: $info !important;
+		background-color: rgba($info, .1)
+	}
+}
+
+.btn-success {
+	&.btn-animation:is(:hover, :focus, :active, :focus-visible) {
+		color: $success !important;
+		background-color: rgba($success, .1)
+	}
+}
+
+.btn-dark {
+	&.btn-animation:is(:hover, :focus, :active, :focus-visible) {
+		color: $dark !important;
+		background-color: rgba($dark, .1)
+	}
+}
+.btn-outline-white {
+	color: var(--dark);
+	background-color: var(--white);
+	border-color: var(--border-color);
+	&:hover, &:active, &.active, &.disabled, &:disabled {
+		color: var(--dark);
+		background-color: var(--light);
+		border-color: var(--light);
+	}
+}
+.btn-liner-gradient{
+	background: linear-gradient(90deg, #2E37A4 0%, #0E9384 100%);
+	color: #fff !important;
+	border: none;
+	box-shadow: none;
+	padding: 7px 14px;
+	transition: all .3s cubic-bezier(.4, 0, .2, 1);
+	&:hover{
+		background: linear-gradient(-90deg, #2E37A4 0%, #0E9384 100%);
+		transform: translateY(-1px);
+	}
+}

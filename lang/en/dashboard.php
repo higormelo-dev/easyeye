@@ -66,6 +66,15 @@ return [
     'activation_done'         => 'setup complete',
     'activation_completed_on' => 'Completed on',
 
+    // Live / Polling
+    'live_label'       => 'Live',
+    'live_refreshing'  => 'Refreshing...',
+    'last_updated_at'  => 'Updated at',
+    'btn_refresh'      => 'Refresh',
+
+    // Today's schedule
+    'section_schedule_today' => "Today's schedule",
+
     // Demo
     'demo_title'       => 'Demo environment',
     'demo_description' => 'Populate test data or reset the environment for demonstrations.',

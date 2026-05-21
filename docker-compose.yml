@@ -107,29 +107,37 @@ services:
   #     start_period: 20s
   #     timeout: 5s
 
-  # [DOCKER-REDIS] Descomente para rodar Redis em container
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: easyeye_redis
-  #   restart: unless-stopped
-  #   command: ["redis-server", "--appendonly", "yes"]
-  #   ports:
-  #     - "${REDIS_HOST_PORT:-6379}:6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   networks:
-  #     - easyeye-network
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     retries: 5
-  #     start_period: 20s
-  #     timeout: 5s
+  # [DOCKER-REDIS] Redis em container — isolado da instalação do host.
+#   redis:
+#     image: redis:7-alpine
+#     container_name: easyeye_redis
+#     restart: unless-stopped
+#     command: ["redis-server", "--appendonly", "yes"]
+#     ports:
+#       - "${REDIS_HOST_PORT:-6380}:6379"
+#     volumes:
+#       - redis_data:/data
+#     networks:
+#       - easyeye-network
+#     healthcheck:
+#       test: ["CMD", "redis-cli", "ping"]
+#       interval: 10s
+#       retries: 5
+#       start_period: 20s
+#       timeout: 5s
 
   # Vite dev server com HMR.
   # Browser acessa http://localhost:5173 via port mapping do Docker.
   # server.host=0.0.0.0 e hmr.host=localhost estão em vite.config.js.
   # CHOKIDAR_USEPOLLING=1: força polling porque inotify não propaga em bind mounts Docker/Linux.
+  #
+  # `user: UID:GID` (default 1000:1000) faz o container escrever `public/hot` e
+  # outros arquivos com a MESMA permissão do host. Sem isso, o container roda
+  # como root e Laravel/host não conseguem ler/sobrescrever os arquivos gerados,
+  # causando o sintoma "assets sempre antigos" (queda no fallback de build/).
+  #
+  # `rm -f public/hot` antes do `npm run dev` garante que um hot-file stale de
+  # uma execução anterior (com endpoint errado) não confunda o Laravel.
   node:
     image: node:22-alpine
     container_name: easyeye_node
@@ -144,9 +152,64 @@ services:
     environment:
       CHOKIDAR_USEPOLLING: "1"
       CHOKIDAR_INTERVAL: "300"
-    command: sh -c "npm install --silent && npm run dev"
+      # WATCHPACK_POLLING cobre o caso (raro) do webpack interno do Vite
+      # cair em fallback chokidar antes da config aplicar.
+      WATCHPACK_POLLING: "true"
+      # HOME=/tmp dá ao container node um local writable para cache do npm
+      # quando o container roda como UID não-root sem home configurado.
+      HOME: /tmp
+      # NPM ignora avisos de funding/audit em dev — output mais limpo, falhas reais visíveis.
+      NPM_CONFIG_FUND: "false"
+      NPM_CONFIG_AUDIT: "false"
+    command: >
+      sh -c "
+        chown ${UID:-1000}:${GID:-1000} node_modules &&
+        echo '[node] Instalando dependências...' &&
+        npm install --no-audit --no-fund --loglevel=warn &&
+        echo '[node] Limpando public/hot stale...' &&
+        rm -f public/hot &&
+        echo '[node] Iniciando Vite dev server...' &&
+        exec npm run dev
+      "
+    # Roda como root para poder fazer chown no volume nomeado.
+    # npm install e Vite rodam como root dentro do container, mas os
+    # arquivos no bind mount do host mantêm a permissão do host.
+    # O volume nomeado (node_modules) é isolado e não afeta o host.
+    user: "0:0"
     networks:
       - easyeye-network
+    # Healthcheck monitora a presença do public/hot — sinal claro de que o
+    # Vite escreveu o endpoint e o Laravel passará a servir assets em dev.
+    healthcheck:
+      test: ["CMD-SHELL", "test -f public/hot"]
+      interval: 10s
+      retries: 12
+      start_period: 90s
+      timeout: 3s
+
+  # SSR (Server-Side Rendering) — pré-renderiza páginas Vue/Inertia para SEO.
+  # O container app (PHP) envia requests HTTP para http://ssr:13714.
+  # Quando este serviço não está rodando, o Inertia faz fallback silencioso para CSR.
+  ssr:
+    image: node:22-alpine
+    container_name: easyeye_ssr
+    restart: unless-stopped
+    working_dir: /var/www/html/app
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ./:/var/www/html/app
+      - node_modules:/var/www/html/app/node_modules
+    environment:
+      HOME: /tmp
+    command: sh -c "node bootstrap/ssr/ssr.js"
+    networks:
+      - easyeye-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:13714/health || exit 1"]
+      interval: 15s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
 
 networks:
   easyeye-network:
@@ -155,6 +218,6 @@ networks:
 volumes:
   # node_modules em volume nomeado: evita conflito entre binários do host e do container
   node_modules:
-  # Descomente junto com os blocos [DOCKER-DB] e [DOCKER-REDIS] acima
-  # postgres_data:
   # redis_data:
+  # Descomente junto com o bloco [DOCKER-DB] acima
+  # postgres_data:

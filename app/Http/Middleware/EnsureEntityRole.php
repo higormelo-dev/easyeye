@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
@@ -44,13 +44,13 @@ class EnsureEntityRole
 
         $entity = $this->resolveEntity($request);
 
-        if (!$entity) {
+        if (! $entity) {
             return $this->deny($request, __('http-statuses.404'));
         }
 
         $user = $request->user();
 
-        if (!$user || !$user->hasAnyRoleInEntity($entity, $roles)) {
+        if (! $user || ! $user->hasAnyRoleInEntity($entity, $roles)) {
             return $this->deny($request, __('http-statuses.403'));
         }
 
@@ -85,8 +85,15 @@ class EnsureEntityRole
 
     private function deny(Request $request, string $message): Response
     {
+        // API e fetch com Accept: application/json → JSON puro
         if ($request->expectsJson()) {
             return response()->json(['message' => $message], Response::HTTP_FORBIDDEN);
+        }
+
+        // Inertia (X-Inertia: true) → redireciona de volta com flash de erro
+        // Evita que o HTML da página de erro seja exibido como modal overlay.
+        if ($request->hasHeader('X-Inertia')) {
+            return redirect()->back()->with('error', $message);
         }
 
         abort(Response::HTTP_FORBIDDEN, $message);

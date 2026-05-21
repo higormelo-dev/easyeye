@@ -10,19 +10,15 @@ enum CommissionStatus: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Pending   => 'Pendente',
-            self::Paid      => 'Pago',
-            self::Cancelled => 'Cancelado',
-        };
+        return __('partners.commission_status.' . $this->value);
     }
 
     public function badgeClass(): string
     {
         return match ($this) {
-            self::Pending   => 'bg-warning text-dark',
-            self::Paid      => 'bg-success',
-            self::Cancelled => 'bg-secondary',
+            self::Pending   => 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
+            self::Paid      => 'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
+            self::Cancelled => 'badge-soft-secondary rounded fs-13 fw-medium',
         };
     }
 }

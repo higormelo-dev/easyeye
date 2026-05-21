@@ -1,0 +1,55 @@
+// ─── Design Tokens ───────────────────────────────────────────
+$navy:       #0F2551;
+$navy-mid:   #1B3A6B;
+$navy-dark:  #0a1628;
+$blue:       #1E5EBF;
+$teal:       #00B4D8;
+$teal-lt:    #90E0EF;
+$teal-dark:  #0096b5;
+$mint:       #06D6A0;
+$purple:     #6c63ff;
+$orange:     #f97316;
+$red:        #ef4444;
+$yellow:     #f59e0b;
+
+$bg:         #F4F7FB;
+$bg-white:   #FFFFFF;
+$text:       #1A202C;
+$text-muted: #64748B;
+$border:     #E2E8F0;
+
+$radius:     12px;
+$radius-lg:  20px;
+
+$shadow:     0 4px 24px rgba($navy, .08);
+$shadow-lg:  0 12px 48px rgba($navy, .14);
+
+// ─── Breakpoints ─────────────────────────────────────────────
+$bp-sm:  640px;
+$bp-md:  768px;
+$bp-lg:  900px;
+$bp-xl:  960px;
+
+@mixin below($bp) {
+    @media (max-width: $bp) { @content; }
+}
+
+// ─── CSS Custom Properties (runtime) ─────────────────────────
+// Mantidas para uso nos componentes Vue via var(--teal), etc.
+:root {
+    --navy:       #{$navy};
+    --navy-mid:   #{$navy-mid};
+    --blue:       #{$blue};
+    --teal:       #{$teal};
+    --teal-lt:    #{$teal-lt};
+    --mint:       #{$mint};
+    --bg:         #{$bg};
+    --bg-white:   #{$bg-white};
+    --text:       #{$text};
+    --text-muted: #{$text-muted};
+    --border:     #{$border};
+    --radius:     #{$radius};
+    --radius-lg:  #{$radius-lg};
+    --shadow:     #{$shadow};
+    --shadow-lg:  #{$shadow-lg};
+}

@@ -6,16 +6,16 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
-use Illuminate\View\View;
+use Inertia\{Inertia, Response};
 
 class ConfirmablePasswordController extends Controller
 {
-    /**
-     * Show the confirm password view.
-     */
-    public function show(): View
+    public function show(): Response
     {
-        return view('auth.confirm-password');
+        return Inertia::render('Auth/ConfirmPassword', [
+            'appName' => config('app.name', 'EasyEye'),
+            't'       => trans('auth'),
+        ])->rootView('guest-app');
     }
 
     /**

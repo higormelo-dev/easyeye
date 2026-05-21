@@ -24,11 +24,11 @@ enum SubscriptionStatus: string
     public function badgeClass(): string
     {
         return match ($this) {
-            self::Trial     => 'bg-info',
-            self::Active    => 'bg-success',
-            self::Expired   => 'bg-danger',
-            self::Cancelled => 'bg-secondary',
-            self::PastDue   => 'bg-warning text-dark',
+            self::Trial     => 'badge-soft-info rounded text-info border border-info fs-13 fw-medium',
+            self::Active    => 'badge-soft-success rounded text-success border border-success fs-13 fw-medium',
+            self::Expired   => 'badge-soft-danger rounded text-danger border border-danger fs-13 fw-medium',
+            self::Cancelled => 'badge-soft-secondary rounded fs-13 fw-medium',
+            self::PastDue   => 'badge-soft-warning rounded text-warning border border-warning fs-13 fw-medium',
         };
     }
 

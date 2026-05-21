@@ -5,6 +5,10 @@
 /public/storage
 /public/vendor/tinymce
 /public/vendor/tinymce-langs
+# Imagens estáticas geradas pelo Vite a partir de resources/img/ — não commitar
+/public/system/images/*
+!/public/system/images/users
+/public/site/images/
 /storage/*.key
 /storage/pail
 /vendor

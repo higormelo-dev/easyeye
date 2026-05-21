@@ -6,12 +6,8 @@ namespace App\DTOs;
  * Visibilidade e modo de ações disponíveis para um registro na UI.
  *
  * Resolve ownership multi-tenant + soft-delete + flag global em um modo
- * único. Consumido por:
- *   - app/DataTables/BaseDataTable::buildActionButtons (server-side render)
- *   - controllers cards() endpoints (JSON spread em toArray())
- *   - blade card views (Alpine x-if em record.mode)
- *
- * Garante paridade entre DataTable list view e card view.
+ * único. Consumido pelos controllers em listings Inertia (spread em toArray())
+ * e pelos componentes Vue (v-if em record.mode).
  */
 final readonly class ActionPolicy
 {
