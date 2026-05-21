@@ -4,6 +4,9 @@ import { router } from '@inertiajs/vue3';
 import LoadingSpinner   from '@/Components/Panel/LoadingSpinner.vue';
 import StatusBadge      from '@/Components/Panel/StatusBadge.vue';
 import CardsPagination  from '@/Components/Panel/CardsPagination.vue';
+import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -62,7 +65,7 @@ onUnmounted(() => removeSuccessListener?.());
                         </div>
                         <div class="flex-grow-1 min-w-0">
                             <h6 class="mb-1 fw-semibold lh-sm text-truncate">{{ e.name }}</h6>
-                            <div class="mb-1">
+                            <div class="mb-1 d-flex flex-wrap gap-1">
                                 <StatusBadge
                                     :active="e.active"
                                     :deleted="e.deleted"
@@ -70,6 +73,13 @@ onUnmounted(() => removeSuccessListener?.());
                                     :label-inactive="t.status_inactive"
                                     :label-deleted="t.status_deleted"
                                 />
+                                <span
+                                    v-if="e.requires_two_factor"
+                                    class="badge badge-soft-success rounded text-success border border-success fs-11"
+                                    :title="t.badge_2fa_required_hint ?? 'Esta empresa exige 2FA de todos os usuários'"
+                                >
+                                    <i class="ti ti-shield-lock-filled me-1"></i>2FA
+                                </span>
                             </div>
                             <address class="small text-muted mb-2">
                                 <div><strong>{{ t.card_code }}</strong> {{ e.code }}</div>
@@ -100,46 +110,48 @@ onUnmounted(() => removeSuccessListener?.());
                     <hr class="my-2">
 
                     <div class="d-flex align-items-center justify-content-between">
-                        <div class="d-flex gap-1">
-                            <a
+                        <ActionIconGroup gap="tight">
+                            <ActionIconButton
                                 v-if="e.entity_users_count > 0"
-                                :href="e.users_url"
-                                class="btn btn-xs btn-outline-secondary"
+                                icon="ti ti-users"
                                 :title="t.action_users"
-                            ><i class="ti ti-users"></i></a>
-                            <a
+                                :href="e.users_url"
+                            />
+                            <ActionIconButton
                                 v-if="e.entity_user_integrators_count > 0"
-                                :href="e.user_integrators_url"
-                                class="btn btn-xs btn-outline-secondary"
+                                icon="ti ti-user-cog"
                                 :title="t.action_user_integrators"
-                            ><i class="ti ti-user-cog"></i></a>
-                        </div>
-                        <div v-if="e.mode === 'full'" class="d-flex gap-1">
-                            <button class="btn btn-xs btn-outline-secondary" :title="t.action_view" @click="$emit('view', e.id)">
-                                <i class="ti ti-eye"></i>
-                            </button>
-                            <button class="btn btn-xs btn-outline-secondary" :title="t.action_edit" @click="$emit('edit', e.id)">
-                                <i class="ti ti-edit"></i>
-                            </button>
-                            <div class="dropdown">
-                                <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="dropdown">
-                                    <i class="ti ti-dots-vertical"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end p-2">
-                                    <li>
-                                        <button class="dropdown-item rounded-1" @click="$emit('toggleActive', e.id, e.active)">
-                                            <i :class="`ti me-1 ${e.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                            {{ e.active ? t.action_deactivate : t.action_activate }}
-                                        </button>
-                                    </li>
-                                    <li>
-                                        <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', e.id)">
-                                            <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
-                                        </button>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
+                                :href="e.user_integrators_url"
+                            />
+                        </ActionIconGroup>
+                        <ActionIconGroup v-if="e.mode === 'full'" align="end" gap="tight">
+                            <ActionIconButton
+                                icon="ti ti-eye"
+                                :title="t.action_view"
+                                @click="$emit('view', e.id)"
+                            />
+                            <ActionIconButton
+                                icon="ti ti-edit"
+                                :title="t.action_edit"
+                                @click="$emit('edit', e.id)"
+                            />
+                            <ActionDropdown
+                                btn-class="ee-action-icon ee-action-icon--default"
+                                icon="ti ti-dots-vertical"
+                            >
+                                <li>
+                                    <button class="dropdown-item rounded-1" @click="$emit('toggleActive', e.id, e.active)">
+                                        <i :class="`ti me-1 ${e.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
+                                        {{ e.active ? t.action_deactivate : t.action_activate }}
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', e.id)">
+                                        <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
+                                    </button>
+                                </li>
+                            </ActionDropdown>
+                        </ActionIconGroup>
                     </div>
                 </div>
             </div>

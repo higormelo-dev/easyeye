@@ -1,13 +1,16 @@
 <script setup>
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     doctors: { type: Object, required: true },
     filters: { type: Object, default: () => ({}) },
 });
 
-const emit = defineEmits(['sort', 'edit', 'delete', 'toggleActive']);
+const emit = defineEmits(['sort', 'view', 'edit', 'delete', 'toggleActive']);
 
 const currentSort = computed(() => props.filters.sort ?? 'created_at');
 const currentDir  = computed(() => props.filters.direction ?? 'desc');
@@ -90,39 +93,42 @@ const th = 'cursor-pointer user-select-none';
                         >Inativo</span>
                     </td>
                     <td class="text-end">
-                        <div class="d-flex align-items-center justify-content-end gap-1">
-                            <a
-                                :href="d.work_schedule_url"
-                                class="btn btn-sm btn-outline-info"
+                        <ActionIconGroup align="end" gap="tight">
+                            <ActionIconButton
+                                icon="ti ti-eye"
+                                title="Visualizar"
+                                @click="$emit('view', d.id)"
+                            />
+                            <ActionIconButton
+                                icon="ti ti-calendar-time"
                                 title="Horários de atendimento"
-                            ><i class="ti ti-calendar-time"></i></a>
-                            <template v-if="d.mode === 'full'">
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-                                        <i class="ti ti-dots-vertical"></i>
+                                variant="info"
+                                :href="d.work_schedule_url"
+                            />
+                            <ActionDropdown
+                                v-if="d.mode === 'full'"
+                                btn-class="ee-action-icon ee-action-icon--default"
+                                icon="ti ti-dots-vertical"
+                            >
+                                <li>
+                                    <button class="dropdown-item rounded-1" @click="$emit('edit', d.id)">
+                                        <i class="ti ti-edit me-1"></i> Editar
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end p-2">
-                                        <li>
-                                            <button class="dropdown-item rounded-1" @click="$emit('edit', d.id)">
-                                                <i class="ti ti-edit me-1"></i> Editar
-                                            </button>
-                                        </li>
-                                        <li>
-                                            <button class="dropdown-item rounded-1" @click="$emit('toggleActive', d.id, d.active)">
-                                                <i :class="`ti me-1 ${d.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                                {{ d.active ? 'Desativar' : 'Ativar' }}
-                                            </button>
-                                        </li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', d.id)">
-                                                <i class="ti ti-trash me-1"></i> Excluir
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </template>
-                        </div>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item rounded-1" @click="$emit('toggleActive', d.id, d.active)">
+                                        <i :class="`ti me-1 ${d.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
+                                        {{ d.active ? 'Desativar' : 'Ativar' }}
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', d.id)">
+                                        <i class="ti ti-trash me-1"></i> Excluir
+                                    </button>
+                                </li>
+                            </ActionDropdown>
+                        </ActionIconGroup>
                     </td>
                 </tr>
             </tbody>

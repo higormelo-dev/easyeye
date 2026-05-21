@@ -197,22 +197,63 @@ class DoctorsController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Display the specified resource (JSON only — viewed via modal drawer on index).
      */
-    public function show(string $id): Application|View|JsonResponse
+    public function show(string $id): JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
 
-        if (request()->wantsJson()) {
-            return response()->json([
-                'data' => new DoctorResource($record),
-            ]);
+        if (!request()->wantsJson()) {
+            return redirect()->route('panel.doctors.index');
         }
 
-        return view(
-            'system.doctors.show',
-            compact('record'),
-        );
+        $person        = $record->person;
+        $userPhotoPath = 'users/' . $record->user_id . '.jpg';
+        $photoUrl      = Storage::disk('public')->exists($userPhotoPath)
+            ? Storage::disk('public')->url($userPhotoPath)
+            : Vite::asset('resources/img/system/team.png');
+
+        return response()->json([
+            'data' => [
+                'id'                => $record->id,
+                'code'              => $record->code,
+                'record'            => $record->record,
+                'record_specialty' => $record->record_specialty,
+                'color'             => $record->color,
+                'observation'       => $record->observation,
+                'partner'           => (bool) $record->partner,
+                'active'            => (bool) $record->active,
+                'photo_url'         => $photoUrl,
+                'created_at'        => $record->created_at?->format('d/m/Y H:i'),
+                'updated_at'        => $record->updated_at?->format('d/m/Y H:i'),
+                'deleted_at'        => $record->deleted_at?->format('d/m/Y H:i'),
+                'full_name'         => $person->full_name,
+                'nickname'          => $person->nickname,
+                'cpf'               => $person->national_registry ? $person->present()->getNationalRegistry() : null,
+                'birth_date'        => $person->birth_date ? $person->present()->getBirthDate() : null,
+                'age'               => $person->birth_date ? $person->present()->getAge() : null,
+                'gender'            => $person->present()->getGender(),
+                'marital_status'    => $person->present()->getMaritalStatus(),
+                'email'             => $record->email,
+                'mother_name'       => $person->mother_name,
+                'father_name'       => $person->father_name,
+                'rg'                => $person->state_registry,
+                'rg_agency'         => $person->state_registry_agency,
+                'rg_state'          => $person->state_registry_initial,
+                'rg_date'           => $person->state_registry_date ? $person->present()->getStateRegistryDate() : null,
+                'telephone'         => $person->telephone ? $person->present()->getTelephone() : null,
+                'cellphone'         => $person->cellphone ? $person->present()->getCellphone() : null,
+                'whatsapp'          => (bool) $person->whatsapp,
+                'zipcode'           => $person->zipcode ? $person->present()->getZipcode() : null,
+                'address'           => $person->address,
+                'number'            => $person->number,
+                'complement'        => $person->complement,
+                'district'          => $person->district,
+                'city'              => $person->city,
+                'state'             => $person->state,
+                'work_schedule_url' => route('panel.doctors.work-schedule.index', $record->id),
+            ],
+        ]);
     }
 
     /**
@@ -258,28 +299,22 @@ class DoctorsController extends Controller
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Return doctor data for the edit modal (JSON only — UI is Vue/Inertia).
      */
-    public function edit(string $id): Application|View|JsonResponse
+    public function edit(string $id): JsonResponse|RedirectResponse
     {
-        $record          = $this->service->findByIdOrCode($id);
-        $genders         = People::$genders;
-        $maritalStatuses = People::$maritalStatuses;
-        $statesOfBrazil  = People::$statesOfBrazil;
-
-        if (request()->wantsJson()) {
-            return response()->json([
-                'data'            => new DoctorResource($record),
-                'genders'         => $genders,
-                'maritalStatuses' => $maritalStatuses,
-                'statesOfBrazil'  => $statesOfBrazil,
-            ]);
+        if (!request()->wantsJson()) {
+            return redirect()->route('panel.doctors.index');
         }
 
-        return view(
-            'system.doctors.show',
-            compact('record'),
-        );
+        $record = $this->service->findByIdOrCode($id);
+
+        return response()->json([
+            'data'            => new DoctorResource($record),
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
+        ]);
     }
 
     /**

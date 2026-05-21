@@ -26,6 +26,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxStorageGB->value        => '2',
                     FeatureKey::HasAiExamAssistant->value  => '0',
                     FeatureKey::HasAiReportDrafting->value => '0',
+                    FeatureKey::HasAiConsensus->value      => '0',
                     FeatureKey::HasApiIntegrator->value    => '0',
                     FeatureKey::AiMonthlyCredits->value    => '0',
                     FeatureKey::ApiMonthlyExamSends->value => '0',
@@ -34,7 +35,7 @@ class PlanSeeder extends Seeder
             [
                 'name'          => 'Pro',
                 'slug'          => 'pro',
-                'description'   => 'Clínica com até 3 médicos que usa convênios TISS e integra equipamentos. IA para laudos e faturamento sem glosas.',
+                'description'   => 'Clínica com até 3 médicos que usa convênios TISS e quer produtividade com IA na redação de laudos.',
                 'price'         => 899.90,
                 'billing_cycle' => BillingCycle::Monthly,
                 'active'        => true,
@@ -44,8 +45,9 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxPatients->value         => '5000',
                     FeatureKey::MaxDoctors->value          => '3',
                     FeatureKey::MaxStorageGB->value        => '5',
-                    FeatureKey::HasAiExamAssistant->value  => '1',
-                    FeatureKey::HasAiReportDrafting->value => '0',
+                    FeatureKey::HasAiExamAssistant->value  => '0',
+                    FeatureKey::HasAiReportDrafting->value => '1',
+                    FeatureKey::HasAiConsensus->value      => '0',
                     FeatureKey::HasApiIntegrator->value    => '0',
                     FeatureKey::AiMonthlyCredits->value    => '30',  // degustação — excedente R$ 2,50/crédito
                     FeatureKey::ApiMonthlyExamSends->value => '0',
@@ -66,6 +68,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxStorageGB->value        => '10',
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '1',
+                    FeatureKey::HasAiConsensus->value      => '1',
                     FeatureKey::HasApiIntegrator->value    => '1',
                     FeatureKey::AiMonthlyCredits->value    => '80',  // franquia — excedente R$ 2,00/crédito
                     FeatureKey::ApiMonthlyExamSends->value => '0',   // ilimitado → cap interno 1000
@@ -82,7 +85,7 @@ class PlanSeeder extends Seeder
             foreach ($features as $key => $value) {
                 PlanFeature::updateOrCreate(
                     ['plan_id' => $plan->id, 'feature' => $key],
-                    ['value' => $value]
+                    ['value' => $value],
                 );
             }
         }

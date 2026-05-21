@@ -2,9 +2,53 @@
     <Head>
         <title>{{ t.meta.title }}</title>
         <meta name="description" :content="t.meta.description">
+
+        <!-- Canonical -->
+        <link rel="canonical" :href="seo.canonicalUrl">
+
+        <!-- hreflang (multi-idioma) -->
+        <link
+            v-for="alt in seo.alternateLocales"
+            :key="alt.code"
+            rel="alternate"
+            :hreflang="alt.default ? 'x-default' : alt.code"
+            :href="alt.url"
+        >
+        <link
+            v-for="alt in seo.alternateLocales"
+            :key="'h-' + alt.code"
+            rel="alternate"
+            :hreflang="alt.code"
+            :href="alt.url"
+        >
+
+        <!-- Open Graph -->
         <meta property="og:title" :content="t.meta.og_title">
         <meta property="og:description" :content="t.meta.og_description">
         <meta property="og:type" content="website">
+        <meta property="og:url" :content="seo.canonicalUrl">
+        <meta property="og:image" :content="seo.ogImage">
+        <meta property="og:image:width" content="1200">
+        <meta property="og:image:height" content="630">
+        <meta property="og:locale" :content="seo.currentLocale">
+        <meta property="og:site_name" :content="appName">
+
+        <!-- Twitter Cards -->
+        <meta name="twitter:card" content="summary_large_image">
+        <meta name="twitter:title" :content="t.meta.og_title">
+        <meta name="twitter:description" :content="t.meta.og_description">
+        <meta name="twitter:image" :content="seo.ogImage">
+
+        <!-- JSON-LD Structured Data -->
+        <component
+            v-for="(schema, i) in seo.jsonLd"
+            :key="i"
+            :is="'script'"
+            type="application/ld+json"
+            v-text="JSON.stringify(schema)"
+        />
+
+        <!-- Fonts & Icons -->
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -558,6 +602,7 @@ const props = defineProps({
     routes: { type: Object, required: true },
     appName: { type: String, default: 'EasyEye' },
     howImageExists: { type: Boolean, default: false },
+    seo: { type: Object, default: () => ({}) },
 });
 
 // ─── HOW IT WORKS ───

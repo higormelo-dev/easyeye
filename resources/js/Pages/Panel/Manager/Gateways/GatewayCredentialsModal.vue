@@ -1,6 +1,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
     open:    { type: Boolean, required: true },
@@ -9,6 +11,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close']);
+
+// Modal de confirmação destrutiva (LGPD/CFM)
+const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
 
 // Credential list
 const credentials  = ref([]);
@@ -59,58 +64,79 @@ function resetForm() {
     showWebhook.value = false;
 }
 
-async function saveCredential() {
-    saving.value    = true;
-    formError.value = '';
-    try {
-        const body = {};
-        if (form.value.label)          body.label          = form.value.label;
-        if (form.value.secret)         body.secret         = form.value.secret;
-        if (form.value.webhook_secret) body.webhook_secret = form.value.webhook_secret;
-        if (form.value.valid_from)     body.valid_from     = form.value.valid_from;
-        if (form.value.valid_to)       body.valid_to       = form.value.valid_to;
-
-        const res  = await fetch(props.gateway.credentials_store_url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                'Accept': 'application/json',
-            },
-            body: JSON.stringify(body),
-        });
-        const json = await res.json();
-        if (!res.ok) {
-            formError.value = json.errors
-                ? Object.values(json.errors).flat().join(' ')
-                : (json.message ?? props.t.js_error_save);
-            return;
-        }
-        if (window.showSuccessToast) showSuccessToast(json.message);
-        emit('close');
-        router.reload({ only: ['gateways', 'defaultGateway'] });
-    } finally {
-        saving.value = false;
+// saveCredential agora exige reason — cadastro de credencial de pagamento
+// é evento crítico (afeta capacidade de cobrar clientes).
+function saveCredential() {
+    if (!form.value.secret) {
+        formError.value = props.t.js_error_secret_required ?? 'Informe o secret.';
+        return;
     }
-}
+    openReasonModal({
+        title: props.t.js_confirm_store_title ?? 'Cadastrar credencial',
+        message: props.t.js_confirm_store ?? 'A credencial anterior será revogada automaticamente.',
+        confirmVariant: 'primary',
+        async onConfirm(reason) {
+            saving.value    = true;
+            formError.value = '';
+            try {
+                const body = { reason };
+                if (form.value.label)          body.label          = form.value.label;
+                if (form.value.secret)         body.secret         = form.value.secret;
+                if (form.value.webhook_secret) body.webhook_secret = form.value.webhook_secret;
+                if (form.value.valid_from)     body.valid_from     = form.value.valid_from;
+                if (form.value.valid_to)       body.valid_to       = form.value.valid_to;
 
-async function revokeCredential(cred) {
-    if (!confirm(props.t.js_confirm_revoke ?? 'Revogar?')) return;
-    const res  = await fetch(cred.revoke_url, {
-        method: 'PATCH',
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-            'Accept': 'application/json',
+                const res  = await fetch(props.gateway.credentials_store_url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify(body),
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    formError.value = json.errors
+                        ? Object.values(json.errors).flat().join(' ')
+                        : (json.message ?? props.t.js_error_save);
+                    return;
+                }
+                if (window.showSuccessToast) showSuccessToast(json.message);
+                emit('close');
+                router.reload({ only: ['gateways', 'defaultGateway'] });
+            } finally {
+                saving.value = false;
+            }
         },
     });
-    const json = await res.json();
-    if (res.ok) {
-        if (window.showSuccessToast) showSuccessToast(json.message);
-        await loadCredentials();
-        router.reload({ only: ['gateways', 'defaultGateway'] });
-    } else {
-        if (window.showErrorToast) showErrorToast(json.message ?? props.t.js_error_generic);
-    }
+}
+
+function revokeCredential(cred) {
+    openReasonModal({
+        title: props.t.js_confirm_revoke_title ?? 'Revogar credencial',
+        message: props.t.js_confirm_revoke ?? 'Revogar?',
+        confirmVariant: 'danger',
+        async onConfirm(reason) {
+            const res  = await fetch(cred.revoke_url, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({ reason }),
+            });
+            const json = await res.json();
+            if (res.ok) {
+                if (window.showSuccessToast) showSuccessToast(json.message);
+                await loadCredentials();
+                router.reload({ only: ['gateways', 'defaultGateway'] });
+            } else {
+                if (window.showErrorToast) showErrorToast(json.message ?? props.t.js_error_generic);
+            }
+        },
+    });
 }
 </script>
 
@@ -294,5 +320,16 @@ async function revokeCredential(cred) {
                 </div>
             </div>
         </div>
+
+        <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
+        />
     </Teleport>
 </template>

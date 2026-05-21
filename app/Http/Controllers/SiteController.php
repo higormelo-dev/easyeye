@@ -37,6 +37,65 @@ class SiteController extends Controller
             . __('subscriptions.pricing_credit_note.body') . ' '
             . __('subscriptions.pricing_credit_note.topup');
 
+        $currentUrl = url('/');
+        $currentLocale = app()->getLocale();
+
+        // Alternate locales para hreflang
+        $alternateLocales = [];
+        foreach (\App\Http\Middleware\SetLocale::SUPPORTED_LOCALES as $code => $meta) {
+            $alternateLocales[] = [
+                'code'    => str_replace('_', '-', $code),
+                'url'     => $currentUrl . '?lang=' . $code,
+                'default' => $code === config('app.locale', 'pt_BR'),
+            ];
+        }
+
+        // JSON-LD: FAQPage
+        $faqItems = trans('site.faq.items');
+        $faqJsonLd = [
+            '@context'   => 'https://schema.org',
+            '@type'      => 'FAQPage',
+            'mainEntity' => collect($faqItems)->map(fn ($item) => [
+                '@type'          => 'Question',
+                'name'           => $item['q'],
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text'  => $item['a'],
+                ],
+            ])->toArray(),
+        ];
+
+        // JSON-LD: Organization + SoftwareApplication
+        $orgJsonLd = [
+            '@context'    => 'https://schema.org',
+            '@type'       => 'Organization',
+            'name'        => config('app.name', 'EasyEye'),
+            'url'         => $currentUrl,
+            'logo'        => asset('images/logo.svg'),
+            'description' => trans('site.meta.description'),
+            'contactPoint' => [
+                '@type'            => 'ContactPoint',
+                'contactType'      => 'sales',
+                'availableLanguage'=> ['Portuguese', 'English'],
+            ],
+        ];
+
+        $softwareJsonLd = [
+            '@context'           => 'https://schema.org',
+            '@type'              => 'SoftwareApplication',
+            'name'               => config('app.name', 'EasyEye'),
+            'applicationCategory'=> 'HealthApplication',
+            'operatingSystem'    => 'Web',
+            'description'        => trans('site.meta.description'),
+            'url'                => $currentUrl,
+            'offers'             => [
+                '@type'         => 'Offer',
+                'price'         => '0',
+                'priceCurrency' => 'BRL',
+                'description'   => trans('site.pricing.subtitle'),
+            ],
+        ];
+
         return Inertia::render('Site/Home', [
             'plans'          => $plans,
             'appName'        => config('app.name', 'EasyEye'),
@@ -47,6 +106,17 @@ class SiteController extends Controller
                 'register'     => route('register'),
                 'go'           => route('go'),
                 'contactStore' => route('contact.store'),
+            ],
+            'seo' => [
+                'canonicalUrl'     => $currentUrl,
+                'currentLocale'    => str_replace('_', '-', $currentLocale),
+                'alternateLocales' => $alternateLocales,
+                'ogImage'          => asset('images/og-preview.jpg'),
+                'jsonLd'           => [
+                    $faqJsonLd,
+                    $orgJsonLd,
+                    $softwareJsonLd,
+                ],
             ],
         ]);
     }

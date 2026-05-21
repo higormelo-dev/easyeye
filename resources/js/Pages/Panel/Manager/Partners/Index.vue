@@ -4,6 +4,11 @@ import { router }                   from '@inertiajs/vue3';
 import AppLayout                    from '@/Layouts/AppLayout.vue';
 import PartnerFormModal             from './PartnerFormModal.vue';
 import LiveStatusBar                from '@/Components/Panel/LiveStatusBar.vue';
+import ActionIconButton             from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup              from '@/Components/Panel/ActionIconGroup.vue';
+import ActionDropdown               from '@/Components/Panel/ActionDropdown.vue';
+import ConfirmationWithReasonModal  from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 import { useDashboardPolling }      from '@/composables/useDashboardPolling.js';
 
 const props = defineProps({
@@ -46,36 +51,53 @@ function closeForm() {
     editId.value   = null;
 }
 
-// ── Delete ────────────────────────────────────────────────────────────────────
-async function onDelete(partner) {
-    if (!confirm(props.t.confirm_delete)) return;
+// ── Confirmação destrutiva com reason (LGPD/CFM) ──────────────────────────────
+const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
 
-    const res = await fetch(partner.destroy_url, {
-        method: 'DELETE',
-        headers: {
-            'Accept':       'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+// ── Delete ────────────────────────────────────────────────────────────────────
+function onDelete(partner) {
+    openReasonModal({
+        title: props.t.confirm_delete_title ?? 'Excluir parceiro',
+        message: props.t.confirm_delete ?? '',
+        confirmVariant: 'danger',
+        async onConfirm(reason) {
+            const res = await fetch(partner.destroy_url, {
+                method: 'DELETE',
+                headers: {
+                    'Accept':       'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                body: JSON.stringify({ reason }),
+            });
+            const json = await res.json();
+            showToast(json.message, res.ok ? 'success' : 'error');
+            if (res.ok) router.reload({ only: ['partners', 'kpis', 'funnel', 'recentCommissions'] });
         },
     });
-    const json = await res.json();
-    showToast(json.message, res.ok ? 'success' : 'error');
-    if (res.ok) router.reload({ only: ['partners', 'kpis', 'funnel', 'recentCommissions'] });
 }
 
 // ── Pay commission ────────────────────────────────────────────────────────────
-async function onPay(commission) {
-    if (!confirm(props.t.confirm_pay)) return;
-
-    const res = await fetch(commission.pay_url, {
-        method: 'PATCH',
-        headers: {
-            'Accept':       'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+function onPay(commission) {
+    openReasonModal({
+        title: props.t.confirm_pay_title ?? 'Pagar comissão',
+        message: props.t.confirm_pay ?? '',
+        confirmVariant: 'primary',
+        async onConfirm(reason) {
+            const res = await fetch(commission.pay_url, {
+                method: 'PATCH',
+                headers: {
+                    'Accept':       'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+                },
+                body: JSON.stringify({ reason }),
+            });
+            const json = await res.json();
+            showToast(json.message, res.ok ? 'success' : 'error');
+            if (res.ok) router.reload({ only: ['recentCommissions', 'kpis'] });
         },
     });
-    const json = await res.json();
-    showToast(json.message, res.ok ? 'success' : 'error');
-    if (res.ok) router.reload({ only: ['recentCommissions', 'kpis'] });
 }
 
 function showToast(msg, type = 'success') {
@@ -92,6 +114,27 @@ const breadcrumbs = [
     { label: props.t.breadcrumb_home    ?? 'Dashboard', url: route('panel.dashboard'), active: false },
     { label: props.t.breadcrumb_current ?? 'Parceiros', url: '#', active: true },
 ];
+
+// ── Export PDF / Excel ───────────────────────────────────────────────────────
+// Filtros opcionais (período + status) refletem na URL como query string.
+// Backend ignora silenciosamente datas inválidas e exporta tudo se vazias.
+const exportFrom = ref('');
+const exportTo = ref('');
+const exportStatus = ref('');
+
+function exportUrl(format) {
+    const base = format === 'pdf'
+        ? route('manager.partners.export.pdf')
+        : route('manager.partners.export.excel');
+
+    const params = new URLSearchParams();
+    if (exportFrom.value)   params.set('from', exportFrom.value);
+    if (exportTo.value)     params.set('to', exportTo.value);
+    if (exportStatus.value) params.set('status', exportStatus.value);
+
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+}
 </script>
 
 <template>
@@ -99,13 +142,43 @@ const breadcrumbs = [
         <div>
 
             <!-- ── Cabeçalho da página ─────────────────────────────────────── -->
-            <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-bottom">
-                <div class="flex-grow-1">
-                    <h4 class="fw-bold mb-0">
-                        <i class="ti ti-affiliate me-2 text-primary"></i>{{ t.page_title }}
-                    </h4>
-                    <p class="text-muted small mb-0 mt-1">{{ t.page_subtitle }}</p>
-                </div>
+            <div class="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom flex-wrap">
+                <h4 class="mb-0 fw-bold me-auto">{{ t.page_title }}</h4>
+
+                <!-- Dropdown de Exportar (PDF / Excel) com filtros de período + status -->
+                <ActionDropdown
+                    btn-class="btn btn-outline-primary btn-md fs-13 d-inline-flex align-items-center"
+                    :min-width="280"
+                    icon="ti ti-download"
+                    :title="t.export ?? 'Exportar'"
+                >
+                    <li class="px-2 pb-2">
+                        <div class="small text-muted fw-semibold mb-1">{{ t.export_filters ?? 'Filtros do export' }}</div>
+                        <label class="form-label small mb-1">{{ t.export_from ?? 'De' }}</label>
+                        <input v-model="exportFrom" type="date" class="form-control form-control-sm mb-2">
+                        <label class="form-label small mb-1">{{ t.export_to ?? 'Até' }}</label>
+                        <input v-model="exportTo" type="date" class="form-control form-control-sm mb-2">
+                        <label class="form-label small mb-1">{{ t.export_status ?? 'Status (comissões)' }}</label>
+                        <select v-model="exportStatus" class="form-select form-select-sm">
+                            <option value="">{{ t.export_status_all ?? 'Todos' }}</option>
+                            <option value="pending">{{ t.export_status_pending ?? 'Pendentes' }}</option>
+                            <option value="paid">{{ t.export_status_paid ?? 'Pagas' }}</option>
+                            <option value="cancelled">{{ t.export_status_cancelled ?? 'Canceladas' }}</option>
+                        </select>
+                    </li>
+                    <li><hr class="dropdown-divider my-1"></li>
+                    <li>
+                        <a :href="exportUrl('pdf')" target="_blank" class="dropdown-item rounded-1">
+                            <i class="ti ti-file-type-pdf me-1 text-danger"></i> {{ t.export_pdf ?? 'Exportar PDF' }}
+                        </a>
+                    </li>
+                    <li>
+                        <a :href="exportUrl('excel')" class="dropdown-item rounded-1">
+                            <i class="ti ti-file-type-xls me-1 text-success"></i> {{ t.export_excel ?? 'Exportar Excel' }}
+                        </a>
+                    </li>
+                </ActionDropdown>
+
                 <button type="button" class="btn btn-primary btn-md fs-13" @click="openCreate">
                     <i class="ti ti-plus me-1"></i>{{ t.new }}
                 </button>
@@ -236,23 +309,25 @@ const breadcrumbs = [
                                 <td class="text-end fw-semibold text-warning">{{ p.pending_fmt }}</td>
                                 <td class="text-end fw-semibold text-success">{{ p.paid_fmt }}</td>
                                 <td class="text-end">
-                                    <div class="d-flex gap-1 justify-content-end">
-                                        <a
-                                            :href="p.show_url"
-                                            class="btn btn-xs btn-outline-info"
+                                    <ActionIconGroup align="end" gap="tight">
+                                        <ActionIconButton
+                                            icon="ti ti-eye"
                                             :title="t.view"
-                                        ><i class="ti ti-eye"></i></a>
-                                        <button
-                                            class="btn btn-xs btn-outline-secondary"
+                                            variant="info"
+                                            :href="p.show_url"
+                                        />
+                                        <ActionIconButton
+                                            icon="ti ti-edit"
                                             :title="t.edit"
                                             @click="openEdit(p)"
-                                        ><i class="ti ti-edit"></i></button>
-                                        <button
-                                            class="btn btn-xs btn-outline-danger"
+                                        />
+                                        <ActionIconButton
+                                            icon="ti ti-trash"
                                             :title="t.delete"
+                                            variant="danger"
                                             @click="onDelete(p)"
-                                        ><i class="ti ti-trash"></i></button>
-                                    </div>
+                                        />
+                                    </ActionIconGroup>
                                 </td>
                             </tr>
                         </tbody>
@@ -312,6 +387,17 @@ const breadcrumbs = [
             :t="t"
             @close="closeForm"
             @saved="closeForm"
+        />
+
+        <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
         />
 
     </AppLayout>

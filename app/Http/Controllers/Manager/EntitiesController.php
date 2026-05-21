@@ -6,6 +6,7 @@ use App\DTOs\ActionPolicy;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\EntityRequest;
 use App\Models\Entity;
+use App\Services\Audit\AuditLogger;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
@@ -14,6 +15,11 @@ use Inertia\{Inertia, Response};
 class EntitiesController extends Controller
 {
     protected string $titleController = 'Empresas';
+
+    public function __construct(
+        private readonly AuditLogger $audit,
+    ) {
+    }
 
     public function index(Request $request): Response
     {
@@ -98,7 +104,7 @@ class EntitiesController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $record = Entity::withTrashed()->findOrFail($id);
+        $record = Entity::withTrashed()->with('twoFactorEnabledByUser')->findOrFail($id);
 
         return response()->json(['data' => [
             'id'                     => $record->id,
@@ -122,6 +128,10 @@ class EntitiesController extends Controller
             'state'                  => $record->state,
             'country'                => $record->country,
             'active'                 => (bool) $record->active,
+            // 2FA por empresa (Hardening LGPD/CFM)
+            'requires_two_factor'    => (bool) $record->requires_two_factor,
+            'two_factor_enabled_at'  => $record->two_factor_enabled_at?->format('d/m/Y H:i'),
+            'two_factor_enabled_by'  => $record->twoFactorEnabledByUser?->name,
             'deleted_at'             => $record->deleted_at?->format('d/m/Y H:i'),
             'created_at'             => $record->created_at?->format('d/m/Y H:i'),
         ]]);
@@ -185,12 +195,94 @@ class EntitiesController extends Controller
             ->with('success', $this->titleController . ' atualizada com sucesso.');
     }
 
-    public function destroy(string $id): Application|JsonResponse|Redirector|RedirectResponse
+    /**
+     * Admin SaaS força/desativa 2FA em uma entity específica.
+     * Reuso da mesma política do Setting/SecurityController, mas com a entity
+     * vindo do param de rota (admin SaaS opera sobre QUALQUER tenant).
+     * Exige reason por LGPD/CFM — auditor precisa saber por que SaaS forçou.
+     */
+    public function toggleTwoFactor(Request $request, string $id): JsonResponse
     {
+        $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'reason'  => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
+        $entity     = Entity::findOrFail($id);
+        $enabled    = $request->boolean('enabled');
+        $reason     = trim((string) $request->input('reason'));
+        $oldEnabled = (bool) $entity->requires_two_factor;
+
+        if ($oldEnabled === $enabled) {
+            return response()->json([
+                'message' => $enabled
+                    ? __('manager_hardening.entity_2fa_enabled')
+                    : __('manager_hardening.entity_2fa_disabled'),
+                'data' => [
+                    'requires_two_factor'   => $enabled,
+                    'two_factor_enabled_at' => $entity->two_factor_enabled_at?->format('d/m/Y H:i'),
+                ],
+            ]);
+        }
+
+        $entity->update([
+            'requires_two_factor'   => $enabled,
+            'two_factor_enabled_at' => $enabled ? now() : null,
+            'two_factor_enabled_by' => $enabled ? \Illuminate\Support\Facades\Auth::id() : null,
+        ]);
+
+        $this->audit->recordAdminAction(
+            event: $enabled ? 'entity.two_factor.enable' : 'entity.two_factor.disable',
+            targetEntityId: (string) $entity->id,
+            targetUserId: null,
+            auditableType: 'entity',
+            auditableId: (string) $entity->id,
+            reason: $reason,
+            newValues: ['requires_two_factor' => $enabled, 'forced_by_saas' => true],
+            request: $request,
+            oldValues: ['requires_two_factor' => $oldEnabled],
+        );
+
+        return response()->json([
+            'message' => $enabled
+                ? __('manager_hardening.entity_2fa_enabled')
+                : __('manager_hardening.entity_2fa_disabled'),
+            'data' => [
+                'requires_two_factor'   => $enabled,
+                'two_factor_enabled_at' => $entity->fresh()->two_factor_enabled_at?->format('d/m/Y H:i'),
+            ],
+        ]);
+    }
+
+    public function destroy(string $id, Request $request): Application|JsonResponse|Redirector|RedirectResponse
+    {
+        $request->validate([
+            'reason' => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
         $record = Entity::findOrFail($id);
         $record->delete();
 
-        if (request()->wantsJson()) {
+        $this->audit->recordAdminAction(
+            event: 'manager.entity.destroy',
+            targetEntityId: (string) $record->id,
+            targetUserId: null,
+            auditableType: 'entity',
+            auditableId: (string) $record->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: ['code' => $record->code, 'name' => $record->name],
+            request: $request,
+        );
+
+        if ($request->wantsJson()) {
             return response()->json([
                 'message' => $this->titleController . ' removida com sucesso.',
                 'deleted' => $record->toArray(),
@@ -214,6 +306,7 @@ class EntitiesController extends Controller
             'email'                         => $e->email,
             'is_client'                     => $e->is_client,
             'active'                        => (bool) $e->active,
+            'requires_two_factor'           => (bool) $e->requires_two_factor,
             'deleted_at'                    => $e->deleted_at,
             'created_at'                    => $e->created_at?->format('d/m/Y'),
             'entity_users_count'            => (int) $e->entity_users_count,

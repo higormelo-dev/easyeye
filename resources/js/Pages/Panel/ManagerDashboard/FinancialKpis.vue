@@ -97,12 +97,12 @@ function brl(value) {
                         <div class="stat-value">R$ {{ brl(fk.revenueAtRisk) }}</div>
                         <div class="stat-label">{{ t.kpi_revenue_at_risk }}</div>
                         <span v-if="fk.revenueAtRisk > 0"
-                              class="badge bg-danger bg-opacity-15 text-danger border border-danger border-opacity-25 fs-11 fw-semibold mt-1">
-                            Past Due
+                              class="badge badge-soft-danger rounded text-danger border border-danger fs-11 fw-medium mt-1">
+                            <i class="ti ti-alert-triangle me-1"></i>{{ t.past_due ?? 'Em atraso' }}
                         </span>
                         <span v-else
-                              class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 fs-11 fw-semibold mt-1">
-                            {{ t.all_clear }}
+                              class="badge badge-soft-success rounded text-success border border-success fs-11 fw-medium mt-1">
+                            <i class="ti ti-circle-check me-1"></i>{{ t.all_clear }}
                         </span>
                     </div>
                 </div>

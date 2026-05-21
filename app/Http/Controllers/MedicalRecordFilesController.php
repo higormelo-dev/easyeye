@@ -66,7 +66,10 @@ class MedicalRecordFilesController extends Controller
             ];
         }
 
-        return response()->json(['files' => $saved], 201);
+        return response()->json([
+            'files'   => $saved,
+            'storage' => $this->currentStorageStatus(),
+        ], 201);
     }
 
     /**
@@ -107,6 +110,31 @@ class MedicalRecordFilesController extends Controller
     {
         $entityId = session('selected_entity_id');
         Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail($entityId));
+    }
+
+    /**
+     * Payload de cota retornado junto com o upload — permite ao modal atualizar
+     * o medidor sem nova requisição. Estado autoritativo (server-side), evita
+     * divergência se houver upload concorrente em outro dispositivo.
+     */
+    private function currentStorageStatus(): array
+    {
+        $entityId   = (string) session('selected_entity_id');
+        $status     = $this->featureGate->status($entityId, FeatureKey::MaxStorageGB);
+        $usedBytes  = $this->usageMeter->getStorageUsedBytes($entityId);
+        $limitBytes = $status->isUnlimited ? 0 : $status->limit * 1024 * 1024 * 1024;
+        $percent    = $status->isUnlimited || $limitBytes === 0
+            ? 0
+            : min(100, (int) round(($usedBytes / $limitBytes) * 100));
+
+        return [
+            'used_bytes'      => $usedBytes,
+            'limit_bytes'     => $limitBytes,
+            'limit_gb'        => $status->limit,
+            'is_unlimited'    => $status->isUnlimited,
+            'percent'         => $percent,
+            'remaining_bytes' => $status->isUnlimited ? null : max(0, $limitBytes - $usedBytes),
+        ];
     }
 
     /**

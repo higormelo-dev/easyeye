@@ -126,6 +126,35 @@ watch(() => props.open, (val) => {
                     <div class="detail-row"><span class="detail-label">{{ t.detail_registered_at }}</span><span class="detail-value">{{ entity.created_at }}</span></div>
                 </div>
             </div>
+
+            <!-- Section: Segurança (Hardening LGPD/CFM) -->
+            <div class="detail-section">
+                <div class="detail-section__title">
+                    <i class="ti ti-shield-lock me-1"></i> {{ t.section_security ?? 'Segurança' }}
+                </div>
+                <div class="detail-table">
+                    <div class="detail-row">
+                        <span class="detail-label">{{ t.detail_2fa_required ?? 'Exige 2FA' }}</span>
+                        <span class="detail-value">
+                            <span v-if="entity.requires_two_factor"
+                                  class="badge badge-soft-success rounded text-success border border-success">
+                                <i class="ti ti-shield-lock-filled me-1"></i>{{ t.detail_2fa_yes ?? 'Sim' }}
+                            </span>
+                            <span v-else class="badge badge-soft-secondary rounded">
+                                {{ t.detail_2fa_no ?? 'Não' }}
+                            </span>
+                        </span>
+                    </div>
+                    <div v-if="entity.requires_two_factor && entity.two_factor_enabled_at" class="detail-row">
+                        <span class="detail-label">{{ t.detail_2fa_enabled_at ?? 'Ativado em' }}</span>
+                        <span class="detail-value">{{ entity.two_factor_enabled_at }}</span>
+                    </div>
+                    <div v-if="entity.requires_two_factor && entity.two_factor_enabled_by" class="detail-row">
+                        <span class="detail-label">{{ t.detail_2fa_enabled_by ?? 'Ativado por' }}</span>
+                        <span class="detail-value">{{ entity.two_factor_enabled_by }}</span>
+                    </div>
+                </div>
+            </div>
         </template>
     </OffcanvasPanel>
 </template>

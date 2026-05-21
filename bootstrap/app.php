@@ -11,6 +11,7 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     EnsureEntitySelected,
     EnsureIsPartner,
     EnsureSaasAdmin,
+    EnsureTwoFactor,
     EnsureUserBelongsToEntity,
     HandleImpersonation,
     HandleInertiaRequests,
@@ -50,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'partner'              => EnsureIsPartner::class,
             'saas.admin'           => EnsureSaasAdmin::class,
             'admin.audit'          => LogAdminAccess::class,
+            '2fa'                  => EnsureTwoFactor::class,
         ]);
 
         // Adiciona o SetLocale, HandleImpersonation e HandleInertiaRequests ao grupo web

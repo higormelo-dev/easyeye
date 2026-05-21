@@ -18,6 +18,20 @@ class HandleInertiaRequests extends Middleware
             return 'panel-app';
         }
 
+        // Fluxos de identidade/autenticação (login, register, verify, 2FA setup)
+        // usam o rootView guest-app, que carrega vendor.css + system.scss —
+        // necessário para o GuestLayout renderizar com Bootstrap grid + estilos
+        // ee-auth-*. O rootView default 'app' carrega só site.scss (marketing).
+        if ($request->routeIs('security.*')) {
+            return 'guest-app';
+        }
+
+        // Portal de Parceiros: layout próprio (gradient teal/blue + nav simples).
+        // Compartilha vendor + system com painel, mas tem chrome distinto.
+        if ($request->routeIs('portal.*')) {
+            return 'portal-app';
+        }
+
         return 'app';
     }
 
@@ -33,6 +47,12 @@ class HandleInertiaRequests extends Middleware
 
         return [
             ...parent::share($request),
+
+            'ziggy' => function () use ($request) {
+                return array_merge((new \Tighten\Ziggy\Ziggy)->toArray(), [
+                    'location' => $request->url(),
+                ]);
+            },
 
             'locale'  => $currentLocale,
             'locales' => collect($locales)->map(fn ($l, $code) => [
@@ -54,6 +74,17 @@ class HandleInertiaRequests extends Middleware
             'nav' => fn () => ($request->routeIs('panel.*') || $request->routeIs('manager.*')) && $request->user()
                 ? PanelNavigation::build()
                 : [],
+
+            // Portal de Parceiros: partner ativo da sessão (compartilhado pelo
+            // PortalLayout para mostrar nome/email/code no header).
+            'partner' => fn () => $request->routeIs('portal.*')
+                ? $this->portalPartnerProps()
+                : null,
+
+            // Traduções do hardening (modal de confirmação com reason etc.)
+            // Carregadas em todo request para que o ConfirmationWithReasonModal
+            // funcione em qualquer página sem precisar passar t={} manualmente.
+            't_hardening' => fn () => trans('manager_hardening'),
         ];
     }
 
@@ -104,6 +135,31 @@ class HandleInertiaRequests extends Middleware
             'impersonating' => session()->has('impersonating')
                 ? ['original_name' => session('impersonating.original_user_name')]
                 : null,
+        ];
+    }
+
+    /**
+     * Dados do partner ativo no portal (vem da sessão setada pelo middleware
+     * EnsureIsPartner). Carregamento lazy — só executa quando o request é
+     * de uma rota portal.*.
+     */
+    private function portalPartnerProps(): ?array
+    {
+        $partnerId = session('portal_partner_id');
+        if (! $partnerId) {
+            return null;
+        }
+
+        $partner = \App\Models\Partner::find($partnerId);
+        if (! $partner) {
+            return null;
+        }
+
+        return [
+            'id'    => (string) $partner->id,
+            'code'  => $partner->code,
+            'name'  => $partner->name,
+            'email' => $partner->email,
         ];
     }
 }

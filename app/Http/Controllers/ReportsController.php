@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers;
 
 use App\Enums\{ClientRule, EntityGate, ScheduleSituation};
@@ -7,57 +9,56 @@ use App\Models\{Covenant, Doctor, Entity, Schedule};
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class ReportsController extends Controller
 {
-    public function index()
+    public function index(): InertiaResponse
     {
         Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
 
-        $meta = [
-            'title'       => __('actions.sidemenu.reports'),
-            'action'      => __('actions.sidemenu.dashboard'),
+        return Inertia::render('Panel/Reports/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),      'active' => false],
+                ['label' => __('actions.sidemenu.reports'),   'url' => route('panel.reports.index'), 'active' => true],
             ],
-        ];
-
-        return view('system.reports.index', compact('meta'));
+            'links' => [
+                ['title' => __('actions.reports.schedules_label'),   'icon' => 'ti-calendar',    'url' => route('panel.reports.schedules')],
+                ['title' => __('actions.reports.absenteeism_label'),'icon' => 'ti-user-x',      'url' => route('panel.reports.absenteeism')],
+            ],
+        ]);
     }
 
-    /**
-     * Production report: agendamentos grouped by situation, doctor, covenant.
-     * Filters: date_from, date_until, doctor_id, covenant_id, situation
-     */
-    public function schedules(Request $request)
+    public function schedules(Request $request): InertiaResponse
     {
         Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
 
-        $entityId  = session('selected_entity_id');
-        $doctors   = $this->doctorsByEntity($entityId);
-        $covenants = Covenant::where(function ($q) use ($entityId) {
+        $entityId   = session('selected_entity_id');
+        $doctors    = $this->doctorsByEntity((string) $entityId);
+        $covenants  = Covenant::where(function ($q) use ($entityId) {
             $q->where('entity_id', $entityId)->orWhereNull('entity_id');
-        })->where('active', true)->orderBy('name')->get();
-        $situations = ScheduleSituation::cases();
+        })->where('active', true)->orderBy('name')->get(['id', 'name']);
+        $situations = collect(ScheduleSituation::cases())
+            ->map(fn (ScheduleSituation $s) => ['value' => $s->value, 'label' => $s->label()])
+            ->all();
 
-        $meta = [
-            'title'       => __('actions.sidemenu.reports'),
-            'action'      => __('actions.reports.schedules'),
+        $payload = [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
-                ['label' => __('actions.reports.schedules_label'), 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'),       'url' => route('panel.dashboard'),       'active' => false],
+                ['label' => __('actions.sidemenu.reports'),          'url' => route('panel.reports.index'),   'active' => false],
+                ['label' => __('actions.reports.schedules_label'),  'url' => '#',                            'active' => true],
             ],
+            'doctors'    => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
+            'covenants'  => $covenants,
+            'situations' => $situations,
+            'filters'    => $request->only(['date_from', 'date_until', 'doctor_id', 'covenant_id', 'situation']),
+            'schedules'  => [],
+            'summary'    => null,
+            'byDoctor'   => [],
         ];
 
-        if (!$request->filled('date_from')) {
-            return view('system.reports.schedules', compact(
-                'doctors',
-                'covenants',
-                'situations',
-                'meta'
-            ));
+        if (! $request->filled('date_from')) {
+            return Inertia::render('Panel/Reports/Schedules', $payload);
         }
 
         $request->validate([
@@ -68,7 +69,6 @@ class ReportsController extends Controller
             'situation'   => ['nullable', 'integer'],
         ]);
 
-        $entityId  = session('selected_entity_id');
         $dateFrom  = Carbon::parse($request->input('date_from'))->startOfDay();
         $dateUntil = Carbon::parse($request->input('date_until'))->endOfDay();
 
@@ -80,78 +80,75 @@ class ReportsController extends Controller
         if ($doctorId = $request->input('doctor_id')) {
             $query->where('doctor_id', $doctorId);
         }
-
         if ($covenantId = $request->input('covenant_id')) {
             $query->where('covenant_id', $covenantId);
         }
-
         if ($situation = $request->integer('situation')) {
             $query->where('situation', $situation);
         }
 
         $loggedDoctor = $this->loggedDoctor();
-
         if ($loggedDoctor) {
             $query->where('doctor_id', $loggedDoctor->id);
         }
 
         $schedules = $query->orderBy('date_time')->get();
 
-        // Summary totals
         $summary = [
             'total'     => $schedules->count(),
             'attended'  => $schedules->where('situation', ScheduleSituation::Attended)->count(),
             'cancelled' => $schedules->where('situation', ScheduleSituation::Cancelled)->count(),
             'noshow'    => $schedules->where('situation', ScheduleSituation::NoShow)->count(),
-            'pending'   => $schedules->filter(fn ($s) => !$s->situation->isTerminal())->count(),
+            'pending'   => $schedules->filter(fn ($s) => ! $s->situation->isTerminal())->count(),
         ];
-
         $summary['attendance_rate'] = $summary['total'] > 0
             ? round(($summary['attended'] / $summary['total']) * 100, 1)
             : 0;
 
-        // Grouped by doctor
         $byDoctor = $schedules->groupBy('doctor_id')->map(fn ($group) => [
             'doctor_name' => $group->first()->doctor?->user_name ?? 'Sem médico',
             'total'       => $group->count(),
             'attended'    => $group->where('situation', ScheduleSituation::Attended)->count(),
             'noshow'      => $group->where('situation', ScheduleSituation::NoShow)->count(),
             'cancelled'   => $group->where('situation', ScheduleSituation::Cancelled)->count(),
-        ])->values();
+        ])->values()->all();
 
-        return view('system.reports.schedules', compact(
-            'schedules',
-            'summary',
-            'byDoctor',
-            'doctors',
-            'covenants',
-            'situations',
-            'meta'
-        ));
+        return Inertia::render('Panel/Reports/Schedules', array_merge($payload, [
+            'schedules' => $schedules->map(fn (Schedule $s) => [
+                'date_time'    => $s->date_time?->format('d/m/Y H:i'),
+                'patient_name' => $s->patient?->person?->name,
+                'doctor_name'  => $s->doctor?->user_name,
+                'covenant'     => $s->covenant?->name,
+                'visit_type'   => $s->visitType?->name,
+                'situation'    => $s->situation->value,
+                'situation_label' => $s->situation->label(),
+            ]),
+            'summary'  => $summary,
+            'byDoctor' => $byDoctor,
+        ]));
     }
 
-    /**
-     * Absenteeism report: no-shows and cancellations with averages.
-     */
-    public function absenteeism(Request $request)
+    public function absenteeism(Request $request): InertiaResponse
     {
         Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
 
         $entityId = session('selected_entity_id');
-        $doctors  = $this->doctorsByEntity($entityId);
+        $doctors  = $this->doctorsByEntity((string) $entityId);
 
-        $meta = [
-            'title'       => __('actions.sidemenu.reports'),
-            'action'      => __('actions.reports.absenteeism'),
+        $payload = [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
-                ['label' => __('actions.reports.absenteeism_label'), 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'),        'url' => route('panel.dashboard'),       'active' => false],
+                ['label' => __('actions.sidemenu.reports'),           'url' => route('panel.reports.index'),   'active' => false],
+                ['label' => __('actions.reports.absenteeism_label'), 'url' => '#',                            'active' => true],
             ],
+            'doctors'   => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
+            'filters'   => $request->only(['date_from', 'date_until', 'doctor_id']),
+            'schedules' => [],
+            'summary'   => null,
         ];
 
-        if (!$request->filled('date_from')) {
-            return view('system.reports.absenteeism', compact('doctors', 'meta'));
+        if (! $request->filled('date_from')) {
+            return Inertia::render('Panel/Reports/Absenteeism', $payload);
         }
 
         $request->validate([
@@ -160,7 +157,6 @@ class ReportsController extends Controller
             'doctor_id'  => ['nullable', 'uuid'],
         ]);
 
-        $entityId  = session('selected_entity_id');
         $dateFrom  = Carbon::parse($request->input('date_from'))->startOfDay();
         $dateUntil = Carbon::parse($request->input('date_until'))->endOfDay();
 
@@ -176,9 +172,7 @@ class ReportsController extends Controller
         if ($doctorId = $request->input('doctor_id')) {
             $query->where('doctor_id', $doctorId);
         }
-
         $loggedDoctor = $this->loggedDoctor();
-
         if ($loggedDoctor) {
             $query->where('doctor_id', $loggedDoctor->id);
         }
@@ -201,12 +195,17 @@ class ReportsController extends Controller
                 : 0,
         ];
 
-        return view('system.reports.absenteeism', compact(
-            'schedules',
-            'summary',
-            'doctors',
-            'meta'
-        ));
+        return Inertia::render('Panel/Reports/Absenteeism', array_merge($payload, [
+            'schedules' => $schedules->map(fn (Schedule $s) => [
+                'date_time'       => $s->date_time?->format('d/m/Y H:i'),
+                'patient_name'    => $s->patient?->person?->name,
+                'doctor_name'     => $s->doctor?->user_name,
+                'covenant'        => $s->covenant?->name,
+                'situation'       => $s->situation->value,
+                'situation_label' => $s->situation->label(),
+            ]),
+            'summary' => $summary,
+        ]));
     }
 
     private function loggedDoctor(): ?Doctor

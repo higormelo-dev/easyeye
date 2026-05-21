@@ -117,11 +117,28 @@
 }
 
 .stat-card .stat-label {
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--ee-text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ee-text);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
+    opacity: 0.72;
+}
+
+/* ─── Responsivo: stat-cards em colunas estreitas ─────────────────────── */
+@media (max-width: 767.98px) {
+    .stat-card .stat-value {
+        font-size: 1.5rem;
+    }
+    .stat-card .stat-label {
+        font-size: 0.8125rem;
+    }
+    .stat-card .stat-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        font-size: 1.25rem;
+    }
 }
 
 /* ─── Quick Action Buttons ───────────────────────────────────────────── */

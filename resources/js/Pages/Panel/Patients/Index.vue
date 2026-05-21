@@ -5,6 +5,7 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import PatientTable    from './PatientTable.vue';
 import PatientCards    from './PatientCards.vue';
 import PatientFormModal from './PatientFormModal.vue';
+import PatientDetailDrawer from './PatientDetailDrawer.vue';
 
 const props = defineProps({
     patients:        { type: Object, required: true },
@@ -75,9 +76,18 @@ function closeModal() {
     editPatientId.value = null;
 }
 
-// ── Actions ──────────────────────────────────────────────────────────────────
+// ── Detail drawer ────────────────────────────────────────────────────────────
+const detailOpen      = ref(false);
+const viewPatientId   = ref(null);
+
 function onView(id) {
-    router.get(route('panel.patients.show', id));
+    viewPatientId.value = id;
+    detailOpen.value    = true;
+}
+
+function closeDetail() {
+    detailOpen.value    = false;
+    viewPatientId.value = null;
 }
 
 function onDelete(id) {
@@ -110,14 +120,10 @@ const breadcrumbs = [
         <div class="page-patients">
 
             <!-- ── Page Header ───────────────────────────────────────────── -->
-            <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-bottom">
-                <div class="flex-grow-1">
-                    <h4 class="fw-bold mb-0">
-                        Pacientes
-                        <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
-                            Total: {{ totalPatients }}
-                        </span>
-                    </h4>
+            <div class="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2 me-auto">
+                    <h4 class="mb-0 fw-bold">Pacientes</h4>
+                    <span style="font-size:.78rem;font-weight:600;color:#0d6efd;background:#eff4ff;border:1.5px solid #0d6efd;border-radius:20px;padding:2px 12px;white-space:nowrap;line-height:1.6;">Total: {{ patients.total }}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <!-- View toggle -->
@@ -215,6 +221,13 @@ const breadcrumbs = [
             :marital-statuses="maritalStatuses"
             :states-of-brazil="statesOfBrazil"
             @close="closeModal"
+        />
+
+        <!-- ── Patient Detail Drawer ─────────────────────────────────────── -->
+        <PatientDetailDrawer
+            :open="detailOpen"
+            :patient-id="viewPatientId"
+            @close="closeDetail"
         />
     </AppLayout>
 </template>

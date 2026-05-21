@@ -85,10 +85,10 @@ const breadcrumbs = [
             <PageHeader
                 :title="t.page_title"
                 :total="total"
-                :total-label="t.total_label"
                 :view="view"
                 :view-table-title="t.view_table"
                 :view-cards-title="t.view_cards"
+                :show-view-toggle="true"
                 @set-view="setView"
             >
                 <template #actions>

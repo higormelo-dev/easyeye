@@ -8,6 +8,8 @@ import ReportSettingTable       from './ReportSettingTable.vue';
 import ReportSettingCards       from './ReportSettingCards.vue';
 import ReportSettingFormModal   from './ReportSettingFormModal.vue';
 import ReportSettingPreviewModal from './ReportSettingPreviewModal.vue';
+import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
 const props = defineProps({
     reportSettings: { type: Object, required: true },
@@ -81,46 +83,54 @@ const previewUrl  = ref(null);
 function openPreview(r) { previewUrl.value = r.preview_url; previewOpen.value = true; }
 function closePreview() { previewOpen.value = false; previewUrl.value = null; }
 
+// ── Confirmação destrutiva com reason (LGPD/CFM) ──────────────────────────────
+const { state: reasonModal, open: openReasonModal, close: closeReasonModal, handle: handleReasonConfirm } = useConfirmationWithReason();
+
 // ── Publish ───────────────────────────────────────────────────────────────────
-async function onPublish(r) {
-    if (!confirm(props.t.confirm_publish)) return;
-    await postAction(r.publish_url, props.t.action_publish);
+function onPublish(r) {
+    openReasonModal({
+        title: props.t.confirm_publish_title ?? 'Publicar modelo',
+        message: props.t.confirm_publish ?? '',
+        confirmVariant: 'primary',
+        async onConfirm(reason) {
+            await postActionWithReason(r.publish_url, 'POST', reason);
+        },
+    });
 }
 
 // ── Archive ───────────────────────────────────────────────────────────────────
-async function onArchive(r) {
-    if (!confirm(props.t.confirm_archive)) return;
-    await postAction(r.archive_url, props.t.action_archive);
+function onArchive(r) {
+    openReasonModal({
+        title: props.t.confirm_archive_title ?? 'Arquivar modelo',
+        message: props.t.confirm_archive ?? '',
+        confirmVariant: 'warning',
+        async onConfirm(reason) {
+            await postActionWithReason(r.archive_url, 'POST', reason);
+        },
+    });
 }
 
 // ── Delete ────────────────────────────────────────────────────────────────────
-async function onDelete(r) {
-    if (!confirm(props.t.confirm_delete)) return;
-
-    const res = await fetch(route('manager.report-settings.destroy', r.id), {
-        method: 'DELETE',
-        headers: {
-            'Accept':       'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+function onDelete(r) {
+    openReasonModal({
+        title: props.t.confirm_delete_title ?? 'Excluir modelo',
+        message: props.t.confirm_delete ?? '',
+        confirmVariant: 'danger',
+        async onConfirm(reason) {
+            await postActionWithReason(route('manager.report-settings.destroy', r.id), 'DELETE', reason);
         },
     });
-
-    const json = await res.json();
-    if (res.ok) {
-        showToast(json.message, 'success');
-        router.reload({ only: ['reportSettings', 'total'] });
-    } else {
-        showToast(json.message ?? 'Erro', 'error');
-    }
 }
 
-async function postAction(url, label) {
+async function postActionWithReason(url, method, reason) {
     const res = await fetch(url, {
-        method: 'POST',
+        method,
         headers: {
             'Accept':       'application/json',
+            'Content-Type': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
         },
+        body: JSON.stringify({ reason }),
     });
 
     const json = await res.json();
@@ -153,10 +163,10 @@ const breadcrumbs = [
             <PageHeader
                 :title="t.page_title"
                 :total="total"
-                :total-label="t.total_label"
                 :view="view"
                 :view-table-title="t.view_table"
                 :view-cards-title="t.view_cards"
+                :show-view-toggle="true"
                 @set-view="setView"
             >
                 <template #actions>
@@ -241,6 +251,17 @@ const breadcrumbs = [
             :preview-url="previewUrl"
             :t="t"
             @close="closePreview"
+        />
+
+        <!-- Confirmação destrutiva com justificativa (LGPD/CFM) -->
+        <ConfirmationWithReasonModal
+            :open="reasonModal.open"
+            :title="reasonModal.title"
+            :message="reasonModal.message"
+            :confirm-variant="reasonModal.confirmVariant"
+            :saving="reasonModal.saving"
+            @close="closeReasonModal"
+            @confirm="handleReasonConfirm"
         />
 
     </AppLayout>

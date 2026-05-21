@@ -7,6 +7,7 @@ use App\Enums\{BillingCycle, FeatureKey};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Manager\PlanRequest;
 use App\Models\{Plan, PlanFeature};
+use App\Services\Audit\AuditLogger;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Str;
 use Inertia\{Inertia, Response};
@@ -14,6 +15,11 @@ use Inertia\{Inertia, Response};
 class PlansController extends Controller
 {
     protected string $titleController = 'Planos';
+
+    public function __construct(
+        private readonly AuditLogger $audit,
+    ) {
+    }
 
     public function index(Request $request): Response
     {
@@ -174,11 +180,30 @@ class PlansController extends Controller
             ->with('success', 'Plano atualizado com sucesso.');
     }
 
-    public function destroy(Plan $plan): JsonResponse|RedirectResponse
+    public function destroy(Request $request, Plan $plan): JsonResponse|RedirectResponse
     {
+        $request->validate([
+            'reason' => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
         $plan->delete();
 
-        if (request()->wantsJson()) {
+        $this->audit->recordAdminAction(
+            event: 'manager.plan.destroy',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'plan',
+            auditableId: (string) $plan->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: ['name' => $plan->name, 'price' => (float) $plan->price],
+            request: $request,
+        );
+
+        if ($request->wantsJson()) {
             return response()->json(['message' => 'Plano removido com sucesso.']);
         }
 

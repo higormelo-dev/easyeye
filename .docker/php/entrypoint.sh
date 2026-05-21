@@ -27,4 +27,15 @@ if [ "${RUN_MIGRATIONS:-false}" = "true" ]; then
     php artisan migrate --force
 fi
 
+# ─── 4. Limpeza de caches Laravel em dev ────────────────────────────────────
+# Em APP_ENV=local, caches de view/route/config compilados costumam mascarar
+# mudanças em arquivos quando você troca de branch ou faz mudanças estruturais.
+# Em prod (`config:cache` ativo), pular a limpeza preserva performance.
+if [ "${APP_ENV:-production}" = "local" ]; then
+    echo "[entrypoint] Modo dev — limpando caches view/route/config..."
+    php artisan view:clear  >/dev/null 2>&1 || true
+    php artisan route:clear >/dev/null 2>&1 || true
+    php artisan config:clear >/dev/null 2>&1 || true
+fi
+
 exec "$@"

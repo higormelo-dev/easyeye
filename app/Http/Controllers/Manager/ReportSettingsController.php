@@ -6,8 +6,10 @@ use App\DTOs\ActionPolicy;
 use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
 use App\Http\Controllers\Controller;
 use App\Models\{ReportCategory, ReportSetting};
+use App\Services\Audit\AuditLogger;
 use App\Services\ReportSettingService;
-use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\{JsonResponse, Request};
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
@@ -17,7 +19,9 @@ class ReportSettingsController extends Controller
 {
     public function __construct(
         private readonly ReportSettingService $service,
-    ) {}
+        private readonly AuditLogger $audit,
+    ) {
+    }
 
     public function index(Request $request): InertiaResponse
     {
@@ -48,17 +52,17 @@ class ReportSettingsController extends Controller
                 'value' => $s->value,
                 'label' => $s->label(),
             ]),
-            'paperSizes'     => PaperSize::values(),
-            'fontFamilies'   => ['Arial', 'Times New Roman', 'Helvetica', 'Courier New', 'Georgia'],
-            'filters'        => [
+            'paperSizes'   => PaperSize::values(),
+            'fontFamilies' => ['Arial', 'Times New Roman', 'Helvetica', 'Courier New', 'Georgia'],
+            'filters'      => [
                 'search'      => $search,
                 'status'      => $status,
                 'category_id' => $categoryId,
                 'sort'        => $sort,
                 'direction'   => $direction,
             ],
-            'cardsUrl'       => route('manager.report-settings.cards'),
-            't'              => trans('manager_report_settings'),
+            'cardsUrl' => route('manager.report-settings.cards'),
+            't'        => trans('manager_report_settings'),
         ]);
     }
 
@@ -131,11 +135,30 @@ class ReportSettingsController extends Controller
             ->with('message', __('actions.report_settings.updated'));
     }
 
-    public function destroy(ReportSetting $reportSetting): mixed
+    public function destroy(Request $request, ReportSetting $reportSetting): mixed
     {
+        $request->validate([
+            'reason' => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
         $reportSetting->delete();
 
-        if (request()->wantsJson()) {
+        $this->audit->recordAdminAction(
+            event: 'manager.report_setting.destroy',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'report_setting',
+            auditableId: (string) $reportSetting->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: ['title' => $reportSetting->title, 'version' => $reportSetting->version],
+            request: $request,
+        );
+
+        if ($request->wantsJson()) {
             return response()->json(['message' => __('actions.report_settings.deleted')]);
         }
 
@@ -144,7 +167,7 @@ class ReportSettingsController extends Controller
             ->with('message', __('actions.report_settings.deleted'));
     }
 
-    public function preview(ReportSetting $reportSetting): \Illuminate\Contracts\View\View
+    public function preview(ReportSetting $reportSetting): View
     {
         $reportSetting->load([
             'activeContents' => fn ($q) => $q->orderBy('sort_order')->orderBy('label'),
@@ -153,11 +176,35 @@ class ReportSettingsController extends Controller
         return view('pdf.report_setting_preview_html', compact('reportSetting'));
     }
 
-    public function publish(ReportSetting $reportSetting): mixed
+    public function publish(Request $request, ReportSetting $reportSetting): mixed
     {
+        $request->validate([
+            'reason' => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
+        $oldStatus = $reportSetting->status instanceof ReportSettingStatus
+            ? $reportSetting->status->value
+            : (string) $reportSetting->status;
+
         $this->service->publish($reportSetting);
 
-        if (request()->wantsJson()) {
+        $this->audit->recordAdminAction(
+            event: 'manager.report_setting.publish',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'report_setting',
+            auditableId: (string) $reportSetting->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: ['title' => $reportSetting->title, 'version' => $reportSetting->version],
+            request: $request,
+            oldValues: ['status' => $oldStatus],
+        );
+
+        if ($request->wantsJson()) {
             return response()->json(['message' => __('actions.report_settings.published')]);
         }
 
@@ -166,11 +213,35 @@ class ReportSettingsController extends Controller
             ->with('message', __('actions.report_settings.published'));
     }
 
-    public function archive(ReportSetting $reportSetting): mixed
+    public function archive(Request $request, ReportSetting $reportSetting): mixed
     {
+        $request->validate([
+            'reason' => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
+        $oldStatus = $reportSetting->status instanceof ReportSettingStatus
+            ? $reportSetting->status->value
+            : (string) $reportSetting->status;
+
         $this->service->archive($reportSetting);
 
-        if (request()->wantsJson()) {
+        $this->audit->recordAdminAction(
+            event: 'manager.report_setting.archive',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'report_setting',
+            auditableId: (string) $reportSetting->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: ['title' => $reportSetting->title, 'version' => $reportSetting->version],
+            request: $request,
+            oldValues: ['status' => $oldStatus],
+        );
+
+        if ($request->wantsJson()) {
             return response()->json(['message' => __('actions.report_settings.archived')]);
         }
 
@@ -228,31 +299,31 @@ class ReportSettingsController extends Controller
     private function toFormData(ReportSetting $r): array
     {
         return [
-            'id'                   => $r->id,
-            'title'                => $r->title ?? '',
-            'description'          => $r->description ?? '',
-            'report_category_id'   => $r->report_category_id ?? '',
-            'paper_size'           => $r->paper_size instanceof PaperSize ? $r->paper_size->value : ($r->paper_size ?? 'A4'),
-            'font_family'          => $r->font_family ?? 'Arial',
-            'font_size'            => $r->font_size ?? 11,
-            'margin_top'           => $r->margin_top ?? 2.0,
-            'margin_right'         => $r->margin_right ?? 2.0,
-            'margin_bottom'        => $r->margin_bottom ?? 2.0,
-            'margin_left'          => $r->margin_left ?? 2.0,
-            'show_header'          => (bool) ($r->show_header ?? true),
-            'header_show_logo'     => (bool) ($r->header_show_logo ?? true),
-            'header_show_name'     => (bool) ($r->header_show_name ?? true),
-            'header_show_address'  => (bool) ($r->header_show_address ?? false),
-            'header_show_phone'    => (bool) ($r->header_show_phone ?? false),
-            'show_signature'       => (bool) ($r->show_signature ?? true),
-            'signature_show_name'  => (bool) ($r->signature_show_name ?? true),
-            'signature_show_crm'   => (bool) ($r->signature_show_crm ?? true),
-            'signature_show_rqe'   => (bool) ($r->signature_show_rqe ?? true),
-            'show_footer'          => (bool) ($r->show_footer ?? false),
-            'footer_text'          => $r->footer_text ?? '',
-            'footer_show_address'  => (bool) ($r->footer_show_address ?? false),
-            'footer_show_phone'    => (bool) ($r->footer_show_phone ?? false),
-            'active'               => (bool) ($r->active ?? true),
+            'id'                  => $r->id,
+            'title'               => $r->title ?? '',
+            'description'         => $r->description ?? '',
+            'report_category_id'  => $r->report_category_id ?? '',
+            'paper_size'          => $r->paper_size instanceof PaperSize ? $r->paper_size->value : ($r->paper_size ?? 'A4'),
+            'font_family'         => $r->font_family ?? 'Arial',
+            'font_size'           => $r->font_size ?? 11,
+            'margin_top'          => $r->margin_top ?? 2.0,
+            'margin_right'        => $r->margin_right ?? 2.0,
+            'margin_bottom'       => $r->margin_bottom ?? 2.0,
+            'margin_left'         => $r->margin_left ?? 2.0,
+            'show_header'         => (bool) ($r->show_header ?? true),
+            'header_show_logo'    => (bool) ($r->header_show_logo ?? true),
+            'header_show_name'    => (bool) ($r->header_show_name ?? true),
+            'header_show_address' => (bool) ($r->header_show_address ?? false),
+            'header_show_phone'   => (bool) ($r->header_show_phone ?? false),
+            'show_signature'      => (bool) ($r->show_signature ?? true),
+            'signature_show_name' => (bool) ($r->signature_show_name ?? true),
+            'signature_show_crm'  => (bool) ($r->signature_show_crm ?? true),
+            'signature_show_rqe'  => (bool) ($r->signature_show_rqe ?? true),
+            'show_footer'         => (bool) ($r->show_footer ?? false),
+            'footer_text'         => $r->footer_text ?? '',
+            'footer_show_address' => (bool) ($r->footer_show_address ?? false),
+            'footer_show_phone'   => (bool) ($r->footer_show_phone ?? false),
+            'active'              => (bool) ($r->active ?? true),
         ];
     }
 

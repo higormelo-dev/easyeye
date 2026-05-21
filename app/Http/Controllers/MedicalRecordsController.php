@@ -2,17 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry};
+use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey};
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
     MedicalRecord, NearPointConvergence, Patient, VisualAcuityType};
 use App\Models\ReportSettingContent;
-use App\Services\{LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService};
+use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, UsageMeterService};
 use App\Traits\LogsDataAccess;
-use Illuminate\Contracts\View\{Factory, View};
-use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class MedicalRecordsController extends Controller
 {
@@ -23,48 +22,55 @@ class MedicalRecordsController extends Controller
         private readonly MedicalRecordDocumentationService $documentationService,
         private readonly MedicalRecordPdfService $pdfService,
         private readonly LensFormatterService $lensFormatter,
+        private readonly FeatureGateService $featureGate,
+        private readonly UsageMeterService $usageMeter,
     ) {
     }
 
     /**
      * Display a listing of the resource.
      */
-    public function index(Patient $patient): Factory|Application|View
+    public function index(Patient $patient): InertiaResponse
     {
-        $meta = [
-            'title'       => __('actions.sidemenu.medical_records'),
-            'action'      => __('actions.records'),
-            'breadcrumbs' => [
-                [
-                    'label'  => __('actions.sidemenu.dashboard'),
-                    'url'    => route('panel.dashboard'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.sidemenu.patients'),
-                    'url'    => route('panel.patients.index'),
-                    'active' => false,
-                ],
-                [
-                    'label'  => $patient->person->full_name ?? $patient->code,
-                    'url'    => 'javascript:void(0);',
-                    'active' => false,
-                ],
-                [
-                    'label'  => __('actions.medical_records.title'),
-                    'url'    => 'javascript:void(0);',
-                    'active' => true,
-                ],
-            ],
-        ];
-
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
 
-        return view('system.medical_records.index', compact('meta', 'patient'));
+        return Inertia::render('Panel/MedicalRecords/Index', [
+            'breadcrumbs' => [
+                ['label' => __('actions.sidemenu.dashboard'),    'url' => route('panel.dashboard'),          'active' => false],
+                ['label' => __('actions.sidemenu.patients'),     'url' => route('panel.patients.index'),     'active' => false],
+                ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#',                    'active' => false],
+                ['label' => __('actions.medical_records.title'), 'url' => '#',                               'active' => true],
+            ],
+            'patient' => [
+                'id'             => (string) $patient->id,
+                'code'           => $patient->code,
+                'full_name'      => $patient->person?->full_name,
+                'birth_date'     => $patient->person?->birth_date?->format('d/m/Y'),
+                'age'            => $patient->person?->birth_date?->age,
+                'gender'         => $patient->person?->gender,
+                'cpf'            => $patient->person?->cpf,
+                'phone'          => $patient->person?->cellphone ?? $patient->person?->telephone,
+                'email'          => $patient->person?->email,
+                'covenant_name'  => $patient->covenant?->name,
+                'skin_type'      => $patient->skinType?->name,
+                'iris_type'      => $patient->irisType?->name,
+            ],
+            'urls' => [
+                'ajax_list' => route('panel.patients.medicalrecords.ajaxlist', $patient),
+                'create'    => route('panel.patients.medicalrecords.create',   $patient),
+                'patients'  => route('panel.patients.index'),
+            ],
+            // Apenas médicos podem criar/editar/excluir prontuário (CFM Res. 2.227/2018).
+            // A UI consome essa flag para esconder botões e o backend valida via
+            // middleware `entity.role:doctor` nas rotas write.
+            'isDoctor' => session('selected_entity_user_rule') === ClientRule::Doctor->value,
+            't'        => trans('actions.medical_records'),
+        ]);
     }
 
     /**
-     * Return paginated JSON for the timeline infinite scroll.
+     * Retorna prontuários paginados como JSON puro para a timeline Vue.
+     * O frontend renderiza cada item (não vem HTML do servidor).
      */
     public function ajaxList(Request $request, Patient $patient): JsonResponse
     {
@@ -76,10 +82,25 @@ class MedicalRecordsController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate($request->integer('per_page', 10));
 
-        $html = view('system.medical_records._items', compact('records', 'patient'))->render();
-
         return response()->json([
-            'html'      => $html,
+            'data' => $records->getCollection()->map(fn (MedicalRecord $r) => [
+                'id'                  => (string) $r->id,
+                'code'                => $r->code,
+                'created_at'          => $r->created_at?->format('d/m/Y H:i'),
+                'created_at_iso'      => $r->created_at?->toIso8601String(),
+                'doctor_name'         => $r->doctor?->person?->full_name,
+                'main_complaint'      => $r->main_complaint,
+                'diagnosis_cids'      => $r->diagnosis_cids ?? [],
+                'clinical_conduct'    => $r->clinical_conduct,
+                'is_signed'           => $r->isSigned(),
+                'is_locked'           => $r->isLocked(),
+                'signed_at'           => $r->signed_at?->format('d/m/Y H:i'),
+                'documentations_count'=> $r->documentations->count(),
+                'edit_url'            => route('panel.patients.medicalrecords.edit', [$patient, $r]),
+                'show_url'            => route('panel.patients.medicalrecords.show', [$patient, $r]),
+                'pdf_url'             => route('panel.patients.medicalrecords.pdf',  [$patient, $r]),
+                'destroy_url'         => route('panel.patients.medicalrecords.destroy', [$patient, $r]),
+            ]),
             'has_more'  => $records->hasMorePages(),
             'next_page' => $records->currentPage() + 1,
             'total'     => $records->total(),
@@ -89,18 +110,17 @@ class MedicalRecordsController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create(Patient $patient): Factory|Application|View
+    public function create(Patient $patient): InertiaResponse
     {
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
-        [$commonData, $meta] = $this->commonFormData($patient);
+        $props = $this->buildFormProps($patient, null);
+        $props['breadcrumbs'][] = [
+            'label'  => __('actions.medical_records.create'),
+            'url'    => '#',
+            'active' => true,
+        ];
 
-        $meta['title']         = __('actions.medical_records.create');
-        $meta['breadcrumbs'][] = ['label' => __('actions.medical_records.create'), 'url' => 'javascript:void(0);', 'active' => true];
-
-        return view('system.medical_records.create', array_merge(
-            compact('meta', 'patient'),
-            $commonData,
-        ));
+        return Inertia::render('Panel/MedicalRecords/Create', $props);
     }
 
     /**
@@ -248,23 +268,27 @@ class MedicalRecordsController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Patient $patient, MedicalRecord $medicalrecord): Factory|Application|View
+    public function edit(Patient $patient, MedicalRecord $medicalrecord): InertiaResponse
     {
         $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $this->logAccess($medicalrecord, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
-        $medicalrecord->load(['doctor', 'documentations.reportSettingContent']);
+        $medicalrecord->load([
+            'doctor.person',
+            'documentations.doctor.person',
+            'documentations.reportSettingContent',
+            'files',
+        ]);
 
-        [$commonData, $meta] = $this->commonFormData($patient);
+        $props = $this->buildFormProps($patient, $medicalrecord);
+        $props['breadcrumbs'][] = [
+            'label'  => __('actions.medical_records.edit'),
+            'url'    => '#',
+            'active' => true,
+        ];
 
-        $meta['title']         = __('actions.medical_records.edit');
-        $meta['breadcrumbs'][] = ['label' => __('actions.medical_records.edit'), 'url' => 'javascript:void(0);', 'active' => true];
-
-        return view('system.medical_records.edit', array_merge(
-            compact('meta', 'patient', 'medicalrecord'),
-            $commonData,
-        ));
+        return Inertia::render('Panel/MedicalRecords/Edit', $props);
     }
 
     /**
@@ -421,18 +445,41 @@ class MedicalRecordsController extends Controller
         // edita manualmente — placeholder literal só polui o textarea.
         $html = preg_replace('/\{\{[A-Z_][A-Z0-9_]*\}\}/u', '', $resolved['html']) ?? $resolved['html'];
 
+        // Remove o cabeçalho de data já resolvido pelo TemplateVariableResolver
+        // (`<p style="text-align:right">SÃO PAULO/SP, 21 de maio de 2026</p>` e
+        // o `<p>&nbsp;</p>` espaçador que segue). Motivo: a data e localização
+        // já aparecem no bloco de assinatura do PDF (`_signature.blade.php`) —
+        // mostrar no topo do editor duplica visualmente e polui o textarea.
+        $html = $this->stripResolvedDateHeader($html);
+
         return response()->json(['content' => $html, 'unresolved' => $resolved['unresolved']]);
     }
 
     /**
-     * Shared form data for create/edit views.
-     *
-     * @return array{0: array, 1: array}
+     * Remove o `<p style="text-align:right">{LOCAL_DATA já resolvido}</p>` e o
+     * `<p>&nbsp;</p>` que normalmente o sucede no template. Pareia o cabeçalho
+     * pela posição (início do HTML) + alinhamento à direita, sem hardcoded
+     * de cidade ou mês — funciona para qualquer entity.
      */
-    private function commonFormData(Patient $patient): array
+    private function stripResolvedDateHeader(string $html): string
     {
-        $entityId = session('selected_entity_id');
+        // Padrão: <p ... text-align:right ...>QUALQUER COISA</p>(\s*<p>&nbsp;</p>)?
+        // Só remove se estiver no INÍCIO do conteúdo (no máximo após whitespace).
+        $pattern = '/^\s*<p\s+[^>]*text-align\s*:\s*right[^>]*>[^<]*<\/p>\s*(?:<p[^>]*>&nbsp;<\/p>)?\s*/iu';
+
+        return preg_replace($pattern, '', $html, 1) ?? $html;
+    }
+
+    /**
+     * Constrói o payload de props para Inertia (Create e Edit).
+     * Substitui o antigo commonFormData() do fluxo Blade — agora retorna tudo
+     * serializado em arrays puros prontos para consumo Vue.
+     */
+    private function buildFormProps(Patient $patient, ?MedicalRecord $record): array
+    {
+        $entityId = (string) session('selected_entity_id');
         $entity   = Entity::find($entityId);
+        $isEdit   = (bool) $record;
 
         $doctors = Doctor::with(['person', 'entityUser'])
             ->whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
@@ -442,41 +489,260 @@ class MedicalRecordsController extends Controller
             fn (Doctor $d) => $d->entityUser?->user_id === auth()->id(),
         );
 
-        $commonData = [
-            'doctors'            => $doctors,
-            'currentDoctor'      => $currentDoctor,
-            'canChooseDoctor'    => $entity && auth()->user()?->hasRoleInEntity($entity, ClientRule::Admin),
-            'visualAcuityTypes'  => VisualAcuityType::orderBy('name')->get(),
-            'colorVisionTypes'   => ColorVisionType::orderBy('name')->get(),
-            'coverTestTypes'     => CoverTestType::orderBy('name')->get(),
-            'nearPointTypes'     => NearPointConvergence::orderBy('name')->get(),
-            'additionTypes'      => AdditionType::orderBy('name')->get(),
-            'lenses'             => Lense::orderBy('name')->get(),
-            'documentationTypes' => $this->documentationService->getTypes(),
-            'availableTemplates' => $this->documentationService->getActiveTemplates($entityId),
-            'examReports'        => array_map(
-                fn (ExamReportRegistry $exam) => [
-                    'value'    => $exam->value,
-                    'label'    => $exam->label(),
-                    'icon'     => $exam->icon(),
-                    'subtypes' => $exam->subtypes(),
-                ],
-                ExamReportRegistry::examsForHub(),
-            ),
-        ];
+        $canChooseDoctor = $entity && auth()->user()?->hasRoleInEntity($entity, ClientRule::Admin);
+        $isDoctor        = session('selected_entity_user_rule') === ClientRule::Doctor->value;
 
-        $meta = [
-            'title'       => __('actions.medical_records.title'),
-            'action'      => __('actions.medical_records.title'),
+        return [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.patients'), 'url' => route('panel.patients.index'), 'active' => false],
-                ['label' => $patient->person->full_name ?? $patient->code, 'url' => 'javascript:void(0);', 'active' => false],
+                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),      'active' => false],
+                ['label' => __('actions.sidemenu.patients'),   'url' => route('panel.patients.index'), 'active' => false],
+                ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#', 'active' => false],
                 ['label' => __('actions.medical_records.title'), 'url' => route('panel.patients.medicalrecords.index', $patient), 'active' => false],
             ],
+            'patient'        => $this->serializePatient($patient),
+            'medicalrecord'  => $record ? $this->serializeRecord($record) : null,
+            'doctors'        => $this->serializeCatalog($doctors, fn (Doctor $d) => [
+                'id'   => (string) $d->id,
+                'name' => $d->person?->full_name,
+            ]),
+            'currentDoctorId'  => $currentDoctor ? (string) $currentDoctor->id : null,
+            'canChooseDoctor'  => (bool) $canChooseDoctor,
+            'isDoctor'         => $isDoctor,
+            'isEdit'           => $isEdit,
+            'catalogs' => [
+                'visual_acuity_types' => $this->serializeCatalog(VisualAcuityType::orderBy('name')->get()),
+                'color_vision_types'  => $this->serializeCatalog(ColorVisionType::orderBy('name')->get()),
+                'cover_test_types'    => $this->serializeCatalog(CoverTestType::orderBy('name')->get()),
+                'near_point_types'    => $this->serializeCatalog(NearPointConvergence::orderBy('name')->get()),
+                'addition_types'      => $this->serializeCatalog(AdditionType::orderBy('name')->get()),
+                'lenses'              => $this->serializeCatalog(Lense::orderBy('name')->get()),
+                'documentation_types' => $this->documentationService->getTypes(),
+                'available_templates' => $this->documentationService->getActiveTemplates($entityId),
+                'exam_reports'        => array_map(
+                    fn (ExamReportRegistry $exam) => [
+                        'value'    => $exam->value,
+                        'label'    => $exam->label(),
+                        'icon'     => $exam->icon(),
+                        'subtypes' => $exam->subtypes(),
+                    ],
+                    ExamReportRegistry::examsForHub(),
+                ),
+            ],
+            'urls'    => $this->buildFormUrls($patient, $record, $isEdit),
+            'storage' => $this->buildStorageQuota($entityId),
+            't'       => trans('actions.medical_records'),
+        ];
+    }
+
+    /**
+     * Payload de cota de armazenamento para o modal de upload de anexos.
+     * Espelha as restrições do backend ({@see MedicalRecordFilesController::store})
+     * para que a UI valide antes de enviar e mostre o consumo atual.
+     */
+    private function buildStorageQuota(string $entityId): array
+    {
+        $status     = $this->featureGate->status($entityId, FeatureKey::MaxStorageGB);
+        $usedBytes  = $this->usageMeter->getStorageUsedBytes($entityId);
+        $limitBytes = $status->isUnlimited ? 0 : $status->limit * 1024 * 1024 * 1024;
+        $percent    = $status->isUnlimited || $limitBytes === 0
+            ? 0
+            : min(100, (int) round(($usedBytes / $limitBytes) * 100));
+
+        return [
+            'used_bytes'           => $usedBytes,
+            'limit_bytes'          => $limitBytes,
+            'limit_gb'             => $status->limit,
+            'is_unlimited'         => $status->isUnlimited,
+            'percent'              => $percent,
+            'remaining_bytes'      => $status->isUnlimited ? null : max(0, $limitBytes - $usedBytes),
+            // Espelha validações do backend (MedicalRecordFilesController::store)
+            'max_file_size_bytes'  => 10 * 1024 * 1024,
+            'max_files_per_batch'  => 10,
+            'accept'               => '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
+            'accept_mimes'         => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
+        ];
+    }
+
+    /**
+     * URLs consumidas pelo formulário Vue. Em CREATE muitas URLs ainda não
+     * existem (depende de UUID do registro) — só são populadas após edit.
+     */
+    private function buildFormUrls(Patient $patient, ?MedicalRecord $record, bool $isEdit): array
+    {
+        $urls = [
+            'store'                => route('panel.patients.medicalrecords.store', $patient),
+            'list'                 => route('panel.patients.medicalrecords.index', $patient),
+            'create'               => route('panel.patients.medicalrecords.create', $patient),
+            'validation_rules'     => route('panel.medical-records.validation-rules', ['mode' => $isEdit ? 'update' : 'store']),
+            'calc_presbyopia'      => route('panel.patients.medicalrecords.calculate-presbyopia', $patient),
+            'lens_format'          => route('panel.medicalrecords.lens-format'),
+            'tonometry_pdf'        => route('panel.patients.tonometry-pdf', $patient),
+            'medicine_search'      => route('panel.medicines.search'),
+            'medication_format'    => route('panel.medication-prescription.format-line'),
+            'procedure_search'     => route('panel.procedures.search'),
+            'indication_search'    => route('panel.indications.search'),
+            'procedure_format'     => route('panel.procedure-solicitation.format-line'),
+            'cid10_search'         => route('panel.cid10.search'),
         ];
 
-        return [$commonData, $meta];
+        if ($isEdit && $record) {
+            $urls['update']             = route('panel.patients.medicalrecords.update',         [$patient, $record]);
+            $urls['destroy']            = route('panel.patients.medicalrecords.destroy',        [$patient, $record]);
+            $urls['pdf']                = route('panel.patients.medicalrecords.pdf',            [$patient, $record]);
+            $urls['templates']          = route('panel.patients.medicalrecords.templates',      [$patient, $record]);
+            $urls['template_preview']   = route('panel.patients.medicalrecords.template-preview', [$patient, $record]);
+            $urls['store_doc']          = route('panel.patients.medicalrecords.documentations.store', [$patient, $record]);
+            $urls['store_file']         = route('panel.patients.medicalrecords.files.store',    [$patient, $record]);
+            $urls['store_tonometry']    = route('panel.patients.medicalrecords.tonometry.store', [$patient, $record]);
+            $urls['quick_action_template']  = route('panel.patients.medicalrecords.quick-actions.issue',
+                [$patient, $record, '__ACTION__']);
+            $urls['exam_template_template'] = route('panel.patients.medicalrecords.exam-template',
+                [$patient, $record, '__EXAM__']);
+            $urls['day_extension_preview']  = route('panel.medical-records.day-extension-preview');
+        }
+
+        return $urls;
+    }
+
+    /**
+     * @template T of \Illuminate\Database\Eloquent\Model
+     * @param \Illuminate\Support\Collection<int,T> $collection
+     * @param  callable|null  $mapper
+     */
+    private function serializeCatalog($collection, ?callable $mapper = null): array
+    {
+        $mapper ??= fn ($item) => [
+            'id'   => (string) $item->id,
+            'name' => $item->name,
+        ];
+
+        return $collection->map($mapper)->values()->all();
+    }
+
+    private function serializePatient(Patient $patient): array
+    {
+        return [
+            'id'             => (string) $patient->id,
+            'code'           => $patient->code,
+            'full_name'      => $patient->person?->full_name,
+            'birth_date'     => $patient->person?->birth_date?->format('d/m/Y'),
+            'age'            => $patient->person?->birth_date?->age,
+            'gender'         => $patient->person?->gender,
+            'cpf'            => $patient->person?->cpf,
+            'phone'          => $patient->person?->cellphone ?? $patient->person?->telephone,
+            'email'          => $patient->person?->email,
+            'covenant_name'  => $patient->covenant?->name,
+            'skin_type'      => $patient->skinType?->name,
+            'iris_type'      => $patient->irisType?->name,
+        ];
+    }
+
+    /**
+     * Serializa o MedicalRecord para o frontend Vue. Inclui todos os campos
+     * editáveis + flags de compliance (locked/signed) + documentações.
+     */
+    private function serializeRecord(MedicalRecord $r): array
+    {
+        return [
+            // Identificação
+            'id'    => (string) $r->id,
+            'code'  => $r->code,
+            'doctor_id' => $r->doctor_id ? (string) $r->doctor_id : null,
+            'doctor_name' => $r->doctor?->person?->full_name,
+
+            // Anamnese
+            'main_complaint'           => $r->main_complaint,
+            'hda'                      => $r->hda,
+            'diabetic'                 => (bool) $r->diabetic,
+            'diabetic_family'          => (bool) $r->diabetic_family,
+            'hypertensive'             => (bool) $r->hypertensive,
+            'hypertensive_family'      => (bool) $r->hypertensive_family,
+            'glaucomatous'             => (bool) $r->glaucomatous,
+            'glaucomatous_family'      => (bool) $r->glaucomatous_family,
+            'others_history'           => $r->others_history,
+            'ocular_surgical_history'  => $r->ocular_surgical_history,
+            'medications_in_use'       => $r->medications_in_use,
+
+            // Acuidade visual e refração
+            'visual_acuity_type_id'                       => $r->visual_acuity_type_id ? (string) $r->visual_acuity_type_id : null,
+            'visual_acuity_without_correction_right_id'   => $r->visual_acuity_without_correction_right_id ? (string) $r->visual_acuity_without_correction_right_id : null,
+            'visual_acuity_without_correction_left_id'    => $r->visual_acuity_without_correction_left_id ? (string) $r->visual_acuity_without_correction_left_id : null,
+            'visual_acuity_with_correction_right_id'      => $r->visual_acuity_with_correction_right_id ? (string) $r->visual_acuity_with_correction_right_id : null,
+            'visual_acuity_with_correction_left_id'       => $r->visual_acuity_with_correction_left_id ? (string) $r->visual_acuity_with_correction_left_id : null,
+            'near_point_convergence_id' => $r->near_point_convergence_id ? (string) $r->near_point_convergence_id : null,
+            'cover_test_type_id'        => $r->cover_test_type_id ? (string) $r->cover_test_type_id : null,
+            'color_vision_type_id'      => $r->color_vision_type_id ? (string) $r->color_vision_type_id : null,
+            'addition_type_id'          => $r->addition_type_id ? (string) $r->addition_type_id : null,
+            'lens_away_id'              => $r->lens_away_id ? (string) $r->lens_away_id : null,
+            'lens_near_id'              => $r->lens_near_id ? (string) $r->lens_near_id : null,
+
+            // Refração dinâmica
+            'dynamic_spherical_right'   => $r->dynamic_spherical_right,
+            'dynamic_spherical_left'    => $r->dynamic_spherical_left,
+            'dynamic_cylindrical_right' => $r->dynamic_cylindrical_right,
+            'dynamic_cylindrical_left'  => $r->dynamic_cylindrical_left,
+            'dynamic_axis_right'        => $r->dynamic_axis_right,
+            'dynamic_axis_left'         => $r->dynamic_axis_left,
+
+            // Refração estática
+            'static_spherical_right'   => $r->static_spherical_right,
+            'static_spherical_left'    => $r->static_spherical_left,
+            'static_cylindrical_right' => $r->static_cylindrical_right,
+            'static_cylindrical_left'  => $r->static_cylindrical_left,
+            'static_axis_right'        => $r->static_axis_right,
+            'static_axis_left'         => $r->static_axis_left,
+
+            // Exame físico
+            'ocular_motility'   => $r->ocular_motility,
+            'tonometer_right'   => $r->tonometer_right,
+            'tonometer_left'    => $r->tonometer_left,
+            'tonometer_time'    => $r->tonometer_time,
+            'pachymetry_right'  => $r->pachymetry_right,
+            'pachymetry_left'   => $r->pachymetry_left,
+            'gonioscopy_right'  => $r->gonioscopy_right,
+            'gonioscopy_left'   => $r->gonioscopy_left,
+
+            // Achados
+            'biomicroscopy_right'   => $r->biomicroscopy_right,
+            'biomicroscopy_left'    => $r->biomicroscopy_left,
+            'fundoscopy_right'      => $r->fundoscopy_right,
+            'fundoscopy_left'       => $r->fundoscopy_left,
+            'observation_general'   => $r->observation_general,
+            'observation_of_lenses' => $r->observation_of_lenses,
+
+            // Diagnóstico & conduta
+            'diagnosis_cids'    => $r->diagnosis_cids ?? [],
+            'clinical_conduct'  => $r->clinical_conduct,
+            'follow_up_days'    => $r->follow_up_days,
+
+            // Compliance CFM
+            'is_signed'           => $r->isSigned(),
+            'is_locked'           => $r->isLocked(),
+            'signed_at_formatted' => $r->signed_at?->format('d/m/Y H:i'),
+
+            // Documentações já anexadas
+            'documentations' => $r->documentations->map(fn ($d) => [
+                'id'          => (string) $d->id,
+                'type'        => $d->type,
+                'type_label'  => $d->getTypeLabel(),
+                'title'       => $d->title,
+                'doctor_name' => $d->doctor?->person?->full_name ?? '',
+                'created_at'  => $d->created_at?->format('d/m/Y H:i'),
+                'pdf_url'     => route('panel.patients.medicalrecords.documentations.pdf',
+                    [$r->patient_id, $r, $d]),
+            ])->all(),
+
+            // Anexos já enviados — consumido pela lista no rodapé do form
+            'files' => $r->files->map(fn ($f) => [
+                'id'            => (string) $f->id,
+                'original_name' => $f->original_name,
+                'mime_type'     => $f->mime_type,
+                'file_size'     => $f->file_size,
+                'is_image'      => $f->isImage(),
+                'show_url'      => route('panel.patients.medicalrecords.files.show',
+                    [$r->patient_id, $r, $f]),
+            ])->all(),
+        ];
     }
 
     private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void

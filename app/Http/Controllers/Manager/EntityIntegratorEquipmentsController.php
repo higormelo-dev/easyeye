@@ -1,26 +1,30 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Manager;
 
-use App\DataTables\EntityIntegratorEquipmentsDataTable;
 use App\Http\Controllers\Controller;
 use App\Models\{Entity, EntityIntegrator, EntityIntegratorEquipment, EntityUserIntegrator};
+use Illuminate\Http\{JsonResponse, Request};
+use Inertia\{Inertia, Response as InertiaResponse};
 
+/**
+ * Visualização de Equipamentos vinculados a um Integrador (Manager SaaS).
+ *
+ * Read-only: equipamentos são criados via API pelo próprio integrador
+ * (autenticado por Sanctum). O Manager apenas inspeciona.
+ *
+ * Rotas: /panel/manager/entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/equipments
+ */
 class EntityIntegratorEquipmentsController extends Controller
 {
-    protected string $titleController = 'Equipamentos';
-
-    protected EntityIntegratorEquipment $model;
-
-    public function __construct(EntityIntegratorEquipment $entityIntegratorEquipment)
-    {
-        $this->model = $entityIntegratorEquipment;
+    public function __construct(
+        protected EntityIntegratorEquipment $model,
+    ) {
     }
 
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(string $entityId, string $userIntegrator, string $integrator, EntityIntegratorEquipmentsDataTable $dataTable): mixed
+    public function index(string $entityId, string $userIntegrator, string $integrator, Request $request): InertiaResponse
     {
         $entity              = Entity::query()->findOrFail($entityId);
         $userIntegratorModel = EntityUserIntegrator::query()
@@ -30,45 +34,80 @@ class EntityIntegratorEquipmentsController extends Controller
             ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
-        $meta = [
-            'title'       => $this->titleController . ': ' . $integratorModel->name,
-            'action'      => __('actions.records'),
-            'total'       => EntityIntegratorEquipment::where('integrator_id', $integratorModel->id)->count(),
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.entities'), 'url' => route('manager.entities.index'), 'active' => false],
-                ['label' => __('actions.user_integrators'), 'url' => route('manager.entities.user-integrators.index', $entityId), 'active' => false],
-                ['label' => __('actions.integrators'), 'url' => route('manager.entities.user-integrators.integrators.index', [$entityId, $userIntegrator]), 'active' => false],
-                ['label' => $this->titleController, 'url' => route('manager.entities.user-integrators.integrators.equipments.index', [$entityId, $userIntegrator, $integratorModel->id]), 'active' => false],
-                ['label' => __('actions.records'), 'url' => 'javascript:void(0);', 'active' => true],
-            ],
-        ];
+        $search = $request->string('search')->trim()->value();
 
-        return $dataTable
-            ->forIntegrator($integrator)
-            ->render('system.manager.entity_integrator_equipments.index', [
-                'meta'           => $meta,
-                'entity'         => $entity,
-                'userIntegrator' => $userIntegratorModel,
-                'integrator'     => $integratorModel,
-            ]);
+        $query = EntityIntegratorEquipment::query()
+            ->withTrashed()
+            ->where('integrator_id', $integratorModel->id);
+
+        if ($search !== '') {
+            $lower = mb_strtolower($search, 'UTF-8');
+            $query->where(function ($q) use ($lower): void {
+                $q->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(ip) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(mac) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(serial_number) LIKE ?', ["%{$lower}%"])
+                    ->orWhereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+            });
+        }
+
+        $items = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
+
+        return Inertia::render('Panel/Manager/EntityIntegratorEquipments/Index', [
+            'entity' => [
+                'id'   => $entity->id,
+                'code' => $entity->code,
+                'name' => $entity->name,
+            ],
+            'userIntegrator' => [
+                'id'   => $userIntegratorModel->id,
+                'name' => $userIntegratorModel->name,
+            ],
+            'integrator' => [
+                'id'   => $integratorModel->id,
+                'code' => $integratorModel->code,
+                'name' => $integratorModel->name,
+            ],
+            'items'   => $items->through(fn (EntityIntegratorEquipment $e) => $this->toRow($e, $entityId, $userIntegrator)),
+            'filters' => ['search' => $search],
+            't'       => trans('manager_entity_integrator_equipments'),
+        ]);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $entityId, string $userIntegrator, string $integratorId, string $equipment): mixed
+    public function show(string $entityId, string $userIntegrator, string $integratorId, string $equipment): JsonResponse
     {
-        $entity     = Entity::query()->withTrashed()->findOrFail($entityId);
         $integrator = EntityIntegrator::query()->withTrashed()
             ->where('entity_user_integrator_id', $userIntegrator)
             ->findOrFail($integratorId);
-        $record = $this->model->query()->withTrashed()->where('integrator_id', $integrator->id)->findOrFail($equipment);
 
-        if (request()->wantsJson()) {
-            return response()->json(['data' => $record->toArray()]);
-        }
+        $record = $this->model->query()->withTrashed()
+            ->where('integrator_id', $integrator->id)
+            ->findOrFail($equipment);
 
-        return view('system.manager.entity_integrator_equipments.show', compact('entity', 'integrator', 'record'));
+        return response()->json(['data' => $this->toRow($record, $entityId, $userIntegrator)]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function toRow(EntityIntegratorEquipment $equipment, string $entityId, string $userIntegratorId): array
+    {
+        $isDeleted    = $equipment->deleted_at !== null;
+        $integratorId = (string) $equipment->integrator_id;
+        $equipmentId  = (string) $equipment->id;
+
+        return [
+            'id'            => $equipmentId,
+            'code'          => (string) $equipment->code,
+            'name'          => (string) $equipment->name,
+            'ip'            => $equipment->ip,
+            'mac'           => $equipment->mac,
+            'serial_number' => $equipment->serial_number,
+            'active'        => (bool) $equipment->active,
+            'deleted'       => $isDeleted,
+            'created_at'    => $equipment->created_at?->format('d/m/Y H:i'),
+            'deleted_at'    => $equipment->deleted_at?->format('d/m/Y H:i'),
+            'show_url'      => route('manager.entities.user-integrators.integrators.equipments.show', [$entityId, $userIntegratorId, $integratorId, $equipmentId]),
+        ];
     }
 }

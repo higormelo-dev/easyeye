@@ -5,6 +5,7 @@ import AppLayout      from '@/Layouts/AppLayout.vue';
 import DoctorTable    from './DoctorTable.vue';
 import DoctorCards    from './DoctorCards.vue';
 import DoctorFormModal from './DoctorFormModal.vue';
+import DoctorDetailDrawer from './DoctorDetailDrawer.vue';
 
 const props = defineProps({
     doctors:         { type: Object, required: true },
@@ -49,6 +50,20 @@ function openCreate() { editDoctorId.value = null; modalOpen.value = true; }
 function openEdit(id) { editDoctorId.value = id;   modalOpen.value = true; }
 function closeModal()  { modalOpen.value = false; editDoctorId.value = null; }
 
+// ── Detail drawer ────────────────────────────────────────────────────────────
+const detailOpen    = ref(false);
+const viewDoctorId  = ref(null);
+
+function onView(id) {
+    viewDoctorId.value = id;
+    detailOpen.value   = true;
+}
+
+function closeDetail() {
+    detailOpen.value   = false;
+    viewDoctorId.value = null;
+}
+
 // ── Actions ──────────────────────────────────────────────────────────────────
 function onDelete(id) {
     if (!confirm('Tem certeza que deseja excluir este médico?')) return;
@@ -74,14 +89,10 @@ const breadcrumbs = [
         <div>
 
             <!-- ── Page Header ──────────────────────────────────────────── -->
-            <div class="d-flex align-items-sm-center flex-sm-row flex-column gap-2 pb-3 mb-3 border-bottom">
-                <div class="flex-grow-1">
-                    <h4 class="fw-bold mb-0">
-                        Médicos
-                        <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13 ms-1">
-                            Total: {{ totalDoctors }}
-                        </span>
-                    </h4>
+            <div class="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2 me-auto">
+                    <h4 class="mb-0 fw-bold">Médicos</h4>
+                    <span style="font-size:.78rem;font-weight:600;color:#0d6efd;background:#eff4ff;border:1.5px solid #0d6efd;border-radius:20px;padding:2px 12px;white-space:nowrap;line-height:1.6;">Total: {{ doctors.total }}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <div class="bg-white border shadow-sm rounded px-1 d-flex align-items-center">
@@ -122,6 +133,7 @@ const breadcrumbs = [
                 :doctors="doctors"
                 :filters="filters"
                 @sort="onSort"
+                @view="onView"
                 @edit="openEdit"
                 @delete="onDelete"
                 @toggle-active="onToggleActive"
@@ -130,6 +142,7 @@ const breadcrumbs = [
                 v-else
                 :cards-url="route('panel.doctors.cards')"
                 :initial-search="search"
+                @view="onView"
                 @edit="openEdit"
                 @delete="onDelete"
                 @toggle-active="onToggleActive"
@@ -143,6 +156,13 @@ const breadcrumbs = [
             :marital-statuses="maritalStatuses"
             :states-of-brazil="statesOfBrazil"
             @close="closeModal"
+        />
+
+        <!-- ── Doctor Detail Drawer ──────────────────────────────────────── -->
+        <DoctorDetailDrawer
+            :open="detailOpen"
+            :doctor-id="viewDoctorId"
+            @close="closeDetail"
         />
     </AppLayout>
 </template>

@@ -4,6 +4,9 @@ import { router } from '@inertiajs/vue3';
 import LoadingSpinner  from '@/Components/Panel/LoadingSpinner.vue';
 import StatusBadge     from '@/Components/Panel/StatusBadge.vue';
 import CardsPagination from '@/Components/Panel/CardsPagination.vue';
+import ActionDropdown  from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -83,32 +86,34 @@ onUnmounted(() => removeSuccessListener?.());
 
                     <hr class="my-2">
 
-                    <div class="d-flex justify-content-end gap-1">
-                        <button class="btn btn-xs btn-outline-secondary" :title="t.action_view" @click="$emit('view', p.id)">
-                            <i class="ti ti-eye"></i>
-                        </button>
-                        <button class="btn btn-xs btn-outline-secondary" :title="t.action_edit" @click="$emit('edit', p.id)">
-                            <i class="ti ti-edit"></i>
-                        </button>
-                        <div class="dropdown">
-                            <button class="btn btn-xs btn-outline-secondary" data-bs-toggle="dropdown">
-                                <i class="ti ti-dots-vertical"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end p-2">
-                                <li>
-                                    <button class="dropdown-item rounded-1" @click="$emit('toggleActive', p.id, p.active)">
-                                        <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                        {{ p.active ? t.action_deactivate : t.action_activate }}
-                                    </button>
-                                </li>
-                                <li>
-                                    <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', p.id)">
-                                        <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+                    <ActionIconGroup align="end" gap="tight">
+                        <ActionIconButton
+                            icon="ti ti-eye"
+                            :title="t.action_view"
+                            @click="$emit('view', p.id)"
+                        />
+                        <ActionIconButton
+                            icon="ti ti-edit"
+                            :title="t.action_edit"
+                            @click="$emit('edit', p.id)"
+                        />
+                        <ActionDropdown
+                            btn-class="ee-action-icon ee-action-icon--default"
+                            icon="ti ti-dots-vertical"
+                        >
+                            <li>
+                                <button class="dropdown-item rounded-1" @click="$emit('toggleActive', p.id, p.active)">
+                                    <i :class="`ti me-1 ${p.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
+                                    {{ p.active ? t.action_deactivate : t.action_activate }}
+                                </button>
+                            </li>
+                            <li>
+                                <button class="dropdown-item rounded-1 text-danger" @click="$emit('delete', p.id)">
+                                    <i class="ti ti-trash me-1"></i> {{ t.action_delete }}
+                                </button>
+                            </li>
+                        </ActionDropdown>
+                    </ActionIconGroup>
                 </div>
             </div>
         </div>

@@ -6,15 +6,18 @@ use App\Enums\Billing\CredentialScope;
 use App\Http\Controllers\Controller;
 use App\Models\Billing\{EntityGatewayAccess, Gateway, GatewayCredential};
 use App\Models\Entity;
+use App\Services\Audit\AuditLogger;
 use App\Services\Billing\GatewayDefaultService;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Cache;
 use Inertia\{Inertia, Response};
+use InvalidArgumentException;
 
 class GatewaysController extends Controller
 {
     public function __construct(
         private readonly GatewayDefaultService $defaultService,
+        private readonly AuditLogger $audit,
     ) {
     }
 
@@ -46,7 +49,7 @@ class GatewaysController extends Controller
     {
         try {
             $this->defaultService->setDefault($gateway);
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
@@ -113,15 +116,21 @@ class GatewaysController extends Controller
             'webhook_secret' => ['nullable', 'string'],
             'valid_from'     => ['nullable', 'date'],
             'valid_to'       => ['nullable', 'date', 'after:valid_from'],
+            'reason'         => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
         ]);
 
-        GatewayCredential::query()
+        // Revoga credenciais globais anteriores (rotação automática).
+        $oldCount = GatewayCredential::query()
             ->where('gateway_id', $gateway->id)
             ->whereNull('entity_id')
             ->where('active', true)
             ->update(['active' => false]);
 
-        GatewayCredential::query()->create([
+        $credential = GatewayCredential::query()->create([
             'gateway_id'     => $gateway->id,
             'entity_id'      => null,
             'scope'          => CredentialScope::Global->value,
@@ -136,19 +145,65 @@ class GatewaysController extends Controller
         Cache::forget("gateway_credential:{$gateway->code}:global");
         $this->defaultService->forgetCache();
 
+        // Audit: rotação de credencial é evento crítico — registra qual gateway,
+        // qual credential (UUID), e quantas anteriores foram revogadas em cascata.
+        // NUNCA registramos o secret no audit log (defesa em profundidade).
+        $this->audit->recordAdminAction(
+            event: 'manager.gateway.credential.store',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'gateway_credential',
+            auditableId: (string) $credential->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: [
+                'gateway_code'         => $gateway->code,
+                'gateway_id'           => $gateway->id,
+                'credential_label'     => $credential->label,
+                'scope'                => CredentialScope::Global->value,
+                'cascaded_revocations' => $oldCount,
+                'has_webhook_secret'   => $request->filled('webhook_secret'),
+                'valid_from'           => $request->valid_from,
+                'valid_to'             => $request->valid_to,
+            ],
+            request: $request,
+        );
+
         return response()->json(['message' => __('gateways.credential_saved')]);
     }
 
-    public function revokeCredential(Gateway $gateway, GatewayCredential $credential): JsonResponse
+    public function revokeCredential(Request $request, Gateway $gateway, GatewayCredential $credential): JsonResponse
     {
         if ($credential->gateway_id !== $gateway->id) {
             abort(404);
         }
 
+        $request->validate([
+            'reason' => ['required', 'string', 'min:20', 'max:1000'],
+        ], [
+            'reason.required' => __('manager_hardening.reason_required'),
+            'reason.min'      => __('manager_hardening.reason_min', ['min' => 20]),
+            'reason.max'      => __('manager_hardening.reason_max', ['max' => 1000]),
+        ]);
+
         $credential->update(['active' => false]);
 
         Cache::forget("gateway_credential:{$gateway->code}:global");
         $this->defaultService->forgetCache();
+
+        $this->audit->recordAdminAction(
+            event: 'manager.gateway.credential.revoke',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: 'gateway_credential',
+            auditableId: (string) $credential->id,
+            reason: trim((string) $request->input('reason')),
+            newValues: [
+                'gateway_code'     => $gateway->code,
+                'gateway_id'       => $gateway->id,
+                'credential_label' => $credential->label,
+            ],
+            request: $request,
+        );
 
         return response()->json(['message' => __('gateways.credential_revoked')]);
     }
@@ -203,7 +258,7 @@ class GatewaysController extends Controller
 
     private function toRow(Gateway $g): array
     {
-        $credCount   = $g->active_credentials_count  ?? 0;
+        $credCount   = $g->active_credentials_count ?? 0;
         $clinicCount = $g->entities_with_access_count ?? 0;
 
         return [
@@ -225,14 +280,14 @@ class GatewaysController extends Controller
             'clinics_label'              => $clinicCount > 0
                 ? trans_choice('gateways.clinics_count', $clinicCount, ['count' => $clinicCount])
                 : null,
-            'can_be_default'             => (bool) $g->active && $credCount > 0,
+            'can_be_default' => (bool) $g->active && $credCount > 0,
             // Route URLs
-            'set_default_url'       => route('manager.gateways.set-default',    $g),
-            'toggle_active_url'     => route('manager.gateways.toggle-active',  $g),
-            'priority_url'          => route('manager.gateways.priority',        $g),
-            'credentials_url'       => route('manager.gateways.credentials',     $g),
+            'set_default_url'       => route('manager.gateways.set-default', $g),
+            'toggle_active_url'     => route('manager.gateways.toggle-active', $g),
+            'priority_url'          => route('manager.gateways.priority', $g),
+            'credentials_url'       => route('manager.gateways.credentials', $g),
             'credentials_store_url' => route('manager.gateways.credentials.store', $g),
-            'entity_access_url'     => route('manager.gateways.entity-access',   $g),
+            'entity_access_url'     => route('manager.gateways.entity-access', $g),
         ];
     }
 }

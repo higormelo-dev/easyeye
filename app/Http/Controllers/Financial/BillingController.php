@@ -11,6 +11,7 @@ use App\Models\{BillingBatch, BillingClaim, Covenant, Entity, Schedule};
 use App\Services\Financial\BillingService;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\{DB, Gate, Storage};
+use Inertia\{Inertia, Response as InertiaResponse};
 
 class BillingController extends Controller
 {
@@ -20,7 +21,7 @@ class BillingController extends Controller
         $this->titleController = 'Faturamento TISS';
     }
 
-    public function index(Request $request)
+    public function index(Request $request): InertiaResponse
     {
         $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
@@ -97,29 +98,50 @@ class BillingController extends Controller
         $selectedTissVersion = (string) $request->input('tiss_version', '202603');
         $selectedTissLayout  = (string) $request->input('tiss_layout_version', '04.03.00');
 
-        $meta = [
-            'title'       => __('financial.billing.title'),
-            'action'      => __('financial.financial'),
+        return Inertia::render('Panel/Financial/Billing/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => __('financial.billing.breadcrumb'), 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),                'active' => false],
+                ['label' => __('financial.financial'),         'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.billing.breadcrumb'),'url' => '#',                                    'active' => true],
             ],
-        ];
-
-        return view('system.financial.billing.index', compact(
-            'meta',
-            'eligibleSchedules',
-            'claims',
-            'batches',
-            'covenants',
-            'from',
-            'to',
-            'tissVersionOptions',
-            'tissLayoutOptions',
-            'selectedTissVersion',
-            'selectedTissLayout',
-        ));
+            'eligibleSchedules' => $eligibleSchedules->map(fn ($s) => [
+                'id'             => $s->id,
+                'date_time'      => $s->date_time?->format('d/m/Y H:i'),
+                'patient_name'   => $s->patient?->person?->name,
+                'doctor_name'    => $s->doctor?->name,
+                'covenant_name'  => $s->covenant?->name,
+                'covenant_id'    => $s->covenant_id,
+                'visit_type'     => $s->visitType?->name,
+            ]),
+            'claims' => $claims->map(fn ($c) => [
+                'id'             => $c->id,
+                'created_at'     => $c->created_at?->format('d/m/Y H:i'),
+                'patient_name'   => $c->patient?->person?->name,
+                'doctor_name'    => $c->doctor?->name,
+                'covenant_name'  => $c->covenant?->name,
+                'batch_id'       => $c->batch_id,
+                'status'         => $c->status instanceof \BackedEnum ? $c->status->value : $c->status,
+                'amount'         => (float) ($c->amount ?? 0),
+                'mark_paid_url'  => route('panel.financial.billing.claims.markPaid', $c->id),
+                'mark_denied_url'=> route('panel.financial.billing.claims.markDenied', $c->id),
+            ]),
+            'batches' => $batches->map(fn ($b) => [
+                'id'            => $b->id,
+                'created_at'    => $b->created_at?->format('d/m/Y H:i'),
+                'covenant_name' => $b->covenant?->name,
+                'claims_count'  => (int) $b->claims_count,
+                'status'        => $b->status instanceof \BackedEnum ? $b->status->value : $b->status,
+                'submit_url'    => route('panel.financial.billing.batches.submit', $b->id),
+                'xml_url'       => route('panel.financial.billing.batches.xml',    $b->id),
+            ]),
+            'covenants'           => $covenants->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]),
+            'filters'             => ['from' => $from, 'to' => $to],
+            'tissVersionOptions'  => $tissVersionOptions,
+            'tissLayoutOptions'   => $tissLayoutOptions,
+            'selectedTissVersion' => $selectedTissVersion,
+            'selectedTissLayout'  => $selectedTissLayout,
+            't'                   => trans('financial'),
+        ]);
     }
 
     public function storeIndividual(BillingIndividualRequest $request): RedirectResponse

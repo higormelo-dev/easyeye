@@ -7,7 +7,7 @@ use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
 use App\Services\PatientService;
-use Illuminate\Contracts\View\{View};
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
@@ -195,24 +195,62 @@ class PatientsController extends Controller
     }
 
     /**
-     * Display the specified resource.
+     * Display the specified resource (JSON only — viewed via modal drawer on index).
      */
-    public function show(string $id): Application|View|JsonResponse
+    public function show(string $id): JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
 
-        if (request()->wantsJson()) {
-            return response()->json(
-                [
-                    'data' => new PatientResource($record),
-                ],
-            );
+        if (!request()->wantsJson()) {
+            return redirect()->route('panel.patients.index');
         }
 
-        return view(
-            'system.patients.show',
-            compact('record'),
-        );
+        $person   = $record->person;
+        $photoUrl = ($record->photo && Storage::disk('public')->exists('images/patient/' . $record->photo))
+            ? asset('storage/images/patient/' . $record->photo)
+            : Vite::asset('resources/img/system/team.png');
+
+        return response()->json([
+            'data' => [
+                'id'             => $record->id,
+                'code'           => $record->code,
+                'covenant'       => $record->covenant?->name,
+                'card_number'    => $record->card_number,
+                'skin_type'      => $record->skinType?->name,
+                'iris_type'      => $record->irisType?->name,
+                'active'         => (bool) $record->active,
+                'partner'        => (bool) $record->partner,
+                'photo_url'      => $photoUrl,
+                'created_at'     => $record->created_at?->format('d/m/Y H:i'),
+                'updated_at'     => $record->updated_at?->format('d/m/Y H:i'),
+                'deleted_at'     => $record->deleted_at?->format('d/m/Y H:i'),
+                'full_name'      => $person->full_name,
+                'nickname'       => $person->nickname,
+                'cpf'            => $person->national_registry ? $person->present()->getNationalRegistry() : null,
+                'birth_date'     => $person->birth_date ? $person->present()->getBirthDate() : null,
+                'age'            => $person->birth_date ? $person->present()->getAge() : null,
+                'gender'         => $person->present()->getGender(),
+                'marital_status' => $person->present()->getMaritalStatus(),
+                'email'          => $person->email,
+                'mother_name'    => $person->mother_name,
+                'father_name'    => $person->father_name,
+                'rg'             => $person->state_registry,
+                'rg_agency'      => $person->state_registry_agency,
+                'rg_state'       => $person->state_registry_initial,
+                'rg_date'        => $person->state_registry_date ? $person->present()->getStateRegistryDate() : null,
+                'telephone'      => $person->telephone ? $person->present()->getTelephone() : null,
+                'cellphone'      => $person->cellphone ? $person->present()->getCellphone() : null,
+                'whatsapp'       => (bool) $person->whatsapp,
+                'zipcode'        => $person->zipcode ? $person->present()->getZipcode() : null,
+                'address'        => $person->address,
+                'number'         => $person->number,
+                'complement'     => $person->complement,
+                'district'       => $person->district,
+                'city'           => $person->city,
+                'state'          => $person->state,
+                'medical_records_url' => route('panel.patients.medicalrecords.index', $record->id),
+            ],
+        ]);
     }
 
     /**

@@ -2,6 +2,9 @@
 import { computed } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import SortableTh from '@/Components/Panel/SortableTh.vue';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
+import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
     users:   { type: Object, required: true },
@@ -107,54 +110,48 @@ const showing = computed(() => {
 
                     <!-- Ações -->
                     <td class="text-end">
-                        <!-- Restore mode -->
-                        <template v-if="u.mode === 'restore'">
-                            <button
-                                class="btn btn-sm btn-outline-secondary"
+                        <ActionIconGroup align="end" gap="tight">
+                            <!-- Restore mode -->
+                            <ActionIconButton
+                                v-if="u.mode === 'restore'"
+                                icon="ti ti-recycle"
                                 :title="t.btn_restore"
                                 @click="$emit('restore', u.id)"
-                            >
-                                <i class="ti ti-recycle"></i>
-                            </button>
-                        </template>
+                            />
 
-                        <!-- Full mode -->
-                        <template v-else-if="u.mode === 'full'">
-                            <div class="d-flex align-items-center justify-content-end gap-1">
-                                <button
-                                    class="btn btn-sm btn-outline-secondary"
+                            <!-- Full mode -->
+                            <template v-else-if="u.mode === 'full'">
+                                <ActionIconButton
+                                    icon="ti ti-edit"
                                     :title="t.btn_edit"
                                     @click="$emit('edit', u.id)"
+                                />
+                                <ActionDropdown
+                                    v-if="!u.is_owner && !u.is_self"
+                                    btn-class="ee-action-icon ee-action-icon--default"
+                                    icon="ti ti-dots-vertical"
                                 >
-                                    <i class="ti ti-edit"></i>
-                                </button>
-                                <div v-if="!u.is_owner && !u.is_self" class="dropdown">
-                                    <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
-                                        <i class="ti ti-dots-vertical"></i>
-                                    </button>
-                                    <ul class="dropdown-menu dropdown-menu-end p-2">
-                                        <li>
-                                            <button
-                                                class="dropdown-item rounded-1"
-                                                @click="$emit('toggle-active', u.id, u.active)"
-                                            >
-                                                <i :class="`ti me-1 ${u.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
-                                                {{ u.active ? t.btn_deactivate : t.btn_activate }}
-                                            </button>
-                                        </li>
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <button
-                                                class="dropdown-item rounded-1 text-danger"
-                                                @click="$emit('delete', u.id)"
-                                            >
-                                                <i class="ti ti-trash me-1"></i>{{ t.btn_delete }}
-                                            </button>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </template>
+                                    <li>
+                                        <button
+                                            class="dropdown-item rounded-1"
+                                            @click="$emit('toggle-active', u.id, u.active)"
+                                        >
+                                            <i :class="`ti me-1 ${u.active ? 'ti-lock-open' : 'ti-lock'}`"></i>
+                                            {{ u.active ? t.btn_deactivate : t.btn_activate }}
+                                        </button>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <button
+                                            class="dropdown-item rounded-1 text-danger"
+                                            @click="$emit('delete', u.id)"
+                                        >
+                                            <i class="ti ti-trash me-1"></i>{{ t.btn_delete }}
+                                        </button>
+                                    </li>
+                                </ActionDropdown>
+                            </template>
+                        </ActionIconGroup>
                     </td>
                 </tr>
             </tbody>

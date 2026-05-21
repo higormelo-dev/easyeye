@@ -37,17 +37,16 @@ const color = computed(() => {
                 <div class="progress-bar" :class="`bg-${color}`" :style="`width:${activationScore}%`" />
             </div>
 
-            <div class="row g-2">
-                <div v-for="step in activation" :key="step.key" class="col-6 col-md-4 col-lg-3">
-                    <div
-                        class="d-flex align-items-center gap-2 p-2 rounded"
-                        :class="step.done ? 'bg-success bg-opacity-10' : 'bg-light'"
-                    >
-                        <i :class="step.done ? 'ti ti-circle-check text-success' : 'ti ti-circle text-muted'"></i>
-                        <span class="small" :class="step.done ? 'text-success fw-medium' : 'text-muted'">
-                            {{ step.label }}
-                        </span>
-                    </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div
+                    v-for="step in activation"
+                    :key="step.key"
+                    class="d-flex align-items-center gap-1 px-3 py-2 rounded border flex-shrink-0"
+                    :class="step.done ? 'border-success bg-success bg-opacity-10' : 'bg-white'"
+                >
+                    <i class="flex-shrink-0 fs-16" :class="step.done ? 'ti ti-circle-check text-success' : 'ti ti-circle text-muted'"></i>
+                    <span class="small text-nowrap" :class="step.done ? 'text-success fw-medium' : 'text-muted'">{{ step.label }}</span>
+                    <span v-if="!step.done" class="fw-semibold small" style="color:#0d6efd">+{{ step.weight }}%</span>
                 </div>
             </div>
         </div>

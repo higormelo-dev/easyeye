@@ -54,6 +54,10 @@ class Entity extends Model
         'active',
         'locale',
         'schedule_interval',
+        // 2FA por entity (decisão da empresa)
+        'requires_two_factor',
+        'two_factor_enabled_at',
+        'two_factor_enabled_by',
         // Campos de atribuição de aquisição (CAC)
         'partner_id',
         'referral_code_id',
@@ -120,13 +124,25 @@ class Entity extends Model
     protected function casts(): array
     {
         return [
-            'is_client'         => 'boolean',
-            'active'            => 'boolean',
-            'schedule_interval' => 'integer',
-            'created_at'        => 'datetime',
-            'updated_at'        => 'datetime',
-            'deleted_at'        => 'datetime',
+            'is_client'             => 'boolean',
+            'active'                => 'boolean',
+            'schedule_interval'     => 'integer',
+            'requires_two_factor'   => 'boolean',
+            'two_factor_enabled_at' => 'datetime',
+            'created_at'            => 'datetime',
+            'updated_at'            => 'datetime',
+            'deleted_at'            => 'datetime',
         ];
+    }
+
+    /**
+     * Esta entity exige que TODOS os seus usuários tenham 2FA habilitado +
+     * verificado na sessão? Decisão tomada pelo admin da entity (clínica)
+     * ou do SaaS (entidade gerenciadora).
+     */
+    public function requiresTwoFactor(): bool
+    {
+        return (bool) $this->requires_two_factor;
     }
 
     // -------------------------------------------------------------------------
@@ -248,6 +264,12 @@ class Entity extends Model
     public function partner(): BelongsTo
     {
         return $this->belongsTo(Partner::class, 'partner_id');
+    }
+
+    /** Quem ativou a exigência de 2FA nesta empresa (admin clínica ou SaaS) */
+    public function twoFactorEnabledByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'two_factor_enabled_by');
     }
 
     /** Código de indicação usado no cadastro desta clínica */

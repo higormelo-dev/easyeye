@@ -1,6 +1,7 @@
 <script setup>
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, nextTick } from 'vue';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
+import SlotPicker    from '@/Components/Panel/SlotPicker.vue';
 
 const props = defineProps({
     open:          { type: Boolean, required: true },
@@ -16,6 +17,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'saved']);
 
+// ── Estado do formulário ───────────────────────────────────────────────────────
 const saving = ref(false);
 const errors = ref({});
 
@@ -37,7 +39,10 @@ const form = ref({
     recurrence_until:   '',
 });
 
-// ── Patient search ─────────────────────────────────────────────────────────────
+// ── SlotPicker ref ─────────────────────────────────────────────────────────────
+const slotPickerRef = ref(null);
+
+// ── Busca de paciente ──────────────────────────────────────────────────────────
 const patientSearch   = ref('');
 const patientResults  = ref([]);
 const patientDebounce = ref(null);
@@ -92,106 +97,17 @@ async function quickRegister() {
     }
 }
 
-// ── Slot picker ────────────────────────────────────────────────────────────────
-const slotsLoading   = ref(false);
-const slots          = ref([]);
-const hasSchedule    = ref(false);
-const slotInterval   = ref(15);
-const selectedDate   = ref('');
-const showManualTime = ref(false);
-
-// Gera horários padrão localmente (fallback quando médico não tem escala configurada)
-function generateFallbackSlots(date, interval) {
-    const result = [];
-    let min = 7 * 60; // 07:00
-    const end = 19 * 60; // 19:00
-    while (min < end) {
-        const h    = String(Math.floor(min / 60)).padStart(2, '0');
-        const m    = String(min % 60).padStart(2, '0');
-        const time = `${h}:${m}`;
-        result.push({ time, datetime: `${date}T${time}`, available: true });
-        min += interval;
-    }
-    return result;
-}
-
-async function loadSlots() {
-    const doctorId = form.value.doctor_id;
-    if (!doctorId || !selectedDate.value) { slots.value = []; return; }
-
-    slotsLoading.value = true;
-    const qs = new URLSearchParams({ doctor_id: doctorId, date: selectedDate.value });
-    if (props.editSchedule?.id) qs.set('schedule_id', props.editSchedule.id);
-
-    try {
-        const res = await fetch(`/panel/schedules/slots?${qs}`, {
-            headers: { Accept: 'application/json' },
-        });
-        if (res.ok) {
-            const json         = await res.json();
-            slotInterval.value = json.interval ?? 15;
-            hasSchedule.value  = json.has_schedule ?? false;
-            // Se tem escala configurada usa os slots do backend; senão gera localmente
-            slots.value = json.has_schedule
-                ? (json.slots ?? [])
-                : generateFallbackSlots(selectedDate.value, json.interval ?? 15);
-        }
-    } catch { /**/ }
-    slotsLoading.value = false;
-}
-
-function selectSlot(slot) {
-    form.value.date_time = slot.datetime;
-    showManualTime.value = false;
-    loadResources();
-}
-
-function clearSlot() {
-    form.value.date_time  = '';
-    resources.value       = [];
-    resourcesLoaded.value = false;
-}
-
-function slotBtnClass(slot) {
-    if (form.value.date_time === slot.datetime) return 'btn-primary';
-    if (!slot.available)                        return 'btn-secondary opacity-50';
-    return 'btn-outline-primary';
-}
-
-const selectedDateTimeLabel = computed(() => {
-    if (!form.value.date_time) return '';
-    try {
-        const locale = window.sessionLocale ?? 'pt-BR';
-        const dt     = new Date(form.value.date_time + ':00');
-        const d      = dt.toLocaleDateString(locale, { weekday: 'short', day: '2-digit', month: 'short' });
-        const h      = dt.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-        return `${d} · ${h}`;
-    } catch { return form.value.date_time; }
-});
-
-function addDaysToSelected(n) {
-    if (!selectedDate.value) return;
-    const dt = new Date(selectedDate.value + 'T12:00:00');
-    dt.setDate(dt.getDate() + n);
-    selectedDate.value = dt.toISOString().substring(0, 10);
-    clearSlot();
-}
-
-watch(() => form.value.doctor_id, () => { clearSlot(); loadSlots(); });
-watch(selectedDate, () => { clearSlot(); loadSlots(); });
-
-// ── Resources ──────────────────────────────────────────────────────────────────
+// ── Recursos ───────────────────────────────────────────────────────────────────
 const resources        = ref([]);
 const resourcesLoaded  = ref(false);
 const resourcesLoading = ref(false);
 
-async function loadResources() {
-    if (!form.value.date_time) return;
+async function loadResources(dt) {
+    if (!dt) return;
     resourcesLoading.value = true;
     resourcesLoaded.value  = false;
-    const sid = props.editSchedule?.id;
-    const qs  = new URLSearchParams({ date_time: form.value.date_time });
-    if (sid) qs.set('schedule_id', sid);
+    const qs = new URLSearchParams({ date_time: dt });
+    if (props.editSchedule?.id) qs.set('schedule_id', props.editSchedule.id);
     try {
         const res = await fetch(`/panel/schedules/resources?${qs}`, {
             headers: { Accept: 'application/json' },
@@ -204,72 +120,101 @@ async function loadResources() {
     resourcesLoading.value = false;
 }
 
-// ── Open / close ───────────────────────────────────────────────────────────────
-watch(() => props.open, (open) => {
-    if (!open) return;
-    errors.value       = {};
-    saving.value       = false;
-    showManualTime.value = false;
-    patientResults.value = [];
-    showQuickReg.value   = false;
-    quickName.value      = '';
+// Reage a mudanças no datetime selecionado (via SlotPicker ou override manual)
+watch(
+    () => form.value.date_time,
+    (dt) => {
+        if (dt) {
+            loadResources(dt);
+        } else {
+            resources.value       = [];
+            resourcesLoaded.value = false;
+        }
+    },
+);
 
-    if (props.editSchedule) {
-        const s  = props.editSchedule;
-        const dt = s.date_time ? s.date_time.substring(0, 16) : '';
-        selectedDate.value = dt ? dt.substring(0, 10) : '';
+// ── Abertura / fechamento do modal ─────────────────────────────────────────────
+watch(
+    () => props.open,
+    async (open) => {
+        if (!open) return;
 
-        form.value = {
-            doctor_id:          s.doctor_id ?? '',
-            patient_id:         s.patient_id ?? '',
-            full_name:          s.full_name ?? '',
-            date_time:          dt,
-            telephone:          s.telephone ?? '',
-            cellphone:          s.cellphone ?? '',
-            cellphone_whatsapp: s.cellphone_whatsapp ?? false,
-            notes:              s.notes ?? '',
-            covenant_id:        s.covenant_id ?? '',
-            visit_id:           s.visit_id ?? '',
-            resource_ids:       (s.resources ?? []).map(r => r.id),
-            waiting_list_id:    '',
-            use_recurrence:     false,
-            recurrence_type:    'weekly',
-            recurrence_until:   '',
-        };
-        patientSearch.value = s.full_name ?? '';
-        loadResources();
-    } else {
-        const p = props.prefillData;
-        selectedDate.value = props.defaultDate || new Date().toISOString().substring(0, 10);
+        // Reset campos auxiliares
+        errors.value         = {};
+        saving.value         = false;
+        patientResults.value = [];
+        showQuickReg.value   = false;
+        quickName.value      = '';
+        resources.value      = [];
+        resourcesLoaded.value = false;
 
-        form.value = {
-            doctor_id:          p?.doctor_id ?? (props.doctors.length === 1 ? props.doctors[0].id : ''),
-            patient_id:         p?.patient_id ?? '',
-            full_name:          p?.full_name ?? '',
-            date_time:          '',
-            telephone:          p?.telephone ?? '',
-            cellphone:          p?.cellphone ?? '',
-            cellphone_whatsapp: p?.cellphone_whatsapp ?? false,
-            notes:              p?.notes ?? '',
-            covenant_id:        p?.covenant_id ?? '',
-            visit_id:           p?.visit_id ?? '',
-            resource_ids:       [],
-            waiting_list_id:    p?.id ?? '',
-            use_recurrence:     false,
-            recurrence_type:    'weekly',
-            recurrence_until:   '',
-        };
-        patientSearch.value = p?.full_name ?? '';
-        slots.value         = [];
-        resources.value     = [];
-    }
-});
+        if (props.editSchedule) {
+            const s    = props.editSchedule;
+            const dt   = s.date_time ? s.date_time.substring(0, 16) : '';
+            const date = dt.substring(0, 10);
 
-// ── Submit ─────────────────────────────────────────────────────────────────────
+            form.value = {
+                doctor_id:          s.doctor_id ?? '',
+                patient_id:         s.patient_id ?? '',
+                full_name:          s.full_name ?? '',
+                date_time:          dt,
+                telephone:          s.telephone ?? '',
+                cellphone:          s.cellphone ?? '',
+                cellphone_whatsapp: s.cellphone_whatsapp ?? false,
+                notes:              s.notes ?? '',
+                covenant_id:        s.covenant_id ?? '',
+                visit_id:           s.visit_id ?? '',
+                resource_ids:       (s.resources ?? []).map(r => r.id),
+                waiting_list_id:    '',
+                use_recurrence:     false,
+                recurrence_type:    'weekly',
+                recurrence_until:   '',
+            };
+            patientSearch.value = s.full_name ?? '';
+
+            // Navega o SlotPicker para a data do agendamento
+            await nextTick();
+            slotPickerRef.value?.setDate(date);
+        } else {
+            const initDate = props.defaultDate || new Date().toISOString().substring(0, 10);
+            const p        = props.prefillData;
+
+            const prefillDatetime = p?.date_time ?? '';
+
+            form.value = {
+                doctor_id:          p?.doctor_id ?? (props.doctors.length === 1 ? props.doctors[0].id : ''),
+                patient_id:         p?.patient_id ?? '',
+                full_name:          p?.full_name ?? '',
+                date_time:          prefillDatetime,
+                telephone:          p?.telephone ?? '',
+                cellphone:          p?.cellphone ?? '',
+                cellphone_whatsapp: p?.cellphone_whatsapp ?? false,
+                notes:              p?.notes ?? '',
+                covenant_id:        p?.covenant_id ?? '',
+                visit_id:           p?.visit_id ?? '',
+                resource_ids:       [],
+                waiting_list_id:    p?.id ?? '',
+                use_recurrence:     false,
+                recurrence_type:    'weekly',
+                recurrence_until:   '',
+            };
+            patientSearch.value = p?.full_name ?? '';
+
+            // Navega o SlotPicker para a data; se há datetime prefill o slot fica pré-selecionado
+            const resetDate = prefillDatetime
+                ? prefillDatetime.substring(0, 10)
+                : initDate;
+            await nextTick();
+            slotPickerRef.value?.reset(resetDate);
+        }
+    },
+);
+
+// ── Envio do formulário ────────────────────────────────────────────────────────
 const isEdit    = computed(() => !!props.editSchedule);
 const submitUrl = computed(() =>
     isEdit.value
-        ? props.editSchedule.update_url ?? `/panel/schedules/${props.editSchedule.id}`
+        ? (props.editSchedule.update_url ?? `/panel/schedules/${props.editSchedule.id}`)
         : props.storeUrl,
 );
 
@@ -335,98 +280,25 @@ async function onSubmit() {
             </div>
 
             <!-- ════════════════════════════════════════════════════════════
-                 SELETOR DE DATA E HORÁRIO
+                 SELETOR DE DATA E HORÁRIO — componente SlotPicker
                  ════════════════════════════════════════════════════════════ -->
             <div class="mb-3">
                 <label class="form-label fw-semibold">
                     {{ t.form_date_time }} <span class="text-danger">*</span>
                 </label>
 
-                <!-- Erro de validação -->
-                <div v-if="errors.date_time" class="text-danger small mb-1">
+                <div v-if="errors.date_time" class="text-danger small mb-2">
                     <i class="fas fa-exclamation-circle me-1"></i>{{ errors.date_time[0] }}
                 </div>
 
-                <!-- Seletor de data com navegação rápida -->
-                <div class="input-group input-group-sm mb-2">
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            :disabled="!selectedDate"
-                            @click="addDaysToSelected(-1)">
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <input v-model="selectedDate"
-                           type="date"
-                           class="form-control text-center fw-semibold">
-                    <button type="button"
-                            class="btn btn-outline-secondary"
-                            :disabled="!selectedDate"
-                            @click="addDaysToSelected(1)">
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
-
-                <!-- Mensagem: selecione o médico -->
-                <p v-if="!form.doctor_id" class="text-muted small mb-1">
-                    <i class="fas fa-user-md me-1"></i>{{ t.form_select_doctor_first }}
-                </p>
-
-                <!-- Mensagem: selecione a data -->
-                <p v-else-if="!selectedDate" class="text-muted small mb-1">
-                    <i class="fas fa-calendar me-1"></i>{{ t.form_select_date_first }}
-                </p>
-
-                <!-- Carregando -->
-                <div v-else-if="slotsLoading" class="py-1">
-                    <span class="spinner-border spinner-border-sm text-primary me-1"></span>
-                    <span class="text-muted small">{{ t.form_loading_slots }}</span>
-                </div>
-
-                <!-- Grid de horários (idêntico ao visual Alpine.js) -->
-                <div v-else-if="slots.length > 0">
-                    <div class="d-flex flex-wrap gap-1 mt-1">
-                        <button v-for="slot in slots"
-                                :key="slot.datetime"
-                                type="button"
-                                class="btn px-2 py-1"
-                                style="font-size:.78rem; min-width:52px;"
-                                :class="slotBtnClass(slot)"
-                                :disabled="!slot.available && form.date_time !== slot.datetime"
-                                :title="!slot.available && form.date_time !== slot.datetime ? t.form_slot_occupied : slot.time"
-                                @click="selectSlot(slot)">
-                            {{ slot.time }}
-                        </button>
-                    </div>
-                    <!-- Hint de intervalo — igual ao Alpine -->
-                    <small class="text-muted mt-2 d-block">
-                        <i class="fas fa-info-circle me-1"></i>
-                        {{ t.form_interval_hint?.replace(':min', slotInterval) ?? `Intervalo de ${slotInterval} min` }}
-                        <span v-if="!hasSchedule"> {{ t.form_no_scale }}</span>
-                    </small>
-                </div>
-
-                <!-- Nenhum slot disponível -->
-                <p v-else class="text-muted small mb-1">
-                    <i class="fas fa-clock me-1"></i>{{ t.form_no_slots }}
-                </p>
-
-                <!-- Override manual -->
-                <div class="mt-2">
-                    <button type="button"
-                            class="btn btn-link btn-sm p-0 text-muted text-decoration-none"
-                            style="font-size:.78rem;"
-                            @click="showManualTime = !showManualTime">
-                        <i class="fas fa-pencil-alt me-1"></i>{{ t.form_manual_override }}
-                    </button>
-                    <div v-if="showManualTime" class="mt-1">
-                        <input v-model="form.date_time"
-                               type="datetime-local"
-                               class="form-control form-control-sm"
-                               :class="{ 'is-invalid': errors.date_time }"
-                               @change="loadResources">
-                        <div v-if="errors.date_time" class="invalid-feedback">{{ errors.date_time[0] }}</div>
-                    </div>
-                </div>
+                <SlotPicker
+                    v-if="open"
+                    ref="slotPickerRef"
+                    v-model="form.date_time"
+                    :doctor-id="form.doctor_id"
+                    :schedule-id="editSchedule?.id ?? null"
+                    :t="t"
+                />
             </div>
 
             <!-- ── Paciente ──────────────────────────────────────────────── -->
@@ -511,23 +383,23 @@ async function onSubmit() {
                 </div>
             </div>
 
-            <!-- ── Recursos ──────────────────────────────────────────────── -->
+            <!-- ── Recursos da clínica ───────────────────────────────────── -->
             <div v-if="form.date_time" class="mb-3">
                 <label class="form-label fw-semibold">
                     {{ t.form_resources }}
                     <small class="text-muted fw-normal">{{ t.form_resources_opt }}</small>
                 </label>
-                <!-- Carregando -->
-                <div v-if="resourcesLoading" class="py-1">
-                    <span class="spinner-border spinner-border-sm text-secondary me-1"></span>
+
+                <div v-if="resourcesLoading" class="py-1 d-flex align-items-center gap-2">
+                    <span class="spinner-border spinner-border-sm text-secondary"></span>
                     <span class="text-muted small">{{ t.loading }}</span>
                 </div>
-                <!-- Sem recursos cadastrados na clínica -->
+
                 <p v-else-if="resourcesLoaded && resources.length === 0"
                    class="text-muted small mb-0">
                     <i class="fas fa-info-circle me-1"></i>{{ t.form_no_resources }}
                 </p>
-                <!-- Lista de recursos -->
+
                 <div v-else class="d-flex flex-wrap gap-3">
                     <div v-for="r in resources" :key="r.id" class="form-check">
                         <input :id="`res-${r.id}`"

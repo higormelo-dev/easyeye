@@ -11,6 +11,7 @@ use App\Services\Financial\CashFlowService;
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\{Request, Response};
 use Illuminate\Support\Facades\Gate;
+use Inertia\{Inertia, Response as InertiaResponse};
 use Throwable;
 use ZipArchive;
 
@@ -65,28 +66,30 @@ class FinancialReportsController extends Controller
             ])
             ->values();
 
-        $meta = [
-            'title'       => __('financial.cashflow.title'),
-            'action'      => __('financial.financial'),
+        return Inertia::render('Panel/Financial/Reports/CashFlow', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('financial.financial'), 'url' => route('panel.financial.bi.index'), 'active' => false],
-                ['label' => __('financial.cashflow.breadcrumb'), 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'),     'url' => route('panel.dashboard'),                'active' => false],
+                ['label' => __('financial.financial'),            'url' => route('panel.financial.bi.index'),       'active' => false],
+                ['label' => __('financial.cashflow.breadcrumb'),  'url' => '#',                                      'active' => true],
             ],
-        ];
-
-        return view('system.financial.reports.cashflow', compact(
-            'meta',
-            'entries',
-            'summary',
-            'byCategory',
-            'byDay',
-            'from',
-            'to',
-        ));
+            'filters'    => ['from' => $from, 'to' => $to],
+            'summary'    => $summary,
+            'byCategory' => $byCategory->values()->all(),
+            'byDay'      => $byDay->values()->all(),
+            'entries'    => $entries->map(fn ($e) => [
+                'entry_date'    => $e->entry_date?->format('d/m/Y'),
+                'description'   => $e->description,
+                'category_name' => $e->category?->name,
+                'covenant_name' => $e->covenant?->name,
+                'type'          => $e->type instanceof \BackedEnum ? $e->type->value : $e->type,
+                'amount'        => (float) $e->amount,
+            ]),
+            'export_url' => route('panel.financial.reports.cash-flow.export'),
+            't'          => trans('financial'),
+        ]);
     }
 
-    public function covenants(Request $request)
+    public function covenants(Request $request): InertiaResponse
     {
         $entity   = $this->authorizeFinancial();
         $entityId = (string) $entity->id;
@@ -124,24 +127,18 @@ class FinancialReportsController extends Controller
             ->sortByDesc('amount')
             ->values();
 
-        $meta = [
-            'title'       => __('financial.covenants.title'),
-            'action'      => __('financial.financial'),
+        return Inertia::render('Panel/Financial/Reports/Covenants', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('financial.financial'), 'url' => route('panel.financial.bi.index'), 'active' => false],
-                ['label' => __('financial.covenants.breadcrumb'), 'url' => 'javascript:void(0)', 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'),       'url' => route('panel.dashboard'),          'active' => false],
+                ['label' => __('financial.financial'),              'url' => route('panel.financial.bi.index'), 'active' => false],
+                ['label' => __('financial.covenants.breadcrumb'),   'url' => '#',                                'active' => true],
             ],
-        ];
-
-        return view('system.financial.reports.covenants', compact(
-            'meta',
-            'claims',
-            'summary',
-            'byCovenant',
-            'from',
-            'to',
-        ));
+            'filters'    => ['from' => $from, 'to' => $to],
+            'summary'    => $summary,
+            'byCovenant' => $byCovenant->values()->all(),
+            'export_url' => route('panel.financial.reports.covenants.export'),
+            't'          => trans('financial'),
+        ]);
     }
 
     public function exportCashFlowCsv(Request $request)

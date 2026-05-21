@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { usePage, router } from '@inertiajs/vue3';
 import logoSvg from '@img/system/logo.svg';
 import logoSmallSvg from '@img/system/logo-small.svg';
@@ -151,6 +151,52 @@ function logout() {
 function exitImpersonation() {
     router.delete(route('manager.impersonate.destroy'));
 }
+
+// ── Flash messages (Vue-controlled + auto-dismiss 6s) ─────────────────────
+const flashSuccessOpen = ref(false);
+const flashErrorOpen   = ref(false);
+let flashSuccessTimer  = null;
+let flashErrorTimer    = null;
+
+function dismissSuccess() {
+    flashSuccessOpen.value = false;
+    clearTimeout(flashSuccessTimer);
+}
+
+function dismissError() {
+    flashErrorOpen.value = false;
+    clearTimeout(flashErrorTimer);
+}
+
+// Reabre/reseta o timer sempre que o flash muda (nova navegação Inertia)
+watch(
+    () => flash.value.success,
+    (val) => {
+        clearTimeout(flashSuccessTimer);
+        if (val) {
+            flashSuccessOpen.value = true;
+            flashSuccessTimer = setTimeout(() => { flashSuccessOpen.value = false; }, 6000);
+        }
+    },
+    { immediate: true },
+);
+
+watch(
+    () => flash.value.error,
+    (val) => {
+        clearTimeout(flashErrorTimer);
+        if (val) {
+            flashErrorOpen.value = true;
+            flashErrorTimer = setTimeout(() => { flashErrorOpen.value = false; }, 6000);
+        }
+    },
+    { immediate: true },
+);
+
+onUnmounted(() => {
+    clearTimeout(flashSuccessTimer);
+    clearTimeout(flashErrorTimer);
+});
 </script>
 
 <template>
@@ -178,6 +224,9 @@ function exitImpersonation() {
                 </div>
 
                 <div class="d-flex align-items-center">
+                    <!-- Contextual top actions (ex.: IA em páginas clínicas) -->
+                    <slot name="top-actions" />
+
                     <!-- Locale selector -->
                     <div class="header-item" v-if="locales.length > 1">
                         <div class="dropdown me-2">
@@ -202,14 +251,6 @@ function exitImpersonation() {
                         <button class="topbar-link btn btn-icon" type="button" @click="toggleDark">
                             <i :class="isDark ? 'ti ti-sun fs-16' : 'ti ti-moon fs-16'"></i>
                         </button>
-                    </div>
-
-                    <!-- Impersonation badge -->
-                    <div v-if="auth.impersonating" class="header-item me-2">
-                        <span class="badge bg-warning text-dark">
-                            <i class="ti ti-user-check me-1"></i>
-                            {{ auth.impersonating.original_name }}
-                        </span>
                     </div>
 
                     <!-- User dropdown -->
@@ -408,33 +449,34 @@ function exitImpersonation() {
                 </button>
             </div>
 
-            <!-- Flash messages -->
-            <div v-if="flash.success" class="alert alert-success alert-dismissible m-3 mb-0" role="alert">
-                <i class="ti ti-circle-check me-1"></i> {{ flash.success }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            <div v-if="flash.error" class="alert alert-danger alert-dismissible m-3 mb-0" role="alert">
-                <i class="ti ti-alert-circle me-1"></i> {{ flash.error }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+            <!-- Flash messages (Vue-controlled — auto-dismiss 6s + botão X funcional) -->
+            <transition name="flash">
+                <div v-if="flashSuccessOpen && flash.success" class="alert alert-success m-3 mb-0 d-flex align-items-center gap-2" role="alert">
+                    <i class="ti ti-circle-check fs-16"></i>
+                    <span class="flex-grow-1">{{ flash.success }}</span>
+                    <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissSuccess"></button>
+                </div>
+            </transition>
+            <transition name="flash">
+                <div v-if="flashErrorOpen && flash.error" class="alert alert-danger m-3 mb-0 d-flex align-items-center gap-2" role="alert">
+                    <i class="ti ti-alert-circle fs-16"></i>
+                    <span class="flex-grow-1">{{ flash.error }}</span>
+                    <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissError"></button>
+                </div>
+            </transition>
 
             <div class="content">
                 <!-- Breadcrumbs -->
-                <div v-if="breadcrumbs.length" class="page-header">
-                    <div class="page-title">
-                        <h4 v-if="title">{{ title }}</h4>
-                    </div>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb">
-                            <li v-for="(crumb, i) in breadcrumbs" :key="i"
-                                class="breadcrumb-item"
-                                :class="{ active: crumb.active }">
-                                <a v-if="!crumb.active" :href="crumb.url">{{ crumb.label }}</a>
-                                <span v-else>{{ crumb.label }}</span>
-                            </li>
-                        </ol>
-                    </nav>
-                </div>
+                <nav v-if="breadcrumbs.length" aria-label="breadcrumb" class="d-flex justify-content-end mb-2">
+                    <ol class="breadcrumb mb-0 app-breadcrumb">
+                        <li v-for="(crumb, i) in breadcrumbs" :key="i"
+                            class="breadcrumb-item"
+                            :class="{ active: crumb.active }">
+                            <a v-if="!crumb.active" :href="crumb.url">{{ crumb.label }}</a>
+                            <span v-else class="breadcrumb-active">{{ crumb.label }}</span>
+                        </li>
+                    </ol>
+                </nav>
 
                 <!-- Page content -->
                 <slot />
@@ -444,3 +486,11 @@ function exitImpersonation() {
 
     </div>
 </template>
+
+<style scoped>
+/* Flash messages: fade + slide suave */
+.flash-enter-active,
+.flash-leave-active { transition: opacity .25s ease, transform .25s ease; }
+.flash-enter-from,
+.flash-leave-to     { opacity: 0; transform: translateY(-6px); }
+</style>
