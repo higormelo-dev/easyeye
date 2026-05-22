@@ -24,6 +24,7 @@ use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Sentry\Laravel\Integration;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -37,6 +38,45 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // ─────────────────────────────────────────────────────────────────
+        // SaaS atrás de proxy reverso (SaveInCloud, Cloudflare, balancer
+        // do hosting). Sem isso o Laravel ignora X-Forwarded-* e gera URLs
+        // com `Host: _` (server_name catch-all do Nginx) ou esquema `http://`
+        // mesmo o cliente acessando via HTTPS.
+        //
+        // - at: '*'  — confiar em qualquer IP que se apresente como proxy.
+        //              É a opção pragmática em hosting compartilhado onde o
+        //              IP do load balancer pode mudar. Mitigamos o risco de
+        //              Host Header Injection com trustHosts() abaixo.
+        // - headers  — habilita todos os X-Forwarded-* relevantes para que
+        //              URL::generator use Host/Port/Proto do cliente real.
+        // ─────────────────────────────────────────────────────────────────
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                   | Request::HEADER_X_FORWARDED_HOST
+                   | Request::HEADER_X_FORWARDED_PORT
+                   | Request::HEADER_X_FORWARDED_PROTO
+                   | Request::HEADER_X_FORWARDED_AWS_ELB,
+        );
+
+        // ─────────────────────────────────────────────────────────────────
+        // Allowlist de hosts — defesa contra Host Header Injection.
+        //
+        // Sem isso, com `trustProxies('*')` qualquer cliente poderia enviar
+        // `X-Forwarded-Host: site-malicioso.com` e o Laravel geraria links
+        // (e-mails de pacientes, reset de senha, redirects) apontando para
+        // o domínio do atacante. Em LGPD isso caracteriza incidente
+        // reportável à ANPD.
+        //
+        // O middleware só age fora do ambiente `local`, então o dev local
+        // (APP_URL=http://localhost:8085) não é afetado.
+        // ─────────────────────────────────────────────────────────────────
+        $middleware->trustHosts(at: [
+            'easyeye.app',
+            'teste.easyeye.app',
+        ], subdomains: true);
+
         $middleware->alias([
             'entity.selected'      => EnsureEntitySelected::class,
             'entity.member'        => EnsureUserBelongsToEntity::class,

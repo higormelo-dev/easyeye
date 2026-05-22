@@ -2,7 +2,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "npm run tinymce:install && vite build && vite build --ssr",
+        "build": "npm run tinymce:install && NODE_OPTIONS='--max-old-space-size=800' vite build && NODE_OPTIONS='--max-old-space-size=800' vite build --ssr",
         "dev": "vite",
         "ssr": "node bootstrap/ssr/ssr.js",
         "tinymce:install": "rm -rf public/vendor/tinymce public/vendor/tinymce-langs && mkdir -p public/vendor/tinymce public/vendor/tinymce-langs/langs7 && cp -r node_modules/tinymce/. public/vendor/tinymce/ && cp node_modules/tinymce-i18n/langs7/pt_BR.js public/vendor/tinymce-langs/langs7/",
