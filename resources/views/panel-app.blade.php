@@ -9,6 +9,11 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- LGPD/CFM: painel autenticado contém dados de paciente (PII + dados
+         sensíveis de saúde). Bloqueia indexação por buscadores e prévia
+         em redes sociais — qualquer link compartilhado por engano de um
+         médico não deve gerar cache externo com PII. --}}
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
     <title>{{ config('app.name', 'EasyEye') }}</title>
     {{-- Favicon: SVG escalonável (browsers modernos) + ICO fallback + PNG 192 PWA --}}
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">

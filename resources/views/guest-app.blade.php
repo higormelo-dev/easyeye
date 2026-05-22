@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- LGPD: páginas de autenticação não devem ser indexadas por buscadores
+         ou cacheadas por crawlers de redes sociais (token de reset pode vazar). --}}
+    <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
     {{-- Favicon: SVG escalonável (browsers modernos) + ICO fallback + PNG 192 PWA --}}
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
