@@ -79,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
     {
         if (app()->environment(['production', 'testing'])) {
             URL::forceScheme('https');
+            URL::forceRootUrl(config('app.url'));
         }
 
         Paginator::useBootstrapFive();
