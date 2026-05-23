@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Manager\{
+    AiCreditPurchasesController,
     EntitiesController,
     EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
@@ -91,6 +92,29 @@ Route::group([
         ->middleware('throttle:manager-destructive')
         ->name('partners.destroy');
     Route::resource('partners', PartnersController::class)->except('create', 'edit', 'show', 'destroy');
+
+    // ── Compra de créditos IA ──────────────────────────────────────────────────
+    // Gerencia pedidos das clínicas: aprovar pagamento (creditar), cancelar,
+    // marcar falha de gateway, ou reembolsar (estornar wallet).
+    //
+    // Autorização granular via Gates SaaS dentro do controller — credit/fail
+    // exigem `saas.financial`, cancel `saas.support`, refund `saas.admin-panel`.
+    Route::get('ai-credit-purchases', [AiCreditPurchasesController::class, 'index'])
+        ->name('ai-credit-purchases.index');
+    Route::get('ai-credit-purchases/{purchase}', [AiCreditPurchasesController::class, 'show'])
+        ->name('ai-credit-purchases.show');
+    Route::patch('ai-credit-purchases/{purchase}/credit', [AiCreditPurchasesController::class, 'credit'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-credit-purchases.credit');
+    Route::patch('ai-credit-purchases/{purchase}/cancel', [AiCreditPurchasesController::class, 'cancel'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-credit-purchases.cancel');
+    Route::patch('ai-credit-purchases/{purchase}/fail', [AiCreditPurchasesController::class, 'markFailed'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-credit-purchases.fail');
+    Route::patch('ai-credit-purchases/{purchase}/refund', [AiCreditPurchasesController::class, 'refund'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-credit-purchases.refund');
 
     // ── Gateways de Pagamento ──────────────────────────────────────────────────
     Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');

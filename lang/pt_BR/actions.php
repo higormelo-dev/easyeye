@@ -250,6 +250,7 @@ return [
         'reports'               => 'Relatórios',
         'resources'             => 'Recursos',
         'partners'              => 'Parceiros',
+        'ai_credit_purchases'   => 'Compras de créditos IA',
         'financial'             => 'Financeiro',
         'cash_flow'             => 'Fluxo de caixa',
         'tiss_billing'          => 'Faturamento TISS',

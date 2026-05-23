@@ -142,6 +142,63 @@ class AiCreditWalletService
         );
     }
 
+    /**
+     * Estorna créditos de uma compra já creditada (refund administrativo do Manager).
+     *
+     * Debita o `amount` do balance e do lifetime_purchased — ao contrário do
+     * `refund()` (que credita devolução de consumo). Cria entrada do tipo
+     * Adjustment com metadata['adjustment_reason']='purchase_refund'.
+     *
+     * Permite saldo negativo: se a clínica já consumiu parte dos créditos
+     * comprados, o estorno fica em débito. Isso é registro contábil correto —
+     * a área financeira do SaaS decide se cobra o débito ou absorve. Não
+     * podemos REVERTER consumo (PDFs já foram emitidos, dados gravados em
+     * audit_logs); só registramos o estorno e marcamos a wallet.
+     *
+     * Idempotente via idempotencyKey.
+     */
+    public function revokePurchaseCredits(
+        string $entityId,
+        int $amount,
+        ?string $subscriptionId = null,
+        ?string $description = null,
+        ?string $idempotencyKey = null,
+        ?string $createdBy = null,
+        ?array $metadata = null,
+    ): AiCreditLedgerEntry {
+        $this->assertPositiveAmount($amount);
+
+        return DB::transaction(function () use (
+            $entityId,
+            $amount,
+            $subscriptionId,
+            $description,
+            $idempotencyKey,
+            $createdBy,
+            $metadata,
+        ): AiCreditLedgerEntry {
+            if ($existing = $this->findIdempotentEntry($idempotencyKey, $entityId, AiLedgerEntryType::Adjustment)) {
+                return $existing;
+            }
+
+            $wallet = $this->lockWallet($entityId);
+            $wallet->balance -= $amount;
+            $wallet->lifetime_purchased = max(0, $wallet->lifetime_purchased - $amount);
+            $wallet->save();
+
+            return $this->createLedgerEntry(
+                wallet: $wallet,
+                type: AiLedgerEntryType::Adjustment,
+                amount: -$amount,
+                subscriptionId: $subscriptionId,
+                description: $description ?? 'Estorno administrativo de compra de créditos IA.',
+                idempotencyKey: $idempotencyKey,
+                createdBy: $createdBy,
+                metadata: array_merge($metadata ?? [], ['adjustment_reason' => 'purchase_refund']),
+            );
+        });
+    }
+
     public function reserve(
         string $entityId,
         int $amount,

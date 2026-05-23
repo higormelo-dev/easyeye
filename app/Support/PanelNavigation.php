@@ -230,6 +230,13 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.partners'),
                 'match' => ['manager.partners.*'],
             ],
+            [
+                'key'   => 'ai-credit-purchases',
+                'route' => 'manager.ai-credit-purchases.index',
+                'icon'  => 'ti ti-coin',
+                'label' => __('actions.sidemenu.ai_credit_purchases'),
+                'match' => ['manager.ai-credit-purchases.*'],
+            ],
 
             // ── Controle de acesso ──────────────────────────────────────────
             // Agrupa identidade + autenticação (usuários + 2FA da entity SaaS).

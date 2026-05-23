@@ -97,6 +97,137 @@ class AiCreditPurchaseService
         });
     }
 
+    /**
+     * Cancela um pedido pendente (cliente desistiu OU admin SaaS rejeitou).
+     * Idempotente: chamadas repetidas em pedidos já cancelados retornam o mesmo
+     * registro. Pedidos já creditados/refundados/com falha lançam exceção.
+     */
+    public function cancelPurchase(
+        AiCreditPurchase $purchase,
+        ?string $reason = null,
+        ?string $createdBy = null,
+    ): AiCreditPurchase {
+        return DB::transaction(function () use ($purchase, $reason, $createdBy): AiCreditPurchase {
+            $locked = AiCreditPurchase::query()
+                ->whereKey($purchase->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($locked->status === AiCreditPurchaseStatus::Cancelled) {
+                return $locked;
+            }
+
+            if ($locked->status !== AiCreditPurchaseStatus::PendingPayment) {
+                throw new DomainException('ai_credit_purchase_not_cancellable');
+            }
+
+            $locked->update([
+                'status'       => AiCreditPurchaseStatus::Cancelled->value,
+                'cancelled_at' => now(),
+                'metadata'     => array_merge((array) $locked->metadata, [
+                    'cancel_reason' => $reason,
+                    'cancelled_by'  => $createdBy,
+                ]),
+            ]);
+
+            return $locked->fresh();
+        });
+    }
+
+    /**
+     * Marca pedido como falha de pagamento (gateway recusou).
+     * Separado de `cancelled` para métricas de funil — `failed` indica problema
+     * de checkout/gateway, `cancelled` indica desistência do cliente.
+     */
+    public function markAsFailed(
+        AiCreditPurchase $purchase,
+        ?string $reason = null,
+        ?string $createdBy = null,
+    ): AiCreditPurchase {
+        return DB::transaction(function () use ($purchase, $reason, $createdBy): AiCreditPurchase {
+            $locked = AiCreditPurchase::query()
+                ->whereKey($purchase->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($locked->status === AiCreditPurchaseStatus::Failed) {
+                return $locked;
+            }
+
+            if ($locked->status !== AiCreditPurchaseStatus::PendingPayment) {
+                throw new DomainException('ai_credit_purchase_not_failable');
+            }
+
+            $locked->update([
+                'status'    => AiCreditPurchaseStatus::Failed->value,
+                'failed_at' => now(),
+                'metadata'  => array_merge((array) $locked->metadata, [
+                    'failure_reason' => $reason,
+                    'failed_by'      => $createdBy,
+                ]),
+            ]);
+
+            return $locked->fresh();
+        });
+    }
+
+    /**
+     * Estorna créditos de uma compra já creditada.
+     *
+     * Comportamento crítico: se a clínica já consumiu parte dos créditos,
+     * o balance pode ficar NEGATIVO. Isso é registro contábil correto —
+     * não podemos reverter PDFs gerados, dados clínicos persistidos ou
+     * audit logs. O Manager precisa decidir se cobra o débito ou absorve.
+     *
+     * Idempotente via campo `refunded_at`.
+     */
+    public function refundPurchase(
+        AiCreditPurchase $purchase,
+        ?string $reason = null,
+        ?string $createdBy = null,
+    ): AiCreditPurchase {
+        return DB::transaction(function () use ($purchase, $reason, $createdBy): AiCreditPurchase {
+            $locked = AiCreditPurchase::query()
+                ->whereKey($purchase->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($locked->status === AiCreditPurchaseStatus::Refunded) {
+                return $locked;
+            }
+
+            if ($locked->status !== AiCreditPurchaseStatus::Credited) {
+                throw new DomainException('ai_credit_purchase_not_refundable');
+            }
+
+            $this->walletService->revokePurchaseCredits(
+                entityId: (string) $locked->entity_id,
+                amount: (int) $locked->credits,
+                subscriptionId: $locked->subscription_id ? (string) $locked->subscription_id : null,
+                description: "Estorno administrativo da compra {$locked->id}.",
+                idempotencyKey: "ai-credit-purchase:{$locked->id}:refund",
+                createdBy: $createdBy,
+                metadata: [
+                    'ai_credit_purchase_id' => (string) $locked->id,
+                    'package_code'          => (string) $locked->package_code,
+                    'amount_cents'          => (int) $locked->amount_cents,
+                    'refund_reason'         => $reason,
+                ],
+            );
+
+            $locked->update([
+                'status'      => AiCreditPurchaseStatus::Refunded->value,
+                'refunded_at' => now(),
+                'metadata'    => array_merge((array) $locked->metadata, [
+                    'refund_reason' => $reason,
+                    'refunded_by'   => $createdBy,
+                ]),
+            ]);
+
+            return $locked->fresh();
+        });
+    }
+
     public function creditPaidPurchase(AiCreditPurchase $purchase, ?string $createdBy = null): AiCreditPurchase
     {
         return DB::transaction(function () use ($purchase, $createdBy): AiCreditPurchase {

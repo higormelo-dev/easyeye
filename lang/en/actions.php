@@ -249,6 +249,7 @@ return [
         'reports'               => 'Reports',
         'resources'             => 'Resources',
         'partners'              => 'Partners',
+        'ai_credit_purchases'   => 'AI credit purchases',
         'financial'             => 'Financial',
         'cash_flow'             => 'Cash Flow',
         'tiss_billing'          => 'TISS Billing',
