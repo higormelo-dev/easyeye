@@ -5,12 +5,17 @@
         "build": "npm run tinymce:install && NODE_OPTIONS='--max-old-space-size=800' vite build && NODE_OPTIONS='--max-old-space-size=800' vite build --ssr",
         "dev": "vite",
         "ssr": "node bootstrap/ssr/ssr.js",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:coverage": "vitest run --coverage",
         "tinymce:install": "rm -rf public/vendor/tinymce public/vendor/tinymce-langs && mkdir -p public/vendor/tinymce public/vendor/tinymce-langs/langs7 && cp -r node_modules/tinymce/. public/vendor/tinymce/ && cp node_modules/tinymce-i18n/langs7/pt_BR.js public/vendor/tinymce-langs/langs7/",
         "postinstall": "npm run tinymce:install"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.7",
+        "@vitest/coverage-v8": "^4.1.7",
         "@vue/server-renderer": "^3.5.34",
+        "@vue/test-utils": "^2.4.10",
         "autoprefixer": "^10.4.19",
         "axios": "^1.7.4",
         "baseline-browser-mapping": "^2.9.16",
@@ -22,11 +27,13 @@
         "gulp-rename": "^2.0.0",
         "gulp-sass": "^5.1.0",
         "gulp-uglify": "^3.0.2",
+        "happy-dom": "^20.9.0",
         "laravel-vite-plugin": "^1.2.0",
         "postcss": "^8.4.38",
         "sass": "^1.79.4",
         "tailwindcss": "^3.4.3",
-        "vite": "^6.0.11"
+        "vite": "^6.0.11",
+        "vitest": "^4.1.7"
     },
     "dependencies": {
         "@fortawesome/fontawesome-free": "^7.2.0",
