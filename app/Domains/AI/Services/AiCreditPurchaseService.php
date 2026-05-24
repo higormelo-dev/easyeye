@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Models\AiCreditPurchase;
-use App\Enums\AI\AiCreditPurchaseStatus;
+use App\Enums\AI\{AiCreditPurchaseStatus, AiProvider};
 use DomainException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -48,6 +48,7 @@ class AiCreditPurchaseService
     public function createPendingPurchase(
         string $entityId,
         string $packageCode,
+        ?AiProvider $provider = null,
         ?string $subscriptionId = null,
         ?string $requestedBy = null,
         ?string $idempotencyKey = null,
@@ -59,6 +60,7 @@ class AiCreditPurchaseService
         return DB::transaction(function () use (
             $entityId,
             $package,
+            $provider,
             $subscriptionId,
             $requestedBy,
             $idempotencyKey,
@@ -81,6 +83,7 @@ class AiCreditPurchaseService
                 'subscription_id' => $subscriptionId,
                 'requested_by'    => $requestedBy,
                 'package_code'    => (string) $package['code'],
+                'provider'        => $provider?->value,
                 'credits'         => (int) $package['credits'],
                 'amount_cents'    => (int) $package['price_cents'],
                 'currency'        => (string) config('ai.credit_purchases.currency', 'BRL'),
@@ -94,6 +97,67 @@ class AiCreditPurchaseService
                 ]),
                 'idempotency_key' => $idempotencyKey,
             ]);
+        });
+    }
+
+    /**
+     * Cria uma compra manual (cortesia/ajuste administrativo) e credita imediatamente
+     * no provedor especificado. Usado pelo manager para conceder créditos sem passar
+     * por gateway de pagamento.
+     *
+     * O `packageCode` aqui é livre — não precisa corresponder a um pacote do config.
+     * Útil para representar a operação no histórico ("manual_courtesy", "manual_internal").
+     */
+    public function createManualPurchase(
+        string $entityId,
+        int $credits,
+        string $reason,
+        string $createdBy,
+        ?AiProvider $provider = null,
+        int $amountCents = 0,
+        string $packageCode = 'manual',
+        ?string $subscriptionId = null,
+        ?array $metadata = null,
+    ): AiCreditPurchase {
+        if ($credits <= 0) {
+            throw new DomainException('ai_credit_purchase_invalid_credits');
+        }
+
+        $idempotencyKey = 'ai-credit-purchase:manual:' . (string) Str::uuid();
+
+        return DB::transaction(function () use (
+            $entityId,
+            $provider,
+            $credits,
+            $reason,
+            $createdBy,
+            $amountCents,
+            $packageCode,
+            $subscriptionId,
+            $metadata,
+            $idempotencyKey,
+        ): AiCreditPurchase {
+            $purchase = AiCreditPurchase::query()->create([
+                'entity_id'       => $entityId,
+                'subscription_id' => $subscriptionId,
+                'requested_by'    => $createdBy,
+                'package_code'    => $packageCode,
+                'provider'        => $provider?->value, // opcional — metadata, não controla saldo
+                'credits'         => $credits,
+                'amount_cents'    => max(0, $amountCents),
+                'currency'        => (string) config('ai.credit_purchases.currency', 'BRL'),
+                'status'          => AiCreditPurchaseStatus::PendingPayment->value,
+                'description'     => "Crédito manual: {$reason}",
+                'metadata' => array_merge($metadata ?? [], [
+                    'source'         => 'manager_manual',
+                    'manual_reason'  => $reason,
+                    'created_by'     => $createdBy,
+                    'provider_hint'  => $provider?->value,
+                ]),
+                'idempotency_key' => $idempotencyKey,
+            ]);
+
+            return $this->creditPaidPurchase($purchase, $createdBy);
         });
     }
 
@@ -254,6 +318,9 @@ class AiCreditPurchaseService
                 metadata: [
                     'ai_credit_purchase_id' => (string) $locked->id,
                     'package_code'          => (string) $locked->package_code,
+                    'provider_hint'         => $locked->provider instanceof AiProvider
+                        ? $locked->provider->value
+                        : ($locked->provider ? (string) $locked->provider : null),
                     'amount_cents'          => (int) $locked->amount_cents,
                     'currency'              => (string) $locked->currency,
                 ],

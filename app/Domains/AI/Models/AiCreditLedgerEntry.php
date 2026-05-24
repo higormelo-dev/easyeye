@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Models;
 
-use App\Enums\AI\AiLedgerEntryType;
+use App\Enums\AI\{AiLedgerEntryType, AiProvider};
 use App\Models\Entity;
 use App\Models\Subscription;
 use App\Models\User;
@@ -28,6 +28,7 @@ class AiCreditLedgerEntry extends Model
         'subscription_id',
         'ai_run_id',
         'type',
+        'provider',
         'amount',
         'balance_after',
         'description',
@@ -40,6 +41,7 @@ class AiCreditLedgerEntry extends Model
     {
         return [
             'type'          => AiLedgerEntryType::class,
+            'provider'      => AiProvider::class,
             'amount'        => 'integer',
             'balance_after' => 'integer',
             'metadata'      => 'array',

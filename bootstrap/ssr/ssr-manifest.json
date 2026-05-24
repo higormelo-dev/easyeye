@@ -59,20 +59,20 @@
     "/build/assets/ActionDropdown-CiJ85J4x.css"
   ],
   "resources/js/Components/Panel/ActionIconButton.vue": [
-    "/build/assets/ActionIconGroup-Dj2wQrik.js",
-    "/build/assets/ActionIconGroup-CN7Em_cz.css"
+    "/build/assets/ActionIconButton-BTsQtzdl.js",
+    "/build/assets/ActionIconButton-DcDR0XKf.css"
   ],
   "resources/js/Components/Panel/ActionIconButton.vue?vue&type=style&index=0&lang.css": [
-    "/build/assets/ActionIconGroup-Dj2wQrik.js",
-    "/build/assets/ActionIconGroup-CN7Em_cz.css"
+    "/build/assets/ActionIconButton-BTsQtzdl.js",
+    "/build/assets/ActionIconButton-DcDR0XKf.css"
   ],
   "resources/js/Components/Panel/ActionIconGroup.vue": [
-    "/build/assets/ActionIconGroup-Dj2wQrik.js",
-    "/build/assets/ActionIconGroup-CN7Em_cz.css"
+    "/build/assets/ActionIconGroup-B8JEjj1z.js",
+    "/build/assets/ActionIconGroup-db4KCjkl.css"
   ],
   "resources/js/Components/Panel/ActionIconGroup.vue?vue&type=style&index=0&scoped=1c9c59ba&lang.css": [
-    "/build/assets/ActionIconGroup-Dj2wQrik.js",
-    "/build/assets/ActionIconGroup-CN7Em_cz.css"
+    "/build/assets/ActionIconGroup-B8JEjj1z.js",
+    "/build/assets/ActionIconGroup-db4KCjkl.css"
   ],
   "resources/js/Components/Panel/BillingStateBadge.vue": [
     "/build/assets/BillingStateBadge-CJY8fYg_.js"
@@ -98,11 +98,11 @@
     "/build/assets/CardsPagination-B87u3Z8A.js"
   ],
   "resources/js/Components/Panel/MiniCalendar.vue": [
-    "/build/assets/Index-CDl6KKfJ.js",
+    "/build/assets/Index-BGvdsFG2.js",
     "/build/assets/Index-DCp98QmF.css"
   ],
   "resources/js/Components/Panel/MiniCalendar.vue?vue&type=style&index=0&scoped=2bb444a0&lang.css": [
-    "/build/assets/Index-CDl6KKfJ.js",
+    "/build/assets/Index-BGvdsFG2.js",
     "/build/assets/Index-DCp98QmF.css"
   ],
   "resources/js/Components/Panel/OffcanvasPanel.vue": [
@@ -114,7 +114,7 @@
     "/build/assets/OffcanvasPanel-DqyQ4YzK.css"
   ],
   "resources/js/Components/Panel/PageHeader.vue": [
-    "/build/assets/PageHeader-HN8TQqXs.js"
+    "/build/assets/PageHeader-CYjDf0Y-.js"
   ],
   "resources/js/Components/Panel/SearchInput.vue": [
     "/build/assets/SearchInput-DBX1PwVy.js"
@@ -135,6 +135,9 @@
   ],
   "resources/js/Components/Panel/TablePagination.vue": [
     "/build/assets/TablePagination-Dj1_H7YG.js"
+  ],
+  "resources/js/Components/Panel/TinyMceEditor.vue": [
+    "/build/assets/MedicalRecordForm-DO3rHoWx.js"
   ],
   "resources/js/Layouts/AppLayout.vue": [
     "/build/assets/AppLayout-CkzITmof.js",
@@ -198,14 +201,11 @@
     "/build/assets/VerifyEmail-BMBSFjp6.js",
     "/build/assets/email-verification-illustration-img-y-T_SkGr.png"
   ],
-  "resources/js/Pages/Panel/AI/Dashboard.vue": [
-    "/build/assets/Dashboard-BGeorI5C.js"
-  ],
   "resources/js/Pages/Panel/AI/Index.vue": [
-    "/build/assets/Index-BA9TFwA_.js"
+    "/build/assets/Index-BGoWN99A.js"
   ],
   "resources/js/Pages/Panel/Compliance/Index.vue": [
-    "/build/assets/Index-VVNkJ8zt.js"
+    "/build/assets/Index-HQq4LGiw.js"
   ],
   "resources/js/Pages/Panel/Dashboard.vue": [
     "/build/assets/Dashboard-CcZzmqEJ.js",
@@ -237,7 +237,7 @@
     "/build/assets/WelcomeBanner-CTT5czyj.js"
   ],
   "resources/js/Pages/Panel/Doctors/DoctorCards.vue": [
-    "/build/assets/DoctorCards-BVIP_XeN.js"
+    "/build/assets/DoctorCards-Boj1Qwn5.js"
   ],
   "resources/js/Pages/Panel/Doctors/DoctorDetailDrawer.vue": [
     "/build/assets/DoctorDetailDrawer-BWeEy27D.js",
@@ -251,15 +251,15 @@
     "/build/assets/DoctorFormModal-D9wqcHXq.js"
   ],
   "resources/js/Pages/Panel/Doctors/DoctorTable.vue": [
-    "/build/assets/DoctorTable-CCFEDLdU.js",
+    "/build/assets/DoctorTable-BQaDTcz6.js",
     "/build/assets/DoctorTable-Bpkh3KSw.css"
   ],
   "resources/js/Pages/Panel/Doctors/DoctorTable.vue?vue&type=style&index=0&scoped=3dd65b34&lang.css": [
-    "/build/assets/DoctorTable-CCFEDLdU.js",
+    "/build/assets/DoctorTable-BQaDTcz6.js",
     "/build/assets/DoctorTable-Bpkh3KSw.css"
   ],
   "resources/js/Pages/Panel/Doctors/Index.vue": [
-    "/build/assets/Index-DIo1ucT9.js"
+    "/build/assets/Index-DvtiLrs2.js"
   ],
   "resources/js/Pages/Panel/Doctors/WorkSchedule.vue": [
     "/build/assets/WorkSchedule-DM_ndWvY.js",
@@ -270,36 +270,72 @@
     "/build/assets/WorkSchedule-ByUSy0ES.css"
   ],
   "resources/js/Pages/Panel/EyeImages/Index.vue": [
-    "/build/assets/Index-fpU3VIOw.js",
-    "/build/assets/Index-zR71OdFx.css"
+    "/build/assets/Index-DY0HFRkY.js",
+    "/build/assets/Index-4Dyu4nZL.css"
   ],
-  "resources/js/Pages/Panel/EyeImages/Index.vue?vue&type=style&index=0&scoped=db3478e0&lang.css": [
-    "/build/assets/Index-fpU3VIOw.js",
-    "/build/assets/Index-zR71OdFx.css"
+  "resources/js/Pages/Panel/EyeImages/Index.vue?vue&type=style&index=0&scoped=45ceec4f&lang.css": [
+    "/build/assets/Index-DY0HFRkY.js",
+    "/build/assets/Index-4Dyu4nZL.css"
   ],
   "resources/js/Pages/Panel/Financial/Bi/Index.vue": [
-    "/build/assets/Index-Br4ykzY9.js"
+    "/build/assets/Index-BGfMbJaM.js"
   ],
   "resources/js/Pages/Panel/Financial/Billing/Index.vue": [
-    "/build/assets/Index-CB-R2g2O.js"
+    "/build/assets/Index-BnR9Q5h5.js"
   ],
   "resources/js/Pages/Panel/Financial/CashFlow/CashEntryFormModal.vue": [
     "/build/assets/CashEntryFormModal-3jnpI666.js"
   ],
   "resources/js/Pages/Panel/Financial/CashFlow/Index.vue": [
-    "/build/assets/Index-69lJEgf_.js"
+    "/build/assets/Index-Cr1H7rQz.js"
   ],
   "resources/js/Pages/Panel/Financial/Reports/CashFlow.vue": [
-    "/build/assets/CashFlow-DMydeNdD.js"
+    "/build/assets/CashFlow-gyKlvM95.js"
   ],
   "resources/js/Pages/Panel/Financial/Reports/Covenants.vue": [
-    "/build/assets/Covenants-Cm0D6qU5.js"
+    "/build/assets/Covenants-df7E5RkG.js"
   ],
   "resources/js/Pages/Panel/Financial/Tiss/GlosasIndex.vue": [
-    "/build/assets/GlosasIndex-DdIZp1_N.js"
+    "/build/assets/GlosasIndex-D6ijGcn0.js"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/AiCreditPurchaseDetailDrawer.vue": [
+    "/build/assets/AiCreditPurchaseDetailDrawer-BcZyweIA.js"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/ConsumptionByProviderChart.vue": [
+    "/build/assets/ConsumptionByProviderChart-CZSNCYRJ.js"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/Index.vue": [
+    "/build/assets/Index-SG1ALRrl.js",
+    "/build/assets/Index-C8Mr1oh2.css"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/Index.vue?vue&type=style&index=0&scoped=9eb22c9b&lang.css": [
+    "/build/assets/Index-SG1ALRrl.js",
+    "/build/assets/Index-C8Mr1oh2.css"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/InternalWalletCard.vue": [
+    "/build/assets/InternalWalletCard-LXUk6MPn.js",
+    "/build/assets/InternalWalletCard-ByyfqElH.css"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/InternalWalletCard.vue?vue&type=style&index=0&scoped=4c6d2d94&lang.css": [
+    "/build/assets/InternalWalletCard-LXUk6MPn.js",
+    "/build/assets/InternalWalletCard-ByyfqElH.css"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/ManualCreditModal.vue": [
+    "/build/assets/ManualCreditModal-Bbj6mCYH.js"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/ProviderCostsCard.vue": [
+    "/build/assets/ProviderCostsCard-BYPQpeO5.js",
+    "/build/assets/ProviderCostsCard-B__i6gNG.css"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/ProviderCostsCard.vue?vue&type=style&index=0&scoped=349ff23a&lang.css": [
+    "/build/assets/ProviderCostsCard-BYPQpeO5.js",
+    "/build/assets/ProviderCostsCard-B__i6gNG.css"
+  ],
+  "resources/js/Pages/Panel/Manager/AiCreditPurchases/ProviderTopupModal.vue": [
+    "/build/assets/ProviderTopupModal-C4xE_32_.js"
   ],
   "resources/js/Pages/Panel/Manager/Entities/EntityCards.vue": [
-    "/build/assets/EntityCards-DR8UMu5U.js"
+    "/build/assets/EntityCards-BPzC5A1D.js"
   ],
   "resources/js/Pages/Panel/Manager/Entities/EntityDetailDrawer.vue": [
     "/build/assets/EntityDetailDrawer-BXKxnTVv.js",
@@ -313,10 +349,10 @@
     "/build/assets/EntityFormModal-LNgXXU2d.js"
   ],
   "resources/js/Pages/Panel/Manager/Entities/EntityTable.vue": [
-    "/build/assets/EntityTable-BIJ9oDUb.js"
+    "/build/assets/EntityTable-7ehgfmmi.js"
   ],
   "resources/js/Pages/Panel/Manager/Entities/Index.vue": [
-    "/build/assets/Index-Bo3anA5b.js"
+    "/build/assets/Index-Bs0AwHDu.js"
   ],
   "resources/js/Pages/Panel/Manager/EntityIntegratorEquipments/EntityIntegratorEquipmentDetailDrawer.vue": [
     "/build/assets/EntityIntegratorEquipmentDetailDrawer-TTlFqa8P.js",
@@ -327,7 +363,7 @@
     "/build/assets/EntityIntegratorEquipmentDetailDrawer-rXVyT6VV.css"
   ],
   "resources/js/Pages/Panel/Manager/EntityIntegratorEquipments/Index.vue": [
-    "/build/assets/Index-DBZyi9x8.js"
+    "/build/assets/Index-BkJFpjgj.js"
   ],
   "resources/js/Pages/Panel/Manager/EntityIntegrators/EntityIntegratorDetailDrawer.vue": [
     "/build/assets/EntityIntegratorDetailDrawer-DKE328cV.js",
@@ -341,7 +377,7 @@
     "/build/assets/EntityIntegratorFormModal-CbB66oYO.js"
   ],
   "resources/js/Pages/Panel/Manager/EntityIntegrators/Index.vue": [
-    "/build/assets/Index-DfJTRs2n.js"
+    "/build/assets/Index-BbrWHl1_.js"
   ],
   "resources/js/Pages/Panel/Manager/EntityUserIntegrators/EntityUserIntegratorDetailDrawer.vue": [
     "/build/assets/EntityUserIntegratorDetailDrawer-DqsXt0Mk.js",
@@ -355,10 +391,10 @@
     "/build/assets/EntityUserIntegratorFormModal-CTK_SFwa.js"
   ],
   "resources/js/Pages/Panel/Manager/EntityUserIntegrators/Index.vue": [
-    "/build/assets/Index-CvxWVce9.js"
+    "/build/assets/Index-C3_RYVQR.js"
   ],
   "resources/js/Pages/Panel/Manager/EntityUsers/Index.vue": [
-    "/build/assets/Index-ZCrgdmfN.js"
+    "/build/assets/Index-Bj6gvPzg.js"
   ],
   "resources/js/Pages/Panel/Manager/Gateways/GatewayCard.vue": [
     "/build/assets/GatewayCard-Bm85Gf00.js"
@@ -379,7 +415,7 @@
     "/build/assets/Index-D-16NTEx.js"
   ],
   "resources/js/Pages/Panel/Manager/Partners/Index.vue": [
-    "/build/assets/Index-BZi-W-In.js"
+    "/build/assets/Index-CFuFhPyc.js"
   ],
   "resources/js/Pages/Panel/Manager/Partners/PartnerFormModal.vue": [
     "/build/assets/PartnerFormModal-BqLYDJEQ.js"
@@ -388,10 +424,10 @@
     "/build/assets/Show-6EB7-hpi.js"
   ],
   "resources/js/Pages/Panel/Manager/Plans/Index.vue": [
-    "/build/assets/Index-ClxHFwKP.js"
+    "/build/assets/Index-Ce8gUf7z.js"
   ],
   "resources/js/Pages/Panel/Manager/Plans/PlanCards.vue": [
-    "/build/assets/PlanCards-qJPmHnBk.js"
+    "/build/assets/PlanCards-vsi_jCQF.js"
   ],
   "resources/js/Pages/Panel/Manager/Plans/PlanDetailDrawer.vue": [
     "/build/assets/PlanDetailDrawer-DF-im0r8.js",
@@ -405,13 +441,13 @@
     "/build/assets/PlanFormModal-CIb1WujJ.js"
   ],
   "resources/js/Pages/Panel/Manager/Plans/PlanTable.vue": [
-    "/build/assets/PlanTable-B9XkNgws.js"
+    "/build/assets/PlanTable-B8Gqv8xW.js"
   ],
   "resources/js/Pages/Panel/Manager/ReportSettings/Index.vue": [
-    "/build/assets/Index-B-k213Mq.js"
+    "/build/assets/Index-CcefYbl1.js"
   ],
   "resources/js/Pages/Panel/Manager/ReportSettings/ReportSettingCards.vue": [
-    "/build/assets/ReportSettingCards-DIHioxoj.js"
+    "/build/assets/ReportSettingCards-Ds8nozzE.js"
   ],
   "resources/js/Pages/Panel/Manager/ReportSettings/ReportSettingFormModal.vue": [
     "/build/assets/ReportSettingFormModal-C2lSD68w.js",
@@ -430,16 +466,16 @@
     "/build/assets/ReportSettingPreviewModal-BhmJ2L7r.css"
   ],
   "resources/js/Pages/Panel/Manager/ReportSettings/ReportSettingTable.vue": [
-    "/build/assets/ReportSettingTable-DSwXSZsy.js"
+    "/build/assets/ReportSettingTable-BpBPIR4P.js"
   ],
   "resources/js/Pages/Panel/Manager/Subscriptions/Index.vue": [
-    "/build/assets/Index-D7c012_k.js"
+    "/build/assets/Index-CSlHSpdA.js"
   ],
   "resources/js/Pages/Panel/Manager/Subscriptions/SubscriptionActivateModal.vue": [
     "/build/assets/SubscriptionActivateModal-BciEwjzP.js"
   ],
   "resources/js/Pages/Panel/Manager/Subscriptions/SubscriptionCards.vue": [
-    "/build/assets/SubscriptionCards-C9aQg4eh.js"
+    "/build/assets/SubscriptionCards-BN_V9zeA.js"
   ],
   "resources/js/Pages/Panel/Manager/Subscriptions/SubscriptionDetailDrawer.vue": [
     "/build/assets/SubscriptionDetailDrawer-Bxltg8fB.js",
@@ -453,7 +489,7 @@
     "/build/assets/SubscriptionFormModal-BhEu0DHr.js"
   ],
   "resources/js/Pages/Panel/Manager/Subscriptions/SubscriptionTable.vue": [
-    "/build/assets/SubscriptionTable-Cjvdxtgr.js"
+    "/build/assets/SubscriptionTable-CTE2CsgY.js"
   ],
   "resources/js/Pages/Panel/Manager/Subscriptions/SubscriptionTrialModal.vue": [
     "/build/assets/SubscriptionTrialModal-CNSh4P-l.js"
@@ -496,30 +532,58 @@
   "resources/js/Pages/Panel/ManagerDashboard/TrialsExpiring.vue": [
     "/build/assets/TrialsExpiring-BbPuCpb_.js"
   ],
-  "resources/js/Pages/Panel/MedicalRecords/Index.vue": [
-    "/build/assets/Index-CFwTnSkH.js",
-    "/build/assets/Index-BEkzC1X_.css"
+  "resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordFileUploadModal.vue": [
+    "/build/assets/MedicalRecordFileUploadModal-MXGxLznw.js",
+    "/build/assets/MedicalRecordFileUploadModal-Dd4ORBnJ.css"
   ],
-  "resources/js/Pages/Panel/MedicalRecords/Index.vue?vue&type=style&index=0&scoped=cc9a9c05&lang.css": [
-    "/build/assets/Index-CFwTnSkH.js",
-    "/build/assets/Index-BEkzC1X_.css"
+  "resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordFileUploadModal.vue?vue&type=style&index=0&scoped=6887a6e2&lang.css": [
+    "/build/assets/MedicalRecordFileUploadModal-MXGxLznw.js",
+    "/build/assets/MedicalRecordFileUploadModal-Dd4ORBnJ.css"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Components/MedicalRecordForm.vue": [
+    "/build/assets/MedicalRecordForm-DO3rHoWx.js"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Components/PatientInfoSidebar.vue": [
+    "/build/assets/PatientInfoSidebar-ChtWAsyC.js",
+    "/build/assets/PatientInfoSidebar-Qql8nZc4.css"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Components/PatientInfoSidebar.vue?vue&type=style&index=0&scoped=35b6aad5&lang.css": [
+    "/build/assets/PatientInfoSidebar-ChtWAsyC.js",
+    "/build/assets/PatientInfoSidebar-Qql8nZc4.css"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Components/PdfPreviewModal.vue": [
+    "/build/assets/PdfPreviewModal-BGdxaBML.js"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Create.vue": [
+    "/build/assets/Create-CxV1FqM0.js"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Edit.vue": [
+    "/build/assets/Edit-piBL6lqk.js"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Index.vue": [
+    "/build/assets/Index-Dqdvxk5G.js",
+    "/build/assets/Index-DmMpXMxk.css"
+  ],
+  "resources/js/Pages/Panel/MedicalRecords/Index.vue?vue&type=style&index=0&scoped=dbd2a9ec&lang.css": [
+    "/build/assets/Index-Dqdvxk5G.js",
+    "/build/assets/Index-DmMpXMxk.css"
   ],
   "resources/js/Pages/Panel/MedicalRecords/MedicalRecordDetailDrawer.vue": [
-    "/build/assets/MedicalRecordDetailDrawer-BqvEorTq.js",
-    "/build/assets/MedicalRecordDetailDrawer-DDdg9BSQ.css"
+    "/build/assets/MedicalRecordDetailDrawer-c4pBb2FI.js",
+    "/build/assets/MedicalRecordDetailDrawer-BQlA5P2d.css"
   ],
-  "resources/js/Pages/Panel/MedicalRecords/MedicalRecordDetailDrawer.vue?vue&type=style&index=0&scoped=809a728c&lang.css": [
-    "/build/assets/MedicalRecordDetailDrawer-BqvEorTq.js",
-    "/build/assets/MedicalRecordDetailDrawer-DDdg9BSQ.css"
+  "resources/js/Pages/Panel/MedicalRecords/MedicalRecordDetailDrawer.vue?vue&type=style&index=0&scoped=13a8c979&lang.css": [
+    "/build/assets/MedicalRecordDetailDrawer-c4pBb2FI.js",
+    "/build/assets/MedicalRecordDetailDrawer-BQlA5P2d.css"
   ],
   "resources/js/Pages/Panel/Patients/Import.vue": [
-    "/build/assets/Import-CAPqKhyW.js"
+    "/build/assets/Import-6dEDMr48.js"
   ],
   "resources/js/Pages/Panel/Patients/Index.vue": [
-    "/build/assets/Index-BowC7W77.js"
+    "/build/assets/Index-DzAg4LeA.js"
   ],
   "resources/js/Pages/Panel/Patients/PatientCards.vue": [
-    "/build/assets/PatientCards-CWGArATn.js"
+    "/build/assets/PatientCards-CSZYD_zN.js"
   ],
   "resources/js/Pages/Panel/Patients/PatientDetailDrawer.vue": [
     "/build/assets/PatientDetailDrawer-D23psjo3.js",
@@ -533,24 +597,24 @@
     "/build/assets/PatientFormModal-BaTCX5_C.js"
   ],
   "resources/js/Pages/Panel/Patients/PatientTable.vue": [
-    "/build/assets/PatientTable-CNaXFgKY.js",
+    "/build/assets/PatientTable-BrEN59yX.js",
     "/build/assets/PatientTable-DIk8CLbR.css"
   ],
   "resources/js/Pages/Panel/Patients/PatientTable.vue?vue&type=style&index=0&scoped=5c3a7454&lang.css": [
-    "/build/assets/PatientTable-CNaXFgKY.js",
+    "/build/assets/PatientTable-BrEN59yX.js",
     "/build/assets/PatientTable-DIk8CLbR.css"
   ],
   "resources/js/Pages/Panel/Profile/Edit.vue": [
-    "/build/assets/Edit-665-GLpv.js"
+    "/build/assets/Edit-CXUebMeb.js"
   ],
   "resources/js/Pages/Panel/Reports/Absenteeism.vue": [
-    "/build/assets/Absenteeism-CpBf58Tz.js"
+    "/build/assets/Absenteeism-DS5n9zEu.js"
   ],
   "resources/js/Pages/Panel/Reports/Index.vue": [
-    "/build/assets/Index-cVkVze-T.js"
+    "/build/assets/Index-Bvmh_VBO.js"
   ],
   "resources/js/Pages/Panel/Reports/Schedules.vue": [
-    "/build/assets/Schedules-DQA4ywCu.js"
+    "/build/assets/Schedules-BdMOnknM.js"
   ],
   "resources/js/Pages/Panel/Schedules/BulkCancelModal.vue": [
     "/build/assets/BulkCancelModal-BG-WWE_s.js"
@@ -573,7 +637,7 @@
     "/build/assets/EventCard-M507_Jal.js"
   ],
   "resources/js/Pages/Panel/Schedules/Index.vue": [
-    "/build/assets/Index-CDl6KKfJ.js",
+    "/build/assets/Index-BGvdsFG2.js",
     "/build/assets/Index-DCp98QmF.css"
   ],
   "resources/js/Pages/Panel/Schedules/NoticesPanel.vue": [
@@ -583,7 +647,7 @@
     "/build/assets/RescheduleModal-Dchdnf0c.js"
   ],
   "resources/js/Pages/Panel/Schedules/ScheduleCard.vue": [
-    "/build/assets/ScheduleCard-BLE-x3Rp.js"
+    "/build/assets/ScheduleCard-Cb_X2xQF.js"
   ],
   "resources/js/Pages/Panel/Schedules/ScheduleDetailDrawer.vue": [
     "/build/assets/ScheduleDetailDrawer-DEme-sHP.js",
@@ -615,31 +679,31 @@
     "/build/assets/CatalogFormModal-DTObnO2U.js"
   ],
   "resources/js/Pages/Panel/Settings/Catalog/Index.vue": [
-    "/build/assets/Index-DN-0-lDG.js"
+    "/build/assets/Index-CYmcrPeL.js"
   ],
   "resources/js/Pages/Panel/Settings/Gateways/GatewayCredentialsModal.vue": [
     "/build/assets/GatewayCredentialsModal-KFfB6hh_.js"
   ],
   "resources/js/Pages/Panel/Settings/Gateways/Index.vue": [
-    "/build/assets/Index-p3Xhv8Nc.js"
+    "/build/assets/Index-f-ZVzSpx.js"
   ],
   "resources/js/Pages/Panel/Settings/ReportSettings/Form.vue": [
-    "/build/assets/Form-DFz0_pMw.js"
+    "/build/assets/Form-DxW9Cg-t.js"
   ],
   "resources/js/Pages/Panel/Settings/ReportSettings/Index.vue": [
-    "/build/assets/Index-Cnsxq79b.js"
+    "/build/assets/Index-CGBHaVNa.js"
   ],
   "resources/js/Pages/Panel/Settings/Security/Index.vue": [
-    "/build/assets/Index-5xLhMH64.js"
+    "/build/assets/Index-004eOYJS.js"
   ],
   "resources/js/Pages/Panel/SubscriptionExpired.vue": [
     "/build/assets/SubscriptionExpired-B3atPfbS.js"
   ],
   "resources/js/Pages/Panel/Users/Index.vue": [
-    "/build/assets/Index-xPq4lfv5.js"
+    "/build/assets/Index-CdWcZXhc.js"
   ],
   "resources/js/Pages/Panel/Users/UserCards.vue": [
-    "/build/assets/UserCards-WVK3nt_C.js"
+    "/build/assets/UserCards-D70gWRgy.js"
   ],
   "resources/js/Pages/Panel/Users/UserFormModal.vue": [
     "/build/assets/UserFormModal-D_Mk1lpR.js",
@@ -650,7 +714,7 @@
     "/build/assets/UserFormModal-Buc8wz-4.css"
   ],
   "resources/js/Pages/Panel/Users/UserTable.vue": [
-    "/build/assets/UserTable-CDQvLpe2.js"
+    "/build/assets/UserTable-5QinWueF.js"
   ],
   "resources/js/Pages/Portal/Commissions.vue": [
     "/build/assets/Commissions-xLa5iHNY.js"

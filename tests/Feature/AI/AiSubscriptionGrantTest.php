@@ -40,14 +40,18 @@ function makeActiveSubscription(Plan $plan, ?Entity $entity = null): Subscriptio
     ]);
 }
 
-test('grantForSubscription concede créditos quando o plano define AiMonthlyCredits > 0', function () {
+test('grantForSubscription cria cota mensal (não balance comprado)', function () {
     $plan         = makePlanWithAiCredits(80);
     $subscription = makeActiveSubscription($plan);
 
     // O observer já disparou o grant em created(). Verifica resultado direto.
     $wallet = AiCreditWallet::query()->where('entity_id', $subscription->entity_id)->firstOrFail();
 
-    expect($wallet->balance)->toBe(80);
+    expect($wallet->balance)->toBe(0);                // cota não vai para balance comprado
+    expect($wallet->monthly_quota)->toBe(80);
+    expect($wallet->monthly_quota_used)->toBe(0);
+    expect($wallet->monthly_quota_lifetime_granted)->toBe(80);
+    expect($wallet->quota_period_ends_at)->not->toBeNull();
 
     $entries = AiCreditLedgerEntry::query()
         ->where('entity_id', $subscription->entity_id)
@@ -59,6 +63,7 @@ test('grantForSubscription concede créditos quando o plano define AiMonthlyCred
     expect($entries->first()->subscription_id)->toBe($subscription->id);
     expect($entries->first()->metadata['source'])->toBe('subscription_cycle');
     expect($entries->first()->metadata['plan_id'])->toBe($plan->id);
+    expect($entries->first()->metadata['kind'])->toBe('monthly_quota');
 });
 
 test('grantForSubscription não cria entry quando AiMonthlyCredits = 0', function () {
@@ -82,15 +87,13 @@ test('grantForSubscription é idempotente para o mesmo ciclo (ends_at)', functio
     $subscription = makeActiveSubscription($plan);
     $service      = app(AiCreditWalletService::class);
 
-    // Já chamado pelo observer em created(). Chamar de novo manualmente.
-    $second = $service->grantMonthlyCreditsForSubscription($subscription->fresh());
-    $third  = $service->grantMonthlyCreditsForSubscription($subscription->fresh());
-
-    expect($second)->not->toBeNull();
-    expect($third->id)->toBe($second->id);
+    // Já chamado pelo observer em created(). Chamar de novo manualmente — não deve duplicar.
+    $service->grantMonthlyCreditsForSubscription($subscription->fresh());
+    $service->grantMonthlyCreditsForSubscription($subscription->fresh());
 
     $wallet = AiCreditWallet::query()->where('entity_id', $subscription->entity_id)->firstOrFail();
-    expect($wallet->balance)->toBe(50);
+    expect($wallet->monthly_quota)->toBe(50);
+    expect($wallet->balance)->toBe(0);
 
     $count = AiCreditLedgerEntry::query()
         ->where('entity_id', $subscription->entity_id)
@@ -100,7 +103,7 @@ test('grantForSubscription é idempotente para o mesmo ciclo (ends_at)', functio
     expect($count)->toBe(1);
 });
 
-test('renovação avança ends_at e dispara novo grant', function () {
+test('renovação avança ends_at e dispara novo grant (reseta cota)', function () {
     $plan         = makePlanWithAiCredits(40);
     $subscription = makeActiveSubscription($plan);
 
@@ -111,14 +114,16 @@ test('renovação avança ends_at e dispara novo grant', function () {
 
     $wallet = AiCreditWallet::query()->where('entity_id', $subscription->entity_id)->firstOrFail();
 
-    expect($wallet->balance)->toBe(80);
+    // Cota é RESETADA (não acumula) — novo ciclo substitui o anterior.
+    expect($wallet->monthly_quota)->toBe(40);
+    expect($wallet->monthly_quota_lifetime_granted)->toBe(80); // 2 ciclos × 40
 
     $grantCount = AiCreditLedgerEntry::query()
         ->where('entity_id', $subscription->entity_id)
         ->where('type', AiLedgerEntryType::Grant->value)
         ->count();
 
-    expect($grantCount)->toBe(2);
+    expect($grantCount)->toBe(2); // 1 entry por ciclo
 });
 
 test('updates que apenas mudam status mas mantém ends_at não duplicam grant', function () {
@@ -167,7 +172,8 @@ test('conversão de trial para Active dispara grant uma única vez', function ()
     ]);
 
     $wallet = AiCreditWallet::query()->where('entity_id', $entity->id)->firstOrFail();
-    expect($wallet->balance)->toBe(25);
+    expect($wallet->balance)->toBe(0);          // cota não vai para balance comprado
+    expect($wallet->monthly_quota)->toBe(25);
 
     expect(AiCreditLedgerEntry::query()
         ->where('entity_id', $entity->id)

@@ -96,6 +96,12 @@ return [
         'refunded'        => 'Refunded',
     ],
 
+    'providers' => [
+        'openai'    => 'ChatGPT',
+        'anthropic' => 'Claude',
+        'gemini'    => 'Gemini',
+    ],
+
     'credit_packages' => [
         'starter' => [
             'name'        => 'Essential',

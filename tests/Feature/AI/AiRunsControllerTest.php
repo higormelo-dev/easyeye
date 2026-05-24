@@ -33,7 +33,7 @@ beforeEach(function () {
     $this->admin           = User::factory()->create();
     $this->adminEntityUser = createEntityUser($this->entity, $this->admin, ClientRule::Admin->value);
 
-    app(AiCreditWalletService::class)->grantMonthlyCredits(
+    app(AiCreditWalletService::class)->purchaseCredits(
         entityId: $this->entity->id,
         amount: 500,
         description: 'Créditos iniciais de teste',
@@ -164,8 +164,12 @@ test('store cria run reservada e despacha job', function () {
     expect($run->status)->toBe(AiRunStatus::Reserved);
     expect($run->reserved_credits)->toBeGreaterThan(0);
 
+    // No novo modelo, reserva consome COTA primeiro (depois balance).
+    // Validamos que o saldo disponível diminuiu — não importa de onde foi descontado.
     $after = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    expect((int) $after->reserved_balance)->toBeGreaterThan((int) $before->reserved_balance);
+    $beforeAvailable = (int) $before->balance + max(0, (int) $before->monthly_quota - (int) $before->monthly_quota_used);
+    $afterAvailable  = (int) $after->balance + max(0, (int) $after->monthly_quota - (int) $after->monthly_quota_used);
+    expect($afterAvailable)->toBeLessThan($beforeAvailable);
 });
 
 test('store mascara PII antes de persistir input_summary da execução', function () {
@@ -344,9 +348,14 @@ test('show bloqueia acesso entre entities', function () {
 });
 
 test('store retorna 422 quando saldo é insuficiente', function () {
-    // Zera o saldo da entity (que recebeu 500 créditos no beforeEach).
+    // Zera tanto a cota mensal quanto o balance comprado (criados no beforeEach).
     $wallet = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
-    $wallet->update(['balance' => 0, 'reserved_balance' => 0]);
+    $wallet->update([
+        'balance'            => 0,
+        'reserved_balance'   => 0,
+        'monthly_quota'      => 0,
+        'monthly_quota_used' => 0,
+    ]);
 
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEntityUser))

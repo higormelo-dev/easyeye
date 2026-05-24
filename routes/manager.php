@@ -115,6 +115,17 @@ Route::group([
     Route::patch('ai-credit-purchases/{purchase}/refund', [AiCreditPurchasesController::class, 'refund'])
         ->middleware('throttle:manager-destructive')
         ->name('ai-credit-purchases.refund');
+    Route::post('ai-credit-purchases/manual', [AiCreditPurchasesController::class, 'createManual'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-credit-purchases.manual');
+
+    // ── Recargas (topups) do EasyEye nos provedores ──────────────────────
+    Route::post('ai-provider-topups', [AiCreditPurchasesController::class, 'storeTopup'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-provider-topups.store');
+    Route::delete('ai-provider-topups/{topup}', [AiCreditPurchasesController::class, 'deleteTopup'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-provider-topups.destroy');
 
     // ── Gateways de Pagamento ──────────────────────────────────────────────────
     Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');

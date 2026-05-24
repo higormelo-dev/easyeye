@@ -8,34 +8,45 @@ import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 import AiCreditPurchaseDetailDrawer from './AiCreditPurchaseDetailDrawer.vue';
+import ManualCreditModal from './ManualCreditModal.vue';
+import ConsumptionByProviderChart from './ConsumptionByProviderChart.vue';
+import InternalWalletCard from './InternalWalletCard.vue';
+import ProviderCostsCard from './ProviderCostsCard.vue';
+import ProviderTopupModal from './ProviderTopupModal.vue';
 
 /**
- * Manager: gestão de pedidos de compra de créditos IA das clínicas.
+ * Manager: gestão de pedidos de compra de créditos IA + crédito manual + consumo por provedor.
  *
- * Autorização granular (props.permissions vinda do backend):
- *   - credit: Admin + Financial
- *   - cancel: Admin + Support
- *   - fail:   Admin + Financial
- *   - refund: Admin only
+ * RBAC (props.permissions):
+ *   - credit, fail                 : Admin + Financial
+ *   - cancel                       : Admin + Support
+ *   - refund                       : Admin only
+ *   - create_manual                : Admin + Financial + Support (limite diário p/ Support)
+ *   - create_manual_unlimited      : Admin + Financial
+ *   - create_manual_for_internal   : Admin only (entity interna do SaaS)
  *
- * Toda ação destrutiva passa por ConfirmationWithReasonModal — reason vai
- * direto para o audit_log (CFM/LGPD).
+ * Toda ação destrutiva passa por ConfirmationWithReasonModal — reason vai para audit_log.
  */
 const props = defineProps({
-    breadcrumbs:   { type: Array,  default: () => [] },
-    purchases:     { type: Object, default: () => ({ data: [], meta: {}, links: {} }) },
-    kpis:          { type: Object, default: () => ({}) },
-    topConsumers:  { type: Array,  default: () => [] },
-    filters:       { type: Object, default: () => ({}) },
-    statusOptions: { type: Array,  default: () => [] },
-    entities:      { type: Array,  default: () => [] },
-    permissions:   { type: Object, default: () => ({}) },
-    t:             { type: Object, default: () => ({}) },
+    breadcrumbs:           { type: Array,  default: () => [] },
+    purchases:             { type: Object, default: () => ({ data: [], meta: {}, links: {} }) },
+    kpis:                  { type: Object, default: () => ({}) },
+    providerCosts:         { type: Object, default: () => null },
+    consumptionByProvider: { type: Object, default: () => ({}) },
+    internalWallet:        { type: Object, default: () => null },
+    topConsumers:          { type: Array,  default: () => [] },
+    filters:               { type: Object, default: () => ({}) },
+    statusOptions:         { type: Array,  default: () => [] },
+    providerOptions:       { type: Array,  default: () => [] },
+    entities:              { type: Array,  default: () => [] },
+    permissions:           { type: Object, default: () => ({}) },
+    t:                     { type: Object, default: () => ({}) },
 });
 
 // ── Filtros ──────────────────────────────────────────────────────────────────
 const filterForm = reactive({
     status:    props.filters.status    ?? '',
+    provider:  props.filters.provider  ?? '',
     entity_id: props.filters.entity_id ?? '',
     date_from: props.filters.date_from ?? '',
     date_to:   props.filters.date_to   ?? '',
@@ -48,7 +59,7 @@ function applyFilters() {
     router.get(route('manager.ai-credit-purchases.index'), params, {
         preserveScroll: true,
         preserveState: true,
-        only: ['purchases', 'kpis', 'topConsumers', 'filters'],
+        only: ['purchases', 'kpis', 'consumptionByProvider', 'topConsumers', 'filters'],
     });
 }
 
@@ -61,7 +72,7 @@ function clearFilters() {
 const drawerOpen = ref(false);
 const drawerPurchase = ref(null);
 
-async function openDetail(purchase) {
+function openDetail(purchase) {
     drawerPurchase.value = purchase;
     drawerOpen.value = true;
 }
@@ -69,6 +80,90 @@ async function openDetail(purchase) {
 function closeDetail() {
     drawerOpen.value = false;
     drawerPurchase.value = null;
+}
+
+// ── Crédito manual ───────────────────────────────────────────────────────────
+const manualModalOpen = ref(false);
+const manualModalRef = ref(null);
+const presetEntityId = ref(null);
+
+// ── Topup de provedor ────────────────────────────────────────────────────────
+const topupModalOpen = ref(false);
+const topupModalRef = ref(null);
+const presetTopupProvider = ref('');
+
+function openTopupModal(provider = '') {
+    presetTopupProvider.value = provider;
+    topupModalOpen.value = true;
+}
+
+function closeTopupModal() {
+    topupModalOpen.value = false;
+    presetTopupProvider.value = '';
+}
+
+async function submitTopup(payload) {
+    topupModalRef.value?.setSaving(true);
+    topupModalRef.value?.setError('');
+    try {
+        const res = await fetch(route('manager.ai-provider-topups.store'), {
+            method: 'POST',
+            headers: {
+                'Accept':       'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify(payload),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            topupModalRef.value?.setError(json.message ?? `Erro ${res.status}`);
+            return;
+        }
+        closeTopupModal();
+        reload();
+    } catch (e) {
+        topupModalRef.value?.setError(e.message);
+    } finally {
+        topupModalRef.value?.setSaving(false);
+    }
+}
+
+function openManualModal(entityId = null) {
+    presetEntityId.value = entityId;
+    manualModalOpen.value = true;
+}
+
+function closeManualModal() {
+    manualModalOpen.value = false;
+    presetEntityId.value = null;
+}
+
+async function submitManual(payload) {
+    manualModalRef.value?.setSaving(true);
+    manualModalRef.value?.setError('');
+    try {
+        const res = await fetch(route('manager.ai-credit-purchases.manual'), {
+            method: 'POST',
+            headers: {
+                'Accept':       'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken(),
+            },
+            body: JSON.stringify(payload),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            manualModalRef.value?.setError(json.message ?? `Erro ${res.status}`);
+            return;
+        }
+        closeManualModal();
+        reload();
+    } catch (e) {
+        manualModalRef.value?.setError(e.message);
+    } finally {
+        manualModalRef.value?.setSaving(false);
+    }
 }
 
 // ── Ações com confirmação ────────────────────────────────────────────────────
@@ -99,14 +194,11 @@ async function callAction(url, payload = {}) {
 }
 
 function showToast(message, type = 'success') {
-    // Toast padrão do projeto: aqui usamos alert simples + reload.
-    // O projeto tem um sistema de flash; mantemos coerente.
     if (type === 'error') alert(message);
-    // success vai aparecer após o reload via flash
 }
 
 function reload() {
-    router.reload({ only: ['purchases', 'kpis', 'topConsumers'] });
+    router.reload({ only: ['purchases', 'kpis', 'providerCosts', 'consumptionByProvider', 'topConsumers', 'internalWallet'] });
 }
 
 function onCredit(purchase) {
@@ -188,6 +280,24 @@ function goToPage(url) {
     if (!url) return;
     router.get(url, {}, { preserveScroll: true, preserveState: true, only: ['purchases'] });
 }
+
+function providerBadgeClass(provider) {
+    switch (provider) {
+        case 'openai':    return 'badge bg-success-subtle text-success border border-success border-opacity-25';
+        case 'anthropic': return 'badge bg-warning-subtle text-warning border border-warning border-opacity-25';
+        case 'gemini':    return 'badge bg-primary-subtle text-primary border border-primary border-opacity-25';
+        default:          return 'badge bg-light text-muted';
+    }
+}
+
+function providerIcon(provider) {
+    switch (provider) {
+        case 'openai':    return 'ti ti-brand-openai';
+        case 'anthropic': return 'ti ti-message-chatbot';
+        case 'gemini':    return 'ti ti-brand-google';
+        default:          return 'ti ti-minus';
+    }
+}
 </script>
 
 <template>
@@ -197,11 +307,41 @@ function goToPage(url) {
             <PageHeader
                 :title="t?.title ?? 'Compras de créditos IA'"
                 :subtitle="t?.subtitle"
-                :total="purchases?.meta?.total > 0 ? purchases.meta.total : null" />
+                :total="purchases?.meta?.total > 0 ? purchases.meta.total : null"
+            >
+                <template #actions>
+                    <button
+                        v-if="permissions?.create_manual"
+                        type="button"
+                        class="btn btn-success btn-sm"
+                        @click="openManualModal()"
+                    >
+                        <i class="ti ti-coin-plus me-1"></i>
+                        {{ t?.actions?.create_manual ?? 'Adicionar crédito manual' }}
+                    </button>
+                </template>
+            </PageHeader>
+
+            <!-- ─── Card destaque: Sua empresa ─────────────────────────────── -->
+            <InternalWalletCard
+                v-if="internalWallet"
+                :wallet="internalWallet"
+                :permissions="permissions"
+                :t="t"
+                @add-credit="openManualModal"
+            />
+
+            <!-- ─── Custo do EasyEye nos provedores (lado supplier) ──────── -->
+            <ProviderCostsCard
+                v-if="providerCosts"
+                :costs="providerCosts"
+                :permissions="permissions"
+                :t="t"
+                @add-topup="openTopupModal"
+            />
 
             <!-- ─── KPIs ─────────────────────────────────────────────────── -->
             <div class="row g-2 mb-3">
-                <!-- Pendentes -->
                 <div class="col-12 col-md-6 col-xl-3">
                     <div class="card h-100">
                         <div class="card-body p-3">
@@ -218,7 +358,6 @@ function goToPage(url) {
                     </div>
                 </div>
 
-                <!-- Creditados 30d -->
                 <div class="col-12 col-md-6 col-xl-3">
                     <div class="card h-100">
                         <div class="card-body p-3">
@@ -237,7 +376,6 @@ function goToPage(url) {
                     </div>
                 </div>
 
-                <!-- Conversão -->
                 <div class="col-12 col-md-6 col-xl-3">
                     <div class="card h-100">
                         <div class="card-body p-3">
@@ -254,7 +392,6 @@ function goToPage(url) {
                     </div>
                 </div>
 
-                <!-- Cancelados/Falhados -->
                 <div class="col-12 col-md-6 col-xl-3">
                     <div class="card h-100">
                         <div class="card-body p-3">
@@ -272,14 +409,17 @@ function goToPage(url) {
                 </div>
             </div>
 
-            <!-- ─── Top consumers + Filtros ──────────────────────────────── -->
+            <!-- ─── Consumo por provedor + Top consumers + Filtros ─────────── -->
             <div class="row g-2 mb-3">
-                <!-- Top 5 clínicas -->
+                <div class="col-12 col-xl-4">
+                    <ConsumptionByProviderChart :consumption="consumptionByProvider" :t="t" />
+                </div>
+
                 <div class="col-12 col-xl-4">
                     <div class="card h-100">
                         <div class="card-header py-2 d-flex align-items-center">
                             <i class="ti ti-trophy text-warning me-2"></i>
-                            <strong class="small">{{ t?.kpi?.top_consumers ?? 'Top 5 clínicas (30 dias)' }}</strong>
+                            <strong class="small">{{ t?.kpi?.top_consumers ?? 'Top 5 (30 dias)' }}</strong>
                         </div>
                         <div class="card-body p-2">
                             <div v-if="topConsumers.length === 0" class="text-muted text-center small py-3">
@@ -292,7 +432,12 @@ function goToPage(url) {
                                             <span class="badge bg-light text-dark">{{ i + 1 }}</span>
                                         </td>
                                         <td>
-                                            <div class="fw-semibold small">{{ c.entity_name }}</div>
+                                            <div class="fw-semibold small d-flex align-items-center gap-1">
+                                                {{ c.entity_name }}
+                                                <span v-if="c.is_internal" class="badge bg-primary-subtle text-primary small ms-1">
+                                                    <i class="ti ti-building"></i>
+                                                </span>
+                                            </div>
                                             <small class="text-muted">{{ c.purchases_total }} compras</small>
                                         </td>
                                         <td class="text-end">
@@ -306,8 +451,7 @@ function goToPage(url) {
                     </div>
                 </div>
 
-                <!-- Filtros -->
-                <div class="col-12 col-xl-8">
+                <div class="col-12 col-xl-4">
                     <div class="card h-100">
                         <div class="card-header py-2 d-flex align-items-center">
                             <i class="ti ti-filter text-secondary me-2"></i>
@@ -315,38 +459,43 @@ function goToPage(url) {
                         </div>
                         <div class="card-body p-3">
                             <form @submit.prevent="applyFilters" class="row g-2">
-                                <div class="col-12 col-md-3">
+                                <div class="col-6">
                                     <label class="form-label small mb-1">{{ t?.filters?.status ?? 'Status' }}</label>
                                     <select v-model="filterForm.status" class="form-select form-select-sm">
                                         <option value="">{{ t?.filters?.all ?? 'Todos' }}</option>
-                                        <option v-for="s in statusOptions" :key="s.value" :value="s.value">
-                                            {{ s.label }}
+                                        <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small mb-1">{{ t?.filters?.provider ?? 'Provedor' }}</label>
+                                    <select v-model="filterForm.provider" class="form-select form-select-sm">
+                                        <option value="">{{ t?.filters?.all ?? 'Todos' }}</option>
+                                        <option v-for="p in providerOptions" :key="p.value" :value="p.value">{{ p.label }}</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-1">{{ t?.filters?.entity ?? 'Empresa' }}</label>
+                                    <select v-model="filterForm.entity_id" class="form-select form-select-sm">
+                                        <option value="">{{ t?.filters?.all ?? 'Todas' }}</option>
+                                        <option v-for="e in entities" :key="e.id" :value="e.id">
+                                            {{ e.name }}{{ !e.is_client ? ' ★' : '' }}
                                         </option>
                                     </select>
                                 </div>
-                                <div class="col-12 col-md-4">
-                                    <label class="form-label small mb-1">{{ t?.filters?.entity ?? 'Clínica' }}</label>
-                                    <select v-model="filterForm.entity_id" class="form-select form-select-sm">
-                                        <option value="">{{ t?.filters?.all ?? 'Todas' }}</option>
-                                        <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
-                                    </select>
-                                </div>
-                                <div class="col-6 col-md-2">
+                                <div class="col-6">
                                     <label class="form-label small mb-1">{{ t?.filters?.date_from ?? 'De' }}</label>
                                     <input v-model="filterForm.date_from" type="date" class="form-control form-control-sm">
                                 </div>
-                                <div class="col-6 col-md-2">
+                                <div class="col-6">
                                     <label class="form-label small mb-1">{{ t?.filters?.date_to ?? 'Até' }}</label>
                                     <input v-model="filterForm.date_to" type="date" class="form-control form-control-sm">
                                 </div>
-                                <div class="col-12 col-md-1 d-flex align-items-end gap-1">
-                                    <button type="submit" class="btn btn-sm btn-primary w-100" title="Filtrar">
-                                        <i class="ti ti-search"></i>
+                                <div class="col-12 d-flex justify-content-between mt-1">
+                                    <button type="button" class="btn btn-sm btn-link text-muted p-0" @click="clearFilters">
+                                        {{ t?.filters?.clear ?? 'Limpar' }}
                                     </button>
-                                </div>
-                                <div class="col-12 d-flex justify-content-end">
-                                    <button type="button" class="btn btn-sm btn-link text-muted" @click="clearFilters">
-                                        {{ t?.filters?.clear ?? 'Limpar filtros' }}
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="ti ti-search me-1"></i>Filtrar
                                     </button>
                                 </div>
                             </form>
@@ -362,7 +511,8 @@ function goToPage(url) {
                         <thead class="table-light">
                             <tr>
                                 <th class="ps-3">{{ t?.columns?.created_at ?? 'Solicitado em' }}</th>
-                                <th>{{ t?.columns?.entity ?? 'Clínica' }}</th>
+                                <th>{{ t?.columns?.entity ?? 'Empresa' }}</th>
+                                <th>{{ t?.columns?.provider ?? 'Provedor' }}</th>
                                 <th>{{ t?.columns?.package ?? 'Pacote' }}</th>
                                 <th class="text-end">{{ t?.columns?.credits ?? 'Créditos' }}</th>
                                 <th class="text-end">{{ t?.columns?.amount ?? 'Valor' }}</th>
@@ -373,7 +523,7 @@ function goToPage(url) {
                         </thead>
                         <tbody>
                             <tr v-if="!hasResults">
-                                <td colspan="8" class="text-center text-muted small py-4">
+                                <td colspan="9" class="text-center text-muted small py-4">
                                     {{ t?.empty ?? 'Nenhum pedido encontrado.' }}
                                 </td>
                             </tr>
@@ -382,7 +532,19 @@ function goToPage(url) {
                                     <div class="small">{{ p.created_at }}</div>
                                 </td>
                                 <td>
-                                    <div class="fw-semibold small">{{ p.entity_name ?? '—' }}</div>
+                                    <div class="fw-semibold small d-flex align-items-center gap-1">
+                                        {{ p.entity_name ?? '—' }}
+                                        <span v-if="p.is_internal" class="badge bg-primary-subtle text-primary small ms-1">
+                                            <i class="ti ti-building"></i>
+                                        </span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span v-if="p.provider" :class="providerBadgeClass(p.provider)">
+                                        <i :class="providerIcon(p.provider)" class="me-1"></i>
+                                        {{ p.provider_label }}
+                                    </span>
+                                    <span v-else class="text-muted small">—</span>
                                 </td>
                                 <td>
                                     <div class="small">{{ p.package_name }}</div>
@@ -435,7 +597,6 @@ function goToPage(url) {
                     </table>
                 </div>
 
-                <!-- Paginação -->
                 <div v-if="hasResults && purchases.meta?.last_page > 1" class="card-footer py-2 d-flex justify-content-between align-items-center">
                     <small class="text-muted">
                         {{ purchases.meta.from }}–{{ purchases.meta.to }} de {{ purchases.meta.total }}
@@ -481,6 +642,27 @@ function goToPage(url) {
             :saving="reasonModal.saving"
             @close="closeReasonModal"
             @confirm="handleReasonConfirm" />
+
+        <!-- ─── Modal de crédito manual ──────────────────────────────────── -->
+        <ManualCreditModal
+            ref="manualModalRef"
+            :open="manualModalOpen"
+            :entities="entities"
+            :providers="providerOptions"
+            :permissions="permissions"
+            :preset-entity-id="presetEntityId"
+            :t="t"
+            @close="closeManualModal"
+            @submit="submitManual" />
+
+        <!-- ─── Modal de topup de provedor (lado supplier) ───────────────── -->
+        <ProviderTopupModal
+            ref="topupModalRef"
+            :open="topupModalOpen"
+            :preset-provider="presetTopupProvider"
+            :t="t"
+            @close="closeTopupModal"
+            @submit="submitTopup" />
     </AppLayout>
 </template>
 

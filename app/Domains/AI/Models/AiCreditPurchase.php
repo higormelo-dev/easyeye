@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Models;
 
-use App\Enums\AI\AiCreditPurchaseStatus;
+use App\Enums\AI\{AiCreditPurchaseStatus, AiProvider};
 use App\Models\{Entity, Subscription, User};
 use App\Traits\Auditable;
 use Database\Factories\AI\AiCreditPurchaseFactory;
@@ -27,6 +27,7 @@ class AiCreditPurchase extends Model
         'requested_by',
         'credited_ledger_entry_id',
         'package_code',
+        'provider',
         'credits',
         'amount_cents',
         'currency',
@@ -46,6 +47,7 @@ class AiCreditPurchase extends Model
             'credits'      => 'integer',
             'amount_cents' => 'integer',
             'status'       => AiCreditPurchaseStatus::class,
+            'provider'     => AiProvider::class,
             'metadata'     => 'array',
             'credited_at'  => 'datetime',
             'cancelled_at' => 'datetime',
