@@ -137,11 +137,13 @@ const hasClientErrors  = ref(false);
 const showOthersHistory = ref(Boolean(r?.others_history));
 const othersHistoryInput = ref(null);
 
-// Tonometria + relógio
+// Tonometria
 const tonometryPdfSrc      = ref('');
-const tonometryStampedTime = ref(r?.tonometer_time ?? '');
-const liveTime             = ref('');
-let _liveTimeInterval      = null;
+const tonometryStampedTime = ref(
+    r?.tonometer_time
+        ? r.tonometer_time.slice(0, 5)
+        : new Date().toTimeString().slice(0, 5)
+);
 
 // Presbiopia
 const presbyopiaAddition  = ref(0);
@@ -232,9 +234,6 @@ const selectedCids   = ref(Array.isArray(r?.diagnosis_cids) ? [...r.diagnosis_ci
 // Lifecycle
 // ──────────────────────────────────────────────────────────────────────────
 onMounted(async () => {
-    const tick = () => { liveTime.value = new Date().toTimeString().slice(0, 8); };
-    tick();
-    _liveTimeInterval = setInterval(tick, 1000);
     await fetchValidationRules();
 
     // schedule_id via querystring
@@ -243,9 +242,7 @@ onMounted(async () => {
     if (sid) form.schedule_id = sid;
 });
 
-onBeforeUnmount(() => {
-    if (_liveTimeInterval) clearInterval(_liveTimeInterval);
-});
+watch(tonometryStampedTime, (v) => { form.tonometer_time = v; });
 
 watch(showOthersHistory, async (v) => {
     if (v) {
@@ -408,9 +405,10 @@ function focusNextLensField(currentName) {
 // Tonometria
 // ──────────────────────────────────────────────────────────────────────────
 function stampTonometryTime(force = false) {
-    if (!force && tonometryStampedTime.value) return;
     if (!force && (!form.tonometer_right || !form.tonometer_left)) return;
-    tonometryStampedTime.value = new Date().toTimeString().slice(0, 8);
+    if (!tonometryStampedTime.value) {
+        tonometryStampedTime.value = new Date().toTimeString().slice(0, 5);
+    }
     form.tonometer_time = tonometryStampedTime.value;
 }
 
@@ -1252,12 +1250,16 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 </div>
                             </div>
                             <div class="col-6">
-                                <label class="pmr-label">
-                                    {{ tt('tonometry', 'Tonometria') }}
-                                    <span v-if="tonometryStampedTime" class="ms-1 fw-bold" style="color:#03a9f3;font-size:.7rem;">{{ tonometryStampedTime }}</span>
-                                    <span v-else class="ms-1 text-muted" style="font-size:.7rem;">{{ liveTime }}</span>
-                                </label>
+                                <label class="pmr-label">{{ tt('tonometry', 'Tonometria') }}</label>
                                 <div class="d-flex gap-1 align-items-center">
+                                    <input
+                                        type="time"
+                                        v-model="tonometryStampedTime"
+                                        step="600"
+                                        class="form-control form-control-sm"
+                                        style="max-width:110px;"
+                                        :disabled="isLocked"
+                                    >
                                     <div class="input-group input-group-sm" style="max-width:90px;">
                                         <span class="input-group-text pmr-eye-badge">OD</span>
                                         <input v-model="form.tonometer_right" type="number" name="tonometer_right" step="0.5" min="0"
