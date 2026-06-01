@@ -1252,14 +1252,6 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             <div class="col-6">
                                 <label class="pmr-label">{{ tt('tonometry', 'Tonometria') }}</label>
                                 <div class="d-flex gap-1 align-items-center">
-                                    <input
-                                        type="time"
-                                        v-model="tonometryStampedTime"
-                                        step="600"
-                                        class="form-control form-control-sm"
-                                        style="max-width:110px;"
-                                        :disabled="isLocked"
-                                    >
                                     <div class="input-group input-group-sm" style="max-width:90px;">
                                         <span class="input-group-text pmr-eye-badge">OD</span>
                                         <input v-model="form.tonometer_right" type="number" name="tonometer_right" step="0.5" min="0"
@@ -1272,10 +1264,17 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                         <input v-model="form.tonometer_left" type="number" name="tonometer_left" step="0.5" min="0"
                                                class="form-control form-control-sm text-center"
                                                placeholder="00" :disabled="isLocked"
-                                               @click="$event.target.select()"
-                                               @blur="stampTonometryTime()">
+                                               @click="$event.target.select()">
                                     </div>
-                                    <input type="hidden" name="tonometer_time" :value="tonometryStampedTime || form.tonometer_time">
+                                    <input
+                                        type="time"
+                                        v-model="tonometryStampedTime"
+                                        step="600"
+                                        class="form-control form-control-sm"
+                                        style="max-width:110px;"
+                                        :disabled="isLocked"
+                                    >
+                                    <input type="hidden" name="tonometer_time" :value="tonometryStampedTime">
                                     <!--
                                         Impressão do laudo de tonometria: salva via storeTonometry no backend
                                         (exige IssueReport — CFM 2.227/2018). Só médico pode emitir o laudo.
