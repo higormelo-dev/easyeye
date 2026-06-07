@@ -7,6 +7,7 @@ import TablePagination   from '@/Components/Panel/TablePagination.vue';
 import ActionDropdown    from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup   from '@/Components/Panel/ActionIconGroup.vue';
+import SearchSelect      from '@/Components/Panel/SearchSelect.vue';
 import CashEntryFormModal from './CashEntryFormModal.vue';
 
 const props = defineProps({
@@ -60,14 +61,14 @@ async function onDelete(entry) {
     }
 }
 
-const typeBadge = (t) => t === 'revenue'
+const typeBadge = (t) => t === 'income'
     ? 'badge badge-soft-success rounded text-success border border-success'
     : 'badge badge-soft-danger rounded text-danger border border-danger';
 
 const statusBadge = (s) => {
-    if (s === 'paid')     return 'badge bg-success';
-    if (s === 'pending')  return 'badge bg-warning text-dark';
-    if (s === 'overdue')  return 'badge bg-danger';
+    if (s === 'paid')      return 'badge bg-success';
+    if (s === 'pending')   return 'badge bg-warning text-dark';
+    if (s === 'cancelled') return 'badge bg-danger';
     return 'badge bg-secondary';
 };
 </script>
@@ -89,7 +90,7 @@ const statusBadge = (s) => {
                     <div class="card border-0 shadow-sm border-start border-success border-3 h-100">
                         <div class="card-body py-3">
                             <small class="text-muted d-block">Receitas (período)</small>
-                            <div class="fw-bold fs-5 text-success">{{ brl(summary.revenue) }}</div>
+                            <div class="fw-bold fs-5 text-success">{{ brl(summary.income) }}</div>
                         </div>
                     </div>
                 </div>
@@ -97,7 +98,7 @@ const statusBadge = (s) => {
                     <div class="card border-0 shadow-sm border-start border-danger border-3 h-100">
                         <div class="card-body py-3">
                             <small class="text-muted d-block">Despesas (período)</small>
-                            <div class="fw-bold fs-5 text-danger">{{ brl(summary.expenses) }}</div>
+                            <div class="fw-bold fs-5 text-danger">{{ brl(summary.expense) }}</div>
                         </div>
                     </div>
                 </div>
@@ -135,29 +136,31 @@ const statusBadge = (s) => {
                         </div>
                         <div class="col-md-2">
                             <label class="form-label small mb-1">Tipo</label>
-                            <select v-model="form.type" class="form-select form-select-sm">
-                                <option value="">Todos</option>
-                                <option value="revenue">Receita</option>
-                                <option value="expense">Despesa</option>
-                            </select>
+                            <SearchSelect
+                                v-model="form.type"
+                                :options="[{ value: 'income', label: 'Receita' }, { value: 'expense', label: 'Despesa' }]"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :placeholder="'Todos'"
+                            />
                         </div>
                         <div class="col-md-2">
                             <label class="form-label small mb-1">Status</label>
-                            <select v-model="form.status" class="form-select form-select-sm">
-                                <option value="">Todos</option>
-                                <option value="pending">Pendente</option>
-                                <option value="paid">Pago</option>
-                                <option value="overdue">Atrasado</option>
-                            </select>
+                            <SearchSelect
+                                v-model="form.status"
+                                :options="[{ value: 'pending', label: 'Pendente' }, { value: 'paid', label: 'Pago' }, { value: 'cancelled', label: 'Cancelado' }]"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :placeholder="'Todos'"
+                            />
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small mb-1">Categoria</label>
-                            <select v-model="form.category_id" class="form-select form-select-sm">
-                                <option value="">Todas</option>
-                                <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-                                    {{ cat.name }}
-                                </option>
-                            </select>
+                            <SearchSelect
+                                v-model="form.category_id"
+                                :options="categories"
+                                :placeholder="'Todas'"
+                            />
                         </div>
                         <div class="col-md-1 d-flex gap-1">
                             <button type="submit" class="btn btn-primary btn-sm">
@@ -201,17 +204,17 @@ const statusBadge = (s) => {
                                 <td class="text-muted">{{ entry.covenant_name || '—' }}</td>
                                 <td class="text-center">
                                     <span :class="typeBadge(entry.type)">
-                                        {{ entry.type === 'revenue' ? 'Receita' : 'Despesa' }}
+                                        {{ entry.type === 'income' ? 'Receita' : 'Despesa' }}
                                     </span>
                                 </td>
                                 <td class="text-center">
                                     <span :class="statusBadge(entry.status)" class="rounded fs-11 fw-medium">
                                         {{ entry.status === 'paid' ? 'Pago' :
                                            entry.status === 'pending' ? 'Pendente' :
-                                           entry.status === 'overdue' ? 'Atrasado' : entry.status }}
+                                           entry.status === 'cancelled' ? 'Cancelado' : entry.status }}
                                     </span>
                                 </td>
-                                <td class="text-end fw-bold" :class="entry.type === 'revenue' ? 'text-success' : 'text-danger'">
+                                <td class="text-end fw-bold" :class="entry.type === 'income' ? 'text-success' : 'text-danger'">
                                     {{ brl(entry.amount) }}
                                 </td>
                                 <td class="text-end">

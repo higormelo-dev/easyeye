@@ -8,9 +8,11 @@ use App\Http\Controllers\{
     DoctorsController,
     EyeImagesController,
     Financial\BillingController as FinancialBillingController,
+    Financial\CashClosingController,
     Financial\CashFlowController,
     Financial\ClinicBiController,
     Financial\FinancialReportsController,
+    Financial\ProcedurePricesController,
     Financial\TissGlosasController,
     Financial\TissGuidePreValidateController,
     LocaleController,
@@ -319,6 +321,7 @@ Route::group(
             Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
             Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
             Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
+            Route::post('schedules/{schedule}/cash-entry', [SchedulesController::class, 'storeCashEntry'])->name('schedules.cash-entry.store');
             Route::get('schedules/slots', [SchedulesController::class, 'slots'])->name('schedules.slots');
             Route::get('schedules/resources', [SchedulesController::class, 'resources'])->name('schedules.resources');
             Route::resource('schedules', SchedulesController::class);
@@ -366,6 +369,15 @@ Route::group(
                 Route::post('cash-flow', [CashFlowController::class, 'store'])->name('cash-flow.store');
                 Route::match(['PUT', 'PATCH'], 'cash-flow/{entry}', [CashFlowController::class, 'update'])->name('cash-flow.update');
                 Route::delete('cash-flow/{entry}', [CashFlowController::class, 'destroy'])->name('cash-flow.destroy');
+
+                // Tabela de preço por procedimento × convênio
+                Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
+                Route::post('procedure-prices', [ProcedurePricesController::class, 'store'])->name('procedure-prices.store');
+
+                // Fechamento de caixa (lock por período)
+                Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
+                Route::post('cash-closing', [CashClosingController::class, 'store'])->name('cash-closing.store');
+                Route::delete('cash-closing/{cashClose}', [CashClosingController::class, 'destroy'])->name('cash-closing.destroy');
 
                 // Faturamento TISS (individual e lote)
                 Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');

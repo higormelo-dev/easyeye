@@ -16,20 +16,26 @@ import NoticesPanel             from './NoticesPanel.vue';
 import WaitingListPanel         from './WaitingListPanel.vue';
 import WaitingListFormModal     from './WaitingListFormModal.vue';
 import ScheduleDetailDrawer     from './ScheduleDetailDrawer.vue';
+import CashEntryModal           from './CashEntryModal.vue';
 import { useDashboardPolling }  from '@/composables/useDashboardPolling.js';
 import MiniCalendar             from '@/Components/Panel/MiniCalendar.vue';
 
 const props = defineProps({
-    scheduleItems: { type: Array,   default: () => [] },
-    doctors:       { type: Array,   default: () => [] },
-    covenants:     { type: Array,   default: () => [] },
-    visitTypes:    { type: Array,   default: () => [] },
-    situations:    { type: Array,   default: () => [] },
-    moods:         { type: Array,   default: () => [] },
-    filters:       { type: Object,  default: () => ({}) },
-    isDoctor:      { type: Boolean, default: false },
-    isStaff:       { type: Boolean, default: false },
-    t:             { type: Object,  default: () => ({}) },
+    scheduleItems:    { type: Array,   default: () => [] },
+    doctors:          { type: Array,   default: () => [] },
+    covenants:        { type: Array,   default: () => [] },
+    visitTypes:       { type: Array,   default: () => [] },
+    procedures:       { type: Array,   default: () => [] },
+    procedurePrices:  { type: Object,  default: () => ({}) },
+    paymentMethods:   { type: Array,   default: () => [] },
+    incomeCategories: { type: Array,   default: () => [] },
+    situations:       { type: Array,   default: () => [] },
+    moods:            { type: Array,   default: () => [] },
+    filters:          { type: Object,  default: () => ({}) },
+    isDoctor:         { type: Boolean, default: false },
+    isStaff:          { type: Boolean, default: false },
+    canRegisterCash:  { type: Boolean, default: false },
+    t:                { type: Object,  default: () => ({}) },
 });
 
 // ── Polling ────────────────────────────────────────────────────────────────────
@@ -233,6 +239,33 @@ function onCancelled(json) {
     router.reload({ only: ['scheduleItems'] });
 }
 
+// ── Caixa: entrada vinculada ao agendamento ─────────────────────────────────────
+const cashItem = ref(null);
+const cashOpen = ref(false);
+// Transição de situação que aguarda o lançamento no caixa (ex.: marcar "Atendido").
+const pendingAfterCash = ref(null);
+
+function openCashEntry(item) {
+    cashItem.value = item;
+    cashOpen.value = true;
+}
+
+async function onCashSaved() {
+    cashOpen.value = false;
+    cashItem.value = null;
+
+    // Se o caixa foi aberto porque faltava lançamento para concluir o atendimento,
+    // retoma a transição pendente (agora o lançamento já existe).
+    const pending = pendingAfterCash.value;
+    pendingAfterCash.value = null;
+    if (pending) {
+        await onChangeSituation(pending);
+        return;
+    }
+
+    router.reload({ only: ['scheduleItems'] });
+}
+
 // ── Situation / mood change ────────────────────────────────────────────────────
 async function onChangeSituation({ item, to }) {
     const res = await fetch(item.situation_url, {
@@ -245,8 +278,44 @@ async function onChangeSituation({ item, to }) {
         body: JSON.stringify({ situation: to }),
     });
     const json = await res.json();
-    showToast(json.message, res.ok ? 'success' : 'error');
-    if (res.ok) router.reload({ only: ['scheduleItems'] });
+
+    if (! res.ok) {
+        // Conclusão bloqueada por falta de caixa: abre o lançamento e retoma depois.
+        if (res.status === 422 && json.requires_cash_entry) {
+            if (props.canRegisterCash) {
+                pendingAfterCash.value = { item, to };
+                openCashEntry(item);
+            } else {
+                showToast(json.message, 'error');
+            }
+            return;
+        }
+        showToast(json.message, 'error');
+        return;
+    }
+
+    // Fluxo "Chegou -> abre caixa": ao marcar Aguardando (3), abre a entrada
+    // no caixa pré-preenchida, desde que o utilizador tenha permissão financeira
+    // e ainda não exista lançamento. NÃO auto-abre para convênio cobrável
+    // (faturado via guia) — nesse caso o lançamento é manual/co-participação.
+    const continueFlow = () => {
+        if (to === 3 && props.canRegisterCash && ! item.has_cash_entry && ! item.bills_covenant) {
+            openCashEntry(item);
+        }
+        router.reload({ only: ['scheduleItems'] });
+    };
+
+    // Sucesso da mudança de situação: modal (em vez de toast).
+    if (window.Swal) {
+        window.Swal.fire({
+            icon: 'success',
+            title: json.message,
+            confirmButtonText: 'OK',
+        }).then(continueFlow);
+    } else {
+        showToast(json.message, 'success');
+        continueFlow();
+    }
 }
 
 async function onChangeMood({ item, mood }) {
@@ -561,6 +630,7 @@ const breadcrumbs = [
                                     :item="item"
                                     :is-staff="isStaff"
                                     :is-doctor="isDoctor"
+                                    :can-register-cash="canRegisterCash"
                                     :moods="moods"
                                     :selection-mode="selectionMode"
                                     :selected="isSelected(item.id)"
@@ -572,6 +642,7 @@ const breadcrumbs = [
                                     @cancel="openCancel"
                                     @change-situation="onChangeSituation"
                                     @change-mood="onChangeMood"
+                                    @register-cash="openCashEntry"
                                 />
                                 <EventCard v-else :item="item" :t="t" />
                             </template>
@@ -647,6 +718,21 @@ const breadcrumbs = [
             :schedule-id="viewScheduleId"
             :t="t"
             @close="closeDetail"
+        />
+
+        <!-- ── Entrada no caixa (fluxo "Chegou -> caixa") ──────────────────── -->
+        <CashEntryModal
+            :open="cashOpen"
+            :item="cashItem"
+            :procedures="procedures"
+            :procedure-prices="procedurePrices"
+            :doctors="doctors"
+            :covenants="covenants"
+            :payment-methods="paymentMethods"
+            :income-categories="incomeCategories"
+            :t="t"
+            @close="cashOpen = false; cashItem = null"
+            @saved="onCashSaved"
         />
 
     </AppLayout>

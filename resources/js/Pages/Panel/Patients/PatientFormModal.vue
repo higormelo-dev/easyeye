@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:           { type: Boolean, required: true },
@@ -225,26 +226,28 @@ const tabHasErrors = computed(() => ({
                     </div>
                     <div class="col-6">
                         <label class="form-label">Gênero <span class="text-danger">*</span></label>
-                        <select v-model="form.gender"
-                                class="form-select"
-                                :class="{ 'is-invalid': form.errors.gender }">
-                            <option value="">Selecione</option>
-                            <option v-for="o in genderOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-                        </select>
-                        <div v-if="form.errors.gender" class="invalid-feedback">{{ form.errors.gender }}</div>
+                        <SearchSelect v-model="form.gender"
+                                      :options="genderOptions"
+                                      :value-key="'value'"
+                                      :label-key="'label'"
+                                      :placeholder="'Selecione'"
+                                      :clearable="false"
+                                      :invalid="!!form.errors.gender" />
+                        <div v-if="form.errors.gender" class="invalid-feedback d-block">{{ form.errors.gender }}</div>
                     </div>
                 </div>
 
                 <div class="row g-3 mb-3">
                     <div class="col-6">
                         <label class="form-label">Estado civil <span class="text-danger">*</span></label>
-                        <select v-model="form.marital_status"
-                                class="form-select"
-                                :class="{ 'is-invalid': form.errors.marital_status }">
-                            <option value="">Selecione</option>
-                            <option v-for="o in maritalOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-                        </select>
-                        <div v-if="form.errors.marital_status" class="invalid-feedback">{{ form.errors.marital_status }}</div>
+                        <SearchSelect v-model="form.marital_status"
+                                      :options="maritalOptions"
+                                      :value-key="'value'"
+                                      :label-key="'label'"
+                                      :placeholder="'Selecione'"
+                                      :clearable="false"
+                                      :invalid="!!form.errors.marital_status" />
+                        <div v-if="form.errors.marital_status" class="invalid-feedback d-block">{{ form.errors.marital_status }}</div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">CPF <span class="text-danger">*</span></label>
@@ -289,13 +292,11 @@ const tabHasErrors = computed(() => ({
             <div v-show="activeTab === 'clinical'">
                 <div class="mb-3">
                     <label class="form-label">Convênio</label>
-                    <select v-model="form.covenant_id"
-                            class="form-select"
-                            :class="{ 'is-invalid': form.errors.covenant_id }">
-                        <option value="">Selecione</option>
-                        <option v-for="c in covenants" :key="c.id" :value="c.id">{{ c.name }}</option>
-                    </select>
-                    <div v-if="form.errors.covenant_id" class="invalid-feedback">{{ form.errors.covenant_id }}</div>
+                    <SearchSelect v-model="form.covenant_id"
+                                  :options="covenants"
+                                  :placeholder="'Selecione'"
+                                  :invalid="!!form.errors.covenant_id" />
+                    <div v-if="form.errors.covenant_id" class="invalid-feedback d-block">{{ form.errors.covenant_id }}</div>
                 </div>
 
                 <div class="mb-3">
@@ -306,17 +307,15 @@ const tabHasErrors = computed(() => ({
                 <div class="row g-3 mb-3">
                     <div class="col-6">
                         <label class="form-label">Tipo de pele</label>
-                        <select v-model="form.skin_id" class="form-select">
-                            <option value="">Não informado</option>
-                            <option v-for="s in skinTypes" :key="s.id" :value="s.id">{{ s.name }}</option>
-                        </select>
+                        <SearchSelect v-model="form.skin_id"
+                                      :options="skinTypes"
+                                      :placeholder="'Não informado'" />
                     </div>
                     <div class="col-6">
                         <label class="form-label">Tipo de íris</label>
-                        <select v-model="form.iris_id" class="form-select">
-                            <option value="">Não informado</option>
-                            <option v-for="i in irisTypes" :key="i.id" :value="i.id">{{ i.name }}</option>
-                        </select>
+                        <SearchSelect v-model="form.iris_id"
+                                      :options="irisTypes"
+                                      :placeholder="'Não informado'" />
                     </div>
                 </div>
 
@@ -333,10 +332,11 @@ const tabHasErrors = computed(() => ({
                         </div>
                         <div class="col-6">
                             <label class="form-label small">UF do RG</label>
-                            <select v-model="form.state_registry_initial" class="form-select form-select-sm">
-                                <option value="">—</option>
-                                <option v-for="s in stateOptions" :key="s.value" :value="s.value">{{ s.value }}</option>
-                            </select>
+                            <SearchSelect v-model="form.state_registry_initial"
+                                          :options="stateOptions"
+                                          :value-key="'value'"
+                                          :label-key="'value'"
+                                          :placeholder="'—'" />
                         </div>
                         <div class="col-6">
                             <label class="form-label small">Data do RG</label>
@@ -417,10 +417,11 @@ const tabHasErrors = computed(() => ({
                     </div>
                     <div class="col-4">
                         <label class="form-label">UF</label>
-                        <select v-model="form.state" class="form-select">
-                            <option value="">—</option>
-                            <option v-for="s in stateOptions" :key="s.value" :value="s.value">{{ s.value }}</option>
-                        </select>
+                        <SearchSelect v-model="form.state"
+                                      :options="stateOptions"
+                                      :value-key="'value'"
+                                      :label-key="'value'"
+                                      :placeholder="'—'" />
                     </div>
                 </div>
 

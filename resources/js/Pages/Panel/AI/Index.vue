@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     balance: { type: Object, required: true },
@@ -92,6 +93,8 @@ const canApproveOrReject = computed(() => selectedRun.value?.status === 'waiting
 const availableStatuses = computed(() => props.statuses.length
     ? props.statuses
     : ['pending', 'reserved', 'running', 'waiting_approval', 'approved', 'rejected', 'failed', 'cancelled']);
+const statusFilterOptions = computed(() =>
+    availableStatuses.value.map((status) => ({ value: status, label: statusLabel(status) })));
 const paginationLinks = computed(() => Array.isArray(props.runs?.links) ? props.runs.links : []);
 
 const workflowLabel = (workflow) => {
@@ -432,10 +435,15 @@ async function rejectRun() {
                     <div class="border rounded p-3 bg-white">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="fw-semibold mb-0">{{ label('runs', 'Execuções') }}</h6>
-                            <select v-model="statusFilter" class="form-select form-select-sm w-auto" @change="filterByStatus">
-                                <option value="">{{ label('all_statuses', 'Todos status') }}</option>
-                                <option v-for="status in availableStatuses" :key="status" :value="status">{{ statusLabel(status) }}</option>
-                            </select>
+                            <SearchSelect
+                                v-model="statusFilter"
+                                class="w-auto"
+                                :options="statusFilterOptions"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :placeholder="label('all_statuses', 'Todos status')"
+                                @change="filterByStatus"
+                            />
                         </div>
 
                         <div class="table-responsive">

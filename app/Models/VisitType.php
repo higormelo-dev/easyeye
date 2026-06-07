@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class VisitType extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasEntityCode;
     use HasUppercaseName;
     use HasUuids;
@@ -20,7 +20,7 @@ class VisitType extends Model
 
     protected string $codePrefixGlobal = 'VTP';
 
-    protected $fillable = ['entity_id', 'code', 'name', 'active'];
+    protected $fillable = ['entity_id', 'code', 'name', 'procedure_id', 'active'];
 
     protected function casts(): array
     {
@@ -30,5 +30,11 @@ class VisitType extends Model
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'id');
+    }
+
+    /** Procedimento padrão usado para pré-preencher o lançamento de caixa. */
+    public function procedure(): BelongsTo
+    {
+        return $this->belongsTo(Procedure::class);
     }
 }

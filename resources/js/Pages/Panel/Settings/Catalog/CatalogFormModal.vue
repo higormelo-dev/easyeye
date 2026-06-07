@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
+import SearchSelect from "@/Components/Panel/SearchSelect.vue";
 
 /**
  * Form modal GENÉRICO schema-driven para catálogos clínicos.
@@ -190,18 +191,16 @@ function firstError(field) { return errors.value[field]?.[0] ?? ''; }
                                 >
 
                                 <!-- select -->
-                                <select
+                                <SearchSelect
                                     v-else-if="field.type === 'select'"
                                     v-model="form[field.key]"
-                                    class="form-select"
-                                    :class="{ 'is-invalid': hasError(field.key) }"
-                                    :required="field.required ?? false"
-                                >
-                                    <option value="">—</option>
-                                    <option v-for="opt in (field.options ?? [])" :key="opt.value" :value="opt.value">
-                                        {{ opt.label }}
-                                    </option>
-                                </select>
+                                    :options="field.options ?? []"
+                                    :value-key="'value'"
+                                    :label-key="'label'"
+                                    :placeholder="'—'"
+                                    :clearable="!(field.required ?? false)"
+                                    :invalid="hasError(field.key)"
+                                />
 
                                 <!-- checkbox -->
                                 <div v-else-if="field.type === 'checkbox'" class="form-check form-switch mt-2">

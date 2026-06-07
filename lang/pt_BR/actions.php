@@ -201,6 +201,7 @@ return [
     'lense'                  => 'Lente',
     'nearpointconvergence'   => 'Convergência de ponto próximo',
     'category'               => 'Categoria',
+    'default_procedure'      => 'Procedimento padrão',
     'version'                => 'Versão',
     'abbreviation'           => 'Abreviação',
     'scale'                  => 'Escala',

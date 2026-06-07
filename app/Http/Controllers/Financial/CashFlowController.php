@@ -1,24 +1,24 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Controllers\Financial;
 
 use App\Enums\EntityGate;
+use App\Exceptions\Financial\CashPeriodClosedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\CashEntryRequest;
 use App\Models\{Entity, FinancialCashEntry, FinancialCategory};
 use App\Services\Financial\CashFlowService;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
+use BackedEnum;
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Gate;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class CashFlowController extends Controller
 {
     public function __construct(
-        private readonly CashFlowService $cashFlowService
+        private readonly CashFlowService $cashFlowService,
     ) {
         $this->titleController = 'Lançamento financeiro';
     }
@@ -40,9 +40,11 @@ class CashFlowController extends Controller
         if ($request->filled('type')) {
             $query->where('type', $request->input('type'));
         }
+
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
+
         if ($request->filled('category_id')) {
             $query->where('category_id', $request->input('category_id'));
         }
@@ -53,18 +55,18 @@ class CashFlowController extends Controller
             ->paginate(30)
             ->withQueryString()
             ->through(fn (FinancialCashEntry $e) => [
-                'id'             => $e->id,
-                'entry_date'     => $e->entry_date?->format('Y-m-d'),
-                'description'    => $e->description,
-                'type'           => $e->type instanceof \BackedEnum ? $e->type->value : $e->type,
-                'status'         => $e->status instanceof \BackedEnum ? $e->status->value : $e->status,
-                'amount'         => (float) $e->amount,
-                'category_name'  => $e->category?->name,
-                'category_id'    => $e->category_id,
-                'covenant_name'  => $e->covenant?->name,
-                'covenant_id'    => $e->covenant_id,
-                'has_claim'      => $e->billingClaim !== null,
-                'notes'          => $e->notes,
+                'id'            => $e->id,
+                'entry_date'    => $e->entry_date?->format('Y-m-d'),
+                'description'   => $e->description,
+                'type'          => $e->type instanceof BackedEnum ? $e->type->value : $e->type,
+                'status'        => $e->status instanceof BackedEnum ? $e->status->value : $e->status,
+                'amount'        => (float) $e->amount,
+                'category_name' => $e->category?->name,
+                'category_id'   => $e->category_id,
+                'covenant_name' => $e->covenant?->name,
+                'covenant_id'   => $e->covenant_id,
+                'has_claim'     => $e->billingClaim !== null,
+                'notes'         => $e->notes,
             ]);
 
         $categories = FinancialCategory::query()
@@ -77,9 +79,9 @@ class CashFlowController extends Controller
 
         return Inertia::render('Panel/Financial/CashFlow/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),               'active' => false],
-                ['label' => 'Financeiro',                     'url' => route('panel.financial.cash-flow.index'), 'active' => false],
-                ['label' => 'Fluxo de Caixa',                 'url' => '#',                                     'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => 'Financeiro', 'url' => route('panel.financial.cash-flow.index'), 'active' => false],
+                ['label' => 'Fluxo de Caixa', 'url' => '#', 'active' => true],
             ],
             'entries'    => $entries,
             'categories' => $categories,
@@ -99,12 +101,16 @@ class CashFlowController extends Controller
     {
         $this->authorizeFinancial();
 
-        $entry = $this->cashFlowService->create($request->validated());
+        try {
+            $entry = $this->cashFlowService->create($request->validated());
+        } catch (CashPeriodClosedException $e) {
+            return $this->periodClosedResponse($request, $e);
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => $this->getCreateMessage(),
-                'data' => $entry->fresh(['category', 'covenant']),
+                'data'    => $entry->fresh(['category', 'covenant']),
             ]);
         }
 
@@ -115,16 +121,29 @@ class CashFlowController extends Controller
     {
         $this->authorizeFinancial();
 
-        $entry = $this->cashFlowService->update($entry, $request->validated());
+        try {
+            $entry = $this->cashFlowService->update($entry, $request->validated());
+        } catch (CashPeriodClosedException $e) {
+            return $this->periodClosedResponse($request, $e);
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => $this->getUpdateMessage($request),
-                'data' => $entry->fresh(['category', 'covenant']),
+                'data'    => $entry->fresh(['category', 'covenant']),
             ]);
         }
 
         return back()->with('message', $this->getUpdateMessage($request));
+    }
+
+    private function periodClosedResponse(Request $request, CashPeriodClosedException $e): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return back()->withErrors(['entry_date' => $e->getMessage()]);
     }
 
     public function destroy(FinancialCashEntry $entry): RedirectResponse

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:       { type: Boolean, required: true },
@@ -143,13 +144,12 @@ async function onSubmit() {
             <!-- Doctor -->
             <div class="mb-3">
                 <label class="form-label fw-semibold">{{ t.wl_doctor }} <span class="text-danger">*</span></label>
-                <select v-model="form.doctor_id"
-                        class="form-select"
-                        :class="{ 'is-invalid': errors.doctor_id }">
-                    <option value="">{{ t.form_select }}</option>
-                    <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
-                </select>
-                <div v-if="errors.doctor_id" class="invalid-feedback">{{ errors.doctor_id[0] }}</div>
+                <SearchSelect v-model="form.doctor_id"
+                              :options="doctors"
+                              :placeholder="t.form_select"
+                              :clearable="false"
+                              :invalid="!! errors.doctor_id" />
+                <div v-if="errors.doctor_id" class="invalid-feedback d-block">{{ errors.doctor_id[0] }}</div>
             </div>
 
             <!-- Preferred period -->
@@ -249,17 +249,15 @@ async function onSubmit() {
             <div class="row g-2 mb-3">
                 <div class="col-6">
                     <label class="form-label fw-semibold">{{ t.wl_covenant }}</label>
-                    <select v-model="form.covenant_id" class="form-select">
-                        <option value="">{{ t.wl_none }}</option>
-                        <option v-for="c in covenants" :key="c.id" :value="c.id">{{ c.name }}</option>
-                    </select>
+                    <SearchSelect v-model="form.covenant_id"
+                                  :options="covenants"
+                                  :placeholder="t.wl_none" />
                 </div>
                 <div class="col-6">
                     <label class="form-label fw-semibold">{{ t.wl_visit_type }}</label>
-                    <select v-model="form.visit_id" class="form-select">
-                        <option value="">{{ t.wl_none }}</option>
-                        <option v-for="v in visitTypes" :key="v.id" :value="v.id">{{ v.name }}</option>
-                    </select>
+                    <SearchSelect v-model="form.visit_id"
+                                  :options="visitTypes"
+                                  :placeholder="t.wl_none" />
                 </div>
             </div>
 

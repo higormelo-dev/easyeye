@@ -5,6 +5,7 @@ import AppLayout                    from '@/Layouts/AppLayout.vue';
 import PartnerFormModal             from './PartnerFormModal.vue';
 import LiveStatusBar                from '@/Components/Panel/LiveStatusBar.vue';
 import ConfirmationWithReasonModal  from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import SearchSelect                  from '@/Components/Panel/SearchSelect.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 import { useDashboardPolling }      from '@/composables/useDashboardPolling.js';
 
@@ -290,20 +291,17 @@ const breadcrumbs = computed(() => [
                                                 <span class="badge" :class="lead.status_badge">{{ lead.status_label }}</span>
                                             </td>
                                             <td class="text-center">
-                                                <select
+                                                <SearchSelect
                                                     v-if="lead.is_active"
-                                                    class="form-select form-select-sm"
+                                                    :model-value="''"
                                                     style="min-width:130px;"
+                                                    :options="leadStatuses.filter(s => s.value !== lead.status)"
+                                                    :value-key="'value'"
+                                                    :label-key="'label'"
+                                                    :placeholder="t.field_advance"
                                                     :disabled="advancingId === lead.id"
-                                                    @change="advanceLead(lead, $event.target.value); $event.target.value = ''"
-                                                >
-                                                    <option value="">{{ t.field_advance }}</option>
-                                                    <option
-                                                        v-for="s in leadStatuses.filter(s => s.value !== lead.status)"
-                                                        :key="s.value"
-                                                        :value="s.value"
-                                                    >{{ s.label }}</option>
-                                                </select>
+                                                    @change="advanceLead(lead, $event)"
+                                                />
                                                 <span v-else class="text-muted small">—</span>
                                             </td>
                                             <td class="text-center text-muted small">{{ lead.created_at }}</td>

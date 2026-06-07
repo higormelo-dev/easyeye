@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:           { type: Boolean, required: true },
@@ -103,28 +104,27 @@ function firstError(field) {
                 <!-- Plano -->
                 <div class="col-md-6">
                     <label class="form-label">{{ t.form_field_plan }}</label>
-                    <select
+                    <SearchSelect
                         v-model="form.plan_id"
-                        class="form-select"
-                        :class="{ 'is-invalid': firstError('plan_id') }"
-                    >
-                        <option value="">{{ t.form_select_plan }}</option>
-                        <option v-for="p in plans" :key="p.id" :value="p.id">{{ p.name }}</option>
-                    </select>
-                    <div v-if="firstError('plan_id')" class="invalid-feedback">{{ firstError('plan_id') }}</div>
+                        :options="plans"
+                        :placeholder="t.form_select_plan"
+                        :invalid="!!firstError('plan_id')"
+                    />
+                    <div v-if="firstError('plan_id')" class="invalid-feedback d-block">{{ firstError('plan_id') }}</div>
                 </div>
 
                 <!-- Status -->
                 <div class="col-md-6">
                     <label class="form-label">{{ t.form_field_status }}</label>
-                    <select
+                    <SearchSelect
                         v-model="form.status"
-                        class="form-select"
-                        :class="{ 'is-invalid': firstError('status') }"
-                    >
-                        <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-                    </select>
-                    <div v-if="firstError('status')" class="invalid-feedback">{{ firstError('status') }}</div>
+                        :options="statuses"
+                        :value-key="'value'"
+                        :label-key="'label'"
+                        :clearable="false"
+                        :invalid="!!firstError('status')"
+                    />
+                    <div v-if="firstError('status')" class="invalid-feedback d-block">{{ firstError('status') }}</div>
                 </div>
 
                 <!-- Início -->

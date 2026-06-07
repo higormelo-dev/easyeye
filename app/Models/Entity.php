@@ -54,6 +54,7 @@ class Entity extends Model
         'active',
         'locale',
         'schedule_interval',
+        'requires_cash_to_complete',
         // 2FA por entity (decisão da empresa)
         'requires_two_factor',
         'two_factor_enabled_at',
@@ -124,14 +125,15 @@ class Entity extends Model
     protected function casts(): array
     {
         return [
-            'is_client'             => 'boolean',
-            'active'                => 'boolean',
-            'schedule_interval'     => 'integer',
-            'requires_two_factor'   => 'boolean',
-            'two_factor_enabled_at' => 'datetime',
-            'created_at'            => 'datetime',
-            'updated_at'            => 'datetime',
-            'deleted_at'            => 'datetime',
+            'is_client'                 => 'boolean',
+            'active'                    => 'boolean',
+            'schedule_interval'         => 'integer',
+            'requires_cash_to_complete' => 'boolean',
+            'requires_two_factor'       => 'boolean',
+            'two_factor_enabled_at'     => 'datetime',
+            'created_at'                => 'datetime',
+            'updated_at'                => 'datetime',
+            'deleted_at'                => 'datetime',
         ];
     }
 

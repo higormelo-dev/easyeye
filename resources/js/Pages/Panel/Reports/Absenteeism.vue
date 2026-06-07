@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout  from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
@@ -43,10 +44,7 @@ const hasResults = computed(() => props.summary !== null);
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small mb-1">Médico</label>
-                            <select v-model="form.doctor_id" class="form-select form-select-sm">
-                                <option value="">Todos</option>
-                                <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
-                            </select>
+                            <SearchSelect v-model="form.doctor_id" :options="doctors" :placeholder="'Todos'" />
                         </div>
                         <div class="col-md-3">
                             <button type="submit" class="btn btn-primary btn-sm w-100">

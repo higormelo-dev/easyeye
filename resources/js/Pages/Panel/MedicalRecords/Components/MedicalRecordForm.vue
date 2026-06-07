@@ -4,6 +4,7 @@ import { useForm } from '@inertiajs/vue3';
 import { validatePayload } from '@/utils/formRulesValidator.js';
 import PdfPreviewModal from './PdfPreviewModal.vue';
 import TinyMceEditor   from '@/Components/Panel/TinyMceEditor.vue';
+import SearchSelect    from '@/Components/Panel/SearchSelect.vue';
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 
 /**
@@ -1086,13 +1087,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             <div class="row g-2">
                 <div class="col-12 col-md-4 col-lg-3">
                     <label class="pmr-label">{{ tt('doctor', 'Médico') }}</label>
-                    <select v-model="form.doctor_id" name="doctor_id"
-                            class="form-select form-select-sm"
-                            :class="{ 'is-invalid': form.errors.doctor_id }"
-                            :disabled="isLocked">
-                        <option value="">{{ tt('select', 'Selecione') }}</option>
-                        <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
-                    </select>
+                    <SearchSelect v-model="form.doctor_id"
+                                  :options="doctors"
+                                  :placeholder="tt('select', 'Selecione')"
+                                  :invalid="Boolean(form.errors.doctor_id)"
+                                  :disabled="isLocked" />
                 </div>
             </div>
         </div>
@@ -1198,27 +1197,21 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div class="row g-2">
                             <div class="col-4">
                                 <label class="pmr-label">{{ tt('chromatic_vision', 'Vis. cromática') }}</label>
-                                <select v-model="form.color_vision_type_id" name="color_vision_type_id"
-                                        class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">—</option>
-                                    <option v-for="item in colorVisionTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.color_vision_type_id"
+                                              :options="colorVisionTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="col-4">
                                 <label class="pmr-label">{{ tt('near_point', 'PPC') }}</label>
-                                <select v-model="form.near_point_convergence_id" name="near_point_convergence_id"
-                                        class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">—</option>
-                                    <option v-for="item in nearPointTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.near_point_convergence_id"
+                                              :options="nearPointTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="col-4">
                                 <label class="pmr-label">{{ tt('cover_test', 'Cover test') }}</label>
-                                <select v-model="form.cover_test_type_id" name="cover_test_type_id"
-                                        class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">—</option>
-                                    <option v-for="item in coverTestTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.cover_test_type_id"
+                                              :options="coverTestTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                         </div>
                     </div>
@@ -1231,21 +1224,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 <div class="d-flex gap-1">
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text pmr-eye-badge">OD</span>
-                                        <select v-model="form.visual_acuity_without_correction_right_id"
-                                                name="visual_acuity_without_correction_right_id"
-                                                class="form-select form-select-sm" :disabled="isLocked">
-                                            <option value="">—</option>
-                                            <option v-for="item in visualAcuityTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                        </select>
+                                        <SearchSelect v-model="form.visual_acuity_without_correction_right_id"
+                                                      :options="visualAcuityTypes"
+                                                      :placeholder="'—'" :disabled="isLocked" />
                                     </div>
                                     <div class="input-group input-group-sm">
                                         <span class="input-group-text pmr-eye-badge">OE</span>
-                                        <select v-model="form.visual_acuity_without_correction_left_id"
-                                                name="visual_acuity_without_correction_left_id"
-                                                class="form-select form-select-sm" :disabled="isLocked">
-                                            <option value="">—</option>
-                                            <option v-for="item in visualAcuityTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                        </select>
+                                        <SearchSelect v-model="form.visual_acuity_without_correction_left_id"
+                                                      :options="visualAcuityTypes"
+                                                      :placeholder="'—'" :disabled="isLocked" />
                                     </div>
                                 </div>
                             </div>
@@ -1416,24 +1403,21 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div class="row g-2 align-items-end">
                             <div class="col-3">
                                 <label class="pmr-label">{{ tt('addition', 'Adição') }}</label>
-                                <select v-model="form.addition_type_id" name="addition_type_id" class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">{{ tt('select', 'Selecione') }}</option>
-                                    <option v-for="item in additionTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.addition_type_id"
+                                              :options="additionTypes"
+                                              :placeholder="tt('select', 'Selecione')" :disabled="isLocked" />
                             </div>
                             <div class="col-3">
                                 <label class="pmr-label">{{ tt('lens_away', 'Longe') }}</label>
-                                <select v-model="form.lens_away_id" name="lens_away_id" class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">—</option>
-                                    <option v-for="item in lenses" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.lens_away_id"
+                                              :options="lenses"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="col-3">
                                 <label class="pmr-label">{{ tt('lens_near', 'Perto') }}</label>
-                                <select v-model="form.lens_near_id" name="lens_near_id" class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">—</option>
-                                    <option v-for="item in lenses" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.lens_near_id"
+                                              :options="lenses"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="col-3 d-flex gap-1">
                                 <input v-model.number="presbyopiaAddition" type="number" step="0.25"
@@ -1472,19 +1456,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div class="d-flex gap-1">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
-                                <select v-model="form.visual_acuity_with_correction_right_id" name="visual_acuity_with_correction_right_id"
-                                        class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">—</option>
-                                    <option v-for="item in visualAcuityTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.visual_acuity_with_correction_right_id"
+                                              :options="visualAcuityTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
-                                <select v-model="form.visual_acuity_with_correction_left_id" name="visual_acuity_with_correction_left_id"
-                                        class="form-select form-select-sm" :disabled="isLocked">
-                                    <option value="">—</option>
-                                    <option v-for="item in visualAcuityTypes" :key="item.id" :value="item.id">{{ item.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.visual_acuity_with_correction_left_id"
+                                              :options="visualAcuityTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                         </div>
                     </div>
@@ -1966,13 +1946,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             </div>
                             <div class="col-12 col-md-5">
                                 <label class="pmr-label mb-1">{{ tt('procedure_type_label','Tipo') }}</label>
-                                <select v-model="procTypeSelected" class="form-select form-select-sm">
-                                    <option value="">—</option>
-                                    <option value="rotina">{{ tt('procedure_type_rotina','Rotina') }}</option>
-                                    <option value="urgencia">{{ tt('procedure_type_urgencia','Urgência') }}</option>
-                                    <option value="controle">{{ tt('procedure_type_controle','Controle') }}</option>
-                                    <option value="comparativo">{{ tt('procedure_type_comparativo','Comparativo') }}</option>
-                                </select>
+                                <SearchSelect v-model="procTypeSelected"
+                                              :options="[
+                                                  { value: 'rotina',      label: tt('procedure_type_rotina','Rotina') },
+                                                  { value: 'urgencia',    label: tt('procedure_type_urgencia','Urgência') },
+                                                  { value: 'controle',    label: tt('procedure_type_controle','Controle') },
+                                                  { value: 'comparativo', label: tt('procedure_type_comparativo','Comparativo') },
+                                              ]"
+                                              :value-key="'value'" :label-key="'label'"
+                                              :placeholder="'—'" />
                             </div>
                         </div>
 
@@ -2057,11 +2039,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             <label class="btn btn-outline-primary btn-sm" for="cataractEyeBoth">{{ tt('cataract_eye_both','AO') }}</label>
                         </div>
                         <label class="pmr-label mb-1">{{ tt('cataract_template','Modelo') }}</label>
-                        <select v-model="cataractForm.template" class="form-select form-select-sm mb-3">
-                            <option value="pre_operatorio">{{ tt('cataract_template_pre','Pré-operatório') }}</option>
-                            <option value="pos_operatorio">{{ tt('cataract_template_pos','Pós-operatório') }}</option>
-                            <option value="instrucoes_cirurgicas">{{ tt('cataract_template_inst','Instruções cirúrgicas') }}</option>
-                        </select>
+                        <SearchSelect v-model="cataractForm.template"
+                                      class="mb-3"
+                                      :options="[
+                                          { value: 'pre_operatorio',        label: tt('cataract_template_pre','Pré-operatório') },
+                                          { value: 'pos_operatorio',        label: tt('cataract_template_pos','Pós-operatório') },
+                                          { value: 'instrucoes_cirurgicas', label: tt('cataract_template_inst','Instruções cirúrgicas') },
+                                      ]"
+                                      :value-key="'value'" :label-key="'label'"
+                                      :clearable="false" />
                         <div class="row g-2 mb-1" :class="{ 'opacity-75': cataractForm.template !== 'instrucoes_cirurgicas' }">
                             <div class="col-7">
                                 <label class="pmr-label mb-1">{{ tt('cataract_date','Data') }}</label>

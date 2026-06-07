@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ExamTypesSeeder::class);
         $this->call(AdditionTypesSeeder::class);
         $this->call(SurgeryTypesSeeder::class);
+        $this->call(ProcedureSeeder::class);
         $this->call(CoverTestTypesSeeder::class);
         $this->call(ColorVisionTypesSeeder::class);
         $this->call(VisualAcuityTypesSeeder::class);

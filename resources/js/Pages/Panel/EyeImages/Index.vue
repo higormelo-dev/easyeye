@@ -2,6 +2,7 @@
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import AppLayout  from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
  * Eye Images — porta fiel da implementação Alpine.js original.
@@ -757,6 +758,14 @@ async function submitAiRun() {
     }
 }
 
+// Opções para SearchSelect (arrays de objetos {value,label}).
+const aiWorkflowOptions = computed(() =>
+    aiWorkflows.value.map((workflow) => ({ value: workflow, label: aiWorkflowLabel(workflow) })),
+);
+const aiPatientOptions = computed(() =>
+    aiPatients.value.map((p) => ({ value: p.id, label: `${p.name} (${p.code})` })),
+);
+
 // Entidade p/ cabeçalho da impressão
 const printEntity = computed(() => props.entity ?? {});
 </script>
@@ -796,14 +805,17 @@ const printEntity = computed(() => props.entity ?? {});
                     </div>
 
                     <div class="col-6 col-sm-3 col-md-2">
-                        <select class="form-select form-select-sm" :value="period"
-                                @change="changePeriod($event.target.value)">
-                            <option value="hoje">Hoje</option>
-                            <option value="7">Últimos 7 dias</option>
-                            <option value="15">Últimos 15 dias</option>
-                            <option value="30">Últimos 30 dias</option>
-                            <option value="90">Últimos 90 dias</option>
-                        </select>
+                        <SearchSelect v-model="period"
+                                      :options="[
+                                          {value:'hoje',label:'Hoje'},
+                                          {value:'7',label:'Últimos 7 dias'},
+                                          {value:'15',label:'Últimos 15 dias'},
+                                          {value:'30',label:'Últimos 30 dias'},
+                                          {value:'90',label:'Últimos 90 dias'},
+                                      ]"
+                                      :value-key="'value'" :label-key="'label'"
+                                      :clearable="false"
+                                      @change="changePeriod" />
                     </div>
 
                     <div class="col-6 col-sm-auto">
@@ -848,28 +860,26 @@ const printEntity = computed(() => props.entity ?? {});
                     </div>
 
                     <div class="col-12 col-sm-6 col-md-3">
-                        <select class="form-select form-select-sm" v-model="examTypeId">
-                            <option value="">Todos os exames</option>
-                            <option v-for="t in availableExamTypes" :key="t.id" :value="t.id">{{ t.name }}</option>
-                        </select>
+                        <SearchSelect v-model="examTypeId" :options="availableExamTypes"
+                                      :placeholder="'Todos os exames'" />
                     </div>
 
                     <div class="col-12 col-sm-6 col-md-2">
-                        <select class="form-select form-select-sm" v-model="examStatus">
-                            <option value="">Todos status</option>
-                            <option value="solicitado">Solicitado</option>
-                            <option value="realizado">Realizado</option>
-                            <option value="laudado">Laudado</option>
-                            <option value="cancelado">Cancelado</option>
-                        </select>
+                        <SearchSelect v-model="examStatus"
+                                      :options="[
+                                          {value:'solicitado',label:'Solicitado'},
+                                          {value:'realizado',label:'Realizado'},
+                                          {value:'laudado',label:'Laudado'},
+                                          {value:'cancelado',label:'Cancelado'},
+                                      ]"
+                                      :value-key="'value'" :label-key="'label'"
+                                      :placeholder="'Todos status'" />
                     </div>
 
                     <div class="col-12 col-sm-6 col-md-3">
-                        <select class="form-select form-select-sm" :value="doctorId"
-                                @change="setDoctor($event.target.value)">
-                            <option value="">Todos médicos</option>
-                            <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
-                        </select>
+                        <SearchSelect v-model="doctorId" :options="doctors"
+                                      :placeholder="'Todos médicos'"
+                                      @change="setDoctor" />
                     </div>
 
                     <div class="col-auto">
@@ -1453,28 +1463,28 @@ const printEntity = computed(() => props.entity ?? {});
                         <div class="row g-2 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small">{{ aiLabel('workflow', 'Workflow') }}</label>
-                                <select v-model="aiForm.workflow" class="form-select form-select-sm">
-                                    <option v-for="workflow in aiWorkflows" :key="workflow" :value="workflow">
-                                        {{ aiWorkflowLabel(workflow) }}
-                                    </option>
-                                </select>
+                                <SearchSelect v-model="aiForm.workflow" :options="aiWorkflowOptions"
+                                              :value-key="'value'" :label-key="'label'"
+                                              :clearable="false" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small">{{ aiLabel('risk', 'Risco') }}</label>
-                                <select v-model="aiForm.risk_level" class="form-select form-select-sm">
-                                    <option value="low">{{ aiLabel('risk_low', 'Baixo') }}</option>
-                                    <option value="medium">{{ aiLabel('risk_medium', 'Médio') }}</option>
-                                    <option value="high">{{ aiLabel('risk_high', 'Alto') }}</option>
-                                </select>
+                                <SearchSelect v-model="aiForm.risk_level"
+                                              :options="[
+                                                  {value:'low',label:aiLabel('risk_low', 'Baixo')},
+                                                  {value:'medium',label:aiLabel('risk_medium', 'Médio')},
+                                                  {value:'high',label:aiLabel('risk_high', 'Alto')},
+                                              ]"
+                                              :value-key="'value'" :label-key="'label'"
+                                              :clearable="false" />
                             </div>
                         </div>
 
                         <div v-if="aiShowPatientSelector" class="mb-3">
                             <label class="form-label small">{{ aiLabel('patient_optional', 'Patient (optional)') }}</label>
-                            <select v-model="aiForm.patient_id" class="form-select form-select-sm">
-                                <option value="">{{ aiLabel('select_placeholder', 'Select') }}</option>
-                                <option v-for="p in aiPatients" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
-                            </select>
+                            <SearchSelect v-model="aiForm.patient_id" :options="aiPatientOptions"
+                                          :value-key="'value'" :label-key="'label'"
+                                          :placeholder="aiLabel('select_placeholder', 'Select')" />
                         </div>
                         <div v-else class="mb-3">
                             <label class="form-label small">{{ aiLabel('patient_optional', 'Patient (optional)') }}</label>

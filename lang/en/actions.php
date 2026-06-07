@@ -206,6 +206,7 @@ return [
     'lense'                  => 'Lense',
     'nearpointconvergence'   => 'Near Point Convergence',
     'category'               => 'Category',
+    'default_procedure'      => 'Default procedure',
     'version'                => 'Version',
     'abbreviation'           => 'Abbreviation',
     'scale'                  => 'Scale',

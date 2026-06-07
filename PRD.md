@@ -1,11 +1,11 @@
-**Versão:** 2.6  
-**Data:** 25 de abril de 2026  
-**Status:** Produção ativa (escopo implementado)
+**Versão:** 3.0  
+**Data:** Junho de 2026 (Migração SPA)  
+**Status:** Produção ativa (escopo implementado via Vue 3 + Inertia.js)
 
 ---
 
 ## 1. Visão do Produto
-O **EasyEye** é uma plataforma SaaS multi-tenant para clínicas de oftalmologia, com foco em operação clínica diária, conformidade regulatória (CFM/LGPD), integração de exames e gestão financeira/faturamento.
+O **EasyEye** é uma plataforma SaaS multi-tenant (com interface SPA ultra-rápida) para clínicas de oftalmologia, com foco em operação clínica diária, conformidade regulatória (CFM/LGPD), integração de exames e gestão financeira/faturamento.
 
 Produto já cobre operação de ponta a ponta do tenant clínico e operação SaaS do provedor (manager), com camada de parceiros e billing multi-gateway.
 

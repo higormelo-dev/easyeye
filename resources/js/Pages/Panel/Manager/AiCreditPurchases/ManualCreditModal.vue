@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
+import SearchSelect from "@/Components/Panel/SearchSelect.vue";
 
 /**
  * Modal para lançar crédito IA manual em uma carteira de empresa.
@@ -50,6 +51,13 @@ const filteredEntities = computed(() => {
     if (props.permissions?.create_manual_for_internal) return props.entities;
     return props.entities.filter(e => e.is_client);
 });
+
+const entityOptions = computed(() =>
+    filteredEntities.value.map(e => ({
+        id: e.id,
+        name: `${e.name}${!e.is_client ? ' ★' : ''}`,
+    })),
+);
 
 const selectedEntityIsInternal = computed(() => {
     const e = props.entities.find(x => x.id === form.value.entity_id);
@@ -141,12 +149,13 @@ defineExpose({ setSaving, setError });
                                         {{ t?.manual?.select_entity ?? 'Empresa destinatária' }}
                                         <span class="text-danger">*</span>
                                     </label>
-                                    <select v-model="form.entity_id" class="form-select" required :disabled="saving">
-                                        <option value="" disabled>—</option>
-                                        <option v-for="e in filteredEntities" :key="e.id" :value="e.id">
-                                            {{ e.name }}{{ !e.is_client ? ' ★' : '' }}
-                                        </option>
-                                    </select>
+                                    <SearchSelect
+                                        v-model="form.entity_id"
+                                        :options="entityOptions"
+                                        :placeholder="'—'"
+                                        :clearable="false"
+                                        :disabled="saving"
+                                    />
                                     <small class="text-muted">{{ t?.manual?.select_entity_help ?? '' }}</small>
                                     <div v-if="selectedEntityIsInternal" class="mt-2">
                                         <span class="badge bg-primary-subtle text-primary border border-primary border-opacity-25">

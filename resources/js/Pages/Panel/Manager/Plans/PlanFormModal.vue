@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:          { type: Boolean, required: true },
@@ -65,6 +66,16 @@ function submit() {
 
 const booleanFeatures = computed(() => props.features.filter(f => f.is_boolean));
 const numericFeatures  = computed(() => props.features.filter(f => f.is_numeric));
+
+const statusOptions = computed(() => ([
+    { value: true,  label: props.t.status_option_active },
+    { value: false, label: props.t.status_option_inactive },
+]));
+
+const booleanFeatureOptions = computed(() => ([
+    { value: '0', label: props.t.features_boolean_not_included },
+    { value: '1', label: props.t.features_boolean_included },
+]));
 
 const tabErrors = computed(() => ({
     dados:    ['name','description','price','billing_cycle','sort_order'].some(k => k in form.errors),
@@ -134,17 +145,12 @@ const tabErrors = computed(() => ({
                     </div>
                     <div class="col-7">
                         <label class="form-label">{{ t.field_billing_cycle_required }}</label>
-                        <select v-model="form.billing_cycle" class="form-select" :class="{ 'is-invalid': form.errors.billing_cycle }">
-                            <option v-for="c in billingCycles" :key="c.value" :value="c.value">{{ c.label }}</option>
-                        </select>
-                        <div v-if="form.errors.billing_cycle" class="invalid-feedback">{{ form.errors.billing_cycle }}</div>
+                        <SearchSelect v-model="form.billing_cycle" :options="billingCycles" :value-key="'value'" :label-key="'label'" :placeholder="t.field_billing_cycle_required" :clearable="false" :invalid="!!form.errors.billing_cycle" />
+                        <div v-if="form.errors.billing_cycle" class="invalid-feedback d-block">{{ form.errors.billing_cycle }}</div>
                     </div>
                     <div v-if="isEdit" class="col-6">
                         <label class="form-label">{{ t.field_status }}</label>
-                        <select v-model="form.active" class="form-select">
-                            <option :value="true">{{ t.status_option_active }}</option>
-                            <option :value="false">{{ t.status_option_inactive }}</option>
-                        </select>
+                        <SearchSelect v-model="form.active" :options="statusOptions" :value-key="'value'" :label-key="'label'" :placeholder="t.field_status" :clearable="false" />
                     </div>
                 </div>
             </div>
@@ -173,10 +179,7 @@ const tabErrors = computed(() => ({
                     <div class="row g-3">
                         <div v-for="f in booleanFeatures" :key="f.key" class="col-6">
                             <label class="form-label small">{{ f.label }}</label>
-                            <select v-model="form.features[f.key]" class="form-select form-select-sm">
-                                <option value="0">{{ t.features_boolean_not_included }}</option>
-                                <option value="1">{{ t.features_boolean_included }}</option>
-                            </select>
+                            <SearchSelect v-model="form.features[f.key]" :options="booleanFeatureOptions" :value-key="'value'" :label-key="'label'" :placeholder="t.features_boolean_not_included" :clearable="false" />
                         </div>
                     </div>
                 </div>

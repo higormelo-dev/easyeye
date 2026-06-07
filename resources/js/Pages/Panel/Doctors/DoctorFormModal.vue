@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:           { type: Boolean, required: true },
@@ -109,7 +110,7 @@ const maritalOptions = computed(() =>
     Object.entries(props.maritalStatuses).map(([v, l]) => ({ value: Number(v), label: l })),
 );
 const stateOptions = computed(() =>
-    Object.entries(props.statesOfBrazil).map(([v]) => v),
+    Object.entries(props.statesOfBrazil).map(([v]) => ({ value: v, label: v })),
 );
 
 const tabErrors = computed(() => ({
@@ -206,10 +207,11 @@ const tabErrors = computed(() => ({
                     </div>
                     <div class="col-6">
                         <label class="form-label">Gênero</label>
-                        <select v-model="form.gender" class="form-select">
-                            <option value="">Selecione</option>
-                            <option v-for="o in genderOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-                        </select>
+                        <SearchSelect v-model="form.gender"
+                                      :options="genderOptions"
+                                      :value-key="'value'"
+                                      :label-key="'label'"
+                                      :placeholder="'Selecione'" />
                     </div>
                 </div>
 
@@ -225,10 +227,11 @@ const tabErrors = computed(() => ({
                     </div>
                     <div class="col-6">
                         <label class="form-label">Estado civil</label>
-                        <select v-model="form.marital_status" class="form-select">
-                            <option value="">Selecione</option>
-                            <option v-for="o in maritalOptions" :key="o.value" :value="o.value">{{ o.label }}</option>
-                        </select>
+                        <SearchSelect v-model="form.marital_status"
+                                      :options="maritalOptions"
+                                      :value-key="'value'"
+                                      :label-key="'label'"
+                                      :placeholder="'Selecione'" />
                     </div>
                 </div>
 
@@ -364,10 +367,11 @@ const tabErrors = computed(() => ({
                     </div>
                     <div class="col-4">
                         <label class="form-label">UF</label>
-                        <select v-model="form.state" class="form-select">
-                            <option value="">—</option>
-                            <option v-for="s in stateOptions" :key="s" :value="s">{{ s }}</option>
-                        </select>
+                        <SearchSelect v-model="form.state"
+                                      :options="stateOptions"
+                                      :value-key="'value'"
+                                      :label-key="'label'"
+                                      :placeholder="'—'" />
                     </div>
                 </div>
             </div>

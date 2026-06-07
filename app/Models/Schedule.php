@@ -11,11 +11,11 @@ use Laracasts\Presenter\PresentableTrait;
 
 class Schedule extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasUuids;
-    use SoftDeletes;
     use PresentableTrait;
+    use SoftDeletes;
 
     protected $presenter = SchedulePresenter::class;
 
@@ -51,7 +51,7 @@ class Schedule extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {
@@ -140,6 +140,17 @@ class Schedule extends Model
     public function situationLogs(): HasMany
     {
         return $this->hasMany(ScheduleSituationLog::class)->orderBy('created_at');
+    }
+
+    /**
+     * Lançamentos de caixa vinculados a este agendamento.
+     * O vínculo é polimórfico via reference_type/reference_id no modelo
+     * FinancialCashEntry, com o tipo literal 'schedule'.
+     */
+    public function financialEntries(): HasMany
+    {
+        return $this->hasMany(FinancialCashEntry::class, 'reference_id')
+            ->where('financial_cash_entries.reference_type', 'schedule');
     }
 
     public function resources(): BelongsToMany

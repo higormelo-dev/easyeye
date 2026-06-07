@@ -1,6 +1,7 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:          { type: Boolean, required: true },
@@ -16,6 +17,11 @@ const emit = defineEmits(['close', 'saved']);
 const saving  = ref(false);
 const error   = ref('');
 const form    = ref({ plan_id: '', billing_cycle: '', gateway: '' });
+
+// Preserva o rótulo "Nome — Preço" do plano no SearchSelect.
+const planOptions = computed(() =>
+    props.plans.map((p) => ({ id: p.id, label: p.price ? `${p.name} — ${p.price}` : p.name })),
+);
 
 watch(() => props.open, (val) => {
     if (val) {
@@ -88,29 +94,38 @@ async function submit() {
                         <!-- Plano -->
                         <div class="mb-3">
                             <label class="form-label">{{ t.activate_plan }}</label>
-                            <select v-model="form.plan_id" class="form-select" required>
-                                <option value="">{{ t.activate_plan_select }}</option>
-                                <option v-for="p in plans" :key="p.id" :value="p.id">
-                                    {{ p.name }}{{ p.price ? ` — ${p.price}` : '' }}
-                                </option>
-                            </select>
+                            <SearchSelect
+                                v-model="form.plan_id"
+                                :options="planOptions"
+                                :label-key="'label'"
+                                :placeholder="t.activate_plan_select"
+                                :clearable="false"
+                            />
+
                         </div>
 
                         <!-- Ciclo -->
                         <div class="mb-3">
                             <label class="form-label">{{ t.activate_cycle }}</label>
-                            <select v-model="form.billing_cycle" class="form-select" required>
-                                <option v-for="c in billingCycles" :key="c.value" :value="c.value">{{ c.label }}</option>
-                            </select>
+                            <SearchSelect
+                                v-model="form.billing_cycle"
+                                :options="billingCycles"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :clearable="false"
+                            />
                         </div>
 
                         <!-- Gateway -->
                         <div class="mb-3">
                             <label class="form-label">{{ t.activate_gateway }}</label>
-                            <select v-model="form.gateway" class="form-select">
-                                <option value="">{{ t.activate_gateway_default }}</option>
-                                <option v-for="g in gateways" :key="g.value" :value="g.value">{{ g.label }}</option>
-                            </select>
+                            <SearchSelect
+                                v-model="form.gateway"
+                                :options="gateways"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :placeholder="t.activate_gateway_default"
+                            />
                             <div class="form-text">{{ t.activate_gateway_hint }}</div>
                         </div>
 

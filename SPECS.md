@@ -1,7 +1,7 @@
 **Runtime:** PHP 8.4 (ambiente atual) / requisito Composer `^8.2`  
 **Framework:** Laravel 12.x  
-**Frontend:** Blade + Alpine.js + Vite + Bootstrap 5 + Tailwind  
-**Banco:** SQLite (default local/test) com suporte a MySQL/MariaDB/PostgreSQL/SQL Server
+**Frontend:** Vue 3 (Composition API) + Inertia.js + Vite + Bootstrap 5 + Tailwind CSS  
+**Banco:** SQLite (default local/test) com suporte a PostgreSQL/MySQL/MariaDB/SQL Server
 
 ---
 
@@ -11,7 +11,7 @@ Arquitetura modular em monólito Laravel, orientada a domínio de negócio (clí
 1. **HTTP** (`Controllers`, `Requests`, `Middleware`) para orquestração e borda.
 2. **Aplicação/Negócio** (`Services`, `Domains`, `Actions`) para regras centrais.
 3. **Persistência** (`Models`, migrations, enums, traits) para consistência de dados.
-4. **Apresentação** (`Blade`, `DataTables`, `Alpine`, assets Vite) para operação web.
+4. **Apresentação** (`Vue 3`, `Inertia.js`, assets Vite) para operação web em formato SPA.
 
 ## 2. Multi-Tenancy e ACL
 
@@ -131,18 +131,19 @@ Arquitetura modular em monólito Laravel, orientada a domínio de negócio (clí
 5. TISS: operadores, credenciais, guias, lotes, XML, retornos, glosas.
 6. Growth: partners, referrals, leads, commissions, activation.
 
-## 8. Frontend (Blade + Vite + Alpine)
+## 8. Frontend (Vue 3 + Inertia.js + Vite)
 
 ### 8.1 Estrutura
-1. Layout principal em `resources/views/layouts/app.blade.php`.
-2. JS app em `resources/js/app.js` com registro de componentes Alpine.
-3. Vendor bundle em `resources/js/vendor.js` (jQuery, DataTables, Bootstrap, plugins).
-4. CSS via `resources/css/vendor.css` + `resources/css/app.css`.
+1. Entry-points Inertia: `resources/views/{app,panel-app,guest-app,portal-app}.blade.php`.
+2. Layouts Vue: `resources/js/Layouts/{AppLayout,GuestLayout,PortalLayout}.vue`.
+3. JS app em `resources/js/app.js` e páginas em `resources/js/Pages/*`.
+4. SCSS modular em `resources/css/system/_*.scss` e `system.scss` como entry, junto com Tailwind.
 
 ### 8.2 Observações Técnicas
-1. DataTables server-side via Yajra (PHP) + namespace JS `LaravelDataTables`.
-2. jQuery carregado de forma síncrona no layout para scripts inline DataTables.
-3. Scripts de domínio em `resources/js/system/*` e componentes reutilizáveis em `resources/js/components/*`.
+1. Utilização extensiva de Vue 3 Composition API (`<script setup>`).
+2. Componentes compartilhados centralizados em `resources/js/Components/Panel/` (ex: TinyMceEditor, TablePagination).
+3. Gerenciamento de formulários feito exclusivamente via `useForm` do `@inertiajs/vue3`.
+4. Alpine.js, Yajra DataTables e jQuery (na lógica de negócio) foram removidos em prol do Inertia.
 
 ## 9. Qualidade, Testes e Operação
 
@@ -160,6 +161,6 @@ Arquitetura modular em monólito Laravel, orientada a domínio de negócio (clí
 3. Queue default em `database` no `.env.example`.
 
 ## 10. Riscos Técnicos Atuais
-1. Forte acoplamento com DataTables+jQuery em várias telas administrativas.
+1. Transição recente para Vue/Inertia requer vigilância para garantir que componentes legados do Bootstrap não quebrem a reatividade.
 2. Alta superfície de domínio (clínico + billing + TISS) exige disciplina de regressão em releases.
 3. Multi-tenancy por sessão requer atenção especial em jobs, logs e autorizações fora de request web.

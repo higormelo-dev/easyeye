@@ -4,6 +4,7 @@ import { router }               from '@inertiajs/vue3';
 import AppLayout                from '@/Layouts/AppLayout.vue';
 import PageHeader               from '@/Components/Panel/PageHeader.vue';
 import SearchInput              from '@/Components/Panel/SearchInput.vue';
+import SearchSelect             from '@/Components/Panel/SearchSelect.vue';
 import ReportSettingTable       from './ReportSettingTable.vue';
 import ReportSettingCards       from './ReportSettingCards.vue';
 import ReportSettingFormModal   from './ReportSettingFormModal.vue';
@@ -184,23 +185,21 @@ const breadcrumbs = [
                     max-width="320px"
                 />
 
-                <select
+                <SearchSelect
                     v-model="statusFilter"
-                    class="form-select form-select-sm"
+                    :options="statuses"
+                    :value-key="'value'"
+                    :label-key="'label'"
+                    :placeholder="t.all_statuses"
                     style="max-width:180px;"
-                >
-                    <option value="">{{ t.all_statuses }}</option>
-                    <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-                </select>
+                />
 
-                <select
+                <SearchSelect
                     v-model="categoryFilter"
-                    class="form-select form-select-sm"
+                    :options="categories"
+                    :placeholder="t.all_categories"
                     style="max-width:200px;"
-                >
-                    <option value="">{{ t.all_categories }}</option>
-                    <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-                </select>
+                />
             </div>
 
             <!-- ── Table / Cards ─────────────────────────────────────────────── -->

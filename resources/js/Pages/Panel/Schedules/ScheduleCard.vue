@@ -5,13 +5,14 @@ import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 
 const props = defineProps({
-    item:          { type: Object,  required: true },
-    isStaff:       { type: Boolean, default: false },
-    isDoctor:      { type: Boolean, default: false },
-    moods:         { type: Array,   default: () => [] },
-    selectionMode: { type: Boolean, default: false },
-    selected:      { type: Boolean, default: false },
-    t:             { type: Object,  required: true },
+    item:            { type: Object,  required: true },
+    isStaff:         { type: Boolean, default: false },
+    isDoctor:        { type: Boolean, default: false },
+    canRegisterCash: { type: Boolean, default: false },
+    moods:           { type: Array,   default: () => [] },
+    selectionMode:   { type: Boolean, default: false },
+    selected:        { type: Boolean, default: false },
+    t:               { type: Object,  required: true },
 });
 
 const emit = defineEmits([
@@ -22,6 +23,7 @@ const emit = defineEmits([
     'cancel',
     'change-situation',
     'change-mood',
+    'register-cash',
 ]);
 
 // ── Waiting timer ──────────────────────────────────────────────────────────────
@@ -197,6 +199,17 @@ function onSituationClick(trans) {
 
                     <!-- Grupo 2: navegação/edição do agendamento -->
                     <ActionIconGroup gap="tight">
+                        <!-- Caixa: registrar entrada (fluxo "Chegou -> caixa") -->
+                        <ActionIconButton
+                            v-if="canRegisterCash && !item.is_terminal"
+                            icon="ti ti-cash-register"
+                            :variant="item.has_cash_entry ? 'success' : 'default'"
+                            :title="item.has_cash_entry
+                                ? (t.cash_already_registered ?? 'Entrada já lançada no caixa')
+                                : (t.cash_register ?? 'Registrar entrada no caixa')"
+                            @click="emit('register-cash', item)"
+                        />
+
                         <!-- Edit -->
                         <ActionIconButton
                             v-if="!item.is_terminal"

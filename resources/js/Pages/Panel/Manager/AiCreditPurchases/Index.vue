@@ -6,6 +6,7 @@ import PageHeader from '@/Components/Panel/PageHeader.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 import AiCreditPurchaseDetailDrawer from './AiCreditPurchaseDetailDrawer.vue';
 import ManualCreditModal from './ManualCreditModal.vue';
@@ -276,6 +277,11 @@ function onRefund(purchase) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const hasResults = computed(() => (props.purchases?.data ?? []).length > 0);
 
+// Preserva o marcador ★ das entidades internas (não-cliente) no rótulo.
+const entityOptions = computed(() =>
+    (props.entities ?? []).map((e) => ({ id: e.id, name: `${e.name}${!e.is_client ? ' ★' : ''}` })),
+);
+
 function goToPage(url) {
     if (!url) return;
     router.get(url, {}, { preserveScroll: true, preserveState: true, only: ['purchases'] });
@@ -461,26 +467,32 @@ function providerIcon(provider) {
                             <form @submit.prevent="applyFilters" class="row g-2">
                                 <div class="col-6">
                                     <label class="form-label small mb-1">{{ t?.filters?.status ?? 'Status' }}</label>
-                                    <select v-model="filterForm.status" class="form-select form-select-sm">
-                                        <option value="">{{ t?.filters?.all ?? 'Todos' }}</option>
-                                        <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
-                                    </select>
+                                    <SearchSelect
+                                        v-model="filterForm.status"
+                                        :options="statusOptions"
+                                        :value-key="'value'"
+                                        :label-key="'label'"
+                                        :placeholder="t?.filters?.all ?? 'Todos'"
+                                    />
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">{{ t?.filters?.provider ?? 'Provedor' }}</label>
-                                    <select v-model="filterForm.provider" class="form-select form-select-sm">
-                                        <option value="">{{ t?.filters?.all ?? 'Todos' }}</option>
-                                        <option v-for="p in providerOptions" :key="p.value" :value="p.value">{{ p.label }}</option>
-                                    </select>
+                                    <SearchSelect
+                                        v-model="filterForm.provider"
+                                        :options="providerOptions"
+                                        :value-key="'value'"
+                                        :label-key="'label'"
+                                        :placeholder="t?.filters?.all ?? 'Todos'"
+                                    />
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small mb-1">{{ t?.filters?.entity ?? 'Empresa' }}</label>
-                                    <select v-model="filterForm.entity_id" class="form-select form-select-sm">
-                                        <option value="">{{ t?.filters?.all ?? 'Todas' }}</option>
-                                        <option v-for="e in entities" :key="e.id" :value="e.id">
-                                            {{ e.name }}{{ !e.is_client ? ' ★' : '' }}
-                                        </option>
-                                    </select>
+                                    <SearchSelect
+                                        v-model="filterForm.entity_id"
+                                        :options="entityOptions"
+                                        :label-key="'name'"
+                                        :placeholder="t?.filters?.all ?? 'Todas'"
+                                    />
                                 </div>
                                 <div class="col-6">
                                     <label class="form-label small mb-1">{{ t?.filters?.date_from ?? 'De' }}</label>

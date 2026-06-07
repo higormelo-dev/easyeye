@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
+import SearchSelect from "@/Components/Panel/SearchSelect.vue";
 
 const props = defineProps({
     open:         { type: Boolean, required: true },
@@ -83,10 +84,7 @@ async function submit() {
                         <!-- Plano opcional -->
                         <div class="mb-3">
                             <label class="form-label">{{ t.trial_plan }}</label>
-                            <select v-model="form.plan_id" class="form-select">
-                                <option value="">{{ t.trial_plan_none }}</option>
-                                <option v-for="p in plans" :key="p.id" :value="p.id">{{ p.name }}</option>
-                            </select>
+                            <SearchSelect v-model="form.plan_id" :options="plans" :placeholder="t.trial_plan_none" />
                         </div>
 
                         <!-- Dias -->

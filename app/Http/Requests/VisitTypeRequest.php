@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\VisitType;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +20,7 @@ class VisitTypeRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -34,6 +35,13 @@ class VisitTypeRequest extends FormRequest
                         $query->where('entity_id', session('selected_entity_id'))
                             ->whereNull('deleted_at');
                     }),
+            ],
+            'procedure_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('procedures', 'id')->where(fn ($q) => $q
+                    ->where(fn ($sub) => $sub->where('entity_id', session('selected_entity_id'))->orWhereNull('entity_id'))
+                    ->whereNull('deleted_at')),
             ],
         ];
 

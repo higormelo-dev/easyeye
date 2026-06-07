@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:       { type: Boolean, required: true },
@@ -14,7 +15,7 @@ const errors = ref({});
 
 const form = ref({
     entry_date:  new Date().toISOString().slice(0, 10),
-    type:        'revenue',
+    type:        'income',
     status:      'paid',
     amount:      0,
     description: '',
@@ -25,7 +26,7 @@ const form = ref({
 function reset() {
     form.value = {
         entry_date:  new Date().toISOString().slice(0, 10),
-        type:        'revenue',
+        type:        'income',
         status:      'paid',
         amount:      0,
         description: '',
@@ -128,12 +129,12 @@ const filteredCategories = computed(() =>
 
                         <div class="col-md-6">
                             <label class="form-label">Tipo <span class="text-danger">*</span></label>
-                            <select v-model="form.type" class="form-select"
-                                    :class="{ 'is-invalid': hasError('type') }" required>
-                                <option value="revenue">Receita</option>
-                                <option value="expense">Despesa</option>
-                            </select>
-                            <div class="invalid-feedback">{{ firstError('type') }}</div>
+                            <SearchSelect v-model="form.type"
+                                          :options="[{value:'income',label:'Receita'},{value:'expense',label:'Despesa'}]"
+                                          :value-key="'value'" :label-key="'label'"
+                                          :clearable="false"
+                                          :invalid="hasError('type')" />
+                            <div v-if="hasError('type')" class="invalid-feedback d-block">{{ firstError('type') }}</div>
                         </div>
 
                         <div class="col-12">
@@ -145,21 +146,15 @@ const filteredCategories = computed(() =>
 
                         <div class="col-md-6">
                             <label class="form-label">Categoria</label>
-                            <select v-model="form.category_id" class="form-select">
-                                <option value="">—</option>
-                                <option v-for="cat in filteredCategories" :key="cat.id" :value="cat.id">
-                                    {{ cat.name }}
-                                </option>
-                            </select>
+                            <SearchSelect v-model="form.category_id" :options="filteredCategories" :placeholder="'—'" />
                         </div>
 
                         <div class="col-md-6">
                             <label class="form-label">Status</label>
-                            <select v-model="form.status" class="form-select">
-                                <option value="pending">Pendente</option>
-                                <option value="paid">Pago</option>
-                                <option value="overdue">Atrasado</option>
-                            </select>
+                            <SearchSelect v-model="form.status"
+                                          :options="[{value:'pending',label:'Pendente'},{value:'paid',label:'Pago'},{value:'cancelled',label:'Cancelado'}]"
+                                          :value-key="'value'" :label-key="'label'"
+                                          :clearable="false" />
                         </div>
 
                         <div class="col-12">
