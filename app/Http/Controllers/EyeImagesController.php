@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\AiProviderSettings;
+use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings};
 use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\FeatureKey;
 use App\Models\{Doctor, Entity, Patient, PatientExam};
@@ -21,6 +21,7 @@ class EyeImagesController extends Controller
     public function __construct(
         private readonly FeatureGateService $featureGate,
         private readonly AiProviderSettings $providerSettings,
+        private readonly AiCreditWalletService $walletService,
     ) {
     }
 
@@ -86,6 +87,7 @@ class EyeImagesController extends Controller
                 ])),
                 'can_consensus' => $canConsensus,
                 'modes'         => $modes,
+                'balance'       => $this->walletService->balance($entityId),
                 'max_images'    => (int) config('ai.eye_image.max_images', 4),
                 'urls'          => [
                     'estimate' => route('panel.ai-runs.estimate'),

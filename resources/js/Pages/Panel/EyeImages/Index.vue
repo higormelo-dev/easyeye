@@ -727,6 +727,9 @@ function openAiModal()  {
         aiForm.user_prompt = aiDefaultEyePrompt;
     }
     resetAiRun();
+    // Mostra o saldo da carteira já na abertura (o estimate atualiza depois).
+    aiBalance.available = props.ai?.balance?.available ?? '—';
+    aiBalance.reserved  = props.ai?.balance?.reserved ?? '—';
     aiModalOpen.value = true;
 }
 function closeAiModal() { aiModalOpen.value = false; }
