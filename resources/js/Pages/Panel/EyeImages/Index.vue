@@ -797,10 +797,8 @@ async function estimateAiRun() {
 async function submitAiRun() {
     clearAiAlert();
     if (!aiValidate()) return;
-    if (!aiEstimate.value) {
-        setAiAlert('warning', aiLabel('estimate', 'Estime antes de executar.'));
-        return;
-    }
+    // Estimativa é opcional: o servidor calcula o custo e reserva os créditos no
+    // store (com tratamento de saldo insuficiente). Não bloqueamos sem estimar.
     aiSubmitting.value = true;
     try {
         const { data } = await window.axios.post(route('panel.ai-runs.store'), aiPayload());
