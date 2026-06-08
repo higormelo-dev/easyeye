@@ -7,12 +7,12 @@ use Illuminate\Http\Request;
 abstract class Controller
 {
     /**
-     * Name of the controller for messages
+     * Name of the controller for messages.
      */
     protected string $titleController;
 
     /**
-     * Get update message based on request type
+     * Get update message based on request type.
      */
     protected function getUpdateMessage(Request $request): string
     {
@@ -25,7 +25,7 @@ abstract class Controller
     }
 
     /**
-     * Get create success message
+     * Get create success message.
      */
     protected function getCreateMessage(): string
     {
@@ -33,7 +33,7 @@ abstract class Controller
     }
 
     /**
-     * Get delete success message
+     * Get delete success message.
      */
     protected function getDeleteMessage(): string
     {
@@ -41,7 +41,7 @@ abstract class Controller
     }
 
     /**
-     * Get restore success message
+     * Get restore success message.
      */
     protected function getRestoreMessage(): string
     {

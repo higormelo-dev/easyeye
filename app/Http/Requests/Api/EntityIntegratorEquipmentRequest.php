@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api;
 
 use App\Models\EntityIntegratorEquipment;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,7 @@ class EntityIntegratorEquipmentRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -52,7 +53,7 @@ class EntityIntegratorEquipmentRequest extends FormRequest
     }
 
     /**
-     * Regra unique com escopo do integrador
+     * Regra unique com escopo do integrador.
      */
     private function uniqueRule(string $column): Unique
     {
@@ -62,7 +63,7 @@ class EntityIntegratorEquipmentRequest extends FormRequest
             Str::isUuid((string) $param) => $param,
             ctype_digit((string) $param) => EntityIntegratorEquipment::where(
                 'code',
-                sprintf('EIQ-%010d', (int) $param)
+                sprintf('EIQ-%010d', (int) $param),
             )->value('id'),
             default => EntityIntegratorEquipment::where('code', $param)->value('id'),
         };

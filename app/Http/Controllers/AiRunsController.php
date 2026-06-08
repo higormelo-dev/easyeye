@@ -6,15 +6,16 @@ namespace App\Http\Controllers;
 
 use App\Domains\AI\Exceptions\{AiModelPriceNotFoundException, InsufficientAiCreditsException};
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiCreditPurchaseService, AiCreditWalletService, AiMedicalContextBuilder, AiPricingService, AiPromptGuardrailService};
+use App\Domains\AI\Services\{AiCreditPurchaseService, AiCreditWalletService, AiMedicalContextBuilder, AiPricingService, AiPromptGuardrailService, AiProviderSettings};
 use App\DTOs\AI\AiCreditEstimateData;
 use App\Enums\AI\{AiProvider, AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, DocumentationType, EntityGate, FeatureKey};
 use App\Jobs\AI\RunAiWorkflowJob;
-use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, Subscription};
+use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, Schedule, Subscription};
 use App\Services\FeatureGateService;
 use DomainException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\{DB, Gate};
 use Inertia\{Inertia, Response as InertiaResponse};
 use Mews\Purifier\Facades\Purifier;
@@ -28,6 +29,7 @@ class AiRunsController extends Controller
         private readonly AiMedicalContextBuilder $contextBuilder,
         private readonly AiCreditPurchaseService $creditPurchaseService,
         private readonly AiPromptGuardrailService $promptGuardrails,
+        private readonly AiProviderSettings $providerSettings,
     ) {
     }
 
@@ -83,11 +85,11 @@ class AiRunsController extends Controller
         $configuredDefaultMode = (string) config('ai.default_mode', AiRunMode::Validated->value);
         $defaultMode           = in_array($configuredDefaultMode, $modes, true)
             ? $configuredDefaultMode
-            : AiRunMode::Validated->value;
+            : ($modes[0] ?? AiRunMode::Economy->value);
         $canPurchaseCredits = $this->canPurchaseCredits();
 
         // ── Analítico de uso do mês corrente (consolidado em /panel/ai/usage) ──
-        $now        = \Illuminate\Support\Carbon::now();
+        $now        = Carbon::now();
         $monthStart = $now->copy()->startOfMonth();
         $monthEnd   = $now->copy()->endOfMonth();
 
@@ -135,10 +137,10 @@ class AiRunsController extends Controller
             ->pluck('cnt', 'status')
             ->toArray();
 
-        $approvedCount   = (int) ($approvalCounts[AiRunStatus::Approved->value] ?? 0);
-        $rejectedCount   = (int) ($approvalCounts[AiRunStatus::Rejected->value] ?? 0);
-        $approvalTotal   = $approvedCount + $rejectedCount;
-        $approvalRate    = $approvalTotal > 0 ? round(($approvedCount / $approvalTotal) * 100, 1) : null;
+        $approvedCount = (int) ($approvalCounts[AiRunStatus::Approved->value] ?? 0);
+        $rejectedCount = (int) ($approvalCounts[AiRunStatus::Rejected->value] ?? 0);
+        $approvalTotal = $approvedCount + $rejectedCount;
+        $approvalRate  = $approvalTotal > 0 ? round(($approvedCount / $approvalTotal) * 100, 1) : null;
 
         $topRuns = AiRun::query()
             ->where('entity_id', $entityId)
@@ -165,7 +167,7 @@ class AiRunsController extends Controller
             'creditPurchaseAutoCredit' => (bool) config('ai.credit_purchases.auto_credit_without_gateway', false),
             'canPurchaseCredits'       => $canPurchaseCredits,
             'prefill'                  => $prefill,
-            'analytics' => [
+            'analytics'                => [
                 'period' => [
                     'start' => $monthStart->format('d/m/Y'),
                     'end'   => $monthEnd->format('d/m/Y'),
@@ -189,7 +191,7 @@ class AiRunsController extends Controller
                 ],
                 'top_runs' => $topRuns,
             ],
-            'runs'                     => $runs->through(function (AiRun $run): array {
+            'runs' => $runs->through(function (AiRun $run): array {
                 return [
                     'id'                   => $run->id,
                     'workflow'             => $run->workflow,
@@ -315,10 +317,13 @@ class AiRunsController extends Controller
                     'reserved_credits'  => 0,
                     'consumed_credits'  => 0,
                     'input_summary'     => [
-                        'user_prompt'       => $payload['user_prompt'],
-                        'system_prompt'     => $payload['system_prompt'] ?? null,
-                        'context'           => $payload['context'] ?? [],
-                        'attachments'       => $payload['attachments'] ?? [],
+                        'user_prompt'   => $payload['user_prompt'],
+                        'system_prompt' => $payload['system_prompt'] ?? null,
+                        'context'       => $payload['context'] ?? [],
+                        'attachments'   => $payload['attachments'] ?? [],
+                        // Eye Image: guardamos só as referências dos exames (o
+                        // base64 é reconstruído na execução, nunca persistido).
+                        'exam_ids'          => array_values((array) ($payload['exam_ids'] ?? [])),
                         'expects_json'      => (bool) ($payload['expects_json'] ?? false),
                         'max_output_tokens' => $payload['max_output_tokens'] ?? null,
                         'metadata'          => [
@@ -328,6 +333,18 @@ class AiRunsController extends Controller
                     ],
                     'safety_notes' => $this->guardrailSafetyNotes($payload['_guardrails'] ?? []),
                 ]);
+
+                // Vincula os exames analisados ao run (laudo no módulo Eye Image).
+                $examIds = array_values((array) ($payload['exam_ids'] ?? []));
+
+                if ($examIds !== []) {
+                    DB::table('ai_run_patient_exam')->insert(array_map(fn (string $examId): array => [
+                        'ai_run_id'       => (string) $run->id,
+                        'patient_exam_id' => $examId,
+                        'entity_id'       => $entityId,
+                        'created_at'      => now(),
+                    ], $examIds));
+                }
 
                 $this->walletService->reserve(
                     entityId: $entityId,
@@ -397,8 +414,10 @@ class AiRunsController extends Controller
             ? (string) $validated['final_output']
             : (string) $aiRun->final_output;
 
+        $persistResult = ['attached' => false, 'requires_record_confirmation' => false, 'consultation_date' => null];
+
         try {
-            DB::transaction(function () use ($aiRun, $finalOutput): void {
+            DB::transaction(function () use ($aiRun, $finalOutput, &$persistResult): void {
                 $lockedRun = AiRun::query()
                     ->whereKey($aiRun->id)
                     ->lockForUpdate()
@@ -416,7 +435,7 @@ class AiRunsController extends Controller
                     'error_message' => null,
                 ]);
 
-                $this->persistDocumentationFromApprovedRun($lockedRun->fresh(), $finalOutput);
+                $persistResult = $this->persistDocumentationFromApprovedRun($lockedRun->fresh(), $finalOutput);
             });
         } catch (DomainException) {
             return $this->statusTransitionErrorResponse($request);
@@ -426,6 +445,11 @@ class AiRunsController extends Controller
             return response()->json([
                 'message' => __('ai.run_approved'),
                 'status'  => AiRunStatus::Approved->value,
+                'run_id'  => (string) $aiRun->id,
+                // Sem prontuário do dia da consulta: o front pergunta ao médico
+                // se pode abrir um novo prontuário para receber o laudo.
+                'requires_record_confirmation' => (bool) $persistResult['requires_record_confirmation'],
+                'consultation_date'            => $persistResult['consultation_date'],
             ]);
         }
 
@@ -433,33 +457,166 @@ class AiRunsController extends Controller
     }
 
     /**
-     * Quando uma execução de IA é aprovada e está vinculada a um prontuário,
-     * persiste o resultado como `MedicalRecordDocumentation` (type=Report) com
-     * referência ao `ai_run_id`. Permite rastreabilidade CFM/LGPD: dado um
-     * laudo, saber se foi originado por IA, com qual prompt e quem aprovou.
-     *
-     * Usa `updateOrCreate` para idempotência em cenários de retry/race.
+     * Abre um novo prontuário (do dia) para receber o laudo de um run já aprovado,
+     * quando o médico confirma. Idempotente: se já houver documentação para o run,
+     * apenas retorna sucesso.
      */
-    private function persistDocumentationFromApprovedRun(AiRun $aiRun, string $finalOutput): void
+    public function openRecordForRun(Request $request, AiRun $aiRun): JsonResponse|RedirectResponse
     {
-        if (! $aiRun->medical_record_id) {
-            return;
+        $entityId = $this->selectedEntityId();
+        $this->assertRunBelongsToEntity($aiRun, $entityId);
+        $this->assertAiFeatureEnabled($entityId);
+        $this->authorizeDoctorApproval($entityId);
+
+        if ($aiRun->status !== AiRunStatus::Approved) {
+            return $this->statusTransitionErrorResponse($request);
         }
 
-        $recordQuery = MedicalRecord::query()
-            ->where('id', (string) $aiRun->medical_record_id)
-            ->where('entity_id', (string) $aiRun->entity_id);
+        $patientId = $this->resolveRunPatientId($aiRun);
 
-        if (! empty($aiRun->patient_id)) {
-            $recordQuery->where('patient_id', (string) $aiRun->patient_id);
+        if (! $patientId) {
+            abort(422, __('ai.record_patient_missing'));
         }
 
-        $record = $recordQuery->first();
+        // Abrir prontuário é ato médico: exige um Doctor (do aprovador ou do exame).
+        $doctorId = $this->resolveDoctorIdForCurrentUser($entityId)
+            ?? PatientExam::query()
+                ->whereIn('id', (array) ($aiRun->input_summary['exam_ids'] ?? []))
+                ->value('doctor_id');
+
+        if (! $doctorId) {
+            abort(422, __('ai.record_doctor_required'));
+        }
+
+        // Idempotência: laudo já documentado em algum prontuário.
+        $existing = MedicalRecordDocumentation::query()->where('ai_run_id', $aiRun->id)->exists();
+
+        if (! $existing) {
+            // Vincula o novo prontuário ao agendamento da consulta, quando houver.
+            [$scheduleId] = $this->consultationAnchorForRun($aiRun);
+
+            DB::transaction(function () use ($aiRun, $entityId, $patientId, $doctorId, $scheduleId): void {
+                $record = MedicalRecord::query()->create(array_filter([
+                    'entity_id'   => $entityId,
+                    'patient_id'  => $patientId,
+                    'doctor_id'   => (string) $doctorId,
+                    'schedule_id' => $scheduleId,
+                ]));
+
+                $this->writeRunDocumentation($aiRun, $record, (string) $aiRun->final_output);
+            });
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => __('ai.record_opened'),
+                'status'  => AiRunStatus::Approved->value,
+            ]);
+        }
+
+        return back()->with('success', __('ai.record_opened'));
+    }
+
+    /**
+     * Persiste o laudo no prontuário do DIA DA CONSULTA (agendamento). Regra:
+     *  - Run já vinculado a um prontuário específico -> grava nele.
+     *  - Senão, procura o prontuário do paciente da consulta: mesmo agendamento
+     *    (schedule_id) e, na falta, qualquer prontuário do mesmo dia do agendamento.
+     *  - Sem prontuário desse dia, NÃO cria automaticamente: sinaliza
+     *    `requires_record_confirmation` para o médico decidir abrir (CFM/LGPD).
+     *
+     * Idempotência via `updateOrCreate` por `ai_run_id`.
+     *
+     * @return array{attached: bool, requires_record_confirmation: bool, consultation_date: ?string}
+     */
+    private function persistDocumentationFromApprovedRun(AiRun $aiRun, string $finalOutput): array
+    {
+        $consultationDate = null;
+
+        if ($aiRun->medical_record_id) {
+            $recordQuery = MedicalRecord::query()
+                ->where('id', (string) $aiRun->medical_record_id)
+                ->where('entity_id', (string) $aiRun->entity_id);
+
+            if (! empty($aiRun->patient_id)) {
+                $recordQuery->where('patient_id', (string) $aiRun->patient_id);
+            }
+
+            $record = $recordQuery->first();
+        } else {
+            $patientId = $this->resolveRunPatientId($aiRun);
+
+            if (! $patientId) {
+                return ['attached' => false, 'requires_record_confirmation' => false, 'consultation_date' => null];
+            }
+
+            [$scheduleId, $consultationDate] = $this->consultationAnchorForRun($aiRun);
+            $record                          = $this->findConsultationRecord((string) $aiRun->entity_id, $patientId, $scheduleId, $consultationDate);
+
+            // Sem prontuário do dia da consulta -> pergunta ao médico se pode abrir.
+            if (! $record) {
+                return ['attached' => false, 'requires_record_confirmation' => true, 'consultation_date' => $consultationDate];
+            }
+        }
 
         if (! $record) {
-            return;
+            return ['attached' => false, 'requires_record_confirmation' => false, 'consultation_date' => $consultationDate];
         }
 
+        $this->writeRunDocumentation($aiRun, $record, $finalOutput);
+
+        return ['attached' => true, 'requires_record_confirmation' => false, 'consultation_date' => $consultationDate];
+    }
+
+    /**
+     * Prontuário da consulta: prioriza o do MESMO agendamento; na falta, qualquer
+     * prontuário do paciente no mesmo DIA do agendamento.
+     */
+    private function findConsultationRecord(string $entityId, string $patientId, ?string $scheduleId, string $consultationDate): ?MedicalRecord
+    {
+        $base = MedicalRecord::query()
+            ->where('entity_id', $entityId)
+            ->where('patient_id', $patientId);
+
+        if ($scheduleId) {
+            $record = (clone $base)->where('schedule_id', $scheduleId)->latest('created_at')->first();
+
+            if ($record) {
+                return $record;
+            }
+        }
+
+        return (clone $base)->whereDate('created_at', $consultationDate)->latest('created_at')->first();
+    }
+
+    /**
+     * Âncora da consulta = agendamento dos exames analisados: devolve
+     * [schedule_id, data]. Sem agendamento vinculado, cai para hoje.
+     *
+     * @return array{0: ?string, 1: string}
+     */
+    private function consultationAnchorForRun(AiRun $aiRun): array
+    {
+        $scheduleId = PatientExam::query()
+            ->whereIn('id', (array) ($aiRun->input_summary['exam_ids'] ?? []))
+            ->whereNotNull('schedule_id')
+            ->orderByDesc('created_at')
+            ->value('schedule_id');
+
+        if ($scheduleId) {
+            $dateTime = Schedule::query()->whereKey($scheduleId)->value('date_time');
+
+            return [(string) $scheduleId, $dateTime ? Carbon::parse($dateTime)->toDateString() : now()->toDateString()];
+        }
+
+        return [null, now()->toDateString()];
+    }
+
+    /**
+     * Grava (idempotente) a documentação do laudo no prontuário informado.
+     */
+    private function writeRunDocumentation(AiRun $aiRun, MedicalRecord $record, string $finalOutput): void
+    {
         $doctorId = $this->resolveDoctorIdForCurrentUser((string) $aiRun->entity_id)
             ?? (string) $record->doctor_id;
 
@@ -467,9 +624,8 @@ class AiRunsController extends Controller
             'workflow' => __('ai.workflow_' . $aiRun->workflow),
         ]);
 
-        // O conteúdo aprovado pela IA pode carregar HTML/trechos injetados. Antes
-        // de persistir em documentação clínica (renderizada em PDF), sanitizamos
-        // com o mesmo profile "medical" já usado no fluxo manual.
+        // O conteúdo aprovado pode carregar HTML/trechos injetados. Sanitiza com o
+        // mesmo profile "medical" usado no fluxo manual antes de persistir.
         $sanitizedOutput = Purifier::clean($finalOutput, 'medical');
 
         MedicalRecordDocumentation::query()->updateOrCreate(
@@ -483,6 +639,23 @@ class AiRunsController extends Controller
                 'content'           => $sanitizedOutput,
             ],
         );
+    }
+
+    /**
+     * Paciente do run: o próprio patient_id ou, em runs de imagem sem paciente
+     * explícito, o paciente dos exames analisados.
+     */
+    private function resolveRunPatientId(AiRun $aiRun): ?string
+    {
+        if (! empty($aiRun->patient_id)) {
+            return (string) $aiRun->patient_id;
+        }
+
+        $patientId = PatientExam::query()
+            ->whereIn('id', (array) ($aiRun->input_summary['exam_ids'] ?? []))
+            ->value('patient_id');
+
+        return $patientId !== null ? (string) $patientId : null;
     }
 
     /**
@@ -579,8 +752,9 @@ class AiRunsController extends Controller
     {
         $hasExamAssistant  = $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant);
         $hasReportDrafting = $this->featureGate->can($entityId, FeatureKey::HasAiReportDrafting);
+        $hasEyeImage       = $this->featureGate->can($entityId, FeatureKey::HasAiEyeImageAnalysis);
 
-        if (! $hasExamAssistant && ! $hasReportDrafting) {
+        if (! $hasExamAssistant && ! $hasReportDrafting && ! $hasEyeImage) {
             abort(403, __('ai.feature_unavailable'));
         }
     }
@@ -603,7 +777,7 @@ class AiRunsController extends Controller
         $canConsensus = $this->canConsensusForEntity($entityId);
 
         $validated = $request->validate([
-            'workflow'          => ['required', 'string', 'in:exam_assistant,report_drafting,consensus_review'],
+            'workflow'          => ['required', 'string', 'in:exam_assistant,report_drafting,consensus_review,eye_image_analysis'],
             'mode'              => ['required', 'string', 'in:economy,validated,consensus'],
             'risk_level'        => ['required', 'string', 'in:low,medium,high'],
             'patient_id'        => ['nullable', 'uuid', 'exists:patients,id'],
@@ -612,9 +786,23 @@ class AiRunsController extends Controller
             'system_prompt'     => ['nullable', 'string', 'max:10000'],
             'context'           => ['nullable', 'array'],
             'attachments'       => ['nullable', 'array'],
+            'exam_ids'          => ['nullable', 'array', 'max:' . (int) config('ai.eye_image.max_images', 4)],
+            'exam_ids.*'        => ['uuid'],
             'expects_json'      => ['nullable', 'boolean'],
             'max_output_tokens' => ['nullable', 'integer', 'min:64', 'max:8192'],
         ]);
+
+        // ── Eye Image: análise de imagem ocular ──────────────────────────────
+        // Requer exames, resolve a propriedade por entidade, força o system
+        // prompt clínico (server-side) e marca o nº de imagens para a estimativa.
+        // O base64 NÃO é montado aqui nem guardado no run — é reconstruído em
+        // tempo de execução a partir de exam_ids (ver AiRunExecutionService).
+        if (($validated['workflow'] ?? '') === 'eye_image_analysis') {
+            $validated['exam_ids']      = $this->authorizeExamIds((array) ($validated['exam_ids'] ?? []), $entityId);
+            $validated['system_prompt'] = __('ai.eye_image_system_prompt');
+            $validated['attachments']   = [];
+            $validated['_image_count']  = count($validated['exam_ids']);
+        }
 
         $usingConsensus = ($validated['mode'] ?? '') === AiRunMode::Consensus->value
             || ($validated['workflow'] ?? '') === 'consensus_review';
@@ -703,10 +891,44 @@ class AiRunsController extends Controller
         }
     }
 
+    /**
+     * Resolve e autoriza os exames de imagem por entidade (PatientExam é escopado
+     * via patient.entity_id). Exige ao menos um exame e bloqueia IDs de outra
+     * entidade (cross-tenant). Devolve a lista de IDs válidos.
+     *
+     * @param array<int, string> $examIds
+     *
+     * @return list<string>
+     */
+    private function authorizeExamIds(array $examIds, string $entityId): array
+    {
+        $examIds = array_values(array_unique(array_filter(array_map('strval', $examIds))));
+
+        if ($examIds === []) {
+            abort(422, __('ai.eye_image_exams_required'));
+        }
+
+        $owned = PatientExam::query()
+            ->whereIn('patient_exams.id', $examIds)
+            ->whereHas('patient', fn ($q) => $q->where('entity_id', $entityId))
+            ->pluck('patient_exams.id')
+            ->map(fn ($id) => (string) $id)
+            ->all();
+
+        // Algum exame não pertence à entidade ativa.
+        abort_if(count($owned) !== count($examIds), 403);
+
+        return $owned;
+    }
+
     private function validateFeatureByWorkflow(string $workflow, string $entityId): void
     {
         if ($workflow === 'exam_assistant' && ! $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant)) {
             abort(403, __('ai.feature_exam_unavailable'));
+        }
+
+        if ($workflow === 'eye_image_analysis' && ! $this->featureGate->can($entityId, FeatureKey::HasAiEyeImageAnalysis)) {
+            abort(403, __('ai.feature_eye_image_unavailable'));
         }
 
         if (in_array($workflow, ['report_drafting', 'consensus_review'], true)
@@ -733,7 +955,13 @@ class AiRunsController extends Controller
         $contextJson = json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $chars       = mb_strlen($prompt) + mb_strlen($contextJson !== false ? $contextJson : '');
 
-        $baseInput  = max(120, (int) ceil($chars / 4));
+        $baseInput = max(120, (int) ceil($chars / 4));
+
+        // Sobretaxa de tokens por imagem (visão) — reflete o custo das imagens
+        // do módulo Eye Image na estimativa de créditos.
+        $imageCount = (int) ($payload['_image_count'] ?? 0);
+        $baseInput += $imageCount * (int) config('ai.eye_image.tokens_per_image', 300);
+
         $baseOutput = max(100, min((int) ($payload['max_output_tokens'] ?? 700), intdiv($baseInput, 2) + 120));
 
         $providerEstimates = [];
@@ -802,22 +1030,7 @@ class AiRunsController extends Controller
      */
     private function providerCodesForMode(AiRunMode $mode): array
     {
-        if ($mode === AiRunMode::Economy) {
-            return [(string) config('ai.providers.primary', 'openai')];
-        }
-
-        if ($mode === AiRunMode::Validated) {
-            return [
-                (string) config('ai.providers.primary', 'openai'),
-                (string) config('ai.providers.reviewer', 'anthropic'),
-            ];
-        }
-
-        return [
-            (string) config('ai.providers.primary', 'openai'),
-            (string) config('ai.providers.reviewer', 'anthropic'),
-            (string) config('ai.providers.adjudicator', 'gemini'),
-        ];
+        return $this->providerSettings->providerCodesForMode($mode);
     }
 
     private function providerModel(string $provider): string
@@ -835,12 +1048,16 @@ class AiRunsController extends Controller
      */
     private function availableModes(bool $canConsensus): array
     {
-        $modes = [
-            AiRunMode::Validated->value,
-        ];
+        // Modos disponíveis escalam com o número de provedores HABILITADOS
+        // (1 -> economia, 2 -> +validado, 3 -> +consenso). O consenso ainda
+        // depende do recurso da entidade (canConsensus).
+        $modes = [];
 
-        if ($canConsensus) {
-            $modes[] = AiRunMode::Consensus->value;
+        foreach ($this->providerSettings->availableModes() as $mode) {
+            if ($mode === AiRunMode::Consensus && ! $canConsensus) {
+                continue;
+            }
+            $modes[] = $mode->value;
         }
 
         return $modes;
@@ -865,7 +1082,9 @@ class AiRunsController extends Controller
 
     private function canConsensusForEntity(string $entityId): bool
     {
-        if (! (bool) config('ai.enable_consensus', true)) {
+        // Consenso exige a flag de config, 3+ provedores habilitados (settings)
+        // e o recurso liberado para a entidade.
+        if (! $this->providerSettings->isModeAvailable(AiRunMode::Consensus)) {
             return false;
         }
 

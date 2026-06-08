@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 return [
-    'page_title'         => 'Company Users',
-    'breadcrumb_home'    => 'Dashboard',
-    'breadcrumb_entities'=> 'Companies',
-    'breadcrumb_current' => 'Users',
+    'page_title'          => 'Company Users',
+    'breadcrumb_home'     => 'Dashboard',
+    'breadcrumb_entities' => 'Companies',
+    'breadcrumb_current'  => 'Users',
 
     'btn_back'           => 'Back to companies',
     'search_placeholder' => 'Search by name or e-mail...',
@@ -27,12 +27,12 @@ return [
     'status_deleted'  => 'Removed',
 
     // Actions
-    'action_impersonate'           => 'Login as this user',
-    'action_impersonate_disabled'  => 'Cannot impersonate this user',
-    'confirm_impersonate_title'    => 'Login as :name?',
-    'confirm_impersonate_text'     => 'You will temporarily assume this clinic context. Only use for authorized support.',
-    'confirm_impersonate_yes'      => 'Yes, continue',
-    'confirm_impersonate_no'       => 'Cancel',
+    'action_impersonate'          => 'Login as this user',
+    'action_impersonate_disabled' => 'Cannot impersonate this user',
+    'confirm_impersonate_title'   => 'Login as :name?',
+    'confirm_impersonate_text'    => 'You will temporarily assume this clinic context. Only use for authorized support.',
+    'confirm_impersonate_yes'     => 'Yes, continue',
+    'confirm_impersonate_no'      => 'Cancel',
 
     // Empty
     'empty_list' => 'No users found in this company.',

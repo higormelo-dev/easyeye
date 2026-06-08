@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  * Dados usados para: nudges in-app, alertas de trial sem engajamento,
  * e análise de cohort de conversão no painel do gestor.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('entity_activations', function (Blueprint $table) {

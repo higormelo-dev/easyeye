@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Schema;
  *   expired   : vencida; acesso bloqueado (ou em grace period)
  *   cancelled : cancelada pelo cliente ou admin
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('subscriptions', function (Blueprint $table) {

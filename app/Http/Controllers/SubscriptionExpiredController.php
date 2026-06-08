@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\{Entity, Plan, Subscription};
 use App\Services\SubscriptionService;
+use BackedEnum;
 use Illuminate\Http\RedirectResponse;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -35,14 +36,14 @@ class SubscriptionExpiredController extends Controller
             ->orderBy('sort_order')
             ->get()
             ->map(fn (Plan $plan) => [
-                'id'             => $plan->id,
-                'name'           => $plan->name,
-                'description'    => $plan->description,
-                'price'          => (float) $plan->price,
-                'billing_cycle'  => $plan->billing_cycle instanceof \BackedEnum
+                'id'            => $plan->id,
+                'name'          => $plan->name,
+                'description'   => $plan->description,
+                'price'         => (float) $plan->price,
+                'billing_cycle' => $plan->billing_cycle instanceof BackedEnum
                     ? $plan->billing_cycle->value
                     : $plan->billing_cycle,
-                'features_map'   => $plan->features->keyBy('feature')->map->value,
+                'features_map' => $plan->features->keyBy('feature')->map->value,
             ]);
 
         return Inertia::render('Panel/SubscriptionExpired', [
@@ -51,9 +52,9 @@ class SubscriptionExpiredController extends Controller
                 'name' => $entity->name,
             ] : null,
             'lastSubscription' => $lastSubscription ? [
-                'plan_name'  => $lastSubscription->plan?->name,
-                'ends_at'    => $lastSubscription->ends_at?->format('d/m/Y'),
-                'status'     => $lastSubscription->status instanceof \BackedEnum
+                'plan_name' => $lastSubscription->plan?->name,
+                'ends_at'   => $lastSubscription->ends_at?->format('d/m/Y'),
+                'status'    => $lastSubscription->status instanceof BackedEnum
                     ? $lastSubscription->status->value
                     : $lastSubscription->status,
             ] : null,

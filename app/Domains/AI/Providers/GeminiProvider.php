@@ -6,9 +6,7 @@ namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
 use App\Domains\AI\Support\ProviderErrorSanitizer;
-use App\DTOs\AI\AiProviderResponseData;
-use App\DTOs\AI\AiRequestData;
-use App\DTOs\AI\AiUsageData;
+use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\AiProvider;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -18,9 +16,9 @@ class GeminiProvider implements AiProviderInterface
 {
     public function generate(AiRequestData $request): AiProviderResponseData
     {
-        $payload = $this->buildPayload($request);
+        $payload     = $this->buildPayload($request);
         $requestHash = $this->hashPayload($payload);
-        $startedAt = microtime(true);
+        $startedAt   = microtime(true);
 
         $response = Http::baseUrl($this->baseUrl())
             ->acceptJson()
@@ -36,8 +34,8 @@ class GeminiProvider implements AiProviderInterface
             throw $this->toProviderException($response);
         }
 
-        $json = (array) $response->json();
-        $content = $this->extractTextContent($json);
+        $json         = (array) $response->json();
+        $content      = $this->extractTextContent($json);
         $responseHash = hash('sha256', $content);
 
         return new AiProviderResponseData(
@@ -55,13 +53,13 @@ class GeminiProvider implements AiProviderInterface
             requestHash: $requestHash,
             responseHash: $responseHash,
             rawResponse: [
-                'responseId' => data_get($json, 'responseId'),
-                'modelVersion' => data_get($json, 'modelVersion'),
-                'usageMetadata' => data_get($json, 'usageMetadata'),
+                'responseId'     => data_get($json, 'responseId'),
+                'modelVersion'   => data_get($json, 'modelVersion'),
+                'usageMetadata'  => data_get($json, 'usageMetadata'),
                 'promptFeedback' => data_get($json, 'promptFeedback'),
             ],
             metadata: [
-                'response_id' => data_get($json, 'responseId'),
+                'response_id'         => data_get($json, 'responseId'),
                 'prompt_block_reason' => data_get($json, 'promptFeedback.blockReason'),
             ],
             finishReason: $this->extractFinishReason($json),
@@ -91,7 +89,7 @@ class GeminiProvider implements AiProviderInterface
         $payload = [
             'contents' => [
                 [
-                    'role' => 'user',
+                    'role'  => 'user',
                     'parts' => $this->buildParts($request),
                 ],
             ],
@@ -132,6 +130,23 @@ class GeminiProvider implements AiProviderInterface
         ];
 
         foreach ($request->attachments as $attachment) {
+            $mime = (string) ($attachment['mime_type'] ?? 'image/jpeg');
+            $data = (string) ($attachment['data'] ?? '');
+
+            // Imagem inline (base64): o Gemini NÃO busca URLs arbitrárias (ex.: S3),
+            // então o fluxo Eye Image envia a imagem como inline_data.
+            if ($data !== '') {
+                $parts[] = [
+                    'inline_data' => [
+                        'mime_type' => $mime,
+                        'data'      => $data,
+                    ],
+                ];
+
+                continue;
+            }
+
+            // file_uri só funciona com URIs da Files API do Gemini.
             $fileUri = (string) ($attachment['file_uri'] ?? $attachment['image_url'] ?? $attachment['url'] ?? '');
 
             if ($fileUri === '') {
@@ -140,8 +155,8 @@ class GeminiProvider implements AiProviderInterface
 
             $parts[] = [
                 'file_data' => [
-                    'mime_type' => (string) ($attachment['mime_type'] ?? 'image/jpeg'),
-                    'file_uri' => $fileUri,
+                    'mime_type' => $mime,
+                    'file_uri'  => $fileUri,
                 ],
             ];
         }
@@ -161,7 +176,7 @@ class GeminiProvider implements AiProviderInterface
             return $prompt;
         }
 
-        $contextJson = json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $contextJson  = json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $contextBlock = $contextJson !== false ? $contextJson : '{}';
 
         return trim($prompt . "\n\nContexto clínico (JSON):\n" . $contextBlock);
@@ -290,11 +305,10 @@ class GeminiProvider implements AiProviderInterface
     private function toProviderException(Response $response): RuntimeException
     {
         $rawMessage = (string) data_get($response->json(), 'error.message', '');
-        $status = $response->status();
+        $status     = $response->status();
 
         $safeMessage = ProviderErrorSanitizer::sanitize($rawMessage, 'Falha na integração Gemini.');
 
         return new RuntimeException("Gemini request failed [{$status}]: {$safeMessage}");
     }
 }
-

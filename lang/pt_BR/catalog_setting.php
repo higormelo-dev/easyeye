@@ -9,23 +9,23 @@ declare(strict_types=1);
  */
 return [
     // CRUD messages
-    'created'   => 'Registro cadastrado.',
-    'updated'   => 'Registro atualizado.',
-    'deleted'   => 'Registro removido.',
-    'restored'  => 'Registro restaurado.',
+    'created'  => 'Registro cadastrado.',
+    'updated'  => 'Registro atualizado.',
+    'deleted'  => 'Registro removido.',
+    'restored' => 'Registro restaurado.',
 
     // Page chrome
-    'btn_new'             => 'Novo',
-    'btn_back'            => 'Voltar',
-    'btn_save'            => 'Salvar',
-    'btn_create'          => 'Cadastrar',
-    'btn_cancel'          => 'Cancelar',
-    'btn_close'           => 'Fechar',
-    'btn_edit'            => 'Editar',
-    'search_placeholder'  => 'Buscar por nome ou código...',
-    'total_label'         => 'Total:',
-    'view_table'          => 'Tabela',
-    'view_cards'          => 'Cards',
+    'btn_new'            => 'Novo',
+    'btn_back'           => 'Voltar',
+    'btn_save'           => 'Salvar',
+    'btn_create'         => 'Cadastrar',
+    'btn_cancel'         => 'Cancelar',
+    'btn_close'          => 'Fechar',
+    'btn_edit'           => 'Editar',
+    'search_placeholder' => 'Buscar por nome ou código...',
+    'total_label'        => 'Total:',
+    'view_table'         => 'Tabela',
+    'view_cards'         => 'Cards',
 
     // Form modal
     'form_title_create' => 'Novo registro',

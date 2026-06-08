@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Requests\Financial;
 
@@ -31,16 +31,16 @@ class BillingIndividualRequest extends FormRequest
                 }),
             ],
             'unit_price' => ['required', 'numeric', 'min:0'],
-            'quantity' => ['nullable', 'integer', 'min:1', 'max:99'],
-            'due_date' => ['nullable', 'date'],
-            'status' => ['nullable', Rule::in([
+            'quantity'   => ['nullable', 'integer', 'min:1', 'max:99'],
+            'due_date'   => ['nullable', 'date'],
+            'status'     => ['nullable', Rule::in([
                 BillingClaimStatus::Draft->value,
                 BillingClaimStatus::Submitted->value,
             ])],
-            'tuss_code' => ['nullable', 'string', 'max:32'],
+            'tuss_code'             => ['nullable', 'string', 'max:32'],
             'procedure_description' => ['nullable', 'string', 'max:255'],
-            'authorization_code' => ['nullable', 'string', 'max:64'],
-            'notes' => ['nullable', 'string', 'max:2000'],
+            'authorization_code'    => ['nullable', 'string', 'max:64'],
+            'notes'                 => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -48,11 +48,11 @@ class BillingIndividualRequest extends FormRequest
     {
         $merge = [];
 
-        if (!$this->has('quantity')) {
+        if (! $this->has('quantity')) {
             $merge['quantity'] = 1;
         }
 
-        if (!$this->has('status')) {
+        if (! $this->has('status')) {
             $merge['status'] = BillingClaimStatus::Draft->value;
         }
 
@@ -62,9 +62,8 @@ class BillingIndividualRequest extends FormRequest
             }
         }
 
-        if (!empty($merge)) {
+        if (! empty($merge)) {
             $this->merge($merge);
         }
     }
 }
-

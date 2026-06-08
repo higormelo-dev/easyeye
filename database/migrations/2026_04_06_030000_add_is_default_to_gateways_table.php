@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
  *     entre SQLite (dev) e MySQL/PostgreSQL (prod).
  *   - Somente gateways ativos com credenciais ativas podem ser o padrão.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('gateways', function (Blueprint $table) {

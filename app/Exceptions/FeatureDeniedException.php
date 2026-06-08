@@ -5,6 +5,7 @@ namespace App\Exceptions;
 use App\DTOs\FeatureStatus;
 use App\Enums\FeatureKey;
 use Illuminate\Http\Request;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -16,14 +17,14 @@ use Symfony\Component\HttpFoundation\Response;
  * Uso:
  *   throw new FeatureDeniedException(FeatureKey::HasAiExamAssistant, $status);
  */
-class FeatureDeniedException extends \RuntimeException
+class FeatureDeniedException extends RuntimeException
 {
     public function __construct(
         public readonly FeatureKey $feature,
         public readonly FeatureStatus $status,
     ) {
         parent::__construct(
-            "Acesso à feature [{$feature->value}] negado para esta empresa."
+            "Acesso à feature [{$feature->value}] negado para esta empresa.",
         );
     }
 

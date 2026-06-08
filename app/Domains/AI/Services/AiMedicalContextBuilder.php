@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Services;
 
-use App\Models\MedicalRecord;
-use App\Models\Patient;
+use App\Models\{MedicalRecord, Patient};
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
+use Throwable;
 
 /**
  * Constrói o contexto clínico mínimo enviado ao provedor LLM a partir de
@@ -40,7 +41,7 @@ final class AiMedicalContextBuilder
 
         return array_filter(
             $context,
-            static fn ($value) => $value !== null && $value !== '' && $value !== []
+            static fn ($value) => $value !== null && $value !== '' && $value !== [],
         );
     }
 
@@ -52,7 +53,7 @@ final class AiMedicalContextBuilder
         $patient->loadMissing('person');
         $person = $patient->person;
 
-        if (!$person) {
+        if (! $person) {
             return ['patient_code' => $patient->code];
         }
 
@@ -72,20 +73,20 @@ final class AiMedicalContextBuilder
     private function medicalRecordContext(MedicalRecord $record): array
     {
         return [
-            'medical_record_code'    => $record->code,
-            'main_complaint'         => $this->truncate($record->main_complaint),
-            'history_present_illness'=> $this->truncate($record->hda),
-            'others_history'         => $this->truncate($record->others_history),
-            'medications_in_use'     => $this->truncate($record->medications_in_use),
-            'ocular_surgical_history'=> $this->truncate($record->ocular_surgical_history),
-            'comorbidities'          => $this->comorbidities($record),
-            'tonometry'              => $this->tonometry($record),
-            'visual_acuity'          => $this->visualAcuity($record),
-            'biomicroscopy'          => [
+            'medical_record_code'     => $record->code,
+            'main_complaint'          => $this->truncate($record->main_complaint),
+            'history_present_illness' => $this->truncate($record->hda),
+            'others_history'          => $this->truncate($record->others_history),
+            'medications_in_use'      => $this->truncate($record->medications_in_use),
+            'ocular_surgical_history' => $this->truncate($record->ocular_surgical_history),
+            'comorbidities'           => $this->comorbidities($record),
+            'tonometry'               => $this->tonometry($record),
+            'visual_acuity'           => $this->visualAcuity($record),
+            'biomicroscopy'           => [
                 'right' => $this->truncate($record->biomicroscopy_right),
                 'left'  => $this->truncate($record->biomicroscopy_left),
             ],
-            'fundoscopy'             => [
+            'fundoscopy' => [
                 'right' => $this->truncate($record->fundoscopy_right ?? null),
                 'left'  => $this->truncate($record->fundoscopy_left ?? null),
             ],
@@ -104,7 +105,7 @@ final class AiMedicalContextBuilder
 
         $initials = array_map(
             static fn (string $part) => mb_strtoupper(mb_substr($part, 0, 1)) . '.',
-            array_filter($parts, static fn (string $p) => $p !== '')
+            array_filter($parts, static fn (string $p) => $p !== ''),
         );
 
         return implode(' ', $initials);
@@ -112,15 +113,15 @@ final class AiMedicalContextBuilder
 
     private function ageFromBirthDate(mixed $birthDate): ?int
     {
-        if (!$birthDate) {
+        if (! $birthDate) {
             return null;
         }
 
         try {
-            $date = $birthDate instanceof \DateTimeInterface
+            $date = $birthDate instanceof DateTimeInterface
                 ? CarbonImmutable::instance($birthDate)
                 : CarbonImmutable::parse((string) $birthDate);
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return null;
         }
 
@@ -156,9 +157,11 @@ final class AiMedicalContextBuilder
         if ($record->diabetic) {
             $flags[] = 'diabetes_mellitus';
         }
+
         if ($record->hypertensive) {
             $flags[] = 'hipertensao_arterial';
         }
+
         if ($record->glaucomatous) {
             $flags[] = 'glaucoma';
         }

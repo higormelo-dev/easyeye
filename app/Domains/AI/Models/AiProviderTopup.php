@@ -29,6 +29,8 @@ class AiProviderTopup extends Model
     protected $fillable = [
         'provider',
         'amount_usd',
+        'amount_brl',
+        'exchange_rate',
         'topped_up_at',
         'reference',
         'note',
@@ -38,11 +40,13 @@ class AiProviderTopup extends Model
     protected function casts(): array
     {
         return [
-            'provider'     => AiProvider::class,
-            'amount_usd'   => 'decimal:4',
-            'topped_up_at' => 'datetime',
-            'created_at'   => 'datetime',
-            'updated_at'   => 'datetime',
+            'provider'      => AiProvider::class,
+            'amount_usd'    => 'decimal:4',
+            'amount_brl'    => 'decimal:2',
+            'exchange_rate' => 'decimal:6',
+            'topped_up_at'  => 'datetime',
+            'created_at'    => 'datetime',
+            'updated_at'    => 'datetime',
         ];
     }
 

@@ -76,8 +76,8 @@ class AiCreditPurchasesController extends Controller
 
         return Inertia::render('Panel/Manager/AiCreditPurchases/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),           'url' => route('manager.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.ai_credit_purchases'), 'url' => '#',                       'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('manager.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.ai_credit_purchases'), 'url' => '#', 'active' => true],
             ],
             'purchases' => [
                 'data' => $purchases->getCollection()->map(fn (AiCreditPurchase $p) => $this->serializeRow($p))->all(),
@@ -94,15 +94,15 @@ class AiCreditPurchasesController extends Controller
                     'next' => $purchases->nextPageUrl(),
                 ],
             ],
-            'kpis'             => $this->kpis(),
-            'providerCosts'    => $this->providerCostService->getCostDashboard(),
+            'kpis'                  => $this->kpis(),
+            'providerCosts'         => $this->providerCostService->getCostDashboard(),
             'consumptionByProvider' => $this->consumptionByProviderLast30Days(),
-            'internalWallet'   => $internalEntity
+            'internalWallet'        => $internalEntity
                 ? $this->presentInternalWallet($internalEntity)
                 : null,
-            'topConsumers'     => $this->topConsumersLast30Days(),
-            'filters'          => $filters,
-            'statusOptions'    => collect(AiCreditPurchaseStatus::cases())->map(fn (AiCreditPurchaseStatus $s) => [
+            'topConsumers'  => $this->topConsumersLast30Days(),
+            'filters'       => $filters,
+            'statusOptions' => collect(AiCreditPurchaseStatus::cases())->map(fn (AiCreditPurchaseStatus $s) => [
                 'value' => $s->value,
                 'label' => __("ai.credit_purchase_status.{$s->value}"),
             ])->values(),
@@ -123,16 +123,16 @@ class AiCreditPurchasesController extends Controller
                     'is_client' => (bool) $e->is_client,
                 ]),
             'permissions' => [
-                'credit'        => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
-                'cancel'        => Gate::allows(EntityGate::SaasSupport->value, $this->currentSaasEntity()),
-                'fail'          => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
-                'refund'        => Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity()),
-                'create_manual' => Gate::allows(EntityGate::SaasSupport->value, $this->currentSaasEntity()),
-                'create_manual_unlimited' => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
+                'credit'                     => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
+                'cancel'                     => Gate::allows(EntityGate::SaasSupport->value, $this->currentSaasEntity()),
+                'fail'                       => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
+                'refund'                     => Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity()),
+                'create_manual'              => Gate::allows(EntityGate::SaasSupport->value, $this->currentSaasEntity()),
+                'create_manual_unlimited'    => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
                 'create_manual_for_internal' => Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity()),
-                'create_topup'  => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
-                'delete_topup'  => Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity()),
-                'support_daily_limit' => self::SUPPORT_DAILY_LIMIT,
+                'create_topup'               => Gate::allows(EntityGate::SaasFinancial->value, $this->currentSaasEntity()),
+                'delete_topup'               => Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity()),
+                'support_daily_limit'        => self::SUPPORT_DAILY_LIMIT,
             ],
             't' => trans('manager_ai_credit_purchases'),
         ]);
@@ -271,7 +271,7 @@ class AiCreditPurchasesController extends Controller
         $this->authorizeSaasEntity(EntityGate::SaasAdminPanel);
 
         $validated = $request->validate([
-            'reason'         => ['required', 'string', 'min:5', 'max:500'],
+            'reason'                       => ['required', 'string', 'min:5', 'max:500'],
             'acknowledge_negative_balance' => ['sometimes', 'boolean'],
         ]);
 
@@ -414,18 +414,26 @@ class AiCreditPurchasesController extends Controller
         $validated = $request->validate([
             'provider'     => ['required', 'string', Rule::in(array_map(fn (AiProvider $p) => $p->value, AiProvider::cases()))],
             'amount_usd'   => ['required', 'numeric', 'min:0.0001', 'max:1000000'],
+            'amount_brl'   => ['required', 'numeric', 'min:0.01', 'max:99999999'],
             'topped_up_at' => ['required', 'date'],
             'reference'    => ['nullable', 'string', 'max:120'],
             'note'         => ['nullable', 'string', 'max:500'],
         ]);
 
+        // Cotação efetiva (R$ por US$) = valor pago / valor creditado pelo provedor.
+        $exchangeRate = (float) $validated['amount_usd'] > 0
+            ? round((float) $validated['amount_brl'] / (float) $validated['amount_usd'], 6)
+            : null;
+
         $topup = AiProviderTopup::query()->create([
-            'provider'     => $validated['provider'],
-            'amount_usd'   => $validated['amount_usd'],
-            'topped_up_at' => $validated['topped_up_at'],
-            'reference'    => $validated['reference'] ?? null,
-            'note'         => $validated['note']      ?? null,
-            'created_by'   => auth()->id(),
+            'provider'      => $validated['provider'],
+            'amount_usd'    => $validated['amount_usd'],
+            'amount_brl'    => $validated['amount_brl'],
+            'exchange_rate' => $exchangeRate,
+            'topped_up_at'  => $validated['topped_up_at'],
+            'reference'     => $validated['reference'] ?? null,
+            'note'          => $validated['note'] ?? null,
+            'created_by'    => auth()->id(),
         ]);
 
         $this->audit->recordAdminAction(
@@ -445,8 +453,8 @@ class AiCreditPurchasesController extends Controller
         );
 
         return response()->json([
-            'message'       => __('manager_ai_credit_purchases.actions.topup_created'),
-            'topup_id'      => (string) $topup->id,
+            'message'        => __('manager_ai_credit_purchases.actions.topup_created'),
+            'topup_id'       => (string) $topup->id,
             'provider_costs' => $this->providerCostService->getCostDashboard(),
         ]);
     }
@@ -557,12 +565,12 @@ class AiCreditPurchasesController extends Controller
         $isInternal = $p->entity && ! $p->entity->is_client;
 
         return [
-            'id'               => (string) $p->id,
-            'entity_id'        => (string) $p->entity_id,
-            'entity_name'      => $p->entity?->name,
-            'is_internal'      => $isInternal,
-            'package_code'     => (string) $p->package_code,
-            'package_name'     => $p->package_code === 'manual'
+            'id'           => (string) $p->id,
+            'entity_id'    => (string) $p->entity_id,
+            'entity_name'  => $p->entity?->name,
+            'is_internal'  => $isInternal,
+            'package_code' => (string) $p->package_code,
+            'package_name' => $p->package_code === 'manual'
                 ? __('manager_ai_credit_purchases.manual.package_label')
                 : __("ai.credit_packages.{$p->package_code}.name"),
             'provider'         => $provider?->value,
@@ -675,7 +683,7 @@ class AiCreditPurchasesController extends Controller
         $result = [];
 
         foreach (AiProvider::cases() as $provider) {
-            $credits = (int) ($rows[$provider->value]->credits_consumed ?? 0);
+            $credits                  = (int) ($rows[$provider->value]->credits_consumed ?? 0);
             $result[$provider->value] = [
                 'credits' => $credits,
                 'percent' => $total > 0 ? round($credits / $total * 100, 1) : 0.0,

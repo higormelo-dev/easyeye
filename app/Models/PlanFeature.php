@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PlanFeature extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
 
@@ -66,25 +66,25 @@ class PlanFeature extends Model
         $n = $this->intValue();
 
         return match ($feature) {
-            FeatureKey::MaxDoctors          => $n === 0
+            FeatureKey::MaxDoctors => $n === 0
                                                 ? __('subscriptions.features.max_doctors_unlimited')
                                                 : __('subscriptions.features.max_doctors_count', ['n' => $n]),
-            FeatureKey::MaxPatients         => $n === 0
+            FeatureKey::MaxPatients => $n === 0
                                                 ? __('subscriptions.features.max_patients_unlimited')
                                                 : __('subscriptions.features.max_patients_count', ['n' => $n]),
-            FeatureKey::MaxUsers            => $n === 0
+            FeatureKey::MaxUsers => $n === 0
                                                 ? __('subscriptions.features.max_users_unlimited')
                                                 : __('subscriptions.features.max_users_count', ['n' => $n]),
-            FeatureKey::MaxStorageGB        => $n === 0
+            FeatureKey::MaxStorageGB => $n === 0
                                                 ? __('subscriptions.features.max_storage_unlimited')
                                                 : __('subscriptions.features.max_storage_count', ['n' => $n]),
-            FeatureKey::AiMonthlyCredits    => $n === 0
+            FeatureKey::AiMonthlyCredits => $n === 0
                                                 ? __('subscriptions.features.ai_credits_none')
                                                 : __('subscriptions.features.ai_credits_count', ['n' => $n]),
             FeatureKey::ApiMonthlyExamSends => $n === 0
                                                 ? __('subscriptions.features.api_exam_sends_unlimited')
                                                 : __('subscriptions.features.api_exam_sends_count', ['n' => $n]),
-            default                         => $n === 0
+            default => $n === 0
                                                 ? __('subscriptions.features.generic_unlimited', ['label' => $feature->label()])
                                                 : __('subscriptions.features.generic_count', ['label' => $feature->label(), 'n' => $n]),
         };

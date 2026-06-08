@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{ScheduleEvent};
+use App\Models\ScheduleEvent;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Validation\Rule;
 
@@ -18,8 +18,8 @@ class ScheduleEventsController extends Controller
                 'uuid',
                 Rule::exists('doctors', 'id')->where(function ($q) use ($entityId) {
                     $q->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                      ->where('entity_users.entity_id', $entityId)
-                      ->whereNull('doctors.deleted_at');
+                        ->where('entity_users.entity_id', $entityId)
+                        ->whereNull('doctors.deleted_at');
                 }),
             ],
             'title'     => ['required', 'string', 'max:150'],

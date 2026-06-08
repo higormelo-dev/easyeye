@@ -23,7 +23,7 @@ class UsageMeterService
     /**
      * Retorna o uso atual de uma feature para a empresa no período corrente.
      *
-     * @param  string|null  $subscriptionId  Usado apenas para features mensais.
+     * @param string|null $subscriptionId Usado apenas para features mensais.
      */
     public function getCurrentUsage(string $entityId, FeatureKey $feature, ?string $subscriptionId = null): int
     {

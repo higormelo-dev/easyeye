@@ -30,7 +30,7 @@ class CoverTestTypesSeeder extends Seeder
         foreach ($coverTestTypes as $coverTestType) {
             CoverTestType::query()->firstOrCreate(
                 ['abbreviation' => $coverTestType['abbreviation'], 'name' => $coverTestType['name']],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

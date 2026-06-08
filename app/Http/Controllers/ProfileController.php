@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\{Auth, Redirect, Storage, Vite};
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -19,16 +20,16 @@ class ProfileController extends Controller
         return Inertia::render('Panel/Profile/Edit', [
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.edit_profile'),       'url' => '#',                     'active' => true],
+                ['label' => __('actions.edit_profile'), 'url' => '#', 'active' => true],
             ],
             'user' => [
-                'id'                     => (string) $user->id,
-                'name'                   => $user->name,
-                'email'                  => $user->email,
-                'photo_url'              => Storage::disk('public')->exists($userPhotoPath)
+                'id'        => (string) $user->id,
+                'name'      => $user->name,
+                'email'     => $user->email,
+                'photo_url' => Storage::disk('public')->exists($userPhotoPath)
                     ? Storage::disk('public')->url($userPhotoPath) . '?v=' . Storage::disk('public')->lastModified($userPhotoPath)
                     : Vite::asset('resources/img/system/team.png'),
-                'must_verify_email'      => $user instanceof \Illuminate\Contracts\Auth\MustVerifyEmail,
+                'must_verify_email'      => $user instanceof MustVerifyEmail,
                 'email_verified'         => $user->hasVerifiedEmail(),
                 'has_two_factor_enabled' => $user->hasTwoFactorEnabled(),
             ],

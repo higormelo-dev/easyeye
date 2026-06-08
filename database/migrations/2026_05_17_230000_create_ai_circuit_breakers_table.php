@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Espelha o padrão usado em gateway_circuit_breakers para os gateways de billing.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('ai_circuit_breakers', function (Blueprint $table) {

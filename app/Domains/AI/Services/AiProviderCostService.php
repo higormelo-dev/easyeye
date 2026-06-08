@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Services;
 
-use App\Domains\AI\Models\AiProviderTopup;
 use App\Enums\AI\AiProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -69,9 +68,9 @@ class AiProviderCostService
         $totalCalls = 0;
 
         foreach (AiProvider::cases() as $provider) {
-            $mtd = $this->sumCostBetween($provider, $startOfMonth, $now);
-            $w7d = $this->sumCostBetween($provider, $startOf7DaysAgo, $now);
-            $yda = $this->sumCostBetween($provider, $startOfYesterday, $endOfYesterday);
+            $mtd      = $this->sumCostBetween($provider, $startOfMonth, $now);
+            $w7d      = $this->sumCostBetween($provider, $startOf7DaysAgo, $now);
+            $yda      = $this->sumCostBetween($provider, $startOfYesterday, $endOfYesterday);
             $callsMtd = $this->countCallsBetween($provider, $startOfMonth, $now);
             $balance  = $this->getEstimatedBalance($provider, $w7d);
 
@@ -88,19 +87,19 @@ class AiProviderCostService
                 'recent_topups'         => $this->getRecentTopups($provider, 5),
             ];
 
-            $totalMtd   += $mtd;
-            $total7d    += $w7d;
-            $totalYday  += $yda;
+            $totalMtd += $mtd;
+            $total7d += $w7d;
+            $totalYday += $yda;
             $totalCalls += $callsMtd;
         }
 
         return [
             'summary' => [
-                'month_to_date_usd'   => round($totalMtd, 4),
-                'last_7d_usd'         => round($total7d, 4),
-                'yesterday_usd'       => round($totalYday, 4),
-                'month_forecast_usd'  => round($this->forecastMonth($totalMtd, $total7d, $now), 4),
-                'total_calls_mtd'     => $totalCalls,
+                'month_to_date_usd'  => round($totalMtd, 4),
+                'last_7d_usd'        => round($total7d, 4),
+                'yesterday_usd'      => round($totalYday, 4),
+                'month_forecast_usd' => round($this->forecastMonth($totalMtd, $total7d, $now), 4),
+                'total_calls_mtd'    => $totalCalls,
             ],
             'by_provider' => $byProvider,
             'margin'      => $this->calculateMargin($totalMtd, $startOfMonth, $now),
@@ -136,9 +135,9 @@ class AiProviderCostService
      */
     private function forecastMonth(float $costMtd, float $cost7d, CarbonImmutable $now): float
     {
-        $endOfMonth   = $now->endOfMonth();
-        $daysLeft     = $now->diffInDays($endOfMonth);
-        $dailyAvg     = $cost7d / 7;
+        $endOfMonth = $now->endOfMonth();
+        $daysLeft   = $now->diffInDays($endOfMonth);
+        $dailyAvg   = $cost7d / 7;
 
         return $costMtd + ($dailyAvg * $daysLeft);
     }
@@ -226,10 +225,10 @@ class AiProviderCostService
         $daysRemaining = $dailyBurn > 0 ? (int) floor($remaining / $dailyBurn) : null;
 
         $alertLevel = match (true) {
-            $remaining <= 0                                          => 'exhausted',
+            $remaining <= 0                                                  => 'exhausted',
             $dailyBurn > 0 && $daysRemaining !== null && $daysRemaining < 7  => 'critical',
             $dailyBurn > 0 && $daysRemaining !== null && $daysRemaining < 14 => 'warning',
-            default                                                  => 'ok',
+            default                                                          => 'ok',
         };
 
         return [
@@ -257,6 +256,8 @@ class AiProviderCostService
             ->select([
                 'ai_provider_topups.id',
                 'ai_provider_topups.amount_usd',
+                'ai_provider_topups.amount_brl',
+                'ai_provider_topups.exchange_rate',
                 'ai_provider_topups.topped_up_at',
                 'ai_provider_topups.reference',
                 'ai_provider_topups.note',
@@ -268,6 +269,8 @@ class AiProviderCostService
             ->map(fn ($row) => [
                 'id'              => (string) $row->id,
                 'amount_usd'      => round((float) $row->amount_usd, 4),
+                'amount_brl'      => $row->amount_brl !== null ? round((float) $row->amount_brl, 2) : null,
+                'exchange_rate'   => $row->exchange_rate !== null ? round((float) $row->exchange_rate, 4) : null,
                 'topped_up_at'    => (string) $row->topped_up_at,
                 'reference'       => $row->reference ? (string) $row->reference : null,
                 'note'            => $row->note ? (string) $row->note : null,

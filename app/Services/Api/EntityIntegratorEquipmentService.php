@@ -3,18 +3,19 @@
 namespace App\Services\Api;
 
 use App\Http\Requests\Api\EntityIntegratorEquipmentRequest;
-use App\Models\{EntityIntegratorEquipment};
+use App\Models\EntityIntegratorEquipment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 class EntityIntegratorEquipmentService
 {
     private const FILLABLE_FIELDS = ['name', 'ip', 'mac', 'serial_number'];
 
     /**
-     * Create a new record with all related entities
+     * Create a new record with all related entities.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function create(EntityIntegratorEquipmentRequest $request): EntityIntegratorEquipment
     {
@@ -22,9 +23,9 @@ class EntityIntegratorEquipmentService
     }
 
     /**
-     * Update existing record and related entities
+     * Update existing record and related entities.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function update(EntityIntegratorEquipment $equipment, EntityIntegratorEquipmentRequest $request): EntityIntegratorEquipment
     {
@@ -52,7 +53,7 @@ class EntityIntegratorEquipmentService
     }
 
     /**
-     * Find by ID or Code including soft-deleted records
+     * Find by ID or Code including soft-deleted records.
      */
     public function findByIdOrCode(string $idOrCode): ?EntityIntegratorEquipment
     {
@@ -61,7 +62,7 @@ class EntityIntegratorEquipmentService
             ->where('integrator_id', $integrator->id);
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('EIQ-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };

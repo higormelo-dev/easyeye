@@ -12,14 +12,14 @@ class ApiAuthenticateWithIntegrator
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(Request): (Response)  $next
+     * @param Closure(Request): (Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user  = $request->user();
         $token = $user ? $user->currentAccessToken() : null;
 
-        if (!$user) {
+        if (! $user) {
             return response()->json(['message' => __('http-statuses.401')], 401);
         }
 
@@ -35,7 +35,7 @@ class ApiAuthenticateWithIntegrator
             }
         }
 
-        if (!$integratorId) {
+        if (! $integratorId) {
             return response()->json(['message' => __('http-statuses.401')], 401);
         }
 
@@ -44,15 +44,15 @@ class ApiAuthenticateWithIntegrator
             ->with(['user', 'user.entity'])
             ->find($integratorId);
 
-        if (!$integrator || !$integrator->active) {
+        if (! $integrator || ! $integrator->active) {
             return response()->json(['message' => __('auth.integrator_inactive'), 'valid' => false], 401);
         }
 
-        if (!$integrator->user->active) {
+        if (! $integrator->user->active) {
             return response()->json(['message' => __('auth.user_integrator_inactive'), 'valid' => false], 401);
         }
 
-        if (!($integrator->user->entity && $integrator->user->entity->active)) {
+        if (! ($integrator->user->entity && $integrator->user->entity->active)) {
             return response()->json(['message' => __('auth.entity_inactive'), 'valid' => false], 401);
         }
 

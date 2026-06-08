@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  *   referral      — Encaminhamento
  *   report        — Laudo / relatório geral
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('report_setting_contents', function (Blueprint $table) {

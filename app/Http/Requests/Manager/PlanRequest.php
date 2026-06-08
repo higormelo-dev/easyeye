@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Manager;
 
-use App\Enums\{BillingCycle};
+use App\Enums\BillingCycle;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 

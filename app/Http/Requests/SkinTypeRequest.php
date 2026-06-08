@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\SkinType;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +20,7 @@ class SkinTypeRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -83,7 +84,7 @@ class SkinTypeRequest extends FormRequest
             $merge['active'] = $this->normalizeBoolean($this->input('active'));
         }
 
-        if (!empty($merge)) {
+        if (! empty($merge)) {
             $this->merge($merge);
         }
     }
@@ -98,7 +99,7 @@ class SkinTypeRequest extends FormRequest
             return (bool) $value;
         }
 
-        if (!is_string($value)) {
+        if (! is_string($value)) {
             return $value;
         }
 

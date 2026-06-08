@@ -4,6 +4,7 @@ namespace App\Services\Billing;
 
 use App\Models\Billing\Gateway;
 use Illuminate\Support\Facades\{Cache, DB};
+use InvalidArgumentException;
 
 /**
  * Gerencia o gateway padrão do SaaS para billing de assinaturas.
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\{Cache, DB};
 class GatewayDefaultService
 {
     private const CACHE_KEY = 'billing:default_gateway_code';
+
     private const CACHE_TTL = 600; // 10 minutos
 
     /**
@@ -33,11 +35,13 @@ class GatewayDefaultService
             $explicit = Gateway::query()
                 ->where('is_default', true)
                 ->where('active', true)
-                ->whereHas('credentials', fn ($q) => $q
-                    ->whereNull('entity_id')
-                    ->where('scope', 'global')
-                    ->where('active', true)
-                    ->whereNull('deleted_at')
+                ->whereHas(
+                    'credentials',
+                    fn ($q) => $q
+                        ->whereNull('entity_id')
+                        ->where('scope', 'global')
+                        ->where('active', true)
+                        ->whereNull('deleted_at'),
                 )
                 ->value('code');
 
@@ -48,11 +52,13 @@ class GatewayDefaultService
             // 2. Fallback: menor prioridade ativo com credencial
             return Gateway::query()
                 ->where('active', true)
-                ->whereHas('credentials', fn ($q) => $q
-                    ->whereNull('entity_id')
-                    ->where('scope', 'global')
-                    ->where('active', true)
-                    ->whereNull('deleted_at')
+                ->whereHas(
+                    'credentials',
+                    fn ($q) => $q
+                        ->whereNull('entity_id')
+                        ->where('scope', 'global')
+                        ->where('active', true)
+                        ->whereNull('deleted_at'),
                 )
                 ->orderBy('priority')
                 ->value('code');
@@ -72,12 +78,12 @@ class GatewayDefaultService
     /**
      * Define um gateway como padrão do sistema.
      *
-     * @throws \InvalidArgumentException se o gateway não puder ser o padrão.
+     * @throws InvalidArgumentException se o gateway não puder ser o padrão.
      */
     public function setDefault(Gateway $gateway): void
     {
         if (! $gateway->active) {
-            throw new \InvalidArgumentException(__('gateways.error_inactive_gateway'));
+            throw new InvalidArgumentException(__('gateways.error_inactive_gateway'));
         }
 
         $hasCredential = $gateway->credentials()
@@ -88,7 +94,7 @@ class GatewayDefaultService
             ->exists();
 
         if (! $hasCredential) {
-            throw new \InvalidArgumentException(__('gateways.error_no_credential'));
+            throw new InvalidArgumentException(__('gateways.error_no_credential'));
         }
 
         DB::transaction(function () use ($gateway): void {

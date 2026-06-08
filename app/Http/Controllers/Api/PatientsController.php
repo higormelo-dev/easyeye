@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientResource;
-use App\Models\{Patient};
+use App\Models\Patient;
 use Illuminate\Support\Str;
 
 class PatientsController extends Controller
@@ -54,7 +54,7 @@ class PatientsController extends Controller
         $integrator = request()->attributes->get('integrator');
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };

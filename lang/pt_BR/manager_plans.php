@@ -85,14 +85,14 @@ return [
     'btn_create_plan'  => 'Criar plano',
 
     // ── Drawer de detalhes ────────────────────────────────────────────────────
-    'detail_btn_edit'   => 'Editar',
-    'section_pricing'   => 'Precificação',
-    'section_features'  => 'Limites e Features',
-    'detail_price'      => 'Preço',
-    'detail_cycle'      => 'Ciclo',
-    'detail_sort_order' => 'Ordem de exibição',
-    'detail_description'=> 'Descrição',
-    'detail_created_at' => 'Cadastrado em',
+    'detail_btn_edit'    => 'Editar',
+    'section_pricing'    => 'Precificação',
+    'section_features'   => 'Limites e Features',
+    'detail_price'       => 'Preço',
+    'detail_cycle'       => 'Ciclo',
+    'detail_sort_order'  => 'Ordem de exibição',
+    'detail_description' => 'Descrição',
+    'detail_created_at'  => 'Cadastrado em',
 
     // ── Valores de features (drawer) ──────────────────────────────────────────
     'feature_included'     => 'Incluído',

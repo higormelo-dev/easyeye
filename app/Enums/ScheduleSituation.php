@@ -86,7 +86,7 @@ enum ScheduleSituation: int
 
     public function isActive(): bool
     {
-        return !$this->isTerminal();
+        return ! $this->isTerminal();
     }
 
     public function circleClass(): string

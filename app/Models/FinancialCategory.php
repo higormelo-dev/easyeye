@@ -1,20 +1,19 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Concerns\HasEntityCode;
-use App\Concerns\HasUppercaseName;
+use App\Concerns\{HasEntityCode, HasUppercaseName};
 use App\Enums\FinancialEntryType;
 use App\Traits\{Auditable, HasAuditColumns};
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Builder, Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
 class FinancialCategory extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasEntityCode;
     use HasUppercaseName;
     use HasUuids;
@@ -36,9 +35,9 @@ class FinancialCategory extends Model
     protected function casts(): array
     {
         return [
-            'type' => FinancialEntryType::class,
-            'active' => 'boolean',
-            'is_system' => 'boolean',
+            'type'       => FinancialEntryType::class,
+            'active'     => 'boolean',
+            'is_system'  => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
             'deleted_at' => 'datetime',
@@ -75,4 +74,3 @@ class FinancialCategory extends Model
             ->where('active', true);
     }
 }
-

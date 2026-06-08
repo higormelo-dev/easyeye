@@ -19,7 +19,7 @@ class ApiCheckPlanAccess
     {
         $integrator = $request->attributes->get('integrator');
 
-        if (!$integrator) {
+        if (! $integrator) {
             return $next($request);
         }
 
@@ -30,7 +30,7 @@ class ApiCheckPlanAccess
             ->with('plan.features')
             ->first();
 
-        if (!$subscription) {
+        if (! $subscription) {
             return response()->json([
                 'message' => __('subscriptions.access_blocked'),
                 'valid'   => false,
@@ -40,7 +40,7 @@ class ApiCheckPlanAccess
         // Verifica se o plano permite acesso aos integradores
         $hasAccess = $subscription->plan->featureValue(FeatureKey::HasApiIntegrator) === '1';
 
-        if (!$hasAccess) {
+        if (! $hasAccess) {
             return response()->json([
                 'message' => __('subscriptions.features.plan_upgrade_required'),
                 'valid'   => false,

@@ -6,10 +6,9 @@ use App\DTOs\Billing\{CancelSubscriptionDTO, GatewayCallContext};
 use App\Enums\Billing\{BillingEventType, CancellationReason};
 use App\Enums\SubscriptionStatus;
 use App\Jobs\Billing\CancelGatewaySubscriptionJob;
-use App\Models\{Entity, Subscription, SubscriptionSetting};
 use App\Models\Billing\{Cancellation, SubscriptionChange};
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use App\Models\{Entity, Subscription, SubscriptionSetting};
+use Illuminate\Support\Facades\{DB, Log};
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -44,9 +43,9 @@ class BillingCancellationService
     /**
      * Cancela uma assinatura.
      *
-     * @param  bool  $cancelAtGateway  Deve cancelar também no gateway de pagamento?
-     *                                 Use false em migrações de plano onde o novo plano
-     *                                 imediatamente criará uma nova assinatura no gateway.
+     * @param bool $cancelAtGateway Deve cancelar também no gateway de pagamento?
+     *                              Use false em migrações de plano onde o novo plano
+     *                              imediatamente criará uma nova assinatura no gateway.
      */
     public function cancel(
         Subscription $subscription,
@@ -97,7 +96,7 @@ class BillingCancellationService
                 'metadata'        => [
                     'grace_period_ends_at' => now()->addDays($graceDays)->toIso8601String(),
                 ],
-                'correlation_id'  => $correlationId,
+                'correlation_id' => $correlationId,
             ]);
         });
 

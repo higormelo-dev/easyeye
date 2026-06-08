@@ -11,12 +11,12 @@ use Laracasts\Presenter\PresentableTrait;
 
 class Patient extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
-    use SoftDeletes;
     use PresentableTrait;
+    use SoftDeletes;
 
     protected $presenter = PatientPresenter::class;
 
@@ -39,7 +39,7 @@ class Patient extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {

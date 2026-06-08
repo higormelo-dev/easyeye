@@ -29,7 +29,7 @@ class CovenantResource extends JsonResource
             ],
         ];
 
-        if (!$request->routeIs('*.index')) {
+        if (! $request->routeIs('*.index')) {
             $data['relationships'] = [
                 'entity' => $this->entity?->toArray() ?? (object) [],
             ];

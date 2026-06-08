@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Observers;
 
@@ -8,6 +8,7 @@ use App\Enums\ActivationStep;
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule};
 use App\Services\ActivationService;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Rastreia automaticamente os marcos de ativação de cada clínica.
@@ -90,7 +91,7 @@ class ActivationObserver
 
     public function entityUpdated(Entity $entity): void
     {
-        if (!$entity->is_client) {
+        if (! $entity->is_client) {
             return;
         }
 
@@ -107,7 +108,7 @@ class ActivationObserver
     /**
      * Executa o registro de ativação capturando qualquer exceção.
      *
-     * @param  callable(): ?string  $entityIdResolver  Retorna o entity_id ou null
+     * @param callable(): ?string $entityIdResolver Retorna o entity_id ou null
      */
     private function fire(callable $entityIdResolver, ActivationStep $step): void
     {
@@ -119,7 +120,7 @@ class ActivationObserver
             }
 
             $this->activationService->complete($entityId, $step);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning('ActivationObserver: falha ao registrar etapa.', [
                 'step'  => $step->value,
                 'error' => $e->getMessage(),

@@ -262,7 +262,12 @@ function fmtDateOnly(iso) {
                                     style="font-size: .7rem;"
                                 >
                                     <span>{{ fmtDateOnly(topup.topped_up_at) }}</span>
-                                    <strong class="text-success">+{{ fmtUsd(topup.amount_usd) }}</strong>
+                                    <span class="text-end">
+                                        <strong class="text-success">+{{ fmtUsd(topup.amount_usd) }}</strong>
+                                        <span v-if="topup.amount_brl" class="text-muted ms-1">
+                                            (R$ {{ topup.amount_brl.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }})
+                                        </span>
+                                    </span>
                                 </div>
                             </div>
                         </div>

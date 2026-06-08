@@ -18,7 +18,7 @@ class EloquentAiRunRepository implements AiRunRepositoryInterface
     public function markRunning(AiRun $run): void
     {
         $run->update([
-            'status' => AiRunStatus::Running->value,
+            'status'        => AiRunStatus::Running->value,
             'error_message' => null,
         ]);
     }
@@ -31,18 +31,18 @@ class EloquentAiRunRepository implements AiRunRepositoryInterface
         ?string $errorMessage = null,
     ): void {
         $run->update([
-            'status' => AiRunStatus::WaitingApproval->value,
-            'final_output' => $finalOutput,
-            'safety_notes' => $safetyNotes,
+            'status'           => AiRunStatus::WaitingApproval->value,
+            'final_output'     => $finalOutput,
+            'safety_notes'     => $safetyNotes,
             'consumed_credits' => $consumedCredits,
-            'error_message' => $errorMessage,
+            'error_message'    => $errorMessage,
         ]);
     }
 
     public function markFailed(AiRun $run, string $errorMessage): void
     {
         $run->update([
-            'status' => AiRunStatus::Failed->value,
+            'status'        => AiRunStatus::Failed->value,
             'error_message' => mb_substr($errorMessage, 0, 2000),
         ]);
     }

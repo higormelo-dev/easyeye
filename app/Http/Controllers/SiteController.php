@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Middleware\SetLocale;
 use App\Models\Plan;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Log;
-use Inertia\Inertia;
-use Inertia\Response;
+use Inertia\{Inertia, Response};
 
 class SiteController extends Controller
 {
@@ -37,12 +36,13 @@ class SiteController extends Controller
             . __('subscriptions.pricing_credit_note.body') . ' '
             . __('subscriptions.pricing_credit_note.topup');
 
-        $currentUrl = url('/');
+        $currentUrl    = url('/');
         $currentLocale = app()->getLocale();
 
         // Alternate locales para hreflang
         $alternateLocales = [];
-        foreach (\App\Http\Middleware\SetLocale::SUPPORTED_LOCALES as $code => $meta) {
+
+        foreach (SetLocale::SUPPORTED_LOCALES as $code => $meta) {
             $alternateLocales[] = [
                 'code'    => str_replace('_', '-', $code),
                 'url'     => $currentUrl . '?lang=' . $code,
@@ -51,7 +51,7 @@ class SiteController extends Controller
         }
 
         // JSON-LD: FAQPage
-        $faqItems = trans('site.faq.items');
+        $faqItems  = trans('site.faq.items');
         $faqJsonLd = [
             '@context'   => 'https://schema.org',
             '@type'      => 'FAQPage',
@@ -67,28 +67,28 @@ class SiteController extends Controller
 
         // JSON-LD: Organization + SoftwareApplication
         $orgJsonLd = [
-            '@context'    => 'https://schema.org',
-            '@type'       => 'Organization',
-            'name'        => config('app.name', 'EasyEye'),
-            'url'         => $currentUrl,
-            'logo'        => asset('images/logo.svg'),
-            'description' => trans('site.meta.description'),
+            '@context'     => 'https://schema.org',
+            '@type'        => 'Organization',
+            'name'         => config('app.name', 'EasyEye'),
+            'url'          => $currentUrl,
+            'logo'         => asset('images/logo.svg'),
+            'description'  => trans('site.meta.description'),
             'contactPoint' => [
-                '@type'            => 'ContactPoint',
-                'contactType'      => 'sales',
-                'availableLanguage'=> ['Portuguese', 'English'],
+                '@type'             => 'ContactPoint',
+                'contactType'       => 'sales',
+                'availableLanguage' => ['Portuguese', 'English'],
             ],
         ];
 
         $softwareJsonLd = [
-            '@context'           => 'https://schema.org',
-            '@type'              => 'SoftwareApplication',
-            'name'               => config('app.name', 'EasyEye'),
-            'applicationCategory'=> 'HealthApplication',
-            'operatingSystem'    => 'Web',
-            'description'        => trans('site.meta.description'),
-            'url'                => $currentUrl,
-            'offers'             => [
+            '@context'            => 'https://schema.org',
+            '@type'               => 'SoftwareApplication',
+            'name'                => config('app.name', 'EasyEye'),
+            'applicationCategory' => 'HealthApplication',
+            'operatingSystem'     => 'Web',
+            'description'         => trans('site.meta.description'),
+            'url'                 => $currentUrl,
+            'offers'              => [
                 '@type'         => 'Offer',
                 'price'         => '0',
                 'priceCurrency' => 'BRL',

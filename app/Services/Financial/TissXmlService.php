@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services\Financial;
 
@@ -20,7 +20,7 @@ class TissXmlService
             'claims.doctor',
         ]);
 
-        $dom = new DOMDocument('1.0', 'UTF-8');
+        $dom               = new DOMDocument('1.0', 'UTF-8');
         $dom->formatOutput = true;
 
         $ansTiss = $dom->createElement('ansTISS');
@@ -32,7 +32,7 @@ class TissXmlService
         $relativePath = sprintf(
             'private/tiss/%s/%s.xml',
             $batch->entity_id,
-            mb_strtolower($batch->code)
+            mb_strtolower($batch->code),
         );
 
         Storage::disk('local')->put($relativePath, $dom->saveXML());
@@ -42,14 +42,14 @@ class TissXmlService
 
     private function appendHeader(DOMDocument $dom, DOMElement $root, BillingBatch $batch): void
     {
-        $cabecalho = $root->appendChild($dom->createElement('cabecalho'));
+        $cabecalho              = $root->appendChild($dom->createElement('cabecalho'));
         $identificacaoTransacao = $cabecalho->appendChild($dom->createElement('identificacaoTransacao'));
         $identificacaoTransacao->appendChild($dom->createElement('tipoTransacao', 'ENVIO_LOTE_GUIAS'));
         $identificacaoTransacao->appendChild($dom->createElement('sequencialTransacao', $batch->code));
         $identificacaoTransacao->appendChild($dom->createElement('dataRegistroTransacao', now()->format('Y-m-d')));
         $identificacaoTransacao->appendChild($dom->createElement('horaRegistroTransacao', now()->format('H:i:s')));
 
-        $origem = $cabecalho->appendChild($dom->createElement('origem'));
+        $origem                 = $cabecalho->appendChild($dom->createElement('origem'));
         $identificacaoPrestador = $origem->appendChild($dom->createElement('identificacaoPrestador'));
         $identificacaoPrestador->appendChild($dom->createElement('codigoPrestadorNaOperadora', $batch->entity->code ?? ''));
         $identificacaoPrestador->appendChild($dom->createElement('cnpjPrestador', $this->digitsOnly((string) ($batch->entity->national_registration ?? ''))));
@@ -64,7 +64,7 @@ class TissXmlService
     private function appendLoteGuias(DOMDocument $dom, DOMElement $root, BillingBatch $batch): void
     {
         $prestadorParaOperadora = $root->appendChild($dom->createElement('prestadorParaOperadora'));
-        $loteGuias = $prestadorParaOperadora->appendChild($dom->createElement('loteGuias'));
+        $loteGuias              = $prestadorParaOperadora->appendChild($dom->createElement('loteGuias'));
         $loteGuias->appendChild($dom->createElement('numeroLote', $batch->code));
 
         $guiasTiss = $loteGuias->appendChild($dom->createElement('guiasTISS'));
@@ -101,4 +101,3 @@ class TissXmlService
         return preg_replace('/\D+/', '', $value) ?? '';
     }
 }
-

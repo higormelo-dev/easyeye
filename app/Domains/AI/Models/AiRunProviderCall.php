@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Models;
 
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiProviderCallRole;
+use App\Enums\AI\{AiProvider, AiProviderCallRole};
 use App\Traits\Auditable;
+use Database\Factories\AI\AiRunProviderCallFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -62,8 +62,8 @@ class AiRunProviderCall extends Model
         return $this->belongsTo(AiRun::class, 'ai_run_id');
     }
 
-    protected static function newFactory(): \Database\Factories\AI\AiRunProviderCallFactory
+    protected static function newFactory(): AiRunProviderCallFactory
     {
-        return \Database\Factories\AI\AiRunProviderCallFactory::new();
+        return AiRunProviderCallFactory::new();
     }
 }

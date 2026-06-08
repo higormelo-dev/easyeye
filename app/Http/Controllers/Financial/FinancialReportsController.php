@@ -8,6 +8,7 @@ use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
 use App\Models\{BillingClaim, Entity, FinancialCashEntry};
 use App\Services\Financial\CashFlowService;
+use BackedEnum;
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\{Request, Response};
 use Illuminate\Support\Facades\Gate;
@@ -68,9 +69,9 @@ class FinancialReportsController extends Controller
 
         return Inertia::render('Panel/Financial/Reports/CashFlow', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),     'url' => route('panel.dashboard'),                'active' => false],
-                ['label' => __('financial.financial'),            'url' => route('panel.financial.bi.index'),       'active' => false],
-                ['label' => __('financial.cashflow.breadcrumb'),  'url' => '#',                                      'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.bi.index'), 'active' => false],
+                ['label' => __('financial.cashflow.breadcrumb'), 'url' => '#', 'active' => true],
             ],
             'filters'    => ['from' => $from, 'to' => $to],
             'summary'    => $summary,
@@ -81,7 +82,7 @@ class FinancialReportsController extends Controller
                 'description'   => $e->description,
                 'category_name' => $e->category?->name,
                 'covenant_name' => $e->covenant?->name,
-                'type'          => $e->type instanceof \BackedEnum ? $e->type->value : $e->type,
+                'type'          => $e->type instanceof BackedEnum ? $e->type->value : $e->type,
                 'amount'        => (float) $e->amount,
             ]),
             'export_url' => route('panel.financial.reports.cash-flow.export'),
@@ -129,9 +130,9 @@ class FinancialReportsController extends Controller
 
         return Inertia::render('Panel/Financial/Reports/Covenants', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),       'url' => route('panel.dashboard'),          'active' => false],
-                ['label' => __('financial.financial'),              'url' => route('panel.financial.bi.index'), 'active' => false],
-                ['label' => __('financial.covenants.breadcrumb'),   'url' => '#',                                'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.bi.index'), 'active' => false],
+                ['label' => __('financial.covenants.breadcrumb'), 'url' => '#', 'active' => true],
             ],
             'filters'    => ['from' => $from, 'to' => $to],
             'summary'    => $summary,

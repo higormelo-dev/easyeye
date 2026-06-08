@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * Registra qual parceiro trouxe a clínica e qual código de indicação foi usado.
  * Essencial para calcular o CAC por canal e medir ROI de cada canal de venda.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('entities', function (Blueprint $table) {

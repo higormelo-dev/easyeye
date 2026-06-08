@@ -44,7 +44,7 @@ class VisualAcuityTypesSeeder extends Seeder
         foreach ($types as $type) {
             VisualAcuityType::query()->firstOrCreate(
                 ['name' => $type['name'], 'scale' => $type['scale']],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

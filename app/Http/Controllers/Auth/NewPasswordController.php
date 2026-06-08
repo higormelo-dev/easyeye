@@ -8,7 +8,7 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\{Hash, Password};
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules;
+use Illuminate\Validation\{Rules, ValidationException};
 use Inertia\{Inertia, Response};
 
 class NewPasswordController extends Controller
@@ -26,7 +26,7 @@ class NewPasswordController extends Controller
     /**
      * Handle an incoming new password request.
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function store(Request $request): RedirectResponse
     {
@@ -48,7 +48,7 @@ class NewPasswordController extends Controller
                 ])->save();
 
                 event(new PasswordReset($user));
-            }
+            },
         );
 
         // If the password was successfully reset, we will redirect the user back to

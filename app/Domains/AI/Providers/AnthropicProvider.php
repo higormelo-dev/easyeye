@@ -6,9 +6,7 @@ namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
 use App\Domains\AI\Support\ProviderErrorSanitizer;
-use App\DTOs\AI\AiProviderResponseData;
-use App\DTOs\AI\AiRequestData;
-use App\DTOs\AI\AiUsageData;
+use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\AiProvider;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -18,15 +16,15 @@ class AnthropicProvider implements AiProviderInterface
 {
     public function generate(AiRequestData $request): AiProviderResponseData
     {
-        $payload = $this->buildPayload($request);
+        $payload     = $this->buildPayload($request);
         $requestHash = $this->hashPayload($payload);
-        $startedAt = microtime(true);
+        $startedAt   = microtime(true);
 
         $response = Http::baseUrl($this->baseUrl())
             ->acceptJson()
             ->asJson()
             ->withHeaders([
-                'x-api-key' => $this->apiKey(),
+                'x-api-key'         => $this->apiKey(),
                 'anthropic-version' => $this->apiVersion(),
             ])
             ->withUserAgent($this->userAgent())
@@ -39,8 +37,8 @@ class AnthropicProvider implements AiProviderInterface
             throw $this->toProviderException($response);
         }
 
-        $json = (array) $response->json();
-        $content = $this->extractTextContent($json);
+        $json         = (array) $response->json();
+        $content      = $this->extractTextContent($json);
         $responseHash = hash('sha256', $content);
 
         return new AiProviderResponseData(
@@ -64,14 +62,14 @@ class AnthropicProvider implements AiProviderInterface
             requestHash: $requestHash,
             responseHash: $responseHash,
             rawResponse: [
-                'id' => data_get($json, 'id'),
-                'type' => data_get($json, 'type'),
-                'model' => data_get($json, 'model'),
-                'usage' => data_get($json, 'usage'),
+                'id'          => data_get($json, 'id'),
+                'type'        => data_get($json, 'type'),
+                'model'       => data_get($json, 'model'),
+                'usage'       => data_get($json, 'usage'),
                 'stop_reason' => data_get($json, 'stop_reason'),
             ],
             metadata: [
-                'message_id' => data_get($json, 'id'),
+                'message_id'  => data_get($json, 'id'),
                 'stop_reason' => data_get($json, 'stop_reason'),
             ],
             finishReason: $this->extractFinishReason($json),
@@ -99,11 +97,11 @@ class AnthropicProvider implements AiProviderInterface
     private function buildPayload(AiRequestData $request): array
     {
         $payload = [
-            'model' => $this->model(),
+            'model'      => $this->model(),
             'max_tokens' => $request->maxOutputTokens ?? $this->defaultMaxTokens(),
-            'messages' => [
+            'messages'   => [
                 [
-                    'role' => 'user',
+                    'role'    => 'user',
                     'content' => $this->buildContentItems($request),
                 ],
             ],
@@ -133,6 +131,22 @@ class AnthropicProvider implements AiProviderInterface
         ];
 
         foreach ($request->attachments as $attachment) {
+            $data = (string) ($attachment['data'] ?? '');
+
+            // Imagem inline (base64) tem prioridade (fluxo Eye Image).
+            if ($data !== '') {
+                $items[] = [
+                    'type'   => 'image',
+                    'source' => [
+                        'type'       => 'base64',
+                        'media_type' => (string) ($attachment['mime_type'] ?? 'image/jpeg'),
+                        'data'       => $data,
+                    ],
+                ];
+
+                continue;
+            }
+
             $imageUrl = (string) ($attachment['image_url'] ?? $attachment['url'] ?? '');
 
             if ($imageUrl === '') {
@@ -140,10 +154,10 @@ class AnthropicProvider implements AiProviderInterface
             }
 
             $items[] = [
-                'type' => 'image',
+                'type'   => 'image',
                 'source' => [
                     'type' => 'url',
-                    'url' => $imageUrl,
+                    'url'  => $imageUrl,
                 ],
             ];
         }
@@ -163,7 +177,7 @@ class AnthropicProvider implements AiProviderInterface
             return $prompt;
         }
 
-        $contextJson = json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $contextJson  = json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $contextBlock = $contextJson !== false ? $contextJson : '{}';
 
         return trim($prompt . "\n\nContexto clínico (JSON):\n" . $contextBlock);
@@ -286,13 +300,12 @@ class AnthropicProvider implements AiProviderInterface
     private function toProviderException(Response $response): RuntimeException
     {
         $rawMessage = (string) data_get($response->json(), 'error.message', '');
-        $type = (string) data_get($response->json(), 'error.type', 'unknown');
-        $status = $response->status();
+        $type       = (string) data_get($response->json(), 'error.type', 'unknown');
+        $status     = $response->status();
 
-        $safeType = ProviderErrorSanitizer::sanitize($type, 'unknown');
+        $safeType    = ProviderErrorSanitizer::sanitize($type, 'unknown');
         $safeMessage = ProviderErrorSanitizer::sanitize($rawMessage, 'Falha na integração Anthropic.');
 
         return new RuntimeException("Anthropic request failed [{$status}/{$safeType}]: {$safeMessage}");
     }
 }
-

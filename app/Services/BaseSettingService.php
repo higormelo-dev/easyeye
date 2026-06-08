@@ -33,13 +33,13 @@ abstract class BaseSettingService
             ->withTrashed()
             ->where(
                 fn ($q) => $q
-                ->where('entity_id', session()->get('selected_entity_id'))
-                ->orWhereNull('entity_id')
+                    ->where('entity_id', session()->get('selected_entity_id'))
+                    ->orWhereNull('entity_id'),
             )
             ->when(
                 Str::isUuid($idOrCode),
                 fn ($q) => $q->where('id', $idOrCode),
-                fn ($q) => $q->where('code', $idOrCode)
+                fn ($q) => $q->where('code', $idOrCode),
             )
             ->firstOrFail();
     }
@@ -51,8 +51,8 @@ abstract class BaseSettingService
         return $class::query()
             ->where(
                 fn ($q) => $q
-                ->where('entity_id', session('selected_entity_id'))
-                ->orWhereNull('entity_id')
+                    ->where('entity_id', session('selected_entity_id'))
+                    ->orWhereNull('entity_id'),
             )
             ->count();
     }

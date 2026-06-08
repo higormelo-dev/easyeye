@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
@@ -89,19 +89,19 @@ class PartnerService
      * Gera uma comissão para o parceiro quando sua clínica ativa um plano pago.
      * Chamado pelo SubscriptionObserver.
      *
-     * @param  Subscription  $subscription  Assinatura que acabou de ser ativada
+     * @param Subscription $subscription Assinatura que acabou de ser ativada
      */
     public function generateCommission(Subscription $subscription): ?PartnerCommission
     {
         $entity = $subscription->entity;
 
-        if (!$entity->partner_id) {
+        if (! $entity->partner_id) {
             return null;
         }
 
         $partner = $entity->partner;
 
-        if (!$partner || !$partner->isActive()) {
+        if (! $partner || ! $partner->isActive()) {
             return null;
         }
 

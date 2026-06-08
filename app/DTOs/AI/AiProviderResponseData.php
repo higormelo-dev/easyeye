@@ -10,7 +10,7 @@ readonly class AiProviderResponseData
 {
     /**
      * @param array<string, mixed>|null $rawResponse
-     * @param array<string, mixed> $metadata
+     * @param array<string, mixed>      $metadata
      */
     public function __construct(
         public AiProvider $provider,

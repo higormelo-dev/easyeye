@@ -23,11 +23,11 @@ const emit = defineEmits(['close', 'submit']);
 
 const form = ref({
     entity_id:    '',
+    kind:         'courtesy',   // 'courtesy' (grátis, R$ 0) | 'purchase' (compra avulsa, paga)
     provider:     '',           // opcional — só metadata analítica
     credits:      100,
     amount_cents: 0,
     reason:       '',
-    package_code: 'manual',
 });
 
 const saving = ref(false);
@@ -37,14 +37,21 @@ watch(() => props.open, (val) => {
     if (val) {
         form.value = {
             entity_id:    props.presetEntityId ?? '',
+            kind:         'courtesy',
             provider:     '',
             credits:      100,
             amount_cents: 0,
             reason:       '',
-            package_code: 'manual',
         };
         errorMessage.value = '';
     }
+});
+
+const isCourtesy = computed(() => form.value.kind === 'courtesy');
+
+// Cortesia não tem valor monetário — zera o campo ao alternar.
+watch(() => form.value.kind, (kind) => {
+    if (kind === 'courtesy') form.value.amount_cents = 0;
 });
 
 const filteredEntities = computed(() => {
@@ -67,7 +74,8 @@ const selectedEntityIsInternal = computed(() => {
 const isValid = computed(() =>
     form.value.entity_id
     && form.value.credits > 0
-    && form.value.reason.trim().length >= 10,
+    && form.value.reason.trim().length >= 10
+    && (isCourtesy.value || form.value.amount_cents > 0),
 );
 
 function close() {
@@ -82,7 +90,14 @@ async function submit() {
     errorMessage.value = '';
 
     try {
-        await emit('submit', { ...form.value });
+        await emit('submit', {
+            entity_id:    form.value.entity_id,
+            provider:     form.value.provider,
+            credits:      form.value.credits,
+            reason:       form.value.reason,
+            amount_cents: isCourtesy.value ? 0 : form.value.amount_cents,
+            package_code: isCourtesy.value ? 'courtesy' : 'manual',
+        });
     } catch (e) {
         errorMessage.value = e?.message || 'Erro ao lançar crédito.';
     } finally {
@@ -165,6 +180,28 @@ defineExpose({ setSaving, setError });
                                     </div>
                                 </div>
 
+                                <!-- Tipo: Cortesia (grátis) x Compra avulsa (paga) -->
+                                <div class="col-12">
+                                    <label class="form-label small fw-semibold mb-1">
+                                        {{ t?.manual?.kind ?? 'Tipo' }} <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="d-flex gap-2" role="group">
+                                        <input id="kind-courtesy" v-model="form.kind" type="radio" class="btn-check" value="courtesy" :disabled="saving">
+                                        <label class="btn btn-outline-info flex-fill" for="kind-courtesy">
+                                            <i class="ti ti-gift me-1"></i>{{ t?.manual?.kind_courtesy ?? 'Cortesia (grátis)' }}
+                                        </label>
+                                        <input id="kind-purchase" v-model="form.kind" type="radio" class="btn-check" value="purchase" :disabled="saving">
+                                        <label class="btn btn-outline-success flex-fill" for="kind-purchase">
+                                            <i class="ti ti-cash me-1"></i>{{ t?.manual?.kind_purchase ?? 'Compra avulsa (paga)' }}
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-1">
+                                        {{ isCourtesy
+                                            ? (t?.manual?.kind_courtesy_help ?? 'Crédito gratuito — não gera valor financeiro.')
+                                            : (t?.manual?.kind_purchase_help ?? 'Compra paga fora do app — informe o valor cobrado.') }}
+                                    </small>
+                                </div>
+
                                 <!-- Provedor (opcional — apenas etiqueta analítica) -->
                                 <div class="col-12 col-md-6">
                                     <label class="form-label small fw-semibold mb-1">
@@ -228,33 +265,20 @@ defineExpose({ setSaving, setError });
                                         :disabled="saving">
                                 </div>
 
-                                <!-- Valor monetário (opcional) -->
-                                <div class="col-12 col-md-6">
+                                <!-- Valor cobrado (apenas em compra avulsa) -->
+                                <div v-if="!isCourtesy" class="col-12 col-md-6">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.manual?.amount_cents ?? 'Valor (centavos)' }}
+                                        {{ t?.manual?.amount_cents ?? 'Valor cobrado (centavos)' }}
+                                        <span class="text-danger">*</span>
                                     </label>
                                     <input
                                         v-model.number="form.amount_cents"
                                         type="number"
-                                        min="0"
+                                        min="1"
                                         max="9999999"
                                         class="form-control"
                                         :disabled="saving">
-                                    <small class="text-muted">{{ t?.manual?.amount_help ?? '' }}</small>
-                                </div>
-
-                                <!-- Package code (opcional) -->
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label small fw-semibold mb-1">
-                                        Código (opcional)
-                                    </label>
-                                    <input
-                                        v-model="form.package_code"
-                                        type="text"
-                                        maxlength="50"
-                                        class="form-control"
-                                        placeholder="manual"
-                                        :disabled="saving">
+                                    <small class="text-muted">{{ t?.manual?.amount_help ?? 'Em centavos (ex.: 24990 = R$ 249,90).' }}</small>
                                 </div>
 
                                 <!-- Motivo -->

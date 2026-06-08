@@ -13,7 +13,6 @@ use App\DTOs\Billing\{
     GatewayWebhookInputDTO,
     NormalizedWebhookEventDTO,
 };
-use App\Exceptions\Billing\GatewayIntegrationException;
 
 /**
  * Integração completa com InfinitePay.
@@ -109,17 +108,17 @@ class InfinitePayGateway extends AbstractHttpGateway
     protected function buildChargePayload(CreateChargeDTO $payload): array
     {
         return array_filter([
-            'amount'        => $payload->amount,
-            'description'   => $payload->description,
-            'payment_type'  => $this->mapPaymentType($payload->paymentMethod),
-            'customer'      => array_filter([
+            'amount'       => $payload->amount,
+            'description'  => $payload->description,
+            'payment_type' => $this->mapPaymentType($payload->paymentMethod),
+            'customer'     => array_filter([
                 'name'     => $payload->metadata['customer_name'] ?? null,
                 'email'    => $payload->metadata['email'] ?? null,
                 'document' => preg_replace('/\D/', '', (string) ($payload->metadata['document'] ?? '')) ?: null,
             ]),
-            'due_date'      => $payload->dueDate ?? now()->addDays(3)->format('Y-m-d'),
-            'external_id'   => $payload->invoiceId,
-            'metadata'      => [
+            'due_date'    => $payload->dueDate ?? now()->addDays(3)->format('Y-m-d'),
+            'external_id' => $payload->invoiceId,
+            'metadata'    => [
                 'invoice_id'      => $payload->invoiceId,
                 'subscription_id' => $payload->subscriptionId,
             ],
@@ -162,6 +161,7 @@ class InfinitePayGateway extends AbstractHttpGateway
         $externalRef       = $data['external_id'] ?? null;
 
         $metadata = [];
+
         if ($externalRef) {
             $metadata['invoice_id'] = $externalRef;
         }
@@ -185,14 +185,14 @@ class InfinitePayGateway extends AbstractHttpGateway
     protected function eventTypeMap(): array
     {
         return [
-            'charge.approved'         => 'paid',
-            'charge.declined'         => 'failed',
-            'charge.refunded'         => 'refunded',
-            'charge.chargeback'       => 'chargeback',
-            'charge.cancelled'        => 'cancelled',
-            'payment.approved'        => 'paid',
-            'payment.declined'        => 'failed',
-            'payment.refunded'        => 'refunded',
+            'charge.approved'   => 'paid',
+            'charge.declined'   => 'failed',
+            'charge.refunded'   => 'refunded',
+            'charge.chargeback' => 'chargeback',
+            'charge.cancelled'  => 'cancelled',
+            'payment.approved'  => 'paid',
+            'payment.declined'  => 'failed',
+            'payment.refunded'  => 'refunded',
         ];
     }
 
@@ -201,13 +201,13 @@ class InfinitePayGateway extends AbstractHttpGateway
     private function normalizeInfinitePayStatus(string $status): string
     {
         return match (strtolower($status)) {
-            'approved', 'paid', 'captured'  => 'paid',
-            'pending', 'processing'         => 'pending',
+            'approved', 'paid', 'captured' => 'paid',
+            'pending', 'processing' => 'pending',
             'declined', 'failed', 'refused' => 'failed',
-            'refunded', 'reversed'          => 'refunded',
-            'chargeback'                    => 'chargeback',
-            'cancelled', 'canceled'         => 'cancelled',
-            default                         => strtolower($status),
+            'refunded', 'reversed' => 'refunded',
+            'chargeback' => 'chargeback',
+            'cancelled', 'canceled' => 'cancelled',
+            default => strtolower($status),
         };
     }
 

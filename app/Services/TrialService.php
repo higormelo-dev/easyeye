@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\SubscriptionStatus;
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
+use RuntimeException;
 
 class TrialService
 {
@@ -11,13 +12,13 @@ class TrialService
      * Inicia o período de trial para uma empresa recém-criada.
      * Deve ser chamado automaticamente via EntityObserver.
      *
-     * @throws \RuntimeException se não existir nenhum plano ativo.
+     * @throws RuntimeException se não existir nenhum plano ativo.
      */
     public function startTrial(Entity $entity): Subscription
     {
         // Usa o plano de menor tier (sort_order) como base do trial
         $plan = Plan::active()->orderBy('sort_order')->first()
-            ?? throw new \RuntimeException('Nenhum plano ativo encontrado para iniciar o trial.');
+            ?? throw new RuntimeException('Nenhum plano ativo encontrado para iniciar o trial.');
 
         $trialDays = SubscriptionSetting::trialDays();
 
@@ -36,7 +37,7 @@ class TrialService
     public function startManualTrial(Entity $entity, ?Plan $plan = null, ?int $days = null): Subscription
     {
         $plan ??= Plan::active()->orderBy('sort_order')->first()
-            ?? throw new \RuntimeException('Nenhum plano ativo encontrado.');
+            ?? throw new RuntimeException('Nenhum plano ativo encontrado.');
 
         $days ??= SubscriptionSetting::trialDays();
 

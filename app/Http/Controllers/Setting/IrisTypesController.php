@@ -12,11 +12,11 @@ class IrisTypesController extends BaseSettingController
 {
     public function __construct(IrisTypeService $service)
     {
-        $this->titleController = __("actions.sidemenu.iristypes");
+        $this->titleController = __('actions.sidemenu.iristypes');
         $this->service         = $service;
         $this->resourceClass   = IrisTypeResource::class;
-        $this->routePrefix     = "panel.setting.iristypes";
-        $this->viewSlot        = "iristypes";
+        $this->routePrefix     = 'panel.setting.iristypes';
+        $this->viewSlot        = 'iristypes';
     }
 
     public function store(IrisTypeRequest $request)

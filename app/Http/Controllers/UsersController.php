@@ -198,7 +198,7 @@ class UsersController extends Controller
      */
     public function show(string $id): JsonResponse|RedirectResponse
     {
-        if (!request()->wantsJson()) {
+        if (! request()->wantsJson()) {
             return redirect()->route('panel.accesscontrol.users.index');
         }
 
@@ -221,7 +221,7 @@ class UsersController extends Controller
      */
     public function edit(string $id): JsonResponse|RedirectResponse
     {
-        if (!request()->wantsJson()) {
+        if (! request()->wantsJson()) {
             return redirect()->route('panel.accesscontrol.users.index');
         }
 

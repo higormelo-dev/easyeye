@@ -61,16 +61,16 @@ return [
     'empty_patients'  => 'Nenhum paciente cadastrado.',
 
     // Activation / Setup
-    'activation_title'     => 'Configure sua clínica',
-    'activation_subtitle'  => 'Complete os passos para aproveitar ao máximo o sistema.',
-    'activation_done'      => 'setup concluído',
+    'activation_title'        => 'Configure sua clínica',
+    'activation_subtitle'     => 'Complete os passos para aproveitar ao máximo o sistema.',
+    'activation_done'         => 'setup concluído',
     'activation_completed_on' => 'Concluído em',
 
     // Live / Polling
-    'live_label'       => 'Ao vivo',
-    'live_refreshing'  => 'Atualizando...',
-    'last_updated_at'  => 'Atualizado às',
-    'btn_refresh'      => 'Atualizar',
+    'live_label'      => 'Ao vivo',
+    'live_refreshing' => 'Atualizando...',
+    'last_updated_at' => 'Atualizado às',
+    'btn_refresh'     => 'Atualizar',
 
     // Agenda de hoje
     'section_schedule_today' => 'Agenda de hoje',

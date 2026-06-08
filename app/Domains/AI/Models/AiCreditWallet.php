@@ -7,11 +7,11 @@ namespace App\Domains\AI\Models;
 use App\Enums\AI\AiProvider;
 use App\Models\Entity;
 use App\Traits\Auditable;
+use Database\Factories\AI\AiCreditWalletFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 /**
  * Carteira de créditos IA — modelo unificado com cota mensal + saldo comprado.
@@ -120,8 +120,8 @@ class AiCreditWallet extends Model
         return (int) $this->{"lifetime_consumed_{$provider->value}"};
     }
 
-    protected static function newFactory(): \Database\Factories\AI\AiCreditWalletFactory
+    protected static function newFactory(): AiCreditWalletFactory
     {
-        return \Database\Factories\AI\AiCreditWalletFactory::new();
+        return AiCreditWalletFactory::new();
     }
 }

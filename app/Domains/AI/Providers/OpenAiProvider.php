@@ -6,9 +6,7 @@ namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
 use App\Domains\AI\Support\ProviderErrorSanitizer;
-use App\DTOs\AI\AiProviderResponseData;
-use App\DTOs\AI\AiRequestData;
-use App\DTOs\AI\AiUsageData;
+use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\AiProvider;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -18,9 +16,9 @@ class OpenAiProvider implements AiProviderInterface
 {
     public function generate(AiRequestData $request): AiProviderResponseData
     {
-        $payload = $this->buildPayload($request);
+        $payload     = $this->buildPayload($request);
         $requestHash = $this->hashPayload($payload);
-        $startedAt = microtime(true);
+        $startedAt   = microtime(true);
 
         $response = Http::baseUrl($this->baseUrl())
             ->acceptJson()
@@ -36,8 +34,8 @@ class OpenAiProvider implements AiProviderInterface
             throw $this->toProviderException($response);
         }
 
-        $json = (array) $response->json();
-        $content = $this->extractTextContent($json);
+        $json         = (array) $response->json();
+        $content      = $this->extractTextContent($json);
         $responseHash = hash('sha256', $content);
 
         return new AiProviderResponseData(
@@ -55,14 +53,14 @@ class OpenAiProvider implements AiProviderInterface
             requestHash: $requestHash,
             responseHash: $responseHash,
             rawResponse: [
-                'id' => data_get($json, 'id'),
+                'id'     => data_get($json, 'id'),
                 'status' => data_get($json, 'status'),
-                'model' => data_get($json, 'model'),
-                'usage' => data_get($json, 'usage'),
+                'model'  => data_get($json, 'model'),
+                'usage'  => data_get($json, 'usage'),
             ],
             metadata: [
                 'response_id' => data_get($json, 'id'),
-                'status' => data_get($json, 'status'),
+                'status'      => data_get($json, 'status'),
             ],
             finishReason: $this->extractFinishReason($json),
         );
@@ -92,7 +90,7 @@ class OpenAiProvider implements AiProviderInterface
             'model' => $this->model(),
             'input' => [
                 [
-                    'role' => 'user',
+                    'role'    => 'user',
                     'content' => $this->buildContentItems($request),
                 ],
             ],
@@ -128,16 +126,23 @@ class OpenAiProvider implements AiProviderInterface
         ];
 
         foreach ($request->attachments as $attachment) {
-            $imageUrl = (string) ($attachment['image_url'] ?? $attachment['url'] ?? '');
+            // Imagem inline (base64) tem prioridade — usada no fluxo Eye Image,
+            // onde o backend resolve o arquivo do S3 e envia como data URL.
+            $data = (string) ($attachment['data'] ?? '');
+            $mime = (string) ($attachment['mime_type'] ?? 'image/jpeg');
+
+            $imageUrl = $data !== ''
+                ? "data:{$mime};base64,{$data}"
+                : (string) ($attachment['image_url'] ?? $attachment['url'] ?? '');
 
             if ($imageUrl === '') {
                 continue;
             }
 
             $items[] = [
-                'type' => 'input_image',
+                'type'      => 'input_image',
                 'image_url' => $imageUrl,
-                'detail' => (string) ($attachment['detail'] ?? 'auto'),
+                'detail'    => (string) ($attachment['detail'] ?? 'auto'),
             ];
         }
 
@@ -156,14 +161,14 @@ class OpenAiProvider implements AiProviderInterface
             return $prompt;
         }
 
-        $contextJson = json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $contextJson  = json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         $contextBlock = $contextJson !== false ? $contextJson : '{}';
 
         return trim(
             $prompt
             . "\n\n"
             . "Contexto clínico (JSON):\n"
-            . $contextBlock
+            . $contextBlock,
         );
     }
 
@@ -172,7 +177,7 @@ class OpenAiProvider implements AiProviderInterface
      */
     private function extractTextContent(array $json): string
     {
-        $chunks = [];
+        $chunks      = [];
         $outputItems = (array) data_get($json, 'output', []);
 
         foreach ($outputItems as $outputItem) {
@@ -285,9 +290,9 @@ class OpenAiProvider implements AiProviderInterface
     private function toProviderException(Response $response): RuntimeException
     {
         $rawMessage = (string) data_get($response->json(), 'error.message', '');
-        $code = data_get($response->json(), 'error.code');
-        $status = $response->status();
-        $safeCode = is_scalar($code) ? (string) $code : 'unknown';
+        $code       = data_get($response->json(), 'error.code');
+        $status     = $response->status();
+        $safeCode   = is_scalar($code) ? (string) $code : 'unknown';
 
         $safeMessage = ProviderErrorSanitizer::sanitize($rawMessage, 'Falha na integração OpenAI.');
 

@@ -9,6 +9,12 @@ return [
     'feature_unavailable'                   => 'Your current plan does not have AI features enabled.',
     'feature_exam_unavailable'              => 'Your plan does not include AI exam assistant.',
     'feature_report_unavailable'            => 'Your plan does not include AI report drafting.',
+    'feature_eye_image_unavailable'         => 'Your plan does not include AI ocular image analysis.',
+    'eye_image_exams_required'              => 'Select at least one image for AI analysis.',
+    'record_opened'                         => 'Medical record opened and report saved.',
+    'record_patient_missing'                => 'Could not identify the patient to open the medical record.',
+    'record_doctor_required'                => 'Only a doctor can open a medical record to save the report.',
+    'record_confirm_open'                   => 'There is no medical record for the consultation day for this patient. Open a new record to save the report?',
     'feature_consensus_unavailable'         => 'Your current plan does not include intelligent consistency review.',
     'consensus_disabled'                    => 'Intelligent consistency review is disabled in this environment.',
     'mode_unavailable'                      => 'This AI mode is not available on the current plan.',
@@ -29,6 +35,7 @@ return [
     'run_network_error'                     => 'Network error while creating run.',
     'approve'                               => 'Approve',
     'reject'                                => 'Reject',
+    'processing'                            => 'Processing analysis...',
     'credits_available'                     => 'Available credits',
     'credits_requested'                     => 'Requested',
     'credits_reserved'                      => 'Reserved',
@@ -87,6 +94,10 @@ return [
     'workflow_exam_assistant'               => 'Exam assistant',
     'workflow_report_drafting'              => 'Report drafting',
     'workflow_consensus_review'             => 'Consistency review',
+    'workflow_eye_image_analysis'           => 'Ocular image analysis',
+
+    // Server-side system prompt for ocular image analysis.
+    'eye_image_system_prompt' => 'You are an experienced ophthalmologist analyzing ocular images (fundus photography, OCT, slit-lamp, topography, etc.) as SUPPORT for the physician — never as a final decision. Describe findings in a structured way by anatomical structure (optic disc, macula, vessels, periphery, cornea, etc.) and by laterality (OD = right eye, OE = left eye) when provided. Use technical, objective and ALWAYS conditional language ("findings consistent with", "suggestive of"), with no definitive diagnosis, no prescription and never addressing the patient directly. List hypotheses by likelihood and recommend clinical correlation and in-person confirmation. If image quality is insufficient, state it. Reply in the medical record/patient language.',
 
     'credit_purchase_status' => [
         'pending_payment' => 'Awaiting payment',

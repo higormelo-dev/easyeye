@@ -2,15 +2,16 @@
 
 namespace App\Actions\Register;
 
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\DB;
 
 class RegisterAction
 {
     public function __construct(
-        private readonly CreateUserAction       $createUser,
-        private readonly CreateEntityAction     $createEntity,
+        private readonly CreateUserAction $createUser,
+        private readonly CreateEntityAction $createEntity,
         private readonly CreateEntityUserAction $createEntityUser,
-        private readonly StartTrialAction       $startTrial,
+        private readonly StartTrialAction $startTrial,
     ) {
     }
 
@@ -39,7 +40,7 @@ class RegisterAction
         });
 
         // E-mails dispatched após commit para não travar a transação
-        event(new \Illuminate\Auth\Events\Registered($result['user']));
+        event(new Registered($result['user']));
 
         return $result;
     }

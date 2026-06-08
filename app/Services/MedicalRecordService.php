@@ -22,7 +22,7 @@ class MedicalRecordService
         Gate::authorize(EntityGate::IssueReport->value, Entity::findOrFail(session('selected_entity_id')));
 
         return MedicalRecord::create(
-            array_merge($this->normalize($data), ['patient_id' => $patient->id])
+            array_merge($this->normalize($data), ['patient_id' => $patient->id]),
         );
     }
 
@@ -69,7 +69,7 @@ class MedicalRecordService
      *
      * Fórmula optométrica: Esf. Estática = Esf. Dinâmica + Adição
      *
-     * @param  float|null  $addition  Valor de adição (ex: +2.00)
+     * @param float|null $addition Valor de adição (ex: +2.00)
      *
      * @return array{
      *   right: float|null,

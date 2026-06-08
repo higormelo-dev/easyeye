@@ -29,17 +29,17 @@ readonly class AiCreditEstimateData
     public function toArray(): array
     {
         return [
-            'workflow'              => $this->workflow,
-            'mode'                  => $this->mode->value,
-            'raw_cost_usd'          => $this->rawCostUsd,
-            'cost_usd_with_margin'  => $this->costUsdWithMargin,
-            'margin_multiplier'     => $this->marginMultiplier,
-            'usd_per_credit'        => $this->usdPerCredit,
-            'credits_before_minimum'=> $this->creditsBeforeMinimum,
-            'minimum_credits'       => $this->minimumCredits,
-            'minimum_applied'       => $this->minimumApplied,
-            'normalized_credits'    => $this->normalizedCredits,
-            'breakdown'             => $this->breakdown,
+            'workflow'               => $this->workflow,
+            'mode'                   => $this->mode->value,
+            'raw_cost_usd'           => $this->rawCostUsd,
+            'cost_usd_with_margin'   => $this->costUsdWithMargin,
+            'margin_multiplier'      => $this->marginMultiplier,
+            'usd_per_credit'         => $this->usdPerCredit,
+            'credits_before_minimum' => $this->creditsBeforeMinimum,
+            'minimum_credits'        => $this->minimumCredits,
+            'minimum_applied'        => $this->minimumApplied,
+            'normalized_credits'     => $this->normalizedCredits,
+            'breakdown'              => $this->breakdown,
         ];
     }
 }

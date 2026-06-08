@@ -53,14 +53,14 @@ return [
     'form_title_create' => 'Novo Usuário',
     'form_title_edit'   => 'Editar Usuário',
 
-    'field_name'            => 'Nome completo',
-    'field_email'           => 'E-mail',
-    'field_role'            => 'Perfil de acesso',
-    'field_role_placeholder'=> 'Selecione um perfil',
-    'field_active'          => 'Usuário ativo',
-    'field_password'        => 'Senha',
-    'field_password_hint'   => 'Mínimo 8 caracteres, com letras maiúsculas, minúsculas, números e símbolos.',
-    'field_password_confirm'=> 'Confirmar senha',
+    'field_name'             => 'Nome completo',
+    'field_email'            => 'E-mail',
+    'field_role'             => 'Perfil de acesso',
+    'field_role_placeholder' => 'Selecione um perfil',
+    'field_active'           => 'Usuário ativo',
+    'field_password'         => 'Senha',
+    'field_password_hint'    => 'Mínimo 8 caracteres, com letras maiúsculas, minúsculas, números e símbolos.',
+    'field_password_confirm' => 'Confirmar senha',
 
     'credentials_info' => 'O usuário receberá estas credenciais para acessar o sistema.',
 
@@ -69,9 +69,9 @@ return [
     'btn_create' => 'Criar usuário',
 
     // Owner / self-protection
-    'badge_owner'      => 'Proprietário',
-    'owner_protected'  => 'O proprietário da entidade não pode ser desativado nem removido.',
-    'self_protected'   => 'Você não pode desativar ou remover sua própria conta.',
+    'badge_owner'     => 'Proprietário',
+    'owner_protected' => 'O proprietário da entidade não pode ser desativado nem removido.',
+    'self_protected'  => 'Você não pode desativar ou remover sua própria conta.',
 
     // JS errors
     'js_error_load' => 'Erro ao carregar dados do usuário.',

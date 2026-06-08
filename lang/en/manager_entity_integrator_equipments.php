@@ -10,9 +10,9 @@ return [
     'breadcrumb_integrators' => 'Integrators',
     'breadcrumb_current'     => 'Equipments',
 
-    'btn_back'               => 'Back to integrators',
-    'search_placeholder'     => 'Search by name, IP, MAC, serial or code...',
-    'total_label'            => 'Total:',
+    'btn_back'           => 'Back to integrators',
+    'search_placeholder' => 'Search by name, IP, MAC, serial or code...',
+    'total_label'        => 'Total:',
 
     'readonly_note' => 'Read-only view. Equipments are registered by the integrator itself via API.',
 

@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany,
 
 class EntityIntegratorEquipment extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;

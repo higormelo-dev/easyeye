@@ -12,16 +12,20 @@ class ScheduleNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public const EVENT_CREATED     = 'created';
-    public const EVENT_CONFIRMED   = 'confirmed';
-    public const EVENT_CANCELLED   = 'cancelled';
+    public const EVENT_CREATED = 'created';
+
+    public const EVENT_CONFIRMED = 'confirmed';
+
+    public const EVENT_CANCELLED = 'cancelled';
+
     public const EVENT_RESCHEDULED = 'rescheduled';
-    public const EVENT_REMINDER    = 'reminder';
+
+    public const EVENT_REMINDER = 'reminder';
 
     public function __construct(
         public readonly Schedule $schedule,
-        public readonly string   $event,
-        public readonly ?string  $extraInfo = null,
+        public readonly string $event,
+        public readonly ?string $extraInfo = null,
     ) {
     }
 
@@ -42,7 +46,7 @@ class ScheduleNotification extends Notification implements ShouldQueue
             self::EVENT_CREATED => (new MailMessage())
                 ->subject("[{$clinicName}] Agendamento confirmado — {$dateTime}")
                 ->greeting("Olá, {$this->schedule->full_name}!")
-                ->line("Seu agendamento foi **confirmado**:")
+                ->line('Seu agendamento foi **confirmado**:')
                 ->line("📅 **Data/Hora:** {$dateTime}")
                 ->line("👨‍⚕️ **Médico:** {$doctorName}")
                 ->line("📋 **Código:** {$this->schedule->code}")

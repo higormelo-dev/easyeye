@@ -56,7 +56,7 @@ class RegisteredUserController extends Controller
     {
         $exists = User::where('email', $request->string('email')->lower()->toString())->exists();
 
-        return response()->json(['available' => !$exists]);
+        return response()->json(['available' => ! $exists]);
     }
 
     /**

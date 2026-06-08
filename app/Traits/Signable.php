@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Traits;
 
@@ -28,7 +28,7 @@ trait Signable
             if ($model->is_locked) {
                 throw new LockedMedicalRecordException(
                     "Prontuário {$model->code} está assinado e não pode ser alterado. " .
-                    'Para retificação, crie um novo registro com referência a este.'
+                    'Para retificação, crie um novo registro com referência a este.',
                 );
             }
         });
@@ -36,7 +36,7 @@ trait Signable
         static::deleting(function (self $model): void {
             if ($model->is_locked) {
                 throw new LockedMedicalRecordException(
-                    "Prontuário {$model->code} está assinado e não pode ser excluído."
+                    "Prontuário {$model->code} está assinado e não pode ser excluído.",
                 );
             }
         });
@@ -53,7 +53,7 @@ trait Signable
     {
         if ($this->is_locked) {
             throw new LockedMedicalRecordException(
-                "Prontuário {$this->code} já foi assinado em {$this->signed_at->format('d/m/Y H:i')}."
+                "Prontuário {$this->code} já foi assinado em {$this->signed_at->format('d/m/Y H:i')}.",
             );
         }
 
@@ -100,7 +100,7 @@ trait Signable
      */
     public function verifyIntegrity(): bool
     {
-        if (!$this->is_locked || !$this->signature_hash) {
+        if (! $this->is_locked || ! $this->signature_hash) {
             return false;
         }
 
@@ -113,7 +113,7 @@ trait Signable
                 $this->signed_by,
                 $this->signed_at->toIso8601String(),
                 $contentHash,
-            ]))
+            ])),
         );
     }
 
@@ -128,7 +128,7 @@ trait Signable
     {
         return array_diff_key(
             $this->getAttributes(),
-            array_flip(['signed_by', 'signed_at', 'signature_hash', 'is_locked'])
+            array_flip(['signed_by', 'signed_at', 'signature_hash', 'is_locked']),
         );
     }
 

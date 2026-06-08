@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Eventos rastreados no funil de indicação.
  * Permite calcular: quantas indicações viraram trial e quantas converteram para pago.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('referral_events', function (Blueprint $table) {

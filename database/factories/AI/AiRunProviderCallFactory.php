@@ -2,10 +2,8 @@
 
 namespace Database\Factories\AI;
 
-use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Models\AiRunProviderCall;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiProviderCallRole;
+use App\Domains\AI\Models\{AiRun, AiRunProviderCall};
+use App\Enums\AI\{AiProvider, AiProviderCallRole};
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

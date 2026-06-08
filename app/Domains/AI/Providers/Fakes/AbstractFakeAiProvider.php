@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Providers\Fakes;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
-use App\DTOs\AI\AiProviderResponseData;
-use App\DTOs\AI\AiRequestData;
-use App\DTOs\AI\AiUsageData;
+use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\AiRunMode;
 
 abstract class AbstractFakeAiProvider implements AiProviderInterface
@@ -35,20 +33,20 @@ abstract class AbstractFakeAiProvider implements AiProviderInterface
     public function generate(AiRequestData $request): AiProviderResponseData
     {
         $inputTokens = $this->estimateTokens(
-            $request->fullPrompt() . ' ' . json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            $request->fullPrompt() . ' ' . json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         );
 
         $maxOutputTokens = $request->maxOutputTokens ?? 320;
-        $outputTokens = max(40, min($maxOutputTokens, intdiv($inputTokens, 2) + 64));
+        $outputTokens    = max(40, min($maxOutputTokens, intdiv($inputTokens, 2) + 64));
         $reasoningTokens = $this->estimateReasoningTokens($request->mode);
-        $toolCallsCount = (int) ($request->metadata['tool_calls_count'] ?? 0);
+        $toolCallsCount  = (int) ($request->metadata['tool_calls_count'] ?? 0);
 
         $rawCostUsd = round(
             (($inputTokens / 1_000_000) * $this->inputUsdPerMillion)
             + (($outputTokens / 1_000_000) * $this->outputUsdPerMillion)
             + (($reasoningTokens / 1_000_000) * $this->reasoningUsdPerMillion)
             + ($toolCallsCount * $this->toolCallUsd),
-            8
+            8,
         );
 
         $content = $this->buildFakeContent($request);
@@ -68,9 +66,9 @@ abstract class AbstractFakeAiProvider implements AiProviderInterface
             requestHash: hash('sha256', $request->fullPrompt()),
             responseHash: hash('sha256', $content),
             rawResponse: [
-                'fake' => true,
+                'fake'     => true,
                 'provider' => $this->provider()->value,
-                'model' => $this->model,
+                'model'    => $this->model,
             ],
             finishReason: 'stop',
         );
@@ -86,7 +84,7 @@ abstract class AbstractFakeAiProvider implements AiProviderInterface
     protected function estimateReasoningTokens(AiRunMode $mode): int
     {
         return match ($mode) {
-            AiRunMode::Economy => 16,
+            AiRunMode::Economy   => 16,
             AiRunMode::Validated => 40,
             AiRunMode::Consensus => 80,
         };

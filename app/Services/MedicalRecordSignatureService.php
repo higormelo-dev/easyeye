@@ -1,11 +1,13 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
 use App\Exceptions\LockedMedicalRecordException;
 use App\Models\{EntityUser, MedicalRecord};
+use Illuminate\Database\Eloquent\Collection;
+use InvalidArgumentException;
 
 /**
  * Gerencia a assinatura eletrônica de prontuários.
@@ -18,13 +20,13 @@ class MedicalRecordSignatureService
      * Após a assinatura o prontuário fica bloqueado para edições.
      *
      * @throws LockedMedicalRecordException se o prontuário já estiver assinado
-     * @throws \InvalidArgumentException    se o EntityUser não for um médico
+     * @throws InvalidArgumentException     se o EntityUser não for um médico
      */
     public function sign(MedicalRecord $record, EntityUser $entityUser): MedicalRecord
     {
-        if (!$entityUser->doctor) {
-            throw new \InvalidArgumentException(
-                "O usuário '{$entityUser->user->name}' não é médico e não pode assinar prontuários."
+        if (! $entityUser->doctor) {
+            throw new InvalidArgumentException(
+                "O usuário '{$entityUser->user->name}' não é médico e não pode assinar prontuários.",
             );
         }
 
@@ -48,15 +50,15 @@ class MedicalRecordSignatureService
      */
     public function canEdit(MedicalRecord $record): bool
     {
-        return !$record->isLocked();
+        return ! $record->isLocked();
     }
 
     /**
      * Retorna todos os prontuários de um paciente que ainda não foram assinados.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<MedicalRecord>
+     * @return Collection<MedicalRecord>
      */
-    public function pendingSignature(string $patientId): \Illuminate\Database\Eloquent\Collection
+    public function pendingSignature(string $patientId): Collection
     {
         return MedicalRecord::query()
             ->where('patient_id', $patientId)

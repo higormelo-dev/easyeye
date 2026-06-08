@@ -32,9 +32,9 @@ class ClinicBiController extends Controller
 
         return Inertia::render('Panel/Financial/Bi/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),                'active' => false],
-                ['label' => __('financial.financial'),         'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => __('financial.bi.title'),          'url' => '#',                                    'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.bi.title'), 'url' => '#', 'active' => true],
             ],
             'entity'  => ['id' => $entity->id, 'name' => $entity->name],
             'filters' => ['from' => $from, 'to' => $to],

@@ -19,9 +19,11 @@ class TenantGatewayController extends Controller
 
         $gateways = Gateway::query()
             ->where('active', true)
-            ->whereHas('entityAccess', fn ($q) => $q
-                ->where('entity_id', $entityId)
-                ->where('enabled', true)
+            ->whereHas(
+                'entityAccess',
+                fn ($q) => $q
+                    ->where('entity_id', $entityId)
+                    ->where('enabled', true),
             )
             ->withCount([
                 'credentials' => fn ($q) => $q
@@ -34,18 +36,18 @@ class TenantGatewayController extends Controller
 
         return Inertia::render('Panel/Settings/Gateways/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),       'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.payment_gateways'),'url' => '#',                     'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.payment_gateways'), 'url' => '#', 'active' => true],
             ],
             'gateways' => $gateways->map(fn (Gateway $g) => [
-                'id'                       => (string) $g->id,
-                'code'                     => $g->code,
-                'name'                     => $g->name,
-                'priority'                 => $g->priority,
-                'credentials_count'        => (int) $g->credentials_count,
-                'has_active_credential'    => $g->credentials_count > 0,
-                'credentials_url'          => route('panel.setting.gateways.credentials',       $g->id),
-                'credentials_store_url'    => route('panel.setting.gateways.credentials.store',$g->id),
+                'id'                    => (string) $g->id,
+                'code'                  => $g->code,
+                'name'                  => $g->name,
+                'priority'              => $g->priority,
+                'credentials_count'     => (int) $g->credentials_count,
+                'has_active_credential' => $g->credentials_count > 0,
+                'credentials_url'       => route('panel.setting.gateways.credentials', $g->id),
+                'credentials_store_url' => route('panel.setting.gateways.credentials.store', $g->id),
             ]),
         ]);
     }

@@ -659,14 +659,34 @@ const aiEstimate   = ref(null);
 const aiBalance    = reactive({ available: '—', reserved: '—' });
 const aiAlert      = reactive({ type: '', message: '' });
 const aiForm       = reactive({
-    workflow: aiWorkflows.value[0] ?? 'exam_assistant',
+    workflow: props.ai?.default_workflow ?? aiWorkflows.value[0] ?? 'exam_assistant',
     risk_level: 'medium',
     patient_id: '',
     user_prompt: '',
     system_prompt: aiLabel('system_prompt_default', 'Você é um assistente de apoio clínico. Nunca emita decisão final.'),
     max_output_tokens: 700,
 });
-const aiMode = computed(() => aiForm.workflow === 'consensus_review' ? 'consensus' : 'validated');
+
+// Modos disponíveis vêm do backend (escalam com o nº de provedores ativos:
+// Gemini-only => só Economia). Consenso continua exigindo o recurso.
+const aiModes = computed(() => Array.isArray(props.ai?.modes) ? props.ai.modes : []);
+const aiMode  = computed(() => {
+    if (aiForm.workflow === 'consensus_review') return 'consensus';
+    return aiModes.value[0]?.value ?? 'economy';
+});
+const isEyeImageWorkflow = computed(() => aiForm.workflow === 'eye_image_analysis');
+
+// Estado de acompanhamento do run (polling + aprovação).
+const aiRunId      = ref(null);
+const aiRunStatus  = ref('');
+const aiRunOutput  = ref('');
+const aiActioning  = ref(false);
+
+const aiMaxImages       = computed(() => Number(props.ai?.max_images ?? 4));
+const aiSelectedCount   = computed(() => selectedExamIds.value.length);
+const aiHasSelection    = computed(() => aiSelectedCount.value > 0);
+// Prompt clínico padrão para análise de imagem (atinge o mínimo de 12 chars).
+const aiDefaultEyePrompt = 'Analisar as imagens oculares selecionadas e descrever os achados por estrutura e lateralidade.';
 
 watch(
     () => [aiForm.workflow, aiForm.risk_level, aiForm.patient_id, aiForm.user_prompt, aiForm.system_prompt, aiForm.max_output_tokens],
@@ -701,14 +721,26 @@ function openAiModal()  {
     if (aiSelectedPatient.value?.id) {
         aiForm.patient_id = aiSelectedPatient.value.id;
     }
+    // Para análise de imagem, pré-preenche o prompt clínico (o system prompt é
+    // forçado no servidor) e zera o estado de run anterior.
+    if (isEyeImageWorkflow.value && (!aiForm.user_prompt || !aiForm.user_prompt.trim())) {
+        aiForm.user_prompt = aiDefaultEyePrompt;
+    }
+    resetAiRun();
     aiModalOpen.value = true;
 }
 function closeAiModal() { aiModalOpen.value = false; }
 function setAiAlert(type, message) { aiAlert.type = type; aiAlert.message = message; }
 function clearAiAlert() { aiAlert.type = ''; aiAlert.message = ''; }
+function resetAiRun() {
+    aiRunId.value = null;
+    aiRunStatus.value = '';
+    aiRunOutput.value = '';
+}
 function aiWorkflowLabel(workflow) {
-    if (workflow === 'exam_assistant')   return aiLabel('workflow_exam_assistant', 'Assistente de exame');
-    if (workflow === 'consensus_review') return aiLabel('workflow_consensus_review', 'Revisão de consistência');
+    if (workflow === 'eye_image_analysis') return aiLabel('workflow_eye_image_analysis', 'Análise de imagem ocular');
+    if (workflow === 'exam_assistant')     return aiLabel('workflow_exam_assistant', 'Assistente de exame');
+    if (workflow === 'consensus_review')   return aiLabel('workflow_consensus_review', 'Revisão de consistência');
     return workflow;
 }
 function aiPayload() {
@@ -717,16 +749,27 @@ function aiPayload() {
         patient_id: aiForm.patient_id || null, medical_record_id: null,
         user_prompt: aiForm.user_prompt, system_prompt: aiForm.system_prompt,
         context: { specialty: 'ophthalmology', source: 'eye_images_top_modal' },
-        attachments: [], expects_json: false,
+        attachments: [],
+        // Eye Image: envia as imagens selecionadas; o backend resolve o base64.
+        exam_ids: isEyeImageWorkflow.value ? selectedExamIds.value : [],
+        expects_json: false,
         max_output_tokens: Number(aiForm.max_output_tokens || 700),
     };
 }
-async function estimateAiRun() {
-    clearAiAlert();
+function aiValidate() {
+    if (isEyeImageWorkflow.value && !aiHasSelection.value) {
+        setAiAlert('warning', aiLabel('eye_image_none', 'Selecione ao menos uma imagem para analisar.'));
+        return false;
+    }
     if (!aiForm.user_prompt || aiForm.user_prompt.trim().length < 12) {
         setAiAlert('warning', aiLabel('prompt_min_chars', 'O prompt clínico deve ter pelo menos 12 caracteres.'));
-        return;
+        return false;
     }
+    return true;
+}
+async function estimateAiRun() {
+    clearAiAlert();
+    if (!aiValidate()) return;
     aiEstimating.value = true;
     try {
         const { data } = await window.axios.post(route('panel.ai-runs.estimate'), aiPayload());
@@ -741,21 +784,103 @@ async function estimateAiRun() {
 }
 async function submitAiRun() {
     clearAiAlert();
+    if (!aiValidate()) return;
     if (!aiEstimate.value) {
         setAiAlert('warning', aiLabel('estimate', 'Estime antes de executar.'));
         return;
     }
     aiSubmitting.value = true;
     try {
-        await window.axios.post(route('panel.ai-runs.store'), aiPayload());
-        setAiAlert('success', aiLabel('run_created_waiting_review', 'Execução criada e enviada para revisão médica.'));
-        aiForm.user_prompt = '';
+        const { data } = await window.axios.post(route('panel.ai-runs.store'), aiPayload());
+        aiRunId.value = data?.run_id ?? null;
         aiEstimate.value = null;
+        if (aiRunId.value) {
+            await pollAiRun(aiRunId.value);
+        } else {
+            setAiAlert('success', aiLabel('run_created_waiting_review', 'Execução criada e enviada para revisão médica.'));
+        }
     } catch (error) {
         setAiAlert('danger', error?.response?.data?.message ?? aiLabel('run_create_failed', 'Falha ao criar execução.'));
     } finally {
         aiSubmitting.value = false;
     }
+}
+// Aguarda a execução do run (job) até ficar pronto para revisão médica.
+async function pollAiRun(runId) {
+    aiRunStatus.value = 'processing';
+    const showUrl = (props.ai?.urls?.show ?? '').replace('__ID__', runId);
+    for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        try {
+            const { data } = await window.axios.get(showUrl, { headers: { Accept: 'application/json' } });
+            const run = data?.data ?? {};
+            aiRunStatus.value = run.status ?? '';
+            if (run.status === 'waiting_approval') {
+                aiRunOutput.value = run.final_output ?? '';
+                return;
+            }
+            if (['failed', 'rejected', 'cancelled'].includes(run.status)) {
+                setAiAlert('danger', run.error_message ?? aiLabel('run_create_failed', 'A análise não pôde ser concluída.'));
+                return;
+            }
+        } catch { /* mantém o polling */ }
+    }
+    setAiAlert('warning', aiLabel('processing', 'Processando análise...'));
+}
+async function actAiRun(action) {
+    if (!aiRunId.value) return;
+    aiActioning.value = true;
+    clearAiAlert();
+    try {
+        const url = (props.ai?.urls?.[action] ?? '').replace('__ID__', aiRunId.value);
+        const { data } = await window.axios.post(url, action === 'approve' ? { final_output: aiRunOutput.value } : {});
+
+        // Sem prontuário do dia da consulta: pergunta ao médico se pode abrir.
+        if (action === 'approve' && data?.requires_record_confirmation) {
+            await maybeOpenRecord(aiRunId.value);
+        }
+
+        setAiAlert('success', action === 'approve'
+            ? aiLabel('eye_image_reported', 'Laudado (IA)')
+            : aiLabel('reject', 'Rejeitar'));
+        resetAiRun();
+        await fetchPatients(); // atualiza badges/laudos
+        aiModalOpen.value = false;
+    } catch (error) {
+        setAiAlert('danger', error?.response?.data?.message ?? aiLabel('run_create_failed', 'Falha ao registrar a decisão.'));
+    } finally {
+        aiActioning.value = false;
+    }
+}
+
+// Pergunta ao médico se pode abrir um prontuário do dia para receber o laudo.
+async function maybeOpenRecord(runId) {
+    const message = aiLabel('record_confirm_open',
+        'Não há prontuário do dia da consulta. Deseja abrir um novo prontuário para registrar o laudo?');
+
+    const confirmed = window.Swal
+        ? (await window.Swal.fire({
+            icon: 'question', title: message,
+            showCancelButton: true,
+            confirmButtonText: aiLabel('approve', 'Sim'),
+            cancelButtonText: aiLabel('close', 'Não'),
+        })).isConfirmed
+        : window.confirm(message);
+
+    if (!confirmed) return;
+
+    const url = (props.ai?.urls?.record ?? '').replace('__ID__', runId);
+    await window.axios.post(url, {});
+}
+
+// Abre o modal mostrando um laudo de IA já aprovado (somente leitura).
+function openExistingReport(exam) {
+    if (!exam?.ai_report?.content) return;
+    clearAiAlert();
+    aiRunId.value     = exam.ai_report.run_id ?? null;
+    aiRunOutput.value = exam.ai_report.content;
+    aiRunStatus.value = 'approved';
+    aiModalOpen.value = true;
 }
 
 // Opções para SearchSelect (arrays de objetos {value,label}).
@@ -1089,6 +1214,15 @@ const printEntity = computed(() => props.entity ?? {});
                                                         <i v-show="isSelected(exam.id)" class="fa fa-check text-white"
                                                            style="font-size:.5rem;"></i>
                                                     </span>
+                                                </span>
+
+                                                <!-- Badge laudo IA -->
+                                                <span v-if="exam.ai_report?.approved"
+                                                      class="position-absolute bottom-0 end-0 badge bg-info text-dark d-flex align-items-center"
+                                                      style="z-index:2;margin:3px;font-size:.5rem;cursor:pointer;"
+                                                      :title="aiLabel('eye_image_reported', 'Laudado (IA)')"
+                                                      @click.stop="openExistingReport(exam)">
+                                                    <i class="ti ti-robot me-1"></i>IA
                                                 </span>
 
                                                 <!-- Thumbnail com imagem -->
@@ -1460,6 +1594,17 @@ const printEntity = computed(() => props.entity ?? {});
                             {{ aiAlert.message }}
                         </div>
 
+                        <!-- Eye Image: imagens selecionadas que serão analisadas -->
+                        <div v-if="isEyeImageWorkflow" class="mb-3">
+                            <label class="form-label small">{{ aiLabel('eye_image_selected', 'Imagens selecionadas') }}</label>
+                            <div class="form-control form-control-sm bg-light d-flex align-items-center justify-content-between">
+                                <span><i class="ti ti-photo me-1"></i>{{ aiSelectedCount }} / {{ aiMaxImages }}</span>
+                                <span v-if="!aiHasSelection" class="text-danger small">
+                                    {{ aiLabel('eye_image_none', 'Selecione ao menos uma imagem para analisar.') }}
+                                </span>
+                            </div>
+                        </div>
+
                         <div class="row g-2 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small">{{ aiLabel('workflow', 'Workflow') }}</label>
@@ -1503,7 +1648,8 @@ const printEntity = computed(() => props.entity ?? {});
                                       :placeholder="aiLabel('clinical_prompt_placeholder', 'Descreva o contexto e objetivo clínico.')"></textarea>
                         </div>
 
-                        <div class="mb-3">
+                        <!-- System prompt: na análise de imagem é forçado no servidor. -->
+                        <div v-if="!isEyeImageWorkflow" class="mb-3">
                             <label class="form-label small">{{ aiLabel('system_prompt', 'System prompt') }}</label>
                             <textarea v-model="aiForm.system_prompt" class="form-control form-control-sm" rows="2"></textarea>
                         </div>
@@ -1517,20 +1663,52 @@ const printEntity = computed(() => props.entity ?? {});
                                 <span class="text-muted">{{ aiWorkflowLabel(aiEstimate.workflow) }}</span>
                             </div>
                         </div>
+
+                        <!-- Resultado: processamento + laudo p/ revisão médica -->
+                        <div v-if="aiRunStatus === 'processing'" class="text-center py-3 text-muted small">
+                            <span class="spinner-border spinner-border-sm me-1"></span>{{ aiLabel('processing', 'Processando análise...') }}
+                        </div>
+                        <div v-else-if="aiRunStatus === 'waiting_approval'" class="mt-3">
+                            <label class="form-label fw-semibold">
+                                <i class="ti ti-file-text me-1 text-info"></i>{{ aiLabel('eye_image_report', 'Laudo da IA') }}
+                            </label>
+                            <textarea v-model="aiRunOutput" class="form-control" rows="8"></textarea>
+                            <div class="d-flex justify-content-end gap-2 mt-2">
+                                <button type="button" class="btn btn-outline-danger btn-sm" :disabled="aiActioning" @click="actAiRun('reject')">
+                                    <i class="ti ti-x me-1"></i>{{ aiLabel('reject', 'Rejeitar') }}
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" :disabled="aiActioning" @click="actAiRun('approve')">
+                                    <span v-if="aiActioning" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="ti ti-check me-1"></i>{{ aiLabel('approve', 'Aprovar') }}
+                                </button>
+                            </div>
+                        </div>
+                        <!-- Laudo já aprovado (somente leitura) -->
+                        <div v-else-if="aiRunStatus === 'approved'" class="mt-3">
+                            <label class="form-label fw-semibold">
+                                <i class="ti ti-robot me-1 text-info"></i>{{ aiLabel('eye_image_report', 'Laudo da IA') }}
+                                <span class="badge bg-info text-dark ms-1">{{ aiLabel('eye_image_reported', 'Laudado (IA)') }}</span>
+                            </label>
+                            <div class="border rounded p-2 bg-light" style="white-space:pre-wrap;">{{ aiRunOutput }}</div>
+                        </div>
                     </div>
 
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary btn-sm" @click="closeAiModal">
                             {{ aiLabel('close', 'Close') }}
                         </button>
-                        <button type="button" class="btn btn-outline-info btn-sm" :disabled="aiEstimating" @click="estimateAiRun">
-                            <span v-if="aiEstimating" class="spinner-border spinner-border-sm me-1"></span>
-                            <i v-else class="ti ti-calculator me-1"></i>{{ aiLabel('estimate', 'Estimar Custo') }}
-                        </button>
-                        <button type="button" class="btn btn-success btn-sm" :disabled="aiSubmitting || !aiEstimate" @click="submitAiRun">
-                            <span v-if="aiSubmitting" class="spinner-border spinner-border-sm me-1"></span>
-                            <i v-else class="ti ti-player-play me-1"></i>{{ aiLabel('run', 'Executar IA') }}
-                        </button>
+                        <template v-if="!aiRunStatus">
+                            <button type="button" class="btn btn-outline-info btn-sm"
+                                    :disabled="aiEstimating || (isEyeImageWorkflow && !aiHasSelection)" @click="estimateAiRun">
+                                <span v-if="aiEstimating" class="spinner-border spinner-border-sm me-1"></span>
+                                <i v-else class="ti ti-calculator me-1"></i>{{ aiLabel('estimate', 'Estimar Custo') }}
+                            </button>
+                            <button type="button" class="btn btn-success btn-sm"
+                                    :disabled="aiSubmitting || !aiEstimate || (isEyeImageWorkflow && !aiHasSelection)" @click="submitAiRun">
+                                <span v-if="aiSubmitting" class="spinner-border spinner-border-sm me-1"></span>
+                                <i v-else class="ti ti-player-play me-1"></i>{{ aiLabel('run', 'Executar IA') }}
+                            </button>
+                        </template>
                     </div>
                 </div>
             </div>

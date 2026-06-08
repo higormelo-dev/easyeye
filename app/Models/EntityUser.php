@@ -11,11 +11,11 @@ use Laracasts\Presenter\PresentableTrait;
 
 class EntityUser extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasUuids;
-    use SoftDeletes;
     use PresentableTrait;
+    use SoftDeletes;
 
     protected $primaryKey = 'id';
 
@@ -38,7 +38,7 @@ class EntityUser extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {

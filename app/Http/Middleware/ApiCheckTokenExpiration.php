@@ -16,13 +16,13 @@ class ApiCheckTokenExpiration
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param Closure(Request): (Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->user() ? $request->user()->currentAccessToken() : null;
 
-        if (!$token) {
+        if (! $token) {
             return $next($request);
         }
 
@@ -59,19 +59,19 @@ class ApiCheckTokenExpiration
                 ->where('active', true)
                 ->first();
 
-            if (!$integrator) {
+            if (! $integrator) {
                 $token->delete();
 
                 return $this->invalidResponse('auth.integrator_inactive');
             }
 
-            if (!$integrator->user->active) {
+            if (! $integrator->user->active) {
                 $token->delete();
 
                 return $this->invalidResponse('auth.user_integrator_inactive');
             }
 
-            if (!($integrator->user->entity && $integrator->user->entity->active)) {
+            if (! ($integrator->user->entity && $integrator->user->entity->active)) {
                 $token->delete();
 
                 return $this->invalidResponse('auth.entity_inactive');
@@ -109,7 +109,7 @@ class ApiCheckTokenExpiration
     {
         return response()->json(
             ['message' => __($messageKey), 'valid' => false],
-            $status
+            $status,
         );
     }
 }

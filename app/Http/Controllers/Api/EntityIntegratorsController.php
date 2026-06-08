@@ -35,12 +35,11 @@ class EntityIntegratorsController extends Controller
             ->where('email', $request->get('email'))
             ->first();
 
-        if (!$user || !Hash::check($request->get('password'), $user->password)) {
-
+        if (! $user || ! Hash::check($request->get('password'), $user->password)) {
             return $this->invalidResponse('auth.failed');
         }
 
-        if (!$user->active) {
+        if (! $user->active) {
             return $this->invalidResponse('auth.inactive');
         }
 
@@ -50,19 +49,19 @@ class EntityIntegratorsController extends Controller
             ->where('active', true)
             ->first();
 
-        if (!$integrator) {
+        if (! $integrator) {
             return $this->invalidResponse('auth.integrator_invalid');
         }
 
         $token = $user->createToken(
             'integrator-token',
             ['integrator_id:' . $integrator->id],
-            Carbon::now()->addDay(7)
+            Carbon::now()->addDay(7),
         );
 
         return response()->json(
             (new EntityIntegratorResource($integrator, $token)),
-            HttpResponse::HTTP_OK
+            HttpResponse::HTTP_OK,
         );
     }
 
@@ -70,13 +69,13 @@ class EntityIntegratorsController extends Controller
     {
         $token = $request->get('token');
 
-        if (!$token) {
+        if (! $token) {
             return $this->invalidResponse('auth.token_not_provided', HttpResponse::HTTP_BAD_REQUEST);
         }
 
         $accessToken = PersonalAccessToken::findToken($token);
 
-        if (!$accessToken) {
+        if (! $accessToken) {
             return $this->invalidResponse('auth.token_invalid');
         }
 
@@ -88,7 +87,7 @@ class EntityIntegratorsController extends Controller
 
         $integratorId = $this->extractIntegratorId($accessToken->abilities);
 
-        if (!$integratorId) {
+        if (! $integratorId) {
             $accessToken->delete();
 
             return $this->invalidResponse('auth.token_invalid');
@@ -100,19 +99,19 @@ class EntityIntegratorsController extends Controller
             ->where('active', true)
             ->first();
 
-        if (!$integrator) {
+        if (! $integrator) {
             $accessToken->delete();
 
             return $this->invalidResponse('auth.integrator_inactive');
         }
 
-        if (!$integrator->user->active) {
+        if (! $integrator->user->active) {
             $accessToken->delete();
 
             return $this->invalidResponse('auth.user_integrator_inactive');
         }
 
-        if (!($integrator->user->entity && $integrator->user->entity->active)) {
+        if (! ($integrator->user->entity && $integrator->user->entity->active)) {
             $accessToken->delete();
 
             return $this->invalidResponse('auth.entity_inactive');
@@ -138,7 +137,7 @@ class EntityIntegratorsController extends Controller
     }
 
     /**
-     * Revogar token (logout)
+     * Revogar token (logout).
      */
     public function destroy(Request $request): JsonResponse
     {
@@ -160,7 +159,7 @@ class EntityIntegratorsController extends Controller
             ->filter(fn (string $item) => str_starts_with($item, 'integrator_id:'))
             ->first();
 
-        if (!$ability) {
+        if (! $ability) {
             return null;
         }
 
@@ -171,7 +170,7 @@ class EntityIntegratorsController extends Controller
     {
         return response()->json(
             ['message' => __($messageKey), 'valid' => false],
-            $status
+            $status,
         );
     }
 }

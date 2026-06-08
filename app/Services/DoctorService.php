@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 class DoctorService
 {
     /**
-     * Create a new doctor with all related entities
+     * Create a new doctor with all related entities.
      */
     public function create(DoctorRequest $request): EntityUser
     {
@@ -26,7 +26,7 @@ class DoctorService
     }
 
     /**
-     * Update existing doctor and related entities
+     * Update existing doctor and related entities.
      */
     public function update(Doctor $doctor, DoctorRequest $request): Doctor
     {
@@ -60,7 +60,7 @@ class DoctorService
             $doctor->update($data);
             $this->updateEntityUser($doctor->entityUser, $request);
 
-            if (!$request->has('type_method')) {
+            if (! $request->has('type_method')) {
                 $this->updatePerson($doctor->person, $request);
                 $this->updateUser($doctor->entityUser->user, $request);
             }
@@ -70,7 +70,7 @@ class DoctorService
     }
 
     /**
-     * Find by ID or Code including soft-deleted records
+     * Find by ID or Code including soft-deleted records.
      */
     public function findByIdOrCode(string $idOrCode): ?Doctor
     {
@@ -83,7 +83,7 @@ class DoctorService
             ->when(
                 Str::isUuid($idOrCode),
                 static fn ($q) => $q->where('doctors.id', $idOrCode),
-                static fn ($q) => $q->where('doctors.code', $idOrCode)
+                static fn ($q) => $q->where('doctors.code', $idOrCode),
             )
             ->firstOrFail();
 
@@ -91,7 +91,7 @@ class DoctorService
     }
 
     /**
-     * Find or create user
+     * Find or create user.
      */
     private function findOrCreateUser(DoctorRequest $request): User
     {
@@ -123,7 +123,7 @@ class DoctorService
     }
 
     /**
-     * Find or create entity user
+     * Find or create entity user.
      */
     private function findOrCreateEntityUser(User $user, DoctorRequest $request): EntityUser
     {
@@ -155,7 +155,7 @@ class DoctorService
     }
 
     /**
-     * Find or create person
+     * Find or create person.
      */
     private function findOrCreatePerson(DoctorRequest $request): People
     {
@@ -179,7 +179,7 @@ class DoctorService
     }
 
     /**
-     * Find or create doctor
+     * Find or create doctor.
      */
     private function findOrCreate(People $person, EntityUser $entityUser, DoctorRequest $request): void
     {
@@ -213,7 +213,7 @@ class DoctorService
     }
 
     /**
-     * Extract person data from request
+     * Extract person data from request.
      */
     private function getPersonFromRequest(DoctorRequest $request): array
     {
@@ -246,7 +246,7 @@ class DoctorService
     }
 
     /**
-     * Update person data
+     * Update person data.
      */
     private function updatePerson(People $person, Request $request): void
     {
@@ -279,7 +279,7 @@ class DoctorService
     }
 
     /**
-     * Update entity user data
+     * Update entity user data.
      */
     private function updateEntityUser(EntityUser $entityUser, Request $request): void
     {
@@ -289,7 +289,7 @@ class DoctorService
     }
 
     /**
-     * Update user data
+     * Update user data.
      */
     private function updateUser(User $user, Request $request): void
     {

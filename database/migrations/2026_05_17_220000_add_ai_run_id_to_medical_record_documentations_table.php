@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  * Nullable porque a maioria das documentações é criada manualmente sem IA.
  * `nullOnDelete` preserva o documento mesmo se o AiRun for purgado por GDPR.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('medical_record_documentations', function (Blueprint $table) {

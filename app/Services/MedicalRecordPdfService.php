@@ -43,7 +43,7 @@ class MedicalRecordPdfService
         ]);
 
         $setting = $this->resolveEntitySetting(
-            $record->schedule?->entity_id ?? session('selected_entity_id')
+            $record->schedule?->entity_id ?? session('selected_entity_id'),
         );
 
         $filename = 'PMR-' . $record->code . '-' . ($record->patient->person?->full_name ?? 'paciente') . '.pdf';
@@ -123,9 +123,9 @@ class MedicalRecordPdfService
 
         $parts = array_filter([
             $entity->address,
-            $entity->number     ? 'nº ' . $entity->number : null,
+            $entity->number ? 'nº ' . $entity->number : null,
             $entity->complement ?: null,
-            $entity->district   ?: null,
+            $entity->district ?: null,
             ($entity->city && $entity->state)
                 ? $entity->city . '/' . $entity->state
                 : ($entity->city ?? $entity->state ?? null),
@@ -134,9 +134,9 @@ class MedicalRecordPdfService
 
         $html = view('pdf.partials.footer', [
             'address'    => count($parts) ? implode(', ', $parts) : null,
-            'telephone'  => $entity->telephone  ?: null,
-            'cellphone'  => $entity->cellphone  ?: null,
-            'email'      => $entity->email      ?: null,
+            'telephone'  => $entity->telephone ?: null,
+            'cellphone'  => $entity->cellphone ?: null,
+            'email'      => $entity->email ?: null,
             'fontFamily' => $setting?->font_family ?? 'Arial',
         ])->render();
 

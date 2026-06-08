@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Schema;
  * O default funciona apenas para entities NOVAS; o seeder do data
  * migration abaixo marca entities SaaS existentes como true.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('entities', function (Blueprint $table) {
@@ -42,7 +42,7 @@ return new class () extends Migration {
 
         // Data migration: entities SaaS existentes passam a exigir 2FA por default.
         // Admin SaaS pode desligar manualmente se necessário (audit log captura).
-        \DB::table('entities')
+        DB::table('entities')
             ->where('is_client', false)
             ->update([
                 'requires_two_factor'   => true,

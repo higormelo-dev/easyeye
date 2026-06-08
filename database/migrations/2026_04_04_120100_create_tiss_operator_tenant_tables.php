@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('tiss_entity_operator_credentials', function (Blueprint $table) {
@@ -40,11 +40,11 @@ return new class () extends Migration {
 
             $table->unique(
                 ['entity_id', 'operator_id', 'environment'],
-                'tiss_entity_operator_credentials_entity_operator_env_unique'
+                'tiss_entity_operator_credentials_entity_operator_env_unique',
             );
             $table->index(
                 ['entity_id', 'operator_id', 'active'],
-                'tiss_entity_operator_credentials_entity_operator_active_idx'
+                'tiss_entity_operator_credentials_entity_operator_active_idx',
             );
         });
 
@@ -72,11 +72,11 @@ return new class () extends Migration {
 
             $table->unique(
                 ['entity_id', 'operator_id', 'contract_code'],
-                'tiss_entity_operator_contracts_entity_operator_contract_unique'
+                'tiss_entity_operator_contracts_entity_operator_contract_unique',
             );
             $table->index(
                 ['entity_id', 'operator_id', 'active'],
-                'tiss_entity_operator_contracts_entity_operator_active_idx'
+                'tiss_entity_operator_contracts_entity_operator_active_idx',
             );
         });
     }

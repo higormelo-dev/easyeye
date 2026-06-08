@@ -8,10 +8,10 @@ return [
     'breadcrumb_entities' => 'Companies',
     'breadcrumb_current'  => 'Integrator Users',
 
-    'btn_back'            => 'Back to companies',
-    'btn_new'             => 'New integrator user',
-    'search_placeholder'  => 'Search by name, email or code...',
-    'total_label'         => 'Total:',
+    'btn_back'           => 'Back to companies',
+    'btn_new'            => 'New integrator user',
+    'search_placeholder' => 'Search by name, email or code...',
+    'total_label'        => 'Total:',
 
     'col_registered_at' => 'Registered',
     'col_code'          => 'Code',

@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\ReferralRewardType;
+use App\Enums\{ReferralEventType, ReferralRewardType};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
@@ -56,7 +56,7 @@ class ReferralCode extends Model
 
     public function isUsable(): bool
     {
-        if (!$this->active) {
+        if (! $this->active) {
             return false;
         }
 
@@ -64,18 +64,14 @@ class ReferralCode extends Model
             return false;
         }
 
-        if ($this->max_uses !== null && $this->uses_count >= $this->max_uses) {
-            return false;
-        }
-
-        return true;
+        return ! ($this->max_uses !== null && $this->uses_count >= $this->max_uses);
     }
 
     /** Contagem de conversões (trial → pago) geradas por este código */
     public function conversionsCount(): int
     {
         return $this->events()
-            ->where('event_type', \App\Enums\ReferralEventType::PlanActivated->value)
+            ->where('event_type', ReferralEventType::PlanActivated->value)
             ->count();
     }
 }

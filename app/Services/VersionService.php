@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
@@ -14,8 +14,8 @@ class VersionService
      * Cria um snapshot do estado atual do model antes de uma atualização.
      * Deve ser chamado no evento `updating`, antes do save().
      *
-     * @param  Model        $model   O model sendo atualizado
-     * @param  string|null  $reason  Motivo opcional da alteração
+     * @param Model       $model  O model sendo atualizado
+     * @param string|null $reason Motivo opcional da alteração
      */
     public function snapshot(Model $model, ?string $reason = null): void
     {
@@ -44,7 +44,7 @@ class VersionService
 
     /**
      * Resolve o entity_id para a versão.
-     * Prioridade: sessão ativa → coluna entity_id no model → null
+     * Prioridade: sessão ativa → coluna entity_id no model → null.
      */
     private function resolveEntityId(Model $model): ?string
     {

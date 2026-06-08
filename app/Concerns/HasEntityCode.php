@@ -16,7 +16,7 @@ trait HasEntityCode
                     ->when(
                         $model->entity_id !== null,
                         fn ($q) => $q->where('entity_id', $model->entity_id),
-                        fn ($q) => $q->whereNull('entity_id')
+                        fn ($q) => $q->whereNull('entity_id'),
                     )
                     ->where('code', 'like', $prefix . '-%')
                     ->orderBy('code', 'desc')

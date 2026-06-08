@@ -10,12 +10,12 @@ use Illuminate\Support\Facades\Auth;
 class LocaleController extends Controller
 {
     /**
-     * Trocar o idioma do sistema e salvar na preferência do usuário
+     * Trocar o idioma do sistema e salvar na preferência do usuário.
      */
     public function switch(Request $request, string $locale): RedirectResponse|JsonResponse
     {
         // Verifica se o locale é suportado
-        if (!array_key_exists($locale, SetLocale::SUPPORTED_LOCALES)) {
+        if (! array_key_exists($locale, SetLocale::SUPPORTED_LOCALES)) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
@@ -46,7 +46,7 @@ class LocaleController extends Controller
     }
 
     /**
-     * Definir o idioma padrão da empresa (apenas para administradores)
+     * Definir o idioma padrão da empresa (apenas para administradores).
      */
     public function setEntityLocale(Request $request): RedirectResponse|JsonResponse
     {
@@ -56,7 +56,7 @@ class LocaleController extends Controller
 
         $entityId = session('selected_entity_id');
 
-        if (!$entityId) {
+        if (! $entityId) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
@@ -69,7 +69,7 @@ class LocaleController extends Controller
 
         $entity = Entity::find($entityId);
 
-        if (!$entity) {
+        if (! $entity) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'success' => false,
@@ -94,7 +94,7 @@ class LocaleController extends Controller
     }
 
     /**
-     * Limpar a preferência de idioma do usuário (usar o da empresa)
+     * Limpar a preferência de idioma do usuário (usar o da empresa).
      */
     public function clearUserLocale(Request $request): RedirectResponse|JsonResponse
     {
@@ -114,7 +114,7 @@ class LocaleController extends Controller
     }
 
     /**
-     * Retorna os idiomas suportados e as configurações atuais
+     * Retorna os idiomas suportados e as configurações atuais.
      */
     public function index(): JsonResponse
     {

@@ -16,7 +16,7 @@ class ApiTokenPreCheck
      * 1. Capture the original last_used_at before Sanctum overwrites it (for inactivity check).
      * 2. Return a descriptive 401 when the token is expired by date (Sanctum would return a generic message).
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param Closure(Request): (Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -29,7 +29,7 @@ class ApiTokenPreCheck
                 // Store the original last_used_at before Sanctum can overwrite it
                 $request->attributes->set(
                     'token_last_used_at',
-                    $accessToken->last_used_at ?? $accessToken->created_at
+                    $accessToken->last_used_at ?? $accessToken->created_at,
                 );
 
                 // Return descriptive error when token is expired by date

@@ -21,11 +21,12 @@ use App\Models\{Covenant,
     Subscription,
     User,
     VisitType};
-use Carbon\Carbon;
 use App\Services\ActivationService;
+use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class DataFakersSeeder extends Seeder
 {
@@ -75,9 +76,9 @@ class DataFakersSeeder extends Seeder
         $users = User::factory($usersCount)->create(['password' => Hash::make('123456789')]);
 
         // ── Planos ──────────────────────────────────────────────────────────
-        $planBasico  = Plan::where('slug', 'basico')->first();
-        $planPro     = Plan::where('slug', 'pro')->first();
-        $planPremium = Plan::where('slug', 'premium')->first();
+        $planBasico         = Plan::where('slug', 'basico')->first();
+        $planPro            = Plan::where('slug', 'pro')->first();
+        $planPremium        = Plan::where('slug', 'premium')->first();
         $integratorTestPlan = Plan::query()
             ->where('active', true)
             ->whereHas('features', static function ($query): void {
@@ -88,9 +89,9 @@ class DataFakersSeeder extends Seeder
             ->orderByDesc('price')
             ->first();
 
-        if (!$integratorTestPlan) {
-            throw new \RuntimeException(
-                'Nenhum plano ativo com acesso à API de integradores foi encontrado. Execute o PlanSeeder antes do DataFakersSeeder.'
+        if (! $integratorTestPlan) {
+            throw new RuntimeException(
+                'Nenhum plano ativo com acesso à API de integradores foi encontrado. Execute o PlanSeeder antes do DataFakersSeeder.',
             );
         }
 
@@ -201,7 +202,6 @@ class DataFakersSeeder extends Seeder
                         ->create(['integrator_id' => $integrator->id]);
                 });
             });
-
         });
 
         // ── Integrador de teste com credenciais fixas ────────────────────────
@@ -214,7 +214,7 @@ class DataFakersSeeder extends Seeder
                 'country'   => 'BR',
                 'is_client' => true,
                 'active'    => true,
-            ]
+            ],
         );
 
         // Evita múltiplas assinaturas acessíveis em re-seed e garante
@@ -239,7 +239,7 @@ class DataFakersSeeder extends Seeder
                 'email_verified_at' => now(),
                 'password'          => Hash::make('Integrador@123'),
                 'active'            => true,
-            ]
+            ],
         );
 
         $testIntegrator = EntityIntegrator::updateOrCreate(
@@ -249,7 +249,7 @@ class DataFakersSeeder extends Seeder
                 'name'                      => 'Equipamento Teste 01',
                 'ip'                        => '192.168.1.100',
                 'active'                    => true,
-            ]
+            ],
         );
 
         EntityIntegrator::updateOrCreate(
@@ -259,7 +259,7 @@ class DataFakersSeeder extends Seeder
                 'name'                      => 'Equipamento Teste 02',
                 'ip'                        => '192.168.1.101',
                 'active'                    => true,
-            ]
+            ],
         );
 
         // Regra de negócio: esta clínica é exclusiva para testes da API de
@@ -278,7 +278,7 @@ class DataFakersSeeder extends Seeder
             [
                 'full_name' => 'ADMIN CLÍNICA TESTE',
                 'cellphone' => '',
-            ]
+            ],
         );
         $testAdminUser = User::updateOrCreate(
             ['email' => 'admin@clinicateste.com'],
@@ -286,7 +286,7 @@ class DataFakersSeeder extends Seeder
                 'name'              => $testAdminPerson->full_name,
                 'email_verified_at' => now(),
                 'password'          => Hash::make('Admin@123'),
-            ]
+            ],
         );
         EntityUser::updateOrCreate(
             [
@@ -294,9 +294,9 @@ class DataFakersSeeder extends Seeder
                 'user_id'   => $testAdminUser->id,
             ],
             [
-                'rule'      => 'admin',
-                'active'    => true,
-            ]
+                'rule'   => 'admin',
+                'active' => true,
+            ],
         );
 
         // Dra. Ana Lima
@@ -305,7 +305,7 @@ class DataFakersSeeder extends Seeder
             [
                 'full_name' => 'DRA. ANA LIMA',
                 'cellphone' => '',
-            ]
+            ],
         );
         $testAnaUser = User::updateOrCreate(
             ['email' => 'dra.ana@clinicateste.com'],
@@ -313,7 +313,7 @@ class DataFakersSeeder extends Seeder
                 'name'              => $testAnaPersona->full_name,
                 'email_verified_at' => now(),
                 'password'          => Hash::make('Medico@123'),
-            ]
+            ],
         );
         $testAnaEntityUser = EntityUser::updateOrCreate(
             [
@@ -321,9 +321,9 @@ class DataFakersSeeder extends Seeder
                 'user_id'   => $testAnaUser->id,
             ],
             [
-                'rule'      => 'doctor',
-                'active'    => true,
-            ]
+                'rule'   => 'doctor',
+                'active' => true,
+            ],
         );
         $testAnaDoctor = Doctor::updateOrCreate(
             ['entity_user_id' => $testAnaEntityUser->id],
@@ -334,7 +334,7 @@ class DataFakersSeeder extends Seeder
                 'color'            => '#e91e63',
                 'partner'          => false,
                 'active'           => true,
-            ]
+            ],
         );
 
         // Dr. Carlos Souza
@@ -343,7 +343,7 @@ class DataFakersSeeder extends Seeder
             [
                 'full_name' => 'DR. CARLOS SOUZA',
                 'cellphone' => '',
-            ]
+            ],
         );
         $testCarlosUser = User::updateOrCreate(
             ['email' => 'dr.carlos@clinicateste.com'],
@@ -351,7 +351,7 @@ class DataFakersSeeder extends Seeder
                 'name'              => $testCarlosPerson->full_name,
                 'email_verified_at' => now(),
                 'password'          => Hash::make('Medico@123'),
-            ]
+            ],
         );
         $testCarlosEntityUser = EntityUser::updateOrCreate(
             [
@@ -359,9 +359,9 @@ class DataFakersSeeder extends Seeder
                 'user_id'   => $testCarlosUser->id,
             ],
             [
-                'rule'      => 'doctor',
-                'active'    => true,
-            ]
+                'rule'   => 'doctor',
+                'active' => true,
+            ],
         );
         $testCarlosDoctor = Doctor::updateOrCreate(
             ['entity_user_id' => $testCarlosEntityUser->id],
@@ -372,7 +372,7 @@ class DataFakersSeeder extends Seeder
                 'color'            => '#1976d2',
                 'partner'          => false,
                 'active'           => true,
-            ]
+            ],
         );
 
         // Secretária
@@ -381,7 +381,7 @@ class DataFakersSeeder extends Seeder
             [
                 'full_name' => 'SECRETÁRIA CLÍNICA TESTE',
                 'cellphone' => '',
-            ]
+            ],
         );
         $testSecretaryUser = User::updateOrCreate(
             ['email' => 'secretaria@clinicateste.com'],
@@ -389,7 +389,7 @@ class DataFakersSeeder extends Seeder
                 'name'              => $testSecretaryPerson->full_name,
                 'email_verified_at' => now(),
                 'password'          => Hash::make('Secretaria@123'),
-            ]
+            ],
         );
         EntityUser::updateOrCreate(
             [
@@ -397,14 +397,14 @@ class DataFakersSeeder extends Seeder
                 'user_id'   => $testSecretaryUser->id,
             ],
             [
-                'rule'      => 'secretary',
-                'active'    => true,
-            ]
+                'rule'   => 'secretary',
+                'active' => true,
+            ],
         );
 
         $this->createTestEntityData($testEntity);
 
-        $testPlanApiAccess = $integratorTestPlan->featureValue(FeatureKey::HasApiIntegrator) ?? '0';
+        $testPlanApiAccess     = $integratorTestPlan->featureValue(FeatureKey::HasApiIntegrator) ?? '0';
         $testPlanExamSendLimit = $integratorTestPlan->featureValue(FeatureKey::ApiMonthlyExamSends) ?? 'n/a';
 
         $this->command->info('');
@@ -441,14 +441,14 @@ class DataFakersSeeder extends Seeder
 
         // ── Patients ─────────────────────────────────────────────────────────
         $this->command->info('⏳ Criando Patients...');
-        $people    = People::query()->select('id')->get();
-        $skinTypes = SkinType::all();
-        $irisTypes = IrisType::all();
-        $covenants = Covenant::all();
-        $patientsBatch = [];
-        $patientsNow   = now();
-        $entityIds     = $entities->pluck('id')->all();
-        $patientCodes  = $this->loadEntityCodeCounters(Patient::class, 'PAC', $entityIds);
+        $people               = People::query()->select('id')->get();
+        $skinTypes            = SkinType::all();
+        $irisTypes            = IrisType::all();
+        $covenants            = Covenant::all();
+        $patientsBatch        = [];
+        $patientsNow          = now();
+        $entityIds            = $entities->pluck('id')->all();
+        $patientCodes         = $this->loadEntityCodeCounters(Patient::class, 'PAC', $entityIds);
         $entitiesWithPatients = [];
 
         foreach ($people as $person) {
@@ -456,21 +456,21 @@ class DataFakersSeeder extends Seeder
             $selectedEntities = $entities->random($numberOfEntities);
 
             foreach ($selectedEntities as $entity) {
-                $entityId                 = (string) $entity->id;
-                $patientCodes[$entityId]  = ($patientCodes[$entityId] ?? 0) + 1;
+                $entityId                        = (string) $entity->id;
+                $patientCodes[$entityId]         = ($patientCodes[$entityId] ?? 0) + 1;
                 $entitiesWithPatients[$entityId] = true;
-                $patientsBatch[]          = [
-                    'id'         => (string) Str::uuid(),
-                    'entity_id'  => $entityId,
-                    'person_id'  => (string) $person->id,
+                $patientsBatch[]                 = [
+                    'id'          => (string) Str::uuid(),
+                    'entity_id'   => $entityId,
+                    'person_id'   => (string) $person->id,
                     'covenant_id' => $covenants->isNotEmpty() ? $covenants->random()->id : null,
-                    'skin_id'    => $skinTypes->random()->id,
-                    'iris_id'    => $irisTypes->random()->id,
-                    'code'       => sprintf('PAC-%010d', $patientCodes[$entityId]),
+                    'skin_id'     => $skinTypes->random()->id,
+                    'iris_id'     => $irisTypes->random()->id,
+                    'code'        => sprintf('PAC-%010d', $patientCodes[$entityId]),
                     'card_number' => fake()->optional(0.6)->creditCardNumber(),
-                    'active'     => fake()->boolean(90),
-                    'created_at' => $patientsNow,
-                    'updated_at' => $patientsNow,
+                    'active'      => fake()->boolean(90),
+                    'created_at'  => $patientsNow,
+                    'updated_at'  => $patientsNow,
                 ];
 
                 if (count($patientsBatch) >= 1000) {
@@ -480,7 +480,7 @@ class DataFakersSeeder extends Seeder
             }
         }
 
-        if (!empty($patientsBatch)) {
+        if (! empty($patientsBatch)) {
             Patient::insert($patientsBatch);
         }
 
@@ -489,12 +489,12 @@ class DataFakersSeeder extends Seeder
         // ── Doctors ──────────────────────────────────────────────────────────
         $doctorCount = $this->seedInt('SEED_FAKE_DOCTORS', 250, 1);
         $this->command->info("⏳ Criando Doctors ({$doctorCount})...");
-        $entityUsersBatch = [];
-        $doctorsBatch     = [];
-        $doctorsNow       = now();
+        $entityUsersBatch    = [];
+        $doctorsBatch        = [];
+        $doctorsNow          = now();
         $entitiesWithDoctors = [];
-        $entityIsClient   = $entities->pluck('is_client', 'id')->all();
-        $entityUserCode   = [
+        $entityIsClient      = $entities->pluck('is_client', 'id')->all();
+        $entityUserCode      = [
             'EU'  => $this->loadGlobalCodeCounter(EntityUser::class, 'EU'),
             'EUP' => $this->loadGlobalCodeCounter(EntityUser::class, 'EUP'),
         ];
@@ -518,7 +518,7 @@ class DataFakersSeeder extends Seeder
                 $doctorCode++;
                 $entitiesWithDoctors[$entityId] = true;
 
-                $entityUserId = (string) Str::uuid();
+                $entityUserId       = (string) Str::uuid();
                 $entityUsersBatch[] = [
                     'id'         => $entityUserId,
                     'entity_id'  => $entityId,
@@ -555,7 +555,7 @@ class DataFakersSeeder extends Seeder
             }
         }
 
-        if (!empty($entityUsersBatch)) {
+        if (! empty($entityUsersBatch)) {
             EntityUser::insert($entityUsersBatch);
             Doctor::insert($doctorsBatch);
         }
@@ -581,9 +581,9 @@ class DataFakersSeeder extends Seeder
         $codeCounter    = [];
 
         // Cache em memória para evitar queries repetidas durante o loop
-        $entityUsers        = EntityUser::query()->select('id', 'entity_id')->get()->keyBy('id');
-        $entitiesById       = Entity::query()->select('id', 'schedule_interval')->get()->keyBy('id');
-        $allPatients        = Patient::query()
+        $entityUsers  = EntityUser::query()->select('id', 'entity_id')->get()->keyBy('id');
+        $entitiesById = Entity::query()->select('id', 'schedule_interval')->get()->keyBy('id');
+        $allPatients  = Patient::query()
             ->select('id', 'entity_id', 'person_id')
             ->with('person:id,full_name')
             ->get()
@@ -609,15 +609,15 @@ class DataFakersSeeder extends Seeder
         }
 
         // Janela temporal: 1 mês passado até 3 meses futuros (todos os dias)
-        $pastMonths  = $this->seedInt('SEED_FAKE_SCHEDULE_PAST_MONTHS', 1, 0);
-        $futureMonths = $this->seedInt('SEED_FAKE_SCHEDULE_FUTURE_MONTHS', 3, 0);
-        $startDate = Carbon::now()->subMonths($pastMonths)->startOfDay();
-        $endDate   = Carbon::now()->addMonths($futureMonths)->endOfDay();
-        $date      = $startDate->copy();
+        $pastMonths         = $this->seedInt('SEED_FAKE_SCHEDULE_PAST_MONTHS', 1, 0);
+        $futureMonths       = $this->seedInt('SEED_FAKE_SCHEDULE_FUTURE_MONTHS', 3, 0);
+        $startDate          = Carbon::now()->subMonths($pastMonths)->startOfDay();
+        $endDate            = Carbon::now()->addMonths($futureMonths)->endOfDay();
+        $date               = $startDate->copy();
         $attendedExamChance = $this->seedPercent('SEED_FAKE_ATTENDED_EXAM_PERCENT', 30);
 
         // Coleta de agendamentos Attended para gerar PatientExams posteriormente
-        $attendedForExams = [];
+        $attendedForExams      = [];
         $entitiesWithSchedules = [];
 
         while ($date->lte($endDate)) {
@@ -627,13 +627,13 @@ class DataFakersSeeder extends Seeder
             foreach ($doctors as $doctor) {
                 $entityUser = $entityUsers->get($doctor->entity_user_id);
 
-                if (!$entityUser) {
+                if (! $entityUser) {
                     continue;
                 }
 
                 $entityId = $entityUser->entity_id;
 
-                if (!isset($codeCounter[$entityId])) {
+                if (! isset($codeCounter[$entityId])) {
                     $codeCounter[$entityId] = 0;
                 }
 
@@ -645,7 +645,7 @@ class DataFakersSeeder extends Seeder
                     continue;
                 }
 
-                if (!isset($dailyPatientPools[$entityId])) {
+                if (! isset($dailyPatientPools[$entityId])) {
                     $dailyPatientPools[$entityId] = $patientsOfEntity->shuffle()->values()->all();
                 }
 
@@ -660,7 +660,7 @@ class DataFakersSeeder extends Seeder
                 $afternoonSlots = $this->generateTimeSlots($date, 14, 18, $doctor, $entityId, $patientPool, $covenantsOfEntity, $visitTypesOfEntity, $codeCounter, $isPast, $interval);
 
                 foreach (array_merge($morningSlots, $afternoonSlots) as $slot) {
-                    $schedulesBatch[] = $slot;
+                    $schedulesBatch[]                          = $slot;
                     $entitiesWithSchedules[$slot['entity_id']] = true;
 
                     // Seleciona 30% dos Attended passados para geração de exames
@@ -685,7 +685,7 @@ class DataFakersSeeder extends Seeder
             $date->addDay();
         }
 
-        if (!empty($schedulesBatch)) {
+        if (! empty($schedulesBatch)) {
             Schedule::insert($schedulesBatch);
         }
 
@@ -733,7 +733,7 @@ class DataFakersSeeder extends Seeder
                 ScheduleSituation::Cancelled->value,
             ];
 
-        while ($currentTime < $endTime && !empty($patientPool)) {
+        while ($currentTime < $endTime && ! empty($patientPool)) {
             $patient = array_pop($patientPool);
 
             $covenant  = $covenants->random();
@@ -813,21 +813,21 @@ class DataFakersSeeder extends Seeder
             $examCount = fake()->numberBetween(1, 3);
 
             for ($i = 0; $i < $examCount; $i++) {
-                $patientId                    = (string) $schedule['patient_id'];
-                $patientExamCode[$patientId]  = ($patientExamCode[$patientId] ?? 0) + 1;
-                $patientExamBatch[]           = [
-                    'id'         => (string) Str::uuid(),
-                    'patient_id' => $patientId,
-                    'doctor_id'  => $schedule['doctor_id'],
+                $patientId                   = (string) $schedule['patient_id'];
+                $patientExamCode[$patientId] = ($patientExamCode[$patientId] ?? 0) + 1;
+                $patientExamBatch[]          = [
+                    'id'          => (string) Str::uuid(),
+                    'patient_id'  => $patientId,
+                    'doctor_id'   => $schedule['doctor_id'],
                     'schedule_id' => $schedule['id'],
-                    'exam_id'    => $examTypesOfEntity->random()->id,
-                    'code'       => sprintf('EXM-%010d', $patientExamCode[$patientId]),
-                    'archive'    => 'exams/fake-' . Str::uuid() . '.jpg',
-                    'name'       => fake()->optional(0.5)->sentence(3),
-                    'laterality' => fake()->randomElement([null, null, 0, 1, 2]),
-                    'active'     => true,
-                    'created_at' => $patientExamNow,
-                    'updated_at' => $patientExamNow,
+                    'exam_id'     => $examTypesOfEntity->random()->id,
+                    'code'        => sprintf('EXM-%010d', $patientExamCode[$patientId]),
+                    'archive'     => 'exams/fake-' . Str::uuid() . '.jpg',
+                    'name'        => fake()->optional(0.5)->sentence(3),
+                    'laterality'  => fake()->randomElement([null, null, 0, 1, 2]),
+                    'active'      => true,
+                    'created_at'  => $patientExamNow,
+                    'updated_at'  => $patientExamNow,
                 ];
 
                 if (count($patientExamBatch) >= 1000) {
@@ -837,7 +837,7 @@ class DataFakersSeeder extends Seeder
             }
         }
 
-        if (!empty($patientExamBatch)) {
+        if (! empty($patientExamBatch)) {
             PatientExam::insert($patientExamBatch);
         }
     }
@@ -869,7 +869,8 @@ class DataFakersSeeder extends Seeder
     }
 
     /**
-     * @param  array<int, string>  $entityIds
+     * @param array<int, string> $entityIds
+     *
      * @return array<string, int>
      */
     private function loadEntityCodeCounters(string $modelClass, string $prefix, array $entityIds): array
@@ -907,7 +908,7 @@ class DataFakersSeeder extends Seeder
             ->orderBy('code', 'desc')
             ->value('code');
 
-        if (!is_string($lastCode)) {
+        if (! is_string($lastCode)) {
             return 0;
         }
 
@@ -944,7 +945,7 @@ class DataFakersSeeder extends Seeder
     {
         $value = env($key);
 
-        if (!is_numeric($value)) {
+        if (! is_numeric($value)) {
             return $default;
         }
 
@@ -955,7 +956,7 @@ class DataFakersSeeder extends Seeder
     {
         $value = env($key);
 
-        if (!is_numeric($value)) {
+        if (! is_numeric($value)) {
             return $default;
         }
 
@@ -963,7 +964,7 @@ class DataFakersSeeder extends Seeder
     }
 
     /**
-     * @param  array<int, string>  $entityIds
+     * @param array<int, string> $entityIds
      */
     private function markActivationSteps(array $entityIds, ActivationStep $step): void
     {

@@ -12,9 +12,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class EntityIntegrator extends Model
 {
-    use HasAuditColumns;
     use Auditable;
     use HasApiTokens;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;
@@ -46,7 +46,7 @@ class EntityIntegrator extends Model
     ];
 
     /**
-     * Generated code for the entity_user_integrator_id field
+     * Generated code for the entity_user_integrator_id field.
      */
     protected static function booted(): void
     {

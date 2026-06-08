@@ -23,8 +23,8 @@ class CoverTestTypesController extends BaseSettingController
     protected function getColumns(): array
     {
         return [
-            ['key' => 'code',         'label' => __('actions.code'),         'type' => 'code'],
-            ['key' => 'name',         'label' => __('actions.name'),         'type' => 'text', 'sortable' => true],
+            ['key' => 'code', 'label' => __('actions.code'), 'type' => 'code'],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'sortable' => true],
             ['key' => 'abbreviation', 'label' => __('actions.abbreviation'), 'type' => 'abbrev'],
         ];
     }
@@ -32,7 +32,7 @@ class CoverTestTypesController extends BaseSettingController
     protected function getFormFields(): array
     {
         return [
-            ['key' => 'name',         'label' => __('actions.name'),         'type' => 'text', 'required' => true],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'required' => true],
             ['key' => 'abbreviation', 'label' => __('actions.abbreviation'), 'type' => 'text', 'required' => false, 'maxlength' => 10],
         ];
     }

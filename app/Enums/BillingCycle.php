@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use Carbon\Carbon;
+
 enum BillingCycle: string
 {
     case Monthly    = 'monthly';
@@ -22,7 +24,7 @@ enum BillingCycle: string
     }
 
     /** Data de expiração a partir de agora; null para Lifetime. */
-    public function addToNow(): ?\Carbon\Carbon
+    public function addToNow(): ?Carbon
     {
         return match ($this) {
             self::Monthly    => now()->addMonth(),
@@ -50,8 +52,8 @@ enum BillingCycle: string
     {
         return match ($this) {
             self::Monthly, self::Quarterly, self::Semiannual => 'month',
-            self::Yearly                                     => 'year',
-            self::Lifetime                                   => 'lifetime',
+            self::Yearly   => 'year',
+            self::Lifetime => 'lifetime',
         };
     }
 

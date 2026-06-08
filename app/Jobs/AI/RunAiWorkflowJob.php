@@ -29,7 +29,7 @@ class RunAiWorkflowJob implements ShouldQueue, ShouldBeUnique
     public function __construct(
         public readonly string $aiRunId,
     ) {
-        $this->tries = (int) config('ai.jobs.tries', 3);
+        $this->tries   = (int) config('ai.jobs.tries', 3);
         $this->backoff = (int) config('ai.jobs.backoff_seconds', 45);
         $this->timeout = (int) config('ai.jobs.timeout_seconds', 180);
         $this->onQueue((string) config('ai.jobs.queue', 'default'));
@@ -74,8 +74,8 @@ class RunAiWorkflowJob implements ShouldQueue, ShouldBeUnique
                 ->compensateFailedRun($run, $exception->getMessage());
         } catch (Throwable $compensationError) {
             Log::error('RunAiWorkflowJob::failed: falha ao compensar reserva pendente.', [
-                'ai_run_id' => $this->aiRunId,
-                'original_error' => $exception->getMessage(),
+                'ai_run_id'          => $this->aiRunId,
+                'original_error'     => $exception->getMessage(),
                 'compensation_error' => $compensationError->getMessage(),
             ]);
         }

@@ -2,10 +2,9 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\{DB, Schema};
 
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         // Dedupe defensivo: em cenários antigos de corrida pode haver mais de uma
@@ -26,7 +25,8 @@ return new class () extends Migration {
                 ->pluck('id');
 
             $keepId = $ids->shift();
-            if (!$keepId || $ids->isEmpty()) {
+
+            if (! $keepId || $ids->isEmpty()) {
                 continue;
             }
 

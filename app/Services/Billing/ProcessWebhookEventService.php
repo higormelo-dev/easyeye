@@ -236,7 +236,7 @@ class ProcessWebhookEventService
                 'amount'              => $amount ?? (float) $invoice->amount,
                 'currency'            => $currency ?? $invoice->currency,
                 'idempotency_key'     => $idempotencyKey,
-            ]
+            ],
         );
     }
 
@@ -396,8 +396,8 @@ class ProcessWebhookEventService
     {
         if ($payment) {
             $payment->update([
-                'status'         => PaymentStatus::Chargeback->value,
-                'chargeback_at'  => now(),
+                'status'        => PaymentStatus::Chargeback->value,
+                'chargeback_at' => now(),
             ]);
         }
 

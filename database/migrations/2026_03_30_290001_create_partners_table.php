@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
  * Canal de distribuição indireta — distribuidores de equipamentos oftalmológicos,
  * associações médicas, consultores. Principal alavanca de redução de CAC em B2B médico.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('partners', function (Blueprint $table) {

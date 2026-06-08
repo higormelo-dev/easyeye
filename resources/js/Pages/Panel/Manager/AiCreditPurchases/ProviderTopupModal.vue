@@ -23,7 +23,8 @@ const PROVIDERS = [
 
 const form = ref({
     provider:     'openai',
-    amount_usd:   100,
+    amount_brl:   null,   // o que você pagou (cartão/fatura)
+    amount_usd:   100,    // o que o provedor creditou (base do saldo)
     topped_up_at: new Date().toISOString().slice(0, 16),
     reference:    '',
     note:         '',
@@ -36,6 +37,7 @@ watch(() => props.open, (val) => {
     if (val) {
         form.value = {
             provider:     props.presetProvider || 'openai',
+            amount_brl:   null,
             amount_usd:   100,
             topped_up_at: new Date().toISOString().slice(0, 16),
             reference:    '',
@@ -45,9 +47,17 @@ watch(() => props.open, (val) => {
     }
 });
 
+// Cotação efetiva (R$ por US$) — o que você pagou de fato por dólar.
+const effectiveRate = computed(() => {
+    const brl = Number(form.value.amount_brl) || 0;
+    const usd = Number(form.value.amount_usd) || 0;
+    return usd > 0 && brl > 0 ? brl / usd : null;
+});
+
 const isValid = computed(() =>
     form.value.provider
     && Number(form.value.amount_usd) > 0
+    && Number(form.value.amount_brl) > 0
     && form.value.topped_up_at,
 );
 
@@ -60,6 +70,7 @@ async function submit() {
     if (!isValid.value || saving.value) return;
     emit('submit', {
         provider:     form.value.provider,
+        amount_brl:   Number(form.value.amount_brl),
         amount_usd:   Number(form.value.amount_usd),
         topped_up_at: form.value.topped_up_at,
         reference:    form.value.reference || null,
@@ -131,10 +142,30 @@ defineExpose({ setSaving, setError });
                                     </div>
                                 </div>
 
-                                <!-- Valor -->
+                                <!-- Valor pago (R$) -->
                                 <div class="col-12 col-md-6">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.topup?.amount ?? 'Valor (USD)' }} <span class="text-danger">*</span>
+                                        {{ t?.topup?.amount_brl ?? 'Valor pago (R$)' }} <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input
+                                            v-model.number="form.amount_brl"
+                                            type="number"
+                                            step="0.01"
+                                            min="0.01"
+                                            max="99999999"
+                                            class="form-control"
+                                            required
+                                            :disabled="saving">
+                                    </div>
+                                    <small class="text-muted">{{ t?.topup?.amount_brl_help ?? 'O que você pagou no cartão/fatura.' }}</small>
+                                </div>
+
+                                <!-- Creditado no provedor (US$) -->
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label small fw-semibold mb-1">
+                                        {{ t?.topup?.amount_usd ?? 'Creditado no provedor (US$)' }} <span class="text-danger">*</span>
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">$</span>
@@ -147,6 +178,19 @@ defineExpose({ setSaving, setError });
                                             class="form-control"
                                             required
                                             :disabled="saving">
+                                    </div>
+                                    <small class="text-muted">{{ t?.topup?.amount_usd_help ?? 'Saldo que o provedor adicionou (alimenta o saldo estimado).' }}</small>
+                                </div>
+
+                                <!-- Cotação efetiva -->
+                                <div v-if="effectiveRate" class="col-12">
+                                    <div class="alert alert-light border d-flex align-items-center gap-2 small mb-0 py-2">
+                                        <i class="ti ti-exchange text-info"></i>
+                                        <span>
+                                            {{ t?.topup?.effective_rate ?? 'Cotação efetiva:' }}
+                                            <strong>R$ {{ effectiveRate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) }}</strong>
+                                            / US$
+                                        </span>
                                     </div>
                                 </div>
 

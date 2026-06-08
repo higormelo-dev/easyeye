@@ -7,6 +7,8 @@ use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
 use App\Http\Controllers\Controller;
 use App\Models\{ReportCategory, ReportSetting};
 use App\Services\ReportSettingService;
+use BackedEnum;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -31,16 +33,16 @@ class ReportSettingsController extends Controller
 
         return Inertia::render('Panel/Settings/ReportSettings/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),     'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.settings'),      'url' => '#',                     'active' => false],
-                ['label' => __('actions.report_settings.title'),  'url' => '#',                     'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.settings'), 'url' => '#', 'active' => false],
+                ['label' => __('actions.report_settings.title'), 'url' => '#', 'active' => true],
             ],
             'categories' => $categories,
             'items'      => $records->map(fn (ReportSetting $r) => array_merge([
                 'id'             => (string) $r->id,
                 'title'          => $r->title,
                 'description'    => $r->description,
-                'paper_size'     => $r->paper_size instanceof \BackedEnum ? $r->paper_size->value : (string) $r->paper_size,
+                'paper_size'     => $r->paper_size instanceof BackedEnum ? $r->paper_size->value : (string) $r->paper_size,
                 'show_header'    => (bool) $r->show_header,
                 'show_signature' => (bool) $r->show_signature,
                 'show_footer'    => (bool) $r->show_footer,
@@ -108,13 +110,13 @@ class ReportSettingsController extends Controller
         $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
         return Inertia::render('Panel/Settings/ReportSettings/Form', [
-            'breadcrumbs'    => $this->buildBreadcrumbs(__('actions.report_settings.create')),
-            'mode'           => 'create',
-            'reportSetting'  => null,
-            'categories'     => $categories,
-            'paper_sizes'    => array_map(fn (string $v) => ['value' => $v, 'label' => $v], PaperSize::values()),
+            'breadcrumbs'         => $this->buildBreadcrumbs(__('actions.report_settings.create')),
+            'mode'                => 'create',
+            'reportSetting'       => null,
+            'categories'          => $categories,
+            'paper_sizes'         => array_map(fn (string $v) => ['value' => $v, 'label' => $v], PaperSize::values()),
             'documentation_types' => array_map(fn (string $v) => ['value' => $v, 'label' => $v], DocumentationType::values()),
-            'urls' => [
+            'urls'                => [
                 'store' => route('panel.setting.report-settings.store'),
                 'index' => route('panel.setting.report-settings.index'),
             ],
@@ -144,7 +146,7 @@ class ReportSettingsController extends Controller
      * Preview HTML do template — exibido no modal da clínica.
      * Aplica a mesma autorização de show() mas retorna HTML em vez de JSON.
      */
-    public function preview(ReportSetting $reportSetting): \Illuminate\Contracts\View\View
+    public function preview(ReportSetting $reportSetting): View
     {
         $this->assertCanPreviewTemplate($reportSetting);
 
@@ -202,14 +204,14 @@ class ReportSettingsController extends Controller
                 'title'              => $reportSetting->title,
                 'description'        => $reportSetting->description,
                 'report_category_id' => $reportSetting->report_category_id,
-                'paper_size'         => $reportSetting->paper_size instanceof \BackedEnum
+                'paper_size'         => $reportSetting->paper_size instanceof BackedEnum
                     ? $reportSetting->paper_size->value : (string) $reportSetting->paper_size,
-                'font_family'   => $reportSetting->font_family,
-                'font_size'     => $reportSetting->font_size,
-                'margin_top'    => (float) $reportSetting->margin_top,
-                'margin_right'  => (float) $reportSetting->margin_right,
-                'margin_bottom' => (float) $reportSetting->margin_bottom,
-                'margin_left'   => (float) $reportSetting->margin_left,
+                'font_family'         => $reportSetting->font_family,
+                'font_size'           => $reportSetting->font_size,
+                'margin_top'          => (float) $reportSetting->margin_top,
+                'margin_right'        => (float) $reportSetting->margin_right,
+                'margin_bottom'       => (float) $reportSetting->margin_bottom,
+                'margin_left'         => (float) $reportSetting->margin_left,
                 'show_header'         => (bool) $reportSetting->show_header,
                 'header_show_logo'    => (bool) $reportSetting->header_show_logo,
                 'header_show_name'    => (bool) $reportSetting->header_show_name,
@@ -226,7 +228,7 @@ class ReportSettingsController extends Controller
                 'active'              => (bool) $reportSetting->active,
                 'contents'            => $reportSetting->contents->map(fn ($c) => [
                     'id'      => $c->id,
-                    'type'    => $c->type instanceof \BackedEnum ? $c->type->value : (string) $c->type,
+                    'type'    => $c->type instanceof BackedEnum ? $c->type->value : (string) $c->type,
                     'label'   => $c->label,
                     'content' => $c->content,
                     'active'  => (bool) $c->active,
@@ -235,7 +237,7 @@ class ReportSettingsController extends Controller
             'categories'          => $categories,
             'paper_sizes'         => array_map(fn (string $v) => ['value' => $v, 'label' => $v], PaperSize::values()),
             'documentation_types' => array_map(fn (string $v) => ['value' => $v, 'label' => $v], DocumentationType::values()),
-            'urls' => [
+            'urls'                => [
                 'update' => route('panel.setting.report-settings.update', $reportSetting),
                 'index'  => route('panel.setting.report-settings.index'),
             ],
@@ -340,10 +342,10 @@ class ReportSettingsController extends Controller
     private function buildBreadcrumbs(string $pageTitle): array
     {
         return [
-            ['label' => __('actions.sidemenu.dashboard'),     'url' => route('panel.dashboard'),                          'active' => false],
-            ['label' => __('actions.sidemenu.settings'),      'url' => '#',                                                'active' => false],
-            ['label' => __('actions.report_settings.title'),  'url' => route('panel.setting.report-settings.index'),       'active' => false],
-            ['label' => $pageTitle,                           'url' => '#',                                                'active' => true],
+            ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+            ['label' => __('actions.sidemenu.settings'), 'url' => '#', 'active' => false],
+            ['label' => __('actions.report_settings.title'), 'url' => route('panel.setting.report-settings.index'), 'active' => false],
+            ['label' => $pageTitle, 'url' => '#', 'active' => true],
         ];
     }
 

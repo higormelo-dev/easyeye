@@ -274,6 +274,21 @@ function onRefund(purchase) {
     });
 }
 
+// ── Abas: separa os dois trabalhos (provedores x clínicas) ────────────────────
+const activeTab = ref('clients');
+
+// Classifica a linha: cortesia (R$ 0 admin), avulsa (manual paga) ou compra do cliente.
+function purchaseKind(p) {
+    const manual = ['manual', 'courtesy'].includes(p.package_code);
+    if (manual && (p.amount_cents ?? 0) === 0) {
+        return { label: props.t?.kind?.courtesy ?? 'Cortesia', cls: 'bg-info-subtle text-info' };
+    }
+    if (manual) {
+        return { label: props.t?.kind?.manual ?? 'Avulsa (admin)', cls: 'bg-secondary-subtle text-secondary' };
+    }
+    return { label: props.t?.kind?.client ?? 'Compra (cliente)', cls: 'bg-success-subtle text-success' };
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const hasResults = computed(() => (props.purchases?.data ?? []).length > 0);
 
@@ -311,11 +326,40 @@ function providerIcon(provider) {
         <div class="ai-credit-purchases-screen">
 
             <PageHeader
-                :title="t?.title ?? 'Compras de créditos IA'"
-                :subtitle="t?.subtitle"
-                :total="purchases?.meta?.total > 0 ? purchases.meta.total : null"
-            >
-                <template #actions>
+                :title="t?.title ?? 'Créditos de IA'"
+                :subtitle="t?.subtitle ?? 'Recargas nos provedores e distribuição de créditos às clínicas.'"
+            />
+
+            <!-- ─── Abas: separam os dois trabalhos do dono do SaaS ────────── -->
+            <ul class="nav nav-tabs mb-3">
+                <li class="nav-item">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: activeTab === 'clients' }"
+                        @click="activeTab = 'clients'"
+                    >
+                        <i class="ti ti-building-store me-1"></i>
+                        {{ t?.tabs?.clients ?? 'Empresas clientes (créditos)' }}
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button
+                        type="button"
+                        class="nav-link"
+                        :class="{ active: activeTab === 'providers' }"
+                        @click="activeTab = 'providers'"
+                    >
+                        <i class="ti ti-server-bolt me-1"></i>
+                        {{ t?.tabs?.providers ?? 'Provedores (saldo)' }}
+                    </button>
+                </li>
+            </ul>
+
+            <!-- ════════════ ABA: EMPRESAS CLIENTES (créditos / R$) ════════════ -->
+            <div v-show="activeTab === 'clients'">
+
+                <div class="d-flex justify-content-end mb-3">
                     <button
                         v-if="permissions?.create_manual"
                         type="button"
@@ -323,28 +367,18 @@ function providerIcon(provider) {
                         @click="openManualModal()"
                     >
                         <i class="ti ti-coin-plus me-1"></i>
-                        {{ t?.actions?.create_manual ?? 'Adicionar crédito manual' }}
+                        {{ t?.actions?.create_manual ?? 'Dar crédito (cortesia ou compra)' }}
                     </button>
-                </template>
-            </PageHeader>
+                </div>
 
-            <!-- ─── Card destaque: Sua empresa ─────────────────────────────── -->
-            <InternalWalletCard
-                v-if="internalWallet"
-                :wallet="internalWallet"
-                :permissions="permissions"
-                :t="t"
-                @add-credit="openManualModal"
-            />
-
-            <!-- ─── Custo do EasyEye nos provedores (lado supplier) ──────── -->
-            <ProviderCostsCard
-                v-if="providerCosts"
-                :costs="providerCosts"
-                :permissions="permissions"
-                :t="t"
-                @add-topup="openTopupModal"
-            />
+                <!-- ─── Card destaque: Sua empresa ─────────────────────────────── -->
+                <InternalWalletCard
+                    v-if="internalWallet"
+                    :wallet="internalWallet"
+                    :permissions="permissions"
+                    :t="t"
+                    @add-credit="openManualModal"
+                />
 
             <!-- ─── KPIs ─────────────────────────────────────────────────── -->
             <div class="row g-2 mb-3">
@@ -559,7 +593,10 @@ function providerIcon(provider) {
                                     <span v-else class="text-muted small">—</span>
                                 </td>
                                 <td>
-                                    <div class="small">{{ p.package_name }}</div>
+                                    <div class="small d-flex align-items-center gap-1">
+                                        {{ p.package_name }}
+                                        <span class="badge" :class="purchaseKind(p).cls">{{ purchaseKind(p).label }}</span>
+                                    </div>
                                     <small class="text-muted">{{ p.package_code }}</small>
                                 </td>
                                 <td class="text-end fw-semibold">{{ p.credits.toLocaleString('pt-BR') }}</td>
@@ -628,6 +665,33 @@ function providerIcon(provider) {
                             <i class="ti ti-chevron-right"></i>
                         </button>
                     </div>
+                </div>
+            </div>
+            </div><!-- /aba: empresas clientes -->
+
+            <!-- ════════════ ABA: PROVEDORES (saldo / USD) ════════════ -->
+            <div v-show="activeTab === 'providers'">
+                <div class="d-flex justify-content-end mb-3">
+                    <button
+                        v-if="permissions?.create_topup"
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        @click="openTopupModal()"
+                    >
+                        <i class="ti ti-plus me-1"></i>
+                        {{ t?.actions?.create_topup ?? 'Registrar recarga' }}
+                    </button>
+                </div>
+
+                <ProviderCostsCard
+                    v-if="providerCosts"
+                    :costs="providerCosts"
+                    :permissions="permissions"
+                    :t="t"
+                    @add-topup="openTopupModal"
+                />
+                <div v-else class="alert alert-info small mb-0">
+                    {{ t?.providers_empty ?? 'Registre uma recarga para acompanhar o saldo dos provedores.' }}
                 </div>
             </div>
         </div>

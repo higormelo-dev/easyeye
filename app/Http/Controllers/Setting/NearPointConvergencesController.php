@@ -12,11 +12,11 @@ class NearPointConvergencesController extends BaseSettingController
 {
     public function __construct(NearPointConvergenceService $service)
     {
-        $this->titleController = __("actions.sidemenu.nearpointconvergences");
+        $this->titleController = __('actions.sidemenu.nearpointconvergences');
         $this->service         = $service;
         $this->resourceClass   = NearPointConvergenceResource::class;
-        $this->routePrefix     = "panel.setting.nearpointconvergences";
-        $this->viewSlot        = "nearpointconvergences";
+        $this->routePrefix     = 'panel.setting.nearpointconvergences';
+        $this->viewSlot        = 'nearpointconvergences';
     }
 
     public function store(NearPointConvergenceRequest $request)

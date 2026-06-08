@@ -8,7 +8,7 @@ use App\Http\Requests\DoctorRequest;
 use App\Http\Resources\{DoctorResource, EntityUserResource};
 use App\Models\{Doctor, Entity, EntityUser, Patient, People, User};
 use App\Services\DoctorService;
-use Illuminate\Contracts\View\{View};
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
@@ -203,7 +203,7 @@ class DoctorsController extends Controller
     {
         $record = $this->service->findByIdOrCode($id);
 
-        if (!request()->wantsJson()) {
+        if (! request()->wantsJson()) {
             return redirect()->route('panel.doctors.index');
         }
 
@@ -218,7 +218,7 @@ class DoctorsController extends Controller
                 'id'                => $record->id,
                 'code'              => $record->code,
                 'record'            => $record->record,
-                'record_specialty' => $record->record_specialty,
+                'record_specialty'  => $record->record_specialty,
                 'color'             => $record->color,
                 'observation'       => $record->observation,
                 'partner'           => (bool) $record->partner,
@@ -303,7 +303,7 @@ class DoctorsController extends Controller
      */
     public function edit(string $id): JsonResponse|RedirectResponse
     {
-        if (!request()->wantsJson()) {
+        if (! request()->wantsJson()) {
             return redirect()->route('panel.doctors.index');
         }
 

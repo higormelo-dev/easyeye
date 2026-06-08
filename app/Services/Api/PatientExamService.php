@@ -7,15 +7,17 @@ use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExa
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
 use Illuminate\Support\Facades\{DB, Storage};
 use Illuminate\Support\Str;
+use RuntimeException;
+use Throwable;
 
 class PatientExamService
 {
     private const FILLABLE_FIELDS = ['patient_id', 'exam_id', 'doctor_id', 'schedule_id', 'entity_integrator_equipment_id', 'archive', 'name', 'laterality'];
 
     /**
-     * Create a new record with all related entities
+     * Create a new record with all related entities.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function create(PatientExamRequest $request, string $patientId): PatientExam
     {
@@ -23,9 +25,9 @@ class PatientExamService
     }
 
     /**
-     * Create a new record resolving patient_id and doctor_id from the schedule
+     * Create a new record resolving patient_id and doctor_id from the schedule.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function createFromScheduleIdentifier(ExamRequest $request): PatientExam
     {
@@ -73,9 +75,9 @@ class PatientExamService
     }
 
     /**
-     * Update existing record and related entities
+     * Update existing record and related entities.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function update(PatientExam $patientExam, PatientExamRequest $request): PatientExam
     {
@@ -106,11 +108,11 @@ class PatientExamService
                     ->put(
                         $archivePath,
                         file_get_contents($file->getRealPath()),
-                        'public'
+                        'public',
                     );
 
-                if (!$uploaded) {
-                    throw new \RuntimeException('Failed to upload exam archive.');
+                if (! $uploaded) {
+                    throw new RuntimeException('Failed to upload exam archive.');
                 }
 
                 $data['archive'] = $archivePath;
@@ -128,7 +130,7 @@ class PatientExamService
             ->where('patient_id', $patientId);
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('EXM-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };
@@ -150,7 +152,7 @@ class PatientExamService
             });
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('EXM-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };
@@ -159,7 +161,7 @@ class PatientExamService
     }
 
     /**
-     * Find or create record (used by PatientExamsController store)
+     * Find or create record (used by PatientExamsController store).
      */
     private function findOrCreate(PatientExamRequest $request, string $patientId): PatientExam
     {
@@ -230,7 +232,7 @@ class PatientExamService
                 return $existingRecord->refresh();
             }
 
-            throw new \RuntimeException('Failed to upload exam archive.');
+            throw new RuntimeException('Failed to upload exam archive.');
         }
 
         $uploaded = Storage::disk('s3')
@@ -249,7 +251,7 @@ class PatientExamService
             ]);
         }
 
-        throw new \RuntimeException('Failed to upload exam archive.');
+        throw new RuntimeException('Failed to upload exam archive.');
     }
 
     /**
@@ -279,7 +281,7 @@ class PatientExamService
             });
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('DOC-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };
@@ -298,7 +300,7 @@ class PatientExamService
             ->where('entity_id', $integrator->user->entity_id);
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('SDL-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };
@@ -316,7 +318,7 @@ class PatientExamService
             });
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('ETP-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };
@@ -336,16 +338,16 @@ class PatientExamService
                 $query->whereHas(
                     'integrator',
                     fn (Builder $q) => $q
-                    ->whereHas(
-                        'user',
-                        fn (Builder $q2) => $q2
-                        ->where('entity_id', $integrator->user->entity_id)
-                    )
+                        ->whereHas(
+                            'user',
+                            fn (Builder $q2) => $q2
+                                ->where('entity_id', $integrator->user->entity_id),
+                        ),
                 )->orWhereNull('integrator_id');
             });
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('EIQ-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };
@@ -360,7 +362,7 @@ class PatientExamService
         }
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };

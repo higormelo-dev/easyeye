@@ -17,7 +17,7 @@ class NearPointConvergencesSeeder extends Seeder
         foreach ($ppcTypes as $ppcType) {
             NearPointConvergence::query()->firstOrCreate(
                 ['name' => $ppcType],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

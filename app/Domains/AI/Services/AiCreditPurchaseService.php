@@ -148,11 +148,11 @@ class AiCreditPurchaseService
                 'currency'        => (string) config('ai.credit_purchases.currency', 'BRL'),
                 'status'          => AiCreditPurchaseStatus::PendingPayment->value,
                 'description'     => "Crédito manual: {$reason}",
-                'metadata' => array_merge($metadata ?? [], [
-                    'source'         => 'manager_manual',
-                    'manual_reason'  => $reason,
-                    'created_by'     => $createdBy,
-                    'provider_hint'  => $provider?->value,
+                'metadata'        => array_merge($metadata ?? [], [
+                    'source'        => 'manager_manual',
+                    'manual_reason' => $reason,
+                    'created_by'    => $createdBy,
+                    'provider_hint' => $provider?->value,
                 ]),
                 'idempotency_key' => $idempotencyKey,
             ]);
@@ -321,8 +321,8 @@ class AiCreditPurchaseService
                     'provider_hint'         => $locked->provider instanceof AiProvider
                         ? $locked->provider->value
                         : ($locked->provider ? (string) $locked->provider : null),
-                    'amount_cents'          => (int) $locked->amount_cents,
-                    'currency'              => (string) $locked->currency,
+                    'amount_cents' => (int) $locked->amount_cents,
+                    'currency'     => (string) $locked->currency,
                 ],
             );
 

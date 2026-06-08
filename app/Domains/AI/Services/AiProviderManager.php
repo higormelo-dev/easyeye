@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiProviderCallRole;
-use App\Enums\AI\AiRunMode;
+use App\Enums\AI\{AiProvider, AiProviderCallRole, AiRunMode};
+use RuntimeException;
 
 class AiProviderManager
 {
@@ -16,6 +15,7 @@ class AiProviderManager
      */
     public function __construct(
         private readonly array $providers,
+        private readonly AiProviderSettings $settings,
     ) {
     }
 
@@ -24,7 +24,7 @@ class AiProviderManager
         $code = $provider instanceof AiProvider ? $provider->value : (string) $provider;
 
         if (! array_key_exists($code, $this->providers)) {
-            throw new \RuntimeException("Provider IA [{$code}] não está registrado.");
+            throw new RuntimeException("Provider IA [{$code}] não está registrado.");
         }
 
         return $this->providers[$code];
@@ -35,31 +35,40 @@ class AiProviderManager
      */
     public function providersForMode(AiRunMode $mode): array
     {
-        if ($mode === AiRunMode::Consensus && ! (bool) config('ai.enable_consensus', true)) {
-            throw new \RuntimeException('Modo consensus está desabilitado por configuração.');
+        // Gate de runtime: por SUFICIÊNCIA de provedores (validado exige 2,
+        // consenso exige 3). A política de oferta no painel (qual modo mostrar)
+        // é separada e vive no AiProviderSettings::availableModes()/controller.
+        $needed = match ($mode) {
+            AiRunMode::Economy   => 1,
+            AiRunMode::Validated => 2,
+            AiRunMode::Consensus => 3,
+        };
+
+        if ($this->settings->count() < $needed) {
+            throw new RuntimeException("Modo [{$mode->value}] requer {$needed} provedor(es) de IA habilitado(s).");
         }
 
-        $primary = $this->get($this->configured('primary', AiProvider::OpenAI->value));
+        $generator = $this->get($this->settings->roleCode(AiProviderCallRole::Generator));
 
         if ($mode === AiRunMode::Economy) {
             return [
-                ['role' => AiProviderCallRole::Generator, 'provider' => $primary],
+                ['role' => AiProviderCallRole::Generator, 'provider' => $generator],
             ];
         }
 
-        $reviewer = $this->get($this->configured('reviewer', AiProvider::Anthropic->value));
+        $reviewer = $this->get($this->settings->roleCode(AiProviderCallRole::Reviewer));
 
         if ($mode === AiRunMode::Validated) {
             return [
-                ['role' => AiProviderCallRole::Generator, 'provider' => $primary],
+                ['role' => AiProviderCallRole::Generator, 'provider' => $generator],
                 ['role' => AiProviderCallRole::Reviewer, 'provider' => $reviewer],
             ];
         }
 
-        $adjudicator = $this->get($this->configured('adjudicator', AiProvider::Gemini->value));
+        $adjudicator = $this->get($this->settings->roleCode(AiProviderCallRole::Adjudicator));
 
         return [
-            ['role' => AiProviderCallRole::Generator, 'provider' => $primary],
+            ['role' => AiProviderCallRole::Generator, 'provider' => $generator],
             ['role' => AiProviderCallRole::Reviewer, 'provider' => $reviewer],
             ['role' => AiProviderCallRole::Adjudicator, 'provider' => $adjudicator],
         ];
@@ -75,34 +84,17 @@ class AiProviderManager
      */
     public function fallbackChainForRole(AiProviderCallRole $role): array
     {
-        $primaryCode     = $this->configured('primary', AiProvider::OpenAI->value);
-        $reviewerCode    = $this->configured('reviewer', AiProvider::Anthropic->value);
-        $adjudicatorCode = $this->configured('adjudicator', AiProvider::Gemini->value);
-
-        $preferred = match ($role) {
-            AiProviderCallRole::Generator   => [$primaryCode, $reviewerCode, $adjudicatorCode],
-            AiProviderCallRole::Reviewer    => [$reviewerCode, $adjudicatorCode, $primaryCode],
-            AiProviderCallRole::Adjudicator => [$adjudicatorCode, $primaryCode, $reviewerCode],
-            AiProviderCallRole::Fallback    => [$primaryCode, $reviewerCode, $adjudicatorCode],
-        };
-
-        // Deduplica preservando ordem (caso o usuário tenha configurado o mesmo
-        // provider para múltiplos papéis) e ignora códigos não registrados.
-        $seen  = [];
+        // Cadeia restrita ao conjunto de provedores HABILITADOS: começa pelo
+        // provider preferido do papel e cai para os demais ativos (rotação da
+        // lista de prioridade). Com 1 provedor habilitado, a cadeia tem 1 item.
         $chain = [];
-        foreach ($preferred as $code) {
-            if (isset($seen[$code]) || !array_key_exists($code, $this->providers)) {
-                continue;
+
+        foreach ($this->settings->fallbackOrder($role) as $code) {
+            if (array_key_exists($code, $this->providers)) {
+                $chain[] = $this->providers[$code];
             }
-            $seen[$code] = true;
-            $chain[]     = $this->providers[$code];
         }
 
         return $chain;
-    }
-
-    private function configured(string $key, string $fallback): string
-    {
-        return (string) config("ai.providers.{$key}", $fallback);
     }
 }

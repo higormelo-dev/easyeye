@@ -8,6 +8,7 @@ use App\Domains\AI\Contracts\AiRunRepositoryInterface;
 use App\Domains\AI\Models\AiRun;
 use App\DTOs\AI\AiRequestData;
 use App\Enums\AI\{AiRiskLevel, AiRunStatus};
+use App\Models\PatientExam;
 use Throwable;
 
 class AiRunExecutionService
@@ -18,6 +19,7 @@ class AiRunExecutionService
         private readonly AiPricingService $pricingService,
         private readonly AiCreditWalletService $walletService,
         private readonly AiSafetyService $safetyService,
+        private readonly EyeImageAttachmentService $eyeImageAttachments,
     ) {
     }
 
@@ -148,11 +150,35 @@ class AiRunExecutionService
             systemPrompt: isset($summary['system_prompt']) ? (string) $summary['system_prompt'] : null,
             riskLevel: $run->risk_level instanceof AiRiskLevel ? $run->risk_level : AiRiskLevel::Low,
             context: (array) ($summary['context'] ?? []),
-            attachments: (array) ($summary['attachments'] ?? []),
+            attachments: $this->resolveAttachments($run, $summary),
             expectsJson: (bool) ($summary['expects_json'] ?? false),
             maxOutputTokens: isset($summary['max_output_tokens']) ? (int) $summary['max_output_tokens'] : null,
             metadata: (array) ($summary['metadata'] ?? []),
         );
+    }
+
+    /**
+     * Resolve os anexos de imagem em tempo de execução. Para o módulo Eye Image,
+     * o run guarda apenas `exam_ids` (não o base64): aqui buscamos os exames e
+     * geramos os anexos inline. Para outros fluxos, usa os anexos já presentes.
+     *
+     * @param array<string, mixed> $summary
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function resolveAttachments(AiRun $run, array $summary): array
+    {
+        $examIds = array_values(array_filter((array) ($summary['exam_ids'] ?? [])));
+
+        if ($examIds !== []) {
+            $exams = PatientExam::query()
+                ->whereIn('id', $examIds)
+                ->get();
+
+            return $this->eyeImageAttachments->build($exams);
+        }
+
+        return (array) ($summary['attachments'] ?? []);
     }
 
     private function releaseReservationOnFailure(AiRun $run): void

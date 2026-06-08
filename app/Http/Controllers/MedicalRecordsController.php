@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings};
+use App\Enums\AI\AiRunMode;
 use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey};
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
@@ -11,6 +13,7 @@ use App\Models\ReportSettingContent;
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
+use Illuminate\Support\Collection;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class MedicalRecordsController extends Controller
@@ -24,6 +27,8 @@ class MedicalRecordsController extends Controller
         private readonly LensFormatterService $lensFormatter,
         private readonly FeatureGateService $featureGate,
         private readonly UsageMeterService $usageMeter,
+        private readonly AiCreditWalletService $aiWallet,
+        private readonly AiProviderSettings $aiProviderSettings,
     ) {
     }
 
@@ -36,28 +41,28 @@ class MedicalRecordsController extends Controller
 
         return Inertia::render('Panel/MedicalRecords/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),    'url' => route('panel.dashboard'),          'active' => false],
-                ['label' => __('actions.sidemenu.patients'),     'url' => route('panel.patients.index'),     'active' => false],
-                ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#',                    'active' => false],
-                ['label' => __('actions.medical_records.title'), 'url' => '#',                               'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.patients'), 'url' => route('panel.patients.index'), 'active' => false],
+                ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#', 'active' => false],
+                ['label' => __('actions.medical_records.title'), 'url' => '#', 'active' => true],
             ],
             'patient' => [
-                'id'             => (string) $patient->id,
-                'code'           => $patient->code,
-                'full_name'      => $patient->person?->full_name,
-                'birth_date'     => $patient->person?->birth_date?->format('d/m/Y'),
-                'age'            => $patient->person?->birth_date?->age,
-                'gender'         => $patient->person?->gender,
-                'cpf'            => $patient->person?->cpf,
-                'phone'          => $patient->person?->cellphone ?? $patient->person?->telephone,
-                'email'          => $patient->person?->email,
-                'covenant_name'  => $patient->covenant?->name,
-                'skin_type'      => $patient->skinType?->name,
-                'iris_type'      => $patient->irisType?->name,
+                'id'            => (string) $patient->id,
+                'code'          => $patient->code,
+                'full_name'     => $patient->person?->full_name,
+                'birth_date'    => $patient->person?->birth_date?->format('d/m/Y'),
+                'age'           => $patient->person?->birth_date?->age,
+                'gender'        => $patient->person?->gender,
+                'cpf'           => $patient->person?->cpf,
+                'phone'         => $patient->person?->cellphone ?? $patient->person?->telephone,
+                'email'         => $patient->person?->email,
+                'covenant_name' => $patient->covenant?->name,
+                'skin_type'     => $patient->skinType?->name,
+                'iris_type'     => $patient->irisType?->name,
             ],
             'urls' => [
                 'ajax_list' => route('panel.patients.medicalrecords.ajaxlist', $patient),
-                'create'    => route('panel.patients.medicalrecords.create',   $patient),
+                'create'    => route('panel.patients.medicalrecords.create', $patient),
                 'patients'  => route('panel.patients.index'),
             ],
             // Apenas médicos podem criar/editar/excluir prontuário (CFM Res. 2.227/2018).
@@ -84,22 +89,22 @@ class MedicalRecordsController extends Controller
 
         return response()->json([
             'data' => $records->getCollection()->map(fn (MedicalRecord $r) => [
-                'id'                  => (string) $r->id,
-                'code'                => $r->code,
-                'created_at'          => $r->created_at?->format('d/m/Y H:i'),
-                'created_at_iso'      => $r->created_at?->toIso8601String(),
-                'doctor_name'         => $r->doctor?->person?->full_name,
-                'main_complaint'      => $r->main_complaint,
-                'diagnosis_cids'      => $r->diagnosis_cids ?? [],
-                'clinical_conduct'    => $r->clinical_conduct,
-                'is_signed'           => $r->isSigned(),
-                'is_locked'           => $r->isLocked(),
-                'signed_at'           => $r->signed_at?->format('d/m/Y H:i'),
-                'documentations_count'=> $r->documentations->count(),
-                'edit_url'            => route('panel.patients.medicalrecords.edit', [$patient, $r]),
-                'show_url'            => route('panel.patients.medicalrecords.show', [$patient, $r]),
-                'pdf_url'             => route('panel.patients.medicalrecords.pdf',  [$patient, $r]),
-                'destroy_url'         => route('panel.patients.medicalrecords.destroy', [$patient, $r]),
+                'id'                   => (string) $r->id,
+                'code'                 => $r->code,
+                'created_at'           => $r->created_at?->format('d/m/Y H:i'),
+                'created_at_iso'       => $r->created_at?->toIso8601String(),
+                'doctor_name'          => $r->doctor?->person?->full_name,
+                'main_complaint'       => $r->main_complaint,
+                'diagnosis_cids'       => $r->diagnosis_cids ?? [],
+                'clinical_conduct'     => $r->clinical_conduct,
+                'is_signed'            => $r->isSigned(),
+                'is_locked'            => $r->isLocked(),
+                'signed_at'            => $r->signed_at?->format('d/m/Y H:i'),
+                'documentations_count' => $r->documentations->count(),
+                'edit_url'             => route('panel.patients.medicalrecords.edit', [$patient, $r]),
+                'show_url'             => route('panel.patients.medicalrecords.show', [$patient, $r]),
+                'pdf_url'              => route('panel.patients.medicalrecords.pdf', [$patient, $r]),
+                'destroy_url'          => route('panel.patients.medicalrecords.destroy', [$patient, $r]),
             ]),
             'has_more'  => $records->hasMorePages(),
             'next_page' => $records->currentPage() + 1,
@@ -113,7 +118,7 @@ class MedicalRecordsController extends Controller
     public function create(Patient $patient): InertiaResponse
     {
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
-        $props = $this->buildFormProps($patient, null);
+        $props                  = $this->buildFormProps($patient, null);
         $props['breadcrumbs'][] = [
             'label'  => __('actions.medical_records.create'),
             'url'    => '#',
@@ -248,19 +253,19 @@ class MedicalRecordsController extends Controller
             'pdf_url'       => route('panel.patients.medicalrecords.pdf', [$patient, $medicalrecord]),
             'templates_url' => route('panel.patients.medicalrecords.templates', [$patient, $medicalrecord]),
             // Labels i18n consumidos pelo `buildDetailHtml` no offcanvas.
-            'labels'        => [
-                'yes'           => __('actions.medical_records.yes'),
-                'no'            => __('actions.medical_records.no'),
-                'not_informed'  => __('actions.medical_records.not_informed'),
-                'complaint'     => __('actions.medical_records.complaint'),
-                'history'       => __('actions.medical_records.history'),
-                'diabetic'      => __('actions.medical_records.diabetic'),
-                'hypertensive'  => __('actions.medical_records.hypertensive'),
-                'glaucomatous'  => __('actions.medical_records.glaucomatous'),
-                'family'        => __('actions.medical_records.family'),
-                'tonometry'     => __('actions.medical_records.tonometry'),
-                'general_obs'   => __('actions.medical_records.general_obs'),
-                'lenses_obs'    => __('actions.medical_records.lenses_obs'),
+            'labels' => [
+                'yes'          => __('actions.medical_records.yes'),
+                'no'           => __('actions.medical_records.no'),
+                'not_informed' => __('actions.medical_records.not_informed'),
+                'complaint'    => __('actions.medical_records.complaint'),
+                'history'      => __('actions.medical_records.history'),
+                'diabetic'     => __('actions.medical_records.diabetic'),
+                'hypertensive' => __('actions.medical_records.hypertensive'),
+                'glaucomatous' => __('actions.medical_records.glaucomatous'),
+                'family'       => __('actions.medical_records.family'),
+                'tonometry'    => __('actions.medical_records.tonometry'),
+                'general_obs'  => __('actions.medical_records.general_obs'),
+                'lenses_obs'   => __('actions.medical_records.lenses_obs'),
             ],
         ]);
     }
@@ -281,7 +286,7 @@ class MedicalRecordsController extends Controller
             'files',
         ]);
 
-        $props = $this->buildFormProps($patient, $medicalrecord);
+        $props                  = $this->buildFormProps($patient, $medicalrecord);
         $props['breadcrumbs'][] = [
             'label'  => __('actions.medical_records.edit'),
             'url'    => '#',
@@ -494,22 +499,22 @@ class MedicalRecordsController extends Controller
 
         return [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),      'active' => false],
-                ['label' => __('actions.sidemenu.patients'),   'url' => route('panel.patients.index'), 'active' => false],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.patients'), 'url' => route('panel.patients.index'), 'active' => false],
                 ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#', 'active' => false],
                 ['label' => __('actions.medical_records.title'), 'url' => route('panel.patients.medicalrecords.index', $patient), 'active' => false],
             ],
-            'patient'        => $this->serializePatient($patient),
-            'medicalrecord'  => $record ? $this->serializeRecord($record) : null,
-            'doctors'        => $this->serializeCatalog($doctors, fn (Doctor $d) => [
+            'patient'       => $this->serializePatient($patient),
+            'medicalrecord' => $record ? $this->serializeRecord($record) : null,
+            'doctors'       => $this->serializeCatalog($doctors, fn (Doctor $d) => [
                 'id'   => (string) $d->id,
                 'name' => $d->person?->full_name,
             ]),
-            'currentDoctorId'  => $currentDoctor ? (string) $currentDoctor->id : null,
-            'canChooseDoctor'  => (bool) $canChooseDoctor,
-            'isDoctor'         => $isDoctor,
-            'isEdit'           => $isEdit,
-            'catalogs' => [
+            'currentDoctorId' => $currentDoctor ? (string) $currentDoctor->id : null,
+            'canChooseDoctor' => (bool) $canChooseDoctor,
+            'isDoctor'        => $isDoctor,
+            'isEdit'          => $isEdit,
+            'catalogs'        => [
                 'visual_acuity_types' => $this->serializeCatalog(VisualAcuityType::orderBy('name')->get()),
                 'color_vision_types'  => $this->serializeCatalog(ColorVisionType::orderBy('name')->get()),
                 'cover_test_types'    => $this->serializeCatalog(CoverTestType::orderBy('name')->get()),
@@ -530,7 +535,60 @@ class MedicalRecordsController extends Controller
             ],
             'urls'    => $this->buildFormUrls($patient, $record, $isEdit),
             'storage' => $this->buildStorageQuota($entityId),
+            'ai'      => $this->buildAiProps($entityId),
             't'       => trans('actions.medical_records'),
+        ];
+    }
+
+    /**
+     * Props do Assistente de IA no prontuário (análise do caso, rascunho de laudo,
+     * apoio em campos). Reaproveita os feature gates e o AiRunsController. Retorna
+     * apenas { enabled:false } quando a entity não tem nenhum recurso de IA.
+     */
+    private function buildAiProps(string $entityId): array
+    {
+        $hasExamAssistant  = $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant);
+        $hasReportDrafting = $this->featureGate->can($entityId, FeatureKey::HasAiReportDrafting);
+        $canConsensus      = $this->aiProviderSettings->isModeAvailable(AiRunMode::Consensus)
+            && $this->featureGate->can($entityId, FeatureKey::HasAiConsensus);
+
+        if (! $hasExamAssistant && ! $hasReportDrafting && ! $canConsensus) {
+            return ['enabled' => false];
+        }
+
+        $modes = [];
+
+        foreach ($this->aiProviderSettings->availableModes() as $mode) {
+            if ($mode === AiRunMode::Consensus && ! $canConsensus) {
+                continue;
+            }
+            $modes[] = ['value' => $mode->value, 'label' => __('ai.mode_' . $mode->value)];
+        }
+
+        return [
+            'enabled'       => true,
+            'can_analysis'  => $hasExamAssistant,   // Análise do caso + apoio inline
+            'can_report'    => $hasReportDrafting,   // Rascunho de laudo
+            'can_consensus' => $canConsensus,
+            'default_mode'  => AiRunMode::Economy->value,
+            'modes'         => $modes,
+            'balance'       => $this->aiWallet->balance($entityId),
+            'urls'          => [
+                'estimate' => route('panel.ai-runs.estimate'),
+                'store'    => route('panel.ai-runs.store'),
+                'show'     => route('panel.ai-runs.show', ['aiRun' => '__ID__']),
+                'approve'  => route('panel.ai-runs.approve', ['aiRun' => '__ID__']),
+                'reject'   => route('panel.ai-runs.reject', ['aiRun' => '__ID__']),
+            ],
+            'labels' => [
+                'title'             => __('ai.title'),
+                'processing'        => __('ai.processing'),
+                'support_notice'    => __('ai.support_notice'),
+                'credits_available' => __('ai.credits_available'),
+                'estimated_credits' => __('ai.estimated_credits'),
+                'approve'           => __('ai.approve'),
+                'reject'            => __('ai.reject'),
+            ],
         ];
     }
 
@@ -549,17 +607,17 @@ class MedicalRecordsController extends Controller
             : min(100, (int) round(($usedBytes / $limitBytes) * 100));
 
         return [
-            'used_bytes'           => $usedBytes,
-            'limit_bytes'          => $limitBytes,
-            'limit_gb'             => $status->limit,
-            'is_unlimited'         => $status->isUnlimited,
-            'percent'              => $percent,
-            'remaining_bytes'      => $status->isUnlimited ? null : max(0, $limitBytes - $usedBytes),
+            'used_bytes'      => $usedBytes,
+            'limit_bytes'     => $limitBytes,
+            'limit_gb'        => $status->limit,
+            'is_unlimited'    => $status->isUnlimited,
+            'percent'         => $percent,
+            'remaining_bytes' => $status->isUnlimited ? null : max(0, $limitBytes - $usedBytes),
             // Espelha validações do backend (MedicalRecordFilesController::store)
-            'max_file_size_bytes'  => 10 * 1024 * 1024,
-            'max_files_per_batch'  => 10,
-            'accept'               => '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
-            'accept_mimes'         => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
+            'max_file_size_bytes' => 10 * 1024 * 1024,
+            'max_files_per_batch' => 10,
+            'accept'              => '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
+            'accept_mimes'        => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
         ];
     }
 
@@ -570,35 +628,39 @@ class MedicalRecordsController extends Controller
     private function buildFormUrls(Patient $patient, ?MedicalRecord $record, bool $isEdit): array
     {
         $urls = [
-            'store'                => route('panel.patients.medicalrecords.store', $patient),
-            'list'                 => route('panel.patients.medicalrecords.index', $patient),
-            'create'               => route('panel.patients.medicalrecords.create', $patient),
-            'validation_rules'     => route('panel.medical-records.validation-rules', ['mode' => $isEdit ? 'update' : 'store']),
-            'calc_presbyopia'      => route('panel.patients.medicalrecords.calculate-presbyopia', $patient),
-            'lens_format'          => route('panel.medicalrecords.lens-format'),
-            'tonometry_pdf'        => route('panel.patients.tonometry-pdf', $patient),
-            'medicine_search'      => route('panel.medicines.search'),
-            'medication_format'    => route('panel.medication-prescription.format-line'),
-            'procedure_search'     => route('panel.procedures.search'),
-            'indication_search'    => route('panel.indications.search'),
-            'procedure_format'     => route('panel.procedure-solicitation.format-line'),
-            'cid10_search'         => route('panel.cid10.search'),
+            'store'             => route('panel.patients.medicalrecords.store', $patient),
+            'list'              => route('panel.patients.medicalrecords.index', $patient),
+            'create'            => route('panel.patients.medicalrecords.create', $patient),
+            'validation_rules'  => route('panel.medical-records.validation-rules', ['mode' => $isEdit ? 'update' : 'store']),
+            'calc_presbyopia'   => route('panel.patients.medicalrecords.calculate-presbyopia', $patient),
+            'lens_format'       => route('panel.medicalrecords.lens-format'),
+            'tonometry_pdf'     => route('panel.patients.tonometry-pdf', $patient),
+            'medicine_search'   => route('panel.medicines.search'),
+            'medication_format' => route('panel.medication-prescription.format-line'),
+            'procedure_search'  => route('panel.procedures.search'),
+            'indication_search' => route('panel.indications.search'),
+            'procedure_format'  => route('panel.procedure-solicitation.format-line'),
+            'cid10_search'      => route('panel.cid10.search'),
         ];
 
         if ($isEdit && $record) {
-            $urls['update']             = route('panel.patients.medicalrecords.update',         [$patient, $record]);
-            $urls['destroy']            = route('panel.patients.medicalrecords.destroy',        [$patient, $record]);
-            $urls['pdf']                = route('panel.patients.medicalrecords.pdf',            [$patient, $record]);
-            $urls['templates']          = route('panel.patients.medicalrecords.templates',      [$patient, $record]);
-            $urls['template_preview']   = route('panel.patients.medicalrecords.template-preview', [$patient, $record]);
-            $urls['store_doc']          = route('panel.patients.medicalrecords.documentations.store', [$patient, $record]);
-            $urls['store_file']         = route('panel.patients.medicalrecords.files.store',    [$patient, $record]);
-            $urls['store_tonometry']    = route('panel.patients.medicalrecords.tonometry.store', [$patient, $record]);
-            $urls['quick_action_template']  = route('panel.patients.medicalrecords.quick-actions.issue',
-                [$patient, $record, '__ACTION__']);
-            $urls['exam_template_template'] = route('panel.patients.medicalrecords.exam-template',
-                [$patient, $record, '__EXAM__']);
-            $urls['day_extension_preview']  = route('panel.medical-records.day-extension-preview');
+            $urls['update']                = route('panel.patients.medicalrecords.update', [$patient, $record]);
+            $urls['destroy']               = route('panel.patients.medicalrecords.destroy', [$patient, $record]);
+            $urls['pdf']                   = route('panel.patients.medicalrecords.pdf', [$patient, $record]);
+            $urls['templates']             = route('panel.patients.medicalrecords.templates', [$patient, $record]);
+            $urls['template_preview']      = route('panel.patients.medicalrecords.template-preview', [$patient, $record]);
+            $urls['store_doc']             = route('panel.patients.medicalrecords.documentations.store', [$patient, $record]);
+            $urls['store_file']            = route('panel.patients.medicalrecords.files.store', [$patient, $record]);
+            $urls['store_tonometry']       = route('panel.patients.medicalrecords.tonometry.store', [$patient, $record]);
+            $urls['quick_action_template'] = route(
+                'panel.patients.medicalrecords.quick-actions.issue',
+                [$patient, $record, '__ACTION__'],
+            );
+            $urls['exam_template_template'] = route(
+                'panel.patients.medicalrecords.exam-template',
+                [$patient, $record, '__EXAM__'],
+            );
+            $urls['day_extension_preview'] = route('panel.medical-records.day-extension-preview');
         }
 
         return $urls;
@@ -606,8 +668,8 @@ class MedicalRecordsController extends Controller
 
     /**
      * @template T of \Illuminate\Database\Eloquent\Model
-     * @param \Illuminate\Support\Collection<int,T> $collection
-     * @param  callable|null  $mapper
+     *
+     * @param Collection<int,T> $collection
      */
     private function serializeCatalog($collection, ?callable $mapper = null): array
     {
@@ -622,18 +684,18 @@ class MedicalRecordsController extends Controller
     private function serializePatient(Patient $patient): array
     {
         return [
-            'id'             => (string) $patient->id,
-            'code'           => $patient->code,
-            'full_name'      => $patient->person?->full_name,
-            'birth_date'     => $patient->person?->birth_date?->format('d/m/Y'),
-            'age'            => $patient->person?->birth_date?->age,
-            'gender'         => $patient->person?->gender,
-            'cpf'            => $patient->person?->cpf,
-            'phone'          => $patient->person?->cellphone ?? $patient->person?->telephone,
-            'email'          => $patient->person?->email,
-            'covenant_name'  => $patient->covenant?->name,
-            'skin_type'      => $patient->skinType?->name,
-            'iris_type'      => $patient->irisType?->name,
+            'id'            => (string) $patient->id,
+            'code'          => $patient->code,
+            'full_name'     => $patient->person?->full_name,
+            'birth_date'    => $patient->person?->birth_date?->format('d/m/Y'),
+            'age'           => $patient->person?->birth_date?->age,
+            'gender'        => $patient->person?->gender,
+            'cpf'           => $patient->person?->cpf,
+            'phone'         => $patient->person?->cellphone ?? $patient->person?->telephone,
+            'email'         => $patient->person?->email,
+            'covenant_name' => $patient->covenant?->name,
+            'skin_type'     => $patient->skinType?->name,
+            'iris_type'     => $patient->irisType?->name,
         ];
     }
 
@@ -645,36 +707,36 @@ class MedicalRecordsController extends Controller
     {
         return [
             // Identificação
-            'id'    => (string) $r->id,
-            'code'  => $r->code,
-            'doctor_id' => $r->doctor_id ? (string) $r->doctor_id : null,
+            'id'          => (string) $r->id,
+            'code'        => $r->code,
+            'doctor_id'   => $r->doctor_id ? (string) $r->doctor_id : null,
             'doctor_name' => $r->doctor?->person?->full_name,
 
             // Anamnese
-            'main_complaint'           => $r->main_complaint,
-            'hda'                      => $r->hda,
-            'diabetic'                 => (bool) $r->diabetic,
-            'diabetic_family'          => (bool) $r->diabetic_family,
-            'hypertensive'             => (bool) $r->hypertensive,
-            'hypertensive_family'      => (bool) $r->hypertensive_family,
-            'glaucomatous'             => (bool) $r->glaucomatous,
-            'glaucomatous_family'      => (bool) $r->glaucomatous_family,
-            'others_history'           => $r->others_history,
-            'ocular_surgical_history'  => $r->ocular_surgical_history,
-            'medications_in_use'       => $r->medications_in_use,
+            'main_complaint'          => $r->main_complaint,
+            'hda'                     => $r->hda,
+            'diabetic'                => (bool) $r->diabetic,
+            'diabetic_family'         => (bool) $r->diabetic_family,
+            'hypertensive'            => (bool) $r->hypertensive,
+            'hypertensive_family'     => (bool) $r->hypertensive_family,
+            'glaucomatous'            => (bool) $r->glaucomatous,
+            'glaucomatous_family'     => (bool) $r->glaucomatous_family,
+            'others_history'          => $r->others_history,
+            'ocular_surgical_history' => $r->ocular_surgical_history,
+            'medications_in_use'      => $r->medications_in_use,
 
             // Acuidade visual e refração
-            'visual_acuity_type_id'                       => $r->visual_acuity_type_id ? (string) $r->visual_acuity_type_id : null,
-            'visual_acuity_without_correction_right_id'   => $r->visual_acuity_without_correction_right_id ? (string) $r->visual_acuity_without_correction_right_id : null,
-            'visual_acuity_without_correction_left_id'    => $r->visual_acuity_without_correction_left_id ? (string) $r->visual_acuity_without_correction_left_id : null,
-            'visual_acuity_with_correction_right_id'      => $r->visual_acuity_with_correction_right_id ? (string) $r->visual_acuity_with_correction_right_id : null,
-            'visual_acuity_with_correction_left_id'       => $r->visual_acuity_with_correction_left_id ? (string) $r->visual_acuity_with_correction_left_id : null,
-            'near_point_convergence_id' => $r->near_point_convergence_id ? (string) $r->near_point_convergence_id : null,
-            'cover_test_type_id'        => $r->cover_test_type_id ? (string) $r->cover_test_type_id : null,
-            'color_vision_type_id'      => $r->color_vision_type_id ? (string) $r->color_vision_type_id : null,
-            'addition_type_id'          => $r->addition_type_id ? (string) $r->addition_type_id : null,
-            'lens_away_id'              => $r->lens_away_id ? (string) $r->lens_away_id : null,
-            'lens_near_id'              => $r->lens_near_id ? (string) $r->lens_near_id : null,
+            'visual_acuity_type_id'                     => $r->visual_acuity_type_id ? (string) $r->visual_acuity_type_id : null,
+            'visual_acuity_without_correction_right_id' => $r->visual_acuity_without_correction_right_id ? (string) $r->visual_acuity_without_correction_right_id : null,
+            'visual_acuity_without_correction_left_id'  => $r->visual_acuity_without_correction_left_id ? (string) $r->visual_acuity_without_correction_left_id : null,
+            'visual_acuity_with_correction_right_id'    => $r->visual_acuity_with_correction_right_id ? (string) $r->visual_acuity_with_correction_right_id : null,
+            'visual_acuity_with_correction_left_id'     => $r->visual_acuity_with_correction_left_id ? (string) $r->visual_acuity_with_correction_left_id : null,
+            'near_point_convergence_id'                 => $r->near_point_convergence_id ? (string) $r->near_point_convergence_id : null,
+            'cover_test_type_id'                        => $r->cover_test_type_id ? (string) $r->cover_test_type_id : null,
+            'color_vision_type_id'                      => $r->color_vision_type_id ? (string) $r->color_vision_type_id : null,
+            'addition_type_id'                          => $r->addition_type_id ? (string) $r->addition_type_id : null,
+            'lens_away_id'                              => $r->lens_away_id ? (string) $r->lens_away_id : null,
+            'lens_near_id'                              => $r->lens_near_id ? (string) $r->lens_near_id : null,
 
             // Refração dinâmica
             'dynamic_spherical_right'   => $r->dynamic_spherical_right,
@@ -693,14 +755,14 @@ class MedicalRecordsController extends Controller
             'static_axis_left'         => $r->static_axis_left,
 
             // Exame físico
-            'ocular_motility'   => $r->ocular_motility,
-            'tonometer_right'   => $r->tonometer_right,
-            'tonometer_left'    => $r->tonometer_left,
-            'tonometer_time'    => $r->tonometer_time,
-            'pachymetry_right'  => $r->pachymetry_right,
-            'pachymetry_left'   => $r->pachymetry_left,
-            'gonioscopy_right'  => $r->gonioscopy_right,
-            'gonioscopy_left'   => $r->gonioscopy_left,
+            'ocular_motility'  => $r->ocular_motility,
+            'tonometer_right'  => $r->tonometer_right,
+            'tonometer_left'   => $r->tonometer_left,
+            'tonometer_time'   => $r->tonometer_time,
+            'pachymetry_right' => $r->pachymetry_right,
+            'pachymetry_left'  => $r->pachymetry_left,
+            'gonioscopy_right' => $r->gonioscopy_right,
+            'gonioscopy_left'  => $r->gonioscopy_left,
 
             // Achados
             'biomicroscopy_right'   => $r->biomicroscopy_right,
@@ -711,9 +773,9 @@ class MedicalRecordsController extends Controller
             'observation_of_lenses' => $r->observation_of_lenses,
 
             // Diagnóstico & conduta
-            'diagnosis_cids'    => $r->diagnosis_cids ?? [],
-            'clinical_conduct'  => $r->clinical_conduct,
-            'follow_up_days'    => $r->follow_up_days,
+            'diagnosis_cids'   => $r->diagnosis_cids ?? [],
+            'clinical_conduct' => $r->clinical_conduct,
+            'follow_up_days'   => $r->follow_up_days,
 
             // Compliance CFM
             'is_signed'           => $r->isSigned(),
@@ -728,8 +790,10 @@ class MedicalRecordsController extends Controller
                 'title'       => $d->title,
                 'doctor_name' => $d->doctor?->person?->full_name ?? '',
                 'created_at'  => $d->created_at?->format('d/m/Y H:i'),
-                'pdf_url'     => route('panel.patients.medicalrecords.documentations.pdf',
-                    [$r->patient_id, $r, $d]),
+                'pdf_url'     => route(
+                    'panel.patients.medicalrecords.documentations.pdf',
+                    [$r->patient_id, $r, $d],
+                ),
             ])->all(),
 
             // Anexos já enviados — consumido pela lista no rodapé do form
@@ -739,8 +803,10 @@ class MedicalRecordsController extends Controller
                 'mime_type'     => $f->mime_type,
                 'file_size'     => $f->file_size,
                 'is_image'      => $f->isImage(),
-                'show_url'      => route('panel.patients.medicalrecords.files.show',
-                    [$r->patient_id, $r, $f]),
+                'show_url'      => route(
+                    'panel.patients.medicalrecords.files.show',
+                    [$r->patient_id, $r, $f],
+                ),
             ])->all(),
         ];
     }

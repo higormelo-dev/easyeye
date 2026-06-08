@@ -101,8 +101,8 @@ class PanelNavigation
         }
 
         if ($isAdmin) {
-            $entityId = (string) session('selected_entity_id');
-            $featureGate = app(FeatureGateService::class);
+            $entityId          = (string) session('selected_entity_id');
+            $featureGate       = app(FeatureGateService::class);
             $canSeeOwnGateways = $entityId !== ''
                 && $featureGate->can($entityId, FeatureKey::HasOwnPaymentGateways);
 

@@ -14,8 +14,8 @@ enum BillingEventType: string
     case SubscriptionCancelled    = 'subscription_cancelled';
     case SubscriptionPastDue      = 'subscription_past_due';
     case SubscriptionExpired      = 'subscription_expired';
-    case ChargebackReceived        = 'chargeback_received';
-    case GatewayFallbackTriggered  = 'gateway_fallback_triggered';
-    case GatewayFallbackSucceeded  = 'gateway_fallback_succeeded';
-    case GatewayFallbackFailed     = 'gateway_fallback_failed';
+    case ChargebackReceived       = 'chargeback_received';
+    case GatewayFallbackTriggered = 'gateway_fallback_triggered';
+    case GatewayFallbackSucceeded = 'gateway_fallback_succeeded';
+    case GatewayFallbackFailed    = 'gateway_fallback_failed';
 }

@@ -80,13 +80,13 @@ final class ProviderErrorSanitizer
         $redacted = preg_replace(
             '/((?:content(?:\s+snippet)?|prompt|input|mensagem|message|snippet|trecho)\s*[:=]\s*)"(?:[^"\\\\]|\\\\.)*"/iu',
             '$1"[REDACTED:PAYLOAD]"',
-            $redacted
+            $redacted,
         ) ?? $redacted;
 
         $redacted = preg_replace(
             "/((?:content(?:\\s+snippet)?|prompt|input|mensagem|message|snippet|trecho)\\s*[:=]\\s*)'(?:[^'\\\\]|\\\\.)*'/iu",
             "$1'[REDACTED:PAYLOAD]'",
-            $redacted
+            $redacted,
         ) ?? $redacted;
 
         return $redacted;

@@ -179,7 +179,7 @@ class DoctorWorkScheduleController extends Controller
             DoctorWorkSchedule::where('doctor_id', $doctor->id)->delete();
 
             foreach ($request->input('days') as $dayData) {
-                if (!$dayData['active']) {
+                if (! $dayData['active']) {
                     continue;
                 }
 

@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Exceptions\InsufficientAiCreditsException;
-use App\Domains\AI\Models\AiCreditLedgerEntry;
-use App\Domains\AI\Models\AiCreditWallet;
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet};
 use App\Enums\AI\{AiLedgerEntryType, AiProvider};
 use App\Enums\FeatureKey;
 use App\Models\Subscription;
@@ -81,8 +80,8 @@ class AiCreditWalletService
                 idempotencyKey: $idempotencyKey,
                 createdBy: $createdBy,
                 metadata: array_merge($metadata ?? [], [
-                    'kind'              => 'monthly_quota',
-                    'period_ends_at'    => $periodEndsAt->toAtomString(),
+                    'kind'           => 'monthly_quota',
+                    'period_ends_at' => $periodEndsAt->toAtomString(),
                 ]),
             );
         });
@@ -107,7 +106,7 @@ class AiCreditWalletService
             return null;
         }
 
-        $endsAt    = $subscription->ends_at
+        $endsAt = $subscription->ends_at
             ? CarbonImmutable::parse($subscription->ends_at)
             : CarbonImmutable::now()->addMonth();
         $periodKey = $endsAt->toDateString();
@@ -155,8 +154,8 @@ class AiCreditWalletService
                 return $existing;
             }
 
-            $wallet                      = $this->lockWallet($entityId);
-            $wallet->balance            += $amount;
+            $wallet = $this->lockWallet($entityId);
+            $wallet->balance += $amount;
             $wallet->lifetime_purchased += $amount;
             $wallet->save();
 
@@ -248,8 +247,8 @@ class AiCreditWalletService
                 return $existing;
             }
 
-            $wallet           = $this->lockWallet($entityId);
-            $wallet->balance  = max(0, $wallet->balance + $delta);
+            $wallet          = $this->lockWallet($entityId);
+            $wallet->balance = max(0, $wallet->balance + $delta);
             $wallet->save();
 
             return $this->createLedgerEntry(
@@ -315,7 +314,7 @@ class AiCreditWalletService
             }
 
             if ($fromBalance > 0) {
-                $wallet->balance          -= $fromBalance;
+                $wallet->balance -= $fromBalance;
                 $wallet->reserved_balance += $fromBalance;
             }
 
@@ -381,21 +380,21 @@ class AiCreditWalletService
                 // o consume só precisa baixar o reserved_balance até o limite.
                 // Se ainda exceder, lança erro (algo desincronizado).
                 if ($wallet->reserved_balance < $amount && $amount > $wallet->reserved_balance) {
-                    $reservedDelta = $wallet->reserved_balance;
+                    $reservedDelta            = $wallet->reserved_balance;
                     $wallet->reserved_balance = 0;
                 } else {
                     $reservedDelta = $amount;
                     $wallet->reserved_balance -= $amount;
                 }
             } else {
-                $reservedDelta            = $amount;
+                $reservedDelta = $amount;
                 $wallet->reserved_balance -= $amount;
             }
 
             $wallet->lifetime_consumed += $amount;
 
             if ($provider !== null) {
-                $col = "lifetime_consumed_{$provider->value}";
+                $col            = "lifetime_consumed_{$provider->value}";
                 $wallet->{$col} = (int) $wallet->{$col} + $amount;
             }
 
@@ -453,20 +452,22 @@ class AiCreditWalletService
 
             // Devolve primeiro à cota se houve consumo dela neste ciclo (e não expirou).
             $toQuota = 0;
+
             if (! $wallet->quotaExpired() && $wallet->monthly_quota_used > 0) {
-                $toQuota                     = min($amount, $wallet->monthly_quota_used);
+                $toQuota = min($amount, $wallet->monthly_quota_used);
                 $wallet->monthly_quota_used -= $toQuota;
             }
 
             $toBalance = $amount - $toQuota;
+
             if ($toBalance > 0) {
                 if ($wallet->reserved_balance < $toBalance) {
                     throw new InvalidArgumentException(
-                        "Tentativa de liberação maior que o reservado. Reservado: {$wallet->reserved_balance}; solicitado adicional: {$toBalance}."
+                        "Tentativa de liberação maior que o reservado. Reservado: {$wallet->reserved_balance}; solicitado adicional: {$toBalance}.",
                     );
                 }
                 $wallet->reserved_balance -= $toBalance;
-                $wallet->balance          += $toBalance;
+                $wallet->balance += $toBalance;
             }
 
             $wallet->save();
@@ -519,7 +520,7 @@ class AiCreditWalletService
                 return $existing;
             }
 
-            $wallet           = $this->lockWallet($entityId);
+            $wallet = $this->lockWallet($entityId);
             $wallet->balance += $amount;
             $wallet->save();
 
@@ -565,6 +566,7 @@ class AiCreditWalletService
         );
 
         $consumedByProvider = [];
+
         foreach (AiProvider::cases() as $provider) {
             $consumedByProvider[$provider->value] = $wallet->lifetimeConsumedFor($provider);
         }
@@ -652,18 +654,18 @@ class AiCreditWalletService
         ?array $metadata = null,
     ): AiCreditLedgerEntry {
         return AiCreditLedgerEntry::query()->create([
-            'entity_id'        => $wallet->entity_id,
-            'wallet_id'        => $wallet->id,
-            'subscription_id'  => $subscriptionId,
-            'ai_run_id'        => $aiRunId,
-            'type'             => $type->value,
-            'provider'         => $provider?->value,
-            'amount'           => $amount,
-            'balance_after'    => (int) $wallet->balance,
-            'description'      => $description,
-            'metadata'         => $metadata,
-            'idempotency_key'  => $idempotencyKey,
-            'created_by'       => $createdBy,
+            'entity_id'       => $wallet->entity_id,
+            'wallet_id'       => $wallet->id,
+            'subscription_id' => $subscriptionId,
+            'ai_run_id'       => $aiRunId,
+            'type'            => $type->value,
+            'provider'        => $provider?->value,
+            'amount'          => $amount,
+            'balance_after'   => (int) $wallet->balance,
+            'description'     => $description,
+            'metadata'        => $metadata,
+            'idempotency_key' => $idempotencyKey,
+            'created_by'      => $createdBy,
         ]);
     }
 

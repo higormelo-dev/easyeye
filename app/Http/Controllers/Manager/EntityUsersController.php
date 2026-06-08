@@ -6,8 +6,7 @@ namespace App\Http\Controllers\Manager;
 
 use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
-use App\Models\Entity;
-use App\Models\EntityUser;
+use App\Models\{Entity, EntityUser};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -40,7 +39,7 @@ class EntityUsersController extends Controller
             $lower = mb_strtolower($search, 'UTF-8');
             $query->where(function ($q) use ($lower): void {
                 $q->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
-                  ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
+                    ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
             });
         }
 
@@ -54,7 +53,7 @@ class EntityUsersController extends Controller
         $isImpersonating = session()->has('impersonating');
 
         return Inertia::render('Panel/Manager/EntityUsers/Index', [
-            'entity'          => [
+            'entity' => [
                 'id'   => $entity->id,
                 'code' => $entity->code,
                 'name' => $entity->name,

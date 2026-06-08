@@ -43,10 +43,10 @@ class CircuitBreakerService
         }
 
         $breaker->update([
-            'state'            => 'closed',
-            'failure_count'    => 0,
-            'open_until'       => null,
-            'last_trigger_type'=> null,
+            'state'             => 'closed',
+            'failure_count'     => 0,
+            'open_until'        => null,
+            'last_trigger_type' => null,
         ]);
     }
 
@@ -60,7 +60,7 @@ class CircuitBreakerService
             ['state' => 'closed', 'failure_count' => 0, 'failure_threshold' => $this->threshold],
         );
 
-        $newCount = $breaker->failure_count + 1;
+        $newCount   = $breaker->failure_count + 1;
         $shouldOpen = $newCount >= ($breaker->failure_threshold ?: $this->threshold);
 
         $breaker->update([
@@ -73,11 +73,11 @@ class CircuitBreakerService
 
         if ($shouldOpen) {
             Log::warning('CircuitBreaker: circuito aberto.', [
-                'gateway'     => $gatewayCode,
-                'entity_id'   => $entityId,
-                'failures'    => $newCount,
-                'open_until'  => now()->addSeconds($this->cooldownSeconds)->toIso8601String(),
-                'trigger'     => $triggerType,
+                'gateway'    => $gatewayCode,
+                'entity_id'  => $entityId,
+                'failures'   => $newCount,
+                'open_until' => now()->addSeconds($this->cooldownSeconds)->toIso8601String(),
+                'trigger'    => $triggerType,
             ]);
         }
     }

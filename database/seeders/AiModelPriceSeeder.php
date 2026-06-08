@@ -121,7 +121,7 @@ class AiModelPriceSeeder extends Seeder
                     'tool_call_usd'             => $price['tool_call_usd'],
                     'effective_until'           => null,
                     'active'                    => true,
-                ]
+                ],
             );
         }
     }

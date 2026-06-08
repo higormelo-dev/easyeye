@@ -9,6 +9,12 @@ return [
     'feature_unavailable'                   => 'Seu plano atual não possui funcionalidades de IA habilitadas.',
     'feature_exam_unavailable'              => 'Seu plano não possui o assistente de exame com IA.',
     'feature_report_unavailable'            => 'Seu plano não possui elaboração de laudo com IA.',
+    'feature_eye_image_unavailable'         => 'Seu plano não possui análise de imagem ocular com IA.',
+    'eye_image_exams_required'              => 'Selecione ao menos uma imagem para a análise com IA.',
+    'record_opened'                         => 'Prontuário aberto e laudo registrado.',
+    'record_patient_missing'                => 'Não foi possível identificar o paciente para abrir o prontuário.',
+    'record_doctor_required'                => 'Apenas um médico pode abrir um prontuário para registrar o laudo.',
+    'record_confirm_open'                   => 'Não há prontuário do dia da consulta para este paciente. Deseja abrir um novo prontuário para registrar o laudo?',
     'feature_consensus_unavailable'         => 'Seu plano atual não possui acesso à revisão inteligente de consistência.',
     'consensus_disabled'                    => 'A revisão inteligente de consistência está desabilitada nesta instância.',
     'mode_unavailable'                      => 'Este modo de IA não está disponível no plano atual.',
@@ -29,6 +35,7 @@ return [
     'run_network_error'                     => 'Erro de rede ao criar execução.',
     'approve'                               => 'Aprovar',
     'reject'                                => 'Rejeitar',
+    'processing'                            => 'Processando análise...',
     'credits_available'                     => 'Créditos disponíveis',
     'credits_requested'                     => 'Solicitado',
     'credits_reserved'                      => 'Reservados',
@@ -87,6 +94,10 @@ return [
     'workflow_exam_assistant'               => 'Assistente de exame',
     'workflow_report_drafting'              => 'Rascunho de laudo',
     'workflow_consensus_review'             => 'Revisão de consistência',
+    'workflow_eye_image_analysis'           => 'Análise de imagem ocular',
+
+    // Prompt de sistema (server-side) da análise de imagem ocular.
+    'eye_image_system_prompt' => 'Você é um oftalmologista experiente analisando imagens oculares (retinografia, OCT, biomicroscopia, topografia, etc.) como APOIO ao médico — nunca como decisão final. Descreva os achados de forma estruturada por estrutura anatômica (disco óptico, mácula, vasos, periferia, córnea, etc.) e por lateralidade (OD = olho direito, OE = olho esquerdo) quando informada. Use linguagem técnica, objetiva e SEMPRE condicional ("achados compatíveis com", "sugestivo de"), sem diagnóstico definitivo, sem prescrição e sem se dirigir ao paciente. Liste hipóteses em ordem de probabilidade e recomende correlação clínica e confirmação presencial. Se a imagem tiver qualidade insuficiente, declare isso. Responda no idioma do prontuário/paciente.',
 
     'credit_purchase_status' => [
         'pending_payment' => 'Aguardando pagamento',

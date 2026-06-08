@@ -34,12 +34,12 @@ return [
     'action_delete'  => 'Excluir',
 
     // Form labels
-    'form_title_create'   => 'Novo Modelo de Documento',
-    'form_title_edit'     => 'Editar Modelo de Documento',
-    'tab_general'         => 'Geral',
-    'tab_header'          => 'Cabeçalho',
-    'tab_signature'       => 'Assinatura',
-    'tab_footer'          => 'Rodapé',
+    'form_title_create' => 'Novo Modelo de Documento',
+    'form_title_edit'   => 'Editar Modelo de Documento',
+    'tab_general'       => 'Geral',
+    'tab_header'        => 'Cabeçalho',
+    'tab_signature'     => 'Assinatura',
+    'tab_footer'        => 'Rodapé',
 
     'field_title'         => 'Título',
     'field_category'      => 'Categoria',

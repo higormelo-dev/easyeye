@@ -50,6 +50,7 @@ class ManagerDashboardService
                 ->toArray();
 
             $subscriptionCounts = [];
+
             foreach (SubscriptionStatus::cases() as $status) {
                 $subscriptionCounts[$status->value] = $byStatus[$status->value] ?? 0;
             }
@@ -122,19 +123,19 @@ class ManagerDashboardService
                     ->where(function ($q) use ($endOfMonth) {
                         // Iniciou antes ou durante este mês
                         $q->where('subscriptions.starts_at', '<=', $endOfMonth)
-                          ->orWhere(function ($q2) use ($endOfMonth) {
-                              $q2->whereNull('subscriptions.starts_at')
-                                 ->where('subscriptions.created_at', '<=', $endOfMonth);
-                          });
+                            ->orWhere(function ($q2) use ($endOfMonth) {
+                                $q2->whereNull('subscriptions.starts_at')
+                                    ->where('subscriptions.created_at', '<=', $endOfMonth);
+                            });
                     })
                     ->where(function ($q) use ($startOfMonth) {
                         // Ainda não havia cancelado/expirado no início do mês
                         $q->whereNull('subscriptions.cancelled_at')
-                          ->orWhere('subscriptions.cancelled_at', '>', $startOfMonth);
+                            ->orWhere('subscriptions.cancelled_at', '>', $startOfMonth);
                     })
                     ->where(function ($q) use ($startOfMonth) {
                         $q->whereNull('subscriptions.ends_at')
-                          ->orWhere('subscriptions.ends_at', '>', $startOfMonth);
+                            ->orWhere('subscriptions.ends_at', '>', $startOfMonth);
                     })
                     ->join('plans', 'subscriptions.plan_id', '=', 'plans.id')
                     ->sum('plans.price');
@@ -186,9 +187,14 @@ class ManagerDashboardService
                 : 0.0;
 
             return compact(
-                'totalLeads', 'totalTrials', 'totalActive',
-                'leadToTrialRate', 'trialToActiveRate',
-                'trialsEnded90d', 'trialsConverted90d', 'trialToPaid90dRate',
+                'totalLeads',
+                'totalTrials',
+                'totalActive',
+                'leadToTrialRate',
+                'trialToActiveRate',
+                'trialsEnded90d',
+                'trialsConverted90d',
+                'trialToPaid90dRate',
             );
         });
     }
@@ -292,14 +298,15 @@ class ManagerDashboardService
     {
         return Cache::remember('mgr_dashboard.partners_summary', self::CACHE_TTL, function () {
             $leadsByStatus = [];
+
             foreach (PartnerLeadStatus::cases() as $status) {
                 $leadsByStatus[$status->value] = PartnerLead::where('status', $status->value)->count();
             }
 
             return [
-                'totalPartners'       => Partner::count(),
-                'totalLeads'          => PartnerLead::count(),
-                'leadsActive'         => PartnerLead::whereIn('status', [
+                'totalPartners' => Partner::count(),
+                'totalLeads'    => PartnerLead::count(),
+                'leadsActive'   => PartnerLead::whereIn('status', [
                     PartnerLeadStatus::New->value,
                     PartnerLeadStatus::Contacted->value,
                     PartnerLeadStatus::Trial->value,
@@ -346,6 +353,7 @@ class ManagerDashboardService
     private function batchActivationScores(array $entityIds, ActivationService $activationService): array
     {
         $scores = [];
+
         foreach ($entityIds as $id) {
             $scores[$id] = $activationService->getScore($id);
         }

@@ -90,7 +90,7 @@ class ResourceWorkScheduleController extends Controller
             ResourceWorkSchedule::where('resource_id', $resource->id)->delete();
 
             foreach ($request->input('days') as $dayData) {
-                if (!$dayData['active']) {
+                if (! $dayData['active']) {
                     continue;
                 }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Doctor;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateMedicalRecordRequest extends FormRequest
@@ -31,10 +32,11 @@ class UpdateMedicalRecordRequest extends FormRequest
 
         if (! $this->filled('doctor_id')) {
             $entityId = session('selected_entity_id');
-            $doctor   = \App\Models\Doctor::whereHas('entityUser', fn ($q) => $q
+            $doctor   = Doctor::whereHas('entityUser', fn ($q) => $q
                 ->where('entity_id', $entityId)
                 ->where('user_id', auth()->id()))
                 ->first();
+
             if ($doctor) {
                 $payload['doctor_id'] = $doctor->id;
             }
@@ -45,6 +47,7 @@ class UpdateMedicalRecordRequest extends FormRequest
         // validação rodar a regra `array`.
         if ($this->has('diagnosis_cids')) {
             $cids = $this->input('diagnosis_cids');
+
             if (is_string($cids)) {
                 $decoded                   = json_decode($cids, true);
                 $payload['diagnosis_cids'] = is_array($decoded) ? $decoded : [];

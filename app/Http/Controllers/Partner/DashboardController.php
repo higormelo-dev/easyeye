@@ -33,7 +33,7 @@ class DashboardController extends Controller
             ->get();
 
         return Inertia::render('Portal/Dashboard', [
-            'metrics' => $metrics,
+            'metrics'     => $metrics,
             'recentLeads' => $recentLeads->map(fn (PartnerLead $l) => [
                 'id'           => (string) $l->id,
                 'name'         => $l->name,

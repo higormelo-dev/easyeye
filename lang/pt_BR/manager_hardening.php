@@ -9,19 +9,19 @@ return [
     'reason_max'      => 'A justificativa não pode ultrapassar :max caracteres.',
 
     // Modal de confirmação destrutiva (Vue)
-    'modal_title'        => 'Confirmar ação',
-    'modal_warning'      => 'Esta ação é registrada no log de auditoria e não pode ser desfeita silenciosamente.',
-    'modal_reason_label' => 'Justificativa (LGPD/CFM)',
-    'modal_reason_hint'  => 'Descreva por que esta ação está sendo executada. Mínimo 20 caracteres. Será registrado no audit trail.',
+    'modal_title'              => 'Confirmar ação',
+    'modal_warning'            => 'Esta ação é registrada no log de auditoria e não pode ser desfeita silenciosamente.',
+    'modal_reason_label'       => 'Justificativa (LGPD/CFM)',
+    'modal_reason_hint'        => 'Descreva por que esta ação está sendo executada. Mínimo 20 caracteres. Será registrado no audit trail.',
     'modal_reason_placeholder' => 'Ex.: Solicitação do cliente via ticket #1234 — cancelamento por inadimplência após 3 tentativas de retry.',
-    'modal_cancel'       => 'Cancelar',
-    'modal_confirm'      => 'Confirmar',
-    'modal_counter'      => ':current / :min mínimo',
+    'modal_cancel'             => 'Cancelar',
+    'modal_confirm'            => 'Confirmar',
+    'modal_counter'            => ':current / :min mínimo',
 
     // 2FA (preparação)
-    'two_factor_required' => 'Autenticação em dois fatores é obrigatória para administradores SaaS.',
+    'two_factor_required'           => 'Autenticação em dois fatores é obrigatória para administradores SaaS.',
     'two_factor_required_by_entity' => 'A empresa ":entity" exige autenticação em dois fatores para todos os usuários.',
-    'two_factor_invalid'  => 'Código de verificação inválido ou expirado.',
+    'two_factor_invalid'            => 'Código de verificação inválido ou expirado.',
 
     // Settings de 2FA por empresa (admin clínica/SaaS configura)
     'entity_2fa_section'        => 'Autenticação em dois fatores',

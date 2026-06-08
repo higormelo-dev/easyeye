@@ -25,7 +25,7 @@ class PeopleFactory extends Factory
         $firstName = $nameParts[0];
 
         foreach ($nameParts as $part) {
-            if (!in_array($part, $titlesToIgnore)) {
+            if (! in_array($part, $titlesToIgnore)) {
                 $firstName = $part;
 
                 break;
@@ -62,7 +62,6 @@ class PeopleFactory extends Factory
             'photo'                  => fake()->optional(0.4)->imageUrl(200, 200, 'people'),
             'latitude'               => fake()->latitude(-33.7683777, 5.2842873),
             'longitude'              => fake()->longitude(-73.9872354, -28.6341773),
-
         ];
     }
 }

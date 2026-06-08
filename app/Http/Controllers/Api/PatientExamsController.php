@@ -9,9 +9,10 @@ use App\Http\Resources\PatientExamResource;
 use App\Models\{Patient, PatientExam};
 use App\Services\Api\PatientExamService;
 use App\Services\FeatureGateService;
-use Illuminate\Http\{JsonResponse};
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Throwable;
 
 class PatientExamsController extends Controller
 {
@@ -88,7 +89,7 @@ class PatientExamsController extends Controller
 
         abort_unless(
             Patient::where('id', $patientId)->where('entity_id', $entityId)->exists(),
-            404
+            404,
         );
 
         $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
@@ -117,7 +118,7 @@ class PatientExamsController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function update(PatientExamRequest $request, string $patientId, string $idOrCode): PatientExamResource|JsonResponse
     {
@@ -128,7 +129,7 @@ class PatientExamsController extends Controller
 
         abort_unless(
             Patient::where('id', $patientId)->where('entity_id', $entityId)->exists(),
-            404
+            404,
         );
 
         $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
@@ -159,7 +160,7 @@ class PatientExamsController extends Controller
     private function resolvePatient(string $idOrCode, string $entityId): Patient
     {
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
@@ -33,13 +33,13 @@ class EnsureUserBelongsToEntity
     {
         $entity = $this->resolveEntity($request);
 
-        if (!$entity) {
+        if (! $entity) {
             return $this->deny($request, __('http-statuses.404'));
         }
 
         $user = $request->user();
 
-        if (!$user || !$user->canAccessEntity($entity)) {
+        if (! $user || ! $user->canAccessEntity($entity)) {
             return $this->deny($request, __('http-statuses.403'));
         }
 

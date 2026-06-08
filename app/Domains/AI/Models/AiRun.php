@@ -4,20 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Models;
 
-use App\Enums\AI\AiRiskLevel;
-use App\Enums\AI\AiRunMode;
-use App\Enums\AI\AiRunStatus;
-use App\Models\Entity;
-use App\Models\MedicalRecord;
-use App\Models\MedicalRecordDocumentation;
-use App\Models\Patient;
-use App\Models\User;
+use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
+use App\Models\{Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, User};
 use App\Traits\Auditable;
+use Database\Factories\AI\AiRunFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany, HasMany};
 
 class AiRun extends Model
 {
@@ -96,6 +90,15 @@ class AiRun extends Model
         return $this->hasMany(AiRunProviderCall::class, 'ai_run_id');
     }
 
+    /**
+     * Exames de imagem ocular analisados por esta execução (módulo Eye Image).
+     */
+    public function exams(): BelongsToMany
+    {
+        return $this->belongsToMany(PatientExam::class, 'ai_run_patient_exam', 'ai_run_id', 'patient_exam_id')
+            ->withPivot('entity_id');
+    }
+
     public function ledgerEntries(): HasMany
     {
         return $this->hasMany(AiCreditLedgerEntry::class, 'ai_run_id');
@@ -110,8 +113,8 @@ class AiRun extends Model
         return $this->hasMany(MedicalRecordDocumentation::class, 'ai_run_id');
     }
 
-    protected static function newFactory(): \Database\Factories\AI\AiRunFactory
+    protected static function newFactory(): AiRunFactory
     {
-        return \Database\Factories\AI\AiRunFactory::new();
+        return AiRunFactory::new();
     }
 }

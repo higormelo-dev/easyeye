@@ -7,10 +7,8 @@ namespace App\Domains\AI\Services;
 use App\Domains\AI\Contracts\AiModelPriceRepositoryInterface;
 use App\Domains\AI\Exceptions\AiModelPriceNotFoundException;
 use App\Domains\AI\Models\AiModelPrice;
-use App\DTOs\AI\AiCreditEstimateData;
-use App\DTOs\AI\AiProviderResponseData;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiRunMode;
+use App\DTOs\AI\{AiCreditEstimateData, AiProviderResponseData};
+use App\Enums\AI\{AiProvider, AiRunMode};
 
 class AiPricingService
 {
@@ -86,8 +84,8 @@ class AiPricingService
         $breakdown  = [];
 
         foreach ($providerResponses as $response) {
-            $usage = $response->usage;
-            $cost  = $usage->rawCostUsd;
+            $usage  = $response->usage;
+            $cost   = $usage->rawCostUsd;
             $source = 'provider_reported';
 
             if ($cost === null) {
@@ -165,10 +163,10 @@ class AiPricingService
         int $toolCallsCount,
         AiModelPrice $price,
     ): float {
-        $inputCost = ($inputTokens / 1_000_000) * (float) $price->input_usd_per_million;
-        $outputCost = ($outputTokens / 1_000_000) * (float) $price->output_usd_per_million;
+        $inputCost     = ($inputTokens / 1_000_000) * (float) $price->input_usd_per_million;
+        $outputCost    = ($outputTokens / 1_000_000) * (float) $price->output_usd_per_million;
         $reasoningCost = ($reasoningTokens / 1_000_000) * (float) ($price->reasoning_usd_per_million ?? 0);
-        $toolCost = $toolCallsCount * (float) ($price->tool_call_usd ?? 0);
+        $toolCost      = $toolCallsCount * (float) ($price->tool_call_usd ?? 0);
 
         return round($inputCost + $outputCost + $reasoningCost + $toolCost, 8);
     }
@@ -178,13 +176,13 @@ class AiPricingService
      */
     private function buildEstimate(string $workflow, AiRunMode $mode, float $rawCostUsd, array $breakdown): AiCreditEstimateData
     {
-        $rawCostUsd = round($rawCostUsd, 8);
-        $marginMultiplier = max(0.0, (float) config('ai.pricing.margin_multiplier', 2.0));
-        $usdPerCredit = max(0.000001, (float) config('ai.pricing.usd_per_credit', 0.01));
-        $costUsdWithMargin = round($rawCostUsd * $marginMultiplier, 8);
+        $rawCostUsd           = round($rawCostUsd, 8);
+        $marginMultiplier     = max(0.0, (float) config('ai.pricing.margin_multiplier', 2.0));
+        $usdPerCredit         = max(0.000001, (float) config('ai.pricing.usd_per_credit', 0.01));
+        $costUsdWithMargin    = round($rawCostUsd * $marginMultiplier, 8);
         $creditsBeforeMinimum = (int) ceil($costUsdWithMargin / $usdPerCredit);
-        $minimumCredits = $this->minimumCreditsForWorkflow($workflow);
-        $normalizedCredits = max($minimumCredits, $creditsBeforeMinimum);
+        $minimumCredits       = $this->minimumCreditsForWorkflow($workflow);
+        $normalizedCredits    = max($minimumCredits, $creditsBeforeMinimum);
 
         return new AiCreditEstimateData(
             workflow: $workflow,
@@ -204,7 +202,7 @@ class AiPricingService
     private function minimumCreditsForWorkflow(string $workflow): int
     {
         $workflowMinimum = (int) data_get(config('ai.pricing.minimum_credits_by_workflow', []), $workflow, 0);
-        $defaultMinimum = (int) config('ai.pricing.minimum_credits_default', 5);
+        $defaultMinimum  = (int) config('ai.pricing.minimum_credits_default', 5);
 
         return max(0, $workflowMinimum, $defaultMinimum);
     }

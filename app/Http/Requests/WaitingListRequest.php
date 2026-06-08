@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class WaitingListRequest extends FormRequest
@@ -19,14 +20,14 @@ class WaitingListRequest extends FormRequest
                 'required',
                 'uuid',
                 function ($attribute, $value, $fail) {
-                    $exists = \Illuminate\Support\Facades\DB::table('doctors')
+                    $exists = DB::table('doctors')
                         ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
                         ->where('doctors.id', $value)
                         ->where('entity_users.entity_id', session('selected_entity_id'))
                         ->whereNull('doctors.deleted_at')
                         ->exists();
 
-                    if (!$exists) {
+                    if (! $exists) {
                         $fail('Médico não encontrado nesta clínica.');
                     }
                 },

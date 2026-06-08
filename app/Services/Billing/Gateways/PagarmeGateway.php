@@ -14,8 +14,7 @@ use App\DTOs\Billing\{
     NormalizedWebhookEventDTO,
 };
 use App\Exceptions\Billing\GatewayIntegrationException;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Support\Facades\Http;
+use Carbon\Carbon;
 
 /**
  * Integração completa com Pagar.me v5.
@@ -35,7 +34,7 @@ class PagarmeGateway extends AbstractHttpGateway
 
     protected function authHeaders(): array
     {
-        $apiKey = (string) $this->resolveSecret();
+        $apiKey  = (string) $this->resolveSecret();
         $encoded = base64_encode($apiKey . ':');
 
         return [
@@ -68,12 +67,12 @@ class PagarmeGateway extends AbstractHttpGateway
         $phone    = preg_replace('/\D/', '', (string) $customer->phone);
 
         return array_filter([
-            'name'     => $customer->name,
-            'email'    => $customer->email,
-            'type'     => 'individual',
-            'document' => $document ?: null,
+            'name'          => $customer->name,
+            'email'         => $customer->email,
+            'type'          => 'individual',
+            'document'      => $document ?: null,
             'document_type' => $document ? $docType : null,
-            'phones'   => $phone ? [
+            'phones'        => $phone ? [
                 'mobile_phone' => [
                     'country_code' => '55',
                     'area_code'    => substr($phone, 0, 2),
@@ -197,22 +196,22 @@ class PagarmeGateway extends AbstractHttpGateway
     protected function buildChargePayload(CreateChargeDTO $payload): array
     {
         return [
-            'customer_id'     => $payload->customerId,
-            'items'           => [[
+            'customer_id' => $payload->customerId,
+            'items'       => [[
                 'amount'      => (int) round($payload->amount * 100),
                 'description' => $payload->description,
                 'quantity'    => 1,
                 'code'        => $payload->invoiceId,
             ]],
-            'payments'        => [[
+            'payments' => [[
                 'payment_method' => $this->mapPaymentMethod($payload->paymentMethod),
                 'boleto'         => $payload->paymentMethod === 'boleto' ? [
-                    'due_at'      => $payload->dueDate
-                        ? \Carbon\Carbon::parse($payload->dueDate)->endOfDay()->toIso8601String()
+                    'due_at' => $payload->dueDate
+                        ? Carbon::parse($payload->dueDate)->endOfDay()->toIso8601String()
                         : now()->addDays(3)->endOfDay()->toIso8601String(),
                     'instructions' => "Pagamento referente a {$payload->description}",
                 ] : null,
-                'pix'            => $payload->paymentMethod === 'pix' ? [
+                'pix' => $payload->paymentMethod === 'pix' ? [
                     'expires_in' => 3600 * 24,
                 ] : null,
             ]],
@@ -297,16 +296,16 @@ class PagarmeGateway extends AbstractHttpGateway
     protected function eventTypeMap(): array
     {
         return [
-            'order.paid'                       => 'paid',
-            'order.payment_failed'             => 'failed',
-            'order.canceled'                   => 'cancelled',
-            'charge.paid'                      => 'paid',
-            'charge.payment_failed'            => 'failed',
-            'charge.refunded'                  => 'refunded',
-            'charge.chargeback_notification'   => 'chargeback',
-            'subscription.deactivated'         => 'cancelled',
-            'subscription.activated'           => 'unknown',
-            'subscription.payment_failed'      => 'failed',
+            'order.paid'                     => 'paid',
+            'order.payment_failed'           => 'failed',
+            'order.canceled'                 => 'cancelled',
+            'charge.paid'                    => 'paid',
+            'charge.payment_failed'          => 'failed',
+            'charge.refunded'                => 'refunded',
+            'charge.chargeback_notification' => 'chargeback',
+            'subscription.deactivated'       => 'cancelled',
+            'subscription.activated'         => 'unknown',
+            'subscription.payment_failed'    => 'failed',
         ];
     }
 
@@ -315,23 +314,23 @@ class PagarmeGateway extends AbstractHttpGateway
     private function normalizePagarmeStatus(string $status): string
     {
         return match (strtolower($status)) {
-            'active', 'paid'   => 'active',
-            'canceled'         => 'cancelled',
-            'pending'          => 'pending',
-            default            => strtolower($status),
+            'active', 'paid' => 'active',
+            'canceled' => 'cancelled',
+            'pending'  => 'pending',
+            default    => strtolower($status),
         };
     }
 
     private function normalizePagarmeChargeStatus(string $status): string
     {
         return match (strtolower($status)) {
-            'paid', 'overpaid'   => 'paid',
+            'paid', 'overpaid' => 'paid',
             'pending', 'processing' => 'pending',
-            'failed', 'with_error'  => 'failed',
-            'refunded'              => 'refunded',
-            'chargedback'           => 'chargeback',
-            'canceled'              => 'cancelled',
-            default                 => strtolower($status),
+            'failed', 'with_error' => 'failed',
+            'refunded'    => 'refunded',
+            'chargedback' => 'chargeback',
+            'canceled'    => 'cancelled',
+            default       => strtolower($status),
         };
     }
 

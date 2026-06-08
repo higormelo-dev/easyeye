@@ -67,10 +67,10 @@ return [
     'activation_completed_on' => 'Completed on',
 
     // Live / Polling
-    'live_label'       => 'Live',
-    'live_refreshing'  => 'Refreshing...',
-    'last_updated_at'  => 'Updated at',
-    'btn_refresh'      => 'Refresh',
+    'live_label'      => 'Live',
+    'live_refreshing' => 'Refreshing...',
+    'last_updated_at' => 'Updated at',
+    'btn_refresh'     => 'Refresh',
 
     // Today's schedule
     'section_schedule_today' => "Today's schedule",

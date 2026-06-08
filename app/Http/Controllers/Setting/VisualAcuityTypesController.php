@@ -23,8 +23,8 @@ class VisualAcuityTypesController extends BaseSettingController
     protected function getColumns(): array
     {
         return [
-            ['key' => 'code',  'label' => __('actions.code'),  'type' => 'code'],
-            ['key' => 'name',  'label' => __('actions.name'),  'type' => 'text', 'sortable' => true],
+            ['key' => 'code', 'label' => __('actions.code'), 'type' => 'code'],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'sortable' => true],
             ['key' => 'scale', 'label' => __('actions.scale'), 'type' => 'numeric'],
         ];
     }
@@ -32,7 +32,7 @@ class VisualAcuityTypesController extends BaseSettingController
     protected function getFormFields(): array
     {
         return [
-            ['key' => 'name',  'label' => __('actions.name'),  'type' => 'text',    'required' => true],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'required' => true],
             ['key' => 'scale', 'label' => __('actions.scale'), 'type' => 'numeric', 'required' => true, 'min' => 0, 'step' => 0.01],
         ];
     }

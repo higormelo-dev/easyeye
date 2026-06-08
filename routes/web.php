@@ -284,6 +284,8 @@ Route::group(
                         ->middleware('throttle:ai-decision')->name('approve');
                     Route::post('runs/{aiRun}/reject', [AiRunsController::class, 'reject'])
                         ->middleware('throttle:ai-decision')->name('reject');
+                    Route::post('runs/{aiRun}/record', [AiRunsController::class, 'openRecordForRun'])
+                        ->middleware('throttle:ai-decision')->name('record');
                 });
             });
 
