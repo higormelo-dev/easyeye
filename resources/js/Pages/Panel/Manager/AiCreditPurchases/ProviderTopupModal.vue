@@ -54,6 +54,13 @@ const effectiveRate = computed(() => {
     return usd > 0 && brl > 0 ? brl / usd : null;
 });
 
+// Faixa plausível do R$/US$ (~4 a 7 historicamente). Fora disso, provável
+// inversão dos campos (ex.: R$ 0,40 = US$ no campo de R$).
+const rateLooksOff = computed(() => {
+    const r = effectiveRate.value;
+    return r !== null && (r < 3 || r > 12);
+});
+
 const isValid = computed(() =>
     form.value.provider
     && Number(form.value.amount_usd) > 0
@@ -184,13 +191,20 @@ defineExpose({ setSaving, setError });
 
                                 <!-- Cotação efetiva -->
                                 <div v-if="effectiveRate" class="col-12">
-                                    <div class="alert alert-light border d-flex align-items-center gap-2 small mb-0 py-2">
-                                        <i class="ti ti-exchange text-info"></i>
-                                        <span>
-                                            {{ t?.topup?.effective_rate ?? 'Cotação efetiva:' }}
-                                            <strong>R$ {{ effectiveRate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) }}</strong>
-                                            / US$
-                                        </span>
+                                    <div
+                                        class="alert d-flex align-items-start gap-2 small mb-0 py-2"
+                                        :class="rateLooksOff ? 'alert-warning' : 'alert-light border'"
+                                    >
+                                        <i :class="rateLooksOff ? 'ti ti-alert-triangle mt-1' : 'ti ti-exchange text-info mt-1'"></i>
+                                        <div>
+                                            <div>
+                                                {{ t?.topup?.effective_rate ?? 'Cotação efetiva:' }}
+                                                <strong>US$&nbsp;1,00 = R$&nbsp;{{ effectiveRate.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 }) }}</strong>
+                                            </div>
+                                            <div v-if="rateLooksOff" class="text-warning-emphasis mt-1">
+                                                {{ t?.topup?.rate_warning ?? 'Cotação fora do esperado — confira se não inverteu os campos R$ e US$.' }}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 

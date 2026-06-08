@@ -68,6 +68,7 @@ return [
         'amount_usd'            => 'Credited at provider (US$)',
         'amount_usd_help'       => 'Balance the provider added — feeds the estimated balance.',
         'effective_rate'        => 'Effective rate:',
+        'rate_warning'          => 'Rate looks off — check whether you swapped the R$ and US$ fields.',
         'topped_up_at'          => 'Top-up date',
         'reference'             => 'Reference (optional)',
         'reference_placeholder' => 'e.g. ch_3MtIxhXKt8, invoice #INV-001',

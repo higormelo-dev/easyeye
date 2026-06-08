@@ -69,6 +69,7 @@ return [
         'amount_usd'            => 'Creditado no provedor (US$)',
         'amount_usd_help'       => 'Saldo que o provedor adicionou — alimenta o saldo estimado.',
         'effective_rate'        => 'Cotação efetiva:',
+        'rate_warning'          => 'Cotação fora do esperado — confira se não inverteu os campos R$ e US$.',
         'topped_up_at'          => 'Data da recarga',
         'reference'             => 'Referência (opcional)',
         'reference_placeholder' => 'Ex.: ch_3MtIxhXKt8, invoice #INV-001',
