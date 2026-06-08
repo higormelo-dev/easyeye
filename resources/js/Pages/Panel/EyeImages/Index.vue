@@ -744,6 +744,18 @@ function openAiModal()  {
 function closeAiModal() { aiModalOpen.value = false; }
 function setAiAlert(type, message) { aiAlert.type = type; aiAlert.message = message; }
 function clearAiAlert() { aiAlert.type = ''; aiAlert.message = ''; }
+
+// Mensagem de erro detalhada (status + validação) para diagnóstico real.
+function aiErrorMessage(error, fallback) {
+    const res = error?.response;
+    if (!res) return `${fallback} (sem resposta do servidor — verifique a conexão/sessão)`;
+    const d = res.data ?? {};
+    if (d.message) {
+        const firstErr = d.errors ? Object.values(d.errors)?.[0]?.[0] : null;
+        return firstErr ? `${d.message} — ${firstErr}` : d.message;
+    }
+    return `${fallback} (HTTP ${res.status})`;
+}
 function resetAiRun() {
     aiRunId.value = null;
     aiRunStatus.value = '';
@@ -789,7 +801,7 @@ async function estimateAiRun() {
         aiBalance.available = data?.balance?.available ?? '—';
         aiBalance.reserved  = data?.balance?.reserved ?? '—';
     } catch (error) {
-        setAiAlert('danger', error?.response?.data?.message ?? aiLabel('estimate_failed', 'Falha ao estimar custo.'));
+        setAiAlert('danger', aiErrorMessage(error, aiLabel('estimate_failed', 'Falha ao estimar custo.')));
     } finally {
         aiEstimating.value = false;
     }
@@ -810,7 +822,7 @@ async function submitAiRun() {
             setAiAlert('success', aiLabel('run_created_waiting_review', 'Execução criada e enviada para revisão médica.'));
         }
     } catch (error) {
-        setAiAlert('danger', error?.response?.data?.message ?? aiLabel('run_create_failed', 'Falha ao criar execução.'));
+        setAiAlert('danger', aiErrorMessage(error, aiLabel('run_create_failed', 'Falha ao criar execução.')));
     } finally {
         aiSubmitting.value = false;
     }
