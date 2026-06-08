@@ -657,6 +657,15 @@ const aiEstimating = ref(false);
 const aiSubmitting = ref(false);
 const aiEstimate   = ref(null);
 const aiBalance    = reactive({ available: '—', reserved: '—' });
+
+// Motivo de o "Executar IA" estar desabilitado — exibido no rodapé + tooltip.
+// A estimativa é opcional: o custo é calculado/reservado no servidor ao executar.
+const aiRunDisabledReason = computed(() => {
+    if (isEyeImageWorkflow.value && !aiHasSelection.value) {
+        return aiLabel('run_needs_images', 'Selecione ao menos uma imagem para executar.');
+    }
+    return '';
+});
 const aiAlert      = reactive({ type: '', message: '' });
 const aiForm       = reactive({
     workflow: props.ai?.default_workflow ?? aiWorkflows.value[0] ?? 'exam_assistant',
@@ -1701,13 +1710,17 @@ const printEntity = computed(() => props.entity ?? {});
                             {{ aiLabel('close', 'Close') }}
                         </button>
                         <template v-if="!aiRunStatus">
+                            <small v-if="aiRunDisabledReason" class="w-100 text-muted d-flex align-items-center gap-1 mb-2">
+                                <i class="ti ti-info-circle"></i>{{ aiRunDisabledReason }}
+                            </small>
                             <button type="button" class="btn btn-outline-info btn-sm"
                                     :disabled="aiEstimating || (isEyeImageWorkflow && !aiHasSelection)" @click="estimateAiRun">
                                 <span v-if="aiEstimating" class="spinner-border spinner-border-sm me-1"></span>
                                 <i v-else class="ti ti-calculator me-1"></i>{{ aiLabel('estimate', 'Estimar Custo') }}
                             </button>
                             <button type="button" class="btn btn-success btn-sm"
-                                    :disabled="aiSubmitting || !aiEstimate || (isEyeImageWorkflow && !aiHasSelection)" @click="submitAiRun">
+                                    :disabled="aiSubmitting || (isEyeImageWorkflow && !aiHasSelection)"
+                                    :title="aiRunDisabledReason" @click="submitAiRun">
                                 <span v-if="aiSubmitting" class="spinner-border spinner-border-sm me-1"></span>
                                 <i v-else class="ti ti-player-play me-1"></i>{{ aiLabel('run', 'Executar IA') }}
                             </button>
