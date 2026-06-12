@@ -324,17 +324,31 @@ class AiCreditPurchasesController extends Controller
         $this->authorizeSaasEntity(EntityGate::SaasSupport);
 
         $validated = $request->validate([
-            'entity_id'    => ['required', 'string', 'uuid', 'exists:entities,id'],
-            'provider'     => ['nullable', 'string', Rule::in(array_map(fn (AiProvider $p) => $p->value, AiProvider::cases()))],
-            'credits'      => ['required', 'integer', 'min:1', 'max:1000000'],
+            'entity_id' => ['required', 'string', 'uuid', 'exists:entities,id'],
+            'kind'      => ['nullable', 'string', Rule::in(['courtesy', 'purchase'])],
+            'credits'   => ['required', 'integer', 'min:1', 'max:1000000'],
+            // Valor da compra: aceitamos Reais (UI) e convertemos para centavos.
+            // `amount_cents` segue aceito por compatibilidade com chamadas antigas.
+            'amount_reais' => ['nullable', 'numeric', 'min:0', 'max:99999.99'],
             'amount_cents' => ['nullable', 'integer', 'min:0', 'max:9999999'],
             'reason'       => ['required', 'string', 'min:10', 'max:500'],
             'package_code' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $entity   = Entity::findOrFail($validated['entity_id']);
-        $provider = ! empty($validated['provider']) ? AiProvider::from($validated['provider']) : null;
-        $credits  = (int) $validated['credits'];
+        $entity  = Entity::findOrFail($validated['entity_id']);
+        $credits = (int) $validated['credits'];
+
+        // Cortesia × Compra: a distinção de domínio é amount_cents == 0 (cortesia)
+        // vs > 0 (compra paga fora do app). O package_code documenta a operação.
+        $isCourtesy = ($validated['kind'] ?? null) === 'courtesy'
+            || ($validated['package_code'] ?? null) === 'courtesy';
+        $packageCode = $isCourtesy ? 'courtesy' : ($validated['package_code'] ?? 'manual');
+
+        $amountCents = $isCourtesy
+            ? 0
+            : (isset($validated['amount_reais'])
+                ? (int) round(((float) $validated['amount_reais']) * 100)
+                : (int) ($validated['amount_cents'] ?? 0));
 
         // Bloqueia Financial e Support de creditar na entity interna (só Admin)
         if (! $entity->is_client && ! Gate::allows(EntityGate::SaasAdminPanel->value, $this->currentSaasEntity())) {
@@ -365,9 +379,9 @@ class AiCreditPurchasesController extends Controller
                 credits: $credits,
                 reason: (string) $validated['reason'],
                 createdBy: (string) auth()->id(),
-                provider: $provider,
-                amountCents: (int) ($validated['amount_cents'] ?? 0),
-                packageCode: (string) ($validated['package_code'] ?? 'manual'),
+                provider: null, // carteira tem saldo único — provedor não roteia crédito
+                amountCents: $amountCents,
+                packageCode: $packageCode,
             );
         } catch (DomainException $e) {
             return response()->json([
@@ -384,8 +398,9 @@ class AiCreditPurchasesController extends Controller
             reason: (string) $validated['reason'],
             newValues: [
                 'credits'          => $credits,
-                'amount_cents'     => (int) ($validated['amount_cents'] ?? 0),
-                'provider_hint'    => $provider?->value,
+                'amount_cents'     => $amountCents,
+                'kind'             => $isCourtesy ? 'courtesy' : 'purchase',
+                'package_code'     => $packageCode,
                 'is_internal'      => ! $entity->is_client,
                 'used_daily_quota' => ! $isFinancialOrAdmin,
             ],
@@ -536,7 +551,9 @@ class AiCreditPurchasesController extends Controller
     }
 
     /**
-     * Total de créditos manuais que o usuário Support criou hoje.
+     * Total de créditos manuais (cortesia + compra avulsa) que o usuário Support
+     * lançou hoje. Conta ambos os package_codes para o limite diário não ser
+     * burlado lançando tudo como cortesia.
      */
     private function supportDailyUsage(string $userId): int
     {
@@ -545,7 +562,7 @@ class AiCreditPurchasesController extends Controller
         return (int) AiCreditPurchase::query()
             ->where('requested_by', $userId)
             ->where('created_at', '>=', $startOfDay)
-            ->where('package_code', 'manual')
+            ->whereIn('package_code', ['manual', 'courtesy'])
             ->sum('credits');
     }
 
@@ -563,16 +580,17 @@ class AiCreditPurchasesController extends Controller
             : ($p->provider ? AiProvider::tryFrom((string) $p->provider) : null);
 
         $isInternal = $p->entity && ! $p->entity->is_client;
+        $kind       = $this->purchaseKind($p);
 
         return [
-            'id'           => (string) $p->id,
-            'entity_id'    => (string) $p->entity_id,
-            'entity_name'  => $p->entity?->name,
-            'is_internal'  => $isInternal,
-            'package_code' => (string) $p->package_code,
-            'package_name' => $p->package_code === 'manual'
-                ? __('manager_ai_credit_purchases.manual.package_label')
-                : __("ai.credit_packages.{$p->package_code}.name"),
+            'id'               => (string) $p->id,
+            'entity_id'        => (string) $p->entity_id,
+            'entity_name'      => $p->entity?->name,
+            'is_internal'      => $isInternal,
+            'package_code'     => (string) $p->package_code,
+            'package_name'     => $this->packageName((string) $p->package_code),
+            'kind'             => $kind,
+            'kind_label'       => __("manager_ai_credit_purchases.kind.{$kind}"),
             'provider'         => $provider?->value,
             'provider_label'   => $provider ? __("ai.providers.{$provider->value}") : null,
             'credits'          => (int) $p->credits,
@@ -606,56 +624,45 @@ class AiCreditPurchasesController extends Controller
     }
 
     /**
+     * KPIs focados nos dois trabalhos reais do dono do SaaS:
+     *   - distribuição de créditos às clínicas no mês (cortesia × compra paga);
+     *   - pedidos de clientes ainda pendentes (aviso discreto, raramente usado).
+     *
      * @return array<string, mixed>
      */
     private function kpis(): array
     {
-        $thirtyDaysAgo = CarbonImmutable::now()->subDays(30);
+        $startOfMonth = CarbonImmutable::now()->startOfMonth();
+
+        // Distribuição creditada no mês, separando cortesia (R$ 0) de compra paga.
+        $distributed = AiCreditPurchase::query()
+            ->where('status', AiCreditPurchaseStatus::Credited)
+            ->where('credited_at', '>=', $startOfMonth)
+            ->selectRaw('COUNT(*) as cnt')
+            ->selectRaw('COALESCE(SUM(credits), 0) as credits')
+            ->selectRaw('COALESCE(SUM(amount_cents), 0) as amount_cents')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount_cents = 0 THEN credits ELSE 0 END), 0) as courtesy_credits')
+            ->selectRaw('COALESCE(SUM(CASE WHEN amount_cents > 0 THEN credits ELSE 0 END), 0) as paid_credits')
+            ->first();
 
         $pending = AiCreditPurchase::query()
             ->where('status', AiCreditPurchaseStatus::PendingPayment)
             ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(amount_cents), 0) as sum_cents')
             ->first();
 
-        $credited30d = AiCreditPurchase::query()
-            ->where('status', AiCreditPurchaseStatus::Credited)
-            ->where('credited_at', '>=', $thirtyDaysAgo)
-            ->selectRaw('COUNT(*) as cnt, COALESCE(SUM(amount_cents), 0) as sum_cents, COALESCE(SUM(credits), 0) as credits')
-            ->first();
-
-        $statusesLast30d = AiCreditPurchase::query()
-            ->where('created_at', '>=', $thirtyDaysAgo)
-            ->selectRaw('status, COUNT(*) as cnt')
-            ->groupBy('status')
-            ->pluck('cnt', 'status')
-            ->all();
-
-        $total30d    = array_sum($statusesLast30d);
-        $credited    = (int) ($statusesLast30d[AiCreditPurchaseStatus::Credited->value] ?? 0);
-        $cancelled   = (int) ($statusesLast30d[AiCreditPurchaseStatus::Cancelled->value] ?? 0);
-        $failed      = (int) ($statusesLast30d[AiCreditPurchaseStatus::Failed->value] ?? 0);
-        $conversion  = $total30d > 0 ? round(($credited / $total30d) * 100, 1) : 0.0;
-        $abandonment = $total30d > 0 ? round((($cancelled + $failed) / $total30d) * 100, 1) : 0.0;
-
         return [
+            'distributed_mtd' => [
+                'count'            => (int) ($distributed->cnt ?? 0),
+                'credits'          => (int) ($distributed->credits ?? 0),
+                'courtesy_credits' => (int) ($distributed->courtesy_credits ?? 0),
+                'paid_credits'     => (int) ($distributed->paid_credits ?? 0),
+                'amount_cents'     => (int) ($distributed->amount_cents ?? 0),
+                'amount_formatted' => $this->formatMoney((int) ($distributed->amount_cents ?? 0), 'BRL'),
+            ],
             'pending' => [
                 'count'            => (int) ($pending->cnt ?? 0),
                 'amount_cents'     => (int) ($pending->sum_cents ?? 0),
                 'amount_formatted' => $this->formatMoney((int) ($pending->sum_cents ?? 0), 'BRL'),
-            ],
-            'credited_30d' => [
-                'count'            => (int) ($credited30d->cnt ?? 0),
-                'amount_cents'     => (int) ($credited30d->sum_cents ?? 0),
-                'amount_formatted' => $this->formatMoney((int) ($credited30d->sum_cents ?? 0), 'BRL'),
-                'credits_sold'     => (int) ($credited30d->credits ?? 0),
-            ],
-            'funnel_30d' => [
-                'total'           => $total30d,
-                'credited'        => $credited,
-                'cancelled'       => $cancelled,
-                'failed'          => $failed,
-                'conversion_pct'  => $conversion,
-                'abandonment_pct' => $abandonment,
             ],
         ];
     }
@@ -729,6 +736,37 @@ class AiCreditPurchasesController extends Controller
                 'purchases_total'  => (int) $row->purchases_total,
             ])
             ->all();
+    }
+
+    /**
+     * Rótulo legível do pacote. Lançamentos manuais (manual/courtesy) usam os
+     * rótulos da própria tela; pacotes de catálogo usam ai.credit_packages.
+     */
+    private function packageName(string $code): string
+    {
+        return match ($code) {
+            'manual'   => __('manager_ai_credit_purchases.kind.purchase'),
+            'courtesy' => __('manager_ai_credit_purchases.kind.courtesy'),
+            default    => __("ai.credit_packages.{$code}.name"),
+        };
+    }
+
+    /**
+     * Classifica a linha: cortesia (grátis), compra avulsa (admin lançou paga)
+     * ou pedido de cliente (checkout no app). Distinção de domínio: amount_cents.
+     */
+    private function purchaseKind(AiCreditPurchase $p): string
+    {
+        $metadata = is_array($p->metadata) ? $p->metadata : (array) $p->metadata;
+        $source   = $metadata['source'] ?? null;
+        $isManual = in_array((string) $p->package_code, ['manual', 'courtesy'], true)
+            || $source === 'manager_manual';
+
+        return match (true) {
+            $isManual && (int) $p->amount_cents === 0 => 'courtesy',
+            $isManual                                 => 'purchase',
+            default                                   => 'client',
+        };
     }
 
     private function statusBadge(?AiCreditPurchaseStatus $status): string

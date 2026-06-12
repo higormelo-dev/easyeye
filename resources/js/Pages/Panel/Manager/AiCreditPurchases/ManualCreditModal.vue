@@ -3,55 +3,52 @@ import { ref, computed, watch } from 'vue';
 import SearchSelect from "@/Components/Panel/SearchSelect.vue";
 
 /**
- * Modal para lançar crédito IA manual em uma carteira de empresa.
+ * Modal para conceder crédito IA a uma clínica — cortesia (grátis) ou compra (paga).
+ *
+ * O crédito cai direto na carteira da clínica (saldo único, não expira). Não há
+ * seletor de provedor: o provedor é decidido pelo sistema na hora do uso; aqui só
+ * importa quantos créditos e se foi cortesia ou compra paga fora do app.
  *
  * RBAC (vem de props.permissions):
- *   - create_manual            : exibe o botão de submit (todos os perfis SaaS que tiverem suporte)
- *   - create_manual_unlimited  : Admin/Financial — sem limite diário
+ *   - create_manual             : exibe o botão de submit
+ *   - create_manual_unlimited   : Admin/Financial — sem limite diário
  *   - create_manual_for_internal: Admin apenas — pode escolher a entidade interna
  */
 const props = defineProps({
-    open:            { type: Boolean, required: true },
-    entities:        { type: Array,   default: () => [] },
-    providers:       { type: Array,   default: () => [] },
-    permissions:     { type: Object,  default: () => ({}) },
-    presetEntityId:  { type: String,  default: null },
-    t:               { type: Object,  default: () => ({}) },
+    open:           { type: Boolean, required: true },
+    entities:       { type: Array,   default: () => [] },
+    permissions:    { type: Object,  default: () => ({}) },
+    presetEntityId: { type: String,  default: null },
+    t:              { type: Object,  default: () => ({}) },
 });
 
 const emit = defineEmits(['close', 'submit']);
 
-const form = ref({
+const EMPTY_FORM = () => ({
     entity_id:    '',
-    kind:         'courtesy',   // 'courtesy' (grátis, R$ 0) | 'purchase' (compra avulsa, paga)
-    provider:     '',           // opcional — só metadata analítica
+    kind:         'courtesy',  // 'courtesy' (grátis) | 'purchase' (paga fora do app)
     credits:      100,
-    amount_cents: 0,
+    amount_reais: null,        // só usado em compra paga
     reason:       '',
 });
+
+const form = ref(EMPTY_FORM());
 
 const saving = ref(false);
 const errorMessage = ref('');
 
 watch(() => props.open, (val) => {
     if (val) {
-        form.value = {
-            entity_id:    props.presetEntityId ?? '',
-            kind:         'courtesy',
-            provider:     '',
-            credits:      100,
-            amount_cents: 0,
-            reason:       '',
-        };
+        form.value = { ...EMPTY_FORM(), entity_id: props.presetEntityId ?? '' };
         errorMessage.value = '';
     }
 });
 
 const isCourtesy = computed(() => form.value.kind === 'courtesy');
 
-// Cortesia não tem valor monetário — zera o campo ao alternar.
+// Ao voltar para cortesia, limpa o valor para não enviar resíduo.
 watch(() => form.value.kind, (kind) => {
-    if (kind === 'courtesy') form.value.amount_cents = 0;
+    if (kind === 'courtesy') form.value.amount_reais = null;
 });
 
 const filteredEntities = computed(() => {
@@ -71,11 +68,13 @@ const selectedEntityIsInternal = computed(() => {
     return e ? !e.is_client : false;
 });
 
+const amountReais = computed(() => Number(form.value.amount_reais) || 0);
+
 const isValid = computed(() =>
     form.value.entity_id
     && form.value.credits > 0
     && form.value.reason.trim().length >= 10
-    && (isCourtesy.value || form.value.amount_cents > 0),
+    && (isCourtesy.value || amountReais.value > 0),
 );
 
 function close() {
@@ -92,14 +91,13 @@ async function submit() {
     try {
         await emit('submit', {
             entity_id:    form.value.entity_id,
-            provider:     form.value.provider,
+            kind:         form.value.kind,
             credits:      form.value.credits,
             reason:       form.value.reason,
-            amount_cents: isCourtesy.value ? 0 : form.value.amount_cents,
-            package_code: isCourtesy.value ? 'courtesy' : 'manual',
+            amount_reais: isCourtesy.value ? 0 : amountReais.value,
         });
     } catch (e) {
-        errorMessage.value = e?.message || 'Erro ao lançar crédito.';
+        errorMessage.value = e?.message || 'Erro ao conceder crédito.';
     } finally {
         saving.value = false;
     }
@@ -126,7 +124,7 @@ defineExpose({ setSaving, setError });
                         <div>
                             <h5 class="modal-title">
                                 <i class="ti ti-coin-plus me-2 text-success"></i>
-                                {{ t?.manual?.modal_title ?? 'Adicionar crédito manual' }}
+                                {{ t?.manual?.modal_title ?? 'Conceder crédito a uma clínica' }}
                             </h5>
                             <small class="text-muted d-block mt-1">
                                 {{ t?.manual?.modal_subtitle ?? '' }}
@@ -158,10 +156,10 @@ defineExpose({ setSaving, setError });
 
                             <div class="row g-3">
 
-                                <!-- Empresa destinatária -->
+                                <!-- Clínica destinatária -->
                                 <div class="col-12">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.manual?.select_entity ?? 'Empresa destinatária' }}
+                                        {{ t?.manual?.select_entity ?? 'Clínica destinatária' }}
                                         <span class="text-danger">*</span>
                                     </label>
                                     <SearchSelect
@@ -180,10 +178,10 @@ defineExpose({ setSaving, setError });
                                     </div>
                                 </div>
 
-                                <!-- Tipo: Cortesia (grátis) x Compra avulsa (paga) -->
+                                <!-- Como conceder: Cortesia (grátis) x Compra (paga) -->
                                 <div class="col-12">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.manual?.kind ?? 'Tipo' }} <span class="text-danger">*</span>
+                                        {{ t?.manual?.kind ?? 'Como conceder' }} <span class="text-danger">*</span>
                                     </label>
                                     <div class="d-flex gap-2" role="group">
                                         <input id="kind-courtesy" v-model="form.kind" type="radio" class="btn-check" value="courtesy" :disabled="saving">
@@ -192,67 +190,20 @@ defineExpose({ setSaving, setError });
                                         </label>
                                         <input id="kind-purchase" v-model="form.kind" type="radio" class="btn-check" value="purchase" :disabled="saving">
                                         <label class="btn btn-outline-success flex-fill" for="kind-purchase">
-                                            <i class="ti ti-cash me-1"></i>{{ t?.manual?.kind_purchase ?? 'Compra avulsa (paga)' }}
+                                            <i class="ti ti-cash me-1"></i>{{ t?.manual?.kind_purchase ?? 'Compra (paga)' }}
                                         </label>
                                     </div>
                                     <small class="text-muted d-block mt-1">
                                         {{ isCourtesy
-                                            ? (t?.manual?.kind_courtesy_help ?? 'Crédito gratuito — não gera valor financeiro.')
-                                            : (t?.manual?.kind_purchase_help ?? 'Compra paga fora do app — informe o valor cobrado.') }}
+                                            ? (t?.manual?.kind_courtesy_help ?? 'Crédito gratuito — sem valor financeiro.')
+                                            : (t?.manual?.kind_purchase_help ?? 'A clínica pagou fora do app — informe o valor recebido.') }}
                                     </small>
                                 </div>
 
-                                <!-- Provedor (opcional — apenas etiqueta analítica) -->
-                                <div class="col-12 col-md-6">
+                                <!-- Quantidade de créditos -->
+                                <div class="col-12" :class="{ 'col-md-6': !isCourtesy }">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.manual?.select_provider ?? 'Provedor (opcional)' }}
-                                    </label>
-                                    <!-- Linha 1: "Sem preferência" ocupa toda a largura -->
-                                    <input
-                                        id="prov-none"
-                                        v-model="form.provider"
-                                        type="radio"
-                                        class="btn-check"
-                                        value=""
-                                        :disabled="saving">
-                                    <label
-                                        class="btn btn-outline-secondary w-100 text-nowrap mb-2"
-                                        for="prov-none"
-                                    >
-                                        <i class="ti ti-asterisk me-1"></i>{{ t?.manual?.no_provider ?? 'Sem preferência' }}
-                                    </label>
-
-                                    <!-- Linha 2: os 3 provedores dividindo a largura -->
-                                    <div class="d-flex gap-2" role="group">
-                                        <template v-for="p in providers" :key="p.value">
-                                            <input
-                                                :id="`prov-${p.value}`"
-                                                v-model="form.provider"
-                                                type="radio"
-                                                class="btn-check"
-                                                :value="p.value"
-                                                :disabled="saving">
-                                            <label
-                                                class="btn btn-outline-primary flex-fill text-nowrap"
-                                                :for="`prov-${p.value}`"
-                                                style="min-width: 0; flex-basis: 0;"
-                                            >
-                                                <i :class="{
-                                                    'ti ti-brand-openai': p.value === 'openai',
-                                                    'ti ti-message-chatbot': p.value === 'anthropic',
-                                                    'ti ti-brand-google': p.value === 'gemini',
-                                                }" class="me-1"></i>
-                                                {{ p.label }}
-                                            </label>
-                                        </template>
-                                    </div>
-                                    <small class="text-muted d-block mt-1">{{ t?.manual?.select_provider_help ?? 'Apenas etiqueta — créditos vão para o saldo único.' }}</small>
-                                </div>
-
-                                <!-- Quantidade -->
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.manual?.credits ?? 'Créditos' }}
+                                        {{ t?.manual?.credits ?? 'Quantidade de créditos' }}
                                         <span class="text-danger">*</span>
                                     </label>
                                     <input
@@ -263,22 +214,28 @@ defineExpose({ setSaving, setError });
                                         class="form-control"
                                         required
                                         :disabled="saving">
+                                    <small class="text-muted">{{ t?.manual?.credits_help ?? '' }}</small>
                                 </div>
 
-                                <!-- Valor cobrado (apenas em compra avulsa) -->
+                                <!-- Valor recebido (apenas em compra paga) -->
                                 <div v-if="!isCourtesy" class="col-12 col-md-6">
                                     <label class="form-label small fw-semibold mb-1">
-                                        {{ t?.manual?.amount_cents ?? 'Valor cobrado (centavos)' }}
+                                        {{ t?.manual?.amount_reais ?? 'Valor recebido (R$)' }}
                                         <span class="text-danger">*</span>
                                     </label>
-                                    <input
-                                        v-model.number="form.amount_cents"
-                                        type="number"
-                                        min="1"
-                                        max="9999999"
-                                        class="form-control"
-                                        :disabled="saving">
-                                    <small class="text-muted">{{ t?.manual?.amount_help ?? 'Em centavos (ex.: 24990 = R$ 249,90).' }}</small>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input
+                                            v-model.number="form.amount_reais"
+                                            type="number"
+                                            step="0.01"
+                                            min="0.01"
+                                            max="99999.99"
+                                            class="form-control"
+                                            placeholder="0,00"
+                                            :disabled="saving">
+                                    </div>
+                                    <small class="text-muted">{{ t?.manual?.amount_reais_help ?? 'Quanto a clínica pagou por estes créditos.' }}</small>
                                 </div>
 
                                 <!-- Motivo -->
@@ -310,7 +267,7 @@ defineExpose({ setSaving, setError });
                             </button>
                             <button type="submit" class="btn btn-success" :disabled="!isValid || saving">
                                 <i class="ti ti-coin-plus me-1"></i>
-                                {{ saving ? '...' : (t?.manual?.submit ?? 'Lançar crédito') }}
+                                {{ saving ? '...' : (t?.manual?.submit ?? 'Conceder crédito') }}
                             </button>
                         </div>
                     </form>

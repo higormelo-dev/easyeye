@@ -2,18 +2,50 @@
 
 return [
     'title'    => 'Créditos de IA',
-    'subtitle' => 'Recargas nos provedores e distribuição de créditos às clínicas.',
+    'subtitle' => 'Dois trabalhos: recarregar suas contas nos provedores (o que você gasta) e distribuir créditos às clínicas (o que você entrega).',
 
     'tabs' => [
-        'clients'   => 'Empresas clientes (créditos)',
-        'providers' => 'Provedores (saldo)',
+        'clients'   => 'Créditos das clínicas',
+        'providers' => 'Recargas nos provedores',
+    ],
+
+    // Explicação curta no topo de cada aba, deixando claro que são trabalhos distintos.
+    'tab_help' => [
+        'clients'   => 'Conceda cortesia ou registre uma compra paga direto na carteira de uma clínica.',
+        'providers' => 'Registre quanto você carregou em cada provedor de IA (OpenAI/Claude/Gemini) para acompanhar o saldo restante.',
+    ],
+
+    // Faixa de resumo sempre visível, ligando os dois trabalhos.
+    'summary' => [
+        'providers_balance'      => 'Saldo nos provedores',
+        'providers_balance_help' => 'estimado restante (USD)',
+        'providers_no_data'      => 'sem recarga registrada',
+        'distributed'            => 'Distribuído no mês',
+        'distributed_help'       => 'créditos entregues às clínicas',
+        'courtesy'               => 'cortesia',
+        'paid'                   => 'compra',
+        'margin'                 => 'Margem bruta (mês)',
+        'margin_help'            => 'receita estimada − custo dos provedores',
+        'alert'                  => [
+            'ok'        => 'OK',
+            'warning'   => 'Atenção',
+            'critical'  => 'Crítico',
+            'exhausted' => 'Esgotado',
+        ],
+    ],
+
+    // Aviso discreto: pedidos de clientes aguardando aprovação (fluxo pouco usado).
+    'pending_alert' => [
+        'title'  => ':count pedido(s) de cliente aguardando aprovação',
+        'body'   => 'Pedidos iniciados pelo cliente no app. Abra para aprovar, cancelar ou marcar como falha.',
+        'action' => 'Ver pendentes',
     ],
 
     // Badge que classifica cada linha da tabela de créditos.
     'kind' => [
         'courtesy' => 'Cortesia',
-        'manual'   => 'Avulsa (admin)',
-        'client'   => 'Compra (cliente)',
+        'purchase' => 'Compra avulsa',
+        'client'   => 'Pedido do cliente',
     ],
 
     'providers_empty' => 'Registre uma recarga para acompanhar o saldo dos provedores.',
@@ -96,6 +128,8 @@ return [
     ],
 
     'filters' => [
+        'title'     => 'Filtros',
+        'apply'     => 'Filtrar',
         'status'    => 'Status',
         'provider'  => 'Provedor',
         'entity'    => 'Empresa',
@@ -109,7 +143,7 @@ return [
     'columns' => [
         'created_at'   => 'Solicitado em',
         'entity'       => 'Empresa',
-        'package'      => 'Pacote',
+        'package'      => 'Tipo',
         'provider'     => 'Provedor',
         'credits'      => 'Créditos',
         'amount'       => 'Valor',
@@ -124,8 +158,8 @@ return [
         'cancel'         => 'Cancelar pedido',
         'fail'           => 'Marcar como falha de gateway',
         'refund'         => 'Reembolsar (estornar créditos)',
-        'create_manual'  => 'Dar crédito (cortesia ou compra)',
-        'create_topup'   => 'Registrar recarga',
+        'create_manual'  => 'Conceder crédito à clínica',
+        'create_topup'   => 'Registrar recarga no provedor',
         'credited'       => 'Créditos aprovados e creditados na carteira da empresa.',
         'cancelled'      => 'Pedido cancelado.',
         'marked_failed'  => 'Pedido marcado como falha de pagamento.',
@@ -136,29 +170,27 @@ return [
     ],
 
     'manual' => [
-        'package_label'        => 'Manual / Cortesia',
-        'modal_title'          => 'Adicionar crédito manual',
-        'modal_subtitle'       => 'Lance créditos diretamente na carteira de uma empresa, sem passar por gateway de pagamento. Ideal para cortesias, ajustes contábeis ou consumo interno.',
-        'select_entity'        => 'Empresa destinatária',
-        'select_entity_help'   => 'Selecione a empresa que receberá os créditos. Sua empresa aparece destacada.',
-        'kind'                 => 'Tipo',
-        'kind_courtesy'        => 'Cortesia (grátis)',
-        'kind_purchase'        => 'Compra avulsa (paga)',
-        'kind_courtesy_help'   => 'Crédito gratuito — não gera valor financeiro.',
-        'kind_purchase_help'   => 'Compra paga fora do app — informe o valor cobrado.',
-        'select_provider'      => 'Provedor (opcional)',
-        'select_provider_help' => 'Apenas etiqueta analítica — créditos vão para o saldo único, sistema decide qual IA usar.',
-        'no_provider'          => 'Sem preferência',
-        'credits'              => 'Quantidade de créditos',
-        'amount_cents'         => 'Valor cobrado (centavos)',
-        'amount_help'          => 'Em centavos (ex.: 24990 = R$ 249,90).',
-        'reason'               => 'Motivo (obrigatório)',
-        'reason_help'          => 'Será registrado na trilha de auditoria. Mínimo 10 caracteres.',
-        'submit'               => 'Lançar crédito',
-        'cancel'               => 'Cancelar',
-        'badge_internal'       => 'Sua empresa',
-        'badge_client'         => 'Cliente',
-        'limit_warning'        => 'Você é Support. Limite diário: :limit créditos. Usado hoje: :used.',
+        'package_label'      => 'Manual / Cortesia',
+        'modal_title'        => 'Conceder crédito a uma clínica',
+        'modal_subtitle'     => 'O crédito vai direto para a carteira da clínica, sem gateway. Cortesia é grátis; compra registra um valor cobrado fora do app.',
+        'select_entity'      => 'Clínica destinatária',
+        'select_entity_help' => 'Selecione a clínica que receberá os créditos. Sua empresa aparece destacada com ★.',
+        'kind'               => 'Como conceder',
+        'kind_courtesy'      => 'Cortesia (grátis)',
+        'kind_purchase'      => 'Compra (paga)',
+        'kind_courtesy_help' => 'Crédito gratuito — sem valor financeiro. Use para brindes, testes ou ajuste.',
+        'kind_purchase_help' => 'A clínica pagou fora do app (PIX, boleto, cartão). Informe o valor recebido.',
+        'credits'            => 'Quantidade de créditos',
+        'credits_help'       => 'Vão para o saldo único da clínica (não expiram).',
+        'amount_reais'       => 'Valor recebido (R$)',
+        'amount_reais_help'  => 'Quanto a clínica pagou por estes créditos.',
+        'reason'             => 'Motivo (obrigatório)',
+        'reason_help'        => 'Será registrado na trilha de auditoria. Mínimo 10 caracteres.',
+        'submit'             => 'Conceder crédito',
+        'cancel'             => 'Cancelar',
+        'badge_internal'     => 'Sua empresa',
+        'badge_client'       => 'Cliente',
+        'limit_warning'      => 'Você é Support. Limite diário: :limit créditos (cortesia + compra). Usado hoje: :used.',
     ],
 
     'confirm' => [

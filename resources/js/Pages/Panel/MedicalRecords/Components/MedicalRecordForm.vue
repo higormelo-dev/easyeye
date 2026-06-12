@@ -1,11 +1,12 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import { validatePayload } from '@/utils/formRulesValidator.js';
 import PdfPreviewModal from './PdfPreviewModal.vue';
 import TinyMceEditor   from '@/Components/Panel/TinyMceEditor.vue';
 import SearchSelect    from '@/Components/Panel/SearchSelect.vue';
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
+import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 
 /**
  * MedicalRecordForm — Port fiel de _form.blade.php (1744 LOC) +
@@ -34,6 +35,7 @@ const props = defineProps({
         accept: '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx',
         accept_mimes: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'],
     }) },
+    ai:              { type: Object,  default: () => ({ enabled: false }) },
     t:               { type: Object,  default: () => ({}) },
 });
 
@@ -152,6 +154,37 @@ const presbyopiaObsForm   = reactive({ content: '' });
 
 // Documentações
 const documentations = ref(r?.documentations ?? []);
+// Mantém a lista sincronizada após reload parcial (ex.: novo laudo de IA aprovado).
+watch(() => props.medicalrecord?.documentations, (v) => { if (Array.isArray(v)) documentations.value = v; });
+
+// ── Assistente de IA ────────────────────────────────────────────────────────
+const aiEnabled  = computed(() => Boolean(props.ai?.enabled) && props.isEdit);
+const aiPanelOpen = ref(false);
+const aiContext = computed(() => ({
+    workflow_default:  props.ai?.default_workflow ?? 'record_assist',
+    patient_id:        props.patient?.id ?? null,
+    medical_record_id: r?.id ?? null,
+    can_insert:        !isLocked.value,
+}));
+
+function openAiPanel() { aiPanelOpen.value = true; }
+
+// Insere uma sugestão da IA num campo do prontuário (texto), com confirmação
+// quando o campo já tem conteúdo. Nunca substitui sem o médico decidir.
+function applyAiSuggestion({ field, value }) {
+    if (isLocked.value || !value) return;
+    const target = field === 'observations' ? 'observation_general' : 'clinical_conduct';
+    const current = (form[target] || '').trim();
+    if (current && !window.confirm(tt('ai_insert_confirm', 'O campo já tem conteúdo. Anexar a sugestão da IA ao final?'))) {
+        return;
+    }
+    form[target] = current ? `${current}\n${value}` : value;
+}
+
+// Após aprovar um laudo de IA, recarrega o prontuário para puxar a nova documentação.
+function onAiApproved() {
+    router.reload({ only: ['medicalrecord'], preserveScroll: true });
+}
 const docForm = reactive({
     report_setting_content_id: '',
     title:        '',
@@ -1054,6 +1087,24 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
 <template>
     <form @submit.prevent="submit" class="pmr-form" enctype="multipart/form-data" novalidate>
+        <!-- Assistente de IA -->
+        <div v-if="aiEnabled" class="d-flex justify-content-end align-items-center gap-2 px-3 pt-2">
+            <button type="button" class="btn btn-sm btn-info text-white d-inline-flex align-items-center gap-1"
+                    @click="openAiPanel">
+                <i class="ti ti-robot"></i>{{ ai?.assistant?.title ?? 'Assistente de IA' }}
+            </button>
+        </div>
+
+        <AiAssistantPanel
+            v-if="aiEnabled"
+            :open="aiPanelOpen"
+            :ai="ai"
+            :context="aiContext"
+            @close="aiPanelOpen = false"
+            @inserted="applyAiSuggestion"
+            @approved="onAiApproved"
+        />
+
         <!-- F9 erros client -->
         <div v-if="hasClientErrors" class="alert alert-danger m-3 mb-0" role="alert">
             <h6 class="alert-heading mb-1"><i class="fas fa-exclamation-triangle me-1"></i>{{ tt('client_errors_title', 'Erros de validação') }}</h6>
@@ -1756,7 +1807,13 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     <td colspan="4" class="text-center text-muted small py-2">{{ tt('no_documentations', 'Nenhuma documentação registrada.') }}</td>
                                 </tr>
                                 <tr v-for="doc in documentations" :key="doc.id">
-                                    <td><span class="badge bg-info-subtle text-info">{{ doc.type_label }}</span></td>
+                                    <td>
+                                        <span class="badge bg-info-subtle text-info">{{ doc.type_label }}</span>
+                                        <span v-if="doc.is_ai" class="badge bg-info text-dark ms-1"
+                                              :title="doc.ai_workflow_label || 'Gerado por IA'">
+                                            <i class="ti ti-robot me-1"></i>IA
+                                        </span>
+                                    </td>
                                     <td>{{ doc.title }}</td>
                                     <td>{{ doc.created_at }}</td>
                                     <td class="text-end">

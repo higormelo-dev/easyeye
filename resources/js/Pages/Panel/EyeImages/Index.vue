@@ -3,6 +3,7 @@ import { ref, computed, reactive, watch, onMounted, onBeforeUnmount, nextTick } 
 import AppLayout  from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 
 /**
  * Eye Images — porta fiel da implementação Alpine.js original.
@@ -726,20 +727,25 @@ watch(
     },
 );
 
-function openAiModal()  {
-    if (aiSelectedPatient.value?.id) {
-        aiForm.patient_id = aiSelectedPatient.value.id;
-    }
-    // Para análise de imagem, pré-preenche o prompt clínico (o system prompt é
-    // forçado no servidor) e zera o estado de run anterior.
-    if (isEyeImageWorkflow.value && (!aiForm.user_prompt || !aiForm.user_prompt.trim())) {
-        aiForm.user_prompt = aiDefaultEyePrompt;
-    }
-    resetAiRun();
-    // Mostra o saldo da carteira já na abertura (o estimate atualiza depois).
-    aiBalance.available = props.ai?.balance?.available ?? '—';
-    aiBalance.reserved  = props.ai?.balance?.reserved ?? '—';
-    aiModalOpen.value = true;
+// ── Painel de IA compartilhado (substitui o modal inline) ───────────────────
+const aiPanelOpen  = ref(false);
+const aiViewReport = ref(null);
+
+const aiPanelContext = computed(() => ({
+    workflow_default: 'eye_image_analysis',
+    patient_id:       aiSelectedPatient.value?.id ?? null,
+    exam_ids:         selectedExamIds.value,
+}));
+
+function openAiModal() {
+    aiViewReport.value = null;
+    aiPanelOpen.value  = true;
+}
+function onAiApproved() {
+    fetchPatients(); // atualiza badges/laudos
+}
+function onAiNeedsRecord(payload) {
+    if (payload?.run_id) maybeOpenRecord(payload.run_id);
 }
 function closeAiModal() { aiModalOpen.value = false; }
 function setAiAlert(type, message) { aiAlert.type = type; aiAlert.message = message; }
@@ -895,14 +901,11 @@ async function maybeOpenRecord(runId) {
     await window.axios.post(url, {});
 }
 
-// Abre o modal mostrando um laudo de IA já aprovado (somente leitura).
+// Abre o painel mostrando um laudo de IA já aprovado (somente leitura).
 function openExistingReport(exam) {
     if (!exam?.ai_report?.content) return;
-    clearAiAlert();
-    aiRunId.value     = exam.ai_report.run_id ?? null;
-    aiRunOutput.value = exam.ai_report.content;
-    aiRunStatus.value = 'approved';
-    aiModalOpen.value = true;
+    aiViewReport.value = { content: exam.ai_report.content };
+    aiPanelOpen.value  = true;
 }
 
 // Opções para SearchSelect (arrays de objetos {value,label}).
@@ -1739,6 +1742,18 @@ const printEntity = computed(() => props.entity ?? {});
                 </div>
             </div>
         </div>
+
+        <!-- Painel de IA compartilhado (análise de imagem + visualização de laudo) -->
+        <AiAssistantPanel
+            v-if="aiEnabled"
+            :open="aiPanelOpen"
+            :ai="ai"
+            :context="aiPanelContext"
+            :view-report="aiViewReport"
+            @close="aiPanelOpen = false"
+            @approved="onAiApproved"
+            @needs-record="onAiNeedsRecord"
+        />
     </AppLayout>
 </template>
 

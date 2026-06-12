@@ -1,30 +1,30 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import ManualCreditModal from '@/Pages/Panel/Manager/AiCreditPurchases/ManualCreditModal.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
- * Testes de unidade do modal de crédito manual.
+ * Testes de unidade do modal de concessão de crédito à clínica.
+ *
+ * A seleção de empresa usa SearchSelect (wrapper do @vueform/multiselect, que
+ * NÃO renderiza um <select> nativo), então interagimos com a entity emitindo
+ * update:modelValue diretamente no componente — robusto e independente do DOM.
  *
  * Cobre:
  *   - Renderização condicional (open=true vs open=false)
  *   - Validação de isValid (entity_id + credits + reason ≥ 10 chars)
+ *   - Validação extra na compra paga (amount_reais > 0)
  *   - Filtro de entidades por permissão (create_manual_for_internal)
  *   - Reset do form ao reabrir (watch open)
  *   - Pré-seleção de entity (presetEntityId)
  *   - Detecção de entity interna selecionada
- *   - Emit close e submit
+ *   - Emit close e submit (cortesia × compra)
  */
 describe('ManualCreditModal', () => {
     const entities = [
         { id: 'ent-internal', name: 'Easyeye Internal', is_client: false },
         { id: 'ent-client-a', name: 'Clínica A',        is_client: true },
         { id: 'ent-client-b', name: 'Clínica B',        is_client: true },
-    ];
-
-    const providers = [
-        { value: 'openai',    label: 'ChatGPT' },
-        { value: 'anthropic', label: 'Claude' },
-        { value: 'gemini',    label: 'Gemini' },
     ];
 
     const defaultPermissions = {
@@ -36,11 +36,11 @@ describe('ManualCreditModal', () => {
 
     const tStubs = {
         manual: {
-            modal_title:     'Adicionar crédito manual',
-            submit:          'Lançar crédito',
-            cancel:          'Cancelar',
-            no_provider:     'Sem preferência',
-            badge_internal:  'Sua empresa',
+            modal_title:    'Conceder crédito a uma clínica',
+            submit:         'Conceder crédito',
+            cancel:         'Cancelar',
+            kind_purchase:  'Compra (paga)',
+            badge_internal: 'Sua empresa',
         },
     };
 
@@ -50,12 +50,46 @@ describe('ManualCreditModal', () => {
             props: {
                 open: true,
                 entities,
-                providers,
                 permissions: defaultPermissions,
                 t: tStubs,
                 ...propsOverride,
             },
         });
+    }
+
+    // Seleciona a entity via o componente SearchSelect (sem <select> nativo).
+    async function selectEntity(wrapper, value) {
+        wrapper.findComponent(SearchSelect).vm.$emit('update:modelValue', value);
+        await wrapper.vm.$nextTick();
+    }
+
+    function entityOptionIds(wrapper) {
+        return wrapper.findComponent(SearchSelect).props('options').map((o) => o.id);
+    }
+
+    function fillReason(text) {
+        const textarea = document.body.querySelector('textarea');
+        textarea.value = text;
+        textarea.dispatchEvent(new Event('input'));
+    }
+
+    // Alterna para "compra paga" e, após o re-render, informa o valor em reais.
+    async function setPurchaseAmount(wrapper, reais) {
+        const purchaseRadio = document.body.querySelector('#kind-purchase');
+        purchaseRadio.checked = true;
+        purchaseRadio.dispatchEvent(new Event('change'));
+        await wrapper.vm.$nextTick();
+
+        const amount = document.body.querySelector('input[type="number"][step="0.01"]');
+        if (amount && reais != null) {
+            amount.value = String(reais);
+            amount.dispatchEvent(new Event('input'));
+            await wrapper.vm.$nextTick();
+        }
+    }
+
+    function submitBtn() {
+        return document.body.querySelector('button[type="submit"]');
     }
 
     beforeEach(() => {
@@ -72,48 +106,56 @@ describe('ManualCreditModal', () => {
         const wrapper = mountModal();
         const modal = document.body.querySelector('.modal');
         expect(modal).not.toBeNull();
-        expect(modal.textContent).toContain('Adicionar crédito manual');
+        expect(modal.textContent).toContain('Conceder crédito a uma clínica');
         wrapper.unmount();
     });
 
     it('botão submit começa desabilitado (form vazio)', () => {
         const wrapper = mountModal();
-        const submit = document.body.querySelector('button[type="submit"]');
-        expect(submit.disabled).toBe(true);
+        expect(submitBtn().disabled).toBe(true);
         wrapper.unmount();
     });
 
-    it('botão submit fica habilitado quando entity + credits + reason ≥ 10 chars', async () => {
+    it('botão submit fica habilitado quando entity + credits + reason ≥ 10 chars (cortesia)', async () => {
         const wrapper = mountModal();
 
-        const select = document.body.querySelector('select');
-        select.value = 'ent-client-a';
-        select.dispatchEvent(new Event('change'));
-
-        const textarea = document.body.querySelector('textarea');
-        textarea.value = 'cortesia institucional por incidente xpto';
-        textarea.dispatchEvent(new Event('input'));
-
+        await selectEntity(wrapper, 'ent-client-a');
+        fillReason('cortesia institucional por incidente xpto');
         await wrapper.vm.$nextTick();
 
-        const submit = document.body.querySelector('button[type="submit"]');
-        expect(submit.disabled).toBe(false);
+        expect(submitBtn().disabled).toBe(false);
         wrapper.unmount();
     });
 
     it('rejeita reason com menos de 10 caracteres', async () => {
         const wrapper = mountModal();
 
-        document.body.querySelector('select').value = 'ent-client-a';
-        document.body.querySelector('select').dispatchEvent(new Event('change'));
-
-        const textarea = document.body.querySelector('textarea');
-        textarea.value = 'curto';
-        textarea.dispatchEvent(new Event('input'));
-
+        await selectEntity(wrapper, 'ent-client-a');
+        fillReason('curto');
         await wrapper.vm.$nextTick();
 
-        expect(document.body.querySelector('button[type="submit"]').disabled).toBe(true);
+        expect(submitBtn().disabled).toBe(true);
+        wrapper.unmount();
+    });
+
+    it('na compra paga, submit fica desabilitado sem valor e habilita ao informar amount_reais', async () => {
+        const wrapper = mountModal();
+
+        await selectEntity(wrapper, 'ent-client-a');
+        fillReason('compra avulsa de créditos paga via pix');
+        await wrapper.vm.$nextTick();
+
+        // Alterna para "compra" sem informar valor → inválido
+        await setPurchaseAmount(wrapper, null);
+        expect(submitBtn().disabled).toBe(true);
+
+        // Informa valor em reais → válido
+        const amount = document.body.querySelector('input[type="number"][step="0.01"]');
+        amount.value = '249.90';
+        amount.dispatchEvent(new Event('input'));
+        await wrapper.vm.$nextTick();
+
+        expect(submitBtn().disabled).toBe(false);
         wrapper.unmount();
     });
 
@@ -122,38 +164,30 @@ describe('ManualCreditModal', () => {
             permissions: { ...defaultPermissions, create_manual_for_internal: false },
         });
 
-        const options = Array.from(document.body.querySelector('select').options)
-            .map((o) => o.value)
-            .filter(Boolean);
-
-        expect(options).toContain('ent-client-a');
-        expect(options).toContain('ent-client-b');
-        expect(options).not.toContain('ent-internal');
+        const ids = entityOptionIds(wrapper);
+        expect(ids).toContain('ent-client-a');
+        expect(ids).toContain('ent-client-b');
+        expect(ids).not.toContain('ent-internal');
         wrapper.unmount();
     });
 
     it('inclui entity interna na lista quando permission é true', () => {
         const wrapper = mountModal();
-        const options = Array.from(document.body.querySelector('select').options).map((o) => o.value);
-        expect(options).toContain('ent-internal');
+        expect(entityOptionIds(wrapper)).toContain('ent-internal');
         wrapper.unmount();
     });
 
     it('pré-seleciona entity via presetEntityId ao abrir', async () => {
         const wrapper = mountModal({ open: false, presetEntityId: 'ent-internal' });
 
-        // Simula abertura
         await wrapper.setProps({ open: true });
         await wrapper.vm.$nextTick();
 
-        const select = document.body.querySelector('select');
-        expect(select.value).toBe('ent-internal');
+        expect(wrapper.findComponent(SearchSelect).props('modelValue')).toBe('ent-internal');
         wrapper.unmount();
     });
 
     it('mostra badge "Sua empresa" ao selecionar entity interna', async () => {
-        // Monta fechado e abre depois para que o watch(open) dispare e
-        // aplique o presetEntityId — simula o fluxo real de "abrir modal".
         const wrapper = mountModal({ open: false, presetEntityId: 'ent-internal' });
         await wrapper.setProps({ open: true });
         await wrapper.vm.$nextTick();
@@ -167,7 +201,6 @@ describe('ManualCreditModal', () => {
         await wrapper.setProps({ open: true });
         await wrapper.vm.$nextTick();
 
-        // Badge só aparece em entity interna
         const badge = document.body.querySelector('.badge.bg-primary-subtle');
         expect(badge).toBeNull();
         wrapper.unmount();
@@ -187,16 +220,11 @@ describe('ManualCreditModal', () => {
         wrapper.unmount();
     });
 
-    it('emite submit com payload completo quando form é válido', async () => {
+    it('emite submit de cortesia com payload correto (kind=courtesy, amount_reais=0)', async () => {
         const wrapper = mountModal();
 
-        document.body.querySelector('select').value = 'ent-client-a';
-        document.body.querySelector('select').dispatchEvent(new Event('change'));
-
-        const textarea = document.body.querySelector('textarea');
-        textarea.value = 'motivo válido com mais de 10 caracteres';
-        textarea.dispatchEvent(new Event('input'));
-
+        await selectEntity(wrapper, 'ent-client-a');
+        fillReason('motivo válido com mais de 10 caracteres');
         await wrapper.vm.$nextTick();
 
         document.body.querySelector('form').dispatchEvent(new Event('submit'));
@@ -207,19 +235,36 @@ describe('ManualCreditModal', () => {
         expect(payload.entity_id).toBe('ent-client-a');
         expect(payload.credits).toBe(100);                              // default
         expect(payload.reason).toBe('motivo válido com mais de 10 caracteres');
-        expect(payload.package_code).toBe('manual');                    // default
+        expect(payload.kind).toBe('courtesy');                          // default
+        expect(payload.amount_reais).toBe(0);                           // cortesia não tem valor
+        expect(payload.package_code).toBeUndefined();                   // não enviamos mais package_code
+        wrapper.unmount();
+    });
+
+    it('emite submit de compra paga com amount_reais informado', async () => {
+        const wrapper = mountModal();
+
+        await selectEntity(wrapper, 'ent-client-b');
+        fillReason('compra avulsa paga fora do app via boleto');
+        await wrapper.vm.$nextTick();
+
+        await setPurchaseAmount(wrapper, '249.90');
+
+        document.body.querySelector('form').dispatchEvent(new Event('submit'));
+        await wrapper.vm.$nextTick();
+
+        const payload = wrapper.emitted('submit')[0][0];
+        expect(payload.kind).toBe('purchase');
+        expect(payload.amount_reais).toBe(249.9);
         wrapper.unmount();
     });
 
     it('reseta o form quando reabre (watch open: false→true)', async () => {
         const wrapper = mountModal();
 
-        const textarea = document.body.querySelector('textarea');
-        textarea.value = 'algum texto antigo';
-        textarea.dispatchEvent(new Event('input'));
+        fillReason('algum texto antigo');
         await wrapper.vm.$nextTick();
 
-        // Fecha e reabre
         await wrapper.setProps({ open: false });
         await wrapper.setProps({ open: true });
         await wrapper.vm.$nextTick();

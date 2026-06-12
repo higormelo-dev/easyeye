@@ -16,7 +16,13 @@ import ProviderCostsCard from './ProviderCostsCard.vue';
 import ProviderTopupModal from './ProviderTopupModal.vue';
 
 /**
- * Manager: gestão de pedidos de compra de créditos IA + crédito manual + consumo por provedor.
+ * Manager: dois trabalhos do dono do SaaS, separados em abas claras —
+ *   1. Recargas nos provedores (o que você gasta, em USD).
+ *   2. Créditos das clínicas (o que você distribui: cortesia ou compra paga).
+ *
+ * Uma faixa de resumo no topo liga os dois (saldo nos provedores × distribuído ×
+ * margem). O antigo funil de aprovação de pedido (pouco usado) virou um aviso
+ * discreto que só aparece quando há pedidos de cliente pendentes.
  *
  * RBAC (props.permissions):
  *   - credit, fail                 : Admin + Financial
@@ -25,6 +31,7 @@ import ProviderTopupModal from './ProviderTopupModal.vue';
  *   - create_manual                : Admin + Financial + Support (limite diário p/ Support)
  *   - create_manual_unlimited      : Admin + Financial
  *   - create_manual_for_internal   : Admin only (entity interna do SaaS)
+ *   - create_topup / delete_topup  : Financial / Admin
  *
  * Toda ação destrutiva passa por ConfirmationWithReasonModal — reason vai para audit_log.
  */
@@ -66,6 +73,60 @@ function applyFilters() {
 
 function clearFilters() {
     Object.keys(filterForm).forEach(k => filterForm[k] = '');
+    applyFilters();
+}
+
+// ── Abas: separa os dois trabalhos (clínicas x provedores) ────────────────────
+const activeTab = ref('clients');
+
+// ── Faixa de resumo (liga os dois trabalhos) ──────────────────────────────────
+function fmtUsd(v) {
+    return '$' + Number(v ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtNum(n) {
+    return Number(n ?? 0).toLocaleString('pt-BR');
+}
+
+const ALERT_ORDER   = { ok: 0, warning: 1, critical: 2, exhausted: 3 };
+const ALERT_VARIANT = { ok: 'success', warning: 'warning', critical: 'danger', exhausted: 'danger' };
+
+function alertLabel(level) {
+    const fallback = { ok: 'OK', warning: 'Atenção', critical: 'Crítico', exhausted: 'Esgotado' };
+    return props.t?.summary?.alert?.[level] ?? fallback[level] ?? '';
+}
+
+// Soma o saldo estimado restante de todos os provedores que têm recarga registrada.
+const providersBalance = computed(() => {
+    const byProvider = props.providerCosts?.by_provider ?? {};
+    let total = 0;
+    let hasAny = false;
+    let worst = 'ok';
+    for (const info of Object.values(byProvider)) {
+        const eb = info?.estimated_balance;
+        if (eb?.has_topups) {
+            hasAny = true;
+            total += eb.remaining_usd ?? 0;
+            if ((ALERT_ORDER[eb.alert_level] ?? -1) > (ALERT_ORDER[worst] ?? -1)) worst = eb.alert_level;
+        }
+    }
+    return { total, hasAny, worst, variant: ALERT_VARIANT[worst] ?? 'secondary' };
+});
+
+const margin = computed(() => props.providerCosts?.margin ?? {});
+const marginVariant = computed(() => {
+    const pct = margin.value?.gross_margin_pct ?? 0;
+    if (pct >= 40) return 'success';
+    if (pct >= 20) return 'warning';
+    return 'danger';
+});
+
+const distributed  = computed(() => props.kpis?.distributed_mtd ?? {});
+const pendingCount  = computed(() => props.kpis?.pending?.count ?? 0);
+
+// Mostra os pedidos de cliente pendentes (fluxo raro) na aba de clínicas.
+function viewPending() {
+    activeTab.value = 'clients';
+    filterForm.status = 'pending_payment';
     applyFilters();
 }
 
@@ -274,19 +335,14 @@ function onRefund(purchase) {
     });
 }
 
-// ── Abas: separa os dois trabalhos (provedores x clínicas) ────────────────────
-const activeTab = ref('clients');
-
-// Classifica a linha: cortesia (R$ 0 admin), avulsa (manual paga) ou compra do cliente.
-function purchaseKind(p) {
-    const manual = ['manual', 'courtesy'].includes(p.package_code);
-    if (manual && (p.amount_cents ?? 0) === 0) {
-        return { label: props.t?.kind?.courtesy ?? 'Cortesia', cls: 'bg-info-subtle text-info' };
+// Classe do badge de tipo (kind vem pronto do backend: courtesy | purchase | client).
+function kindClass(kind) {
+    switch (kind) {
+        case 'courtesy': return 'bg-info-subtle text-info';
+        case 'purchase': return 'bg-success-subtle text-success';
+        case 'client':   return 'bg-primary-subtle text-primary';
+        default:         return 'bg-secondary-subtle text-secondary';
     }
-    if (manual) {
-        return { label: props.t?.kind?.manual ?? 'Avulsa (admin)', cls: 'bg-secondary-subtle text-secondary' };
-    }
-    return { label: props.t?.kind?.client ?? 'Compra (cliente)', cls: 'bg-success-subtle text-success' };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -322,13 +378,106 @@ function providerIcon(provider) {
 </script>
 
 <template>
-    <AppLayout :title="t?.title ?? 'Compras de créditos IA'" :breadcrumbs="breadcrumbs">
+    <AppLayout :title="t?.title ?? 'Créditos de IA'" :breadcrumbs="breadcrumbs">
         <div class="ai-credit-purchases-screen">
 
             <PageHeader
                 :title="t?.title ?? 'Créditos de IA'"
                 :subtitle="t?.subtitle ?? 'Recargas nos provedores e distribuição de créditos às clínicas.'"
             />
+
+            <!-- ─── Faixa de resumo: liga os dois trabalhos ────────────────── -->
+            <div class="row g-2 mb-3">
+                <!-- Saldo nos provedores (lado oferta) -->
+                <div class="col-12 col-md-4">
+                    <div class="card h-100 summary-card summary-card--providers" role="button" @click="activeTab = 'providers'">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="text-muted small">
+                                    <i class="ti ti-server-bolt text-primary me-1"></i>
+                                    {{ t?.summary?.providers_balance ?? 'Saldo nos provedores' }}
+                                </span>
+                                <span
+                                    v-if="providersBalance.hasAny"
+                                    class="badge"
+                                    :class="`bg-${providersBalance.variant}-subtle text-${providersBalance.variant}`"
+                                >{{ alertLabel(providersBalance.worst) }}</span>
+                            </div>
+                            <h4 v-if="providersBalance.hasAny" class="mb-0 mt-1 fw-bold">{{ fmtUsd(providersBalance.total) }}</h4>
+                            <h4 v-else class="mb-0 mt-1 text-muted">—</h4>
+                            <div class="small text-muted mt-1">
+                                {{ providersBalance.hasAny
+                                    ? (t?.summary?.providers_balance_help ?? 'estimado restante (USD)')
+                                    : (t?.summary?.providers_no_data ?? 'sem recarga registrada') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Distribuído no mês (lado demanda) -->
+                <div class="col-12 col-md-4">
+                    <div class="card h-100 summary-card summary-card--clients" role="button" @click="activeTab = 'clients'">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="text-muted small">
+                                    <i class="ti ti-coins text-success me-1"></i>
+                                    {{ t?.summary?.distributed ?? 'Distribuído no mês' }}
+                                </span>
+                            </div>
+                            <h4 class="mb-0 mt-1 fw-bold">
+                                {{ fmtNum(distributed.credits) }}
+                                <small class="text-muted fw-normal" style="font-size: .7rem;">{{ t?.summary?.distributed_help ?? 'créditos' }}</small>
+                            </h4>
+                            <div class="small mt-1">
+                                <span class="text-info">
+                                    <i class="ti ti-gift"></i> {{ fmtNum(distributed.courtesy_credits) }} {{ t?.summary?.courtesy ?? 'cortesia' }}
+                                </span>
+                                <span class="text-muted mx-1">·</span>
+                                <span class="text-success">
+                                    <i class="ti ti-cash"></i> {{ fmtNum(distributed.paid_credits) }} {{ t?.summary?.paid ?? 'compra' }}
+                                </span>
+                            </div>
+                            <div class="small text-muted mt-1">{{ distributed.amount_formatted ?? 'R$ 0,00' }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Margem bruta (elo entre os dois) -->
+                <div class="col-12 col-md-4">
+                    <div class="card h-100 summary-card">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <span class="text-muted small">
+                                    <i class="ti ti-trending-up me-1" :class="`text-${marginVariant}`"></i>
+                                    {{ t?.summary?.margin ?? 'Margem bruta (mês)' }}
+                                </span>
+                            </div>
+                            <h4 class="mb-0 mt-1 fw-bold" :class="`text-${marginVariant}`">{{ margin.gross_margin_pct ?? 0 }}%</h4>
+                            <div class="small fw-semibold mt-1" :class="`text-${marginVariant}`">
+                                {{ fmtUsd(margin.gross_margin_usd) }}
+                            </div>
+                            <div class="small text-muted mt-1">{{ t?.summary?.margin_help ?? 'receita estimada − custo dos provedores' }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── Aviso discreto: pedidos de cliente pendentes ───────────── -->
+            <div
+                v-if="pendingCount > 0"
+                class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 small mb-3"
+            >
+                <div class="d-flex align-items-center gap-2">
+                    <i class="ti ti-clock-exclamation"></i>
+                    <div>
+                        <strong>{{ (t?.pending_alert?.title ?? ':count pedido(s) de cliente aguardando aprovação').replace(':count', pendingCount) }}</strong>
+                        <div class="text-muted">{{ t?.pending_alert?.body ?? '' }}</div>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-warning" @click="viewPending">
+                    <i class="ti ti-arrow-right me-1"></i>{{ t?.pending_alert?.action ?? 'Ver pendentes' }}
+                </button>
+            </div>
 
             <!-- ─── Abas: separam os dois trabalhos do dono do SaaS ────────── -->
             <ul class="nav nav-tabs mb-3">
@@ -339,8 +488,8 @@ function providerIcon(provider) {
                         :class="{ active: activeTab === 'clients' }"
                         @click="activeTab = 'clients'"
                     >
-                        <i class="ti ti-building-store me-1"></i>
-                        {{ t?.tabs?.clients ?? 'Empresas clientes (créditos)' }}
+                        <i class="ti ti-building-hospital me-1"></i>
+                        {{ t?.tabs?.clients ?? 'Créditos das clínicas' }}
                     </button>
                 </li>
                 <li class="nav-item">
@@ -351,23 +500,27 @@ function providerIcon(provider) {
                         @click="activeTab = 'providers'"
                     >
                         <i class="ti ti-server-bolt me-1"></i>
-                        {{ t?.tabs?.providers ?? 'Provedores (saldo)' }}
+                        {{ t?.tabs?.providers ?? 'Recargas nos provedores' }}
                     </button>
                 </li>
             </ul>
 
-            <!-- ════════════ ABA: EMPRESAS CLIENTES (créditos / R$) ════════════ -->
+            <!-- ════════════ ABA: CRÉDITOS DAS CLÍNICAS ════════════ -->
             <div v-show="activeTab === 'clients'">
 
-                <div class="d-flex justify-content-end mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <p class="text-muted small mb-0 flex-grow-1">
+                        <i class="ti ti-info-circle me-1"></i>
+                        {{ t?.tab_help?.clients ?? 'Conceda cortesia ou registre uma compra paga direto na carteira de uma clínica.' }}
+                    </p>
                     <button
                         v-if="permissions?.create_manual"
                         type="button"
-                        class="btn btn-success btn-sm"
+                        class="btn btn-success btn-sm flex-shrink-0"
                         @click="openManualModal()"
                     >
                         <i class="ti ti-coin-plus me-1"></i>
-                        {{ t?.actions?.create_manual ?? 'Dar crédito (cortesia ou compra)' }}
+                        {{ t?.actions?.create_manual ?? 'Conceder crédito à clínica' }}
                     </button>
                 </div>
 
@@ -380,75 +533,6 @@ function providerIcon(provider) {
                     @add-credit="openManualModal"
                 />
 
-            <!-- ─── KPIs ─────────────────────────────────────────────────── -->
-            <div class="row g-2 mb-3">
-                <div class="col-12 col-md-6 col-xl-3">
-                    <div class="card h-100">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <span class="text-muted small">{{ t?.kpi?.pending ?? 'Pendentes' }}</span>
-                                <i class="ti ti-clock text-warning"></i>
-                            </div>
-                            <h4 class="mb-0 mt-1">{{ kpis?.pending?.count ?? 0 }}</h4>
-                            <small class="text-warning fw-semibold">
-                                {{ kpis?.pending?.amount_formatted ?? 'R$ 0,00' }}
-                            </small>
-                            <div class="small text-muted mt-1">{{ t?.kpi?.pending_help }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-6 col-xl-3">
-                    <div class="card h-100">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <span class="text-muted small">{{ t?.kpi?.credited_30d ?? 'Creditados (30d)' }}</span>
-                                <i class="ti ti-coin text-success"></i>
-                            </div>
-                            <h4 class="mb-0 mt-1">{{ kpis?.credited_30d?.amount_formatted ?? 'R$ 0,00' }}</h4>
-                            <small class="text-success fw-semibold">
-                                {{ kpis?.credited_30d?.credits_sold ?? 0 }} {{ t?.kpi?.credits_sold ?? 'créditos vendidos' }}
-                            </small>
-                            <div class="small text-muted mt-1">
-                                {{ kpis?.credited_30d?.count ?? 0 }} pedidos
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-6 col-xl-3">
-                    <div class="card h-100">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <span class="text-muted small">{{ t?.kpi?.conversion ?? 'Conversão (30d)' }}</span>
-                                <i class="ti ti-trending-up text-info"></i>
-                            </div>
-                            <h4 class="mb-0 mt-1">{{ kpis?.funnel_30d?.conversion_pct ?? 0 }}%</h4>
-                            <small class="text-info fw-semibold">
-                                {{ kpis?.funnel_30d?.credited ?? 0 }} de {{ kpis?.funnel_30d?.total ?? 0 }}
-                            </small>
-                            <div class="small text-muted mt-1">{{ t?.kpi?.conversion_help }}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-12 col-md-6 col-xl-3">
-                    <div class="card h-100">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <span class="text-muted small">{{ t?.kpi?.abandonment ?? 'Abandono (30d)' }}</span>
-                                <i class="ti ti-x text-danger"></i>
-                            </div>
-                            <h4 class="mb-0 mt-1">{{ kpis?.funnel_30d?.abandonment_pct ?? 0 }}%</h4>
-                            <small class="text-danger fw-semibold">
-                                {{ kpis?.funnel_30d?.cancelled ?? 0 }} cancelados / {{ kpis?.funnel_30d?.failed ?? 0 }} falhas
-                            </small>
-                            <div class="small text-muted mt-1">do funil dos últimos 30 dias</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- ─── Consumo por provedor + Top consumers + Filtros ─────────── -->
             <div class="row g-2 mb-3">
                 <div class="col-12 col-xl-4">
@@ -459,7 +543,7 @@ function providerIcon(provider) {
                     <div class="card h-100">
                         <div class="card-header py-2 d-flex align-items-center">
                             <i class="ti ti-trophy text-warning me-2"></i>
-                            <strong class="small">{{ t?.kpi?.top_consumers ?? 'Top 5 (30 dias)' }}</strong>
+                            <strong class="small">{{ t?.kpi?.top_consumers ?? 'Top 5 clínicas (30 dias)' }}</strong>
                         </div>
                         <div class="card-body p-2">
                             <div v-if="topConsumers.length === 0" class="text-muted text-center small py-3">
@@ -478,7 +562,7 @@ function providerIcon(provider) {
                                                     <i class="ti ti-building"></i>
                                                 </span>
                                             </div>
-                                            <small class="text-muted">{{ c.purchases_total }} compras</small>
+                                            <small class="text-muted">{{ c.purchases_total }} lançamentos</small>
                                         </td>
                                         <td class="text-end">
                                             <div class="fw-semibold small">{{ c.credits_total.toLocaleString('pt-BR') }}</div>
@@ -495,7 +579,7 @@ function providerIcon(provider) {
                     <div class="card h-100">
                         <div class="card-header py-2 d-flex align-items-center">
                             <i class="ti ti-filter text-secondary me-2"></i>
-                            <strong class="small">Filtros</strong>
+                            <strong class="small">{{ t?.filters?.title ?? 'Filtros' }}</strong>
                         </div>
                         <div class="card-body p-3">
                             <form @submit.prevent="applyFilters" class="row g-2">
@@ -541,7 +625,7 @@ function providerIcon(provider) {
                                         {{ t?.filters?.clear ?? 'Limpar' }}
                                     </button>
                                     <button type="submit" class="btn btn-sm btn-primary">
-                                        <i class="ti ti-search me-1"></i>Filtrar
+                                        <i class="ti ti-search me-1"></i>{{ t?.filters?.apply ?? 'Filtrar' }}
                                     </button>
                                 </div>
                             </form>
@@ -558,8 +642,7 @@ function providerIcon(provider) {
                             <tr>
                                 <th class="ps-3">{{ t?.columns?.created_at ?? 'Solicitado em' }}</th>
                                 <th>{{ t?.columns?.entity ?? 'Empresa' }}</th>
-                                <th>{{ t?.columns?.provider ?? 'Provedor' }}</th>
-                                <th>{{ t?.columns?.package ?? 'Pacote' }}</th>
+                                <th>{{ t?.columns?.package ?? 'Tipo' }}</th>
                                 <th class="text-end">{{ t?.columns?.credits ?? 'Créditos' }}</th>
                                 <th class="text-end">{{ t?.columns?.amount ?? 'Valor' }}</th>
                                 <th>{{ t?.columns?.requested_by ?? 'Solicitante' }}</th>
@@ -569,8 +652,8 @@ function providerIcon(provider) {
                         </thead>
                         <tbody>
                             <tr v-if="!hasResults">
-                                <td colspan="9" class="text-center text-muted small py-4">
-                                    {{ t?.empty ?? 'Nenhum pedido encontrado.' }}
+                                <td colspan="8" class="text-center text-muted small py-4">
+                                    {{ t?.empty ?? 'Nenhum lançamento encontrado.' }}
                                 </td>
                             </tr>
                             <tr v-for="p in purchases.data" :key="p.id" @click="openDetail(p)" style="cursor: pointer;">
@@ -586,21 +669,18 @@ function providerIcon(provider) {
                                     </div>
                                 </td>
                                 <td>
-                                    <span v-if="p.provider" :class="providerBadgeClass(p.provider)">
-                                        <i :class="providerIcon(p.provider)" class="me-1"></i>
-                                        {{ p.provider_label }}
-                                    </span>
-                                    <span v-else class="text-muted small">—</span>
-                                </td>
-                                <td>
-                                    <div class="small d-flex align-items-center gap-1">
-                                        {{ p.package_name }}
-                                        <span class="badge" :class="purchaseKind(p).cls">{{ purchaseKind(p).label }}</span>
+                                    <span class="badge" :class="kindClass(p.kind)">{{ p.kind_label }}</span>
+                                    <div v-if="p.provider" class="mt-1">
+                                        <span :class="providerBadgeClass(p.provider)" style="font-size: .65rem;">
+                                            <i :class="providerIcon(p.provider)" class="me-1"></i>{{ p.provider_label }}
+                                        </span>
                                     </div>
-                                    <small class="text-muted">{{ p.package_code }}</small>
                                 </td>
                                 <td class="text-end fw-semibold">{{ p.credits.toLocaleString('pt-BR') }}</td>
-                                <td class="text-end fw-semibold">{{ p.amount_formatted }}</td>
+                                <td class="text-end fw-semibold">
+                                    <span v-if="p.amount_cents > 0">{{ p.amount_formatted }}</span>
+                                    <span v-else class="text-muted">—</span>
+                                </td>
                                 <td>
                                     <div class="small">{{ p.requested_by ?? '—' }}</div>
                                     <small v-if="p.requested_email" class="text-muted">{{ p.requested_email }}</small>
@@ -667,19 +747,23 @@ function providerIcon(provider) {
                     </div>
                 </div>
             </div>
-            </div><!-- /aba: empresas clientes -->
+            </div><!-- /aba: créditos das clínicas -->
 
-            <!-- ════════════ ABA: PROVEDORES (saldo / USD) ════════════ -->
+            <!-- ════════════ ABA: RECARGAS NOS PROVEDORES (saldo / USD) ════════════ -->
             <div v-show="activeTab === 'providers'">
-                <div class="d-flex justify-content-end mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                    <p class="text-muted small mb-0 flex-grow-1">
+                        <i class="ti ti-info-circle me-1"></i>
+                        {{ t?.tab_help?.providers ?? 'Registre quanto você carregou em cada provedor de IA para acompanhar o saldo restante.' }}
+                    </p>
                     <button
                         v-if="permissions?.create_topup"
                         type="button"
-                        class="btn btn-primary btn-sm"
+                        class="btn btn-primary btn-sm flex-shrink-0"
                         @click="openTopupModal()"
                     >
                         <i class="ti ti-plus me-1"></i>
-                        {{ t?.actions?.create_topup ?? 'Registrar recarga' }}
+                        {{ t?.actions?.create_topup ?? 'Registrar recarga no provedor' }}
                     </button>
                 </div>
 
@@ -719,19 +803,18 @@ function providerIcon(provider) {
             @close="closeReasonModal"
             @confirm="handleReasonConfirm" />
 
-        <!-- ─── Modal de crédito manual ──────────────────────────────────── -->
+        <!-- ─── Modal de concessão de crédito à clínica ──────────────────── -->
         <ManualCreditModal
             ref="manualModalRef"
             :open="manualModalOpen"
             :entities="entities"
-            :providers="providerOptions"
             :permissions="permissions"
             :preset-entity-id="presetEntityId"
             :t="t"
             @close="closeManualModal"
             @submit="submitManual" />
 
-        <!-- ─── Modal de topup de provedor (lado supplier) ───────────────── -->
+        <!-- ─── Modal de recarga de provedor (lado oferta) ───────────────── -->
         <ProviderTopupModal
             ref="topupModalRef"
             :open="topupModalOpen"
@@ -746,4 +829,14 @@ function providerIcon(provider) {
 .ai-credit-purchases-screen {
     padding: 0.5rem 0;
 }
+.summary-card {
+    border: 1px solid #e2e8f0;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.summary-card[role="button"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+.summary-card--providers { border-left: 3px solid var(--bs-primary); }
+.summary-card--clients   { border-left: 3px solid var(--bs-success); }
 </style>

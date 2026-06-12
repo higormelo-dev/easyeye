@@ -317,6 +317,11 @@ function closePdfPreview() {
                                     <span class="badge badge-soft-info text-info">
                                         {{ doc.type_label }}
                                     </span>
+                                    <span v-if="doc.is_ai"
+                                          class="badge bg-info text-dark ms-1"
+                                          :title="doc.ai_workflow_label || 'Gerado por IA'">
+                                        <i class="ti ti-robot me-1"></i>IA
+                                    </span>
                                 </td>
                                 <td>
                                     <div class="fw-medium small">{{ doc.title }}</div>

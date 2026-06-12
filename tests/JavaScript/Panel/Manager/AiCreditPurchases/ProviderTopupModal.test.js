@@ -39,6 +39,16 @@ describe('ProviderTopupModal', () => {
         });
     }
 
+    // Os dois campos numéricos compartilham type/step; distinguimos pelo max:
+    // R$ (valor pago) usa max=99999999; US$ (creditado) usa max=1000000.
+    const brlInput = () => document.body.querySelector('input[type="number"][max="99999999"]');
+    const usdInput = () => document.body.querySelector('input[type="number"][max="1000000"]');
+
+    function fillNumber(input, value) {
+        input.value = String(value);
+        input.dispatchEvent(new Event('input'));
+    }
+
     beforeEach(() => {
         document.body.innerHTML = '';
     });
@@ -86,17 +96,22 @@ describe('ProviderTopupModal', () => {
         wrapper.unmount();
     });
 
-    it('valor padrão = 100 USD', () => {
+    it('valor padrão = 100 creditado no provedor (US$)', () => {
         const wrapper = mountModal();
-        const valueInput = document.body.querySelector('input[type="number"]');
-        expect(Number(valueInput.value)).toBe(100);
+        expect(Number(usdInput().value)).toBe(100);
         wrapper.unmount();
     });
 
-    it('isValid=true por padrão (valores default são válidos)', () => {
+    it('isValid só fica true após informar o valor pago (R$)', async () => {
         const wrapper = mountModal();
-        const submit = document.body.querySelector('button[type="submit"]');
-        expect(submit.disabled).toBe(false);
+
+        // Sem valor pago (amount_brl) o form é inválido, mesmo com US$ default.
+        expect(document.body.querySelector('button[type="submit"]').disabled).toBe(true);
+
+        fillNumber(brlInput(), '550');
+        await wrapper.vm.$nextTick();
+
+        expect(document.body.querySelector('button[type="submit"]').disabled).toBe(false);
         wrapper.unmount();
     });
 
@@ -128,10 +143,8 @@ describe('ProviderTopupModal', () => {
         await wrapper.setProps({ open: true });
         await wrapper.vm.$nextTick();
 
-        const valueInput = document.body.querySelector('input[type="number"]');
-        valueInput.value = '250.5';
-        valueInput.dispatchEvent(new Event('input'));
-
+        fillNumber(brlInput(), '1300');
+        fillNumber(usdInput(), '250.5');
         await wrapper.vm.$nextTick();
 
         document.body.querySelector('form').dispatchEvent(new Event('submit'));
@@ -142,6 +155,7 @@ describe('ProviderTopupModal', () => {
 
         expect(payload.provider).toBe('anthropic');
         expect(payload.amount_usd).toBe(250.5);
+        expect(payload.amount_brl).toBe(1300);
         expect(payload.reference).toBeNull();                           // vazio → null
         expect(payload.note).toBeNull();
         expect(payload.topped_up_at).toBeTruthy();                      // datetime preenchido por default
@@ -150,6 +164,8 @@ describe('ProviderTopupModal', () => {
 
     it('emite submit com reference e note quando preenchidos', async () => {
         const wrapper = mountModal();
+
+        fillNumber(brlInput(), '550');                                   // valor pago obrigatório
 
         const inputs = document.body.querySelectorAll('input[type="text"]');
         const refInput = inputs[0];                                      // referência é o primeiro text

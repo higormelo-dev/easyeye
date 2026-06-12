@@ -266,6 +266,8 @@ return [
         'gateways'              => 'Gateways',
         'users'                 => 'Usuários',
         'ai_assistant'          => 'Assistente de IA',
+        'ai_usage'              => 'Consumo & dashboard',
+        'ai_prompts'            => 'Meus prompts',
     ],
     'reports' => [
         'schedules'         => 'Relatório de Produção',

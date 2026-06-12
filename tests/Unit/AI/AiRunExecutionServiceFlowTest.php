@@ -228,6 +228,14 @@ class InMemoryRunRepository implements AiRunRepositoryInterface
             'error_message' => $errorMessage,
         ]);
     }
+
+    public function markCancelled(AiRun $run): void
+    {
+        $run->forceFill([
+            'status'       => AiRunStatus::Cancelled,
+            'cancelled_at' => $run->cancelled_at ?? now(),
+        ]);
+    }
 }
 
 function buildLedgerEntry(): AiCreditLedgerEntry

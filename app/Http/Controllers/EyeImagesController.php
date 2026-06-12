@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings};
+use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaService};
 use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\FeatureKey;
 use App\Models\{Doctor, Entity, Patient, PatientExam};
@@ -22,6 +22,7 @@ class EyeImagesController extends Controller
         private readonly FeatureGateService $featureGate,
         private readonly AiProviderSettings $providerSettings,
         private readonly AiCreditWalletService $walletService,
+        private readonly AiQuotaService $quotaService,
     ) {
     }
 
@@ -88,14 +89,31 @@ class EyeImagesController extends Controller
                 'can_consensus' => $canConsensus,
                 'modes'         => $modes,
                 'balance'       => $this->walletService->balance($entityId),
+                'quota'         => $this->quotaService->currentMonthSnapshot($entityId),
                 'max_images'    => (int) config('ai.eye_image.max_images', 4),
                 'urls'          => [
-                    'estimate' => route('panel.ai-runs.estimate'),
-                    'store'    => route('panel.ai-runs.store'),
-                    'show'     => route('panel.ai-runs.show', ['aiRun' => '__ID__']),
-                    'approve'  => route('panel.ai-runs.approve', ['aiRun' => '__ID__']),
-                    'reject'   => route('panel.ai-runs.reject', ['aiRun' => '__ID__']),
-                    'record'   => route('panel.ai-runs.record', ['aiRun' => '__ID__']),
+                    'estimate'   => route('panel.ai-runs.estimate'),
+                    'store'      => route('panel.ai-runs.store'),
+                    'show'       => route('panel.ai-runs.show', ['aiRun' => '__ID__']),
+                    'approve'    => route('panel.ai-runs.approve', ['aiRun' => '__ID__']),
+                    'reject'     => route('panel.ai-runs.reject', ['aiRun' => '__ID__']),
+                    'cancel'     => route('panel.ai-runs.cancel', ['aiRun' => '__ID__']),
+                    'record'     => route('panel.ai-runs.record', ['aiRun' => '__ID__']),
+                    'by_patient' => route('panel.ai-runs.by-patient', ['patient' => '__ID__']),
+                    'image_url'  => route('panel.eye-images.image-url', ['exam' => '__ID__']),
+                    // Onda 3 — endpoints inline
+                    'my_prompts_index'   => route('panel.ai-runs.my-prompts.index'),
+                    'my_prompts_store'   => route('panel.ai-runs.my-prompts.store'),
+                    'my_prompts_destroy' => route('panel.ai-runs.my-prompts.destroy', ['aiPrompt' => '__ID__']),
+                    'escalate'           => route('panel.ai-runs.escalate', ['aiRun' => '__ID__']),
+                    'feedback'           => route('panel.ai-runs.feedback', ['aiRun' => '__ID__']),
+                ],
+                // Rótulos do painel compartilhado (AiAssistantPanel).
+                'assistant'       => trans('ai.assistant'),
+                'workflow_labels' => [
+                    'record_assist'      => __('ai.workflow_record_assist'),
+                    'report_drafting'    => __('ai.workflow_report_drafting'),
+                    'eye_image_analysis' => __('ai.workflow_eye_image_analysis'),
                 ],
                 'labels' => [
                     'workflow_eye_image_analysis' => __('ai.workflow_eye_image_analysis'),

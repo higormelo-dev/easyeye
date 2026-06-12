@@ -1,32 +1,80 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Multiselect from '@vueform/multiselect';
 
 // Select com busca, nativo Vue 3 (sem jQuery, SSR-safe).
 // Drop-in para <select> simples: v-model + :options (array de objetos).
+//
+// Onda 4, C2 — modo remoto opcional:
+//   - remoteSearchUrl: URL com `__Q__` para substituir pela query digitada.
+//     Quando preenchido, busca no servidor (debounced) e substitui as options
+//     que ficam visíveis. As `options` iniciais ainda funcionam como seed.
+//   - remoteMinChars: número mínimo de caracteres para disparar a busca.
 const props = defineProps({
-    modelValue:  { type: [String, Number, Boolean, null], default: null },
-    options:     { type: Array,   default: () => [] },
-    valueKey:    { type: String,  default: 'id' },
-    labelKey:    { type: String,  default: 'name' },
-    placeholder: { type: String,  default: 'Selecione...' },
-    disabled:    { type: Boolean, default: false },
-    clearable:   { type: Boolean, default: true },
-    searchable:  { type: Boolean, default: true },
-    invalid:     { type: Boolean, default: false },
+    modelValue:      { type: [String, Number, Boolean, null], default: null },
+    options:         { type: Array,   default: () => [] },
+    valueKey:        { type: String,  default: 'id' },
+    labelKey:        { type: String,  default: 'name' },
+    placeholder:     { type: String,  default: 'Selecione...' },
+    disabled:        { type: Boolean, default: false },
+    clearable:       { type: Boolean, default: true },
+    searchable:      { type: Boolean, default: true },
+    invalid:         { type: Boolean, default: false },
+    remoteSearchUrl: { type: String,  default: '' },
+    remoteMinChars:  { type: Number,  default: 2 },
 });
 
 const emit = defineEmits(['update:modelValue', 'change']);
 
-// Normaliza '' (valor vazio do form) <-> null (interno do multiselect).
 const value = computed({
     get: () => (props.modelValue === '' ? null : props.modelValue),
     set: (v) => {
         const out = v ?? '';
         emit('update:modelValue', out);
-        emit('change', out); // drop-in para handlers @change (recebe o VALOR, não o evento)
+        emit('change', out);
     },
 });
+
+// ── Onda 4 / C2 — busca remota debounced ───────────────────────────────────
+const remoteOptions = ref([]);
+const effectiveOptions = computed(() => {
+    if (!props.remoteSearchUrl) return props.options;
+    return remoteOptions.value.length ? remoteOptions.value : props.options;
+});
+
+const searchTerm = ref('');
+let remoteTimer = null;
+
+watch(searchTerm, (q) => {
+    if (!props.remoteSearchUrl) return;
+    if (remoteTimer) clearTimeout(remoteTimer);
+
+    const term = (q || '').trim();
+    if (term.length < props.remoteMinChars) {
+        remoteOptions.value = [];
+        return;
+    }
+
+    remoteTimer = setTimeout(async () => {
+        try {
+            const url = props.remoteSearchUrl.replace('__Q__', encodeURIComponent(term));
+            const { data } = await window.axios.get(url);
+            const rows = Array.isArray(data?.data) ? data.data : [];
+            // Normaliza para a forma esperada pelo Multiselect via valueKey/labelKey.
+            remoteOptions.value = rows.map((r) => ({
+                [props.valueKey]: r.id ?? r[props.valueKey],
+                [props.labelKey]: r.label ?? r[props.labelKey],
+                sub_label: r.sub_label ?? '',
+            }));
+        } catch {
+            // silencioso — seed mantém UX funcional
+        }
+    }, 300);
+});
+
+function onSearchChange(q) {
+    searchTerm.value = q ?? '';
+}
 </script>
 
 <template>
@@ -34,7 +82,7 @@ const value = computed({
         v-model="value"
         class="search-select"
         :class="{ 'is-invalid': invalid }"
-        :options="options"
+        :options="effectiveOptions"
         :value-prop="valueKey"
         :label="labelKey"
         :track-by="labelKey"
@@ -46,6 +94,7 @@ const value = computed({
         :disabled="disabled"
         no-options-text="Nenhuma opção"
         no-results-text="Nada encontrado"
+        @search-change="onSearchChange"
     />
 </template>
 

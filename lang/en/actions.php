@@ -265,6 +265,8 @@ return [
         'gateways'              => 'Gateways',
         'users'                 => 'Users',
         'ai_assistant'          => 'AI Assistant',
+        'ai_usage'              => 'Usage & dashboard',
+        'ai_prompts'            => 'My prompts',
     ],
 
     'reports' => [

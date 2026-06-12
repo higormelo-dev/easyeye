@@ -2,17 +2,46 @@
 
 return [
     'title'    => 'AI credits',
-    'subtitle' => 'Provider top-ups and credit distribution to clinics.',
+    'subtitle' => 'Two jobs: top up your provider accounts (what you spend) and distribute credits to clinics (what you hand out).',
 
     'tabs' => [
-        'clients'   => 'Client companies (credits)',
-        'providers' => 'Providers (balance)',
+        'clients'   => 'Clinic credits',
+        'providers' => 'Provider top-ups',
+    ],
+
+    'tab_help' => [
+        'clients'   => 'Grant courtesy or record a paid purchase straight into a clinic wallet.',
+        'providers' => 'Record how much you topped up at each AI provider (OpenAI/Claude/Gemini) to track the remaining balance.',
+    ],
+
+    'summary' => [
+        'providers_balance'      => 'Provider balance',
+        'providers_balance_help' => 'estimated remaining (USD)',
+        'providers_no_data'      => 'no top-up recorded',
+        'distributed'            => 'Distributed this month',
+        'distributed_help'       => 'credits handed to clinics',
+        'courtesy'               => 'courtesy',
+        'paid'                   => 'purchase',
+        'margin'                 => 'Gross margin (month)',
+        'margin_help'            => 'estimated revenue − provider cost',
+        'alert'                  => [
+            'ok'        => 'OK',
+            'warning'   => 'Warning',
+            'critical'  => 'Critical',
+            'exhausted' => 'Exhausted',
+        ],
+    ],
+
+    'pending_alert' => [
+        'title'  => ':count client request(s) awaiting approval',
+        'body'   => 'Requests started by clients in the app. Open to approve, cancel or mark as failed.',
+        'action' => 'View pending',
     ],
 
     'kind' => [
         'courtesy' => 'Courtesy',
-        'manual'   => 'Manual (admin)',
-        'client'   => 'Client purchase',
+        'purchase' => 'One-off purchase',
+        'client'   => 'Client request',
     ],
 
     'providers_empty' => 'Record a top-up to track provider balances.',
@@ -95,6 +124,8 @@ return [
     ],
 
     'filters' => [
+        'title'     => 'Filters',
+        'apply'     => 'Filter',
         'status'    => 'Status',
         'provider'  => 'Provider',
         'entity'    => 'Company',
@@ -108,7 +139,7 @@ return [
     'columns' => [
         'created_at'   => 'Requested at',
         'entity'       => 'Company',
-        'package'      => 'Package',
+        'package'      => 'Type',
         'provider'     => 'Provider',
         'credits'      => 'Credits',
         'amount'       => 'Amount',
@@ -123,8 +154,8 @@ return [
         'cancel'         => 'Cancel purchase',
         'fail'           => 'Mark as gateway failure',
         'refund'         => 'Refund (revoke credits)',
-        'create_manual'  => 'Give credit (courtesy or purchase)',
-        'create_topup'   => 'Record top-up',
+        'create_manual'  => 'Grant credit to clinic',
+        'create_topup'   => 'Record provider top-up',
         'credited'       => 'Credits approved and posted to company wallet.',
         'cancelled'      => 'Purchase cancelled.',
         'marked_failed'  => 'Purchase marked as payment failure.',
@@ -135,29 +166,27 @@ return [
     ],
 
     'manual' => [
-        'package_label'        => 'Manual / Courtesy',
-        'modal_title'          => 'Add manual credit',
-        'modal_subtitle'       => 'Post credits directly to a company wallet without going through payment gateway. Suitable for courtesy, accounting adjustments, or internal use.',
-        'select_entity'        => 'Recipient company',
-        'select_entity_help'   => 'Pick the company that will receive the credits. Your company appears highlighted.',
-        'kind'                 => 'Type',
-        'kind_courtesy'        => 'Courtesy (free)',
-        'kind_purchase'        => 'One-off purchase (paid)',
-        'kind_courtesy_help'   => 'Free credit — no financial value recorded.',
-        'kind_purchase_help'   => 'Paid outside the app — enter the amount charged.',
-        'select_provider'      => 'Provider (optional)',
-        'select_provider_help' => 'Analytical label only — credits go to the single balance, system picks which AI to use.',
-        'no_provider'          => 'No preference',
-        'credits'              => 'Credit amount',
-        'amount_cents'         => 'Amount charged (cents)',
-        'amount_help'          => 'In cents (e.g., 24990 = R$ 249.90).',
-        'reason'               => 'Reason (required)',
-        'reason_help'          => 'Will be recorded in the audit trail. Minimum 10 characters.',
-        'submit'               => 'Post credit',
-        'cancel'               => 'Cancel',
-        'badge_internal'       => 'Your company',
-        'badge_client'         => 'Client',
-        'limit_warning'        => 'You are Support. Daily limit: :limit credits. Used today: :used.',
+        'package_label'      => 'Manual / Courtesy',
+        'modal_title'        => 'Grant credit to a clinic',
+        'modal_subtitle'     => 'Credit goes straight to the clinic wallet, no gateway. Courtesy is free; purchase records an amount paid outside the app.',
+        'select_entity'      => 'Recipient clinic',
+        'select_entity_help' => 'Pick the clinic that will receive the credits. Your company is highlighted with ★.',
+        'kind'               => 'How to grant',
+        'kind_courtesy'      => 'Courtesy (free)',
+        'kind_purchase'      => 'Purchase (paid)',
+        'kind_courtesy_help' => 'Free credit — no financial value. Use for gifts, trials or adjustments.',
+        'kind_purchase_help' => 'The clinic paid outside the app (PIX, invoice, card). Enter the amount received.',
+        'credits'            => 'Credit amount',
+        'credits_help'       => 'Go to the clinic single balance (never expire).',
+        'amount_reais'       => 'Amount received (R$)',
+        'amount_reais_help'  => 'How much the clinic paid for these credits.',
+        'reason'             => 'Reason (required)',
+        'reason_help'        => 'Will be recorded in the audit trail. Minimum 10 characters.',
+        'submit'             => 'Grant credit',
+        'cancel'             => 'Cancel',
+        'badge_internal'     => 'Your company',
+        'badge_client'       => 'Client',
+        'limit_warning'      => 'You are Support. Daily limit: :limit credits (courtesy + purchase). Used today: :used.',
     ],
 
     'confirm' => [

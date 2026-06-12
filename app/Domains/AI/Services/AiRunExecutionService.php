@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Contracts\AiRunRepositoryInterface;
+use App\Domains\AI\Exceptions\AiRunCancelledException;
 use App\Domains\AI\Models\AiRun;
 use App\DTOs\AI\AiRequestData;
 use App\Enums\AI\{AiRiskLevel, AiRunStatus};
@@ -90,6 +91,11 @@ class AiRunExecutionService
                 safetyNotes: $safetyNotes,
                 consumedCredits: $consumedCredits,
             );
+        } catch (AiRunCancelledException) {
+            // Cancelamento cooperativo: o orchestrator detectou cancelled_at entre
+            // etapas e abortou. Não é falha — só ajusta o estado e devolve o saldo
+            // que ainda não foi consumido. Não relança para o job não marcar failed.
+            $this->compensateCancelledRun($run);
         } catch (Throwable $e) {
             $this->compensateFailedRun($run, $e->getMessage());
 
@@ -118,6 +124,50 @@ class AiRunExecutionService
 
         if ($status !== AiRunStatus::Failed) {
             $this->runRepository->markFailed($run, $reason);
+        }
+    }
+
+    /**
+     * Aplica a compensação de um cancelamento cooperativo: marca como Cancelled
+     * de forma idempotente e devolve à carteira apenas o saldo da reserva que
+     * NÃO foi consumido pelas chamadas que já haviam succeeded antes do checkpoint
+     * de cancel. O que foi consumido continua cobrado (é custo real do provider).
+     */
+    public function compensateCancelledRun(AiRun $run): void
+    {
+        $run->refresh();
+        $status = $run->status instanceof AiRunStatus
+            ? $run->status
+            : AiRunStatus::tryFrom((string) $run->status);
+
+        if ($status === AiRunStatus::Cancelled) {
+            return;
+        }
+
+        $this->releaseRemainderOnCancel($run);
+        $this->runRepository->markCancelled($run);
+    }
+
+    private function releaseRemainderOnCancel(AiRun $run): void
+    {
+        $remainder = max(0, ((int) $run->reserved_credits) - ((int) $run->consumed_credits));
+
+        if ($remainder <= 0) {
+            return;
+        }
+
+        try {
+            $this->walletService->releaseReservation(
+                entityId: (string) $run->entity_id,
+                amount: $remainder,
+                aiRunId: (string) $run->id,
+                idempotencyKey: "ai-run:{$run->id}:release-on-cancel",
+                metadata: ['reason' => 'workflow_cancelled'],
+            );
+        } catch (Throwable) {
+            // Evita mascarar o cancelamento se a carteira já tiver liberado tudo
+            // (idempotency_key duplicada, por exemplo). O run continua marcado
+            // como Cancelled mesmo assim.
         }
     }
 

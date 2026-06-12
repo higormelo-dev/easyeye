@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings};
+use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaService};
 use App\Enums\AI\AiRunMode;
 use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey};
 use App\Exceptions\LockedMedicalRecordException;
@@ -29,6 +29,7 @@ class MedicalRecordsController extends Controller
         private readonly UsageMeterService $usageMeter,
         private readonly AiCreditWalletService $aiWallet,
         private readonly AiProviderSettings $aiProviderSettings,
+        private readonly AiQuotaService $aiQuotaService,
     ) {
     }
 
@@ -171,6 +172,7 @@ class MedicalRecordsController extends Controller
             'lensNear',
             'signedBy.user',
             'documentations.doctor.person',
+            'documentations.aiRun',
         ]);
 
         return response()->json([
@@ -240,13 +242,15 @@ class MedicalRecordsController extends Controller
             'signed_by_name'      => $medicalrecord->signedBy?->user?->name,
             // Documentações
             'documentations' => $medicalrecord->documentations->map(fn ($d) => [
-                'id'          => $d->id,
-                'type'        => $d->type,
-                'type_label'  => $d->getTypeLabel(),
-                'title'       => $d->title,
-                'doctor_name' => $d->doctor?->person?->full_name ?? '',
-                'created_at'  => $d->created_at?->format('d/m/Y H:i'),
-                'pdf_url'     => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $d]),
+                'id'                => $d->id,
+                'type'              => $d->type,
+                'type_label'        => $d->getTypeLabel(),
+                'title'             => $d->title,
+                'doctor_name'       => $d->doctor?->person?->full_name ?? '',
+                'created_at'        => $d->created_at?->format('d/m/Y H:i'),
+                'is_ai'             => $d->ai_run_id !== null,
+                'ai_workflow_label' => $d->ai_run_id && $d->aiRun ? __('ai.workflow_' . $d->aiRun->workflow) : null,
+                'pdf_url'           => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $d]),
             ]),
             // URLs de ação
             'edit_url'      => route('panel.patients.medicalrecords.edit', [$patient, $medicalrecord]),
@@ -283,6 +287,7 @@ class MedicalRecordsController extends Controller
             'doctor.person',
             'documentations.doctor.person',
             'documentations.reportSettingContent',
+            'documentations.aiRun',
             'files',
         ]);
 
@@ -565,29 +570,43 @@ class MedicalRecordsController extends Controller
             $modes[] = ['value' => $mode->value, 'label' => __('ai.mode_' . $mode->value)];
         }
 
+        $workflows = array_values(array_filter([
+            $hasExamAssistant ? 'record_assist' : null,    // Análise do caso + sugestões
+            $hasReportDrafting ? 'report_drafting' : null, // Rascunho de laudo
+        ]));
+
         return [
-            'enabled'       => true,
-            'can_analysis'  => $hasExamAssistant,   // Análise do caso + apoio inline
-            'can_report'    => $hasReportDrafting,   // Rascunho de laudo
-            'can_consensus' => $canConsensus,
-            'default_mode'  => AiRunMode::Economy->value,
-            'modes'         => $modes,
-            'balance'       => $this->aiWallet->balance($entityId),
-            'urls'          => [
-                'estimate' => route('panel.ai-runs.estimate'),
-                'store'    => route('panel.ai-runs.store'),
-                'show'     => route('panel.ai-runs.show', ['aiRun' => '__ID__']),
-                'approve'  => route('panel.ai-runs.approve', ['aiRun' => '__ID__']),
-                'reject'   => route('panel.ai-runs.reject', ['aiRun' => '__ID__']),
+            'enabled'          => true,
+            'can_analysis'     => $hasExamAssistant,   // Análise do caso + apoio inline
+            'can_report'       => $hasReportDrafting,   // Rascunho de laudo
+            'can_consensus'    => $canConsensus,
+            'default_mode'     => AiRunMode::Economy->value,
+            'default_workflow' => $workflows[0] ?? 'record_assist',
+            'workflows'        => $workflows,
+            'modes'            => $modes,
+            'balance'          => $this->aiWallet->balance($entityId),
+            'quota'            => $this->aiQuotaService->currentMonthSnapshot($entityId),
+            'urls'             => [
+                'estimate'   => route('panel.ai-runs.estimate'),
+                'store'      => route('panel.ai-runs.store'),
+                'show'       => route('panel.ai-runs.show', ['aiRun' => '__ID__']),
+                'approve'    => route('panel.ai-runs.approve', ['aiRun' => '__ID__']),
+                'reject'     => route('panel.ai-runs.reject', ['aiRun' => '__ID__']),
+                'cancel'     => route('panel.ai-runs.cancel', ['aiRun' => '__ID__']),
+                'by_patient' => route('panel.ai-runs.by-patient', ['patient' => '__ID__']),
+                // Onda 3 — endpoints inline
+                'my_prompts_index'   => route('panel.ai-runs.my-prompts.index'),
+                'my_prompts_store'   => route('panel.ai-runs.my-prompts.store'),
+                'my_prompts_destroy' => route('panel.ai-runs.my-prompts.destroy', ['aiPrompt' => '__ID__']),
+                'escalate'           => route('panel.ai-runs.escalate', ['aiRun' => '__ID__']),
+                'feedback'           => route('panel.ai-runs.feedback', ['aiRun' => '__ID__']),
             ],
-            'labels' => [
-                'title'             => __('ai.title'),
-                'processing'        => __('ai.processing'),
-                'support_notice'    => __('ai.support_notice'),
-                'credits_available' => __('ai.credits_available'),
-                'estimated_credits' => __('ai.estimated_credits'),
-                'approve'           => __('ai.approve'),
-                'reject'            => __('ai.reject'),
+            // Rótulos do painel compartilhado (AiAssistantPanel).
+            'assistant'       => trans('ai.assistant'),
+            'workflow_labels' => [
+                'record_assist'      => __('ai.workflow_record_assist'),
+                'report_drafting'    => __('ai.workflow_report_drafting'),
+                'eye_image_analysis' => __('ai.workflow_eye_image_analysis'),
             ],
         ];
     }
@@ -784,13 +803,15 @@ class MedicalRecordsController extends Controller
 
             // Documentações já anexadas
             'documentations' => $r->documentations->map(fn ($d) => [
-                'id'          => (string) $d->id,
-                'type'        => $d->type,
-                'type_label'  => $d->getTypeLabel(),
-                'title'       => $d->title,
-                'doctor_name' => $d->doctor?->person?->full_name ?? '',
-                'created_at'  => $d->created_at?->format('d/m/Y H:i'),
-                'pdf_url'     => route(
+                'id'                => (string) $d->id,
+                'type'              => $d->type,
+                'type_label'        => $d->getTypeLabel(),
+                'title'             => $d->title,
+                'doctor_name'       => $d->doctor?->person?->full_name ?? '',
+                'created_at'        => $d->created_at?->format('d/m/Y H:i'),
+                'is_ai'             => $d->ai_run_id !== null,
+                'ai_workflow_label' => $d->ai_run_id && $d->aiRun ? __('ai.workflow_' . $d->aiRun->workflow) : null,
+                'pdf_url'           => route(
                     'panel.patients.medicalrecords.documentations.pdf',
                     [$r->patient_id, $r, $d],
                 ),
