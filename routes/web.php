@@ -34,6 +34,7 @@ use App\Http\Controllers\{
     SubscriptionExpiredController,
 };
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
+use App\Http\Controllers\Docs\ApiDocsController;
 use App\Http\Controllers\PanelDashboardController;
 use App\Http\Controllers\Security\TwoFactorController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
@@ -494,6 +495,25 @@ Route::middleware(['auth', 'verified'])->prefix('security/two-factor')->name('se
     Route::post('/verify', [TwoFactorController::class, 'verifyStore'])
         ->middleware('throttle:6,1') // 6 tentativas/min — defesa anti-brute-force
         ->name('verify.store');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Documentação Swagger da API de integradores — protegida por senha
+// (DOCS_API_PASSWORD). Sem a senha configurada, todas as rotas respondem 404.
+// Cada liberação de acesso é registrada em log (IP + user agent).
+// ─────────────────────────────────────────────────────────────────────────────
+Route::prefix('docs/api')->name('docs.api.')->group(function () {
+    // Formulário de senha fica fora do gate (senão loop de redirect)
+    Route::get('/auth', [ApiDocsController::class, 'showAuthForm'])->name('auth');
+    Route::post('/auth', [ApiDocsController::class, 'authenticate'])
+        ->middleware('throttle:10,1') // anti brute-force
+        ->name('auth.store');
+
+    Route::middleware('docs.access')->group(function () {
+        Route::get('/', [ApiDocsController::class, 'index'])->name('index');
+        Route::get('/spec', [ApiDocsController::class, 'spec'])->name('spec');
+        Route::post('/logout', [ApiDocsController::class, 'logout'])->name('logout');
+    });
 });
 
 require __DIR__ . '/manager.php';

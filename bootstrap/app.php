@@ -7,6 +7,7 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     CheckFeature,
     CheckJsonResponse,
     CheckSubscription,
+    EnsureApiDocsAccess,
     EnsureEntityRole,
     EnsureEntitySelected,
     EnsureIsPartner,
@@ -92,6 +93,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'saas.admin'           => EnsureSaasAdmin::class,
             'admin.audit'          => LogAdminAccess::class,
             '2fa'                  => EnsureTwoFactor::class,
+            'docs.access'          => EnsureApiDocsAccess::class,
         ]);
 
         // Adiciona o SetLocale, HandleImpersonation e HandleInertiaRequests ao grupo web

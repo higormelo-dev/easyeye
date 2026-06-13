@@ -80,7 +80,7 @@ class FeatureGateService
     {
         $status = $this->status($entityId, $feature);
 
-        if (!$status->allowed) {
+        if (! $status->allowed) {
             throw new FeatureDeniedException($feature, $status);
         }
     }
@@ -95,7 +95,7 @@ class FeatureGateService
     {
         $subscription = $this->getSubscription($entityId);
 
-        if (!$subscription) {
+        if (! $subscription) {
             return new FeatureStatus(
                 feature:     $feature,
                 allowed:     false,
@@ -114,7 +114,7 @@ class FeatureGateService
         if ($feature === FeatureKey::ApiMonthlyExamSends) {
             $apiEnabled = $subscription->plan->featureValue(FeatureKey::HasApiIntegrator) === '1';
 
-            if (!$apiEnabled) {
+            if (! $apiEnabled) {
                 return new FeatureStatus(
                     feature:     $feature,
                     allowed:     false,
@@ -194,13 +194,13 @@ class FeatureGateService
      */
     public function increment(string $entityId, FeatureKey $feature, int $amount = 1): void
     {
-        if (!$feature->isMonthlyReset()) {
+        if (! $feature->isMonthlyReset()) {
             return;
         }
 
         $subscription = $this->getSubscription($entityId);
 
-        if (!$subscription) {
+        if (! $subscription) {
             return;
         }
 
@@ -216,13 +216,13 @@ class FeatureGateService
      */
     public function decrement(string $entityId, FeatureKey $feature, int $amount = 1): void
     {
-        if (!$feature->isMonthlyReset()) {
+        if (! $feature->isMonthlyReset()) {
             return;
         }
 
         $subscription = $this->getSubscription($entityId);
 
-        if (!$subscription) {
+        if (! $subscription) {
             return;
         }
 
@@ -239,7 +239,7 @@ class FeatureGateService
      */
     public function canAndIncrement(string $entityId, FeatureKey $feature, int $amount = 1): bool
     {
-        if (!$this->can($entityId, $feature)) {
+        if (! $this->can($entityId, $feature)) {
             return false;
         }
 
@@ -248,15 +248,73 @@ class FeatureGateService
         return true;
     }
 
+    /**
+     * Verifica o gating do plano E consome a cota mensal de forma ATÔMICA.
+     *
+     * Para features mensais, o consumo usa um UPDATE condicional no banco
+     * (ver UsageMeterService::reserveMonthly), fechando a janela de corrida do
+     * padrão can()+increment(): sob requests concorrentes, a cota nunca estoura.
+     *
+     * Em caso de falha na operação subsequente, reverta com decrement().
+     *
+     * @return bool true se autorizado e reservado; false se gated ou cota esgotada.
+     */
+    public function tryConsume(string $entityId, FeatureKey $feature, int $amount = 1): bool
+    {
+        $status = $this->status($entityId, $feature);
+
+        // Gating do plano (inclui feature não incluída, API desabilitada, sem assinatura).
+        if (! $status->allowed) {
+            return false;
+        }
+
+        // Features baseadas em counter de domínio (max_users, etc.) já foram
+        // verificadas por status() — não há contador mensal a reservar.
+        if (! $feature->isMonthlyReset()) {
+            return true;
+        }
+
+        $subscription = $this->getSubscription($entityId);
+
+        if (! $subscription) {
+            return false;
+        }
+
+        $reserved = $this->usageMeter->reserveMonthly(
+            $entityId,
+            $feature,
+            $subscription->id,
+            $status->isUnlimited ? 0 : $status->limit,
+            $amount,
+        );
+
+        unset($this->subscriptionCache[$entityId]);
+
+        return $reserved;
+    }
+
+    /**
+     * Igual a tryConsume(), mas lança FeatureDeniedException (auto-renderizável)
+     * quando o gating falha ou a cota está esgotada. Recomendado em controllers.
+     *
+     * @throws FeatureDeniedException
+     */
+    public function consumeOrFail(string $entityId, FeatureKey $feature, int $amount = 1): void
+    {
+        if (! $this->tryConsume($entityId, $feature, $amount)) {
+            throw new FeatureDeniedException($feature, $this->status($entityId, $feature));
+        }
+    }
+
     // ── Utilitários ──────────────────────────────────────────────────────────
 
     /**
      * Retorna o status de múltiplas features de uma vez.
      * Útil para popular dashboards, menus e páginas de configuração.
      *
-     * @param  FeatureKey[]  $features
+     * @param FeatureKey[] $features
      *
-     * @return array<string, FeatureStatus>  chaveado por FeatureKey::value
+     * @return array<string, FeatureStatus> chaveado por FeatureKey::value
      */
     public function statusBatch(string $entityId, array $features): array
     {
@@ -282,7 +340,7 @@ class FeatureGateService
 
     private function getSubscription(string $entityId): ?Subscription
     {
-        if (!array_key_exists($entityId, $this->subscriptionCache)) {
+        if (! array_key_exists($entityId, $this->subscriptionCache)) {
             $this->subscriptionCache[$entityId] = Subscription::forEntity($entityId)
                 ->accessible()
                 ->with('plan.features')

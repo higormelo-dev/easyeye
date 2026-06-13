@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\FeatureKey;
 use App\Models\{Doctor, EntityUser, FeatureUsage, MedicalRecordFile, Patient};
+use Illuminate\Support\Facades\DB;
 
 /**
  * Responsável por ler e registrar o consumo de features por empresa.
@@ -23,7 +24,7 @@ class UsageMeterService
     /**
      * Retorna o uso atual de uma feature para a empresa no período corrente.
      *
-     * @param  string|null  $subscriptionId  Usado apenas para features mensais.
+     * @param string|null $subscriptionId Usado apenas para features mensais.
      */
     public function getCurrentUsage(string $entityId, FeatureKey $feature, ?string $subscriptionId = null): int
     {
@@ -74,6 +75,58 @@ class UsageMeterService
             ->where('period', $period)
             ->where('used', '>', 0)
             ->decrement('used', $amount);
+    }
+
+    /**
+     * Reserva (incrementa) uso de uma feature mensal de forma ATÔMICA, respeitando o limite.
+     *
+     * Diferente de increment(), que faz read-modify-write (sujeito a lost update e
+     * estouro de cota sob concorrência), este método usa um UPDATE condicional
+     * (`used + amount <= limit`) que o banco resolve atomicamente. Sob N requests
+     * simultâneos, apenas os que couberem no limite têm linha afetada.
+     *
+     * @param int $limit 0 = ilimitado (não aplica o teto, apenas contabiliza).
+     *
+     * @return bool true se a reserva coube no limite; false se a cota está esgotada.
+     */
+    public function reserveMonthly(string $entityId, FeatureKey $feature, string $subscriptionId, int $limit, int $amount = 1): bool
+    {
+        if (! $feature->isMonthlyReset()) {
+            return true;
+        }
+
+        $period = now()->format('Y-m');
+
+        // Garante a existência da linha sem zerar `used` em caso de corrida (ON CONFLICT
+        // atualiza só metadados). UNIQUE: (entity_id, feature, period).
+        FeatureUsage::query()->upsert(
+            [[
+                'entity_id'       => $entityId,
+                'feature'         => $feature->value,
+                'period'          => $period,
+                'subscription_id' => $subscriptionId,
+                'used'            => 0,
+                'last_used_at'    => now(),
+            ]],
+            ['entity_id', 'feature', 'period'],
+            ['subscription_id', 'last_used_at'],
+        );
+
+        $query = FeatureUsage::where('entity_id', $entityId)
+            ->where('feature', $feature->value)
+            ->where('period', $period);
+
+        if ($limit > 0) {
+            $query->whereRaw('used + ? <= ?', [$amount, $limit]);
+        }
+
+        $affected = $query->update([
+            'used'            => DB::raw('used + ' . (int) $amount),
+            'subscription_id' => $subscriptionId,
+            'last_used_at'    => now(),
+        ]);
+
+        return $affected > 0;
     }
 
     /**

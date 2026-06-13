@@ -16,13 +16,13 @@ class ApiCheckTokenExpiration
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param Closure(Request): (Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         $token = $request->user() ? $request->user()->currentAccessToken() : null;
 
-        if (!$token) {
+        if (! $token) {
             return $next($request);
         }
 
@@ -49,32 +49,26 @@ class ApiCheckTokenExpiration
             $token->save();
         }
 
-        // Validação de integrador (se o token for de um integrador)
-        $integratorId = $this->extractIntegratorId($token->abilities ?? []);
+        // auth_with_integrator (quando presente na pipeline, como nas rotas v1)
+        // já carregou e validou o integrador nesta request — não revalida nem re-consulta.
+        if ($request->attributes->has('integrator')) {
+            return $next($request);
+        }
+
+        // Fallback para uso standalone do middleware (sem auth_with_integrator antes)
+        $integratorId = EntityIntegrator::idFromTokenAbilities($token->abilities ?? []);
 
         if ($integratorId) {
             $integrator = EntityIntegrator::query()
                 ->with('user.entity')
-                ->where('id', $integratorId)
-                ->where('active', true)
-                ->first();
+                ->find($integratorId);
 
-            if (!$integrator) {
+            $blockReason = $integrator ? $integrator->accessBlockReason() : 'auth.integrator_inactive';
+
+            if ($blockReason !== null) {
                 $token->delete();
 
-                return $this->invalidResponse('auth.integrator_inactive');
-            }
-
-            if (!$integrator->user->active) {
-                $token->delete();
-
-                return $this->invalidResponse('auth.user_integrator_inactive');
-            }
-
-            if (!($integrator->user->entity && $integrator->user->entity->active)) {
-                $token->delete();
-
-                return $this->invalidResponse('auth.entity_inactive');
+                return $this->invalidResponse($blockReason);
             }
 
             // Disponibiliza o integrador para uso posterior na request
@@ -85,31 +79,13 @@ class ApiCheckTokenExpiration
     }
 
     /**
-     * Extrai o ID do integrador das abilities do token.
-     */
-    private function extractIntegratorId(array $abilities): ?string
-    {
-        foreach ($abilities as $key => $value) {
-            $ability = is_int($key) ? $value : $key;
-
-            if (str_starts_with($ability, 'integrator_id:')) {
-                $parts = explode(':', $ability, 2);
-
-                return $parts[1] ?? null;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Retorna resposta de erro padronizada.
      */
     private function invalidResponse(string $messageKey, int $status = Response::HTTP_UNAUTHORIZED): JsonResponse
     {
         return response()->json(
             ['message' => __($messageKey), 'valid' => false],
-            $status
+            $status,
         );
     }
 }

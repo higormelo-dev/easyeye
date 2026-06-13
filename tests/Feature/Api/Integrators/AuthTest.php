@@ -75,6 +75,26 @@ describe('POST /api/integrators/signin', function () {
         ])->assertUnauthorized()
             ->assertJsonFragment(['valid' => false]);
     });
+
+    it('accepts short code format (EI-1 instead of EI-0000000001)', function () {
+        // Extrai a parte numérica sem zero-padding: EI-0000000003 → EI-3
+        $numericPart = (int) substr($this->integrator->code, strpos($this->integrator->code, '-') + 1);
+        $shortCode   = 'EI-' . $numericPart;
+
+        $this->postJson('/api/integrators/signin', [
+            'email'    => $this->integratorUser->email,
+            'password' => 'Senha@123',
+            'code'     => $shortCode,
+        ])->assertOk();
+    });
+
+    it('accepts code in lower-case', function () {
+        $this->postJson('/api/integrators/signin', [
+            'email'    => $this->integratorUser->email,
+            'password' => 'Senha@123',
+            'code'     => mb_strtolower($this->integrator->code),
+        ])->assertOk();
+    });
 });
 
 // ── check-token ───────────────────────────────────────────────────────────────

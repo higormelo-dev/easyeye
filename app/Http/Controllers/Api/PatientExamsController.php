@@ -9,9 +9,10 @@ use App\Http\Resources\PatientExamResource;
 use App\Models\{Patient, PatientExam};
 use App\Services\Api\PatientExamService;
 use App\Services\FeatureGateService;
-use Illuminate\Http\{JsonResponse};
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Throwable;
 
 class PatientExamsController extends Controller
 {
@@ -48,30 +49,33 @@ class PatientExamsController extends Controller
             });
 
         if (request()->has('search')) {
+            // `ilike` (case-insensitive no PG) e apenas colunas que EXISTEM em people
+            // (full_name/nickname). A antiga referência a `name` não errava: por ser
+            // subquery correlacionada, o PG resolvia contra patient_exams.name — ou
+            // seja, a busca por nome de pessoa comparava com o nome do exame.
             $search       = request()->search;
             $patientExams = $patientExams->where(function ($query) use ($search) {
                 $query->whereHas('patient', function ($q) use ($search) {
-                    $q->where('code', 'like', '%' . $search . '%')
+                    $q->where('code', 'ilike', '%' . $search . '%')
                         ->orWhereHas('person', function ($p) use ($search) {
-                            $p->where('name', 'like', '%' . $search . '%')
-                                ->orWhere('nickname', 'like', '%' . $search . '%');
+                            $p->where('full_name', 'ilike', '%' . $search . '%')
+                                ->orWhere('nickname', 'ilike', '%' . $search . '%');
                         });
                 })
                     ->orWhereHas('doctor', function ($q) use ($search) {
-                        $q->where('code', 'like', '%' . $search . '%')
+                        $q->where('code', 'ilike', '%' . $search . '%')
                             ->orWhereHas('person', function ($p) use ($search) {
-                                $p->where('full_name', 'like', '%' . $search . '%')
-                                    ->orWhere('name', 'like', '%' . $search . '%')
-                                    ->orWhere('nickname', 'like', '%' . $search . '%');
+                                $p->where('full_name', 'ilike', '%' . $search . '%')
+                                    ->orWhere('nickname', 'ilike', '%' . $search . '%');
                             });
                     })
                     ->orWhereHas('schedule', function ($q) use ($search) {
-                        $q->where('code', 'like', '%' . $search . '%');
+                        $q->where('code', 'ilike', '%' . $search . '%');
                     });
             });
         }
 
-        $patientExams = $patientExams->paginate(min((int) request()->get('per_page', 10), 10));
+        $patientExams = $patientExams->paginate($this->perPage());
 
         return PatientExamResource::collection($patientExams);
     }
@@ -88,14 +92,19 @@ class PatientExamsController extends Controller
 
         abort_unless(
             Patient::where('id', $patientId)->where('entity_id', $entityId)->exists(),
-            404
+            404,
         );
 
-        $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
+        // Reserva atômica da cota ANTES de criar; reverte se a criação falhar.
+        $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        $record = $this->service->create($request, $patientId);
+        try {
+            $record = $this->service->create($request, $patientId);
+        } catch (Throwable $e) {
+            $this->featureGate->decrement($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        $this->featureGate->increment($entityId, FeatureKey::ApiMonthlyExamSends);
+            throw $e;
+        }
 
         return (new PatientExamResource($record))->response()->setStatusCode(201);
     }
@@ -117,7 +126,7 @@ class PatientExamsController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @throws \Throwable
+     * @throws Throwable
      */
     public function update(PatientExamRequest $request, string $patientId, string $idOrCode): PatientExamResource|JsonResponse
     {
@@ -128,16 +137,21 @@ class PatientExamsController extends Controller
 
         abort_unless(
             Patient::where('id', $patientId)->where('entity_id', $entityId)->exists(),
-            404
+            404,
         );
-
-        $this->featureGate->canOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
         $record = $this->service->findByIdOrCode($patientId, $idOrCode);
 
-        $updatedRecord = $this->service->update($record, $request);
+        // Reserva atômica da cota ANTES de atualizar; reverte se a atualização falhar.
+        $this->featureGate->consumeOrFail($entityId, FeatureKey::ApiMonthlyExamSends);
 
-        $this->featureGate->increment($entityId, FeatureKey::ApiMonthlyExamSends);
+        try {
+            $updatedRecord = $this->service->update($record, $request);
+        } catch (Throwable $e) {
+            $this->featureGate->decrement($entityId, FeatureKey::ApiMonthlyExamSends);
+
+            throw $e;
+        }
 
         return new PatientExamResource($updatedRecord);
     }
@@ -159,7 +173,7 @@ class PatientExamsController extends Controller
     private function resolvePatient(string $idOrCode, string $entityId): Patient
     {
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };

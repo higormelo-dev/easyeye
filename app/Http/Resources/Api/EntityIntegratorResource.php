@@ -45,7 +45,23 @@ class EntityIntegratorResource extends JsonResource
                 'created_at'                => $this->created_at,
                 'updated_at'                => $this->updated_at,
             ],
-            'entity' => $this->user->entity->toArray(),
+            // Whitelist explícita (LGPD — minimização). Não usar toArray():
+            // a tabela `entities` tem CNPJ/registros/contatos/billing que não
+            // devem trafegar pra um cliente externo que só precisa identificar a clínica.
+            'entity' => [
+                'id'                => $this->user->entity->id,
+                'code'              => $this->user->entity->code,
+                'name'              => $this->user->entity->name,
+                'subdomain'         => $this->user->entity->subdomain,
+                'city'              => $this->user->entity->city,
+                'state'             => $this->user->entity->state,
+                'country'           => $this->user->entity->country,
+                'locale'            => $this->user->entity->locale,
+                'schedule_interval' => $this->user->entity->schedule_interval,
+                'active'            => (bool) $this->user->entity->active,
+                'created_at'        => $this->user->entity->created_at,
+                'updated_at'        => $this->user->entity->updated_at,
+            ],
         ];
     }
 }

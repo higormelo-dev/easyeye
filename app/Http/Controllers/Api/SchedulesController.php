@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ScheduleResource;
 use App\Models\Schedule;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 
 class SchedulesController extends Controller
@@ -34,7 +35,7 @@ class SchedulesController extends Controller
         $identifierSearch = $this->resolveIdentifierSearch($search);
 
         if (request()->has('date')) {
-            $date      = \Carbon\Carbon::parse(request()->date)->toDateString();
+            $date      = Carbon::parse(request()->date)->toDateString();
             $schedules = $schedules->whereDate('date_time', $date);
         } elseif ($identifierSearch === null) {
             $schedules = $schedules->whereDate('date_time', now()->toDateString());
@@ -43,7 +44,7 @@ class SchedulesController extends Controller
         if ($identifierSearch !== null) {
             $schedules = $schedules->where(
                 $identifierSearch['column'],
-                $identifierSearch['value']
+                $identifierSearch['value'],
             );
         } elseif (filled($search)) {
             $schedules = $schedules->where(function ($query) use ($search) {
@@ -67,7 +68,7 @@ class SchedulesController extends Controller
             });
         }
 
-        $schedules = $schedules->paginate(min((int) request()->get('per_page', 10), 10));
+        $schedules = $schedules->paginate($this->perPage());
 
         return ScheduleResource::collection($schedules);
     }
@@ -108,7 +109,7 @@ class SchedulesController extends Controller
         $integrator = request()->attributes->get('integrator');
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('SDL-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };

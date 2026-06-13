@@ -38,13 +38,13 @@ class ExamTypesController extends Controller
                     static fn ($q) => $q->where(
                         'exam_types.code',
                         'like',
-                        '%' . request()->search . '%'
-                    )->orWhere('exam_types.name', 'like', '%' . request()->search . '%')
+                        '%' . request()->search . '%',
+                    )->orWhere('exam_types.name', 'like', '%' . request()->search . '%'),
                 );
             });
         }
 
-        $examTypes = $examTypes->paginate(min((int) request()->get('per_page', 10), 10));
+        $examTypes = $examTypes->paginate($this->perPage());
 
         return ExamTypeResource::collection($examTypes);
     }
@@ -57,7 +57,7 @@ class ExamTypesController extends Controller
         $integrator = request()->attributes->get('integrator');
 
         [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id',   $idOrCode],
+            Str::isUuid($idOrCode) => ['id', $idOrCode],
             ctype_digit($idOrCode) => ['code', sprintf('ETP-%010d', (int) $idOrCode)],
             default                => ['code', $idOrCode],
         };
