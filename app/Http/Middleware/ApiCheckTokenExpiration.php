@@ -66,23 +66,9 @@ class ApiCheckTokenExpiration
             $blockReason = $integrator ? $integrator->accessBlockReason() : 'auth.integrator_inactive';
 
             if ($blockReason !== null) {
-            if (! $integrator) {
                 $token->delete();
 
                 return $this->invalidResponse($blockReason);
-                return $this->invalidResponse('auth.integrator_inactive');
-            }
-
-            if (! $integrator->user->active) {
-                $token->delete();
-
-                return $this->invalidResponse('auth.user_integrator_inactive');
-            }
-
-            if (! ($integrator->user->entity && $integrator->user->entity->active)) {
-                $token->delete();
-
-                return $this->invalidResponse('auth.entity_inactive');
             }
 
             // Disponibiliza o integrador para uso posterior na request
