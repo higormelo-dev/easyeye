@@ -1,12 +1,15 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
 use App\Enums\{ReferralEventType, ReferralRewardType};
 use App\Models\{Entity, ReferralCode, ReferralEvent, Subscription};
+use DateTimeInterface;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Log;
 
 class ReferralService
 {
@@ -14,16 +17,16 @@ class ReferralService
      * Gera um código de indicação para uma clínica ativa.
      * Uma clínica pode ter múltiplos códigos (campanhas diferentes).
      *
-     * @param  ReferralRewardType  $rewardType   Tipo de recompensa para o referenciador
-     * @param  int                 $rewardValue  Dias (TrialExtension) ou % (Discount)
-     * @param  int|null            $maxUses       null = ilimitado
+     * @param ReferralRewardType $rewardType  Tipo de recompensa para o referenciador
+     * @param int                $rewardValue Dias (TrialExtension) ou % (Discount)
+     * @param int|null           $maxUses     null = ilimitado
      */
     public function generate(
         Entity $entity,
         ReferralRewardType $rewardType = ReferralRewardType::TrialExtension,
         int $rewardValue = 30,
         ?int $maxUses = null,
-        ?\DateTimeInterface $expiresAt = null,
+        ?DateTimeInterface $expiresAt = null,
     ): ReferralCode {
         return ReferralCode::create([
             'entity_id'    => $entity->id,
@@ -39,15 +42,15 @@ class ReferralService
     /**
      * Valida e retorna um código de indicação pelo código alfanumérico.
      *
-     * @throws \InvalidArgumentException se o código não existir ou não estiver usável
+     * @throws InvalidArgumentException se o código não existir ou não estiver usável
      */
     public function findUsable(string $code): ReferralCode
     {
         $referral = ReferralCode::where('code', strtoupper($code))->first();
 
-        if (!$referral || !$referral->isUsable()) {
-            throw new \InvalidArgumentException(
-                "Código de indicação '{$code}' é inválido, expirado ou esgotado."
+        if (! $referral || ! $referral->isUsable()) {
+            throw new InvalidArgumentException(
+                "Código de indicação '{$code}' é inválido, expirado ou esgotado.",
             );
         }
 
@@ -85,7 +88,7 @@ class ReferralService
         $referrerEntity       = $code->entity;
         $referrerSubscription = $referrerEntity->subscription;
 
-        if (!$referrerSubscription) {
+        if (! $referrerSubscription) {
             return;
         }
 
@@ -96,7 +99,7 @@ class ReferralService
                 $code,
                 $activatedSubscription,
             ),
-            ReferralRewardType::DiscountPercentage => \Log::info('ReferralService: recompensa de desconto pendente de implementação no gateway de pagamento.', [
+            ReferralRewardType::DiscountPercentage => Log::info('ReferralService: recompensa de desconto pendente de implementação no gateway de pagamento.', [
                 'referral_code_id' => $code->id,
                 'rate'             => $code->reward_value,
             ]),
@@ -114,7 +117,7 @@ class ReferralService
                 'trial_ends_at' => $subscription->trial_ends_at->addDays($days),
             ]);
 
-            \Log::info('ReferralService: trial estendido por indicação.', [
+            Log::info('ReferralService: trial estendido por indicação.', [
                 'referrer_entity_id' => $subscription->entity_id,
                 'referred_entity_id' => $referenceSubscription->entity_id,
                 'days_added'         => $days,
@@ -137,7 +140,7 @@ class ReferralService
 
     /**
      * Gera um código curto único baseado no nome da clínica + sufixo aleatório.
-     * Formato: NOMECL1A2B (máx 10 caracteres, maiúsculas, sem espaços/especiais)
+     * Formato: NOMECL1A2B (máx 10 caracteres, maiúsculas, sem espaços/especiais).
      */
     private function generateUniqueCode(Entity $entity): string
     {

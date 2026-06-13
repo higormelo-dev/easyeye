@@ -19,12 +19,12 @@ class ReportsController extends Controller
 
         return Inertia::render('Panel/Reports/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),      'active' => false],
-                ['label' => __('actions.sidemenu.reports'),   'url' => route('panel.reports.index'), 'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => true],
             ],
             'links' => [
-                ['title' => __('actions.reports.schedules_label'),   'icon' => 'ti-calendar',    'url' => route('panel.reports.schedules')],
-                ['title' => __('actions.reports.absenteeism_label'),'icon' => 'ti-user-x',      'url' => route('panel.reports.absenteeism')],
+                ['title' => __('actions.reports.schedules_label'), 'icon' => 'ti-calendar', 'url' => route('panel.reports.schedules')],
+                ['title' => __('actions.reports.absenteeism_label'), 'icon' => 'ti-user-x', 'url' => route('panel.reports.absenteeism')],
             ],
         ]);
     }
@@ -33,9 +33,9 @@ class ReportsController extends Controller
     {
         Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
 
-        $entityId   = session('selected_entity_id');
-        $doctors    = $this->doctorsByEntity((string) $entityId);
-        $covenants  = Covenant::where(function ($q) use ($entityId) {
+        $entityId  = session('selected_entity_id');
+        $doctors   = $this->doctorsByEntity((string) $entityId);
+        $covenants = Covenant::where(function ($q) use ($entityId) {
             $q->where('entity_id', $entityId)->orWhereNull('entity_id');
         })->where('active', true)->orderBy('name')->get(['id', 'name']);
         $situations = collect(ScheduleSituation::cases())
@@ -44,9 +44,9 @@ class ReportsController extends Controller
 
         $payload = [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),       'url' => route('panel.dashboard'),       'active' => false],
-                ['label' => __('actions.sidemenu.reports'),          'url' => route('panel.reports.index'),   'active' => false],
-                ['label' => __('actions.reports.schedules_label'),  'url' => '#',                            'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
+                ['label' => __('actions.reports.schedules_label'), 'url' => '#', 'active' => true],
             ],
             'doctors'    => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
             'covenants'  => $covenants,
@@ -80,14 +80,17 @@ class ReportsController extends Controller
         if ($doctorId = $request->input('doctor_id')) {
             $query->where('doctor_id', $doctorId);
         }
+
         if ($covenantId = $request->input('covenant_id')) {
             $query->where('covenant_id', $covenantId);
         }
+
         if ($situation = $request->integer('situation')) {
             $query->where('situation', $situation);
         }
 
         $loggedDoctor = $this->loggedDoctor();
+
         if ($loggedDoctor) {
             $query->where('doctor_id', $loggedDoctor->id);
         }
@@ -115,12 +118,12 @@ class ReportsController extends Controller
 
         return Inertia::render('Panel/Reports/Schedules', array_merge($payload, [
             'schedules' => $schedules->map(fn (Schedule $s) => [
-                'date_time'    => $s->date_time?->format('d/m/Y H:i'),
-                'patient_name' => $s->patient?->person?->name,
-                'doctor_name'  => $s->doctor?->user_name,
-                'covenant'     => $s->covenant?->name,
-                'visit_type'   => $s->visitType?->name,
-                'situation'    => $s->situation->value,
+                'date_time'       => $s->date_time?->format('d/m/Y H:i'),
+                'patient_name'    => $s->patient?->person?->name,
+                'doctor_name'     => $s->doctor?->user_name,
+                'covenant'        => $s->covenant?->name,
+                'visit_type'      => $s->visitType?->name,
+                'situation'       => $s->situation->value,
                 'situation_label' => $s->situation->label(),
             ]),
             'summary'  => $summary,
@@ -137,9 +140,9 @@ class ReportsController extends Controller
 
         $payload = [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),        'url' => route('panel.dashboard'),       'active' => false],
-                ['label' => __('actions.sidemenu.reports'),           'url' => route('panel.reports.index'),   'active' => false],
-                ['label' => __('actions.reports.absenteeism_label'), 'url' => '#',                            'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
+                ['label' => __('actions.reports.absenteeism_label'), 'url' => '#', 'active' => true],
             ],
             'doctors'   => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
             'filters'   => $request->only(['date_from', 'date_until', 'doctor_id']),
@@ -173,6 +176,7 @@ class ReportsController extends Controller
             $query->where('doctor_id', $doctorId);
         }
         $loggedDoctor = $this->loggedDoctor();
+
         if ($loggedDoctor) {
             $query->where('doctor_id', $loggedDoctor->id);
         }

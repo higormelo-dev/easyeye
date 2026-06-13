@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Requests\Financial;
 
@@ -20,11 +20,11 @@ class CashEntryRequest extends FormRequest
         $entityId = (string) session('selected_entity_id');
 
         return [
-            'entry_date' => ['required', 'date'],
+            'entry_date'  => ['required', 'date'],
             'description' => ['required', 'string', 'max:255'],
-            'type' => ['required', Rule::enum(FinancialEntryType::class)],
-            'status' => ['nullable', Rule::enum(FinancialEntryStatus::class)],
-            'amount' => ['required', 'numeric', 'min:0'],
+            'type'        => ['required', Rule::enum(FinancialEntryType::class)],
+            'status'      => ['nullable', Rule::enum(FinancialEntryStatus::class)],
+            'amount'      => ['required', 'numeric', 'min:0'],
             'category_id' => [
                 'nullable',
                 'uuid',
@@ -45,9 +45,9 @@ class CashEntryRequest extends FormRequest
             ],
             'payment_method' => ['nullable', 'string', 'max:40'],
             'reference_type' => ['nullable', 'string', 'max:60'],
-            'reference_id' => ['nullable', 'uuid'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'active' => ['sometimes', 'boolean'],
+            'reference_id'   => ['nullable', 'uuid'],
+            'notes'          => ['nullable', 'string', 'max:2000'],
+            'active'         => ['sometimes', 'boolean'],
         ];
     }
 
@@ -67,7 +67,7 @@ class CashEntryRequest extends FormRequest
             }
         }
 
-        if (!empty($merge)) {
+        if (! empty($merge)) {
             $this->merge($merge);
         }
     }
@@ -82,7 +82,7 @@ class CashEntryRequest extends FormRequest
             return (bool) $value;
         }
 
-        if (!is_string($value)) {
+        if (! is_string($value)) {
             return $value;
         }
 
@@ -93,4 +93,3 @@ class CashEntryRequest extends FormRequest
         };
     }
 }
-

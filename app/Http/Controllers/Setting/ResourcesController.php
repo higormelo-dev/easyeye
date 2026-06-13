@@ -37,11 +37,11 @@ class ResourcesController extends BaseSettingController
     protected function getFormFields(): array
     {
         return [
-            ['key' => 'name',        'label' => __('actions.name'),        'type' => 'text',    'required' => true],
-            ['key' => 'type',        'label' => __('actions.type'),        'type' => 'select',  'required' => true, 'options' => [
-                ['value' => 'room',      'label' => 'Sala'],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'required' => true],
+            ['key' => 'type', 'label' => __('actions.type'), 'type' => 'select', 'required' => true, 'options' => [
+                ['value' => 'room', 'label' => 'Sala'],
                 ['value' => 'equipment', 'label' => 'Equipamento'],
-                ['value' => 'other',     'label' => 'Outro'],
+                ['value' => 'other', 'label' => 'Outro'],
             ]],
             ['key' => 'description', 'label' => __('actions.description'), 'type' => 'text'],
         ];

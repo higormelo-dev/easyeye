@@ -12,7 +12,7 @@ class Cid10CodesSeeder extends Seeder
         foreach ($this->codes() as $code) {
             Cid10Code::firstOrCreate(
                 ['code' => $code['code']],
-                ['description' => $code['description'], 'category' => $code['category']]
+                ['description' => $code['description'], 'category' => $code['category']],
             );
         }
     }
@@ -154,7 +154,7 @@ class Cid10CodesSeeder extends Seeder
             ['code' => 'H44.6', 'description' => 'Corpo estranho magnético retido no globo ocular', 'category' => 'Vítreo e Globo Ocular'],
 
             // ── H46–H48 Nervo Óptico e Vias Visuais ──────────────────────────
-            ['code' => 'H46',   'description' => 'Neurite óptica', 'category' => 'Nervo Óptico'],
+            ['code' => 'H46', 'description' => 'Neurite óptica', 'category' => 'Nervo Óptico'],
             ['code' => 'H47.0', 'description' => 'Transtornos do nervo óptico não classificados em outra parte', 'category' => 'Nervo Óptico'],
             ['code' => 'H47.1', 'description' => 'Papiledema', 'category' => 'Nervo Óptico'],
             ['code' => 'H47.2', 'description' => 'Atrofia óptica', 'category' => 'Nervo Óptico'],
@@ -198,7 +198,7 @@ class Cid10CodesSeeder extends Seeder
             ['code' => 'H54.2', 'description' => 'Visão subnormal de ambos os olhos', 'category' => 'Visão e Cegueira'],
 
             // ── H55–H59 Outros Transtornos do Olho ───────────────────────────
-            ['code' => 'H55',   'description' => 'Nistagmo e outros movimentos oculares irregulares', 'category' => 'Outros'],
+            ['code' => 'H55', 'description' => 'Nistagmo e outros movimentos oculares irregulares', 'category' => 'Outros'],
             ['code' => 'H57.0', 'description' => 'Anomalias da função pupilar', 'category' => 'Outros'],
             ['code' => 'H57.1', 'description' => 'Dor ocular', 'category' => 'Outros'],
             ['code' => 'H57.8', 'description' => 'Outros transtornos especificados do olho e anexos', 'category' => 'Outros'],
@@ -210,16 +210,16 @@ class Cid10CodesSeeder extends Seeder
             ['code' => 'E10.3', 'description' => 'Diabetes mellitus tipo 1 com complicações oftálmicas', 'category' => 'Sistêmico'],
             ['code' => 'E11.3', 'description' => 'Diabetes mellitus tipo 2 com complicações oftálmicas', 'category' => 'Sistêmico'],
             ['code' => 'E14.3', 'description' => 'Diabetes mellitus não especificado com complicações oftálmicas', 'category' => 'Sistêmico'],
-            ['code' => 'I10',   'description' => 'Hipertensão essencial (primária)', 'category' => 'Sistêmico'],
+            ['code' => 'I10', 'description' => 'Hipertensão essencial (primária)', 'category' => 'Sistêmico'],
             ['code' => 'I12.9', 'description' => 'Doença renal hipertensiva sem insuficiência renal', 'category' => 'Sistêmico'],
-            ['code' => 'B30',   'description' => 'Conjuntivite viral', 'category' => 'Sistêmico'],
+            ['code' => 'B30', 'description' => 'Conjuntivite viral', 'category' => 'Sistêmico'],
             ['code' => 'B30.0', 'description' => 'Ceratoconjuntivite devida a adenovírus', 'category' => 'Sistêmico'],
             ['code' => 'B30.1', 'description' => 'Conjuntivite devida a adenovírus', 'category' => 'Sistêmico'],
             ['code' => 'B00.3', 'description' => 'Doença ocular herpética', 'category' => 'Sistêmico'],
             ['code' => 'A18.5', 'description' => 'Tuberculose do olho', 'category' => 'Sistêmico'],
             ['code' => 'M05.2', 'description' => 'Artrite reumatoide com vasculite', 'category' => 'Sistêmico'],
             ['code' => 'M32.1', 'description' => 'Lúpus eritematoso sistêmico com manifestações em outros órgãos e sistemas', 'category' => 'Sistêmico'],
-            ['code' => 'G35',   'description' => 'Esclerose múltipla', 'category' => 'Sistêmico'],
+            ['code' => 'G35', 'description' => 'Esclerose múltipla', 'category' => 'Sistêmico'],
             ['code' => 'D86.8', 'description' => 'Sarcoidose de outros sítios especificados', 'category' => 'Sistêmico'],
 
             // ── Malformações congênitas ───────────────────────────────────────

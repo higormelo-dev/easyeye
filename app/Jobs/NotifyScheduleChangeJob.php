@@ -22,8 +22,8 @@ class NotifyScheduleChangeJob implements ShouldQueue
     public int $backoff = 60;
 
     public function __construct(
-        public readonly string  $scheduleId,
-        public readonly string  $event,
+        public readonly string $scheduleId,
+        public readonly string $event,
         public readonly ?string $extraInfo = null,
     ) {
     }
@@ -33,13 +33,13 @@ class NotifyScheduleChangeJob implements ShouldQueue
         $schedule = Schedule::with(['patient.person', 'doctor', 'entity'])
             ->find($this->scheduleId);
 
-        if (!$schedule) {
+        if (! $schedule) {
             return;
         }
 
         $email = $schedule->patient?->person?->email;
 
-        if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return;
         }
 

@@ -34,12 +34,12 @@ return [
     'action_delete'  => 'Delete',
 
     // Form labels
-    'form_title_create'   => 'New Document Template',
-    'form_title_edit'     => 'Edit Document Template',
-    'tab_general'         => 'General',
-    'tab_header'          => 'Header',
-    'tab_signature'       => 'Signature',
-    'tab_footer'          => 'Footer',
+    'form_title_create' => 'New Document Template',
+    'form_title_edit'   => 'Edit Document Template',
+    'tab_general'       => 'General',
+    'tab_header'        => 'Header',
+    'tab_signature'     => 'Signature',
+    'tab_footer'        => 'Footer',
 
     'field_title'         => 'Title',
     'field_category'      => 'Category',

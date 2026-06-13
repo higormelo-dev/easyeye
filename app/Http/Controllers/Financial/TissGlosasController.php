@@ -53,9 +53,9 @@ class TissGlosasController extends Controller
 
         return Inertia::render('Panel/Financial/Tiss/GlosasIndex', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),                'active' => false],
-                ['label' => __('financial.financial'),        'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => __('financial.glosas.title'),     'url' => '#',                                    'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.glosas.title'), 'url' => '#', 'active' => true],
             ],
             'filters' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
             'summary' => [

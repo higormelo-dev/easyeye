@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 return [
     'failed'   => 'These credentials do not match our records.',
@@ -35,76 +35,76 @@ return [
 
     'register' => [
         /* meta */
-        'meta_title'             => ':app — Start for free',
-        'meta_description'       => 'Create your EasyEye account and get started for free. :days-day free trial, no credit card required.',
+        'meta_title'       => ':app — Start for free',
+        'meta_description' => 'Create your EasyEye account and get started for free. :days-day free trial, no credit card required.',
 
         /* left panel */
-        'left_headline'          => 'Start transforming',
-        'left_headline_em'       => 'your clinic today',
-        'left_sub'               => 'Complete management for ophthalmology clinics. Up and running in less than a day.',
-        'benefit_trial_title'    => ':days days free, no credit card',
-        'benefit_trial_text'     => 'Try everything without commitment. Cancel anytime.',
-        'benefit_setup_title'    => 'Ready in less than 1 day',
-        'benefit_setup_text'     => 'No installation, no servers. 100% cloud-based.',
-        'benefit_support_title'  => 'Dedicated onboarding support',
-        'benefit_support_text'   => 'Our team walks you through from day one.',
-        'benefit_lgpd_title'     => 'CFM & LGPD compliant by default',
-        'benefit_lgpd_text'      => 'Built in compliance with CFM, ANS and data protection law.',
-        'testimonial_text'       => 'EasyEye transformed our clinic. TISS billing that used to take days now takes hours.',
-        'testimonial_name'       => 'Dr. Ricardo Mendes',
-        'testimonial_role'       => 'Ophthalmologist — Clínica Visão SP',
+        'left_headline'         => 'Start transforming',
+        'left_headline_em'      => 'your clinic today',
+        'left_sub'              => 'Complete management for ophthalmology clinics. Up and running in less than a day.',
+        'benefit_trial_title'   => ':days days free, no credit card',
+        'benefit_trial_text'    => 'Try everything without commitment. Cancel anytime.',
+        'benefit_setup_title'   => 'Ready in less than 1 day',
+        'benefit_setup_text'    => 'No installation, no servers. 100% cloud-based.',
+        'benefit_support_title' => 'Dedicated onboarding support',
+        'benefit_support_text'  => 'Our team walks you through from day one.',
+        'benefit_lgpd_title'    => 'CFM & LGPD compliant by default',
+        'benefit_lgpd_text'     => 'Built in compliance with CFM, ANS and data protection law.',
+        'testimonial_text'      => 'EasyEye transformed our clinic. TISS billing that used to take days now takes hours.',
+        'testimonial_name'      => 'Dr. Ricardo Mendes',
+        'testimonial_role'      => 'Ophthalmologist — Clínica Visão SP',
 
         /* mobile banner */
-        'days_free'              => 'days free',
-        'no_card'                => 'No credit card',
-        'setup_fast'             => 'Setup in under a day',
+        'days_free'  => 'days free',
+        'no_card'    => 'No credit card',
+        'setup_fast' => 'Setup in under a day',
 
         /* card header */
-        'step1_title'            => 'Create your account',
-        'step1_subtitle'         => ':days days free · no credit card required',
-        'step2_title'            => 'Company details',
-        'step2_subtitle'         => 'Almost there! Set up your clinic to get started.',
+        'step1_title'    => 'Create your account',
+        'step1_subtitle' => ':days days free · no credit card required',
+        'step2_title'    => 'Company details',
+        'step2_subtitle' => 'Almost there! Set up your clinic to get started.',
 
         /* fields and actions */
-        'title'                  => 'Create your account',
-        'step_personal'          => 'Your details',
-        'step_company'           => 'Company & Plan',
-        'name'                   => 'Full name',
-        'email'                  => 'E-mail',
-        'password'               => 'Password',
-        'confirm_password'       => 'Confirm password',
-        'company_name'           => 'Clinic / company name',
-        'cnpj'                   => 'CNPJ',
-        'optional'               => 'optional',
-        'choose_plan'            => 'Choose a plan',
-        'trial_note'             => 'Start your free trial — no credit card required.',
-        'next'                   => 'Next',
-        'back'                   => 'Back',
-        'create_account'         => 'Create account',
-        'start_trial'            => 'Start free trial',
-        'processing'             => 'Processing...',
-        'already_registered'     => 'Already have an account?',
-        'log_in'                 => 'Log in',
-        'or'                     => 'or',
-        'quick_start'            => 'Start with plan',
+        'title'              => 'Create your account',
+        'step_personal'      => 'Your details',
+        'step_company'       => 'Company & Plan',
+        'name'               => 'Full name',
+        'email'              => 'E-mail',
+        'password'           => 'Password',
+        'confirm_password'   => 'Confirm password',
+        'company_name'       => 'Clinic / company name',
+        'cnpj'               => 'CNPJ',
+        'optional'           => 'optional',
+        'choose_plan'        => 'Choose a plan',
+        'trial_note'         => 'Start your free trial — no credit card required.',
+        'next'               => 'Next',
+        'back'               => 'Back',
+        'create_account'     => 'Create account',
+        'start_trial'        => 'Start free trial',
+        'processing'         => 'Processing...',
+        'already_registered' => 'Already have an account?',
+        'log_in'             => 'Log in',
+        'or'                 => 'or',
+        'quick_start'        => 'Start with plan',
 
         /* additional fields */
-        'phone'                  => 'Phone',
+        'phone' => 'Phone',
 
         /* left panel metrics */
-        'metric_clinics'         => 'clinics',
+        'metric_clinics' => 'clinics',
 
         /* JS validations */
-        'email_taken'            => 'This e-mail is already registered.',
-        'field_required'         => 'This field is required.',
-        'passwords_mismatch'     => 'Passwords do not match.',
+        'email_taken'        => 'This e-mail is already registered.',
+        'field_required'     => 'This field is required.',
+        'passwords_mismatch' => 'Passwords do not match.',
 
         /* password strength */
-        'strength_very_weak'     => 'Very weak',
-        'strength_weak'          => 'Weak',
-        'strength_fair'          => 'Fair',
-        'strength_strong'        => 'Strong',
-        'strength_very_strong'   => 'Very strong',
+        'strength_very_weak'   => 'Very weak',
+        'strength_weak'        => 'Weak',
+        'strength_fair'        => 'Fair',
+        'strength_strong'      => 'Strong',
+        'strength_very_strong' => 'Very strong',
     ],
 
     'forgot_password' => [

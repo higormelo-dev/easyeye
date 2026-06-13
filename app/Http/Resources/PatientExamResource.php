@@ -33,71 +33,14 @@ class PatientExamResource extends JsonResource
         ];
 
         if (! $request->routeIs('*.index')) {
-            // Whitelist explícita (LGPD — minimização). toArray() despejava
-            // CPF/PII bruta de paciente/médico e colunas internas do agendamento.
             $data['relationships'] = [
-                'patient'   => $this->relationSummary($this->patient, withPerson: true),
-                'doctor'    => $this->relationSummary($this->doctor, withPerson: true),
-                'schedule'  => $this->scheduleSummary($this->schedule),
-                'equipment' => $this->equipmentSummary($this->equipment),
+                'patient'   => $this->patient?->toArray() ?? (object) [],
+                'doctor'    => $this->doctor?->toArray() ?? (object) [],
+                'schedule'  => $this->schedule?->toArray() ?? (object) [],
+                'equipment' => $this->equipment?->toArray() ?? (object) [],
             ];
         }
 
         return $data;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function relationSummary($model, bool $withPerson = false): array
-    {
-        if ($model === null) {
-            return [];
-        }
-
-        $summary = [
-            'id'   => $model->id,
-            'code' => $model->code,
-        ];
-
-        if ($withPerson) {
-            $summary['full_name'] = $model->person?->full_name;
-            $summary['nickname']  = $model->person?->nickname;
-        }
-
-        return $summary;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function scheduleSummary($schedule): array
-    {
-        if ($schedule === null) {
-            return [];
-        }
-
-        return [
-            'id'        => $schedule->id,
-            'code'      => $schedule->code,
-            'date_time' => $schedule->date_time,
-            'situation' => $schedule->situation,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function equipmentSummary($equipment): array
-    {
-        if ($equipment === null) {
-            return [];
-        }
-
-        return [
-            'id'   => $equipment->id,
-            'code' => $equipment->code,
-            'name' => $equipment->name,
-        ];
     }
 }

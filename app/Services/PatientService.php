@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 class PatientService
 {
     /**
-     * Create a new patient with all related entities
+     * Create a new patient with all related entities.
      */
     public function create(PatientRequest $request): Patient
     {
@@ -22,7 +22,7 @@ class PatientService
     }
 
     /**
-     * Update existing patient and related entities
+     * Update existing patient and related entities.
      */
     public function update(Patient $patient, PatientRequest $request): Patient
     {
@@ -53,7 +53,7 @@ class PatientService
 
             $patient->update($data);
 
-            if (!$request->has('type_method')) {
+            if (! $request->has('type_method')) {
                 $this->updatePersonData($patient->person, $request);
             }
 
@@ -62,7 +62,7 @@ class PatientService
     }
 
     /**
-     * Find by ID or Code including soft-deleted records
+     * Find by ID or Code including soft-deleted records.
      */
     public function findByIdOrCode(string $idOrCode): ?Patient
     {
@@ -73,7 +73,7 @@ class PatientService
             ->when(
                 Str::isUuid($idOrCode),
                 static fn ($q) => $q->where('id', $idOrCode),
-                static fn ($q) => $q->where('code', $idOrCode)
+                static fn ($q) => $q->where('code', $idOrCode),
             )
             ->firstOrFail();
 
@@ -81,7 +81,7 @@ class PatientService
     }
 
     /**
-     * Find or create patient
+     * Find or create patient.
      */
     private function findOrCreate(string $personId, PatientRequest $request): Patient
     {
@@ -117,13 +117,13 @@ class PatientService
                     'entity_id' => $entityId,
                     'person_id' => $personId,
                     'active'    => true,
-                ]
-            )
+                ],
+            ),
         );
     }
 
     /**
-     * Find or create person
+     * Find or create person.
      */
     private function findOrCreatePerson(PatientRequest $request): People
     {
@@ -147,7 +147,7 @@ class PatientService
     }
 
     /**
-     * Extract person data from request
+     * Extract person data from request.
      */
     private function getPersonDataFromRequest(PatientRequest $request): array
     {
@@ -180,7 +180,7 @@ class PatientService
     }
 
     /**
-     * Update person data
+     * Update person data.
      */
     private function updatePersonData(People $person, PatientRequest $request): void
     {

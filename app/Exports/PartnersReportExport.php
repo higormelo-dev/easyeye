@@ -4,19 +4,10 @@ declare(strict_types=1);
 
 namespace App\Exports;
 
-use App\Enums\CommissionStatus;
-use App\Enums\PartnerLeadStatus;
-use App\Models\Partner;
-use App\Models\PartnerCommission;
-use App\Models\PartnerLead;
+use App\Enums\{CommissionStatus, PartnerLeadStatus};
+use App\Models\{Partner, PartnerCommission, PartnerLead};
 use Carbon\CarbonImmutable;
-use Maatwebsite\Excel\Concerns\Exportable;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithHeadings;
-use Maatwebsite\Excel\Concerns\WithMultipleSheets;
-use Maatwebsite\Excel\Concerns\WithStyles;
-use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Concerns\{Exportable, FromCollection, ShouldAutoSize, WithHeadings, WithMultipleSheets, WithStyles, WithTitle};
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 /**
@@ -87,12 +78,13 @@ final class PartnersSummarySheet implements FromCollection, WithHeadings, WithTi
     public function collection()
     {
         $commissionsQuery = PartnerCommission::query();
-        $leadsQuery = PartnerLead::query();
+        $leadsQuery       = PartnerLead::query();
 
         if ($this->from) {
             $commissionsQuery->where('created_at', '>=', $this->from);
             $leadsQuery->where('created_at', '>=', $this->from);
         }
+
         if ($this->to) {
             $commissionsQuery->where('created_at', '<=', $this->to);
             $leadsQuery->where('created_at', '<=', $this->to);
@@ -128,12 +120,15 @@ final class PartnersSummarySheet implements FromCollection, WithHeadings, WithTi
         if ($this->from && $this->to) {
             return $this->from->format('d/m/Y') . ' a ' . $this->to->format('d/m/Y');
         }
+
         if ($this->from) {
             return 'A partir de ' . $this->from->format('d/m/Y');
         }
+
         if ($this->to) {
             return 'Até ' . $this->to->format('d/m/Y');
         }
+
         return 'Todo o histórico';
     }
 }
@@ -162,11 +157,11 @@ final class PartnersListSheet implements FromCollection, WithHeadings, WithTitle
             ->withCount(['leads', 'commissions'])
             ->withSum(
                 ['commissions as pending_amount' => fn ($q) => $q->where('status', CommissionStatus::Pending)],
-                'amount'
+                'amount',
             )
             ->withSum(
                 ['commissions as paid_amount' => fn ($q) => $q->where('status', CommissionStatus::Paid)],
-                'amount'
+                'amount',
             )
             ->orderBy('name')
             ->get()
@@ -221,8 +216,14 @@ final class PartnersLeadsSheet implements FromCollection, WithHeadings, WithTitl
     {
         return collect(PartnerLeadStatus::cases())->map(function (PartnerLeadStatus $s) {
             $q = PartnerLead::query()->where('status', $s);
-            if ($this->from) $q->where('created_at', '>=', $this->from);
-            if ($this->to)   $q->where('created_at', '<=', $this->to);
+
+            if ($this->from) {
+                $q->where('created_at', '>=', $this->from);
+            }
+
+            if ($this->to) {
+                $q->where('created_at', '<=', $this->to);
+            }
 
             return [$s->label(), $q->count()];
         });
@@ -270,11 +271,14 @@ final class PartnersCommissionsSheet implements FromCollection, WithHeadings, Wi
         if ($this->from) {
             $q->where('created_at', '>=', $this->from);
         }
+
         if ($this->to) {
             $q->where('created_at', '<=', $this->to);
         }
+
         if ($this->status) {
             $statusEnum = CommissionStatus::tryFrom($this->status);
+
             if ($statusEnum) {
                 $q->where('status', $statusEnum);
             }

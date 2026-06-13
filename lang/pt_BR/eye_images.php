@@ -47,4 +47,11 @@ return [
     'landscape'   => 'Paisagem',
     'close_btn'   => 'Fechar',
     'report_date' => 'Data do relatório:',
+
+    // IA — análise de imagem ocular
+    'ai_analyze'         => 'Analisar com IA',
+    'ai_selected_images' => 'Imagens selecionadas',
+    'ai_no_selection'    => 'Selecione ao menos uma imagem para analisar.',
+    'ai_report'          => 'Laudo da IA',
+    'ai_reported_badge'  => 'Laudado (IA)',
 ];

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Models;
 
@@ -12,8 +12,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany,
 
 class BillingBatch extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasEntityCode;
     use HasUuids;
     use SoftDeletes;
@@ -44,18 +44,18 @@ class BillingBatch extends Model
     protected function casts(): array
     {
         return [
-            'status' => BillingBatchStatus::class,
+            'status'       => BillingBatchStatus::class,
             'period_start' => 'date',
-            'period_end' => 'date',
-            'due_date' => 'date',
-            'issued_at' => 'datetime',
+            'period_end'   => 'date',
+            'due_date'     => 'date',
+            'issued_at'    => 'datetime',
             'submitted_at' => 'datetime',
             'processed_at' => 'datetime',
             'total_claims' => 'integer',
             'total_amount' => 'decimal:2',
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
+            'created_at'   => 'datetime',
+            'updated_at'   => 'datetime',
+            'deleted_at'   => 'datetime',
         ];
     }
 
@@ -85,4 +85,3 @@ class BillingBatch extends Model
         return $this->hasMany(BillingClaim::class, 'batch_id');
     }
 }
-

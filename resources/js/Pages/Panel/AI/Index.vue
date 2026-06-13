@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     balance: { type: Object, required: true },
@@ -27,6 +28,17 @@ const props = defineProps({
 
 // ── Helpers para a seção analítica ─────────────────────────────────────────
 const analytics = computed(() => props.analytics ?? {});
+
+// Onda 3, P4 — formata segundos como "mm:ss" ou "Xs" para o dashboard.
+function formatSeconds(s) {
+    if (s === null || s === undefined) return '—';
+    const n = Number(s);
+    if (!Number.isFinite(n)) return '—';
+    if (n < 60) return `${Math.round(n)}s`;
+    const m = Math.floor(n / 60);
+    const r = Math.round(n % 60);
+    return `${m}m ${r}s`;
+}
 const usagePercent = computed(() => analytics.value?.consumed?.usage_percent ?? null);
 const usageBarClass = computed(() => {
     const p = usagePercent.value ?? 0;
@@ -92,6 +104,8 @@ const canApproveOrReject = computed(() => selectedRun.value?.status === 'waiting
 const availableStatuses = computed(() => props.statuses.length
     ? props.statuses
     : ['pending', 'reserved', 'running', 'waiting_approval', 'approved', 'rejected', 'failed', 'cancelled']);
+const statusFilterOptions = computed(() =>
+    availableStatuses.value.map((status) => ({ value: status, label: statusLabel(status) })));
 const paginationLinks = computed(() => Array.isArray(props.runs?.links) ? props.runs.links : []);
 
 const workflowLabel = (workflow) => {
@@ -397,6 +411,43 @@ async function rejectRun() {
                         </ul>
                     </div>
 
+                    <!-- Onda 3, P4 — Métricas operacionais ─────────────── -->
+                    <div class="col-md-4" v-if="analytics.avg_approve_time_seconds !== null && analytics.avg_approve_time_seconds !== undefined">
+                        <div class="border rounded p-3 h-100 bg-white">
+                            <div class="text-muted fs-13 mb-1">{{ label('dashboard_avg_approve_time', 'Tempo médio para aprovar') }}</div>
+                            <div class="fs-3 fw-bold text-primary">{{ formatSeconds(analytics.avg_approve_time_seconds) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4" v-if="analytics.avg_cost_per_record !== null && analytics.avg_cost_per_record !== undefined">
+                        <div class="border rounded p-3 h-100 bg-white">
+                            <div class="text-muted fs-13 mb-1">{{ label('dashboard_avg_cost', 'Custo médio por consulta') }}</div>
+                            <div class="fs-3 fw-bold text-info">{{ analytics.avg_cost_per_record }} cr</div>
+                        </div>
+                    </div>
+                    <div class="col-12" v-if="analytics.by_doctor?.length">
+                        <h6 class="fw-semibold fs-13 mb-2">{{ label('dashboard_by_doctor', 'Médicos mais ativos') }}</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>{{ label('dashboard_doctor', 'Médico') }}</th>
+                                        <th class="text-end">{{ label('dashboard_approved', 'Aprovados') }}</th>
+                                        <th class="text-end">{{ label('dashboard_avg_credits', 'Créditos médios') }}</th>
+                                        <th class="text-end">{{ label('dashboard_avg_time', 'Tempo médio') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="r in analytics.by_doctor" :key="r.doctor_id">
+                                        <td class="fs-13">{{ r.doctor_name }}</td>
+                                        <td class="text-end">{{ r.approved }}</td>
+                                        <td class="text-end">{{ r.avg_credits }}</td>
+                                        <td class="text-end fs-13 text-muted">{{ formatSeconds(r.avg_approve_seconds) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <!-- Top runs por custo -->
                     <div class="col-12" v-if="analytics.top_runs?.length">
                         <h6 class="fw-semibold fs-13 mb-2">Top 5 execuções por custo</h6>
@@ -432,10 +483,15 @@ async function rejectRun() {
                     <div class="border rounded p-3 bg-white">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="fw-semibold mb-0">{{ label('runs', 'Execuções') }}</h6>
-                            <select v-model="statusFilter" class="form-select form-select-sm w-auto" @change="filterByStatus">
-                                <option value="">{{ label('all_statuses', 'Todos status') }}</option>
-                                <option v-for="status in availableStatuses" :key="status" :value="status">{{ statusLabel(status) }}</option>
-                            </select>
+                            <SearchSelect
+                                v-model="statusFilter"
+                                class="w-auto"
+                                :options="statusFilterOptions"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :placeholder="label('all_statuses', 'Todos status')"
+                                @change="filterByStatus"
+                            />
                         </div>
 
                         <div class="table-responsive">
@@ -453,7 +509,14 @@ async function rejectRun() {
                                 <tbody>
                                     <tr v-for="run in runs.data" :key="run.id">
                                         <td>{{ run.created_at }}</td>
-                                        <td>{{ workflowLabel(run.workflow) }}</td>
+                                        <td>
+                                            {{ workflowLabel(run.workflow) }}
+                                            <span v-if="run.is_escalation"
+                                                  class="badge bg-info-subtle text-info ms-1"
+                                                  title="Reanálise com modo superior">
+                                                <i class="ti ti-arrow-up"></i> Reanálise
+                                            </span>
+                                        </td>
                                         <td>{{ modeLabel(run.mode) }}</td>
                                         <td><span :class="statusClass(run.status)">{{ statusLabel(run.status) }}</span></td>
                                         <td>{{ run.consumed_credits }}/{{ run.reserved_credits }}</td>

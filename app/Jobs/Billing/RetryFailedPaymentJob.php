@@ -2,17 +2,15 @@
 
 namespace App\Jobs\Billing;
 
-use App\DTOs\Billing\CreateChargeDTO;
+use App\DTOs\Billing\{CreateChargeDTO, GatewayCallContext};
 use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus};
 use App\Models\Billing\{BillingRetrySchedule, Payment};
-use App\DTOs\Billing\GatewayCallContext;
 use App\Services\Billing\{BillingLogService, CircuitBreakerService, FinancialEventService, GatewayRegistry};
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\{DB, Log};
 use Throwable;
 
 /**
@@ -50,11 +48,11 @@ class RetryFailedPaymentJob implements ShouldQueue
             return;
         }
 
-        $subscription = $schedule->subscription;
-        $invoice      = $schedule->invoice;
-        $entity       = $subscription->entity;
-        $plan         = $subscription->plan;
-        $gatewayCode  = (string) ($schedule->gateway_code ?: $subscription->gateway ?: config('billing.default_gateway'));
+        $subscription  = $schedule->subscription;
+        $invoice       = $schedule->invoice;
+        $entity        = $subscription->entity;
+        $plan          = $subscription->plan;
+        $gatewayCode   = (string) ($schedule->gateway_code ?: $subscription->gateway ?: config('billing.default_gateway'));
         $correlationId = (string) $schedule->correlation_id;
 
         // Mark as executing to prevent double-processing
@@ -66,6 +64,7 @@ class RetryFailedPaymentJob implements ShouldQueue
                 'status'         => 'skipped',
                 'result_message' => 'Circuit breaker aberto.',
             ]);
+
             return;
         }
 
@@ -103,6 +102,7 @@ class RetryFailedPaymentJob implements ShouldQueue
                 'retry_schedule' => $this->retryScheduleId,
                 'error'          => $e->getMessage(),
             ]);
+
             return;
         }
 
@@ -120,6 +120,7 @@ class RetryFailedPaymentJob implements ShouldQueue
                 correlationId: $correlationId,
                 source: 'retry_scheduler',
             );
+
             return;
         }
 

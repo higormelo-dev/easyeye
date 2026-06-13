@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiProviderInterface, AiRunProviderCallStoreInterface};
+use App\Domains\AI\Exceptions\AiRunCancelledException;
 use App\Domains\AI\Models\AiRun;
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData, AiWorkflowResultData};
 use App\Enums\AI\{AiProviderCallRole, AiRunMode};
@@ -44,7 +45,23 @@ class AiOrchestrator
         $entityId        = (string) $run->entity_id;
 
         foreach ($steps as $step) {
-            $role        = $step['role'];
+            $role = $step['role'];
+
+            // Checkpoint cooperativo de cancelamento. O controller pode marcar
+            // cancelled_at a qualquer momento; aqui aplicamos a barreira: se for
+            // detectado, abortamos antes da próxima chamada ao provider. A chamada
+            // anterior (se houver) já consumiu seus créditos no fluxo padrão.
+            $run->refresh();
+
+            if ($run->cancelled_at !== null) {
+                throw new AiRunCancelledException();
+            }
+
+            $run->update([
+                'current_role'     => $role->value,
+                'current_provider' => null,
+            ]);
+
             $stepRequest = $this->stepRequest($request, $role, $previousOutputs);
             $chain       = $this->providerManager->fallbackChainForRole($role);
             $response    = $this->runWithFallback(
@@ -59,6 +76,12 @@ class AiOrchestrator
             $responses[]       = $response;
             $previousOutputs[] = $response->content;
         }
+
+        // Workflow concluído com sucesso — limpa marcadores de etapa em execução.
+        $run->update([
+            'current_role'     => null,
+            'current_provider' => null,
+        ]);
 
         return new AiWorkflowResultData(
             workflow: $request->workflow,
@@ -119,6 +142,11 @@ class AiOrchestrator
 
                 continue;
             }
+
+            // Sinaliza para o painel qual provider está respondendo agora ("Revisando
+            // com Claude…"). Persistido em ai_runs para o show() devolver sem precisar
+            // ler ai_run_provider_calls.
+            $run->update(['current_provider' => $providerCode]);
 
             try {
                 $response = $provider->generate($stepRequest);

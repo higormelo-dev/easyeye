@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Traits;
 
@@ -31,10 +31,10 @@ trait LogsDataAccess
     /**
      * Registra o acesso (leitura) a um recurso sensível.
      *
-     * @param  Model                $resource      O model acessado (MedicalRecord, PatientExam, People…)
-     * @param  DataAccessPurpose    $purpose        Finalidade do acesso
-     * @param  string|null          $justification  Obrigatório para EmergencyAccess
-     * @param  string|null          $patientId      UUID do paciente (inferido automaticamente se o model tiver patient_id)
+     * @param Model             $resource      O model acessado (MedicalRecord, PatientExam, People…)
+     * @param DataAccessPurpose $purpose       Finalidade do acesso
+     * @param string|null       $justification Obrigatório para EmergencyAccess
+     * @param string|null       $patientId     UUID do paciente (inferido automaticamente se o model tiver patient_id)
      */
     protected function logAccess(
         Model $resource,

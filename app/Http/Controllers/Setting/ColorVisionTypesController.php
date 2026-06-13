@@ -12,11 +12,11 @@ class ColorVisionTypesController extends BaseSettingController
 {
     public function __construct(ColorVisionTypeService $service)
     {
-        $this->titleController = __("actions.sidemenu.colorvisiontypes");
+        $this->titleController = __('actions.sidemenu.colorvisiontypes');
         $this->service         = $service;
         $this->resourceClass   = ColorVisionTypeResource::class;
-        $this->routePrefix     = "panel.setting.colorvisiontypes";
-        $this->viewSlot        = "colorvisiontypes";
+        $this->routePrefix     = 'panel.setting.colorvisiontypes';
+        $this->viewSlot        = 'colorvisiontypes';
     }
 
     public function store(ColorVisionTypeRequest $request)

@@ -11,7 +11,7 @@ class PeoplePresenter extends Presenter
         return preg_replace(
             '/(\d{3})(\d{3})(\d{3})(\d{2})/',
             '$1.$2.$3-$4',
-            $this->national_registry
+            $this->national_registry,
         );
     }
 
@@ -22,7 +22,7 @@ class PeoplePresenter extends Presenter
 
     public function getAge(): string
     {
-        if (!$this->birth_date) {
+        if (! $this->birth_date) {
             return __('actions.age.not_informed');
         }
 

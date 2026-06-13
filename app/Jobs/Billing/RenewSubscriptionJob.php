@@ -2,19 +2,18 @@
 
 namespace App\Jobs\Billing;
 
-use App\DTOs\Billing\CreateChargeDTO;
+use App\DTOs\Billing\{CreateChargeDTO, GatewayCallContext};
 use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentStatus};
 use App\Enums\BillingCycle;
 use App\Models\Billing\{BillingRetrySchedule, Invoice, Payment};
-use App\Models\{Subscription};
-use App\DTOs\Billing\GatewayCallContext;
+use App\Models\Subscription;
 use App\Services\Billing\{BillingLogService, CircuitBreakerService, FinancialEventService, GatewayRegistry};
+use DateInterval;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\{DB, Log};
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -69,10 +68,10 @@ class RenewSubscriptionJob implements ShouldQueue
 
         // ── Phase 1: DB — create draft invoice ────────────────────────────────
         $invoice = DB::transaction(function () use ($subscription, $entity, $plan, $correlationId, $gatewayCode): Invoice {
-            $cycle      = BillingCycle::from($plan->billing_cycle);
+            $cycle       = BillingCycle::from($plan->billing_cycle);
             $periodStart = $subscription->next_billing_at->toDateString();
             $periodEnd   = $subscription->next_billing_at->add(
-                \DateInterval::createFromDateString($cycle->months() . ' months')
+                DateInterval::createFromDateString($cycle->months() . ' months'),
             )->toDateString();
 
             return Invoice::query()->create([
@@ -97,6 +96,7 @@ class RenewSubscriptionJob implements ShouldQueue
         // ── Phase 2: HTTP — call gateway ──────────────────────────────────────
         if ($circuitBreaker->isOpen($gatewayCode, (string) $entity->id)) {
             $this->handleChargeFailure($subscription, $invoice, $correlationId, null, 'Circuit breaker aberto.');
+
             return;
         }
 
@@ -125,12 +125,14 @@ class RenewSubscriptionJob implements ShouldQueue
         } catch (Throwable $e) {
             $circuitBreaker->recordFailure($gatewayCode, 'exception', (string) $entity->id);
             $this->handleChargeFailure($subscription, $invoice, $correlationId, $e->getMessage());
+
             return;
         }
 
         if (! $chargeResult->success) {
             $circuitBreaker->recordFailure($gatewayCode, 'declined', (string) $entity->id);
             $this->handleChargeFailure($subscription, $invoice, $correlationId, $chargeResult->errorMessage);
+
             return;
         }
 
@@ -159,7 +161,7 @@ class RenewSubscriptionJob implements ShouldQueue
 
             // Advance next_billing_at by one billing cycle
             $nextBillingAt = $subscription->next_billing_at->add(
-                \DateInterval::createFromDateString($cycle->months() . ' months')
+                DateInterval::createFromDateString($cycle->months() . ' months'),
             );
 
             $subscription->update([

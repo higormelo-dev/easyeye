@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany,
 
 class Doctor extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;
@@ -36,7 +36,7 @@ class Doctor extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {

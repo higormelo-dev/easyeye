@@ -26,7 +26,7 @@ class MedicinePresentationsSeeder extends Seeder
         foreach ($presentations as $name) {
             MedicinePresentation::query()->firstOrCreate(
                 ['name' => $name, 'entity_id' => null],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

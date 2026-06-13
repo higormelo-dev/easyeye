@@ -13,7 +13,6 @@ class LensesSeeder extends Seeder
     public function run(): void
     {
         $lensTypes = [
-
             ['name' => 'Monofocal', 'away' => true, 'near' => true],
             ['name' => 'Bifocal', 'away' => true, 'near' => true],
             ['name' => 'Multifocal / Progressiva', 'away' => true, 'near' => true],
@@ -31,7 +30,7 @@ class LensesSeeder extends Seeder
         foreach ($lensTypes as $type) {
             Lense::query()->firstOrCreate(
                 ['name' => $type['name']],
-                ['away' => (bool) $type['away'], 'near' => (bool) $type['near'], 'active' => true]
+                ['away' => (bool) $type['away'], 'near' => (bool) $type['near'], 'active' => true],
             );
         }
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Lense;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +20,7 @@ class LenseRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -39,12 +40,12 @@ class LenseRequest extends FormRequest
                 'required_without:type_method',
                 'boolean',
                 function ($attribute, $value, $fail) {
-                    if (!$this->input('away') && !$this->input('near')) {
+                    if (! $this->input('away') && ! $this->input('near')) {
                         $fail(
                             __(
                                 'validation.at_least_one_required',
-                                ['fields' => __('validation.attributes.away_or_near')]
-                            )
+                                ['fields' => __('validation.attributes.away_or_near')],
+                            ),
                         );
                     }
                 },

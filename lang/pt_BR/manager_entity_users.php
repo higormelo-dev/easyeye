@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 return [
-    'page_title'         => 'Usuários da Empresa',
-    'breadcrumb_home'    => 'Dashboard',
-    'breadcrumb_entities'=> 'Empresas',
-    'breadcrumb_current' => 'Usuários',
+    'page_title'          => 'Usuários da Empresa',
+    'breadcrumb_home'     => 'Dashboard',
+    'breadcrumb_entities' => 'Empresas',
+    'breadcrumb_current'  => 'Usuários',
 
     'btn_back'           => 'Voltar para empresas',
     'search_placeholder' => 'Buscar por nome ou e-mail...',
@@ -27,12 +27,12 @@ return [
     'status_deleted'  => 'Removido',
 
     // Ações
-    'action_impersonate'           => 'Entrar como este usuário',
-    'action_impersonate_disabled'  => 'Não é possível impersonar este usuário',
-    'confirm_impersonate_title'    => 'Entrar como :name?',
-    'confirm_impersonate_text'     => 'Você assumirá temporariamente o contexto desta clínica. Use apenas para suporte autorizado.',
-    'confirm_impersonate_yes'      => 'Sim, continuar',
-    'confirm_impersonate_no'       => 'Cancelar',
+    'action_impersonate'          => 'Entrar como este usuário',
+    'action_impersonate_disabled' => 'Não é possível impersonar este usuário',
+    'confirm_impersonate_title'   => 'Entrar como :name?',
+    'confirm_impersonate_text'    => 'Você assumirá temporariamente o contexto desta clínica. Use apenas para suporte autorizado.',
+    'confirm_impersonate_yes'     => 'Sim, continuar',
+    'confirm_impersonate_no'      => 'Cancelar',
 
     // Estados vazios
     'empty_list' => 'Nenhum usuário encontrado nesta empresa.',

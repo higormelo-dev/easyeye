@@ -13,8 +13,7 @@ use App\DTOs\Billing\{
     GatewayWebhookInputDTO,
     NormalizedWebhookEventDTO,
 };
-use App\Enums\BillingCycle;
-use Illuminate\Support\Arr;
+use App\Exceptions\Billing\GatewayIntegrationException;
 
 /**
  * Integração completa com a API Asaas v3.
@@ -66,8 +65,10 @@ class AsaasGateway extends AbstractHttpGateway
         $response = $this->post('customers', $this->buildCustomerPayload($customer));
 
         if (! $response->successful()) {
-            throw \App\Exceptions\Billing\GatewayIntegrationException::fromHttpStatus(
-                $this->code(), $response->status(), $response->body()
+            throw GatewayIntegrationException::fromHttpStatus(
+                $this->code(),
+                $response->status(),
+                $response->body(),
             );
         }
 
@@ -79,11 +80,11 @@ class AsaasGateway extends AbstractHttpGateway
         $phone = preg_replace('/\D/', '', (string) $customer->phone);
 
         return array_filter([
-            'name'               => $customer->name,
-            'email'              => $customer->email,
-            'cpfCnpj'            => preg_replace('/\D/', '', (string) $customer->document),
-            'mobilePhone'        => $phone ?: null,
-            'externalReference'  => $customer->externalReference,
+            'name'                 => $customer->name,
+            'email'                => $customer->email,
+            'cpfCnpj'              => preg_replace('/\D/', '', (string) $customer->document),
+            'mobilePhone'          => $phone ?: null,
+            'externalReference'    => $customer->externalReference,
             'notificationDisabled' => false,
         ]);
     }
@@ -121,13 +122,13 @@ class AsaasGateway extends AbstractHttpGateway
         $cycle = $this->resolveBillingCycleFromInterval($payload->interval, $payload->intervalCount);
 
         return array_filter([
-            'customer'          => $payload->customerId,
-            'billingType'       => 'BOLETO',
-            'value'             => $payload->amount,
-            'nextDueDate'       => now()->addDays(1)->format('Y-m-d'),
-            'cycle'             => $cycle,
-            'description'       => $payload->description ?? "Assinatura {$payload->planId}",
-            'externalReference' => $payload->subscriptionId,
+            'customer'                   => $payload->customerId,
+            'billingType'                => 'BOLETO',
+            'value'                      => $payload->amount,
+            'nextDueDate'                => now()->addDays(1)->format('Y-m-d'),
+            'cycle'                      => $cycle,
+            'description'                => $payload->description ?? "Assinatura {$payload->planId}",
+            'externalReference'          => $payload->subscriptionId,
             'sendPaymentByPostalService' => false,
         ]);
     }
@@ -227,7 +228,7 @@ class AsaasGateway extends AbstractHttpGateway
         $event   = (string) ($payload->payload['event'] ?? 'unknown');
         $payment = $payload->payload['payment'] ?? [];
 
-        $normalizedType        = $this->normalizeEventType($event);
+        $normalizedType         = $this->normalizeEventType($event);
         $externalSubscriptionId = $payment['subscription'] ?? null;
         $externalPaymentId      = $payment['id'] ?? null;
         $externalRef            = $payment['externalReference'] ?? null;
@@ -235,6 +236,7 @@ class AsaasGateway extends AbstractHttpGateway
         $status                 = $this->normalizeAsaasPaymentStatus($payment['status'] ?? '');
 
         $metadata = [];
+
         if ($externalRef) {
             $metadata['invoice_id'] = $externalRef; // externalReference = invoice_id interno
         }
@@ -260,26 +262,26 @@ class AsaasGateway extends AbstractHttpGateway
     protected function eventTypeMap(): array
     {
         return [
-            'PAYMENT_RECEIVED'                       => 'paid',
-            'PAYMENT_CONFIRMED'                      => 'paid',
-            'PAYMENT_ANTICIPATED'                    => 'paid',
-            'PAYMENT_DUNNING_RECEIVED'               => 'paid',
-            'PAYMENT_OVERDUE'                        => 'failed',
-            'PAYMENT_REFUSED'                        => 'failed',
-            'PAYMENT_DELETED'                        => 'cancelled',
-            'PAYMENT_RESTORED'                       => 'unknown',
-            'PAYMENT_UPDATED'                        => 'unknown',
-            'PAYMENT_CREATED'                        => 'unknown',
-            'PAYMENT_BANK_SLIP_VIEWED'               => 'unknown',
-            'PAYMENT_CHECKOUT_VIEWED'                => 'unknown',
-            'PAYMENT_REFUNDED'                       => 'refunded',
-            'PAYMENT_RECEIVED_IN_CASH_UNDONE'        => 'refunded',
-            'PAYMENT_CHARGEBACK_REQUESTED'           => 'chargeback',
-            'PAYMENT_CHARGEBACK_DISPUTE'             => 'chargeback',
-            'PAYMENT_AWAITING_CHARGEBACK_REVERSAL'   => 'chargeback',
-            'PAYMENT_DUNNING_REQUESTED'              => 'unknown',
-            'SUBSCRIPTION_INACTIVATED'               => 'cancelled',
-            'SUBSCRIPTION_ACTIVATED'                 => 'unknown',
+            'PAYMENT_RECEIVED'                     => 'paid',
+            'PAYMENT_CONFIRMED'                    => 'paid',
+            'PAYMENT_ANTICIPATED'                  => 'paid',
+            'PAYMENT_DUNNING_RECEIVED'             => 'paid',
+            'PAYMENT_OVERDUE'                      => 'failed',
+            'PAYMENT_REFUSED'                      => 'failed',
+            'PAYMENT_DELETED'                      => 'cancelled',
+            'PAYMENT_RESTORED'                     => 'unknown',
+            'PAYMENT_UPDATED'                      => 'unknown',
+            'PAYMENT_CREATED'                      => 'unknown',
+            'PAYMENT_BANK_SLIP_VIEWED'             => 'unknown',
+            'PAYMENT_CHECKOUT_VIEWED'              => 'unknown',
+            'PAYMENT_REFUNDED'                     => 'refunded',
+            'PAYMENT_RECEIVED_IN_CASH_UNDONE'      => 'refunded',
+            'PAYMENT_CHARGEBACK_REQUESTED'         => 'chargeback',
+            'PAYMENT_CHARGEBACK_DISPUTE'           => 'chargeback',
+            'PAYMENT_AWAITING_CHARGEBACK_REVERSAL' => 'chargeback',
+            'PAYMENT_DUNNING_REQUESTED'            => 'unknown',
+            'SUBSCRIPTION_INACTIVATED'             => 'cancelled',
+            'SUBSCRIPTION_ACTIVATED'               => 'unknown',
         ];
     }
 
@@ -289,12 +291,12 @@ class AsaasGateway extends AbstractHttpGateway
     {
         return match (strtoupper($status)) {
             'RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH' => 'paid',
-            'PENDING', 'AWAITING_RISK_ANALYSIS'          => 'pending',
-            'OVERDUE', 'DUNNING_REQUESTED'               => 'failed',
-            'REFUNDED', 'REFUND_REQUESTED'               => 'refunded',
+            'PENDING', 'AWAITING_RISK_ANALYSIS' => 'pending',
+            'OVERDUE', 'DUNNING_REQUESTED' => 'failed',
+            'REFUNDED', 'REFUND_REQUESTED' => 'refunded',
             'CHARGEBACK_REQUESTED', 'CHARGEBACK_DISPUTE' => 'chargeback',
-            'CANCELLED', 'DELETED'                       => 'cancelled',
-            default                                      => strtolower($status),
+            'CANCELLED', 'DELETED' => 'cancelled',
+            default => strtolower($status),
         };
     }
 
@@ -315,10 +317,10 @@ class AsaasGateway extends AbstractHttpGateway
         }
 
         return match ($count) {
-            1  => 'MONTHLY',
-            3  => 'QUARTERLY',
-            6  => 'SEMIANNUALLY',
-            12 => 'YEARLY',
+            1       => 'MONTHLY',
+            3       => 'QUARTERLY',
+            6       => 'SEMIANNUALLY',
+            12      => 'YEARLY',
             default => 'MONTHLY',
         };
     }

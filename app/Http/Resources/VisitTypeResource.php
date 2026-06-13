@@ -18,16 +18,17 @@ class VisitTypeResource extends JsonResource
             'type'       => 'doctor',
             'id'         => $this->id,
             'attributes' => [
-                'entity_id'  => $this->entity_id,
-                'code'       => $this->code,
-                'name'       => $this->name,
-                'active'     => (bool) $this->active,
-                'created_at' => $this->created_at,
-                'updated_at' => $this->updated_at,
+                'entity_id'    => $this->entity_id,
+                'code'         => $this->code,
+                'name'         => $this->name,
+                'procedure_id' => $this->procedure_id,
+                'active'       => (bool) $this->active,
+                'created_at'   => $this->created_at,
+                'updated_at'   => $this->updated_at,
             ],
         ];
 
-        if (!$request->routeIs('*.index')) {
+        if (! $request->routeIs('*.index')) {
             $data['relationships'] = [
                 'entity' => $this->entity->toArray(),
             ];

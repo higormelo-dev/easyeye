@@ -8,8 +8,7 @@ use App\Models\{Entity, MedicalRecord, MedicalRecordFile, Patient};
 use App\Services\{FeatureGateService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response, StreamedResponse};
-use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\{Gate, Storage};
 use Illuminate\Support\Str;
 
 class MedicalRecordFilesController extends Controller
@@ -82,7 +81,7 @@ class MedicalRecordFilesController extends Controller
 
         $this->logAccess($file, DataAccessPurpose::PatientCare, patientId: $patient->id);
 
-        if (!Storage::disk('private')->exists($file->file_path)) {
+        if (! Storage::disk('private')->exists($file->file_path)) {
             abort(404);
         }
 

@@ -11,9 +11,9 @@ use Laravel\Sanctum\HasApiTokens;
 
 class EntityUserIntegrator extends Authenticatable
 {
-    use HasAuditColumns;
     use Auditable;
     use HasApiTokens;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use SoftDeletes;
@@ -45,7 +45,7 @@ class EntityUserIntegrator extends Authenticatable
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {

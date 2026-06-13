@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Diferença do audit_logs: registra LEITURA (view/access), não apenas mudanças.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('data_access_logs', function (Blueprint $table) {

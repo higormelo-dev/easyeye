@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\{FeatureKey, ImportStatus};
 use App\Jobs\ProcessPatientImportJob;
-use App\Models\{PatientImport};
+use App\Models\PatientImport;
 use App\Services\{FeatureGateService, PatientImportService};
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Storage;
@@ -35,16 +35,16 @@ class PatientImportsController extends Controller
 
         return Inertia::render('Panel/Patients/Import', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),       'active' => false],
-                ['label' => __('actions.sidemenu.patients'),   'url' => route('panel.patients.index'),  'active' => false],
-                ['label' => __('imports.patients.title'),      'url' => '#',                            'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.patients'), 'url' => route('panel.patients.index'), 'active' => false],
+                ['label' => __('imports.patients.title'), 'url' => '#', 'active' => true],
             ],
-            'imports' => $imports->map(fn (PatientImport $i) => $this->serializeImport($i)),
+            'imports'        => $imports->map(fn (PatientImport $i) => $this->serializeImport($i)),
             'pending_import' => $pendingImport ? $this->serializeImport($pendingImport) : null,
             'preview_id'     => session('import_preview_id'),
             'plan_status'    => [
-                'max'       => $planStatus['max']       ?? null,
-                'used'      => $planStatus['used']      ?? 0,
+                'max'       => $planStatus['max'] ?? null,
+                'used'      => $planStatus['used'] ?? 0,
                 'available' => $planStatus['available'] ?? null,
             ],
             'urls' => [
@@ -81,10 +81,10 @@ class PatientImportsController extends Controller
             'user_name'       => $i->user?->name,
             'preview'         => $i->preview,
             'has_errors_file' => $i->errors_file_path !== null,
-            'urls' => [
-                'status'  => route('panel.patients.import.status',  $i->id),
+            'urls'            => [
+                'status'  => route('panel.patients.import.status', $i->id),
                 'confirm' => route('panel.patients.import.confirm', $i->id),
-                'cancel'  => route('panel.patients.import.cancel',  $i->id),
+                'cancel'  => route('panel.patients.import.cancel', $i->id),
                 'errors'  => $i->errors_file_path
                     ? route('panel.patients.import.errors', $i->id)
                     : null,

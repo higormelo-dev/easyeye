@@ -55,6 +55,9 @@ const breadcrumbs = [];
                         <a :href="route('manager.partners.index')" class="btn btn-sm btn-banner btn-banner-solid">
                             <i class="ti ti-users-group me-1"></i>{{ t.btn_partners }}
                         </a>
+                        <a :href="route('manager.ai-providers.index')" class="btn btn-sm btn-banner">
+                            <i class="ti ti-robot me-1"></i>{{ t.btn_ai_providers ?? 'Provedores de IA' }}
+                        </a>
                     </div>
                 </div>
             </div>

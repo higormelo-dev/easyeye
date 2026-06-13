@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\Schema;
  *  - route_name         : nome da rota Laravel acionada. Indexado para queries
  *                         "todas as cancelaments de assinatura no período".
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('audit_logs', function (Blueprint $table) {

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
@@ -31,7 +31,7 @@ class TermsService
                 'accepted_at' => now(),
                 'ip_address'  => request()->ip(),
                 'user_agent'  => request()->userAgent(),
-            ]
+            ],
         );
     }
 
@@ -52,7 +52,7 @@ class TermsService
                 ->where('term_version_id', $current->id)
                 ->exists();
 
-            if (!$accepted) {
+            if (! $accepted) {
                 return false;
             }
         }
@@ -81,7 +81,7 @@ class TermsService
                 ->where('term_version_id', $current->id)
                 ->exists();
 
-            if (!$accepted) {
+            if (! $accepted) {
                 $pending[] = $current;
             }
         }

@@ -1,8 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Support;
+
+use App\Models\User;
 
 /**
  * Contexto global de auditoria.
@@ -32,6 +34,6 @@ class AuditContext
 
         $user = auth()->user();
 
-        return ($user instanceof \App\Models\User) ? $user->getKey() : null;
+        return ($user instanceof User) ? $user->getKey() : null;
     }
 }

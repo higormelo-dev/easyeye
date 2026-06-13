@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Traits;
 
@@ -39,7 +39,7 @@ trait HasEntityRoles
      */
     public function getRuleInEntity(Entity $entity): ?string
     {
-        if (!array_key_exists($entity->id, $this->entityRuleCache)) {
+        if (! array_key_exists($entity->id, $this->entityRuleCache)) {
             $this->entityRuleCache[$entity->id] = EntityUser::query()
                 ->where('user_id', $this->id)
                 ->where('entity_id', $entity->id)
@@ -125,7 +125,7 @@ trait HasEntityRoles
      *
      * Each element of $roles may be a raw string or a typed enum.
      *
-     * @param  array<string|SaasRule|ClientRule>  $roles
+     * @param array<string|SaasRule|ClientRule> $roles
      */
     public function hasAnyRoleInEntity(Entity $entity, array $roles): bool
     {
@@ -149,11 +149,11 @@ trait HasEntityRoles
     /**
      * Return true when the user has none of the provided roles in the entity.
      *
-     * @param  array<string|SaasRule|ClientRule>  $roles
+     * @param array<string|SaasRule|ClientRule> $roles
      */
     public function hasNoneOfRolesInEntity(Entity $entity, array $roles): bool
     {
-        return !$this->hasAnyRoleInEntity($entity, $roles);
+        return ! $this->hasAnyRoleInEntity($entity, $roles);
     }
 
     /**

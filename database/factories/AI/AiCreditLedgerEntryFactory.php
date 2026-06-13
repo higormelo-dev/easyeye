@@ -2,8 +2,7 @@
 
 namespace Database\Factories\AI;
 
-use App\Domains\AI\Models\AiCreditLedgerEntry;
-use App\Domains\AI\Models\AiCreditWallet;
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiCreditWallet};
 use App\Enums\AI\AiLedgerEntryType;
 use App\Models\Entity;
 use Illuminate\Database\Eloquent\Factories\Factory;

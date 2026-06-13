@@ -32,7 +32,7 @@ use Illuminate\Support\Facades\Schema;
  *                                  código válido. NULL = setup pendente
  *                                  (não pode ser usado como prova de 2FA).
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {

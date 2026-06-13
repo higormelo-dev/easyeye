@@ -24,4 +24,6 @@ interface AiRunRepositoryInterface
     ): void;
 
     public function markFailed(AiRun $run, string $errorMessage): void;
+
+    public function markCancelled(AiRun $run): void;
 }

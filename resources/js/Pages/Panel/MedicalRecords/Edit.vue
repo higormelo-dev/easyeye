@@ -16,6 +16,7 @@ defineProps({
     catalogs:        { type: Object,  required: true },
     urls:            { type: Object,  required: true },
     storage:         { type: Object,  default: () => ({}) },
+    ai:              { type: Object,  default: () => ({ enabled: false }) },
     t:               { type: Object,  default: () => ({}) },
 });
 </script>
@@ -73,6 +74,7 @@ defineProps({
                             :catalogs="catalogs"
                             :urls="urls"
                             :storage="storage"
+                            :ai="ai"
                             :t="t"
                         />
                     </div>

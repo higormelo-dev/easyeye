@@ -13,7 +13,6 @@ use App\DTOs\Billing\{
     GatewayWebhookInputDTO,
     NormalizedWebhookEventDTO,
 };
-use App\Exceptions\Billing\GatewayIntegrationException;
 
 /**
  * Integração completa com PagBank (PagSeguro).
@@ -57,13 +56,13 @@ class PagBankGateway extends AbstractHttpGateway
         }
 
         $response = $this->post('subscriptions', [
-            'plan'        => ['id' => $planId],
+            'plan'         => ['id' => $planId],
             'reference_id' => $payload->subscriptionId,
-            'customer'    => [
-                'name'          => $payload->metadata['customer_name'] ?? '',
-                'email'         => $payload->metadata['email'] ?? '',
-                'tax_id'        => preg_replace('/\D/', '', (string) ($payload->metadata['document'] ?? '')),
-                'phone'         => [['country' => '55', 'area' => substr(preg_replace('/\D/', '', (string) ($payload->metadata['phone'] ?? '')), 0, 2), 'number' => substr(preg_replace('/\D/', '', (string) ($payload->metadata['phone'] ?? '')), 2)]],
+            'customer'     => [
+                'name'   => $payload->metadata['customer_name'] ?? '',
+                'email'  => $payload->metadata['email'] ?? '',
+                'tax_id' => preg_replace('/\D/', '', (string) ($payload->metadata['document'] ?? '')),
+                'phone'  => [['country' => '55', 'area' => substr(preg_replace('/\D/', '', (string) ($payload->metadata['phone'] ?? '')), 0, 2), 'number' => substr(preg_replace('/\D/', '', (string) ($payload->metadata['phone'] ?? '')), 2)]],
             ],
             'payment_method' => [[
                 'type' => 'CREDIT_CARD',
@@ -158,18 +157,18 @@ class PagBankGateway extends AbstractHttpGateway
         $amountCents = (int) round($payload->amount * 100);
 
         return [
-            'reference_id'    => $payload->invoiceId,
-            'customer'        => [
-                'name'  => $payload->metadata['customer_name'] ?? 'Cliente',
-                'email' => $payload->metadata['email'] ?? '',
+            'reference_id' => $payload->invoiceId,
+            'customer'     => [
+                'name'   => $payload->metadata['customer_name'] ?? 'Cliente',
+                'email'  => $payload->metadata['email'] ?? '',
                 'tax_id' => preg_replace('/\D/', '', (string) ($payload->metadata['document'] ?? '')),
             ],
-            'items'           => [[
-                'name'      => $payload->description,
-                'quantity'  => 1,
+            'items' => [[
+                'name'        => $payload->description,
+                'quantity'    => 1,
                 'unit_amount' => $amountCents,
             ]],
-            'charges'         => [[
+            'charges' => [[
                 'reference_id'   => $payload->invoiceId,
                 'description'    => $payload->description,
                 'amount'         => ['value' => $amountCents, 'currency' => 'BRL'],
@@ -179,7 +178,7 @@ class PagBankGateway extends AbstractHttpGateway
                         default => 'BOLETO',
                     },
                     'boleto' => $payload->paymentMethod !== 'pix' ? [
-                        'due_date'     => $payload->dueDate ?? now()->addDays(3)->format('Y-m-d'),
+                        'due_date'          => $payload->dueDate ?? now()->addDays(3)->format('Y-m-d'),
                         'instruction_lines' => ['line_1' => "Pagamento: {$payload->description}"],
                     ] : null,
                     'pix' => $payload->paymentMethod === 'pix' ? ['expires_in' => 3600 * 24] : null,
@@ -251,22 +250,22 @@ class PagBankGateway extends AbstractHttpGateway
     protected function eventTypeMap(): array
     {
         return [
-            'PAYMENT_AUTHORIZED'             => 'authorized',
-            'PAYMENT_APPROVED'               => 'paid',
-            'PAYMENT_DECLINED'               => 'failed',
-            'PAYMENT_CANCELLED'              => 'cancelled',
-            'PAYMENT_REFUNDED'               => 'refunded',
-            'PAYMENT_CHARGEBACK'             => 'chargeback',
-            'SUBSCRIPTION_APPROVED'          => 'unknown',
-            'SUBSCRIPTION_DEACTIVATED'       => 'cancelled',
-            'ORDER_PAID'                     => 'paid',
-            'ORDER_AUTHORIZED'               => 'authorized',
-            'CHARGE_PAID'                    => 'paid',
-            'CHARGE_DECLINED'                => 'failed',
-            'order.paid'                     => 'paid',
-            'order.authorized'               => 'authorized',
-            'charge.paid'                    => 'paid',
-            'charge.declined'                => 'failed',
+            'PAYMENT_AUTHORIZED'       => 'authorized',
+            'PAYMENT_APPROVED'         => 'paid',
+            'PAYMENT_DECLINED'         => 'failed',
+            'PAYMENT_CANCELLED'        => 'cancelled',
+            'PAYMENT_REFUNDED'         => 'refunded',
+            'PAYMENT_CHARGEBACK'       => 'chargeback',
+            'SUBSCRIPTION_APPROVED'    => 'unknown',
+            'SUBSCRIPTION_DEACTIVATED' => 'cancelled',
+            'ORDER_PAID'               => 'paid',
+            'ORDER_AUTHORIZED'         => 'authorized',
+            'CHARGE_PAID'              => 'paid',
+            'CHARGE_DECLINED'          => 'failed',
+            'order.paid'               => 'paid',
+            'order.authorized'         => 'authorized',
+            'charge.paid'              => 'paid',
+            'charge.declined'          => 'failed',
         ];
     }
 
@@ -275,23 +274,23 @@ class PagBankGateway extends AbstractHttpGateway
     private function normalizePagBankStatus(string $status): string
     {
         return match (strtoupper($status)) {
-            'ACTIVE', 'TRIAL'   => 'active',
-            'CANCELED'          => 'cancelled',
-            'SUSPENDED'         => 'past_due',
-            'PENDING'           => 'pending',
-            default             => strtolower($status),
+            'ACTIVE', 'TRIAL' => 'active',
+            'CANCELED'  => 'cancelled',
+            'SUSPENDED' => 'past_due',
+            'PENDING'   => 'pending',
+            default     => strtolower($status),
         };
     }
 
     private function normalizePagBankChargeStatus(string $status): string
     {
         return match (strtoupper($status)) {
-            'PAID', 'AUTHORIZED'  => 'paid',
+            'PAID', 'AUTHORIZED' => 'paid',
             'DECLINED', 'CANCELED' => 'failed',
             'IN_ANALYSIS', 'WAITING' => 'pending',
-            'REFUNDED'             => 'refunded',
-            'CHARGEBACK'           => 'chargeback',
-            default                => strtolower($status),
+            'REFUNDED'   => 'refunded',
+            'CHARGEBACK' => 'chargeback',
+            default      => strtolower($status),
         };
     }
 }

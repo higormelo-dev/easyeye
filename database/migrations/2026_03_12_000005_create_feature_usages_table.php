@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Schema;
  * period: 'YYYY-MM' para features com reset mensal (ex: ai_monthly_credits).
  *         'lifetime' para contadores sem reset (ex: total de pacientes).
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('feature_usages', function (Blueprint $table) {
@@ -47,7 +47,7 @@ return new class () extends Migration {
             $table->unsignedInteger('limit_snapshot')->nullable()
                 ->comment(
                     'Limite vigente no momento do registro. '
-                    . '0 = ilimitado. Garante auditoria correta mesmo se o plano mudar.'
+                    . '0 = ilimitado. Garante auditoria correta mesmo se o plano mudar.',
                 );
 
             $table->timestamp('last_used_at')->nullable()

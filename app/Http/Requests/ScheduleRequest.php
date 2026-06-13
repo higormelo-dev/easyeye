@@ -4,7 +4,9 @@ namespace App\Http\Requests;
 
 use App\Services\ScheduleService;
 use Carbon\Carbon;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -16,7 +18,7 @@ class ScheduleRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -25,14 +27,14 @@ class ScheduleRequest extends FormRequest
                 'required',
                 'uuid',
                 function ($attribute, $value, $fail) {
-                    $exists = \Illuminate\Support\Facades\DB::table('doctors')
+                    $exists = DB::table('doctors')
                         ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
                         ->where('doctors.id', $value)
                         ->where('entity_users.entity_id', session()->get('selected_entity_id'))
                         ->whereNull('doctors.deleted_at')
                         ->exists();
 
-                    if (!$exists) {
+                    if (! $exists) {
                         $fail(__('validation.custom.schedule.doctor_not_found'));
                     }
                 },
@@ -74,7 +76,7 @@ class ScheduleRequest extends FormRequest
                 function ($attribute, $value, $fail) {
                     $doctorId = $this->input('doctor_id');
 
-                    if (!$doctorId || !Str::isUuid($doctorId)) {
+                    if (! $doctorId || ! Str::isUuid($doctorId)) {
                         return; // doctor_id validation will already report the error
                     }
 
@@ -86,10 +88,10 @@ class ScheduleRequest extends FormRequest
                         $doctorId,
                         Carbon::parse($value),
                         $excludeId,
-                        (array) $this->input('resource_ids', [])
+                        (array) $this->input('resource_ids', []),
                     );
 
-                    if (!empty($errors)) {
+                    if (! empty($errors)) {
                         $fail($errors[0]);
                     }
                 },

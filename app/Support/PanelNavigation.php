@@ -63,13 +63,30 @@ class PanelNavigation
         ];
 
         if ($canSeeAi) {
-            $nav[] = [
-                'key'   => 'ai',
-                'route' => 'panel.ai-runs.index',
-                'icon'  => 'ti ti-robot',
-                'label' => __('actions.sidemenu.ai_assistant'),
-                'match' => ['panel.ai-runs.*'],
-            ];
+            $isDoctor = $rule === ClientRule::Doctor->value;
+
+            // Médicos veem submenu (Dashboard + Meus prompts). Demais roles
+            // só veem o link direto para o dashboard de uso.
+            if ($isDoctor) {
+                $nav[] = [
+                    'key'      => 'ai',
+                    'icon'     => 'ti ti-robot',
+                    'label'    => __('actions.sidemenu.ai_assistant'),
+                    'match'    => ['panel.ai-runs.*', 'panel.setting.ai-prompts.*'],
+                    'children' => [
+                        ['route' => 'panel.ai-runs.index', 'icon' => 'ti ti-chart-pie', 'label' => __('actions.sidemenu.ai_usage'), 'match' => ['panel.ai-runs.index']],
+                        ['route' => 'panel.setting.ai-prompts.index', 'icon' => 'ti ti-bookmark', 'label' => __('actions.sidemenu.ai_prompts'), 'match' => ['panel.setting.ai-prompts.*']],
+                    ],
+                ];
+            } else {
+                $nav[] = [
+                    'key'   => 'ai',
+                    'route' => 'panel.ai-runs.index',
+                    'icon'  => 'ti ti-robot',
+                    'label' => __('actions.sidemenu.ai_assistant'),
+                    'match' => ['panel.ai-runs.*'],
+                ];
+            }
         }
 
         if ($isFinancial) {
@@ -101,8 +118,8 @@ class PanelNavigation
         }
 
         if ($isAdmin) {
-            $entityId = (string) session('selected_entity_id');
-            $featureGate = app(FeatureGateService::class);
+            $entityId          = (string) session('selected_entity_id');
+            $featureGate       = app(FeatureGateService::class);
             $canSeeOwnGateways = $entityId !== ''
                 && $featureGate->can($entityId, FeatureKey::HasOwnPaymentGateways);
 

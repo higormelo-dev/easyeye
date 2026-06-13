@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Correção de bug: color_vision_type_id estava sendo salvo incorretamente em visual_acuity_type_id.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('medical_records', function (Blueprint $table) {

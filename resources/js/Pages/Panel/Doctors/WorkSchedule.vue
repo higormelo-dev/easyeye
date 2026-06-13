@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     doctor:         { type: Object, required: true },
@@ -361,12 +362,18 @@ const breadcrumbs = [
                         <div class="row g-2">
                             <div class="col-12">
                                 <label class="form-label small mb-1">{{ t.block_type ?? 'Tipo' }}</label>
-                                <select v-model="blockForm.type" class="form-select form-select-sm">
-                                    <option value="absence">{{ t.block_type_absence ?? 'Ausência' }}</option>
-                                    <option value="holiday">{{ t.block_type_holiday ?? 'Feriado' }}</option>
-                                    <option value="meeting">{{ t.block_type_meeting ?? 'Reunião / Compromisso' }}</option>
-                                    <option value="other">{{ t.block_type_other ?? 'Outro' }}</option>
-                                </select>
+                                <SearchSelect
+                                    v-model="blockForm.type"
+                                    :options="[
+                                        { value: 'absence', label: t.block_type_absence ?? 'Ausência' },
+                                        { value: 'holiday', label: t.block_type_holiday ?? 'Feriado' },
+                                        { value: 'meeting', label: t.block_type_meeting ?? 'Reunião / Compromisso' },
+                                        { value: 'other',   label: t.block_type_other ?? 'Outro' },
+                                    ]"
+                                    :value-key="'value'"
+                                    :label-key="'label'"
+                                    :clearable="false"
+                                />
                             </div>
                             <div class="col-12">
                                 <label class="form-label small mb-1">

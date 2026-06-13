@@ -34,9 +34,18 @@ class ApiAuthenticateWithIntegrator
             ->find($integratorId);
 
         $blockReason = $integrator ? $integrator->accessBlockReason() : 'auth.integrator_inactive';
+        if (! $integrator || ! $integrator->active) {
+            return response()->json(['message' => __('auth.integrator_inactive'), 'valid' => false], 401);
+        }
 
         if ($blockReason !== null) {
             return response()->json(['message' => __($blockReason), 'valid' => false], 401);
+        if (! $integrator->user->active) {
+            return response()->json(['message' => __('auth.user_integrator_inactive'), 'valid' => false], 401);
+        }
+
+        if (! ($integrator->user->entity && $integrator->user->entity->active)) {
+            return response()->json(['message' => __('auth.entity_inactive'), 'valid' => false], 401);
         }
 
         // Disponibiliza o usuário e integrador para toda a request

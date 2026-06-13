@@ -14,6 +14,7 @@ use App\DTOs\Billing\{
     NormalizedWebhookEventDTO,
 };
 use App\Exceptions\Billing\GatewayIntegrationException;
+use Carbon\Carbon;
 
 /**
  * Integração completa com Mercado Pago.
@@ -39,6 +40,7 @@ class MercadoPagoGateway extends AbstractHttpGateway
 
             if ($search->successful()) {
                 $results = $search->json('results', []);
+
                 if (! empty($results)) {
                     return (string) ($results[0]['id'] ?? '');
                 }
@@ -57,8 +59,8 @@ class MercadoPagoGateway extends AbstractHttpGateway
     protected function buildCustomerPayload(CustomerDTO $customer): array
     {
         return array_filter([
-            'email'       => $customer->email,
-            'first_name'  => $customer->name,
+            'email'          => $customer->email,
+            'first_name'     => $customer->name,
             'identification' => array_filter([
                 'type'   => strlen(preg_replace('/\D/', '', (string) $customer->document)) === 11 ? 'CPF' : 'CNPJ',
                 'number' => preg_replace('/\D/', '', (string) $customer->document) ?: null,
@@ -123,12 +125,12 @@ class MercadoPagoGateway extends AbstractHttpGateway
             'payer_email'        => $payload->metadata['email'] ?? '',
             'back_url'           => config('app.url'),
             'auto_recurring'     => [
-                'frequency'      => $payload->intervalCount ?: 1,
-                'frequency_type' => $payload->interval === 'year' ? 'years' : 'months',
+                'frequency'          => $payload->intervalCount ?: 1,
+                'frequency_type'     => $payload->interval === 'year' ? 'years' : 'months',
                 'transaction_amount' => $payload->amount,
-                'currency_id'    => $payload->currency,
-                'start_date'     => now()->toIso8601String(),
-                'end_date'       => now()->addYears(10)->toIso8601String(),
+                'currency_id'        => $payload->currency,
+                'start_date'         => now()->toIso8601String(),
+                'end_date'           => now()->addYears(10)->toIso8601String(),
             ],
         ];
     }
@@ -202,9 +204,9 @@ class MercadoPagoGateway extends AbstractHttpGateway
             'payer'              => ['id' => $payload->customerId],
             'external_reference' => $payload->invoiceId,
             'date_of_expiration' => $payload->dueDate
-                ? \Carbon\Carbon::parse($payload->dueDate)->endOfDay()->toIso8601String()
+                ? Carbon::parse($payload->dueDate)->endOfDay()->toIso8601String()
                 : now()->addDays(3)->endOfDay()->toIso8601String(),
-            'metadata'           => array_merge($payload->metadata, [
+            'metadata' => array_merge($payload->metadata, [
                 'invoice_id'      => $payload->invoiceId,
                 'subscription_id' => $payload->subscriptionId,
             ]),
@@ -233,8 +235,9 @@ class MercadoPagoGateway extends AbstractHttpGateway
         }
 
         $parts = [];
+
         foreach (explode(',', $sigHeader) as $part) {
-            [$k, $v] = array_pad(explode('=', $part, 2), 2, '');
+            [$k, $v]         = array_pad(explode('=', $part, 2), 2, '');
             $parts[trim($k)] = trim($v);
         }
 
@@ -248,9 +251,11 @@ class MercadoPagoGateway extends AbstractHttpGateway
         }
 
         $template = '';
+
         if ($dataId) {
             $template .= "id:{$dataId};";
         }
+
         if ($requestId) {
             $template .= "request-id:{$requestId};";
         }
@@ -263,9 +268,9 @@ class MercadoPagoGateway extends AbstractHttpGateway
 
     public function parseWebhook(GatewayWebhookInputDTO $payload): NormalizedWebhookEventDTO
     {
-        $action    = (string) ($payload->payload['action'] ?? $payload->payload['type'] ?? 'unknown');
-        $topic     = (string) ($payload->payload['type'] ?? '');
-        $dataId    = (string) ($payload->payload['data']['id'] ?? '');
+        $action = (string) ($payload->payload['action'] ?? $payload->payload['type'] ?? 'unknown');
+        $topic  = (string) ($payload->payload['type'] ?? '');
+        $dataId = (string) ($payload->payload['data']['id'] ?? '');
 
         $normalizedType         = $this->normalizeEventType($action);
         $externalPaymentId      = null;
@@ -275,13 +280,13 @@ class MercadoPagoGateway extends AbstractHttpGateway
 
         if ($topic === 'payment') {
             $externalPaymentId = $dataId;
-            $status = $this->normalizeMpPaymentStatus($payload->payload['data']['status'] ?? '');
-            $amount = isset($payload->payload['data']['transaction_amount'])
+            $status            = $this->normalizeMpPaymentStatus($payload->payload['data']['status'] ?? '');
+            $amount            = isset($payload->payload['data']['transaction_amount'])
                 ? (float) $payload->payload['data']['transaction_amount']
                 : null;
         } elseif ($topic === 'subscription_preapproval') {
             $externalSubscriptionId = $dataId;
-            $status = $this->normalizeMpStatus($payload->payload['data']['status'] ?? '');
+            $status                 = $this->normalizeMpStatus($payload->payload['data']['status'] ?? '');
         }
 
         return new NormalizedWebhookEventDTO(
@@ -303,10 +308,10 @@ class MercadoPagoGateway extends AbstractHttpGateway
     protected function eventTypeMap(): array
     {
         return [
-            'payment.created'                    => 'unknown',
-            'payment.updated'                    => 'unknown', // status determina o tipo
-            'subscription_preapproval.created'   => 'unknown',
-            'subscription_preapproval.updated'   => 'unknown',
+            'payment.created'                  => 'unknown',
+            'payment.updated'                  => 'unknown', // status determina o tipo
+            'subscription_preapproval.created' => 'unknown',
+            'subscription_preapproval.updated' => 'unknown',
         ];
     }
 
@@ -315,13 +320,13 @@ class MercadoPagoGateway extends AbstractHttpGateway
     private function normalizeMpPaymentStatus(string $status): string
     {
         return match (strtolower($status)) {
-            'approved'        => 'paid',
-            'authorized'      => 'authorized',
+            'approved'   => 'paid',
+            'authorized' => 'authorized',
             'pending', 'in_process', 'in_mediation' => 'pending',
-            'rejected'        => 'failed',
-            'cancelled'       => 'cancelled',
+            'rejected'  => 'failed',
+            'cancelled' => 'cancelled',
             'refunded', 'charged_back' => 'refunded',
-            default           => strtolower($status),
+            default => strtolower($status),
         };
     }
 
@@ -329,10 +334,10 @@ class MercadoPagoGateway extends AbstractHttpGateway
     {
         return match (strtolower($status)) {
             'authorized', 'active' => 'active',
-            'paused'               => 'cancelled',
-            'cancelled'            => 'cancelled',
-            'pending'              => 'pending',
-            default                => strtolower($status),
+            'paused'    => 'cancelled',
+            'cancelled' => 'cancelled',
+            'pending'   => 'pending',
+            default     => strtolower($status),
         };
     }
 

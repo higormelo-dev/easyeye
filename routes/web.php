@@ -8,9 +8,11 @@ use App\Http\Controllers\{
     DoctorsController,
     EyeImagesController,
     Financial\BillingController as FinancialBillingController,
+    Financial\CashClosingController,
     Financial\CashFlowController,
     Financial\ClinicBiController,
     Financial\FinancialReportsController,
+    Financial\ProcedurePricesController,
     Financial\TissGlosasController,
     Financial\TissGuidePreValidateController,
     LocaleController,
@@ -50,6 +52,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     TenantGatewayController,
     VisitTypesController,
     VisualAcuityTypesController};
+use App\Http\Controllers\Setting\AiDoctorPromptsController;
 use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
@@ -279,10 +282,34 @@ Route::group(
                     Route::post('runs', [AiRunsController::class, 'store'])
                         ->middleware('throttle:ai-store')->name('store');
                     Route::get('runs/{aiRun}', [AiRunsController::class, 'show'])->name('show');
+                    Route::get('runs/by-patient/{patient}', [AiRunsController::class, 'listByPatient'])
+                        ->middleware('throttle:ai-estimate')->name('by-patient');
+
+                    // Autocomplete remoto do dashboard /panel/usage (Onda 3, P3)
+                    Route::get('runs/search/patients', [AiRunsController::class, 'searchPatients'])
+                        ->middleware('throttle:ai-estimate')->name('search.patients');
+                    Route::get('runs/search/medical-records', [AiRunsController::class, 'searchMedicalRecords'])
+                        ->middleware('throttle:ai-estimate')->name('search.medical-records');
+
+                    // Prompts favoritos inline para o painel do AiAssistantPanel (Onda 3, P1)
+                    Route::get('runs/my-prompts', [AiRunsController::class, 'myPrompts'])
+                        ->middleware('throttle:ai-estimate')->name('my-prompts.index');
+                    Route::post('runs/my-prompts', [AiRunsController::class, 'storeMyPrompt'])
+                        ->middleware('throttle:ai-decision')->name('my-prompts.store');
+                    Route::delete('runs/my-prompts/{aiPrompt}', [AiRunsController::class, 'destroyMyPrompt'])
+                        ->middleware('throttle:ai-decision')->name('my-prompts.destroy');
                     Route::post('runs/{aiRun}/approve', [AiRunsController::class, 'approve'])
                         ->middleware('throttle:ai-decision')->name('approve');
                     Route::post('runs/{aiRun}/reject', [AiRunsController::class, 'reject'])
                         ->middleware('throttle:ai-decision')->name('reject');
+                    Route::post('runs/{aiRun}/cancel', [AiRunsController::class, 'cancel'])
+                        ->middleware('throttle:ai-decision')->name('cancel');
+                    Route::post('runs/{aiRun}/escalate', [AiRunsController::class, 'escalate'])
+                        ->middleware('throttle:ai-store')->name('escalate');
+                    Route::post('runs/{aiRun}/feedback', [AiRunsController::class, 'feedback'])
+                        ->middleware('throttle:ai-decision')->name('feedback');
+                    Route::post('runs/{aiRun}/record', [AiRunsController::class, 'openRecordForRun'])
+                        ->middleware('throttle:ai-decision')->name('record');
                 });
             });
 
@@ -320,6 +347,7 @@ Route::group(
             Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
             Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
             Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
+            Route::post('schedules/{schedule}/cash-entry', [SchedulesController::class, 'storeCashEntry'])->name('schedules.cash-entry.store');
             Route::get('schedules/slots', [SchedulesController::class, 'slots'])->name('schedules.slots');
             Route::get('schedules/resources', [SchedulesController::class, 'resources'])->name('schedules.resources');
             Route::resource('schedules', SchedulesController::class);
@@ -368,6 +396,15 @@ Route::group(
                 Route::match(['PUT', 'PATCH'], 'cash-flow/{entry}', [CashFlowController::class, 'update'])->name('cash-flow.update');
                 Route::delete('cash-flow/{entry}', [CashFlowController::class, 'destroy'])->name('cash-flow.destroy');
 
+                // Tabela de preço por procedimento × convênio
+                Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
+                Route::post('procedure-prices', [ProcedurePricesController::class, 'store'])->name('procedure-prices.store');
+
+                // Fechamento de caixa (lock por período)
+                Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
+                Route::post('cash-closing', [CashClosingController::class, 'store'])->name('cash-closing.store');
+                Route::delete('cash-closing/{cashClose}', [CashClosingController::class, 'destroy'])->name('cash-closing.destroy');
+
                 // Faturamento TISS (individual e lote)
                 Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
                 Route::post('billing/individual', [FinancialBillingController::class, 'storeIndividual'])->name('billing.individual.store');
@@ -391,6 +428,20 @@ Route::group(
                 Route::get('reports/covenants/export', [FinancialReportsController::class, 'exportCovenantsCsv'])->name('reports.covenants.export');
             });
         });
+
+        // ── Configurações pessoais do médico (não exige role admin) ──────────
+        // Prompts favoritos do Assistente de IA (Onda 3, P1) — acessíveis ao
+        // próprio médico autenticado. O controller faz o cross-doctor guard.
+        Route::middleware('entity.role:doctor')
+            ->group(function () {
+                Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
+                    Route::post('ai-prompts/reorder', [AiDoctorPromptsController::class, 'reorder'])
+                        ->name('ai-prompts.reorder');
+                    Route::resource('ai-prompts', AiDoctorPromptsController::class)
+                        ->parameters(['ai-prompts' => 'aiPrompt'])
+                        ->only(['index', 'store', 'update', 'destroy']);
+                });
+            });
 
         // ── admin only: compliance, controle de acesso, configurações ─────────
         Route::middleware('entity.role:admin')->group(function () {

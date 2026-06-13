@@ -2,17 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, PatientMood, ScheduleSituation};
+use App\Enums\{ClientRule, EntityGate, FinancialEntryStatus, PatientMood, PaymentMethod, ScheduleSituation};
+use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
+use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
 use App\Jobs\NotifyScheduleChangeJob;
-use App\Models\{Covenant, Doctor, Schedule, ScheduleEvent, ScheduleSituationLog, VisitType, WaitingList};
+use App\Models\{Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, VisitType, WaitingList};
 use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
+use App\Services\Financial\{CashFlowService, ProcedurePriceService};
 use App\Services\ScheduleService;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\{Cache, Gate};
 use Illuminate\Support\Str;
 use Illuminate\Validation\{Rule, ValidationException};
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -30,7 +33,7 @@ class SchedulesController extends Controller
         $this->service         = $scheduleService;
     }
 
-    public function index(Request $request): InertiaResponse
+    public function index(Request $request, ProcedurePriceService $procedurePrices): InertiaResponse
     {
         $entityId     = session('selected_entity_id');
         $loggedDoctor = $this->loggedDoctor();
@@ -49,7 +52,24 @@ class SchedulesController extends Controller
             'visitTypes' => fn () => VisitType::where(function ($q) use ($entityId) {
                 $q->where('entity_id', $entityId)->orWhereNull('entity_id');
             })->where('active', true)->orderBy('name')->get(['id', 'name']),
-            'situations' => collect(ScheduleSituation::cases())->map(fn ($s) => [
+            'procedures' => fn () => Procedure::where(function ($q) use ($entityId) {
+                $q->where('entity_id', $entityId)->orWhereNull('entity_id');
+            })->where('active', true)->orderBy('name')->get(['id', 'name']),
+            'procedurePrices'  => fn () => $procedurePrices->priceMap((string) $entityId),
+            'incomeCategories' => fn () => FinancialCategory::availableForEntity($entityId)
+                ->where('type', 'income')->orderBy('name')->get(['id', 'name', 'type']),
+            'paymentMethods' => collect(PaymentMethod::cases())->map(fn ($m) => [
+                'value'             => $m->value,
+                'label'             => $m->label(),
+                'uses_installments' => $m->usesInstallments(),
+                'shows_credit'      => $m->showsCredit(),
+                'shows_debit'       => $m->showsDebit(),
+                'shows_cash'        => $m->showsCash(),
+                'is_combined'       => $m->isCombined(),
+                'is_courtesy'       => $m->isCourtesy(),
+            ])->values(),
+            'canRegisterCash' => Gate::allows(EntityGate::ViewFinancial->value, Entity::find($entityId)),
+            'situations'      => collect(ScheduleSituation::cases())->map(fn ($s) => [
                 'value' => $s->value,
                 'label' => $s->label(),
                 'badge' => $s->badgeClass(),
@@ -80,7 +100,7 @@ class SchedulesController extends Controller
 
         // Visualização agora é exclusivamente via drawer modal na própria index.
         // Acesso direto à URL redireciona, preservando preservando o filtro de data do agendamento.
-        if (!request()->wantsJson()) {
+        if (! request()->wantsJson()) {
             return redirect()->route('panel.schedules.index', [
                 'date' => $schedule->date_time->format('Y-m-d'),
             ]);
@@ -100,55 +120,55 @@ class SchedulesController extends Controller
 
         return response()->json(['data' => [
             // ── Identificação ─────────────────────────────────────────────
-            'id'                   => $schedule->id,
-            'code'                 => $schedule->code,
-            'date_time'            => $schedule->date_time->format('d/m/Y H:i'),
-            'date_time_iso'        => $schedule->date_time->format('Y-m-d\TH:i'),
-            'date'                 => $schedule->date_time->format('d/m/Y'),
-            'time'                 => $schedule->date_time->format('H:i'),
+            'id'            => $schedule->id,
+            'code'          => $schedule->code,
+            'date_time'     => $schedule->date_time->format('d/m/Y H:i'),
+            'date_time_iso' => $schedule->date_time->format('Y-m-d\TH:i'),
+            'date'          => $schedule->date_time->format('d/m/Y'),
+            'time'          => $schedule->date_time->format('H:i'),
 
             // ── Paciente ──────────────────────────────────────────────────
-            'patient_id'           => $schedule->patient_id,
-            'patient_name'         => $patient ? $patient->person->full_name : $schedule->full_name,
-            'patient_code'         => $patient?->present()->getCode(),
+            'patient_id'            => $schedule->patient_id,
+            'patient_name'          => $patient ? $patient->person->full_name : $schedule->full_name,
+            'patient_code'          => $patient?->present()->getCode(),
             'patient_is_registered' => (bool) $patient,
-            'medical_records_url'  => $patient
+            'medical_records_url'   => $patient
                 ? route('panel.patients.medicalrecords.index', $patient->id)
                 : null,
 
             // ── Médico ────────────────────────────────────────────────────
-            'doctor_id'            => $schedule->doctor_id,
-            'doctor_name'          => $doctor?->entityUser?->user?->name,
-            'doctor_code'          => $doctor?->code,
-            'doctor_record'        => $doctor?->record,
-            'doctor_color'         => $doctor?->color,
+            'doctor_id'     => $schedule->doctor_id,
+            'doctor_name'   => $doctor?->entityUser?->user?->name,
+            'doctor_code'   => $doctor?->code,
+            'doctor_record' => $doctor?->record,
+            'doctor_color'  => $doctor?->color,
 
             // ── Atendimento ───────────────────────────────────────────────
-            'covenant_name'        => $schedule->covenant?->name,
-            'visit_type_name'      => $schedule->visitType?->name,
+            'covenant_name'   => $schedule->covenant?->name,
+            'visit_type_name' => $schedule->visitType?->name,
 
             // ── Situação ──────────────────────────────────────────────────
-            'situation'            => $schedule->situation->value,
-            'situation_label'      => $schedule->situation->label(),
-            'situation_badge'      => $schedule->situation->badgeClass(),
-            'situation_icon'       => $schedule->situation->icon(),
+            'situation'       => $schedule->situation->value,
+            'situation_label' => $schedule->situation->label(),
+            'situation_badge' => $schedule->situation->badgeClass(),
+            'situation_icon'  => $schedule->situation->icon(),
 
             // ── Contato ───────────────────────────────────────────────────
-            'telephone'            => $schedule->telephone,
-            'cellphone'            => $schedule->cellphone,
-            'cellphone_whatsapp'   => (bool) $schedule->cellphone_whatsapp,
+            'telephone'          => $schedule->telephone,
+            'cellphone'          => $schedule->cellphone,
+            'cellphone_whatsapp' => (bool) $schedule->cellphone_whatsapp,
 
             // ── Tempos ────────────────────────────────────────────────────
-            'arrived_at'           => $schedule->arrived_at?->format('d/m/Y H:i'),
-            'confirmed_at'         => $schedule->confirmed_at?->format('d/m/Y H:i'),
-            'created_at'           => $schedule->created_at?->format('d/m/Y H:i'),
+            'arrived_at'   => $schedule->arrived_at?->format('d/m/Y H:i'),
+            'confirmed_at' => $schedule->confirmed_at?->format('d/m/Y H:i'),
+            'created_at'   => $schedule->created_at?->format('d/m/Y H:i'),
 
             // ── Textos livres ─────────────────────────────────────────────
-            'notes'                => $schedule->notes,
-            'cancellation_reason'  => $schedule->cancellation_reason,
+            'notes'               => $schedule->notes,
+            'cancellation_reason' => $schedule->cancellation_reason,
 
             // ── Recursos vinculados ───────────────────────────────────────
-            'resources'            => $schedule->resources->map(fn ($r) => [
+            'resources' => $schedule->resources->map(fn ($r) => [
                 'id'          => $r->id,
                 'code'        => $r->code,
                 'name'        => $r->name,
@@ -157,15 +177,15 @@ class SchedulesController extends Controller
             ])->values(),
 
             // ── Histórico de situações ────────────────────────────────────
-            'situation_logs'       => $schedule->situationLogs->map(fn ($log) => [
-                'id'          => $log->id,
-                'from_label'  => $log->from_situation?->label(),
-                'from_badge'  => $log->from_situation?->badgeClass(),
-                'to_label'    => $log->to_situation->label(),
-                'to_badge'    => $log->to_situation->badgeClass(),
-                'user_name'   => $log->entityUser?->user?->name,
-                'created_at'  => $log->created_at?->format('d/m/Y H:i'),
-                'notes'       => $log->notes,
+            'situation_logs' => $schedule->situationLogs->map(fn ($log) => [
+                'id'         => $log->id,
+                'from_label' => $log->from_situation?->label(),
+                'from_badge' => $log->from_situation?->badgeClass(),
+                'to_label'   => $log->to_situation->label(),
+                'to_badge'   => $log->to_situation->badgeClass(),
+                'user_name'  => $log->entityUser?->user?->name,
+                'created_at' => $log->created_at?->format('d/m/Y H:i'),
+                'notes'      => $log->notes,
             ])->values(),
         ]]);
     }
@@ -283,6 +303,20 @@ class SchedulesController extends Controller
             return response()->json(['message' => __('schedules.invalid_transition')], 422);
         }
 
+        // Concluir o atendimento NÃO depende do financeiro por padrão.
+        // Apenas quando a entidade habilita `requires_cash_to_complete` é que
+        // exigimos um lançamento no caixa (ou cortesia R$ 0) para marcar Atendido.
+        if (
+            $situation === ScheduleSituation::Attended
+            && Entity::whereKey($schedule->entity_id)->value('requires_cash_to_complete')
+            && ! $this->scheduleHasCashEntry($schedule)
+        ) {
+            return response()->json([
+                'message'             => __('schedules.cash_entry_required'),
+                'requires_cash_entry' => true,
+            ], 422);
+        }
+
         $data = ['situation' => $situation->value];
 
         if ($situation === ScheduleSituation::Waiting) {
@@ -324,6 +358,39 @@ class SchedulesController extends Controller
             'situation' => $situation->value,
             'label'     => $situation->label(),
             'badge'     => $situation->badgeClass(),
+        ]);
+    }
+
+    /** Há lançamento de caixa ativo (não cancelado) para este agendamento? */
+    private function scheduleHasCashEntry(Schedule $schedule): bool
+    {
+        return $schedule->financialEntries()
+            ->where('status', '!=', FinancialEntryStatus::Cancelled->value)
+            ->whereNull('deleted_at')
+            ->exists();
+    }
+
+    /**
+     * Registra um lançamento de caixa (entrada) vinculado ao agendamento,
+     * disparado quando o paciente chega (situação Aguardando). Espelha o
+     * fluxo "Chegou -> abre caixa" do smart_oftal.
+     */
+    public function storeCashEntry(ScheduleCashEntryRequest $request, Schedule $schedule, CashFlowService $cashFlowService): JsonResponse
+    {
+        $this->authorizeSchedule($schedule);
+
+        $entity = Entity::query()->findOrFail(session('selected_entity_id'));
+        Gate::authorize(EntityGate::ViewFinancial->value, $entity);
+
+        try {
+            $entry = $cashFlowService->createForSchedule($schedule, $request->validated());
+        } catch (DuplicateCashEntryException|CashPeriodClosedException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => __('schedules.cash_entry_created'),
+            'data'    => $entry->fresh(['category', 'covenant', 'procedure', 'doctor']),
         ]);
     }
 
@@ -601,9 +668,24 @@ class SchedulesController extends Controller
 
         $events = $eventQuery->orderBy('starts_at')->get();
 
+        // IDs de agendamentos que já possuem lançamento de caixa ativo
+        // (1 query, evita N+1 ao montar has_cash_entry por linha).
+        $cashEntryScheduleIds = $schedules->isEmpty() ? [] : FinancialCashEntry::query()
+            ->where('reference_type', 'schedule')
+            ->whereIn('reference_id', $schedules->pluck('id'))
+            ->where('status', '!=', 'cancelled')
+            ->whereNull('deleted_at')
+            ->pluck('reference_id')
+            ->flip()
+            ->all();
+
+        // Convênios cobráveis (faturados via guia): para esses, o caixa de
+        // chegada não auto-abre nem pré-preenche o valor cheio.
+        $chargingCovenantIds = app(ProcedurePriceService::class)->chargingCovenantIds($entityId);
+
         $scheduleRows = $schedules->map(fn ($s) => array_merge(
             ['sort_time' => $s->date_time->toISOString(), 'type' => 'schedule'],
-            $this->toScheduleRow($s),
+            $this->toScheduleRow($s, $cashEntryScheduleIds, $chargingCovenantIds),
         ));
 
         $eventRows = $events->map(fn ($e) => array_merge(
@@ -614,7 +696,7 @@ class SchedulesController extends Controller
         return $scheduleRows->merge($eventRows)->sortBy('sort_time')->values()->toArray();
     }
 
-    private function toScheduleRow(Schedule $s): array
+    private function toScheduleRow(Schedule $s, array $cashEntryScheduleIds = [], array $chargingCovenantIds = []): array
     {
         $sit = $s->situation instanceof ScheduleSituation
             ? $s->situation
@@ -650,6 +732,13 @@ class SchedulesController extends Controller
             'situation_url'       => route('panel.schedules.situation', $s->id),
             'mood_url'            => route('panel.schedules.mood', $s->id),
             'reschedule_url'      => route('panel.schedules.reschedule', $s->id),
+            'cash_entry_url'      => route('panel.schedules.cash-entry.store', $s->id),
+            'covenant_id'         => $s->covenant_id,
+            'has_cash_entry'      => isset($cashEntryScheduleIds[$s->id]),
+            // Convênio cobrável (faturado via guia): caixa de chegada não
+            // auto-abre nem pré-preenche valor cheio — eventual lançamento é
+            // tratado como co-participação.
+            'bills_covenant'      => $s->covenant_id !== null && isset($chargingCovenantIds[$s->covenant_id]),
             'situation'           => $sit?->value,
             'label'               => $sit?->label() ?? '—',
             'badge'               => $sit?->badgeClass() ?? 'bg-secondary',
@@ -661,6 +750,7 @@ class SchedulesController extends Controller
             'arrived_at'          => $s->arrived_at?->toIso8601String(),
             'covenant_name'       => $s->covenant?->name,
             'visit_name'          => $s->visitType?->name,
+            'visit_procedure_id'  => $s->visitType?->procedure_id,
             'patient_mood'        => $mood ? [
                 'value'      => $mood->value,
                 'label'      => $mood->label(),

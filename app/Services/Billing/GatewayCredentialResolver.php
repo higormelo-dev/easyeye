@@ -33,8 +33,8 @@ class GatewayCredentialResolver
     /**
      * Resolve a chave secreta/token de API para o gateway.
      *
-     * @param  string       $gatewayCode  Código do gateway (ex: 'asaas')
-     * @param  string|null  $entityId     null = contexto SaaS billing | uuid = contexto tenant
+     * @param string      $gatewayCode Código do gateway (ex: 'asaas')
+     * @param string|null $entityId    null = contexto SaaS billing | uuid = contexto tenant
      */
     public function resolveSecret(string $gatewayCode, ?string $entityId = null): ?string
     {
@@ -94,6 +94,7 @@ class GatewayCredentialResolver
 
         foreach (['secret', 'api_key', 'token', 'access_token'] as $candidate) {
             $value = $credentials[$candidate] ?? null;
+
             if (is_string($value) && $value !== '') {
                 return $value;
             }

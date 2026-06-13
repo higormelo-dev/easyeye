@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Presenters\PeoplePresenter;
 use App\Traits\{Auditable, HasAuditColumns};
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
@@ -12,8 +13,8 @@ use Laracasts\Presenter\PresentableTrait;
 
 class People extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
     use Notifiable;
@@ -108,7 +109,7 @@ class People extends Model
     }
 
     /**
-     * Gender of people
+     * Gender of people.
      *
      * 0 => 'FEMININO',
      * 1 => 'MASCULINO',
@@ -123,7 +124,7 @@ class People extends Model
      */
     public function getAgeAttribute(): ?int
     {
-        return $this->birth_date ? \Carbon\Carbon::parse($this->birth_date)->age : null;
+        return $this->birth_date ? Carbon::parse($this->birth_date)->age : null;
     }
 
     /**
@@ -139,7 +140,7 @@ class People extends Model
     }
 
     /**
-     * Merital status of people
+     * Merital status of people.
      *
      * 1 => 'Solteiro(a)',
      * 2 => 'Casado(a)',
@@ -162,7 +163,7 @@ class People extends Model
     ];
 
     /**
-     * States of Brazil
+     * States of Brazil.
      *
      * 1 => 'Solteiro(a)',
      * 2 => 'Casado(a)',

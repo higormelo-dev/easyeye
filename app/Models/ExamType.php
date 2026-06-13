@@ -11,8 +11,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ExamType extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUppercaseFields;
     use HasUuids;
@@ -37,7 +37,7 @@ class ExamType extends Model
     ];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {
@@ -53,7 +53,7 @@ class ExamType extends Model
                     ->when(
                         $examType->entity_id !== null,
                         fn ($q) => $q->where('entity_id', $examType->entity_id),
-                        fn ($q) => $q->whereNull('entity_id')
+                        fn ($q) => $q->whereNull('entity_id'),
                     )
                     ->where('code', 'like', $prefix . '-%')
                     ->orderBy('code', 'desc')
@@ -87,7 +87,7 @@ class ExamType extends Model
     }
 
     /**
-     * Categories of surgery types
+     * Categories of surgery types.
      *
      * @var array<int, string>
      */

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
+use DB;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Factories\HasFactory, Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 class MedicalRecord extends Model
 {
     use Auditable;
+
     // use HasFactory;
     use HasAuditColumns;
     use HasUuids;
@@ -129,7 +131,7 @@ class MedicalRecord extends Model
     {
         $prefix = 'PMR';
 
-        return \DB::transaction(function () use ($prefix, $entityId) {
+        return DB::transaction(function () use ($prefix, $entityId) {
             $query = static::withoutGlobalScopes()
                 ->where('code', 'like', $prefix . '-%')
                 ->orderByDesc('code')

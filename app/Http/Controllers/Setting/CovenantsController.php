@@ -23,8 +23,8 @@ class CovenantsController extends BaseSettingController
     protected function getColumns(): array
     {
         return [
-            ['key' => 'code',  'label' => __('actions.code'),  'type' => 'code'],
-            ['key' => 'name',  'label' => __('actions.name'),  'type' => 'text', 'sortable' => true],
+            ['key' => 'code', 'label' => __('actions.code'), 'type' => 'code'],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'sortable' => true],
             ['key' => 'color', 'label' => __('actions.color'), 'type' => 'color'],
             ['key' => 'table', 'label' => __('actions.table'), 'type' => 'yesno'],
         ];
@@ -33,8 +33,8 @@ class CovenantsController extends BaseSettingController
     protected function getFormFields(): array
     {
         return [
-            ['key' => 'name',  'label' => __('actions.name'),  'type' => 'text',     'required' => true],
-            ['key' => 'color', 'label' => __('actions.color'), 'type' => 'color',    'required' => false],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'required' => true],
+            ['key' => 'color', 'label' => __('actions.color'), 'type' => 'color', 'required' => false],
             ['key' => 'table', 'label' => __('actions.table'), 'type' => 'checkbox', 'hint' => __('actions.covenant_table_hint')],
         ];
     }

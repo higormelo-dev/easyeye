@@ -28,7 +28,7 @@ trait HasBusinessDays
 
     private function isBusinessDay(Carbon $date): bool
     {
-        return !$date->isWeekend() && !$this->isHoliday($date);
+        return ! $date->isWeekend() && ! $this->isHoliday($date);
     }
 
     private function isHoliday(Carbon $date): bool

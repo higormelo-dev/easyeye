@@ -1,6 +1,8 @@
 <script setup>
+import { computed } from 'vue';
 import { Head, useForm } from '@inertiajs/vue3';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import twostepIllustrationImg from '@img/system/auth/twostep-verification-illustration-img.png';
 
 const props = defineProps({
@@ -8,6 +10,11 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },
     entities: { type: Object, default: () => ({}) },
 });
+
+// `entities` é um mapa { id: name }; SearchSelect espera um array de objetos.
+const entityOptions = computed(() =>
+    Object.entries(props.entities).map(([id, name]) => ({ id, name })),
+);
 
 const form = useForm({ entity_user_id: '' });
 const logoutForm = useForm({});
@@ -37,15 +44,13 @@ function logout() {
         <form @submit.prevent="submit" novalidate>
             <div class="mb-4">
                 <label class="form-label">{{ t.select_entity }} <span style="color:#ef4444;">*</span></label>
-                <select
+                <SearchSelect
                     v-model="form.entity_user_id"
-                    class="form-select"
-                    :class="{ 'is-invalid': form.errors.entity_user_id }"
-                    required
-                >
-                    <option value="">Selecione...</option>
-                    <option v-for="(name, id) in entities" :key="id" :value="id">{{ name }}</option>
-                </select>
+                    :options="entityOptions"
+                    :placeholder="'Selecione...'"
+                    :invalid="!!form.errors.entity_user_id"
+                    :clearable="false"
+                />
             </div>
 
             <div class="d-grid mb-3">

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Manager\{
     AiCreditPurchasesController,
+    AiProvidersController,
     EntitiesController,
     EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
@@ -23,14 +24,13 @@ use Illuminate\Support\Facades\Route;
 // Nomes    : manager.*  (separados do panel.* das clínicas)
 // ─────────────────────────────────────────────────────────────────────────────
 Route::group([
-    'prefix'     => 'panel/manager',
-    'as'         => 'manager.',
+    'prefix' => 'panel/manager',
+    'as'     => 'manager.',
     // 2fa entra DEPOIS de auth/verified (precisa de usuário autenticado)
     // e ANTES de saas.admin (que valida a entity SaaS — não devemos expor
     // contexto SaaS sem 2FA verificado na sessão).
     'middleware' => ['auth', 'verified', '2fa', 'entity.selected', 'saas.admin', 'admin.audit', 'throttle:30,1'],
 ], static function () {
-
     // ── Dashboard ──────────────────────────────────────────────────────────────
     Route::get('/', fn () => redirect()->route('manager.dashboard'));
     Route::get('/dashboard', ManagerDashboardController::class)->name('dashboard');
@@ -115,6 +115,24 @@ Route::group([
     Route::patch('ai-credit-purchases/{purchase}/refund', [AiCreditPurchasesController::class, 'refund'])
         ->middleware('throttle:manager-destructive')
         ->name('ai-credit-purchases.refund');
+    Route::post('ai-credit-purchases/manual', [AiCreditPurchasesController::class, 'createManual'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-credit-purchases.manual');
+
+    // ── Recargas (topups) do EasyEye nos provedores ──────────────────────
+    Route::post('ai-provider-topups', [AiCreditPurchasesController::class, 'storeTopup'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-provider-topups.store');
+    Route::delete('ai-provider-topups/{topup}', [AiCreditPurchasesController::class, 'deleteTopup'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-provider-topups.destroy');
+
+    // ── Provedores de IA habilitados (quais/quantos o sistema usa) ───────
+    Route::get('ai-providers', [AiProvidersController::class, 'index'])
+        ->name('ai-providers.index');
+    Route::patch('ai-providers', [AiProvidersController::class, 'update'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-providers.update');
 
     // ── Gateways de Pagamento ──────────────────────────────────────────────────
     Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');

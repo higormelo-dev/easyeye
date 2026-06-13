@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:       { type: Boolean, required: true },
@@ -50,6 +51,14 @@ const form = ref(defaultForm());
 
 const isEdit   = computed(() => !!props.recordId);
 const panelTitle = computed(() => isEdit.value ? props.t.form_title_edit : props.t.form_title_create);
+
+// SearchSelect exige array de objetos; paperSizes/fontFamilies vêm como array de strings.
+const paperSizeOptions  = computed(() => props.paperSizes.map(sz => ({ value: sz, label: sz })));
+const fontFamilyOptions = computed(() => props.fontFamilies.map(f => ({ value: f, label: f })));
+const activeOptions = computed(() => ([
+    { value: true,  label: props.t.yes },
+    { value: false, label: props.t.no },
+]));
 
 function resetForm() {
     form.value   = defaultForm();
@@ -224,29 +233,35 @@ function err(field) {
 
             <div class="col-sm-6">
                 <label class="form-label">{{ t.field_category }}</label>
-                <select
+                <SearchSelect
                     v-model="form.report_category_id"
-                    class="form-select"
-                    :class="{ 'is-invalid': err('report_category_id') }"
-                >
-                    <option value="">{{ t.select_option }}</option>
-                    <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-                </select>
-                <div v-if="err('report_category_id')" class="invalid-feedback">{{ err('report_category_id') }}</div>
+                    :options="categories"
+                    :placeholder="t.select_option"
+                    :invalid="!!err('report_category_id')"
+                />
+                <div v-if="err('report_category_id')" class="invalid-feedback d-block">{{ err('report_category_id') }}</div>
             </div>
 
             <div class="col-sm-6">
                 <label class="form-label">{{ t.field_paper_size }}</label>
-                <select v-model="form.paper_size" class="form-select">
-                    <option v-for="sz in paperSizes" :key="sz" :value="sz">{{ sz }}</option>
-                </select>
+                <SearchSelect
+                    v-model="form.paper_size"
+                    :options="paperSizeOptions"
+                    :value-key="'value'"
+                    :label-key="'label'"
+                    :clearable="false"
+                />
             </div>
 
             <div class="col-sm-6">
                 <label class="form-label">{{ t.field_font_family }}</label>
-                <select v-model="form.font_family" class="form-select">
-                    <option v-for="f in fontFamilies" :key="f" :value="f">{{ f }}</option>
-                </select>
+                <SearchSelect
+                    v-model="form.font_family"
+                    :options="fontFamilyOptions"
+                    :value-key="'value'"
+                    :label-key="'label'"
+                    :clearable="false"
+                />
             </div>
 
             <div class="col-sm-3">
@@ -260,10 +275,13 @@ function err(field) {
 
             <div class="col-sm-3">
                 <label class="form-label">{{ t.field_active }}</label>
-                <select v-model="form.active" class="form-select">
-                    <option :value="true">{{ t.yes }}</option>
-                    <option :value="false">{{ t.no }}</option>
-                </select>
+                <SearchSelect
+                    v-model="form.active"
+                    :options="activeOptions"
+                    :value-key="'value'"
+                    :label-key="'label'"
+                    :clearable="false"
+                />
             </div>
 
             <div class="col-12">

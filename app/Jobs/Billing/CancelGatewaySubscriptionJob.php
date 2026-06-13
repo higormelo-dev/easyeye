@@ -2,16 +2,16 @@
 
 namespace App\Jobs\Billing;
 
-use App\DTOs\Billing\CancelSubscriptionDTO;
+use App\DTOs\Billing\{CancelSubscriptionDTO, GatewayCallContext};
 use App\Enums\Billing\BillingEventType;
 use App\Models\Subscription;
-use App\DTOs\Billing\GatewayCallContext;
 use App\Services\Billing\{BillingLogService, FinancialEventService, GatewayRegistry};
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\{InteractsWithQueue, SerializesModels};
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -38,13 +38,13 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
 
     /**
      * Número máximo de tentativas antes de ir para failed().
-     * Total de janelas: imediato → 5min → 15min → 1h → 6h → 24h
+     * Total de janelas: imediato → 5min → 15min → 1h → 6h → 24h.
      */
     public int $tries = 6;
 
     /**
      * Backoff exponencial em segundos entre tentativas.
-     * [5min, 15min, 1h, 6h, 24h]
+     * [5min, 15min, 1h, 6h, 24h].
      *
      * @return array<int>
      */
@@ -80,6 +80,7 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
                 'gateway'      => $this->gatewayCode,
                 'correlation'  => $this->correlationId,
             ]);
+
             return;
         }
 
@@ -101,9 +102,9 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
                 level: 'warning',
                 message: "Tentativa {$attempt}/{$this->tries} de cancelamento no gateway falhou.",
                 context: [
-                    'gateway'  => $this->gatewayCode,
-                    'attempt'  => $attempt,
-                    'error'    => $result->errorMessage,
+                    'gateway' => $this->gatewayCode,
+                    'attempt' => $attempt,
+                    'error'   => $result->errorMessage,
                 ],
                 entityId: (string) $subscription->entity_id,
                 subscription: $subscription,
@@ -112,8 +113,8 @@ class CancelGatewaySubscriptionJob implements ShouldQueue
             );
 
             // Relança a exceção para que o Laravel recoloque na fila com backoff
-            throw new \RuntimeException(
-                "[{$this->gatewayCode}] Cancelamento no gateway falhou (tentativa {$attempt}): {$result->errorMessage}"
+            throw new RuntimeException(
+                "[{$this->gatewayCode}] Cancelamento no gateway falhou (tentativa {$attempt}): {$result->errorMessage}",
             );
         }
 

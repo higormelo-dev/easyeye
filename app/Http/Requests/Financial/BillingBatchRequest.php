@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Requests\Financial;
 
@@ -32,23 +32,23 @@ class BillingBatchRequest extends FormRequest
                         ->whereNull('deleted_at');
                 }),
             ],
-            'date_from' => ['required', 'date'],
-            'date_until' => ['required', 'date', 'after_or_equal:date_from'],
-            'schedule_ids' => ['nullable', 'array'],
+            'date_from'      => ['required', 'date'],
+            'date_until'     => ['required', 'date', 'after_or_equal:date_from'],
+            'schedule_ids'   => ['nullable', 'array'],
             'schedule_ids.*' => ['uuid'],
-            'unit_price' => ['required', 'numeric', 'min:0'],
-            'quantity' => ['nullable', 'integer', 'min:1', 'max:99'],
-            'due_date' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'status' => ['nullable', Rule::in([
+            'unit_price'     => ['required', 'numeric', 'min:0'],
+            'quantity'       => ['nullable', 'integer', 'min:1', 'max:99'],
+            'due_date'       => ['nullable', 'date', 'after_or_equal:date_from'],
+            'status'         => ['nullable', Rule::in([
                 BillingClaimStatus::Draft->value,
                 BillingClaimStatus::Submitted->value,
             ])],
-            'tiss_version' => ['nullable', 'string', 'max:16'],
-            'tiss_layout_version' => ['nullable', 'string', 'max:16'],
-            'tuss_code' => ['nullable', 'string', 'max:32'],
+            'tiss_version'          => ['nullable', 'string', 'max:16'],
+            'tiss_layout_version'   => ['nullable', 'string', 'max:16'],
+            'tuss_code'             => ['nullable', 'string', 'max:32'],
             'procedure_description' => ['nullable', 'string', 'max:255'],
-            'authorization_code' => ['nullable', 'string', 'max:64'],
-            'notes' => ['nullable', 'string', 'max:2000'],
+            'authorization_code'    => ['nullable', 'string', 'max:64'],
+            'notes'                 => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -56,19 +56,19 @@ class BillingBatchRequest extends FormRequest
     {
         $merge = [];
 
-        if (!$this->has('quantity')) {
+        if (! $this->has('quantity')) {
             $merge['quantity'] = 1;
         }
 
-        if (!$this->has('status')) {
+        if (! $this->has('status')) {
             $merge['status'] = BillingClaimStatus::Draft->value;
         }
 
-        if (!$this->has('tiss_version')) {
+        if (! $this->has('tiss_version')) {
             $merge['tiss_version'] = '202603';
         }
 
-        if (!$this->has('tiss_layout_version')) {
+        if (! $this->has('tiss_layout_version')) {
             $merge['tiss_layout_version'] = '04.03.00';
         }
 
@@ -78,9 +78,8 @@ class BillingBatchRequest extends FormRequest
             }
         }
 
-        if (!empty($merge)) {
+        if (! empty($merge)) {
             $this->merge($merge);
         }
     }
 }
-

@@ -124,7 +124,7 @@ class SurgeryTypesSeeder extends Seeder
             foreach ($surgeries as $surgery) {
                 SurgeryType::query()->firstOrCreate(
                     ['name' => $surgery, 'category' => $category],
-                    ['active' => true]
+                    ['active' => true],
                 );
             }
         }

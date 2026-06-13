@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class IrisType extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasEntityCode;
     use HasUppercaseName;
     use HasUuids;

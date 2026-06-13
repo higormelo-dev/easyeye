@@ -61,7 +61,7 @@ abstract class BaseSettingController extends Controller
 
     /**
      * Estrutura dos CAMPOS do form modal. Sobrescrever para adicionar/customizar.
-     * Tipos: text | select | color | checkbox | numeric
+     * Tipos: text | select | color | checkbox | numeric.
      *
      * @return list<array{key: string, label: string, type: string, required?: bool, hint?: string, options?: array}>
      */
@@ -76,10 +76,10 @@ abstract class BaseSettingController extends Controller
     {
         return Inertia::render('Panel/Settings/Catalog/Index', [
             'meta' => [
-                'title'        => $this->titleController,
-                'total'        => $this->service->count(),
-                'cardsUrl'     => route($this->routePrefix . '.cards'),
-                'storageKey'   => ($this->viewSlot ?: 'catalog') . '_view',
+                'title'      => $this->titleController,
+                'total'      => $this->service->count(),
+                'cardsUrl'   => route($this->routePrefix . '.cards'),
+                'storageKey' => ($this->viewSlot ?: 'catalog') . '_view',
             ],
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
@@ -89,14 +89,14 @@ abstract class BaseSettingController extends Controller
             'fields'     => $this->getFormFields(),
             'crudFields' => $this->crudFields,
             'routes'     => [
-                'index'   => route($this->routePrefix . '.index'),
-                'store'   => route($this->routePrefix . '.store'),
-                'cards'   => route($this->routePrefix . '.cards'),
+                'index' => route($this->routePrefix . '.index'),
+                'store' => route($this->routePrefix . '.store'),
+                'cards' => route($this->routePrefix . '.cards'),
             ],
             'urlTemplates' => [
                 // Vue substitui {id} no client (evita 11 routes :id na hidratação).
-                'show'    => route($this->routePrefix . '.show',    ['placeholder' => '__ID__']),
-                'update'  => route($this->routePrefix . '.update',  ['placeholder' => '__ID__']),
+                'show'    => route($this->routePrefix . '.show', ['placeholder' => '__ID__']),
+                'update'  => route($this->routePrefix . '.update', ['placeholder' => '__ID__']),
                 'destroy' => route($this->routePrefix . '.destroy', ['placeholder' => '__ID__']),
                 'restore' => route($this->routePrefix . '.restore', ['placeholder' => '__ID__']),
             ],
@@ -293,9 +293,11 @@ abstract class BaseSettingController extends Controller
         $keys       = array_unique(array_merge($columnKeys, $formKeys, ['id', 'code', 'name', 'active']));
 
         $data = [];
+
         foreach ($keys as $key) {
             if ($key === 'active') {
                 $data[$key] = (bool) $record->{$key};
+
                 continue;
             }
             $data[$key] = $record->{$key};

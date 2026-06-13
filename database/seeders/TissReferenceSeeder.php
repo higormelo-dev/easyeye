@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace Database\Seeders;
 
@@ -20,16 +20,16 @@ class TissReferenceSeeder extends Seeder
     {
         $versions = [
             [
-                'code' => '202601',
+                'code'           => '202601',
                 'layout_version' => '01.06.00',
                 'effective_from' => '2026-01-01',
-                'active' => true,
+                'active'         => true,
             ],
             [
-                'code' => '202603',
+                'code'           => '202603',
                 'layout_version' => '04.03.00',
                 'effective_from' => '2026-03-01',
-                'active' => true,
+                'active'         => true,
             ],
         ];
 
@@ -39,11 +39,11 @@ class TissReferenceSeeder extends Seeder
                 [
                     'layout_version' => $version['layout_version'],
                     'effective_from' => $version['effective_from'],
-                    'active' => $version['active'],
-                    'metadata' => [
+                    'active'         => $version['active'],
+                    'metadata'       => [
                         'seeded_by' => self::class,
                     ],
-                ]
+                ],
             );
         }
     }
@@ -52,18 +52,18 @@ class TissReferenceSeeder extends Seeder
     {
         $operators = [
             [
-                'ans_code' => '326305',
-                'name' => 'AMIL ASSISTÊNCIA MÉDICA INTERNACIONAL S.A.',
+                'ans_code'   => '326305',
+                'name'       => 'AMIL ASSISTÊNCIA MÉDICA INTERNACIONAL S.A.',
                 'trade_name' => 'AMIL',
             ],
             [
-                'ans_code' => '359017',
-                'name' => 'UNIMED NACIONAL - COOPERATIVA CENTRAL',
+                'ans_code'   => '359017',
+                'name'       => 'UNIMED NACIONAL - COOPERATIVA CENTRAL',
                 'trade_name' => 'UNIMED',
             ],
             [
-                'ans_code' => '005711',
-                'name' => 'BRADESCO SAÚDE S.A.',
+                'ans_code'   => '005711',
+                'name'       => 'BRADESCO SAÚDE S.A.',
                 'trade_name' => 'BRADESCO SAÚDE',
             ],
         ];
@@ -72,13 +72,13 @@ class TissReferenceSeeder extends Seeder
             TissOperator::query()->updateOrCreate(
                 ['ans_code' => $operator['ans_code']],
                 [
-                    'name' => $operator['name'],
+                    'name'       => $operator['name'],
                     'trade_name' => $operator['trade_name'],
-                    'active' => true,
-                    'metadata' => [
+                    'active'     => true,
+                    'metadata'   => [
                         'seeded_by' => self::class,
                     ],
-                ]
+                ],
             );
         }
     }
@@ -87,33 +87,33 @@ class TissReferenceSeeder extends Seeder
     {
         $codes = [
             [
-                'code' => '10101012',
-                'table_code' => '22',
+                'code'        => '10101012',
+                'table_code'  => '22',
                 'description' => 'CONSULTA EM CONSULTÓRIO',
             ],
             [
-                'code' => '30301053',
-                'table_code' => '22',
+                'code'        => '30301053',
+                'table_code'  => '22',
                 'description' => 'BIOMICROSCOPIA DE FUNDO DE OLHO',
             ],
             [
-                'code' => '30301150',
-                'table_code' => '22',
+                'code'        => '30301150',
+                'table_code'  => '22',
                 'description' => 'TONOMETRIA',
             ],
             [
-                'code' => '30301206',
-                'table_code' => '22',
+                'code'        => '30301206',
+                'table_code'  => '22',
                 'description' => 'MAPEAMENTO DE RETINA',
             ],
             [
-                'code' => '30301230',
-                'table_code' => '22',
+                'code'        => '30301230',
+                'table_code'  => '22',
                 'description' => 'RETINOGRAFIA COLORIDA BINOCULAR',
             ],
             [
-                'code' => '30301257',
-                'table_code' => '22',
+                'code'        => '30301257',
+                'table_code'  => '22',
                 'description' => 'TOMOGRAFIA DE COERÊNCIA ÓPTICA',
             ],
         ];
@@ -121,17 +121,17 @@ class TissReferenceSeeder extends Seeder
         foreach ($codes as $code) {
             TissTussCode::query()->updateOrCreate(
                 [
-                    'code' => $code['code'],
+                    'code'       => $code['code'],
                     'table_code' => $code['table_code'],
                 ],
                 [
-                    'description' => $code['description'],
+                    'description'    => $code['description'],
                     'effective_from' => '2026-01-01',
-                    'active' => true,
-                    'metadata' => [
+                    'active'         => true,
+                    'metadata'       => [
                         'seeded_by' => self::class,
                     ],
-                ]
+                ],
             );
         }
     }

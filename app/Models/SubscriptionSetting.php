@@ -44,7 +44,7 @@ class SubscriptionSetting extends Model
     {
         static::updateOrCreate(
             ['key' => $key],
-            array_filter(['value' => (string) $value, 'description' => $description], fn ($v) => $v !== null)
+            array_filter(['value' => (string) $value, 'description' => $description], fn ($v) => $v !== null),
         );
 
         Cache::forget("subscription_setting:{$key}");

@@ -2,8 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\{DB, Schema};
 
 /**
  * Adiciona coluna `entity_id` em `medical_records`. Multi-tenancy correto
@@ -13,8 +12,7 @@ use Illuminate\Support\Facades\Schema;
  * Sintomas pré-fix: códigos PMR duplicados quando record criado sem schedule
  * (boot::creating não encontrava `lastRecord` via whereHas('schedule')).
  */
-return new class extends Migration
-{
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('medical_records', function (Blueprint $table) {
@@ -52,8 +50,10 @@ return new class extends Migration
                 ->get(['id', 'code']);
 
             $counter = 1;
+
             foreach ($records as $record) {
                 $newCode = sprintf('%s-%010d', 'PMR', $counter++);
+
                 if ($record->code !== $newCode) {
                     DB::table('medical_records')
                         ->where('id', $record->id)

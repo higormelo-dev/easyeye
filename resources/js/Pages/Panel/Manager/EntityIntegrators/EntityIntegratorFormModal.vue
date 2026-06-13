@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
  * Modal de cadastro/edição de Integrador.
@@ -28,6 +29,11 @@ const title  = computed(() => isEdit.value
 const loading = ref(false);
 const saving  = ref(false);
 const loadErr = ref('');
+
+const activeOptions = computed(() => [
+    { value: true,  label: props.t.field_yes ?? 'Sim' },
+    { value: false, label: props.t.field_no  ?? 'Não' },
+]);
 
 const form = ref({
     name:   '',
@@ -214,10 +220,13 @@ function firstError(field) { return errors.value[field]?.[0] ?? ''; }
 
                         <div v-if="isEdit" class="col-md-6">
                             <label class="form-label">{{ t.field_active ?? 'Ativo' }}</label>
-                            <select v-model="form.active" class="form-select">
-                                <option :value="true">{{ t.field_yes ?? 'Sim' }}</option>
-                                <option :value="false">{{ t.field_no ?? 'Não' }}</option>
-                            </select>
+                            <SearchSelect
+                                v-model="form.active"
+                                :options="activeOptions"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :clearable="false"
+                            />
                         </div>
                     </form>
                 </div>

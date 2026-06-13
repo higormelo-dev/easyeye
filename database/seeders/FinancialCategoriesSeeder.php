@@ -28,15 +28,14 @@ class FinancialCategoriesSeeder extends Seeder
             FinancialCategory::query()->updateOrCreate(
                 [
                     'entity_id' => null,
-                    'name' => $category['name'],
-                    'type' => $category['type'],
+                    'name'      => $category['name'],
+                    'type'      => $category['type'],
                 ],
                 [
-                    'active' => true,
+                    'active'    => true,
                     'is_system' => true,
-                ]
+                ],
             );
         }
     }
 }
-

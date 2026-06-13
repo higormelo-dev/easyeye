@@ -1,10 +1,10 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services\Financial;
 
-use App\Enums\{BillingBatchStatus, BillingClaimStatus, FinancialEntryStatus, FinancialEntryType, ScheduleSituation};
+use App\Enums\{BillingBatchStatus, BillingClaimStatus, CashEntryNature, FinancialEntryStatus, FinancialEntryType, PaymentMethod, ScheduleSituation};
 use App\Models\{BillingBatch, BillingClaim, Covenant, FinancialCashEntry, FinancialCategory, Schedule};
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -13,8 +13,22 @@ use Illuminate\Validation\ValidationException;
 class BillingService
 {
     public function __construct(
-        private readonly TissXmlService $tissXmlService
+        private readonly TissXmlService $tissXmlService,
+        private readonly ProcedurePriceService $procedurePrices,
     ) {
+    }
+
+    /**
+     * Preço unitário informado tem prioridade; na ausência, busca na tabela
+     * de preço por procedimento × convênio (ProcedurePrice). 0.0 se não houver.
+     */
+    private function resolveUnitPrice(array $data, ?string $covenantId, string $entityId): float
+    {
+        if (isset($data['unit_price']) && $data['unit_price'] !== null && $data['unit_price'] !== '') {
+            return (float) $data['unit_price'];
+        }
+
+        return (float) ($this->procedurePrices->getPrice($data['procedure_id'] ?? null, $covenantId, $entityId) ?? 0.0);
     }
 
     public function createIndividual(array $data): BillingClaim
@@ -32,25 +46,25 @@ class BillingService
 
             $this->ensureScheduleNotBilled($schedule->id);
 
-            $quantity = (int) ($data['quantity'] ?? 1);
-            $unitPrice = (float) $data['unit_price'];
+            $quantity  = (int) ($data['quantity'] ?? 1);
+            $unitPrice = $this->resolveUnitPrice($data, $schedule->covenant_id, $entityId);
 
             return BillingClaim::query()->create([
-                'entity_id' => $entityId,
-                'schedule_id' => $schedule->id,
-                'patient_id' => $schedule->patient_id,
-                'doctor_id' => $schedule->doctor_id,
-                'covenant_id' => $schedule->covenant_id,
-                'status' => $data['status'] ?? BillingClaimStatus::Draft->value,
-                'attendance_date' => $schedule->date_time->toDateString(),
-                'due_date' => $data['due_date'] ?? null,
-                'amount' => $quantity * $unitPrice,
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'tuss_code' => $data['tuss_code'] ?? null,
+                'entity_id'             => $entityId,
+                'schedule_id'           => $schedule->id,
+                'patient_id'            => $schedule->patient_id,
+                'doctor_id'             => $schedule->doctor_id,
+                'covenant_id'           => $schedule->covenant_id,
+                'status'                => $data['status'] ?? BillingClaimStatus::Draft->value,
+                'attendance_date'       => $schedule->date_time->toDateString(),
+                'due_date'              => $data['due_date'] ?? null,
+                'amount'                => $quantity * $unitPrice,
+                'quantity'              => $quantity,
+                'unit_price'            => $unitPrice,
+                'tuss_code'             => $data['tuss_code'] ?? null,
                 'procedure_description' => $data['procedure_description'] ?? null,
-                'authorization_code' => $data['authorization_code'] ?? null,
-                'notes' => $data['notes'] ?? null,
+                'authorization_code'    => $data['authorization_code'] ?? null,
+                'notes'                 => $data['notes'] ?? null,
             ]);
         });
     }
@@ -69,16 +83,16 @@ class BillingService
                 ->firstOrFail();
 
             $batch = BillingBatch::query()->create([
-                'entity_id' => $entityId,
-                'covenant_id' => $covenant->id,
-                'status' => BillingBatchStatus::Draft->value,
-                'tiss_version' => $data['tiss_version'] ?? '202603',
+                'entity_id'           => $entityId,
+                'covenant_id'         => $covenant->id,
+                'status'              => BillingBatchStatus::Draft->value,
+                'tiss_version'        => $data['tiss_version'] ?? '202603',
                 'tiss_layout_version' => $data['tiss_layout_version'] ?? '04.03.00',
-                'period_start' => $data['date_from'],
-                'period_end' => $data['date_until'],
-                'due_date' => $data['due_date'] ?? null,
-                'issued_at' => now(),
-                'notes' => $data['notes'] ?? null,
+                'period_start'        => $data['date_from'],
+                'period_end'          => $data['date_until'],
+                'due_date'            => $data['due_date'] ?? null,
+                'issued_at'           => now(),
+                'notes'               => $data['notes'] ?? null,
             ]);
 
             $schedules = $this->eligibleSchedulesForBatch(
@@ -86,7 +100,7 @@ class BillingService
                 covenantId: $covenant->id,
                 dateFrom: $data['date_from'],
                 dateUntil: $data['date_until'],
-                selectedScheduleIds: $data['schedule_ids'] ?? []
+                selectedScheduleIds: $data['schedule_ids'] ?? [],
             );
 
             if ($schedules->isEmpty()) {
@@ -95,26 +109,26 @@ class BillingService
                 ]);
             }
 
-            $quantity = (int) ($data['quantity'] ?? 1);
-            $unitPrice = (float) $data['unit_price'];
+            $quantity  = (int) ($data['quantity'] ?? 1);
+            $unitPrice = $this->resolveUnitPrice($data, $covenant->id, $entityId);
 
             $claimsPayload = $schedules->map(fn (Schedule $schedule) => [
-                'entity_id' => $entityId,
-                'batch_id' => $batch->id,
-                'schedule_id' => $schedule->id,
-                'patient_id' => $schedule->patient_id,
-                'doctor_id' => $schedule->doctor_id,
-                'covenant_id' => $schedule->covenant_id,
-                'status' => $data['status'] ?? BillingClaimStatus::Draft->value,
-                'attendance_date' => $schedule->date_time->toDateString(),
-                'due_date' => $data['due_date'] ?? null,
-                'amount' => $quantity * $unitPrice,
-                'quantity' => $quantity,
-                'unit_price' => $unitPrice,
-                'tuss_code' => $data['tuss_code'] ?? null,
+                'entity_id'             => $entityId,
+                'batch_id'              => $batch->id,
+                'schedule_id'           => $schedule->id,
+                'patient_id'            => $schedule->patient_id,
+                'doctor_id'             => $schedule->doctor_id,
+                'covenant_id'           => $schedule->covenant_id,
+                'status'                => $data['status'] ?? BillingClaimStatus::Draft->value,
+                'attendance_date'       => $schedule->date_time->toDateString(),
+                'due_date'              => $data['due_date'] ?? null,
+                'amount'                => $quantity * $unitPrice,
+                'quantity'              => $quantity,
+                'unit_price'            => $unitPrice,
+                'tuss_code'             => $data['tuss_code'] ?? null,
                 'procedure_description' => $data['procedure_description'] ?? null,
-                'authorization_code' => $data['authorization_code'] ?? null,
-                'notes' => $data['notes'] ?? null,
+                'authorization_code'    => $data['authorization_code'] ?? null,
+                'notes'                 => $data['notes'] ?? null,
             ])->all();
 
             foreach ($claimsPayload as $claimData) {
@@ -134,6 +148,7 @@ class BillingService
     {
         return DB::transaction(function () use ($batch): BillingBatch {
             $claimsCount = $batch->claims()->count();
+
             if ($claimsCount === 0) {
                 throw ValidationException::withMessages([
                     'batch' => 'Este lote não possui guias para envio.',
@@ -141,7 +156,7 @@ class BillingService
             }
 
             $batch->update([
-                'status' => BillingBatchStatus::Submitted->value,
+                'status'       => BillingBatchStatus::Submitted->value,
                 'submitted_at' => now(),
             ]);
 
@@ -159,8 +174,8 @@ class BillingService
             $paidAmount = (float) ($data['paid_amount'] ?? $claim->amount);
 
             $claim->update([
-                'status' => BillingClaimStatus::Paid->value,
-                'paid_at' => $data['paid_at'] ?? now(),
+                'status'      => BillingClaimStatus::Paid->value,
+                'paid_at'     => $data['paid_at'] ?? now(),
                 'paid_amount' => $paidAmount,
             ]);
 
@@ -174,20 +189,21 @@ class BillingService
                 $incomeCategory = $this->defaultIncomeCategory((string) $claim->entity_id);
 
                 FinancialCashEntry::query()->create([
-                    'entity_id' => $claim->entity_id,
-                    'category_id' => $incomeCategory?->id,
-                    'covenant_id' => $claim->covenant_id,
+                    'entity_id'        => $claim->entity_id,
+                    'category_id'      => $incomeCategory?->id,
+                    'covenant_id'      => $claim->covenant_id,
                     'billing_claim_id' => $claim->id,
-                    'entry_date' => now()->toDateString(),
-                    'description' => sprintf('Recebimento de guia %s', $claim->code),
-                    'type' => FinancialEntryType::Income->value,
-                    'status' => FinancialEntryStatus::Paid->value,
-                    'amount' => $paidAmount,
-                    'payment_method' => $data['payment_method'] ?? 'transferencia',
-                    'reference_type' => 'billing_claim',
-                    'reference_id' => $claim->id,
-                    'notes' => $data['notes'] ?? null,
-                    'active' => true,
+                    'entry_date'       => now()->toDateString(),
+                    'description'      => sprintf('Recebimento de guia %s', $claim->code),
+                    'type'             => FinancialEntryType::Income->value,
+                    'status'           => FinancialEntryStatus::Paid->value,
+                    'amount'           => $paidAmount,
+                    'payment_method'   => $data['payment_method'] ?? PaymentMethod::Transfer->value,
+                    'nature'           => CashEntryNature::Covenant->value,
+                    'reference_type'   => 'billing_claim',
+                    'reference_id'     => $claim->id,
+                    'notes'            => $data['notes'] ?? null,
+                    'active'           => true,
                 ]);
             }
 
@@ -199,9 +215,9 @@ class BillingService
     {
         return DB::transaction(function () use ($claim, $data): BillingClaim {
             $claim->update([
-                'status' => BillingClaimStatus::Denied->value,
+                'status'       => BillingClaimStatus::Denied->value,
                 'glosa_amount' => (float) ($data['glosa_amount'] ?? $claim->amount),
-                'notes' => $data['notes'] ?? $claim->notes,
+                'notes'        => $data['notes'] ?? $claim->notes,
             ]);
 
             return $claim->fresh();
@@ -214,7 +230,7 @@ class BillingService
             $xmlPath = $this->tissXmlService->generate($batch);
 
             $batch->update([
-                'xml_path' => $xmlPath,
+                'xml_path'  => $xmlPath,
                 'issued_at' => $batch->issued_at ?? now(),
             ]);
 
@@ -225,14 +241,14 @@ class BillingService
     }
 
     /**
-     * @param  string[]  $selectedScheduleIds
+     * @param string[] $selectedScheduleIds
      */
     private function eligibleSchedulesForBatch(
         string $entityId,
         string $covenantId,
         string $dateFrom,
         string $dateUntil,
-        array $selectedScheduleIds = []
+        array $selectedScheduleIds = [],
     ): Collection {
         $query = Schedule::query()
             ->where('entity_id', $entityId)
@@ -241,7 +257,7 @@ class BillingService
             ->whereBetween(DB::raw('DATE(date_time)'), [$dateFrom, $dateUntil])
             ->whereNull('deleted_at');
 
-        if (!empty($selectedScheduleIds)) {
+        if (! empty($selectedScheduleIds)) {
             $query->whereIn('id', $selectedScheduleIds);
         }
 
@@ -256,7 +272,7 @@ class BillingService
             ->all();
 
         return $schedules->reject(
-            fn (Schedule $schedule): bool => in_array($schedule->id, $alreadyBilledScheduleIds, true)
+            fn (Schedule $schedule): bool => in_array($schedule->id, $alreadyBilledScheduleIds, true),
         )->values();
     }
 

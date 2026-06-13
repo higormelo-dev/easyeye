@@ -38,6 +38,7 @@ class StripeBrGateway extends AbstractHttpGateway
 
             if ($search->successful()) {
                 $data = $search->json('data', []);
+
                 if (! empty($data)) {
                     return (string) ($data[0]['id'] ?? '');
                 }
@@ -56,9 +57,9 @@ class StripeBrGateway extends AbstractHttpGateway
     protected function buildCustomerPayload(CustomerDTO $customer): array
     {
         return array_filter([
-            'name'  => $customer->name,
-            'email' => $customer->email,
-            'phone' => preg_replace('/\D/', '', (string) $customer->phone) ?: null,
+            'name'     => $customer->name,
+            'email'    => $customer->email,
+            'phone'    => preg_replace('/\D/', '', (string) $customer->phone) ?: null,
             'metadata' => array_filter([
                 'entity_id' => $customer->entityId,
                 'cpf_cnpj'  => preg_replace('/\D/', '', (string) $customer->document),
@@ -173,13 +174,13 @@ class StripeBrGateway extends AbstractHttpGateway
     protected function buildChargePayload(CreateChargeDTO $payload): array
     {
         return array_filter([
-            'amount'   => (int) round($payload->amount * 100),
-            'currency' => strtolower($payload->currency),
-            'customer' => $payload->customerId,
-            'description' => $payload->description,
-            'confirm'  => false,
+            'amount'                    => (int) round($payload->amount * 100),
+            'currency'                  => strtolower($payload->currency),
+            'customer'                  => $payload->customerId,
+            'description'               => $payload->description,
+            'confirm'                   => false,
             'automatic_payment_methods' => ['enabled' => true],
-            'metadata' => array_merge($payload->metadata, [
+            'metadata'                  => array_merge($payload->metadata, [
                 'invoice_id'      => $payload->invoiceId,
                 'subscription_id' => $payload->subscriptionId,
                 'entity_id'       => $payload->entityId,
@@ -207,8 +208,9 @@ class StripeBrGateway extends AbstractHttpGateway
 
         // Parseia t=timestamp,v1=hash
         $parts = [];
+
         foreach (explode(',', $sigHeader) as $part) {
-            [$k, $v] = array_pad(explode('=', $part, 2), 2, '');
+            [$k, $v]     = array_pad(explode('=', $part, 2), 2, '');
             $parts[$k][] = $v;
         }
 
@@ -274,18 +276,18 @@ class StripeBrGateway extends AbstractHttpGateway
     protected function eventTypeMap(): array
     {
         return [
-            'payment_intent.succeeded'        => 'paid',
-            'payment_intent.payment_failed'   => 'failed',
-            'payment_intent.canceled'         => 'cancelled',
-            'invoice.paid'                    => 'paid',
-            'invoice.payment_succeeded'       => 'paid',
-            'invoice.payment_failed'          => 'failed',
-            'charge.succeeded'                => 'paid',
-            'charge.failed'                   => 'failed',
-            'charge.refunded'                 => 'refunded',
-            'charge.dispute.created'          => 'chargeback',
-            'customer.subscription.deleted'   => 'cancelled',
-            'customer.subscription.paused'    => 'cancelled',
+            'payment_intent.succeeded'      => 'paid',
+            'payment_intent.payment_failed' => 'failed',
+            'payment_intent.canceled'       => 'cancelled',
+            'invoice.paid'                  => 'paid',
+            'invoice.payment_succeeded'     => 'paid',
+            'invoice.payment_failed'        => 'failed',
+            'charge.succeeded'              => 'paid',
+            'charge.failed'                 => 'failed',
+            'charge.refunded'               => 'refunded',
+            'charge.dispute.created'        => 'chargeback',
+            'customer.subscription.deleted' => 'cancelled',
+            'customer.subscription.paused'  => 'cancelled',
         ];
     }
 
@@ -294,22 +296,22 @@ class StripeBrGateway extends AbstractHttpGateway
     private function normalizePiStatus(string $status): string
     {
         return match ($status) {
-            'succeeded'                                                   => 'paid',
+            'succeeded' => 'paid',
             'requires_payment_method', 'requires_confirmation',
-            'requires_action', 'processing'                               => 'pending',
-            'canceled'                                                    => 'cancelled',
-            default                                                       => strtolower($status),
+            'requires_action', 'processing' => 'pending',
+            'canceled' => 'cancelled',
+            default    => strtolower($status),
         };
     }
 
     private function normalizeSubStatus(string $status): string
     {
         return match ($status) {
-            'active', 'trialing'  => 'active',
-            'past_due', 'unpaid'  => 'past_due',
-            'canceled', 'paused'  => 'cancelled',
-            'incomplete'          => 'pending',
-            default               => strtolower($status),
+            'active', 'trialing' => 'active',
+            'past_due', 'unpaid' => 'past_due',
+            'canceled', 'paused' => 'cancelled',
+            'incomplete' => 'pending',
+            default      => strtolower($status),
         };
     }
 }

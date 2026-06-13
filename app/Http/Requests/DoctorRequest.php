@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\{Doctor};
+use App\Models\Doctor;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -203,7 +203,7 @@ class DoctorRequest extends FormRequest
             }
         }
 
-        if (!empty($merge)) {
+        if (! empty($merge)) {
             $this->merge($merge);
         }
     }
@@ -218,7 +218,7 @@ class DoctorRequest extends FormRequest
             return (bool) $value;
         }
 
-        if (!is_string($value)) {
+        if (! is_string($value)) {
             return $value;
         }
 

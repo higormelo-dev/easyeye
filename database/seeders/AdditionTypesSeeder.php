@@ -21,7 +21,7 @@ class AdditionTypesSeeder extends Seeder
         foreach ($types as $type) {
             AdditionType::query()->firstOrCreate(
                 ['name' => $type],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:         { type: Boolean, required: true },
@@ -168,16 +169,17 @@ function showToast(msg, type = 'success') {
             <!-- Tipo -->
             <div class="col-12 col-sm-4">
                 <label class="form-label">{{ t.field_type }} <span class="text-danger">*</span></label>
-                <select
+                <SearchSelect
                     v-model="form.type"
-                    class="form-select"
-                    :class="{ 'is-invalid': err('type') }"
+                    :options="partnerTypes"
+                    :value-key="'value'"
+                    :label-key="'label'"
+                    :placeholder="t.field_select"
+                    :clearable="false"
+                    :invalid="!!err('type')"
                     @change="onTypeChange"
-                >
-                    <option value="">{{ t.field_select }}</option>
-                    <option v-for="tp in partnerTypes" :key="tp.value" :value="tp.value">{{ tp.label }}</option>
-                </select>
-                <div v-if="err('type')" class="invalid-feedback">{{ err('type') }}</div>
+                />
+                <div v-if="err('type')" class="invalid-feedback d-block">{{ err('type') }}</div>
             </div>
 
             <!-- Taxa de Comissão -->
@@ -214,11 +216,14 @@ function showToast(msg, type = 'success') {
             <!-- Status (somente edit) -->
             <div v-if="isEdit" class="col-12 col-sm-4">
                 <label class="form-label">{{ t.field_status }}</label>
-                <select v-model="form.status" class="form-select">
-                    <option value="active">{{ t.status_active }}</option>
-                    <option value="inactive">{{ t.status_inactive }}</option>
-                    <option value="suspended">{{ t.status_suspended }}</option>
-                </select>
+                <SearchSelect
+                    v-model="form.status"
+                    :options="[{value:'active',label:t.status_active},{value:'inactive',label:t.status_inactive},{value:'suspended',label:t.status_suspended}]"
+                    :value-key="'value'"
+                    :label-key="'label'"
+                    :placeholder="t.field_select"
+                    :clearable="false"
+                />
             </div>
 
             <!-- Observações -->

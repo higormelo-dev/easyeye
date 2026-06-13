@@ -162,7 +162,7 @@ class ExamTypesSeeder extends Seeder
 
             ExamType::firstOrCreate(
                 ['name' => $normalized, 'category' => $categoryId],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Observers;
 
@@ -8,7 +8,10 @@ use App\Domains\AI\Services\AiCreditWalletService;
 use App\Enums\SubscriptionStatus;
 use App\Models\Subscription;
 use App\Services\{PartnerService, ReferralService};
+use DateTimeImmutable;
+use DateTimeInterface;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Dispara eventos de CAC e provisionamento ao mudar o estado de uma assinatura.
@@ -73,18 +76,18 @@ class SubscriptionObserver
         try {
             $entity = $subscription->entity;
 
-            if (!$entity->referral_code_id) {
+            if (! $entity->referral_code_id) {
                 return;
             }
 
             $referralCode = $entity->referralCode;
 
-            if (!$referralCode) {
+            if (! $referralCode) {
                 return;
             }
 
             $this->referralService->recordTrialStarted($referralCode, $entity);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('SubscriptionObserver: falha ao registrar trial de indicação.', [
                 'subscription_id' => $subscription->id,
                 'error'           => $e->getMessage(),
@@ -96,7 +99,7 @@ class SubscriptionObserver
     {
         try {
             $this->partnerService->generateCommission($subscription);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('SubscriptionObserver: falha ao gerar comissão de parceiro.', [
                 'subscription_id' => $subscription->id,
                 'error'           => $e->getMessage(),
@@ -109,18 +112,18 @@ class SubscriptionObserver
         try {
             $entity = $subscription->entity;
 
-            if (!$entity->referral_code_id) {
+            if (! $entity->referral_code_id) {
                 return;
             }
 
             $referralCode = $entity->referralCode;
 
-            if (!$referralCode) {
+            if (! $referralCode) {
                 return;
             }
 
             $this->referralService->recordConversion($referralCode, $entity, $subscription);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('SubscriptionObserver: falha ao processar conversão de indicação.', [
                 'subscription_id' => $subscription->id,
                 'error'           => $e->getMessage(),
@@ -132,7 +135,7 @@ class SubscriptionObserver
     {
         try {
             $this->aiCreditWalletService->grantMonthlyCreditsForSubscription($subscription);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('SubscriptionObserver: falha ao conceder créditos IA do ciclo.', [
                 'subscription_id' => $subscription->id,
                 'error'           => $e->getMessage(),
@@ -153,9 +156,9 @@ class SubscriptionObserver
             return true;
         }
 
-        $originalAt = $original instanceof \DateTimeInterface
+        $originalAt = $original instanceof DateTimeInterface
             ? $original
-            : new \DateTimeImmutable((string) $original);
+            : new DateTimeImmutable((string) $original);
 
         return $current->getTimestamp() > $originalAt->getTimestamp();
     }

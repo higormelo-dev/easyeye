@@ -2,18 +2,19 @@
 
 namespace App\Models;
 
+use App\Domains\AI\Models\AiRun;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
 use Illuminate\Support\Facades\Storage;
 
 class PatientExam extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasFactory;
     use HasUuids;
 
@@ -43,7 +44,7 @@ class PatientExam extends Model
     protected $appends = ['archive_url'];
 
     /**
-     * Generated code for the entity_id field
+     * Generated code for the entity_id field.
      */
     protected static function booted(): void
     {
@@ -106,6 +107,15 @@ class PatientExam extends Model
     public function equipment(): BelongsTo
     {
         return $this->belongsTo(EntityIntegratorEquipment::class, 'entity_integrator_equipment_id');
+    }
+
+    /**
+     * Execuções de IA (laudos) que analisaram este exame de imagem ocular.
+     */
+    public function aiRuns(): BelongsToMany
+    {
+        return $this->belongsToMany(AiRun::class, 'ai_run_patient_exam', 'patient_exam_id', 'ai_run_id')
+            ->withPivot('entity_id');
     }
 
     public function archiveUrl(): Attribute

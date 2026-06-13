@@ -17,14 +17,6 @@ class EntityIntegratorsController extends Controller
     use HasBusinessDays;
 
     /**
-     * Hash bcrypt (cost 12, igual a BCRYPT_ROUNDS) de valor aleatório descartado.
-     * Quando o e-mail não existe, validamos a senha contra este hash para que o
-     * tempo de resposta seja o mesmo de uma senha errada — evita enumeração de
-     * e-mails por timing.
-     */
-    private const DUMMY_PASSWORD_HASH = '$2y$12$/OdW0afyfIPKXjw1pxgP/.RibSsBgr4figSpx4NSCS.ExmqC4rozK';
-
-    /**
      * Instance of the standard model.
      */
     protected EntityUserIntegrator $model;
@@ -39,20 +31,11 @@ class EntityIntegratorsController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $credentials = $request->validate([
-            'email'    => ['required', 'string'],
-            'password' => ['required', 'string'],
-            'code'     => ['required', 'string'],
-        ]);
-
         $user = $this->model->query()
-            ->where('email', $credentials['email'])
+            ->where('email', $request->get('email'))
             ->first();
 
-        // Hash::check roda SEMPRE (mesmo sem usuário) — ver DUMMY_PASSWORD_HASH.
-        $passwordValid = Hash::check($credentials['password'], $user?->password ?? self::DUMMY_PASSWORD_HASH);
-
-        if (! $user || ! $passwordValid) {
+        if (! $user || ! Hash::check($request->get('password'), $user->password)) {
             return $this->invalidResponse('auth.failed');
         }
 
@@ -60,13 +43,9 @@ class EntityIntegratorsController extends Controller
             return $this->invalidResponse('auth.inactive');
         }
 
-        if (! ($user->entity && $user->entity->active)) {
-            return $this->invalidResponse('auth.entity_inactive');
-        }
-
         $integrator = EntityIntegrator::query()
             ->where('entity_user_integrator_id', $user->id)
-            ->where('code', EntityIntegrator::normalizeCode($credentials['code']))
+            ->where('code', $request->get('code'))
             ->where('active', true)
             ->first();
 
@@ -74,14 +53,10 @@ class EntityIntegratorsController extends Controller
             return $this->invalidResponse('auth.integrator_invalid');
         }
 
-        // Housekeeping: remove tokens já expirados deste usuário para a tabela
-        // não acumular lixo a cada novo signin do cliente desktop.
-        $user->tokens()->where('expires_at', '<', Carbon::now())->delete();
-
         $token = $user->createToken(
             'integrator-token',
             ['integrator_id:' . $integrator->id],
-            Carbon::now()->addDays(7),
+            Carbon::now()->addDay(7),
         );
 
         return response()->json(
@@ -110,7 +85,7 @@ class EntityIntegratorsController extends Controller
             return $this->invalidResponse('auth.token_expired');
         }
 
-        $integratorId = EntityIntegrator::idFromTokenAbilities($accessToken->abilities);
+        $integratorId = $this->extractIntegratorId($accessToken->abilities);
 
         if (! $integratorId) {
             $accessToken->delete();
@@ -120,14 +95,26 @@ class EntityIntegratorsController extends Controller
 
         $integrator = EntityIntegrator::query()
             ->with('user.entity')
-            ->find($integratorId);
+            ->where('id', $integratorId)
+            ->where('active', true)
+            ->first();
 
-        $blockReason = $integrator ? $integrator->accessBlockReason() : 'auth.integrator_inactive';
-
-        if ($blockReason !== null) {
+        if (! $integrator) {
             $accessToken->delete();
 
-            return $this->invalidResponse($blockReason);
+            return $this->invalidResponse('auth.integrator_inactive');
+        }
+
+        if (! $integrator->user->active) {
+            $accessToken->delete();
+
+            return $this->invalidResponse('auth.user_integrator_inactive');
+        }
+
+        if (! ($integrator->user->entity && $integrator->user->entity->active)) {
+            $accessToken->delete();
+
+            return $this->invalidResponse('auth.entity_inactive');
         }
 
         // Verifica se o token vai expirar em 1 dia útil e renova automaticamente
@@ -163,6 +150,20 @@ class EntityIntegratorsController extends Controller
         return response()->json([
             'message' => 'Token revoked successfully.',
         ], HttpResponse::HTTP_OK);
+    }
+
+    private function extractIntegratorId(array $abilities): ?string
+    {
+        $ability = collect($abilities)
+            ->map(fn ($value, $key) => is_int($key) ? $value : $key)
+            ->filter(fn (string $item) => str_starts_with($item, 'integrator_id:'))
+            ->first();
+
+        if (! $ability) {
+            return null;
+        }
+
+        return substr($ability, strlen('integrator_id:')) ?: null;
     }
 
     private function invalidResponse(string $messageKey, int $status = HttpResponse::HTTP_UNAUTHORIZED): JsonResponse

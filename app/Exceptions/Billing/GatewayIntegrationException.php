@@ -2,11 +2,13 @@
 
 namespace App\Exceptions\Billing;
 
+use Throwable;
+
 class GatewayIntegrationException extends BillingException
 {
     private string $triggerType;
 
-    public function __construct(string $message = '', string $triggerType = 'unknown', int $code = 0, ?\Throwable $previous = null)
+    public function __construct(string $message = '', string $triggerType = 'unknown', int $code = 0, ?Throwable $previous = null)
     {
         parent::__construct($message, $code, $previous);
         $this->triggerType = $triggerType;

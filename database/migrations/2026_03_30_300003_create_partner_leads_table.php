@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
  * Leads trazidos por parceiros/revendedores.
  * Rastreia o funil: lead gerado → contactado → em trial → convertido.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('partner_leads', function (Blueprint $table) {

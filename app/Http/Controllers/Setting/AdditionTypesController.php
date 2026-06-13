@@ -12,11 +12,11 @@ class AdditionTypesController extends BaseSettingController
 {
     public function __construct(AdditionTypeService $service)
     {
-        $this->titleController = __("actions.sidemenu.additiontypes");
+        $this->titleController = __('actions.sidemenu.additiontypes');
         $this->service         = $service;
         $this->resourceClass   = AdditionTypeResource::class;
-        $this->routePrefix     = "panel.setting.additiontypes";
-        $this->viewSlot        = "additiontypes";
+        $this->routePrefix     = 'panel.setting.additiontypes';
+        $this->viewSlot        = 'additiontypes';
     }
 
     public function store(AdditionTypeRequest $request)

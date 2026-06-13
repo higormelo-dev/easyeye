@@ -8,6 +8,7 @@ import ActionIconButton             from '@/Components/Panel/ActionIconButton.vu
 import ActionIconGroup              from '@/Components/Panel/ActionIconGroup.vue';
 import ActionDropdown               from '@/Components/Panel/ActionDropdown.vue';
 import ConfirmationWithReasonModal  from '@/Components/Panel/ConfirmationWithReasonModal.vue';
+import SearchSelect                  from '@/Components/Panel/SearchSelect.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 import { useDashboardPolling }      from '@/composables/useDashboardPolling.js';
 
@@ -159,12 +160,18 @@ function exportUrl(format) {
                         <label class="form-label small mb-1">{{ t.export_to ?? 'Até' }}</label>
                         <input v-model="exportTo" type="date" class="form-control form-control-sm mb-2">
                         <label class="form-label small mb-1">{{ t.export_status ?? 'Status (comissões)' }}</label>
-                        <select v-model="exportStatus" class="form-select form-select-sm">
-                            <option value="">{{ t.export_status_all ?? 'Todos' }}</option>
-                            <option value="pending">{{ t.export_status_pending ?? 'Pendentes' }}</option>
-                            <option value="paid">{{ t.export_status_paid ?? 'Pagas' }}</option>
-                            <option value="cancelled">{{ t.export_status_cancelled ?? 'Canceladas' }}</option>
-                        </select>
+                        <SearchSelect
+                            v-model="exportStatus"
+                            :options="[
+                                { value: 'pending',   label: t.export_status_pending ?? 'Pendentes' },
+                                { value: 'paid',      label: t.export_status_paid ?? 'Pagas' },
+                                { value: 'cancelled', label: t.export_status_cancelled ?? 'Canceladas' },
+                            ]"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :placeholder="t.export_status_all ?? 'Todos'"
+                        />
+
                     </li>
                     <li><hr class="dropdown-divider my-1"></li>
                     <li>

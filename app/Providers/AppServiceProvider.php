@@ -2,17 +2,11 @@
 
 namespace App\Providers;
 
-use App\Domains\AI\Contracts\AiCircuitBreakerInterface;
-use App\Domains\AI\Contracts\AiModelPriceRepositoryInterface;
-use App\Domains\AI\Contracts\AiRunProviderCallStoreInterface;
-use App\Domains\AI\Contracts\AiRunRepositoryInterface;
+use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiModelPriceRepositoryInterface, AiRunProviderCallStoreInterface, AiRunRepositoryInterface};
 use App\Domains\AI\Providers\{AnthropicProvider, GeminiProvider, OpenAiProvider};
-use App\Domains\AI\Repositories\EloquentAiRunProviderCallStore;
-use App\Domains\AI\Repositories\EloquentAiRunRepository;
-use App\Domains\AI\Repositories\EloquentAiModelPriceRepository;
 use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, GeminiFakeProvider, OpenAiFakeProvider};
-use App\Domains\AI\Services\AiCircuitBreakerService;
-use App\Domains\AI\Services\AiProviderManager;
+use App\Domains\AI\Repositories\{EloquentAiModelPriceRepository, EloquentAiRunProviderCallStore, EloquentAiRunRepository};
+use App\Domains\AI\Services\{AiCircuitBreakerService, AiProviderManager, AiProviderSettings};
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
@@ -49,21 +43,22 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(AiProviderManager::class, function ($app): AiProviderManager {
-            $runtime = (string) config('ai.provider_runtime', 'fake');
+            $runtime  = (string) config('ai.provider_runtime', 'fake');
+            $settings = $app->make(AiProviderSettings::class);
 
             if ($runtime === 'real') {
                 return new AiProviderManager([
-                    'openai' => $app->make(OpenAiProvider::class),
+                    'openai'    => $app->make(OpenAiProvider::class),
                     'anthropic' => $app->make(AnthropicProvider::class),
-                    'gemini' => $app->make(GeminiProvider::class),
-                ]);
+                    'gemini'    => $app->make(GeminiProvider::class),
+                ], $settings);
             }
 
             return new AiProviderManager([
                 'openai'    => $app->make(OpenAiFakeProvider::class),
                 'anthropic' => $app->make(AnthropicFakeProvider::class),
                 'gemini'    => $app->make(GeminiFakeProvider::class),
-            ]);
+            ], $settings);
         });
 
         // CAC: singletons dos serviços de aquisição
@@ -150,17 +145,21 @@ class AppServiceProvider extends ServiceProvider
         $aiKey = function (Request $request): string {
             $userId   = $request->user()?->id ?? $request->ip();
             $entityId = $request->session()->get('selected_entity_id', 'global');
+
             return "ai:{$userId}:{$entityId}";
         };
 
-        RateLimiter::for('ai-estimate', fn (Request $r) =>
-            Limit::perMinute((int) config('ai.rate_limits.estimate_per_minute', 60))->by($aiKey($r))
+        RateLimiter::for(
+            'ai-estimate',
+            fn (Request $r) => Limit::perMinute((int) config('ai.rate_limits.estimate_per_minute', 60))->by($aiKey($r)),
         );
-        RateLimiter::for('ai-store', fn (Request $r) =>
-            Limit::perMinute((int) config('ai.rate_limits.store_per_minute', 10))->by($aiKey($r))
+        RateLimiter::for(
+            'ai-store',
+            fn (Request $r) => Limit::perMinute((int) config('ai.rate_limits.store_per_minute', 10))->by($aiKey($r)),
         );
-        RateLimiter::for('ai-decision', fn (Request $r) =>
-            Limit::perMinute((int) config('ai.rate_limits.decision_per_minute', 30))->by($aiKey($r))
+        RateLimiter::for(
+            'ai-decision',
+            fn (Request $r) => Limit::perMinute((int) config('ai.rate_limits.decision_per_minute', 30))->by($aiKey($r)),
         );
 
         // -------------------------------------------------------------------------
@@ -180,14 +179,17 @@ class AppServiceProvider extends ServiceProvider
         // -------------------------------------------------------------------------
         $managerKey = static fn (Request $r): string => 'manager:' . ($r->user()?->id ?? $r->ip());
 
-        RateLimiter::for('manager-read', static fn (Request $r) =>
-            Limit::perMinute(60)->by($managerKey($r))
+        RateLimiter::for(
+            'manager-read',
+            static fn (Request $r) => Limit::perMinute(60)->by($managerKey($r)),
         );
-        RateLimiter::for('manager-write', static fn (Request $r) =>
-            Limit::perMinute(30)->by($managerKey($r))
+        RateLimiter::for(
+            'manager-write',
+            static fn (Request $r) => Limit::perMinute(30)->by($managerKey($r)),
         );
-        RateLimiter::for('manager-destructive', static fn (Request $r) =>
-            Limit::perMinute(5)->by($managerKey($r))
+        RateLimiter::for(
+            'manager-destructive',
+            static fn (Request $r) => Limit::perMinute(5)->by($managerKey($r)),
         );
     }
 }

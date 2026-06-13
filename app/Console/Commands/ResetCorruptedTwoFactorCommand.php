@@ -45,6 +45,7 @@ class ResetCorruptedTwoFactorCommand extends Command
 
         if ($candidates->isEmpty()) {
             $this->info('Nenhum usuário com two_factor_secret preenchido.');
+
             return self::SUCCESS;
         }
 
@@ -57,6 +58,7 @@ class ResetCorruptedTwoFactorCommand extends Command
 
             try {
                 $secret = $user->two_factor_secret;  // dispara cast 'encrypted'
+
                 if ($secret === null) {
                     continue;
                 }
@@ -82,6 +84,7 @@ class ResetCorruptedTwoFactorCommand extends Command
 
         if (empty($corrupted)) {
             $this->info('Nenhum registro corrompido. Nada a fazer.');
+
             return self::SUCCESS;
         }
 
@@ -90,6 +93,7 @@ class ResetCorruptedTwoFactorCommand extends Command
 
         if (! $force) {
             $this->comment('Dry-run. Rode novamente com --force para limpar.');
+
             return self::SUCCESS;
         }
 

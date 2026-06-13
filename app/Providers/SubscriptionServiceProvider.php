@@ -29,7 +29,7 @@ class SubscriptionServiceProvider extends ServiceProvider
         Gate::define('feature', function ($user, FeatureKey $feature) {
             $entityId = session('selected_entity_id');
 
-            if (!$entityId) {
+            if (! $entityId) {
                 return false;
             }
 
@@ -40,13 +40,13 @@ class SubscriptionServiceProvider extends ServiceProvider
         Gate::define('subscription.active', function ($user) {
             $entityId = session('selected_entity_id');
 
-            if (!$entityId) {
+            if (! $entityId) {
                 return false;
             }
 
-            $entity = \App\Models\Entity::find($entityId);
+            $entity = Entity::find($entityId);
 
-            return $entity && (!$entity->is_client || app(SubscriptionService::class)->hasAccess($entity));
+            return $entity && (! $entity->is_client || app(SubscriptionService::class)->hasAccess($entity));
         });
     }
 }

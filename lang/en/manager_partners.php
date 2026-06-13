@@ -8,23 +8,23 @@ return [
     'breadcrumb_current' => 'Partners',
 
     // Actions
-    'new'           => 'New Partner',
-    'edit'          => 'Edit Partner',
-    'delete'        => 'Delete',
-    'view'          => 'View details',
-    'save'          => 'Save changes',
-    'register'      => 'Register Partner',
-    'saving'        => 'Saving...',
-    'cancel'        => 'Cancel',
-    'pay'           => 'Pay',
-    'copy'          => 'Copy',
-    'back'          => 'Partners',
+    'new'      => 'New Partner',
+    'edit'     => 'Edit Partner',
+    'delete'   => 'Delete',
+    'view'     => 'View details',
+    'save'     => 'Save changes',
+    'register' => 'Register Partner',
+    'saving'   => 'Saving...',
+    'cancel'   => 'Cancel',
+    'pay'      => 'Pay',
+    'copy'     => 'Copy',
+    'back'     => 'Partners',
 
     // KPI cards
-    'kpi_partners'  => 'Partners',
-    'kpi_leads'     => 'Leads (total)',
-    'kpi_pending'   => 'Pending Commissions',
-    'kpi_paid'      => 'Paid Commissions (total)',
+    'kpi_partners' => 'Partners',
+    'kpi_leads'    => 'Leads (total)',
+    'kpi_pending'  => 'Pending Commissions',
+    'kpi_paid'     => 'Paid Commissions (total)',
 
     // Sections
     'lead_funnel'        => 'Lead Funnel',
@@ -102,14 +102,14 @@ return [
     'btn_refresh'     => 'Refresh',
 
     // Confirms
-    'confirm_delete'     => 'Delete this partner? This action cannot be undone.',
-    'confirm_pay'        => 'Mark commission as paid?',
-    'confirm_advance'    => 'Advance lead status?',
-    'account_created'    => 'Partner registered successfully. Access email sent.',
-    'partner_updated'    => 'Partner updated successfully.',
-    'partner_deleted'    => 'Partner deleted successfully.',
-    'commission_paid'    => 'Commission marked as paid.',
-    'lead_advanced'      => 'Lead status updated.',
+    'confirm_delete'  => 'Delete this partner? This action cannot be undone.',
+    'confirm_pay'     => 'Mark commission as paid?',
+    'confirm_advance' => 'Advance lead status?',
+    'account_created' => 'Partner registered successfully. Access email sent.',
+    'partner_updated' => 'Partner updated successfully.',
+    'partner_deleted' => 'Partner deleted successfully.',
+    'commission_paid' => 'Commission marked as paid.',
+    'lead_advanced'   => 'Lead status updated.',
 
     // Export PDF / Excel
     'export'                  => 'Export',

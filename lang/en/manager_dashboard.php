@@ -8,9 +8,10 @@ return [
     'subtitle'       => 'System admin panel — overview of all clinics',
 
     // Header buttons
-    'btn_entities' => 'Entities',
-    'btn_plans'    => 'Plans',
-    'btn_partners' => 'Partners',
+    'btn_entities'     => 'Entities',
+    'btn_plans'        => 'Plans',
+    'btn_partners'     => 'Partners',
+    'btn_ai_providers' => 'AI Providers',
 
     // Primary KPIs
     'kpi_entities'    => 'Clinics',

@@ -8,23 +8,23 @@ return [
     'breadcrumb_current' => 'Parceiros',
 
     // Actions
-    'new'           => 'Novo Parceiro',
-    'edit'          => 'Editar Parceiro',
-    'delete'        => 'Excluir',
-    'view'          => 'Ver detalhes',
-    'save'          => 'Salvar alterações',
-    'register'      => 'Cadastrar Parceiro',
-    'saving'        => 'Salvando...',
-    'cancel'        => 'Cancelar',
-    'pay'           => 'Pagar',
-    'copy'          => 'Copiar',
-    'back'          => 'Parceiros',
+    'new'      => 'Novo Parceiro',
+    'edit'     => 'Editar Parceiro',
+    'delete'   => 'Excluir',
+    'view'     => 'Ver detalhes',
+    'save'     => 'Salvar alterações',
+    'register' => 'Cadastrar Parceiro',
+    'saving'   => 'Salvando...',
+    'cancel'   => 'Cancelar',
+    'pay'      => 'Pagar',
+    'copy'     => 'Copiar',
+    'back'     => 'Parceiros',
 
     // KPI cards
-    'kpi_partners'  => 'Parceiros',
-    'kpi_leads'     => 'Leads (total)',
-    'kpi_pending'   => 'Comissões Pendentes',
-    'kpi_paid'      => 'Comissões Pagas (total)',
+    'kpi_partners' => 'Parceiros',
+    'kpi_leads'    => 'Leads (total)',
+    'kpi_pending'  => 'Comissões Pendentes',
+    'kpi_paid'     => 'Comissões Pagas (total)',
 
     // Sections
     'lead_funnel'        => 'Funil de Leads',
@@ -102,14 +102,14 @@ return [
     'btn_refresh'     => 'Atualizar',
 
     // Confirms
-    'confirm_delete'     => 'Excluir este parceiro? Esta ação não pode ser desfeita.',
-    'confirm_pay'        => 'Marcar comissão como paga?',
-    'confirm_advance'    => 'Avançar status do lead?',
-    'account_created'    => 'Parceiro cadastrado com sucesso. E-mail de acesso enviado.',
-    'partner_updated'    => 'Parceiro atualizado com sucesso.',
-    'partner_deleted'    => 'Parceiro removido com sucesso.',
-    'commission_paid'    => 'Comissão marcada como paga.',
-    'lead_advanced'      => 'Status do lead atualizado.',
+    'confirm_delete'  => 'Excluir este parceiro? Esta ação não pode ser desfeita.',
+    'confirm_pay'     => 'Marcar comissão como paga?',
+    'confirm_advance' => 'Avançar status do lead?',
+    'account_created' => 'Parceiro cadastrado com sucesso. E-mail de acesso enviado.',
+    'partner_updated' => 'Parceiro atualizado com sucesso.',
+    'partner_deleted' => 'Parceiro removido com sucesso.',
+    'commission_paid' => 'Comissão marcada como paga.',
+    'lead_advanced'   => 'Status do lead atualizado.',
 
     // Export PDF / Excel
     'export'                  => 'Exportar',

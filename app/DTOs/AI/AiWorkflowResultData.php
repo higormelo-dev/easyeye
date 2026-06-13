@@ -10,8 +10,8 @@ readonly class AiWorkflowResultData
 {
     /**
      * @param list<AiProviderResponseData> $providerCalls
-     * @param list<string> $safetyNotes
-     * @param array<string, mixed> $metadata
+     * @param list<string>                 $safetyNotes
+     * @param array<string, mixed>         $metadata
      */
     public function __construct(
         public string $workflow,

@@ -18,8 +18,7 @@ use App\DTOs\Billing\{
 };
 use App\Exceptions\Billing\GatewayIntegrationException;
 use App\Services\Billing\GatewayCredentialResolver;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Response;
+use Illuminate\Http\Client\{ConnectionException, Response};
 use Illuminate\Support\{Arr, Str};
 use Illuminate\Support\Facades\Http;
 
@@ -38,7 +37,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     public function withContext(GatewayCallContext $context): static
     {
-        $clone = clone $this;
+        $clone                = clone $this;
         $clone->correlationId = $context->correlationId;
         $clone->entityId      = $context->entityId;
 
@@ -166,7 +165,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
      */
     public function parseWebhook(GatewayWebhookInputDTO $payload): NormalizedWebhookEventDTO
     {
-        $rawEventType = (string) ($this->extractString($payload->payload, $this->eventTypeKeyPaths()) ?? 'unknown');
+        $rawEventType   = (string) ($this->extractString($payload->payload, $this->eventTypeKeyPaths()) ?? 'unknown');
         $normalizedType = $this->normalizeEventType($rawEventType);
 
         return new NormalizedWebhookEventDTO(
@@ -257,7 +256,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     /**
      * Mapa de tipos de evento nativos do gateway para tipos normalizados internos.
-     * Tipos normalizados: paid | failed | cancelled | refunded | chargeback | authorized | unknown
+     * Tipos normalizados: paid | failed | cancelled | refunded | chargeback | authorized | unknown.
      */
     protected function eventTypeMap(): array
     {
@@ -445,7 +444,7 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
 
     /**
      * Converte um tipo de evento nativo do gateway para o tipo normalizado interno.
-     * Tipos: paid | failed | cancelled | refunded | chargeback | authorized | unknown
+     * Tipos: paid | failed | cancelled | refunded | chargeback | authorized | unknown.
      */
     protected function normalizeEventType(string $rawType): string
     {

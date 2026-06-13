@@ -1,9 +1,8 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 return [
-
     // ── Títulos e cabeçalhos ──────────────────────────────────────────────────
     'title'       => 'Sala de Espera',
     'title_admin' => 'Sala de Espera — Administração',
@@ -85,5 +84,4 @@ return [
         'noshow'      => 'Faltou',
         'cancelled'   => 'Cancelado',
     ],
-
 ];

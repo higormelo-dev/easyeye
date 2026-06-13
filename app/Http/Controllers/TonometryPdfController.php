@@ -48,9 +48,9 @@ class TonometryPdfController extends Controller
 
         $addressParts = array_filter([
             $entity?->address,
-            $entity?->number     ? 'nº ' . $entity->number : null,
+            $entity?->number ? 'nº ' . $entity->number : null,
             $entity?->complement ?: null,
-            $entity?->district   ?: null,
+            $entity?->district ?: null,
             ($entity?->city && $entity?->state)
                 ? $entity->city . '/' . $entity->state
                 : ($entity?->city ?? $entity?->state ?? null),
@@ -59,9 +59,9 @@ class TonometryPdfController extends Controller
 
         $footerHtml = view('pdf.partials.footer', [
             'address'    => count($addressParts) ? implode(', ', $addressParts) : null,
-            'telephone'  => $entity?->telephone  ?: null,
-            'cellphone'  => $entity?->cellphone  ?: null,
-            'email'      => $entity?->email      ?: null,
+            'telephone'  => $entity?->telephone ?: null,
+            'cellphone'  => $entity?->cellphone ?: null,
+            'email'      => $entity?->email ?: null,
             'fontFamily' => $setting?->font_family ?? 'Arial',
         ])->render();
 

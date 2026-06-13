@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\{BillingCycle, SubscriptionStatus};
 use App\Models\{Entity, Plan, Subscription, SubscriptionSetting};
+use DateInterval;
 
 class SubscriptionService
 {
@@ -32,7 +33,7 @@ class SubscriptionService
     {
         $subscription = $this->getCurrent($entity);
 
-        if (!$subscription) {
+        if (! $subscription) {
             return null;
         }
 
@@ -58,10 +59,10 @@ class SubscriptionService
             ? null
             : ($subscription->ends_at ?? now())->add(
                 match ($cycle) {
-                    BillingCycle::Monthly => new \DateInterval('P1M'),
-                    BillingCycle::Yearly  => new \DateInterval('P1Y'),
-                    default               => new \DateInterval('P1M'),
-                }
+                    BillingCycle::Monthly => new DateInterval('P1M'),
+                    BillingCycle::Yearly  => new DateInterval('P1Y'),
+                    default               => new DateInterval('P1M'),
+                },
             );
 
         $subscription->update([

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
@@ -20,13 +20,13 @@ class ComplianceController extends Controller
 
         return Inertia::render('Panel/Compliance/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'),      'active' => false],
-                ['label' => __('actions.sidemenu.reports'),   'url' => route('panel.reports.index'), 'active' => false],
-                ['label' => 'Compliance & Auditoria',         'url' => '#',                          'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
+                ['label' => 'Compliance & Auditoria', 'url' => '#', 'active' => true],
             ],
             'exports' => [
-                'audit'        => route('panel.reports.compliance.audit'),
-                'data_access'  => route('panel.reports.compliance.access'),
+                'audit'       => route('panel.reports.compliance.audit'),
+                'data_access' => route('panel.reports.compliance.access'),
             ],
         ]);
     }

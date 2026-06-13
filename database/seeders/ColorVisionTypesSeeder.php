@@ -21,7 +21,7 @@ class ColorVisionTypesSeeder extends Seeder
         foreach ($types as $type) {
             ColorVisionType::query()->firstOrCreate(
                 ['name' => $type],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

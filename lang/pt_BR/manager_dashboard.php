@@ -8,9 +8,10 @@ return [
     'subtitle'       => 'Painel administrativo do sistema — visão geral de todas as clínicas',
 
     // Header buttons
-    'btn_entities' => 'Empresas',
-    'btn_plans'    => 'Planos',
-    'btn_partners' => 'Parceiros',
+    'btn_entities'     => 'Empresas',
+    'btn_plans'        => 'Planos',
+    'btn_partners'     => 'Parceiros',
+    'btn_ai_providers' => 'Provedores de IA',
 
     // KPIs primários
     'kpi_entities'    => 'Clínicas',
@@ -60,8 +61,8 @@ return [
     'conv_rate'               => 'Taxa',
 
     // Trials expirando
-    'trials_expiring'      => 'Trials Expirando em 7 Dias',
-    'no_trials_expiring'   => 'Nenhum trial expirando nos próximos 7 dias',
+    'trials_expiring'    => 'Trials Expirando em 7 Dias',
+    'no_trials_expiring' => 'Nenhum trial expirando nos próximos 7 dias',
 
     // Últimas clínicas
     'recent_entities' => 'Últimas Clínicas Cadastradas',

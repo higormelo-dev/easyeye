@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
@@ -8,6 +8,7 @@ use App\Enums\DataAccessPurpose;
 use App\Models\DataAccessLog;
 use App\Support\AuditContext;
 use Illuminate\Database\Eloquent\Model;
+use Log;
 
 class DataAccessLogService
 {
@@ -15,10 +16,10 @@ class DataAccessLogService
      * Registra o acesso (leitura) a um recurso sensível.
      * CFM Res. 2.227/2018 + LGPD Art. 37.
      *
-     * @param  Model                $resource      Model acessado (MedicalRecord, PatientExam…)
-     * @param  DataAccessPurpose    $purpose        Finalidade do acesso
-     * @param  string|null          $justification  Obrigatório para EmergencyAccess
-     * @param  string|null          $patientId      UUID do paciente; inferido automaticamente se possível
+     * @param Model             $resource      Model acessado (MedicalRecord, PatientExam…)
+     * @param DataAccessPurpose $purpose       Finalidade do acesso
+     * @param string|null       $justification Obrigatório para EmergencyAccess
+     * @param string|null       $patientId     UUID do paciente; inferido automaticamente se possível
      */
     public function log(
         Model $resource,
@@ -27,7 +28,7 @@ class DataAccessLogService
         ?string $patientId = null,
     ): void {
         if ($purpose->requiresJustification() && blank($justification)) {
-            \Log::warning('DataAccessLogService: acesso emergencial sem justificativa', [
+            Log::warning('DataAccessLogService: acesso emergencial sem justificativa', [
                 'resource' => get_class($resource),
                 'id'       => $resource->getKey(),
                 'user_id'  => AuditContext::userId(),

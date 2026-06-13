@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\{BillingBatchRequest, BillingIndividualRequest};
 use App\Models\{BillingBatch, BillingClaim, Covenant, Entity, Schedule};
 use App\Services\Financial\BillingService;
+use BackedEnum;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\{DB, Gate, Storage};
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -100,39 +101,39 @@ class BillingController extends Controller
 
         return Inertia::render('Panel/Financial/Billing/Index', [
             'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'),  'url' => route('panel.dashboard'),                'active' => false],
-                ['label' => __('financial.financial'),         'url' => route('panel.financial.billing.index'), 'active' => false],
-                ['label' => __('financial.billing.breadcrumb'),'url' => '#',                                    'active' => true],
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('financial.financial'), 'url' => route('panel.financial.billing.index'), 'active' => false],
+                ['label' => __('financial.billing.breadcrumb'), 'url' => '#', 'active' => true],
             ],
             'eligibleSchedules' => $eligibleSchedules->map(fn ($s) => [
-                'id'             => $s->id,
-                'date_time'      => $s->date_time?->format('d/m/Y H:i'),
-                'patient_name'   => $s->patient?->person?->name,
-                'doctor_name'    => $s->doctor?->name,
-                'covenant_name'  => $s->covenant?->name,
-                'covenant_id'    => $s->covenant_id,
-                'visit_type'     => $s->visitType?->name,
+                'id'            => $s->id,
+                'date_time'     => $s->date_time?->format('d/m/Y H:i'),
+                'patient_name'  => $s->patient?->person?->name,
+                'doctor_name'   => $s->doctor?->name,
+                'covenant_name' => $s->covenant?->name,
+                'covenant_id'   => $s->covenant_id,
+                'visit_type'    => $s->visitType?->name,
             ]),
             'claims' => $claims->map(fn ($c) => [
-                'id'             => $c->id,
-                'created_at'     => $c->created_at?->format('d/m/Y H:i'),
-                'patient_name'   => $c->patient?->person?->name,
-                'doctor_name'    => $c->doctor?->name,
-                'covenant_name'  => $c->covenant?->name,
-                'batch_id'       => $c->batch_id,
-                'status'         => $c->status instanceof \BackedEnum ? $c->status->value : $c->status,
-                'amount'         => (float) ($c->amount ?? 0),
-                'mark_paid_url'  => route('panel.financial.billing.claims.markPaid', $c->id),
-                'mark_denied_url'=> route('panel.financial.billing.claims.markDenied', $c->id),
+                'id'              => $c->id,
+                'created_at'      => $c->created_at?->format('d/m/Y H:i'),
+                'patient_name'    => $c->patient?->person?->name,
+                'doctor_name'     => $c->doctor?->name,
+                'covenant_name'   => $c->covenant?->name,
+                'batch_id'        => $c->batch_id,
+                'status'          => $c->status instanceof BackedEnum ? $c->status->value : $c->status,
+                'amount'          => (float) ($c->amount ?? 0),
+                'mark_paid_url'   => route('panel.financial.billing.claims.markPaid', $c->id),
+                'mark_denied_url' => route('panel.financial.billing.claims.markDenied', $c->id),
             ]),
             'batches' => $batches->map(fn ($b) => [
                 'id'            => $b->id,
                 'created_at'    => $b->created_at?->format('d/m/Y H:i'),
                 'covenant_name' => $b->covenant?->name,
                 'claims_count'  => (int) $b->claims_count,
-                'status'        => $b->status instanceof \BackedEnum ? $b->status->value : $b->status,
+                'status'        => $b->status instanceof BackedEnum ? $b->status->value : $b->status,
                 'submit_url'    => route('panel.financial.billing.batches.submit', $b->id),
-                'xml_url'       => route('panel.financial.billing.batches.xml',    $b->id),
+                'xml_url'       => route('panel.financial.billing.batches.xml', $b->id),
             ]),
             'covenants'           => $covenants->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]),
             'filters'             => ['from' => $from, 'to' => $to],

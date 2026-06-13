@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Gerenciado exclusivamente pelo painel do SaaS owner (/manager/gateways).
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('entity_gateway_access', function (Blueprint $table) {
@@ -30,7 +30,7 @@ return new class () extends Migration {
 
             $table->unique(['entity_id', 'gateway_id'], 'entity_gateway_access_unique');
             $table->index(['gateway_id', 'enabled'], 'entity_gateway_access_gateway_enabled_idx');
-            $table->index(['entity_id', 'enabled'],  'entity_gateway_access_entity_enabled_idx');
+            $table->index(['entity_id', 'enabled'], 'entity_gateway_access_entity_enabled_idx');
         });
     }
 

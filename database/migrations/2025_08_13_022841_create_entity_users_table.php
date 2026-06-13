@@ -4,14 +4,13 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class() extends Migration {
     /**
      * Roles disponíveis (App\Enums\EntityUserRole — criar):
      *   owner  : criador da empresa; único por empresa; não removível
      *   admin  : gerencia usuários e configurações
      *   member : acesso operacional completo
      *   viewer : somente leitura
-     *
      */
     public function up(): void
     {

@@ -2,11 +2,12 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\Entity;
+use App\Models\{Entity, Partner};
 use App\Support\PanelNavigation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Storage, Vite};
 use Inertia\Middleware;
+use Tighten\Ziggy\Ziggy;
 
 class HandleInertiaRequests extends Middleware
 {
@@ -49,7 +50,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
 
             'ziggy' => function () use ($request) {
-                return array_merge((new \Tighten\Ziggy\Ziggy)->toArray(), [
+                return array_merge((new Ziggy())->toArray(), [
                     'location' => $request->url(),
                 ]);
             },
@@ -146,11 +147,13 @@ class HandleInertiaRequests extends Middleware
     private function portalPartnerProps(): ?array
     {
         $partnerId = session('portal_partner_id');
+
         if (! $partnerId) {
             return null;
         }
 
-        $partner = \App\Models\Partner::find($partnerId);
+        $partner = Partner::find($partnerId);
+
         if (! $partner) {
             return null;
         }

@@ -12,15 +12,15 @@ class EnsureEntitySelected
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param Closure(Request): (Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!Auth::check()) {
+        if (! Auth::check()) {
             return redirect()->route('login');
         }
 
-        if (!session('selected_entity_user_id')) {
+        if (! session('selected_entity_user_id')) {
             if (count(Auth::user()->entityUsers) > 1) {
                 return redirect()->route('selectentity.create');
             }

@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue';
 import { useForm, router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import ConfirmationWithReasonModal from '@/Components/Panel/ConfirmationWithReasonModal.vue';
 import { useConfirmationWithReason } from '@/composables/useConfirmationWithReason.js';
 
@@ -139,6 +140,17 @@ const tabErrors = computed(() => ({
     endereco: ['zipcode','address','number','complement','district','city','state','country'].some(k => k in form.errors),
     config:   ['schedule_interval','active'].some(k => k in form.errors),
 }));
+
+const scheduleIntervalOptions = computed(() => [
+    { value: 15, label: props.t.interval_15 },
+    { value: 20, label: props.t.interval_20 },
+    { value: 30, label: props.t.interval_30 },
+]);
+
+const statusOptions = computed(() => [
+    { value: true,  label: props.t.status_option_active },
+    { value: false, label: props.t.status_option_inactive },
+]);
 </script>
 
 <template>
@@ -288,18 +300,23 @@ const tabErrors = computed(() => ({
                 <div class="row g-3">
                     <div class="col-6">
                         <label class="form-label">{{ t.field_schedule_interval }}</label>
-                        <select v-model.number="form.schedule_interval" class="form-select">
-                            <option :value="15">{{ t.interval_15 }}</option>
-                            <option :value="20">{{ t.interval_20 }}</option>
-                            <option :value="30">{{ t.interval_30 }}</option>
-                        </select>
+                        <SearchSelect
+                            v-model="form.schedule_interval"
+                            :options="scheduleIntervalOptions"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :clearable="false"
+                        />
                     </div>
                     <div v-if="isEdit" class="col-6">
                         <label class="form-label">{{ t.field_status }}</label>
-                        <select v-model="form.active" class="form-select">
-                            <option :value="true">{{ t.status_option_active }}</option>
-                            <option :value="false">{{ t.status_option_inactive }}</option>
-                        </select>
+                        <SearchSelect
+                            v-model="form.active"
+                            :options="statusOptions"
+                            :value-key="'value'"
+                            :label-key="'label'"
+                            :clearable="false"
+                        />
                     </div>
                 </div>
                 <div v-if="!isEdit" class="alert alert-info small mt-3 py-2">

@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
@@ -27,10 +27,10 @@ class AuditService
     /**
      * Registra um evento de auditoria para o model dado.
      *
-     * @param  string      $event  created | updated | deleted | restored
-     * @param  Model       $model  O model afetado
-     * @param  array|null  $old    Valores anteriores (null em created/restored)
-     * @param  array|null  $new    Valores novos (null em deleted)
+     * @param string     $event created | updated | deleted | restored
+     * @param Model      $model O model afetado
+     * @param array|null $old   Valores anteriores (null em created/restored)
+     * @param array|null $new   Valores novos (null em deleted)
      */
     public function log(string $event, Model $model, ?array $old, ?array $new): void
     {
@@ -55,7 +55,7 @@ class AuditService
 
     /**
      * Resolve o entity_id para o log.
-     * Prioridade: sessão ativa → coluna entity_id no model → null
+     * Prioridade: sessão ativa → coluna entity_id no model → null.
      */
     private function resolveEntityId(Model $model): ?string
     {

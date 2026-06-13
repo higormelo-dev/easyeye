@@ -35,8 +35,8 @@ class SurgeryTypeService extends BaseSettingService
             ->withTrashed()
             ->where([
                 ['entity_id', '=', session()->get('selected_entity_id')],
-                ['category',  '=', $request->category],
-                ['name',      '=', $request->name],
+                ['category', '=', $request->category],
+                ['name', '=', $request->name],
             ])
             ->first();
 

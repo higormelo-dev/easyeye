@@ -10,10 +10,7 @@ use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
 use BaconQrCode\Writer;
 use Illuminate\Contracts\Encryption\DecryptException;
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\{Crypt, DB, Hash, Log};
 use Illuminate\Support\Str;
 use JsonException;
 use PragmaRX\Google2FA\Google2FA;
@@ -209,6 +206,7 @@ class TwoFactorService
             $raw = $user->two_factor_recovery_codes;
         } catch (DecryptException $e) {
             $this->logCorruption($user, 'two_factor_recovery_codes', $e);
+
             return false;
         }
 
@@ -269,6 +267,7 @@ class TwoFactorService
             $secret = $user->two_factor_secret;
         } catch (DecryptException $e) {
             $this->logCorruption($user, 'two_factor_secret', $e);
+
             return null;
         }
 

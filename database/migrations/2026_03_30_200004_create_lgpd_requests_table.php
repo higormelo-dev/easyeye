@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * portabilidade, eliminação, revogação de consentimento e informação.
  * Art. 23 — prazo de resposta: 15 dias.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('lgpd_requests', function (Blueprint $table) {

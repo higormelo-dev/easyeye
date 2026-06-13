@@ -1,12 +1,13 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
 use App\Enums\ActivationStep;
 use App\Models\{Entity, EntityActivation};
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Rastreia os marcos de ativação de cada clínica durante o trial.
@@ -29,7 +30,7 @@ class ActivationService
                 ['entity_id' => $entityId, 'step' => $step->value],
                 ['completed_at' => now()],
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Não deve bloquear a operação principal que gerou o evento
             Log::warning('ActivationService: falha ao registrar etapa.', [
                 'entity_id' => $entityId,
@@ -95,7 +96,7 @@ class ActivationService
 
         return array_values(array_filter(
             ActivationStep::ordered(),
-            fn (ActivationStep $step) => !in_array($step->value, $completedValues, true),
+            fn (ActivationStep $step) => ! in_array($step->value, $completedValues, true),
         ));
     }
 

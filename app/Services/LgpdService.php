@@ -1,11 +1,12 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
 use App\Enums\{LgpdRequestStatus, LgpdRequestType};
 use App\Models\{EntityUser, LgpdRequest, Patient};
+use Illuminate\Database\Eloquent\Collection;
 
 class LgpdService
 {
@@ -75,9 +76,9 @@ class LgpdService
      * Retorna solicitações abertas e vencidas (prazo expirado sem resposta).
      * Deve ser exibido como alerta no painel do gestor.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<LgpdRequest>
+     * @return Collection<LgpdRequest>
      */
-    public function overdueRequests(string $entityId): \Illuminate\Database\Eloquent\Collection
+    public function overdueRequests(string $entityId): Collection
     {
         return LgpdRequest::query()
             ->where('entity_id', $entityId)

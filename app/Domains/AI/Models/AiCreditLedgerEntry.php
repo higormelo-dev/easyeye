@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Models;
 
-use App\Enums\AI\AiLedgerEntryType;
-use App\Models\Entity;
-use App\Models\Subscription;
-use App\Models\User;
+use App\Enums\AI\{AiLedgerEntryType, AiProvider};
+use App\Models\{Entity, Subscription, User};
 use App\Traits\Auditable;
+use Database\Factories\AI\AiCreditLedgerEntryFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +27,7 @@ class AiCreditLedgerEntry extends Model
         'subscription_id',
         'ai_run_id',
         'type',
+        'provider',
         'amount',
         'balance_after',
         'description',
@@ -40,6 +40,7 @@ class AiCreditLedgerEntry extends Model
     {
         return [
             'type'          => AiLedgerEntryType::class,
+            'provider'      => AiProvider::class,
             'amount'        => 'integer',
             'balance_after' => 'integer',
             'metadata'      => 'array',
@@ -73,8 +74,8 @@ class AiCreditLedgerEntry extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    protected static function newFactory(): \Database\Factories\AI\AiCreditLedgerEntryFactory
+    protected static function newFactory(): AiCreditLedgerEntryFactory
     {
-        return \Database\Factories\AI\AiCreditLedgerEntryFactory::new();
+        return AiCreditLedgerEntryFactory::new();
     }
 }

@@ -31,6 +31,7 @@ abstract class Controller
 
     /**
      * Get update message based on request type.
+     * Get update message based on request type.
      */
     protected function getUpdateMessage(Request $request): string
     {

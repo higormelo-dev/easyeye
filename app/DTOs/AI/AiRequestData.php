@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\DTOs\AI;
 
-use App\Enums\AI\AiRiskLevel;
-use App\Enums\AI\AiRunMode;
+use App\Enums\AI\{AiRiskLevel, AiRunMode};
 
 readonly class AiRequestData
 {
     /**
-     * @param array<string, mixed> $context
+     * @param array<string, mixed>       $context
      * @param list<array<string, mixed>> $attachments
-     * @param array<string, mixed> $metadata
+     * @param array<string, mixed>       $metadata
      */
     public function __construct(
         public string $workflow,

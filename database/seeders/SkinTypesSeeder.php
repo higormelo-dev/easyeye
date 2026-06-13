@@ -17,7 +17,7 @@ class SkinTypesSeeder extends Seeder
         foreach ($skinTypes as $skinType) {
             SkinType::query()->firstOrCreate(
                 ['name' => $skinType],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

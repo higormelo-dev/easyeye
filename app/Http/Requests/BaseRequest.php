@@ -24,7 +24,7 @@ abstract class BaseRequest extends FormRequest
                 response()->json([
                     'message' => 'Os dados informados são inválidos.',
                     'errors'  => $validator->errors(),
-                ], 422)
+                ], 422),
             );
         }
 

@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
  *   {{DATA_ATUAL}}         → carbon format d/m/Y
  *   {{DATA_EXTENSO}}       → carbon format por extenso
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('report_setting_variables', function (Blueprint $table) {

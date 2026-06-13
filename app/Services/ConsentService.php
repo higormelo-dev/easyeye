@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Services;
 
@@ -14,11 +14,11 @@ class ConsentService
      * Registra o consentimento de um paciente.
      * LGPD Art. 8 — o consentimento deve ser livre, informado e inequívoco.
      *
-     * @param  Patient     $patient        Paciente titular
-     * @param  ConsentType $type           Tipo de consentimento
-     * @param  EntityUser  $collectedBy    Profissional que coletou o consentimento
-     * @param  string      $channel        Canal: in_person | digital | phone
-     * @param  string|null $documentVersion Versão da política de privacidade vigente
+     * @param Patient     $patient         Paciente titular
+     * @param ConsentType $type            Tipo de consentimento
+     * @param EntityUser  $collectedBy     Profissional que coletou o consentimento
+     * @param string      $channel         Canal: in_person | digital | phone
+     * @param string|null $documentVersion Versão da política de privacidade vigente
      */
     public function grant(
         Patient $patient,
@@ -106,12 +106,12 @@ class ConsentService
     {
         $required = array_filter(
             ConsentType::cases(),
-            fn (ConsentType $type) => $type->isRequired()
+            fn (ConsentType $type) => $type->isRequired(),
         );
 
         return array_values(array_filter(
             $required,
-            fn (ConsentType $type) => !$this->hasActiveConsent($patient, $type)
+            fn (ConsentType $type) => ! $this->hasActiveConsent($patient, $type),
         ));
     }
 
@@ -129,7 +129,7 @@ class ConsentService
     ): array {
         return array_map(
             fn (ConsentType $type) => $this->grant($patient, $type, $collectedBy, $channel, $documentVersion),
-            array_filter(ConsentType::cases(), fn ($t) => $t->isRequired())
+            array_filter(ConsentType::cases(), fn ($t) => $t->isRequired()),
         );
     }
 

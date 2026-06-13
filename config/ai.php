@@ -81,10 +81,23 @@ return [
 
         // Pisos específicos por workflow.
         'minimum_credits_by_workflow' => [
-            'exam_assistant'   => (int) env('AI_MIN_CREDITS_EXAM_ASSISTANT', 3),
-            'report_drafting'  => (int) env('AI_MIN_CREDITS_REPORT_DRAFTING', 2),
-            'consensus_review' => (int) env('AI_MIN_CREDITS_CONSENSUS_REVIEW', 5),
+            'exam_assistant'     => (int) env('AI_MIN_CREDITS_EXAM_ASSISTANT', 3),
+            'report_drafting'    => (int) env('AI_MIN_CREDITS_REPORT_DRAFTING', 2),
+            'consensus_review'   => (int) env('AI_MIN_CREDITS_CONSENSUS_REVIEW', 5),
+            'eye_image_analysis' => (int) env('AI_MIN_CREDITS_EYE_IMAGE', 4),
         ],
+    ],
+
+    // Análise de imagem ocular (módulo Eye Image).
+    'eye_image' => [
+        // Máximo de imagens por execução (limita custo e tamanho do payload inline).
+        'max_images' => (int) env('AI_EYE_IMAGE_MAX_IMAGES', 4),
+        // Maior dimensão (px) após downscale antes de enviar ao modelo.
+        'max_dimension' => (int) env('AI_EYE_IMAGE_MAX_DIMENSION', 1568),
+        // Tamanho máximo do arquivo de origem no S3 (MB) — acima disso, ignora.
+        'max_source_mb' => (int) env('AI_EYE_IMAGE_MAX_SOURCE_MB', 25),
+        // Tokens de entrada estimados por imagem (sobretaxa na estimativa de crédito).
+        'tokens_per_image' => (int) env('AI_EYE_IMAGE_TOKENS_PER_IMAGE', 300),
     ],
 
     'credit_purchases' => [

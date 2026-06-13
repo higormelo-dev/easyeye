@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\{DB, Schema};
  * Migração de dados: registros existentes com diagnosis_cid10 preenchido
  * são convertidos para o novo formato JSON automaticamente.
  */
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::table('medical_records', function (Blueprint $table) {
@@ -53,8 +53,9 @@ return new class () extends Migration {
             ->whereNotNull('diagnosis_cids')
             ->lazyById()
             ->each(function ($record) {
-                $cids = json_decode($record->diagnosis_cids, true);
+                $cids  = json_decode($record->diagnosis_cids, true);
                 $first = $cids[0] ?? null;
+
                 if ($first) {
                     DB::table('medical_records')
                         ->where('id', $record->id)

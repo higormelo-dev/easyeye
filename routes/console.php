@@ -51,3 +51,15 @@ Schedule::call(function () {
         ->select('id')
         ->each(fn ($schedule) => RetryFailedPaymentJob::dispatch($schedule->id));
 })->twiceDaily(9, 15)->name('billing:retry')->withoutOverlapping();
+
+// Onda 4, C5 — Notifica médicos sobre runs em WaitingApproval há >24h.
+Schedule::command('ai:notify-waiting-approval')
+    ->dailyAt('07:00')
+    ->name('ai:notify-waiting-approval')
+    ->withoutOverlapping();
+
+// Onda 4, C6 — Purga feedbacks antigos para conformidade LGPD (>90 dias).
+Schedule::command('ai:purge-feedbacks')
+    ->weeklyOn(0, '03:00')
+    ->name('ai:purge-feedbacks')
+    ->withoutOverlapping();

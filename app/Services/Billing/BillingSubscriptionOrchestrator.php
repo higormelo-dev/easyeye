@@ -3,15 +3,15 @@
 namespace App\Services\Billing;
 
 use App\Contracts\Billing\PaymentGatewayInterface;
-use App\DTOs\Billing\{CancelSubscriptionDTO, CreateChargeDTO, CreateSubscriptionDTO, CustomerDTO, GatewayCallContext};
-use App\Enums\Billing\{BillingEventType, CancellationReason, InvoiceStatus, PaymentAttemptStatus, PaymentStatus};
+use App\DTOs\Billing\{CreateChargeDTO, CreateSubscriptionDTO, CustomerDTO, GatewayCallContext};
+use App\DTOs\Billing\{CreateChargeResultDTO, CreateSubscriptionResultDTO};
+use App\Enums\Billing\{BillingEventType, InvoiceStatus, PaymentAttemptStatus, PaymentStatus};
 use App\Enums\{BillingCycle, SubscriptionStatus};
 use App\Exceptions\Billing\GatewayIntegrationException;
-use App\Models\Billing\{Cancellation, Invoice, Payment, PaymentAttempt, SubscriptionChange};
+use App\Models\Billing\Gateway;
+use App\Models\Billing\{Invoice, Payment, PaymentAttempt, SubscriptionChange};
 use App\Models\{Entity, Plan, Subscription};
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\{DB, Log};
 
 class BillingSubscriptionOrchestrator
 {
@@ -68,6 +68,7 @@ class BillingSubscriptionOrchestrator
             );
         } catch (GatewayIntegrationException $e) {
             $this->persistActivationFailure($subscription, $invoice, $e->getMessage(), $correlationId);
+
             throw $e;
         }
 
@@ -163,7 +164,7 @@ class BillingSubscriptionOrchestrator
      * Em falha, tenta o fallback gateway configurado.
      * Se ambos falharem, propaga a exceção.
      *
-     * @return array{0: PaymentGatewayInterface, 1: string, 2: \App\DTOs\Billing\CreateSubscriptionResultDTO, 3: \App\DTOs\Billing\CreateChargeResultDTO}
+     * @return array{0: PaymentGatewayInterface, 1: string, 2: CreateSubscriptionResultDTO, 3: CreateChargeResultDTO}
      */
     private function executeGatewayFlow(
         Entity $entity,
@@ -389,8 +390,15 @@ class BillingSubscriptionOrchestrator
         string $correlationId,
     ): Subscription {
         return DB::transaction(function () use (
-            $entity, $subscription, $invoice, $plan,
-            $gateway, $customerId, $externalSub, $charge, $correlationId
+            $entity,
+            $subscription,
+            $invoice,
+            $plan,
+            $gateway,
+            $customerId,
+            $externalSub,
+            $charge,
+            $correlationId
         ): Subscription {
             $gatewayCode   = $gateway->code();
             $paymentStatus = $this->mapPaymentStatus($charge->status);
@@ -398,7 +406,7 @@ class BillingSubscriptionOrchestrator
             $isPaid        = $paymentStatus === PaymentStatus::Paid;
 
             // Resolve gateway_id FK para popular nas tabelas
-            $gatewayId = \App\Models\Billing\Gateway::where('code', $gatewayCode)->value('id');
+            $gatewayId = Gateway::where('code', $gatewayCode)->value('id');
 
             // Attempt
             $attempt = PaymentAttempt::create([
@@ -456,30 +464,30 @@ class BillingSubscriptionOrchestrator
             $billingState = $isPaid ? 'paid' : 'past_due';
 
             $subscription->update([
-                'status'                   => $newStatus,
-                'billing_state'            => $billingState,
-                'gateway'                  => $gatewayCode,
-                'pinned_gateway'           => $gatewayCode,
-                'gateway_customer_id'      => $customerId,
-                'gateway_subscription_id'  => $externalSub->externalSubscriptionId,
-                'gateway_payload'          => $this->sanitize($externalSub->rawResponse),
-                'last_billing_error'       => $charge->errorMessage,
-                'last_payment_at'          => $isPaid ? now() : null,
-                'past_due_at'              => (! $isPaid) ? now() : null,
-                'idempotency_key'          => $invoice->idempotency_key,
-                'correlation_id'           => $correlationId,
+                'status'                  => $newStatus,
+                'billing_state'           => $billingState,
+                'gateway'                 => $gatewayCode,
+                'pinned_gateway'          => $gatewayCode,
+                'gateway_customer_id'     => $customerId,
+                'gateway_subscription_id' => $externalSub->externalSubscriptionId,
+                'gateway_payload'         => $this->sanitize($externalSub->rawResponse),
+                'last_billing_error'      => $charge->errorMessage,
+                'last_payment_at'         => $isPaid ? now() : null,
+                'past_due_at'             => (! $isPaid) ? now() : null,
+                'idempotency_key'         => $invoice->idempotency_key,
+                'correlation_id'          => $correlationId,
             ]);
 
             // SubscriptionChange — audit de ativação/troca de plano
             SubscriptionChange::create([
-                'entity_id'       => $entity->id,
-                'subscription_id' => $subscription->id,
-                'new_plan_id'     => $plan->id,
-                'new_gateway_code'=> $gatewayCode,
-                'change_type'     => 'activation',
-                'reason'          => 'Ativação via gateway',
-                'effective_at'    => now(),
-                'correlation_id'  => $correlationId,
+                'entity_id'        => $entity->id,
+                'subscription_id'  => $subscription->id,
+                'new_plan_id'      => $plan->id,
+                'new_gateway_code' => $gatewayCode,
+                'change_type'      => 'activation',
+                'reason'           => 'Ativação via gateway',
+                'effective_at'     => now(),
+                'correlation_id'   => $correlationId,
             ]);
 
             // Financial events
@@ -601,13 +609,13 @@ class BillingSubscriptionOrchestrator
     private function mapPaymentStatus(?string $status): PaymentStatus
     {
         return match ($status) {
-            'paid', 'succeeded', 'approved'          => PaymentStatus::Paid,
-            'authorized'                              => PaymentStatus::Authorized,
-            'cancelled', 'canceled'                  => PaymentStatus::Cancelled,
-            'refunded'                               => PaymentStatus::Refunded,
-            'chargeback'                             => PaymentStatus::Chargeback,
+            'paid', 'succeeded', 'approved' => PaymentStatus::Paid,
+            'authorized' => PaymentStatus::Authorized,
+            'cancelled', 'canceled' => PaymentStatus::Cancelled,
+            'refunded'   => PaymentStatus::Refunded,
+            'chargeback' => PaymentStatus::Chargeback,
             'failed', 'error', 'declined', 'refused' => PaymentStatus::Failed,
-            default                                  => PaymentStatus::Pending,
+            default => PaymentStatus::Pending,
         };
     }
 
@@ -619,11 +627,11 @@ class BillingSubscriptionOrchestrator
 
         return match ($status) {
             'paid', 'succeeded', 'approved' => InvoiceStatus::Paid,
-            'cancelled', 'canceled'         => InvoiceStatus::Cancelled,
-            'refunded'                      => InvoiceStatus::Refunded,
-            'failed', 'declined'            => InvoiceStatus::Failed,
-            'overdue'                       => InvoiceStatus::Overdue,
-            default                         => InvoiceStatus::Pending,
+            'cancelled', 'canceled' => InvoiceStatus::Cancelled,
+            'refunded' => InvoiceStatus::Refunded,
+            'failed', 'declined' => InvoiceStatus::Failed,
+            'overdue' => InvoiceStatus::Overdue,
+            default   => InvoiceStatus::Pending,
         };
     }
 

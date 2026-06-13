@@ -28,7 +28,7 @@ class VisitTypesSeeder extends Seeder
 
             VisitType::query()->updateOrCreate(
                 ['name' => $name],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

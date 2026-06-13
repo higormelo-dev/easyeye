@@ -17,7 +17,7 @@ class IrisTypesSeeder extends Seeder
         foreach ($irisTypes as $irisType) {
             IrisType::query()->firstOrCreate(
                 ['name' => $irisType],
-                ['active' => true]
+                ['active' => true],
             );
         }
     }

@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class () extends Migration {
+return new class() extends Migration {
     public function up(): void
     {
         Schema::create('tiss_batches', function (Blueprint $table) {
@@ -79,7 +79,7 @@ return new class () extends Migration {
 
             $table->unique(
                 ['entity_id', 'operator_id', 'guide_number_provider'],
-                'tiss_guides_entity_operator_provider_number_unique'
+                'tiss_guides_entity_operator_provider_number_unique',
             );
             $table->index(['entity_id', 'status', 'attendance_date'], 'tiss_guides_entity_status_attendance_idx');
             $table->index(['entity_id', 'guide_type', 'due_date'], 'tiss_guides_entity_type_due_idx');
@@ -129,7 +129,7 @@ return new class () extends Migration {
 
             $table->unique(
                 ['entity_id', 'parent_guide_id', 'child_guide_id', 'link_type'],
-                'tiss_guide_links_entity_parent_child_type_unique'
+                'tiss_guide_links_entity_parent_child_type_unique',
             );
             $table->index(['entity_id', 'link_type'], 'tiss_guide_links_entity_type_idx');
         });

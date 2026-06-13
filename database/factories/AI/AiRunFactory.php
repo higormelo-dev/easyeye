@@ -3,11 +3,8 @@
 namespace Database\Factories\AI;
 
 use App\Domains\AI\Models\AiRun;
-use App\Enums\AI\AiRiskLevel;
-use App\Enums\AI\AiRunMode;
-use App\Enums\AI\AiRunStatus;
-use App\Models\Entity;
-use App\Models\User;
+use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
+use App\Models\{Entity, User};
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**

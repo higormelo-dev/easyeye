@@ -47,4 +47,11 @@ return [
     'landscape'   => 'Landscape',
     'close_btn'   => 'Close',
     'report_date' => 'Report date:',
+
+    // AI — ocular image analysis
+    'ai_analyze'         => 'Analyze with AI',
+    'ai_selected_images' => 'Selected images',
+    'ai_no_selection'    => 'Select at least one image to analyze.',
+    'ai_report'          => 'AI report',
+    'ai_reported_badge'  => 'Reported (AI)',
 ];

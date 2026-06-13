@@ -7718,16 +7718,16 @@ class CovenantsSeeder extends Seeder
                     'name'              => (string) mb_convert_case(
                         ($item['nome_fantasia'] ?? $item['razao_social']),
                         MB_CASE_TITLE,
-                        'UTF-8'
+                        'UTF-8',
                     ),
                     'company_name' => (string) mb_convert_case(
                         $item['razao_social'],
                         MB_CASE_TITLE,
-                        'UTF-8'
+                        'UTF-8',
                     ),
                     'table'  => true,
                     'active' => true,
-                ]
+                ],
             );
         }
     }

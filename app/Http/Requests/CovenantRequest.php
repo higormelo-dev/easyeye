@@ -106,7 +106,7 @@ class CovenantRequest extends FormRequest
             $merge['active'] = $this->normalizeBoolean($this->input('active'));
         }
 
-        if (!empty($merge)) {
+        if (! empty($merge)) {
             $this->merge($merge);
         }
     }
@@ -121,7 +121,7 @@ class CovenantRequest extends FormRequest
             return (bool) $value;
         }
 
-        if (!is_string($value)) {
+        if (! is_string($value)) {
             return $value;
         }
 

@@ -11,8 +11,8 @@ use Laracasts\Presenter\PresentableTrait;
 
 class SurgeryType extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasEntityCode;
     use HasUppercaseName;
     use HasUuids;

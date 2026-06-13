@@ -11,17 +11,18 @@ namespace App\Enums;
 enum FeatureKey: string
 {
     // Limites quantitativos (integer, 0 = ilimitado)
-    case MaxUsers      = 'max_users';
-    case MaxPatients   = 'max_patients';
-    case MaxDoctors    = 'max_doctors';
-    case MaxStorageGB  = 'max_storage_gb'; // Armazenamento total em GB (0 = ilimitado)
+    case MaxUsers     = 'max_users';
+    case MaxPatients  = 'max_patients';
+    case MaxDoctors   = 'max_doctors';
+    case MaxStorageGB = 'max_storage_gb'; // Armazenamento total em GB (0 = ilimitado)
 
     // Features booleanas
-    case HasAiExamAssistant     = 'has_ai_exam_assistant';
-    case HasAiReportDrafting    = 'has_ai_report_drafting';
-    case HasAiConsensus         = 'has_ai_consensus';
-    case HasApiIntegrator       = 'has_api_integrator';
-    case HasOwnPaymentGateways  = 'has_own_payment_gateways';
+    case HasAiExamAssistant    = 'has_ai_exam_assistant';
+    case HasAiReportDrafting   = 'has_ai_report_drafting';
+    case HasAiConsensus        = 'has_ai_consensus';
+    case HasAiEyeImageAnalysis = 'has_ai_eye_image_analysis';
+    case HasApiIntegrator      = 'has_api_integrator';
+    case HasOwnPaymentGateways = 'has_own_payment_gateways';
 
     // Limites mensais de créditos IA (integer, 0 = ilimitado)
     case AiMonthlyCredits = 'ai_monthly_credits';
@@ -32,17 +33,18 @@ enum FeatureKey: string
     public function label(): string
     {
         return match ($this) {
-            self::MaxUsers            => __('subscriptions.features.max_users'),
-            self::MaxPatients         => __('subscriptions.features.max_patients'),
-            self::MaxDoctors          => __('subscriptions.features.max_doctors'),
-            self::MaxStorageGB        => __('subscriptions.features.max_storage_gb'),
+            self::MaxUsers              => __('subscriptions.features.max_users'),
+            self::MaxPatients           => __('subscriptions.features.max_patients'),
+            self::MaxDoctors            => __('subscriptions.features.max_doctors'),
+            self::MaxStorageGB          => __('subscriptions.features.max_storage_gb'),
             self::HasAiExamAssistant    => __('subscriptions.features.has_ai_exam_assistant'),
             self::HasAiReportDrafting   => __('subscriptions.features.has_ai_report_drafting'),
             self::HasAiConsensus        => __('subscriptions.features.has_ai_consensus'),
+            self::HasAiEyeImageAnalysis => __('subscriptions.features.has_ai_eye_image_analysis'),
             self::HasApiIntegrator      => __('subscriptions.features.has_api_integrator'),
             self::HasOwnPaymentGateways => __('subscriptions.features.has_own_payment_gateways'),
-            self::AiMonthlyCredits    => __('subscriptions.features.ai_monthly_credits'),
-            self::ApiMonthlyExamSends => __('subscriptions.features.api_monthly_exam_sends'),
+            self::AiMonthlyCredits      => __('subscriptions.features.ai_monthly_credits'),
+            self::ApiMonthlyExamSends   => __('subscriptions.features.api_monthly_exam_sends'),
         };
     }
 
@@ -53,6 +55,7 @@ enum FeatureKey: string
             self::HasAiExamAssistant,
             self::HasAiReportDrafting,
             self::HasAiConsensus,
+            self::HasAiEyeImageAnalysis,
             self::HasApiIntegrator,
             self::HasOwnPaymentGateways,
         ]);
@@ -61,7 +64,7 @@ enum FeatureKey: string
     /** True = chave representa um limite numérico (0 = ilimitado). */
     public function isNumeric(): bool
     {
-        return !$this->isBoolean();
+        return ! $this->isBoolean();
     }
 
     /** True = limite deve ser redefinido mensalmente (créditos IA). */

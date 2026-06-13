@@ -33,7 +33,7 @@ class LensesController extends BaseSettingController
     protected function getFormFields(): array
     {
         return [
-            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text',     'required' => true],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'required' => true],
             ['key' => 'away', 'label' => __('actions.away'), 'type' => 'checkbox'],
             ['key' => 'near', 'label' => __('actions.near'), 'type' => 'checkbox'],
         ];

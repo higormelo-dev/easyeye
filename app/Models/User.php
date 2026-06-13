@@ -19,6 +19,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /** @use HasFactory<UserFactory> */
     use HasAuditColumns;
+
     use HasEntityRoles;
     use HasFactory;
     use HasUuids;

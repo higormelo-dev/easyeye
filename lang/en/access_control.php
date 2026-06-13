@@ -53,14 +53,14 @@ return [
     'form_title_create' => 'New User',
     'form_title_edit'   => 'Edit User',
 
-    'field_name'            => 'Full name',
-    'field_email'           => 'E-mail',
-    'field_role'            => 'Access role',
-    'field_role_placeholder'=> 'Select a role',
-    'field_active'          => 'Active user',
-    'field_password'        => 'Password',
-    'field_password_hint'   => 'Minimum 8 characters, with uppercase, lowercase, numbers and symbols.',
-    'field_password_confirm'=> 'Confirm password',
+    'field_name'             => 'Full name',
+    'field_email'            => 'E-mail',
+    'field_role'             => 'Access role',
+    'field_role_placeholder' => 'Select a role',
+    'field_active'           => 'Active user',
+    'field_password'         => 'Password',
+    'field_password_hint'    => 'Minimum 8 characters, with uppercase, lowercase, numbers and symbols.',
+    'field_password_confirm' => 'Confirm password',
 
     'credentials_info' => 'The user will receive these credentials to access the system.',
 
@@ -69,9 +69,9 @@ return [
     'btn_create' => 'Create user',
 
     // Owner / self-protection
-    'badge_owner'      => 'Owner',
-    'owner_protected'  => 'The entity owner cannot be deactivated or removed.',
-    'self_protected'   => 'You cannot deactivate or remove your own account.',
+    'badge_owner'     => 'Owner',
+    'owner_protected' => 'The entity owner cannot be deactivated or removed.',
+    'self_protected'  => 'You cannot deactivate or remove your own account.',
 
     // JS errors
     'js_error_load' => 'Error loading user data.',

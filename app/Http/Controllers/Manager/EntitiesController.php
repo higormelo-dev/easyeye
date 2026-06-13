@@ -10,6 +10,7 @@ use App\Services\Audit\AuditLogger;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
+use Illuminate\Support\Facades\Auth;
 use Inertia\{Inertia, Response};
 
 class EntitiesController extends Controller
@@ -129,11 +130,11 @@ class EntitiesController extends Controller
             'country'                => $record->country,
             'active'                 => (bool) $record->active,
             // 2FA por empresa (Hardening LGPD/CFM)
-            'requires_two_factor'    => (bool) $record->requires_two_factor,
-            'two_factor_enabled_at'  => $record->two_factor_enabled_at?->format('d/m/Y H:i'),
-            'two_factor_enabled_by'  => $record->twoFactorEnabledByUser?->name,
-            'deleted_at'             => $record->deleted_at?->format('d/m/Y H:i'),
-            'created_at'             => $record->created_at?->format('d/m/Y H:i'),
+            'requires_two_factor'   => (bool) $record->requires_two_factor,
+            'two_factor_enabled_at' => $record->two_factor_enabled_at?->format('d/m/Y H:i'),
+            'two_factor_enabled_by' => $record->twoFactorEnabledByUser?->name,
+            'deleted_at'            => $record->deleted_at?->format('d/m/Y H:i'),
+            'created_at'            => $record->created_at?->format('d/m/Y H:i'),
         ]]);
     }
 
@@ -232,7 +233,7 @@ class EntitiesController extends Controller
         $entity->update([
             'requires_two_factor'   => $enabled,
             'two_factor_enabled_at' => $enabled ? now() : null,
-            'two_factor_enabled_by' => $enabled ? \Illuminate\Support\Facades\Auth::id() : null,
+            'two_factor_enabled_by' => $enabled ? Auth::id() : null,
         ]);
 
         $this->audit->recordAdminAction(

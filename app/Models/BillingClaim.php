@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types = 1);
+declare(strict_types=1);
 
 namespace App\Models;
 
@@ -12,8 +12,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany,
 
 class BillingClaim extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasEntityCode;
     use HasUuids;
     use SoftDeletes;
@@ -60,19 +60,19 @@ class BillingClaim extends Model
     protected function casts(): array
     {
         return [
-            'status' => BillingClaimStatus::class,
-            'attendance_date' => 'date',
-            'due_date' => 'date',
-            'amount' => 'decimal:2',
-            'glosa_amount' => 'decimal:2',
-            'paid_amount' => 'decimal:2',
-            'paid_at' => 'datetime',
+            'status'           => BillingClaimStatus::class,
+            'attendance_date'  => 'date',
+            'due_date'         => 'date',
+            'amount'           => 'decimal:2',
+            'glosa_amount'     => 'decimal:2',
+            'paid_amount'      => 'decimal:2',
+            'paid_at'          => 'datetime',
             'is_tiss_exported' => 'boolean',
-            'quantity' => 'integer',
-            'unit_price' => 'decimal:2',
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
+            'quantity'         => 'integer',
+            'unit_price'       => 'decimal:2',
+            'created_at'       => 'datetime',
+            'updated_at'       => 'datetime',
+            'deleted_at'       => 'datetime',
         ];
     }
 
@@ -122,4 +122,3 @@ class BillingClaim extends Model
         return $this->hasMany(FinancialCashEntry::class, 'billing_claim_id');
     }
 }
-

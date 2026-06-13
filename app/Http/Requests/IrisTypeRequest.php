@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\{IrisType};
+use App\Models\IrisType;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;

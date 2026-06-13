@@ -8,6 +8,7 @@ use App\Http\Requests\SurgeryTypeRequest;
 use App\Http\Resources\SurgeryTypeResource;
 use App\Models\SurgeryType;
 use App\Services\SurgeryTypeService;
+use Illuminate\Database\Eloquent\Model;
 
 class SurgeryTypesController extends BaseSettingController
 {
@@ -24,8 +25,8 @@ class SurgeryTypesController extends BaseSettingController
     protected function getColumns(): array
     {
         return [
-            ['key' => 'code',           'label' => __('actions.code'),     'type' => 'code'],
-            ['key' => 'name',           'label' => __('actions.name'),     'type' => 'text', 'sortable' => true],
+            ['key' => 'code', 'label' => __('actions.code'), 'type' => 'code'],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'sortable' => true],
             ['key' => 'category_label', 'label' => __('actions.category'), 'type' => 'text'],
         ];
     }
@@ -33,7 +34,7 @@ class SurgeryTypesController extends BaseSettingController
     protected function getFormFields(): array
     {
         return [
-            ['key' => 'name',     'label' => __('actions.name'),     'type' => 'text',   'required' => true],
+            ['key' => 'name', 'label' => __('actions.name'), 'type' => 'text', 'required' => true],
             ['key' => 'category', 'label' => __('actions.category'), 'type' => 'select', 'required' => true, 'options' => $this->categoryOptions()],
         ];
     }
@@ -41,10 +42,10 @@ class SurgeryTypesController extends BaseSettingController
     /**
      * Adiciona o label da categoria à serialização (não exibimos só o índice 0-N).
      */
-    protected function serializeRecord(\Illuminate\Database\Eloquent\Model $record): array
+    protected function serializeRecord(Model $record): array
     {
-        $data = parent::serializeRecord($record);
-        $cat  = $record->category;
+        $data                   = parent::serializeRecord($record);
+        $cat                    = $record->category;
         $data['category_label'] = $cat !== null ? (SurgeryType::$categories[$cat] ?? '—') : '—';
 
         return $data;
@@ -56,6 +57,7 @@ class SurgeryTypesController extends BaseSettingController
     private function categoryOptions(): array
     {
         $out = [];
+
         foreach (SurgeryType::$categories as $value => $label) {
             $out[] = ['value' => (int) $value, 'label' => $label];
         }

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue';
 import SlotPicker from '@/Components/Panel/SlotPicker.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     item:    { type: Object, default: null },
@@ -88,10 +89,7 @@ function onHidden() {
                         </div>
                         <div v-if="doctors.length > 1" class="mb-3">
                             <label class="form-label fw-semibold">{{ t.reschedule_doctor }}</label>
-                            <select v-model="doctorId" class="form-select">
-                                <option value="">{{ t.form_select }}</option>
-                                <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
-                            </select>
+                            <SearchSelect v-model="doctorId" :options="doctors" :placeholder="t.form_select" />
                         </div>
                         <SlotPicker
                             v-if="modalOpen"

@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Contracts;
 
-use App\DTOs\AI\AiProviderResponseData;
-use App\DTOs\AI\AiRequestData;
+use App\DTOs\AI\{AiProviderResponseData, AiRequestData};
 use App\Enums\AI\AiProvider;
 
 interface AiProviderInterface

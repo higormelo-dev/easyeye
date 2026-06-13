@@ -5,7 +5,6 @@ namespace App\Services\Api;
 use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
 use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\{DB, Storage};
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -93,16 +92,30 @@ class PatientExamService
             ];
 
             if ($request->hasFile('archive')) {
-                $integrator = request()->attributes->get('integrator');
-                $file       = $request->file('archive');
-                $directory  = "{$integrator->user->entity_id}/{$patientExam->patient_id}/exams";
-                $fileName   = sprintf('%d_%s.%s', time(), Str::uuid(), $file->getClientOriginalExtension());
+                $uuid        = Str::uuid();
+                $timestamp   = time();
+                $integrator  = request()->attributes->get('integrator');
+                $file        = $request->file('archive');
+                $extension   = $file->getClientOriginalExtension();
+                $fileName    = "{$timestamp}_{$uuid}.{$extension}";
+                $archivePath = "{$integrator->user->entity_id}/{$patientExam->patient_id}/exams/{$fileName}";
 
                 if ($patientExam->archive) {
                     Storage::disk('s3')->delete($patientExam->archive);
                 }
 
-                $data['archive'] = $this->storeArchive($file, $directory, $fileName);
+                $uploaded = Storage::disk('s3')
+                    ->put(
+                        $archivePath,
+                        file_get_contents($file->getRealPath()),
+                        'public',
+                    );
+
+                if (! $uploaded) {
+                    throw new RuntimeException('Failed to upload exam archive.');
+                }
+
+                $data['archive'] = $archivePath;
             }
 
             $patientExam->update(array_filter($data, static fn ($value) => $value !== null));
@@ -131,7 +144,7 @@ class PatientExamService
     public function findByIdOrCode(string $patientId, string $idOrCode): ?PatientExam
     {
         $query = PatientExam::query()
-            ->with(['patient.person', 'doctor.person', 'schedule', 'equipment'])
+            ->with('patient')
             ->where('patient_id', $patientId)
             ->whereHas('patient', function ($query) {
                 $query->where('entity_id', request()->attributes->get('integrator')->user->entity_id)
@@ -182,15 +195,14 @@ class PatientExamService
         mixed $archiveFile,
         ?int $laterality = null,
     ): PatientExam {
-        $directory = "{$entityId}/{$patientId}/exams";
-        $fileName  = sprintf('%d_%s.%s', time(), Str::uuid(), $archiveFile->getClientOriginalExtension());
+        $uuid        = Str::uuid();
+        $timestamp   = time();
+        $extension   = $archiveFile->getClientOriginalExtension();
+        $fileName    = "{$timestamp}_{$uuid}.{$extension}";
+        $archivePath = "{$entityId}/{$patientId}/exams/{$fileName}";
 
-        // Escopo do upsert: o registro existente DEVE pertencer ao mesmo paciente.
-        // Sem o filtro por patient_id, um exame de outro paciente com o mesmo
-        // `name` seria reassociado e teria o arquivo apagado (corrupção cross-patient).
         $existingRecord = PatientExam::query()
             ->with('patient')
-            ->where('patient_id', $patientId)
             ->whereHas('patient', function ($query) use ($entityId) {
                 $query->where('entity_id', $entityId)->whereNull('deleted_at');
             })
@@ -202,7 +214,32 @@ class PatientExamService
                 Storage::disk('s3')->delete($existingRecord->archive);
             }
 
-            $existingRecord->update([
+            $uploaded = Storage::disk('s3')
+                ->put($archivePath, file_get_contents($archiveFile), 'public');
+
+            if ($uploaded) {
+                $existingRecord->update([
+                    'patient_id'                     => $patientId,
+                    'exam_id'                        => $examId,
+                    'doctor_id'                      => $doctorId,
+                    'schedule_id'                    => $scheduleId,
+                    'entity_integrator_equipment_id' => $equipmentId,
+                    'name'                           => $name,
+                    'laterality'                     => $laterality,
+                    'archive'                        => $archivePath,
+                ]);
+
+                return $existingRecord->refresh();
+            }
+
+            throw new RuntimeException('Failed to upload exam archive.');
+        }
+
+        $uploaded = Storage::disk('s3')
+            ->put($archivePath, file_get_contents($archiveFile), 'public');
+
+        if ($uploaded) {
+            return PatientExam::create([
                 'patient_id'                     => $patientId,
                 'exam_id'                        => $examId,
                 'doctor_id'                      => $doctorId,
@@ -210,40 +247,11 @@ class PatientExamService
                 'entity_integrator_equipment_id' => $equipmentId,
                 'name'                           => $name,
                 'laterality'                     => $laterality,
-                'archive'                        => $this->storeArchive($archiveFile, $directory, $fileName),
+                'archive'                        => $archivePath,
             ]);
-
-            return $existingRecord->refresh();
         }
 
-        return PatientExam::create([
-            'patient_id'                     => $patientId,
-            'exam_id'                        => $examId,
-            'doctor_id'                      => $doctorId,
-            'schedule_id'                    => $scheduleId,
-            'entity_integrator_equipment_id' => $equipmentId,
-            'name'                           => $name,
-            'laterality'                     => $laterality,
-            'archive'                        => $this->storeArchive($archiveFile, $directory, $fileName),
-        ]);
-    }
-
-    /**
-     * Faz upload do arquivo de exame em streaming (sem carregar tudo em memória),
-     * sempre com visibilidade privada — exame é dado sensível de saúde (LGPD art. 11).
-     * O acesso é feito via URL assinada temporária (PatientExam::archiveUrl()).
-     *
-     * @throws RuntimeException quando o upload falha
-     */
-    private function storeArchive(UploadedFile $file, string $directory, string $fileName): string
-    {
-        $path = Storage::disk('s3')->putFileAs($directory, $file, $fileName, 'private');
-
-        if ($path === false) {
-            throw new RuntimeException('Failed to upload exam archive.');
-        }
-
-        return $path;
+        throw new RuntimeException('Failed to upload exam archive.');
     }
 
     /**

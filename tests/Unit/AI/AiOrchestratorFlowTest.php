@@ -5,13 +5,24 @@ declare(strict_types=1);
 use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiModelPriceRepositoryInterface, AiProviderInterface, AiRunProviderCallStoreInterface};
 use App\Domains\AI\Models\{AiModelPrice, AiRun};
 use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, GeminiFakeProvider, OpenAiFakeProvider};
-use App\Domains\AI\Services\{AiOrchestrator, AiPricingService, AiProviderManager};
+use App\Domains\AI\Services\{AiOrchestrator, AiPricingService, AiProviderManager, AiProviderSettings};
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData};
 use App\Enums\AI\{AiProvider, AiProviderCallRole, AiRiskLevel, AiRunMode, AiRunStatus};
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
 uses(TestCase::class)->in(__FILE__);
+
+beforeEach(function () {
+    config()->set('ai.enable_consensus', true);
+    // 3 provedores ativos (ordem = prioridade), via cache do setting (sem DB).
+    Cache::put(
+        'subscription_setting:' . AiProviderSettings::SETTING_KEY,
+        json_encode(['openai', 'anthropic', 'gemini']),
+        600,
+    );
+});
 
 function buildPricingServiceForOrchestrator(): AiPricingService
 {
@@ -81,7 +92,7 @@ test('orchestrator executa fluxo economy com 1 provider', function () {
         'openai'    => new OpenAiFakeProvider(),
         'anthropic' => new AnthropicFakeProvider(),
         'gemini'    => new GeminiFakeProvider(),
-    ]);
+    ], new AiProviderSettings());
     $orchestrator = new AiOrchestrator($manager, $store, buildPricingServiceForOrchestrator(), new InMemoryAiCircuitBreaker());
 
     $run     = buildAiRun(AiRunMode::Economy);
@@ -103,7 +114,7 @@ test('orchestrator executa fluxo validated com generator e reviewer', function (
         'openai'    => new OpenAiFakeProvider(),
         'anthropic' => new AnthropicFakeProvider(),
         'gemini'    => new GeminiFakeProvider(),
-    ]);
+    ], new AiProviderSettings());
     $orchestrator = new AiOrchestrator($manager, $store, buildPricingServiceForOrchestrator(), new InMemoryAiCircuitBreaker());
 
     $run     = buildAiRun(AiRunMode::Validated);
@@ -124,7 +135,7 @@ test('orchestrator executa fluxo consensus com adjudicator', function () {
         'openai'    => new OpenAiFakeProvider(),
         'anthropic' => new AnthropicFakeProvider(),
         'gemini'    => new GeminiFakeProvider(),
-    ]);
+    ], new AiProviderSettings());
     $orchestrator = new AiOrchestrator($manager, $store, buildPricingServiceForOrchestrator(), new InMemoryAiCircuitBreaker());
 
     $run     = buildAiRun(AiRunMode::Consensus);
@@ -167,7 +178,7 @@ test('orchestrator faz fallback quando provider primário do role falha', functi
         'openai'    => new OpenAiFakeProvider(),
         'anthropic' => $failingAnthropic,
         'gemini'    => new GeminiFakeProvider(),
-    ]);
+    ], new AiProviderSettings());
     $orchestrator = new AiOrchestrator($manager, $store, buildPricingServiceForOrchestrator(), new InMemoryAiCircuitBreaker());
 
     $run     = buildAiRun(AiRunMode::Validated);
@@ -226,7 +237,7 @@ test('orchestrator re-lança quando todos os providers da chain falham', functio
         'openai'    => $alwaysFail(AiProvider::OpenAI),
         'anthropic' => $alwaysFail(AiProvider::Anthropic),
         'gemini'    => $alwaysFail(AiProvider::Gemini),
-    ]);
+    ], new AiProviderSettings());
     $orchestrator = new AiOrchestrator($manager, $store, buildPricingServiceForOrchestrator(), new InMemoryAiCircuitBreaker());
 
     expect(fn () => $orchestrator->execute(buildAiRun(AiRunMode::Economy), baseRequest(AiRunMode::Economy)))
@@ -247,7 +258,7 @@ test('orchestrator pula provider quando circuit breaker já está aberto', funct
         'openai'    => new OpenAiFakeProvider(),
         'anthropic' => new AnthropicFakeProvider(),
         'gemini'    => new GeminiFakeProvider(),
-    ]);
+    ], new AiProviderSettings());
     $orchestrator = new AiOrchestrator($manager, $store, buildPricingServiceForOrchestrator(), $breaker);
 
     // Pré-condição: força circuito aberto para OpenAI (primary do generator).

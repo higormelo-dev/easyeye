@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Cid10Code;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Http\{JsonResponse, Request};
 
 class Cid10SearchController extends Controller
 {

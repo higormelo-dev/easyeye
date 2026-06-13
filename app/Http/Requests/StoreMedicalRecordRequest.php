@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Doctor;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreMedicalRecordRequest extends FormRequest
@@ -35,10 +36,11 @@ class StoreMedicalRecordRequest extends FormRequest
 
         if (! $this->filled('doctor_id')) {
             $entityId = session('selected_entity_id');
-            $doctor   = \App\Models\Doctor::whereHas('entityUser', fn ($q) => $q
+            $doctor   = Doctor::whereHas('entityUser', fn ($q) => $q
                 ->where('entity_id', $entityId)
                 ->where('user_id', auth()->id()))
                 ->first();
+
             if ($doctor) {
                 $payload['doctor_id'] = $doctor->id;
             }
@@ -48,8 +50,9 @@ class StoreMedicalRecordRequest extends FormRequest
         // componente Alpine cid10Search). Decode para array antes da
         // validação rodar a regra `array`.
         $cids = $this->input('diagnosis_cids');
+
         if (is_string($cids)) {
-            $decoded            = json_decode($cids, true);
+            $decoded                   = json_decode($cids, true);
             $payload['diagnosis_cids'] = is_array($decoded) ? $decoded : [];
         }
 
@@ -128,8 +131,8 @@ class StoreMedicalRecordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'doctor_id.required'      => __('actions.medical_records.doctor_required_validation'),
-            'doctor_id.exists'        => __('actions.medical_records.doctor_exists_validation'),
+            'doctor_id.required' => __('actions.medical_records.doctor_required_validation'),
+            'doctor_id.exists'   => __('actions.medical_records.doctor_exists_validation'),
         ];
     }
 }

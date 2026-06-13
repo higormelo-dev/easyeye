@@ -33,12 +33,6 @@ const th = 'cursor-pointer user-select-none';
         <table class="table table-nowrap table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th :class="th" @click="sort('created_at')">
-                        Cadastro <i :class="sortIcon('created_at')" class="ms-1 fs-11"></i>
-                    </th>
-                    <th :class="th" @click="sort('code')">
-                        Código <i :class="sortIcon('code')" class="ms-1 fs-11"></i>
-                    </th>
                     <th :class="th" @click="sort('full_name')">
                         Nome <i :class="sortIcon('full_name')" class="ms-1 fs-11"></i>
                     </th>
@@ -47,6 +41,12 @@ const th = 'cursor-pointer user-select-none';
                     </th>
                     <th :class="th" @click="sort('email')">
                         E-mail <i :class="sortIcon('email')" class="ms-1 fs-11"></i>
+                    </th>
+                    <th :class="th" @click="sort('code')">
+                        Registro <i :class="sortIcon('code')" class="ms-1 fs-11"></i>
+                    </th>
+                    <th :class="th" @click="sort('created_at')">
+                        Criação <i :class="sortIcon('created_at')" class="ms-1 fs-11"></i>
                     </th>
                     <th class="text-center">Status</th>
                     <th class="text-end">Ações</th>
@@ -60,8 +60,6 @@ const th = 'cursor-pointer user-select-none';
                     </td>
                 </tr>
                 <tr v-for="d in doctors.data" :key="d.id" :class="{ 'table-secondary opacity-75': d.deleted }">
-                    <td class="text-muted small">{{ d.created_at }}</td>
-                    <td><code class="text-muted small">{{ d.code }}</code></td>
                     <td>
                         <div class="d-flex align-items-center gap-2">
                             <span
@@ -82,6 +80,8 @@ const th = 'cursor-pointer user-select-none';
                     </td>
                     <td class="small">{{ d.record }}</td>
                     <td class="text-muted small">{{ d.email }}</td>
+                    <td><code class="text-muted small">{{ d.code }}</code></td>
+                    <td class="text-muted small">{{ d.created_at }}</td>
                     <td class="text-center">
                         <span
                             v-if="d.active"

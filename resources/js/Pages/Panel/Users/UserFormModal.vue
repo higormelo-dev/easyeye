@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
     open:     { type: Boolean, required: true },
@@ -142,15 +143,16 @@ function submit() {
                             <label class="form-label fw-semibold">
                                 {{ t.field_role }} <span class="text-danger">*</span>
                             </label>
-                            <select
+                            <SearchSelect
                                 v-model="form.rule"
-                                class="form-select"
-                                :class="{ 'is-invalid': form.errors.rule }"
-                            >
-                                <option value="">{{ t.field_role_placeholder }}</option>
-                                <option v-for="r in roleOptions" :key="r.value" :value="r.value">{{ r.label }}</option>
-                            </select>
-                            <div v-if="form.errors.rule" class="invalid-feedback">{{ form.errors.rule }}</div>
+                                :options="roleOptions"
+                                :value-key="'value'"
+                                :label-key="'label'"
+                                :placeholder="t.field_role_placeholder"
+                                :clearable="false"
+                                :invalid="!!form.errors.rule"
+                            />
+                            <div v-if="form.errors.rule" class="invalid-feedback d-block">{{ form.errors.rule }}</div>
                         </div>
 
                         <!-- Status (edit only) -->

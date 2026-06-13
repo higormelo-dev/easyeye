@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Exceptions;
 
-class InsufficientAiCreditsException extends \RuntimeException
+use RuntimeException;
+
+class InsufficientAiCreditsException extends RuntimeException
 {
     public function __construct(
         public readonly int $requested,

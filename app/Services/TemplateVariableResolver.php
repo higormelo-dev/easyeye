@@ -249,7 +249,7 @@ class TemplateVariableResolver
             // renderiza patient-block próprio via $setting->patient_name,
             // tornando o placeholder redundante (causava duplicação no PDF
             // e poluição no editor TinyMCE com Paciente/Idade/Data).
-            '{{CABECALHO_PACIENTE}}'       => '',
+            '{{CABECALHO_PACIENTE}}' => '',
         ];
     }
 }

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import AppLayout  from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
+import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
  * Formulário de modelo de documentação clínica.
@@ -125,10 +126,7 @@ const activeTab = ref('general');
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label">Categoria</label>
-                                <select v-model="form.report_category_id" class="form-select">
-                                    <option value="">—</option>
-                                    <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-                                </select>
+                                <SearchSelect v-model="form.report_category_id" :options="categories" :placeholder="'—'" />
                             </div>
                             <div class="col-12">
                                 <label class="form-label">Descrição</label>
@@ -151,9 +149,7 @@ const activeTab = ref('general');
                         <div class="row g-3 mb-4">
                             <div class="col-md-3">
                                 <label class="form-label small">Tamanho</label>
-                                <select v-model="form.paper_size" class="form-select form-select-sm">
-                                    <option v-for="ps in paper_sizes" :key="ps.value" :value="ps.value">{{ ps.label }}</option>
-                                </select>
+                                <SearchSelect v-model="form.paper_size" :options="paper_sizes" :value-key="'value'" :label-key="'label'" :clearable="false" />
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label small">Fonte</label>
@@ -243,9 +239,7 @@ const activeTab = ref('general');
                                 <div class="row g-2 mb-2">
                                     <div class="col-md-4">
                                         <label class="form-label small">Tipo</label>
-                                        <select v-model="content.type" class="form-select form-select-sm">
-                                            <option v-for="t in documentation_types" :key="t.value" :value="t.value">{{ t.label }}</option>
-                                        </select>
+                                        <SearchSelect v-model="content.type" :options="documentation_types" :value-key="'value'" :label-key="'label'" :clearable="false" />
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label small">Rótulo (ex: "Receita controlada")</label>

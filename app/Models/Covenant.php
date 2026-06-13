@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
 
 class Covenant extends Model
 {
-    use HasAuditColumns;
     use Auditable;
+    use HasAuditColumns;
     use HasEntityCode;
     use HasFactory;
     use HasUppercaseFields;

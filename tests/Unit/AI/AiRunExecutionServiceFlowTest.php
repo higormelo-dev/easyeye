@@ -3,9 +3,8 @@
 declare(strict_types=1);
 
 use App\Domains\AI\Contracts\AiRunRepositoryInterface;
-use App\Domains\AI\Models\AiCreditLedgerEntry;
-use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiCreditWalletService, AiOrchestrator, AiPricingService, AiRunExecutionService, AiSafetyService};
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiRun};
+use App\Domains\AI\Services\{AiCreditWalletService, AiOrchestrator, AiPricingService, AiRunExecutionService, AiSafetyService, EyeImageAttachmentService};
 use App\DTOs\AI\{AiCreditEstimateData, AiProviderResponseData, AiUsageData, AiWorkflowResultData};
 use App\Enums\AI\{AiProvider, AiRiskLevel, AiRunMode, AiRunStatus};
 use Illuminate\Support\Str;
@@ -14,12 +13,12 @@ use Tests\TestCase;
 uses(TestCase::class)->in(__FILE__);
 
 test('execution service consome e libera reserva no sucesso', function () {
-    $run = buildRunForExecution(AiRunStatus::Reserved, 100);
+    $run        = buildRunForExecution(AiRunStatus::Reserved, 100);
     $repository = new InMemoryRunRepository();
 
-    $orchestrator = \Mockery::mock(AiOrchestrator::class);
-    $pricing = \Mockery::mock(AiPricingService::class);
-    $wallet = \Mockery::mock(AiCreditWalletService::class);
+    $orchestrator = Mockery::mock(AiOrchestrator::class);
+    $pricing      = Mockery::mock(AiPricingService::class);
+    $wallet       = Mockery::mock(AiCreditWalletService::class);
 
     $responses = [
         new AiProviderResponseData(
@@ -67,7 +66,7 @@ test('execution service consome e libera reserva no sucesso', function () {
         ->withArgs(fn (...$args) => $args[1] === 40)
         ->andReturn(buildLedgerEntry());
 
-    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService());
+    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService(), new EyeImageAttachmentService());
     $service->execute($run);
 
     expect($run->status)->toBe(AiRunStatus::WaitingApproval);
@@ -76,12 +75,12 @@ test('execution service consome e libera reserva no sucesso', function () {
 });
 
 test('execution service libera reserva e marca failed quando ocorre erro', function () {
-    $run = buildRunForExecution(AiRunStatus::Reserved, 70);
+    $run        = buildRunForExecution(AiRunStatus::Reserved, 70);
     $repository = new InMemoryRunRepository();
 
-    $orchestrator = \Mockery::mock(AiOrchestrator::class);
-    $pricing = \Mockery::mock(AiPricingService::class);
-    $wallet = \Mockery::mock(AiCreditWalletService::class);
+    $orchestrator = Mockery::mock(AiOrchestrator::class);
+    $pricing      = Mockery::mock(AiPricingService::class);
+    $wallet       = Mockery::mock(AiCreditWalletService::class);
 
     $orchestrator->shouldReceive('execute')
         ->once()
@@ -92,7 +91,7 @@ test('execution service libera reserva e marca failed quando ocorre erro', funct
         ->withArgs(fn (...$args) => $args[1] === 70)
         ->andReturn(buildLedgerEntry());
 
-    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService());
+    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService(), new EyeImageAttachmentService());
 
     expect(fn () => $service->execute($run))
         ->toThrow(RuntimeException::class, 'falha de execução');
@@ -102,12 +101,12 @@ test('execution service libera reserva e marca failed quando ocorre erro', funct
 });
 
 test('execution service quando actual > reserved adiciona safety note e não consome extra', function () {
-    $run = buildRunForExecution(AiRunStatus::Reserved, 50);
+    $run        = buildRunForExecution(AiRunStatus::Reserved, 50);
     $repository = new InMemoryRunRepository();
 
-    $orchestrator = \Mockery::mock(AiOrchestrator::class);
-    $pricing = \Mockery::mock(AiPricingService::class);
-    $wallet = \Mockery::mock(AiCreditWalletService::class);
+    $orchestrator = Mockery::mock(AiOrchestrator::class);
+    $pricing      = Mockery::mock(AiPricingService::class);
+    $wallet       = Mockery::mock(AiCreditWalletService::class);
 
     $orchestrator->shouldReceive('execute')
         ->once()
@@ -144,7 +143,7 @@ test('execution service quando actual > reserved adiciona safety note e não con
     // NÃO deve chamar release — não sobrou reserva pra liberar.
     $wallet->shouldNotReceive('releaseReservation');
 
-    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService());
+    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService(), new EyeImageAttachmentService());
     $service->execute($run);
 
     expect($run->status)->toBe(AiRunStatus::WaitingApproval);
@@ -153,18 +152,18 @@ test('execution service quando actual > reserved adiciona safety note e não con
 });
 
 test('execution service ignora runs em estado terminal', function () {
-    $run = buildRunForExecution(AiRunStatus::WaitingApproval, 30);
+    $run        = buildRunForExecution(AiRunStatus::WaitingApproval, 30);
     $repository = new InMemoryRunRepository();
 
-    $orchestrator = \Mockery::mock(AiOrchestrator::class);
-    $pricing = \Mockery::mock(AiPricingService::class);
-    $wallet = \Mockery::mock(AiCreditWalletService::class);
+    $orchestrator = Mockery::mock(AiOrchestrator::class);
+    $pricing      = Mockery::mock(AiPricingService::class);
+    $wallet       = Mockery::mock(AiCreditWalletService::class);
 
     $orchestrator->shouldNotReceive('execute');
     $wallet->shouldNotReceive('consumeReservation');
     $wallet->shouldNotReceive('releaseReservation');
 
-    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService());
+    $service = new AiRunExecutionService($repository, $orchestrator, $pricing, $wallet, new AiSafetyService(), new EyeImageAttachmentService());
     $service->execute($run);
 
     expect($run->status)->toBe(AiRunStatus::WaitingApproval);
@@ -173,15 +172,15 @@ test('execution service ignora runs em estado terminal', function () {
 function buildRunForExecution(AiRunStatus $status, int $reservedCredits): AiRun
 {
     $run = new AiRun([
-        'entity_id' => (string) Str::uuid(),
-        'workflow' => 'report_drafting',
-        'mode' => AiRunMode::Validated->value,
-        'risk_level' => AiRiskLevel::Medium->value,
-        'status' => $status->value,
+        'entity_id'        => (string) Str::uuid(),
+        'workflow'         => 'report_drafting',
+        'mode'             => AiRunMode::Validated->value,
+        'risk_level'       => AiRiskLevel::Medium->value,
+        'status'           => $status->value,
         'reserved_credits' => $reservedCredits,
         'consumed_credits' => 0,
-        'input_summary' => [
-            'user_prompt' => 'Prompt clínico para apoio médico.',
+        'input_summary'    => [
+            'user_prompt'   => 'Prompt clínico para apoio médico.',
             'system_prompt' => 'Apoio clínico, nunca decisão final.',
         ],
     ]);
@@ -201,7 +200,7 @@ class InMemoryRunRepository implements AiRunRepositoryInterface
     public function markRunning(AiRun $run): void
     {
         $run->forceFill([
-            'status' => AiRunStatus::Running,
+            'status'        => AiRunStatus::Running,
             'error_message' => null,
         ]);
     }
@@ -214,19 +213,27 @@ class InMemoryRunRepository implements AiRunRepositoryInterface
         ?string $errorMessage = null,
     ): void {
         $run->forceFill([
-            'status' => AiRunStatus::WaitingApproval,
-            'final_output' => $finalOutput,
-            'safety_notes' => $safetyNotes,
+            'status'           => AiRunStatus::WaitingApproval,
+            'final_output'     => $finalOutput,
+            'safety_notes'     => $safetyNotes,
             'consumed_credits' => $consumedCredits,
-            'error_message' => $errorMessage,
+            'error_message'    => $errorMessage,
         ]);
     }
 
     public function markFailed(AiRun $run, string $errorMessage): void
     {
         $run->forceFill([
-            'status' => AiRunStatus::Failed,
+            'status'        => AiRunStatus::Failed,
             'error_message' => $errorMessage,
+        ]);
+    }
+
+    public function markCancelled(AiRun $run): void
+    {
+        $run->forceFill([
+            'status'       => AiRunStatus::Cancelled,
+            'cancelled_at' => $run->cancelled_at ?? now(),
         ]);
     }
 }
@@ -234,9 +241,9 @@ class InMemoryRunRepository implements AiRunRepositoryInterface
 function buildLedgerEntry(): AiCreditLedgerEntry
 {
     $entry = new AiCreditLedgerEntry([
-        'entity_id' => (string) Str::uuid(),
-        'type' => 'reserve',
-        'amount' => 0,
+        'entity_id'     => (string) Str::uuid(),
+        'type'          => 'reserve',
+        'amount'        => 0,
         'balance_after' => 0,
     ]);
     $entry->id = (string) Str::uuid();
