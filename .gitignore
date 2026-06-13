@@ -31,3 +31,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Claude Code agent worktrees (artefatos de runtime)
+.claude/worktrees/
