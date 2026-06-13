@@ -191,5 +191,29 @@ class AppServiceProvider extends ServiceProvider
             'manager-destructive',
             static fn (Request $r) => Limit::perMinute(5)->by($managerKey($r)),
         );
+
+        // -------------------------------------------------------------------------
+        // API de integradores (cliente desktop Rust): teto por INTEGRADOR, não por
+        // IP — várias clínicas podem sair pelo mesmo IP corporativo/NAT, e um token
+        // vazado deve ser contido sozinho sem afetar os demais.
+        //
+        // Buckets separados read/write para que uma sincronização pesada de leitura
+        // (lista de pacientes/agenda) não consuma a cota de upload de exames e
+        // vice-versa. O método HTTP decide o bucket (POST/PATCH/DELETE = write).
+        //
+        // Fallback para IP só ocorre antes de auth_with_integrator definir o
+        // atributo — na prática o throttle roda dentro do grupo v1, já autenticado.
+        // -------------------------------------------------------------------------
+        $integratorKey = static fn (Request $r): string => (string) (
+            $r->attributes->get('integrator')?->id ?? $r->ip()
+        );
+
+        RateLimiter::for('integrators-api', static function (Request $r) use ($integratorKey) {
+            $id = $integratorKey($r);
+
+            return $r->isMethodSafe()
+                ? Limit::perMinute(120)->by("int-read:{$id}")
+                : Limit::perMinute(40)->by("int-write:{$id}");
+        });
     }
 }

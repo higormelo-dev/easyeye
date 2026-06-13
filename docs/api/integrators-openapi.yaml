@@ -23,7 +23,28 @@ info:
       - Arquivos de exame são armazenados de forma PRIVADA; o campo `archive` retorna
         uma URL ASSINADA temporária (validade ~24h). Não cacheie a URL além disso.
       - Erros sempre retornam `{ "message": string }`; validação adiciona `{ "errors": {campo: [..]} }`.
-      - `429 Too Many Requests` inclui header `Retry-After`.
+
+    Rate limiting (por integrador):
+      - `signin`: 10 req/min · `check-token`: 30 req/min.
+      - Rotas `v1/*`: 120 req/min para LEITURA (GET/HEAD) e 40 req/min para ESCRITA,
+        em buckets independentes. As respostas trazem `X-RateLimit-Limit` /
+        `X-RateLimit-Remaining`; o `429 Too Many Requests` inclui `Retry-After`.
+
+    Escopos de token (least-privilege):
+      - O signin aceita `scope` (`read` | `write`). `read` emite token somente
+        leitura; `write` ou ausente emite leitura+escrita. Operações de escrita
+        com token read-only retornam `403`.
+      - Tokens antigos (sem escopo) mantêm acesso total por compatibilidade.
+
+    Idempotência:
+      - Operações de escrita aceitam o header opcional `Idempotency-Key`
+        (8–128 caracteres). Re-tentativas com a mesma chave devolvem a resposta
+        de sucesso original com `Idempotency-Replayed: true`, sem reexecutar nem
+        reconsumir cota. Janela de retenção: 24h.
+
+    Conformidade:
+      - Acessos de leitura a dados sensíveis (pacientes/exames) são registrados em
+        trilha de auditoria (LGPD Art. 37 / CFM Res. 2.227/2018).
 
 # Nota: ao servir via /docs/api/spec, este bloco é substituído em runtime pela
 # lista do ambiente (ApiDocsController::servers) — em homolog/produção o server
@@ -280,7 +301,9 @@ paths:
       summary: Envia um exame para o paciente (multipart)
       description: |
         Consome 1 da cota mensal `api_monthly_exam_sends` (reserva atômica).
-        `{patient}` DEVE ser um UUID.
+        `{patient}` DEVE ser um UUID. Aceita `Idempotency-Key` para re-tentativa segura.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -289,16 +312,27 @@ paths:
       responses:
         "201":
           description: Exame criado
+          headers:
+            Idempotency-Replayed:
+              schema: { type: boolean }
+              description: Presente (`true`) quando a resposta é replay de um `Idempotency-Key` anterior.
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/PatientExamResource" }
+        "400":
+          description: "`Idempotency-Key` com formato inválido"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
 
   /api/integrators/v1/patients/{patient}/exams/{exam}:
     parameters:
@@ -328,6 +362,8 @@ paths:
       description: |
         Consome 1 da cota mensal `api_monthly_exam_sends` (reserva atômica).
         Para reenviar o arquivo, use a variante multipart via POST nesta mesma URL.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -336,20 +372,33 @@ paths:
       responses:
         "200":
           description: Exame atualizado
+          headers:
+            Idempotency-Replayed:
+              schema: { type: boolean }
+              description: Presente (`true`) quando a resposta é replay de um `Idempotency-Key` anterior.
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/PatientExamResource" }
+        "400":
+          description: "`Idempotency-Key` com formato inválido"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
     post:
       tags: [Patient Exams]
       summary: Atualiza um exame com novo arquivo (multipart)
       description: Rota dedicada `patients.exams.update_multipart` (PUT não trafega multipart de forma confiável).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -358,16 +407,27 @@ paths:
       responses:
         "200":
           description: Exame atualizado
+          headers:
+            Idempotency-Replayed:
+              schema: { type: boolean }
+              description: Presente (`true`) quando a resposta é replay de um `Idempotency-Key` anterior.
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   data: { $ref: "#/components/schemas/PatientExamResource" }
+        "400":
+          description: "`Idempotency-Key` com formato inválido"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
         "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
     delete:
       tags: [Patient Exams]
       summary: Remove um exame
@@ -515,6 +575,16 @@ components:
       required: true
       schema: { type: string }
       description: "UUID, código formatado (ex.: PAC-0000000123) ou o número inteiro do código."
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,128}$" }
+      description: >-
+        Chave de idempotência opcional (8–128 caracteres: letras, dígitos, `-`
+        ou `_`). Re-tentativas de escrita com a mesma chave devolvem a resposta
+        de sucesso original (header `Idempotency-Replayed: true`) sem reexecutar
+        a operação nem consumir cota novamente. Retenção de 24h por integrador.
 
   responses:
     Unauthorized:
@@ -523,10 +593,18 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     Forbidden:
-      description: Plano sem acesso à API de integradores ou cota mensal esgotada
+      description: >-
+        Plano sem acesso à API de integradores, cota mensal esgotada ou token
+        sem escopo para a operação (ex.: token read-only tentando escrever).
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorValid" }
+    Conflict:
+      description: >-
+        Já há uma requisição com o mesmo `Idempotency-Key` em processamento.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: Recurso não encontrado
       content:
@@ -571,6 +649,14 @@ components:
             lower-case (`ei-1`) — todos são normalizados internamente.
             Cada instalação do EasyEye Integrator usa o seu próprio código.
           example: EI-1
+        scope:
+          type: string
+          enum: [read, write]
+          description: >-
+            Escopo opcional do token. `read` emite token somente leitura;
+            `write` (ou ausente) emite token de leitura+escrita. Tokens são
+            barrados por verbo: escrita exige escopo `write`.
+          example: write
 
     CheckTokenRequest:
       type: object

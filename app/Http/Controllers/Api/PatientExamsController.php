@@ -2,13 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\FeatureKey;
+use App\Enums\{DataAccessPurpose, FeatureKey};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\PatientExamRequest;
 use App\Http\Resources\PatientExamResource;
 use App\Models\{Patient, PatientExam};
 use App\Services\Api\PatientExamService;
 use App\Services\FeatureGateService;
+use App\Traits\LogsDataAccess;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -16,6 +17,8 @@ use Throwable;
 
 class PatientExamsController extends Controller
 {
+    use LogsDataAccess;
+
     /**
      * Instance of the standard model.
      */
@@ -40,6 +43,10 @@ class PatientExamsController extends Controller
         $integrator = request()->attributes->get('integrator');
 
         $patient = $this->resolvePatient($patientIdOrCode, $integrator->user->entity_id);
+
+        // LGPD Art. 37 / CFM Res. 2.227/2018: registra o acesso a exames (dado
+        // sensível de saúde) via API. Um log por listagem — não por exame.
+        $this->logAccess($patient, DataAccessPurpose::ApiAccess, patientId: $patient->id);
 
         $patientExams = $this->model->query()
             ->with('patient', 'doctor', 'schedule', 'patient.person', 'doctor.person')
@@ -119,6 +126,9 @@ class PatientExamsController extends Controller
         $patient = $this->resolvePatient($patientIdOrCode, $entityId);
 
         $record = $this->service->findByIdOrCode($patient->id, $idOrCode);
+
+        // Registra o acesso ao exame específico (LGPD Art. 37 / CFM 2.227/2018).
+        $this->logAccess($record, DataAccessPurpose::ApiAccess, patientId: $patient->id);
 
         return new PatientExamResource($record);
     }

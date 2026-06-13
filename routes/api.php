@@ -15,7 +15,11 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
     Route::post('check-token', [EntityIntegratorsController::class, 'checkToken'])->name('checktoken')->middleware('throttle:30,1');
     Route::group(['middleware' => ['token.precheck', 'auth:sanctum', 'auth_with_integrator', 'token.expiration', 'api.plan']], static function () {
         Route::delete('signout', [EntityIntegratorsController::class, 'destroy'])->name('signout')->withoutMiddleware('api.plan');
-        Route::group(['prefix' => 'v1', 'as' => 'v1.'], function () {
+        Route::group([
+            'prefix'     => 'v1',
+            'as'         => 'v1.',
+            'middleware' => ['throttle:integrators-api', 'token.scope', 'idempotency'],
+        ], function () {
             Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)
                 ->except(['create', 'edit']);
             Route::apiResource('patients', PatientsController::class)->only('index', 'show');

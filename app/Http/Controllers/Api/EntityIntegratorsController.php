@@ -43,6 +43,9 @@ class EntityIntegratorsController extends Controller
             'email'    => ['required', 'string'],
             'password' => ['required', 'string'],
             'code'     => ['required', 'string'],
+            // Escopo opcional do token. Ausente = acesso total (read+write),
+            // preservando o comportamento dos clientes que não enviam o campo.
+            'scope' => ['sometimes', 'string', 'in:read,write'],
         ]);
 
         $user = $this->model->query()
@@ -80,7 +83,7 @@ class EntityIntegratorsController extends Controller
 
         $token = $user->createToken(
             'integrator-token',
-            ['integrator_id:' . $integrator->id],
+            $this->abilitiesFor($integrator->id, $credentials['scope'] ?? null),
             Carbon::now()->addDays(7),
         );
 
@@ -88,6 +91,28 @@ class EntityIntegratorsController extends Controller
             (new EntityIntegratorResource($integrator, $token)),
             HttpResponse::HTTP_OK,
         );
+    }
+
+    /**
+     * Monta as abilities do token Sanctum:
+     * - `integrator_id:<uuid>` sempre presente (identifica o integrador).
+     * - `api:read` / `api:write` conforme o escopo solicitado:
+     *     - 'read'  → somente leitura
+     *     - 'write' → leitura + escrita
+     *     - ausente → leitura + escrita (padrão, retrocompatível)
+     *
+     * EnsureTokenScope usa essas abilities para barrar escrita com token read-only.
+     *
+     * @return list<string>
+     */
+    private function abilitiesFor(string $integratorId, ?string $scope): array
+    {
+        $abilities = ['integrator_id:' . $integratorId];
+
+        return match ($scope) {
+            'read'  => [...$abilities, 'api:read'],
+            default => [...$abilities, 'api:read', 'api:write'],
+        };
     }
 
     public function checkToken(Request $request): JsonResponse

@@ -2,13 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\DataAccessPurpose;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PatientResource;
 use App\Models\Patient;
+use App\Traits\LogsDataAccess;
 use Illuminate\Support\Str;
 
 class PatientsController extends Controller
 {
+    use LogsDataAccess;
+
     /**
      * Instance of the standard model.
      */
@@ -64,6 +68,9 @@ class PatientsController extends Controller
             ->where('entity_id', $integrator->user->entity_id)
             ->where($column, $value)
             ->firstOrFail();
+
+        // LGPD Art. 37 / CFM 2.227/2018: registra acesso ao cadastro do paciente.
+        $this->logAccess($patient, DataAccessPurpose::ApiAccess, patientId: $patient->id);
 
         return new PatientResource($patient);
     }
