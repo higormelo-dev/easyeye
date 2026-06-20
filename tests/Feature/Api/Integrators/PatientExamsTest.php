@@ -54,7 +54,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
         $response = $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams?search={$this->patient->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
@@ -70,7 +70,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
         $response = $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams?search={$schedCtx['schedule']->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
@@ -86,7 +86,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
         $response = $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams?search={$schedCtx['doctor']->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
@@ -97,20 +97,20 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
 
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams?search=XXXXNAOEXISTEXXXX",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonPath('meta.total', 0);
     });
 
-    it('caps per_page at 10', function () {
+    it('caps per_page at 100', function () {
         PatientExam::factory(5)->create(['patient_id' => $this->patient->id]);
 
         $response = $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams?per_page=999",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
-        expect($response->json('meta.per_page'))->toBeLessThanOrEqual(10);
+        expect($response->json('meta.per_page'))->toBeLessThanOrEqual(100);
     });
 
     it('returns 404 for patient from another entity', function () {
@@ -161,7 +161,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Fundoscopia 01',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated()
             ->assertJsonFragment(['name' => 'Exame Fundoscopia 01']);
 
@@ -180,7 +180,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Com Médico',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
 
         $exam = PatientExam::where('name', 'Exame Com Médico')->first();
@@ -197,7 +197,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Por UUID',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated()
             ->assertJsonFragment(['name' => 'Exame Por UUID']);
     });
@@ -211,7 +211,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Via Código',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -227,7 +227,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Outra Entidade',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -246,7 +246,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Repetido',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -268,7 +268,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Único',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
     });
 
@@ -281,7 +281,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Inválido',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -294,7 +294,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Sem Schedule',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -311,7 +311,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Schedule Errado',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -323,7 +323,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'schedule_identifier' => $this->schedule->code,
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -335,7 +335,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'schedule_identifier' => $this->schedule->code,
                 'name'                => 'Exame Sem Arquivo',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -347,7 +347,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Sem Tipo',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -359,7 +359,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'         => UploadedFile::fake()->image('exam.jpg'),
                 'name'            => 'Exame Sem Schedule',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -377,7 +377,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'name'                 => 'Exame Com Equipamento',
                 'equipment_identifier' => $equipment->id,
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
 
         expect($response->json('data.attributes.entity_integrator_equipment_id'))
@@ -399,7 +399,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'name'                 => 'Exame Equipamento Errado',
                 'equipment_identifier' => $otherEquipment->id,
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -412,7 +412,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Sem Equipamento',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
     });
 
@@ -426,7 +426,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'name'                => 'Exame Lateralidade Esquerda',
                 'laterality'          => 1,
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
 
         expect($response->json('data.attributes.laterality'))->toBe(1);
@@ -442,7 +442,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Sem Lateralidade',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertCreated();
 
         expect($response->json('data.attributes.laterality'))->toBeNull();
@@ -458,7 +458,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
                 'name'                => 'Exame Lateralidade Inválida',
                 'laterality'          => 3,
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -481,7 +481,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
     it('shows exam by patient UUID and exam UUID', function () {
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->exam->id]);
     });
@@ -489,7 +489,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
     it('shows exam by patient UUID and exam code', function () {
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->exam->id]);
     });
@@ -497,7 +497,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
     it('shows exam by patient code and exam UUID', function () {
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->exam->id]);
     });
@@ -507,7 +507,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
 
         $this->getJson(
             "/api/integrators/v1/patients/{$numericPart}/exams/{$this->exam->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->exam->id]);
     });
@@ -515,7 +515,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
     it('shows exam by patient code and exam code', function () {
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->exam->id]);
     });
@@ -523,7 +523,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
     it('returns 404 for non-existent exam', function () {
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/EXM-NAOEXISTE",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -533,7 +533,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
 
         $this->getJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$otherExam->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -544,7 +544,7 @@ describe('GET /api/integrators/v1/patients/{patient}/exams/{exam}', function () 
 
         $this->getJson(
             "/api/integrators/v1/patients/{$foreignPatient->code}/exams/{$this->exam->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 });
@@ -579,7 +579,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('updated.jpg'),
                 'name'                => 'Exame Atualizado',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['name' => 'Exame Atualizado']);
     });
@@ -593,7 +593,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('updated.jpg'),
                 'name'                => 'Atualizado UUID+Código',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['name' => 'Atualizado UUID+Código']);
     });
@@ -607,7 +607,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('updated.jpg'),
                 'name'                => 'Exame Médico Atualizado',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect(PatientExam::find($this->exam->id)->doctor_id)->toBe($this->doctor->id);
@@ -624,7 +624,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('new.jpg'),
                 'name'                => 'Exame Original',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         Storage::disk('s3')->assertMissing('old/path/exam.jpg');
@@ -640,7 +640,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Via Código',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -659,7 +659,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Nome Já Existente',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -672,7 +672,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Original',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
     });
 
@@ -686,7 +686,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'name'                => 'Exame Original',
                 'laterality'          => 2,
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect(PatientExam::find($this->exam->id)->laterality)->toBe(2);
@@ -702,7 +702,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'name'                => 'Exame Original',
                 'laterality'          => 9,
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertUnprocessable();
     });
 
@@ -719,7 +719,7 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
                 'archive'             => UploadedFile::fake()->image('exam.jpg'),
                 'name'                => 'Exame Outra Entidade',
             ],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 });
@@ -738,7 +738,7 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
             [],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNoContent();
 
         expect(PatientExam::find($this->exam->id))->toBeNull();
@@ -748,7 +748,7 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->id}",
             [],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNoContent();
 
         expect(PatientExam::find($this->exam->id))->toBeNull();
@@ -760,7 +760,7 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$numericPart}/exams/{$this->exam->id}",
             [],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNoContent();
 
         expect(PatientExam::find($this->exam->id))->toBeNull();
@@ -770,7 +770,7 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->code}",
             [],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNoContent();
 
         expect(PatientExam::find($this->exam->id))->toBeNull();
@@ -780,7 +780,7 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$this->patient->code}/exams/{$this->exam->code}",
             [],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNoContent();
 
         expect(PatientExam::find($this->exam->id))->toBeNull();
@@ -794,7 +794,7 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$foreignPatient->code}/exams/{$this->exam->id}",
             [],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -802,13 +802,13 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
         $this->deleteJson(
             "/api/integrators/v1/patients/{$this->patient->id}/exams/EXM-NAOEXISTE",
             [],
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
     it('returns 401 without authentication', function () {
         $this->deleteJson(
-            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}"
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
         )->assertUnauthorized();
     });
 });

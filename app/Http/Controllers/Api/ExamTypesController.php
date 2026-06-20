@@ -44,7 +44,7 @@ class ExamTypesController extends Controller
             });
         }
 
-        $examTypes = $examTypes->paginate(min((int) request()->get('per_page', 10), 10));
+        $examTypes = $examTypes->paginate($this->perPage());
 
         return ExamTypeResource::collection($examTypes);
     }

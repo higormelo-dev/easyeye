@@ -68,7 +68,7 @@ class SchedulesController extends Controller
             });
         }
 
-        $schedules = $schedules->paginate(min((int) request()->get('per_page', 10), 10));
+        $schedules = $schedules->paginate($this->perPage());
 
         return ScheduleResource::collection($schedules);
     }

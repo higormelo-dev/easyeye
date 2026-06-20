@@ -1,0 +1,1008 @@
+# 3.0.3 (não 3.1): a spec usa idioma 3.0 (nullable, format: binary) e o
+# Swagger UI tem bug com 3.1 — renderiza seletor de server POR OPERAÇÃO que
+# ignora a seleção global (swagger-api/swagger-ui#9947, #9221).
+openapi: 3.0.3
+info:
+  title: EasyEye — Integrators API
+  version: "1.0.0"
+  description: |
+    API consumida pelo integrador desktop (EasyEye Integrator, em Rust).
+
+    Fluxo geral:
+      1. `POST /api/integrators/signin` com e-mail/senha do usuário integrador + `code`
+         do integrador → recebe um token Bearer (Sanctum) com validade de 7 dias.
+      2. Requests autenticados usam `Authorization: Bearer <token>`.
+      3. O token renova automaticamente quando está a ≤ 1 dia útil de expirar, e é
+         invalidado após 3 dias úteis sem uso (inatividade).
+      4. `POST /api/integrators/check-token` valida/renova o token sem consumir um endpoint de negócio.
+
+    Convenções:
+      - Coleções paginadas seguem o envelope `{ data, links, meta }` do Laravel.
+      - Recursos de exame usam o formato JSON:API-like `{ type, id, attributes, relationships }`.
+      - `idOrCode` aceita UUID, código formatado (ex.: `PAC-0000000123`) ou o número inteiro do código.
+      - Arquivos de exame são armazenados de forma PRIVADA; o campo `archive` retorna
+        uma URL ASSINADA temporária (validade ~24h). Não cacheie a URL além disso.
+      - Erros sempre retornam `{ "message": string }`; validação adiciona `{ "errors": {campo: [..]} }`.
+
+    Rate limiting (por integrador):
+      - `signin`: 10 req/min · `check-token`: 30 req/min.
+      - Rotas `v1/*`: 120 req/min para LEITURA (GET/HEAD) e 40 req/min para ESCRITA,
+        em buckets independentes. As respostas trazem `X-RateLimit-Limit` /
+        `X-RateLimit-Remaining`; o `429 Too Many Requests` inclui `Retry-After`.
+
+    Escopos de token (least-privilege):
+      - O signin aceita `scope` (`read` | `write`). `read` emite token somente
+        leitura; `write` ou ausente emite leitura+escrita. Operações de escrita
+        com token read-only retornam `403`.
+      - Tokens antigos (sem escopo) mantêm acesso total por compatibilidade.
+
+    Idempotência:
+      - Operações de escrita aceitam o header opcional `Idempotency-Key`
+        (8–128 caracteres). Re-tentativas com a mesma chave devolvem a resposta
+        de sucesso original com `Idempotency-Replayed: true`, sem reexecutar nem
+        reconsumir cota. Janela de retenção: 24h.
+
+    Conformidade:
+      - Acessos de leitura a dados sensíveis (pacientes/exames) são registrados em
+        trilha de auditoria (LGPD Art. 37 / CFM Res. 2.227/2018).
+
+# Nota: ao servir via /docs/api/spec, este bloco é substituído em runtime pela
+# lista do ambiente (ApiDocsController::servers) — em homolog/produção o server
+# de desenvolvimento local não aparece.
+servers:
+  - url: https://easyeye.app
+    description: Produção
+  - url: https://teste.easyeye.app
+    description: Homologação
+  - url: http://localhost:8085
+    description: Desenvolvimento (local)
+
+tags:
+  - name: Auth
+  - name: Equipments
+  - name: Patients
+  - name: Patient Exams
+  - name: Exams
+  - name: Exam Types
+  - name: Schedules
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/integrators/signin:
+    post:
+      tags: [Auth]
+      summary: Autentica o integrador e emite um token Bearer
+      security: []
+      description: "Rate limit: 10 req/min."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SigninRequest" }
+      responses:
+        "200":
+          description: Autenticado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SigninResponse" }
+        "401":
+          description: Credenciais inválidas / usuário, integrador ou entidade inativos
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorValid" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/integrators/check-token:
+    post:
+      tags: [Auth]
+      summary: Valida e (se necessário) renova um token
+      security: []
+      description: "Rate limit: 30 req/min."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CheckTokenRequest" }
+      responses:
+        "200":
+          description: Token válido
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckTokenResponse" }
+        "400":
+          description: Token não informado
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorValid" }
+        "401":
+          description: Token inválido / expirado / entidade inativa
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorValid" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/integrators/signout:
+    delete:
+      tags: [Auth]
+      summary: Revoga o token atual
+      responses:
+        "200":
+          description: Token revogado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/integrators/v1/equipments:
+    get:
+      tags: [Equipments]
+      summary: Lista equipamentos do integrador
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Página de equipamentos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/EquipmentResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Equipments]
+      summary: Cria um equipamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EquipmentUpsert" }
+      responses:
+        "200":
+          description: Equipamento criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EquipmentResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/integrators/v1/equipments/{equipment}:
+    parameters:
+      - $ref: "#/components/parameters/IdOrCode"
+    get:
+      tags: [Equipments]
+      summary: Detalha um equipamento
+      responses:
+        "200":
+          description: Equipamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EquipmentResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Equipments]
+      summary: Atualiza um equipamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EquipmentUpsert" }
+      responses:
+        "200":
+          description: Equipamento atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/EquipmentResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Equipments]
+      summary: Remove um equipamento
+      responses:
+        "204": { description: Removido }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/integrators/v1/patients:
+    get:
+      tags: [Patients]
+      summary: Lista pacientes da entidade
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Página de pacientes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/PatientResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /api/integrators/v1/patients/{patient}:
+    parameters:
+      - $ref: "#/components/parameters/IdOrCode"
+    get:
+      tags: [Patients]
+      summary: Detalha um paciente
+      responses:
+        "200":
+          description: Paciente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PatientResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/integrators/v1/patients/{patient}/exams:
+    parameters:
+      - $ref: "#/components/parameters/IdOrCode"
+    get:
+      tags: [Patient Exams]
+      summary: Lista exames de um paciente
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Página de exames
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/PatientExamResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Patient Exams]
+      summary: Envia um exame para o paciente (multipart)
+      description: |
+        Consome 1 da cota mensal `api_monthly_exam_sends` (reserva atômica).
+        `{patient}` DEVE ser um UUID. Aceita `Idempotency-Key` para re-tentativa segura.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ExamUpload" }
+      responses:
+        "201":
+          description: Exame criado
+          headers:
+            Idempotency-Replayed:
+              schema: { type: boolean }
+              description: Presente (`true`) quando a resposta é replay de um `Idempotency-Key` anterior.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PatientExamResource" }
+        "400":
+          description: "`Idempotency-Key` com formato inválido"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/integrators/v1/patients/{patient}/exams/{exam}:
+    parameters:
+      - $ref: "#/components/parameters/IdOrCode"
+      - name: exam
+        in: path
+        required: true
+        schema: { type: string }
+        description: "UUID ou código do exame (ex.: EXM-0000000123)"
+    get:
+      tags: [Patient Exams]
+      summary: Detalha um exame
+      responses:
+        "200":
+          description: Exame
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PatientExamResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [Patient Exams]
+      summary: Atualiza um exame
+      description: |
+        Consome 1 da cota mensal `api_monthly_exam_sends` (reserva atômica).
+        Para reenviar o arquivo, use a variante multipart via POST nesta mesma URL.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ExamUpload" }
+      responses:
+        "200":
+          description: Exame atualizado
+          headers:
+            Idempotency-Replayed:
+              schema: { type: boolean }
+              description: Presente (`true`) quando a resposta é replay de um `Idempotency-Key` anterior.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PatientExamResource" }
+        "400":
+          description: "`Idempotency-Key` com formato inválido"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    post:
+      tags: [Patient Exams]
+      summary: Atualiza um exame com novo arquivo (multipart)
+      description: Rota dedicada `patients.exams.update_multipart` (PUT não trafega multipart de forma confiável).
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ExamUpload" }
+      responses:
+        "200":
+          description: Exame atualizado
+          headers:
+            Idempotency-Replayed:
+              schema: { type: boolean }
+              description: Presente (`true`) quando a resposta é replay de um `Idempotency-Key` anterior.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PatientExamResource" }
+        "400":
+          description: "`Idempotency-Key` com formato inválido"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+    delete:
+      tags: [Patient Exams]
+      summary: Remove um exame
+      responses:
+        "204": { description: Removido }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/integrators/v1/exams:
+    post:
+      tags: [Exams]
+      summary: Envia um exame resolvendo paciente/médico pelo agendamento (multipart)
+      description: |
+        Informe `schedule_identifier` OU `patient_identifier`. Consome 1 da cota
+        mensal `api_monthly_exam_sends` (reserva atômica).
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ExamUploadByIdentifier" }
+      responses:
+        "201":
+          description: Exame criado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/PatientExamResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/integrators/v1/examtypes:
+    get:
+      tags: [Exam Types]
+      summary: Lista tipos de exame (globais + da entidade)
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+      responses:
+        "200":
+          description: Página de tipos de exame
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/ExamTypeResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/integrators/v1/examtypes/{examtype}:
+    parameters:
+      - $ref: "#/components/parameters/IdOrCode"
+    get:
+      tags: [Exam Types]
+      summary: Detalha um tipo de exame
+      responses:
+        "200":
+          description: Tipo de exame
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ExamTypeResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/integrators/v1/schedules:
+    get:
+      tags: [Schedules]
+      summary: Lista agendamentos
+      description: Sem `search`/`date`, retorna os agendamentos de hoje.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Search"
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+          description: Filtra por dia (YYYY-MM-DD)
+      responses:
+        "200":
+          description: Página de agendamentos
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: "#/components/schemas/ScheduleResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/integrators/v1/schedules/{schedule}:
+    parameters:
+      - $ref: "#/components/parameters/IdOrCode"
+    get:
+      tags: [Schedules]
+      summary: Detalha um agendamento
+      responses:
+        "200":
+          description: Agendamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/ScheduleResource" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PerPage:
+      name: per_page
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      description: Máximo 100 itens por página.
+    Search:
+      name: search
+      in: query
+      schema: { type: string }
+    IdOrCode:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+      description: "UUID, código formatado (ex.: PAC-0000000123) ou o número inteiro do código."
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,128}$" }
+      description: >-
+        Chave de idempotência opcional (8–128 caracteres: letras, dígitos, `-`
+        ou `_`). Re-tentativas de escrita com a mesma chave devolvem a resposta
+        de sucesso original (header `Idempotency-Replayed: true`) sem reexecutar
+        a operação nem consumir cota novamente. Retenção de 24h por integrador.
+
+  responses:
+    Unauthorized:
+      description: Token ausente, inválido ou expirado
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: >-
+        Plano sem acesso à API de integradores, cota mensal esgotada ou token
+        sem escopo para a operação (ex.: token read-only tentando escrever).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorValid" }
+    Conflict:
+      description: >-
+        Já há uma requisição com o mesmo `Idempotency-Key` em processamento.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ValidationError:
+      description: Erro de validação
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationError" }
+    TooManyRequests:
+      description: Limite de requisições excedido
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Segundos até poder tentar de novo
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    SigninRequest:
+      type: object
+      description: Credenciais do usuário integrador + código do integrador (dispositivo).
+      required: [email, password, code]
+      properties:
+        email:
+          type: string
+          format: email
+          description: E-mail do usuário integrador cadastrado pela clínica no painel.
+          example: integrador@clinicavisao.com.br
+        password:
+          type: string
+          format: password
+          description: Senha do usuário integrador.
+          example: "S3nh@Forte!2026"
+        code:
+          type: string
+          description: >-
+            Código do integrador vinculado ao usuário. Aceita o formato canônico
+            com zero-padding (`EI-0000000001`), o formato abreviado (`EI-1`) ou
+            lower-case (`ei-1`) — todos são normalizados internamente.
+            Cada instalação do EasyEye Integrator usa o seu próprio código.
+          example: EI-1
+        scope:
+          type: string
+          enum: [read, write]
+          description: >-
+            Escopo opcional do token. `read` emite token somente leitura;
+            `write` (ou ausente) emite token de leitura+escrita. Tokens são
+            barrados por verbo: escrita exige escopo `write`.
+          example: write
+
+    CheckTokenRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: >-
+            Token Bearer completo emitido no signin (campo access_token),
+            incluindo o prefixo numérico do Sanctum.
+          example: "12|wXyZ9aBcDeFgHiJkLmNoPqRsTuVw0123456789ab"
+
+    Error:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
+    ErrorValid:
+      type: object
+      properties:
+        message: { type: string }
+        valid: { type: boolean, example: false }
+      required: [message]
+    ValidationError:
+      type: object
+      properties:
+        message: { type: string }
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+      required: [message, errors]
+
+    Page:
+      type: object
+      properties:
+        data:
+          type: array
+          items: {}
+        links:
+          type: object
+          properties:
+            first: { type: string, nullable: true }
+            last: { type: string, nullable: true }
+            prev: { type: string, nullable: true }
+            next: { type: string, nullable: true }
+        meta:
+          type: object
+          properties:
+            current_page: { type: integer }
+            last_page: { type: integer }
+            per_page: { type: integer }
+            total: { type: integer }
+
+    SigninResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: >-
+            Token a enviar em todas as chamadas autenticadas, no header
+            "Authorization: Bearer <access_token>". Validade de 7 dias, com
+            renovação automática quando usado próximo do vencimento.
+          example: "12|wXyZ9aBcDeFgHiJkLmNoPqRsTuVw0123456789ab"
+        token_type: { type: string, example: Bearer }
+        expires_at:
+          type: string
+          format: date-time
+          description: Data/hora de expiração do token (ISO 8601, UTC).
+          example: "2026-06-17T18:30:00.000000Z"
+        user:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            entity_id: { type: string, format: uuid }
+            name: { type: string }
+            email: { type: string, format: email }
+            email_verified_at: { type: string, format: date-time, nullable: true }
+            active: { type: boolean }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+        integrator:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            entity_user_integrator_id: { type: string, format: uuid }
+            code: { type: string }
+            name: { type: string }
+            ip: { type: string, nullable: true }
+            mac: { type: string, nullable: true }
+            active: { type: boolean }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+        entity:
+          type: object
+          description: Identidade mínima da clínica (whitelist — LGPD).
+          properties:
+            id: { type: string, format: uuid }
+            code: { type: string }
+            name: { type: string }
+            subdomain: { type: string, nullable: true }
+            city: { type: string, nullable: true }
+            state: { type: string, nullable: true }
+            country: { type: string, nullable: true }
+            locale: { type: string, nullable: true }
+            schedule_interval: { type: integer, nullable: true }
+            active: { type: boolean }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+
+    CheckTokenResponse:
+      type: object
+      properties:
+        message: { type: string, example: Token válido. }
+        valid: { type: boolean, example: true }
+        renewed:
+          type: boolean
+          description: true quando a chamada renovou automaticamente a expiração (+7 dias).
+          example: false
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-06-17T18:30:00.000000Z"
+
+    EquipmentResource:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        attributes:
+          type: object
+          properties:
+            integrator_id: { type: string, format: uuid, nullable: true }
+            code: { type: string, nullable: true }
+            name: { type: string }
+            ip: { type: string, nullable: true }
+            mac: { type: string, nullable: true }
+            serial_number: { type: string, nullable: true }
+            active: { type: boolean, nullable: true }
+
+    EquipmentUpsert:
+      type: object
+      description: Dados do equipamento oftalmológico conectado ao integrador. name/ip/mac/serial são únicos por integrador.
+      required: [name, ip, mac, serial_number]
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: Nome de identificação do equipamento na clínica.
+          example: RETINOGRAFO CANON CR-2
+        ip:
+          type: string
+          format: ipv4
+          description: IP do equipamento na rede local da clínica.
+          example: 192.168.0.45
+        mac:
+          type: string
+          pattern: "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+          description: Endereço MAC da interface de rede (separado por dois-pontos ou hífen).
+          example: "A4:5E:60:D1:2B:9C"
+        serial_number:
+          type: string
+          maxLength: 100
+          description: Número de série do fabricante.
+          example: CR2-2024-008731
+
+    PatientResource:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        attributes:
+          type: object
+          properties:
+            entity_id: { type: string, format: uuid, nullable: true }
+            person_id: { type: string, format: uuid, nullable: true }
+            covenant_id: { type: string, format: uuid, nullable: true }
+            code: { type: string }
+            card_number: { type: string, nullable: true }
+            active: { type: boolean, nullable: true }
+
+    ExamTypeResource:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        attributes:
+          type: object
+          properties:
+            entity_id: { type: string, format: uuid, nullable: true }
+            code: { type: string }
+            name: { type: string }
+            suffix: { type: string, nullable: true }
+            category: { type: integer, nullable: true }
+            active: { type: boolean, nullable: true }
+
+    ScheduleResource:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        attributes:
+          type: object
+          properties:
+            entity_id: { type: string, format: uuid, nullable: true }
+            doctor_id: { type: string, format: uuid, nullable: true }
+            patient_id: { type: string, format: uuid, nullable: true }
+            code: { type: string }
+            full_name: { type: string, nullable: true }
+            date_time: { type: string, format: date-time, nullable: true }
+            situation: { type: integer, nullable: true }
+            active: { type: boolean, nullable: true }
+
+    PatientExamResource:
+      type: object
+      properties:
+        type: { type: string, example: patient_exams }
+        id: { type: string, format: uuid }
+        attributes:
+          type: object
+          properties:
+            patient_id: { type: string, format: uuid, nullable: true }
+            doctor_id: { type: string, format: uuid, nullable: true }
+            schedule_id: { type: string, format: uuid, nullable: true }
+            entity_integrator_equipment_id: { type: string, format: uuid, nullable: true }
+            code: { type: string, nullable: true }
+            archive:
+              type: string
+              nullable: true
+              description: URL ASSINADA temporária (~24h) para o arquivo privado no S3.
+            name: { type: string, nullable: true }
+            laterality:
+              type: integer
+              nullable: true
+              enum: [0, 1, 2]
+              description: "0=ambos/indefinido, 1=OD, 2=OE (conforme regra de negócio)."
+            active: { type: boolean, nullable: true }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+        relationships:
+          type: object
+          description: Presente apenas em respostas single (não em listagens). Campos minimizados (LGPD).
+          properties:
+            patient: { $ref: "#/components/schemas/RelationPerson" }
+            doctor: { $ref: "#/components/schemas/RelationPerson" }
+            schedule:
+              type: object
+              properties:
+                id: { type: string, format: uuid }
+                code: { type: string }
+                date_time: { type: string, format: date-time, nullable: true }
+                situation: { type: integer, nullable: true }
+            equipment:
+              type: object
+              properties:
+                id: { type: string, format: uuid }
+                code: { type: string, nullable: true }
+                name: { type: string }
+
+    RelationPerson:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, nullable: true }
+        full_name: { type: string, nullable: true }
+        nickname: { type: string, nullable: true }
+
+    ExamUpload:
+      type: object
+      description: Envio de exame para um paciente já identificado na URL (multipart/form-data).
+      required: [exam_identifier, name, archive]
+      properties:
+        exam_identifier:
+          type: string
+          description: Tipo de exame (ExamType) — aceita UUID, código (ETP-XXXXXXXXXX) ou só o número.
+          example: ETP-0000000007
+        schedule_identifier:
+          type: string
+          nullable: true
+          description: Agendamento a vincular (opcional) — UUID, código (SDL-XXXXXXXXXX) ou número.
+          example: SDL-0000004215
+        equipment_identifier:
+          type: string
+          nullable: true
+          description: Equipamento de origem (opcional) — UUID, código (EIQ-XXXXXXXXXX) ou número.
+          example: EIQ-0000000002
+        doctor_identifier:
+          type: string
+          nullable: true
+          description: Médico solicitante (opcional) — UUID, código (DOC-XXXXXXXXXX) ou número. Se ausente, herda o médico do agendamento.
+          example: DOC-0000000031
+        name:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Nome único do exame na clínica (case-insensitive). Reenviar o mesmo name substitui o arquivo do exame.
+          example: OCT-MACULA-20260610-PAC123-OD
+        laterality:
+          type: integer
+          nullable: true
+          enum: [0, 1, 2]
+          description: "Lateralidade do exame: 0 = ambos os olhos (AO), 1 = olho direito (OD), 2 = olho esquerdo (OE)."
+          example: 1
+        archive:
+          type: string
+          format: binary
+          description: Arquivo do exame — jpg, jpeg, png ou emr. Máx 10 MB.
+
+    ExamUploadByIdentifier:
+      type: object
+      description: >-
+        Envio de exame resolvendo o paciente automaticamente: informe
+        schedule_identifier (paciente e médico vêm do agendamento) OU
+        patient_identifier (vincula ao agendamento mais recente do dia, se houver).
+      required: [exam_identifier, name, archive]
+      properties:
+        exam_identifier:
+          type: string
+          description: Tipo de exame (ExamType) — aceita UUID, código (ETP-XXXXXXXXXX) ou só o número.
+          example: ETP-0000000007
+        schedule_identifier:
+          type: string
+          nullable: true
+          description: Agendamento — UUID, código (SDL-XXXXXXXXXX) ou número. Obrigatório se patient_identifier ausente.
+          example: SDL-0000004215
+        patient_identifier:
+          type: string
+          nullable: true
+          description: Paciente — UUID, código (PAC-XXXXXXXXXX) ou número. Obrigatório se schedule_identifier ausente.
+          example: PAC-0000000123
+        equipment_identifier:
+          type: string
+          nullable: true
+          description: Equipamento de origem (opcional) — UUID, código (EIQ-XXXXXXXXXX) ou número.
+          example: EIQ-0000000002
+        name:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Nome único do exame na clínica (case-insensitive). Reenviar o mesmo name substitui o arquivo do exame.
+          example: OCT-MACULA-20260610-PAC123-OD
+        laterality:
+          type: integer
+          nullable: true
+          enum: [0, 1, 2]
+          description: "Lateralidade do exame: 0 = ambos os olhos (AO), 1 = olho direito (OD), 2 = olho esquerdo (OE)."
+          example: 1
+        archive:
+          type: string
+          format: binary
+          description: Arquivo do exame — jpg, jpeg, png ou emr. Máx 10 MB.

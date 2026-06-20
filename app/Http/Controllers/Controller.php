@@ -12,6 +12,25 @@ abstract class Controller
     protected string $titleController;
 
     /**
+     * Resolve o tamanho da página para endpoints paginados de forma segura.
+     *
+     * Lê `per_page` da request com default e teto configuráveis. Substitui o
+     * antigo `min((int) per_page, 10)`, que travava qualquer cliente em 10
+     * itens por página (sincronizações grandes ficavam lentas).
+     */
+    protected function perPage(int $default = 25, int $max = 100): int
+    {
+        $value = (int) request()->integer('per_page', $default);
+
+        if ($value < 1) {
+            $value = $default;
+        }
+
+        return min($value, $max);
+    }
+
+    /**
+     * Get update message based on request type.
      * Get update message based on request type.
      */
     protected function getUpdateMessage(Request $request): string

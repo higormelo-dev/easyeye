@@ -29,6 +29,9 @@ services:
     working_dir: /var/www/html/app
     volumes:
       - ./:/var/www/html/app
+      # Dentro do container o Laravel sempre lê .env.docker (host.docker.internal),
+      # independente do symlink .env do host (que aponta para .env.local).
+      - ./.env.docker:/var/www/html/app/.env:ro
     environment:
       QUEUE_CONNECTION: ${QUEUE_CONNECTION_DOCKER:-database}
       # Habilita php artisan migrate --force automático no entrypoint
@@ -51,6 +54,8 @@ services:
     working_dir: /var/www/html/app
     volumes:
       - ./:/var/www/html/app
+      # Mesmo .env.docker do serviço app (ver comentário acima).
+      - ./.env.docker:/var/www/html/app/.env:ro
       - ./.docker/supervisor/supervisord.conf:/etc/supervisor/supervisord.conf:ro
       - ./.docker/supervisor/easyeye-worker.conf:/etc/supervisor/conf.d/easyeye-worker.conf:ro
     command: ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

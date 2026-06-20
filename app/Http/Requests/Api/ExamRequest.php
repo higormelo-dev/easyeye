@@ -167,37 +167,8 @@ class ExamRequest extends FormRequest
                     }
                 },
             ],
-            'archive'              => 'required|file|mimes:jpg,jpeg,png|max:10240',
-            'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
-            'equipment_identifier' => [
-                'nullable',
-                function ($attribute, $value, $fail) use ($integrator) {
-                    if ($value === null) {
-                        return;
-                    }
-
-                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
-                        $fail(trans('validation.uuid', ['attribute' => $attribute]));
-
-                        return;
-                    }
-
-                    $query = EntityIntegratorEquipment::query()
-                        ->where('integrator_id', $integrator->id)
-                        ->whereNull('deleted_at');
-
-                    [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id', $value],
-                        ctype_digit($value) => ['code', sprintf('EIQ-%010d', (int) $value)],
-                        default             => ['code', $value],
-                    };
-                    $query->where($column, $lookupValue);
-
-                    if (! $query->exists()) {
-                        $fail(__('validation.custom.validation_invalid.not_equipment_identifier'));
-                    }
-                },
-            ],
+            // Paridade com PatientExamRequest: equipamentos também exportam .emr
+            'archive' => 'required|file|mimes:jpg,jpeg,png,emr|max:10240',
         ];
     }
 

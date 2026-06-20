@@ -49,32 +49,26 @@ class ApiCheckTokenExpiration
             $token->save();
         }
 
-        // Validação de integrador (se o token for de um integrador)
-        $integratorId = $this->extractIntegratorId($token->abilities ?? []);
+        // auth_with_integrator (quando presente na pipeline, como nas rotas v1)
+        // já carregou e validou o integrador nesta request — não revalida nem re-consulta.
+        if ($request->attributes->has('integrator')) {
+            return $next($request);
+        }
+
+        // Fallback para uso standalone do middleware (sem auth_with_integrator antes)
+        $integratorId = EntityIntegrator::idFromTokenAbilities($token->abilities ?? []);
 
         if ($integratorId) {
             $integrator = EntityIntegrator::query()
                 ->with('user.entity')
-                ->where('id', $integratorId)
-                ->where('active', true)
-                ->first();
+                ->find($integratorId);
 
-            if (! $integrator) {
+            $blockReason = $integrator ? $integrator->accessBlockReason() : 'auth.integrator_inactive';
+
+            if ($blockReason !== null) {
                 $token->delete();
 
-                return $this->invalidResponse('auth.integrator_inactive');
-            }
-
-            if (! $integrator->user->active) {
-                $token->delete();
-
-                return $this->invalidResponse('auth.user_integrator_inactive');
-            }
-
-            if (! ($integrator->user->entity && $integrator->user->entity->active)) {
-                $token->delete();
-
-                return $this->invalidResponse('auth.entity_inactive');
+                return $this->invalidResponse($blockReason);
             }
 
             // Disponibiliza o integrador para uso posterior na request
@@ -82,24 +76,6 @@ class ApiCheckTokenExpiration
         }
 
         return $next($request);
-    }
-
-    /**
-     * Extrai o ID do integrador das abilities do token.
-     */
-    private function extractIntegratorId(array $abilities): ?string
-    {
-        foreach ($abilities as $key => $value) {
-            $ability = is_int($key) ? $value : $key;
-
-            if (str_starts_with($ability, 'integrator_id:')) {
-                $parts = explode(':', $ability, 2);
-
-                return $parts[1] ?? null;
-            }
-        }
-
-        return null;
     }
 
     /**

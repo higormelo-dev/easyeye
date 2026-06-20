@@ -4,7 +4,9 @@ namespace App\Services\Api;
 
 use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
 use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
+use Closure;
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\{DB, Storage};
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -21,7 +23,25 @@ class PatientExamService
      */
     public function create(PatientExamRequest $request, string $patientId): PatientExam
     {
-        return DB::transaction(fn () => $this->findOrCreate($request, $patientId));
+        $integrator = request()->attributes->get('integrator');
+        $entityId   = $integrator->user->entity_id;
+        $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
+
+        return $this->persistWithArchive(
+            $request->file('archive'),
+            "{$entityId}/{$patientId}/exams",
+            fn (string $archivePath): array => $this->persistExam(
+                patientId: $patientId,
+                entityId: $entityId,
+                examId: $this->examFindByIdOrCode($request->exam_identifier)?->id,
+                doctorId: $this->resolveDoctorId($request, $schedule),
+                scheduleId: $schedule?->id,
+                equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
+                name: $request->name,
+                archivePath: $archivePath,
+                laterality: $request->laterality !== null ? (int) $request->laterality : null,
+            ),
+        );
     }
 
     /**
@@ -31,36 +51,38 @@ class PatientExamService
      */
     public function createFromScheduleIdentifier(ExamRequest $request): PatientExam
     {
-        return DB::transaction(function () use ($request) {
-            $integrator = request()->attributes->get('integrator');
-            $entityId   = $integrator->user->entity_id;
-            $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
+        $integrator = request()->attributes->get('integrator');
+        $entityId   = $integrator->user->entity_id;
+        $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
 
-            if ($schedule) {
-                // Fluxo original: schedule_identifier informado
-                $patientId  = $schedule->patient_id;
-                $doctorId   = $schedule->doctor_id;
-                $scheduleId = $schedule->id;
-            } else {
-                // Fluxo alternativo: resolve pelo patient_identifier
-                $patient = $this->patientFindByIdOrCode($request->patient_identifier, $entityId);
-                abort_unless($patient !== null, 422, 'Patient not found.');
+        if ($schedule) {
+            // Fluxo original: schedule_identifier informado
+            $patientId  = $schedule->patient_id;
+            $doctorId   = $schedule->doctor_id;
+            $scheduleId = $schedule->id;
+        } else {
+            // Fluxo alternativo: resolve pelo patient_identifier
+            $patient = $this->patientFindByIdOrCode($request->patient_identifier, $entityId);
+            abort_unless($patient !== null, 422, 'Patient not found.');
 
-                $patientId = $patient->id;
+            $patientId = $patient->id;
 
-                // Tenta vincular ao agendamento mais recente do dia para esse paciente
-                $todaySchedule = Schedule::where('entity_id', $entityId)
-                    ->where('patient_id', $patientId)
-                    ->whereDate('date_time', now()->toDateString())
-                    ->whereNull('deleted_at')
-                    ->orderByDesc('date_time')
-                    ->first();
+            // Tenta vincular ao agendamento mais recente do dia para esse paciente
+            $todaySchedule = Schedule::where('entity_id', $entityId)
+                ->where('patient_id', $patientId)
+                ->whereDate('date_time', now()->toDateString())
+                ->whereNull('deleted_at')
+                ->orderByDesc('date_time')
+                ->first();
 
-                $doctorId   = $todaySchedule?->doctor_id;
-                $scheduleId = $todaySchedule?->id;
-            }
+            $doctorId   = $todaySchedule?->doctor_id;
+            $scheduleId = $todaySchedule?->id;
+        }
 
-            return $this->persistExam(
+        return $this->persistWithArchive(
+            $request->file('archive'),
+            "{$entityId}/{$patientId}/exams",
+            fn (string $archivePath): array => $this->persistExam(
                 patientId: $patientId,
                 entityId: $entityId,
                 examId: $this->examFindByIdOrCode($request->exam_identifier)?->id,
@@ -68,10 +90,10 @@ class PatientExamService
                 scheduleId: $scheduleId,
                 equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
                 name: $request->name,
-                archiveFile: $request->file('archive'),
+                archivePath: $archivePath,
                 laterality: $request->laterality !== null ? (int) $request->laterality : null,
-            );
-        });
+            ),
+        );
     }
 
     /**
@@ -81,47 +103,96 @@ class PatientExamService
      */
     public function update(PatientExam $patientExam, PatientExamRequest $request): PatientExam
     {
-        return DB::transaction(function () use ($patientExam, $request) {
-            $schedule = $this->scheduleFindByIdOrCode($request->schedule_identifier);
-            $data     = [
-                ...$request->only(self::FILLABLE_FIELDS),
-                'exam_id'                        => $this->examFindByIdOrCode($request->exam_identifier)?->id,
-                'entity_integrator_equipment_id' => $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
-                'doctor_id'                      => $this->resolveDoctorId($request, $schedule),
-                'schedule_id'                    => $schedule?->id,
-            ];
+        // Sem arquivo novo: update simples, sem tocar no S3.
+        if (! $request->hasFile('archive')) {
+            return DB::transaction(function () use ($patientExam, $request) {
+                $patientExam->update($this->buildUpdateData($request, null));
 
-            if ($request->hasFile('archive')) {
-                $uuid        = Str::uuid();
-                $timestamp   = time();
-                $integrator  = request()->attributes->get('integrator');
-                $file        = $request->file('archive');
-                $extension   = $file->getClientOriginalExtension();
-                $fileName    = "{$timestamp}_{$uuid}.{$extension}";
-                $archivePath = "{$integrator->user->entity_id}/{$patientExam->patient_id}/exams/{$fileName}";
+                return $patientExam->refresh();
+            });
+        }
 
-                if ($patientExam->archive) {
-                    Storage::disk('s3')->delete($patientExam->archive);
-                }
+        // Com arquivo novo: sobe o novo ANTES da transação, atualiza o registro
+        // e só apaga o antigo após o commit (ver persistWithArchive).
+        $integrator = request()->attributes->get('integrator');
+        $directory  = "{$integrator->user->entity_id}/{$patientExam->patient_id}/exams";
 
-                $uploaded = Storage::disk('s3')
-                    ->put(
-                        $archivePath,
-                        file_get_contents($file->getRealPath()),
-                        'public',
-                    );
+        return $this->persistWithArchive(
+            $request->file('archive'),
+            $directory,
+            function (string $archivePath) use ($patientExam, $request): array {
+                $oldPath = $patientExam->archive;
+                $patientExam->update($this->buildUpdateData($request, $archivePath));
 
-                if (! $uploaded) {
-                    throw new RuntimeException('Failed to upload exam archive.');
-                }
+                return [$patientExam->refresh(), $oldPath];
+            },
+        );
+    }
 
-                $data['archive'] = $archivePath;
-            }
+    /**
+     * Monta o payload de update do exame. Quando $archivePath é informado, inclui
+     * o novo caminho do arquivo; nulos são removidos para não sobrescrever colunas
+     * com valores ausentes no request.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildUpdateData(PatientExamRequest $request, ?string $archivePath): array
+    {
+        $schedule = $this->scheduleFindByIdOrCode($request->schedule_identifier);
+        $data     = [
+            ...$request->only(self::FILLABLE_FIELDS),
+            'exam_id'                        => $this->examFindByIdOrCode($request->exam_identifier)?->id,
+            'entity_integrator_equipment_id' => $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
+            'doctor_id'                      => $this->resolveDoctorId($request, $schedule),
+            'schedule_id'                    => $schedule?->id,
+        ];
 
-            $patientExam->update(array_filter($data, static fn ($value) => $value !== null));
+        if ($archivePath !== null) {
+            $data['archive'] = $archivePath;
+        } else {
+            // Evita que um UploadedFile vaze de request->only() para o update.
+            unset($data['archive']);
+        }
 
-            return $patientExam->refresh();
-        });
+        return array_filter($data, static fn ($value) => $value !== null);
+    }
+
+    /**
+     * Orquestra um upsert de exame com troca de arquivo de forma segura:
+     *
+     *   1. Faz upload do arquivo NOVO ANTES de abrir a transação.
+     *   2. Executa o persist (find-or-create/update) dentro da transação; o
+     *      callback devolve [PatientExam, ?caminho_do_arquivo_antigo].
+     *   3. Em rollback, apaga o arquivo recém-enviado (órfão).
+     *   4. Só após o COMMIT apaga o arquivo antigo.
+     *
+     * Garante a invariante: o registro nunca aponta para um arquivo inexistente.
+     * No pior caso sobra um órfão no S3 (limpável por GC), nunca o inverso.
+     *
+     * @param Closure(string): array{0: PatientExam, 1: ?string} $persist
+     *
+     * @throws Throwable
+     */
+    private function persistWithArchive(UploadedFile $file, string $directory, Closure $persist): PatientExam
+    {
+        $fileName    = sprintf('%d_%s.%s', time(), Str::uuid(), $file->getClientOriginalExtension());
+        $archivePath = $this->storeArchive($file, $directory, $fileName);
+
+        try {
+            /** @var array{0: PatientExam, 1: ?string} $result */
+            $result             = DB::transaction(static fn () => $persist($archivePath));
+            [$record, $oldPath] = $result;
+        } catch (Throwable $e) {
+            Storage::disk('s3')->delete($archivePath);
+
+            throw $e;
+        }
+
+        if ($oldPath !== null && $oldPath !== $archivePath) {
+            Storage::disk('s3')->delete($oldPath);
+        }
+
+        return $record;
     }
 
     public function destroyByIdOrCode(string $patientId, string $idOrCode): bool
@@ -144,7 +215,7 @@ class PatientExamService
     public function findByIdOrCode(string $patientId, string $idOrCode): ?PatientExam
     {
         $query = PatientExam::query()
-            ->with('patient')
+            ->with(['patient.person', 'doctor.person', 'schedule', 'equipment'])
             ->where('patient_id', $patientId)
             ->whereHas('patient', function ($query) {
                 $query->where('entity_id', request()->attributes->get('integrator')->user->entity_id)
@@ -161,28 +232,12 @@ class PatientExamService
     }
 
     /**
-     * Find or create record (used by PatientExamsController store).
-     */
-    private function findOrCreate(PatientExamRequest $request, string $patientId): PatientExam
-    {
-        $integrator = request()->attributes->get('integrator');
-        $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
-
-        return $this->persistExam(
-            patientId: $patientId,
-            entityId: $integrator->user->entity_id,
-            examId: $this->examFindByIdOrCode($request->exam_identifier)?->id,
-            doctorId: $this->resolveDoctorId($request, $schedule),
-            scheduleId: $schedule?->id,
-            equipmentId: $this->equipmentFindByIdOrCode($request->equipment_identifier)?->id,
-            name: $request->name,
-            archiveFile: $request->file('archive'),
-            laterality: $request->laterality !== null ? (int) $request->laterality : null,
-        );
-    }
-
-    /**
-     * Core upsert logic: upload archive and find-or-create the PatientExam record.
+     * Núcleo do upsert: faz find-or-create do PatientExam usando um arquivo JÁ
+     * enviado ao S3 (caminho em $archivePath). NÃO sobe nem apaga arquivos — a
+     * orquestração de upload/cleanup fica em persistWithArchive, para manter a
+     * ordem segura S3↔DB (upload antes do commit, delete do antigo após o commit).
+     *
+     * @return array{0: PatientExam, 1: ?string} [registro, caminho_do_arquivo_antigo]
      */
     private function persistExam(
         string $patientId,
@@ -192,17 +247,15 @@ class PatientExamService
         ?string $scheduleId,
         ?string $equipmentId,
         ?string $name,
-        mixed $archiveFile,
+        string $archivePath,
         ?int $laterality = null,
-    ): PatientExam {
-        $uuid        = Str::uuid();
-        $timestamp   = time();
-        $extension   = $archiveFile->getClientOriginalExtension();
-        $fileName    = "{$timestamp}_{$uuid}.{$extension}";
-        $archivePath = "{$entityId}/{$patientId}/exams/{$fileName}";
-
+    ): array {
+        // Escopo do upsert: o registro existente DEVE pertencer ao mesmo paciente.
+        // Sem o filtro por patient_id, um exame de outro paciente com o mesmo
+        // `name` seria reassociado e teria o arquivo apagado (corrupção cross-patient).
         $existingRecord = PatientExam::query()
             ->with('patient')
+            ->where('patient_id', $patientId)
             ->whereHas('patient', function ($query) use ($entityId) {
                 $query->where('entity_id', $entityId)->whereNull('deleted_at');
             })
@@ -210,36 +263,9 @@ class PatientExamService
             ->first();
 
         if ($existingRecord) {
-            if ($existingRecord->archive) {
-                Storage::disk('s3')->delete($existingRecord->archive);
-            }
+            $oldPath = $existingRecord->archive;
 
-            $uploaded = Storage::disk('s3')
-                ->put($archivePath, file_get_contents($archiveFile), 'public');
-
-            if ($uploaded) {
-                $existingRecord->update([
-                    'patient_id'                     => $patientId,
-                    'exam_id'                        => $examId,
-                    'doctor_id'                      => $doctorId,
-                    'schedule_id'                    => $scheduleId,
-                    'entity_integrator_equipment_id' => $equipmentId,
-                    'name'                           => $name,
-                    'laterality'                     => $laterality,
-                    'archive'                        => $archivePath,
-                ]);
-
-                return $existingRecord->refresh();
-            }
-
-            throw new RuntimeException('Failed to upload exam archive.');
-        }
-
-        $uploaded = Storage::disk('s3')
-            ->put($archivePath, file_get_contents($archiveFile), 'public');
-
-        if ($uploaded) {
-            return PatientExam::create([
+            $existingRecord->update([
                 'patient_id'                     => $patientId,
                 'exam_id'                        => $examId,
                 'doctor_id'                      => $doctorId,
@@ -249,9 +275,40 @@ class PatientExamService
                 'laterality'                     => $laterality,
                 'archive'                        => $archivePath,
             ]);
+
+            return [$existingRecord->refresh(), $oldPath];
         }
 
-        throw new RuntimeException('Failed to upload exam archive.');
+        $record = PatientExam::create([
+            'patient_id'                     => $patientId,
+            'exam_id'                        => $examId,
+            'doctor_id'                      => $doctorId,
+            'schedule_id'                    => $scheduleId,
+            'entity_integrator_equipment_id' => $equipmentId,
+            'name'                           => $name,
+            'laterality'                     => $laterality,
+            'archive'                        => $archivePath,
+        ]);
+
+        return [$record, null];
+    }
+
+    /**
+     * Faz upload do arquivo de exame em streaming (sem carregar tudo em memória),
+     * sempre com visibilidade privada — exame é dado sensível de saúde (LGPD art. 11).
+     * O acesso é feito via URL assinada temporária (PatientExam::archiveUrl()).
+     *
+     * @throws RuntimeException quando o upload falha
+     */
+    private function storeArchive(UploadedFile $file, string $directory, string $fileName): string
+    {
+        $path = Storage::disk('s3')->putFileAs($directory, $file, $fileName, 'private');
+
+        if ($path === false) {
+            throw new RuntimeException('Failed to upload exam archive.');
+        }
+
+        return $path;
     }
 
     /**

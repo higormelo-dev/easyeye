@@ -3,14 +3,17 @@
 use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     ApiCheckPlanAccess,
     ApiCheckTokenExpiration,
+    ApiIdempotency,
     ApiTokenPreCheck,
     CheckFeature,
     CheckJsonResponse,
     CheckSubscription,
+    EnsureApiDocsAccess,
     EnsureEntityRole,
     EnsureEntitySelected,
     EnsureIsPartner,
     EnsureSaasAdmin,
+    EnsureTokenScope,
     EnsureTwoFactor,
     EnsureUserBelongsToEntity,
     HandleImpersonation,
@@ -86,12 +89,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth_with_integrator' => ApiAuthenticateWithIntegrator::class,
             'token.precheck'       => ApiTokenPreCheck::class,
             'token.expiration'     => ApiCheckTokenExpiration::class,
+            'token.scope'          => EnsureTokenScope::class,
+            'idempotency'          => ApiIdempotency::class,
             'api.plan'             => ApiCheckPlanAccess::class,
             'terms.accepted'       => RequireTermsAcceptance::class,
             'partner'              => EnsureIsPartner::class,
             'saas.admin'           => EnsureSaasAdmin::class,
             'admin.audit'          => LogAdminAccess::class,
             '2fa'                  => EnsureTwoFactor::class,
+            'docs.access'          => EnsureApiDocsAccess::class,
         ]);
 
         // Adiciona o SetLocale, HandleImpersonation e HandleInertiaRequests ao grupo web
@@ -155,9 +161,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (HttpException $e, $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
+                // Preserva headers do erro (ex.: Retry-After e X-RateLimit-* do
+                // ThrottleRequestsException no 429) — sem o 3º argumento o cliente
+                // não saberia quando re-tentar.
                 return response()->json([
                     'message' => $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error',
-                ], $e->getStatusCode());
+                ], $e->getStatusCode(), $e->getHeaders());
             }
 
             // Inertia requests: redireciona de volta com flash de erro em vez de

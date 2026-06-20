@@ -248,6 +248,64 @@ class FeatureGateService
         return true;
     }
 
+    /**
+     * Verifica o gating do plano E consome a cota mensal de forma ATÔMICA.
+     *
+     * Para features mensais, o consumo usa um UPDATE condicional no banco
+     * (ver UsageMeterService::reserveMonthly), fechando a janela de corrida do
+     * padrão can()+increment(): sob requests concorrentes, a cota nunca estoura.
+     *
+     * Em caso de falha na operação subsequente, reverta com decrement().
+     *
+     * @return bool true se autorizado e reservado; false se gated ou cota esgotada.
+     */
+    public function tryConsume(string $entityId, FeatureKey $feature, int $amount = 1): bool
+    {
+        $status = $this->status($entityId, $feature);
+
+        // Gating do plano (inclui feature não incluída, API desabilitada, sem assinatura).
+        if (! $status->allowed) {
+            return false;
+        }
+
+        // Features baseadas em counter de domínio (max_users, etc.) já foram
+        // verificadas por status() — não há contador mensal a reservar.
+        if (! $feature->isMonthlyReset()) {
+            return true;
+        }
+
+        $subscription = $this->getSubscription($entityId);
+
+        if (! $subscription) {
+            return false;
+        }
+
+        $reserved = $this->usageMeter->reserveMonthly(
+            $entityId,
+            $feature,
+            $subscription->id,
+            $status->isUnlimited ? 0 : $status->limit,
+            $amount,
+        );
+
+        unset($this->subscriptionCache[$entityId]);
+
+        return $reserved;
+    }
+
+    /**
+     * Igual a tryConsume(), mas lança FeatureDeniedException (auto-renderizável)
+     * quando o gating falha ou a cota está esgotada. Recomendado em controllers.
+     *
+     * @throws FeatureDeniedException
+     */
+    public function consumeOrFail(string $entityId, FeatureKey $feature, int $amount = 1): void
+    {
+        if (! $this->tryConsume($entityId, $feature, $amount)) {
+            throw new FeatureDeniedException($feature, $this->status($entityId, $feature));
+        }
+    }
+
     // ── Utilitários ──────────────────────────────────────────────────────────
 
     /**
