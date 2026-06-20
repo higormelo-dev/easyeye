@@ -38,5 +38,8 @@
     "additionalDirectories": [
       "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images"
     ]
+  },
+  "enabledPlugins": {
+    "ecc@ecc": true
   }
 }
