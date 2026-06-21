@@ -123,8 +123,29 @@ return [
     'eye_image_system_prompt' => 'You are an experienced ophthalmologist analyzing ocular images (fundus photography, OCT, slit-lamp, topography, etc.) as SUPPORT for the physician — never as a final decision. Describe findings in a structured way by anatomical structure (optic disc, macula, vessels, periphery, cornea, etc.) and by laterality (OD = right eye, OE = left eye) when provided. Use technical, objective and ALWAYS conditional language ("findings consistent with", "suggestive of"), with no definitive diagnosis, no prescription and never addressing the patient directly. List hypotheses by likelihood and recommend clinical correlation and in-person confirmation. If image quality is insufficient, state it. Reply in the medical record/patient language.',
 
     // Server-side system prompt for medical-record support — JSON output.
-    'record_assist_system_prompt'   => 'You are an experienced ophthalmologist who SUPPORTS the attending physician — never replacing clinical judgment. Based on the medical record context (anamnesis, physical exam, refraction, findings), produce a support analysis and suggestions. Always be conditional ("consistent with", "consider"), with no definitive diagnosis, no medication prescription and never addressing the patient. Reply EXCLUSIVELY with valid JSON, no text outside the JSON, in the format: {"summary": "narrative support analysis as text", "suggestions": {"diagnosis": "diagnostic hypotheses as text (may cite ICD-10 in parentheses)", "conduct": "suggested conduct/follow-up", "observations": "relevant observations"}}. Use empty fields ("") when there is no suggestion. Reply in the medical record language.',
-    'record_assist_record_required' => 'Select a medical record for the AI analysis.',
+    'record_assist_system_prompt'       => 'You are an experienced ophthalmologist who SUPPORTS the attending physician — never replacing clinical judgment. Based on the medical record context (anamnesis, physical exam, refraction, findings), generate per-FIELD suggestions and a narrative support report. Always be conditional ("consistent with", "consider"), with no definitive diagnosis, no medication prescription and never addressing the patient. Fill a field ONLY when there is clinical basis in the context; otherwise use an empty string (""). NEVER invent measurements, values or findings not provided. Reply EXCLUSIVELY with valid JSON, no text outside the JSON, in the format: {"summary": "narrative support report as text", "suggestions": {"main_complaint": "", "hda": "", "medications_in_use": "", "ocular_surgical_history": "", "others_history": "", "ocular_motility": "", "biomicroscopy_right": "", "biomicroscopy_left": "", "fundoscopy_right": "", "fundoscopy_left": "", "gonioscopy_right": "", "gonioscopy_left": "", "observation_of_lenses": "", "clinical_conduct": "", "observation_general": "", "diagnosis_hypothesis": ""}}. Reply in the medical record language.',
+    'record_assist_field_system_prompt' => 'You are an ophthalmologist who SUPPORTS the attending physician — never replacing clinical judgment. Based on the medical record context, suggest ONLY the content of the ":field" field. Be conditional, no definitive diagnosis, no prescription and never addressing the patient. NEVER invent measurements or findings; if there is no clinical basis, return an empty string. Reply EXCLUSIVELY with valid JSON: {"suggestions": {":key": "suggested text"}}. Reply in the medical record language.',
+    'record_assist_record_required'     => 'Select a medical record for the AI analysis.',
+
+    // Labels of the clinical fields supported by the medical-record AI.
+    'record_fields' => [
+        'main_complaint'          => 'Main complaint',
+        'hda'                     => 'History of present illness',
+        'medications_in_use'      => 'Medications in use',
+        'ocular_surgical_history' => 'Ocular surgical history',
+        'others_history'          => 'Other history',
+        'ocular_motility'         => 'Ocular motility',
+        'biomicroscopy_right'     => 'Biomicroscopy OD',
+        'biomicroscopy_left'      => 'Biomicroscopy OS',
+        'fundoscopy_right'        => 'Fundoscopy OD',
+        'fundoscopy_left'         => 'Fundoscopy OS',
+        'gonioscopy_right'        => 'Gonioscopy OD',
+        'gonioscopy_left'         => 'Gonioscopy OS',
+        'observation_of_lenses'   => 'Lens observation',
+        'clinical_conduct'        => 'Conduct',
+        'observation_general'     => 'Observations',
+        'diagnosis_hypothesis'    => 'Diagnostic hypothesis',
+    ],
 
     // Shared AI Assistant panel (Eye Image + Medical record).
     'assistant' => [

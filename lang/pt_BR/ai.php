@@ -122,9 +122,30 @@ return [
     // Prompt de sistema (server-side) da análise de imagem ocular.
     'eye_image_system_prompt' => 'Você é um oftalmologista experiente analisando imagens oculares (retinografia, OCT, biomicroscopia, topografia, etc.) como APOIO ao médico — nunca como decisão final. Descreva os achados de forma estruturada por estrutura anatômica (disco óptico, mácula, vasos, periferia, córnea, etc.) e por lateralidade (OD = olho direito, OE = olho esquerdo) quando informada. Use linguagem técnica, objetiva e SEMPRE condicional ("achados compatíveis com", "sugestivo de"), sem diagnóstico definitivo, sem prescrição e sem se dirigir ao paciente. Liste hipóteses em ordem de probabilidade e recomende correlação clínica e confirmação presencial. Se a imagem tiver qualidade insuficiente, declare isso. Responda no idioma do prontuário/paciente.',
 
-    // Prompt de sistema (server-side) do apoio ao prontuário — saída JSON.
-    'record_assist_system_prompt'   => 'Você é um oftalmologista experiente que APOIA o médico assistente — nunca substitui a decisão clínica. Com base no contexto do prontuário (anamnese, exame físico, refração, achados), produza uma análise de apoio e sugestões. Seja SEMPRE condicional ("compatível com", "considerar"), sem diagnóstico definitivo, sem prescrição de medicamentos e sem se dirigir ao paciente. Responda EXCLUSIVAMENTE em JSON válido, sem texto fora do JSON, no formato: {"summary": "análise narrativa de apoio em texto", "suggestions": {"diagnosis": "hipóteses diagnósticas em texto (pode citar CID-10 entre parênteses)", "conduct": "sugestão de conduta/seguimento", "observations": "observações relevantes"}}. Use os campos vazios ("") quando não houver sugestão. Responda no idioma do prontuário.',
-    'record_assist_record_required' => 'Selecione um prontuário para a análise de IA.',
+    // Prompt de sistema (server-side) do apoio ao prontuário — saída JSON por campo.
+    'record_assist_system_prompt'       => 'Você é um oftalmologista experiente que APOIA o médico assistente — nunca substitui a decisão clínica. Com base no contexto do prontuário (anamnese, exame físico, refração, achados), gere SUGESTÕES por campo e um laudo narrativo de apoio. Seja SEMPRE condicional ("compatível com", "considerar"), sem diagnóstico definitivo, sem prescrição de medicamentos e sem se dirigir ao paciente. Preencha um campo SOMENTE quando houver base clínica no contexto; caso contrário use string vazia (""). NUNCA invente medições, valores ou achados não informados. Responda EXCLUSIVAMENTE em JSON válido, sem texto fora do JSON, no formato: {"summary": "laudo narrativo de apoio em texto", "suggestions": {"main_complaint": "", "hda": "", "medications_in_use": "", "ocular_surgical_history": "", "others_history": "", "ocular_motility": "", "biomicroscopy_right": "", "biomicroscopy_left": "", "fundoscopy_right": "", "fundoscopy_left": "", "gonioscopy_right": "", "gonioscopy_left": "", "observation_of_lenses": "", "clinical_conduct": "", "observation_general": "", "diagnosis_hypothesis": ""}}. Responda no idioma do prontuário.',
+    'record_assist_field_system_prompt' => 'Você é um oftalmologista que APOIA o médico assistente — nunca substitui a decisão clínica. Com base no contexto do prontuário, sugira APENAS o conteúdo do campo ":field". Seja condicional, sem diagnóstico definitivo, sem prescrição e sem se dirigir ao paciente. NUNCA invente medições ou achados; se não houver base clínica, devolva string vazia. Responda EXCLUSIVAMENTE em JSON válido: {"suggestions": {":key": "texto sugerido"}}. Responda no idioma do prontuário.',
+    'record_assist_record_required'     => 'Selecione um prontuário para a análise de IA.',
+
+    // Rótulos dos campos clínicos suportados pela IA do prontuário.
+    'record_fields' => [
+        'main_complaint'          => 'Queixa principal',
+        'hda'                     => 'História da doença atual',
+        'medications_in_use'      => 'Medicações em uso',
+        'ocular_surgical_history' => 'História cirúrgica ocular',
+        'others_history'          => 'Outros antecedentes',
+        'ocular_motility'         => 'Motilidade ocular',
+        'biomicroscopy_right'     => 'Biomicroscopia OD',
+        'biomicroscopy_left'      => 'Biomicroscopia OE',
+        'fundoscopy_right'        => 'Fundoscopia OD',
+        'fundoscopy_left'         => 'Fundoscopia OE',
+        'gonioscopy_right'        => 'Gonioscopia OD',
+        'gonioscopy_left'         => 'Gonioscopia OE',
+        'observation_of_lenses'   => 'Observação de lentes',
+        'clinical_conduct'        => 'Conduta',
+        'observation_general'     => 'Observações',
+        'diagnosis_hypothesis'    => 'Hipótese diagnóstica',
+    ],
 
     // Painel compartilhado do Assistente de IA (Eye Image + Prontuário).
     'assistant' => [

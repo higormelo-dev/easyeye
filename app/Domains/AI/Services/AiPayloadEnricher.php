@@ -24,6 +24,20 @@ use App\Services\FeatureGateService;
  */
 class AiPayloadEnricher
 {
+    /**
+     * Campos clínicos do prontuário que a IA pode sugerir (record_assist).
+     * Espelha as chaves do JSON em ai.record_assist_system_prompt e os v-model
+     * do MedicalRecordForm (1:1, exceto diagnosis_hypothesis → conduta/observação).
+     *
+     * @var list<string>
+     */
+    private const RECORD_FIELDS = [
+        'main_complaint', 'hda', 'medications_in_use', 'ocular_surgical_history',
+        'others_history', 'ocular_motility', 'biomicroscopy_right', 'biomicroscopy_left',
+        'fundoscopy_right', 'fundoscopy_left', 'gonioscopy_right', 'gonioscopy_left',
+        'observation_of_lenses', 'clinical_conduct', 'observation_general', 'diagnosis_hypothesis',
+    ];
+
     public function __construct(
         private readonly AiMedicalContextBuilder $contextBuilder,
         private readonly AiPromptGuardrailService $promptGuardrails,
@@ -73,8 +87,16 @@ class AiPayloadEnricher
             if (empty($payload['medical_record_id'])) {
                 abort(422, __('ai.record_assist_record_required'));
             }
-            $payload['system_prompt'] = __('ai.record_assist_system_prompt');
-            $payload['expects_json']  = true;
+
+            // Modo por campo: quando `field` é um campo clínico suportado, usa o
+            // prompt single-field (sugere só aquele campo). Senão, análise completa.
+            $field = (string) ($payload['field'] ?? '');
+
+            $payload['system_prompt'] = $field !== '' && in_array($field, self::RECORD_FIELDS, true)
+                ? __('ai.record_assist_field_system_prompt', ['field' => __('ai.record_fields.' . $field), 'key' => $field])
+                : __('ai.record_assist_system_prompt');
+
+            $payload['expects_json'] = true;
         }
 
         return $payload;

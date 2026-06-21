@@ -51,6 +51,8 @@ class StoreAiRunRequest extends BaseRequest
             'exam_ids.*'        => ['uuid'],
             'expects_json'      => ['nullable', 'boolean'],
             'max_output_tokens' => ['nullable', 'integer', 'min:64', 'max:8192'],
+            // record_assist single-field: campo clínico alvo (validado no enricher).
+            'field' => ['nullable', 'string', 'max:60'],
         ];
     }
 

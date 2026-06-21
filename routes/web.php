@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\{
     AiCreditPurchasesController,
+    AiRunPromptsController,
     AiRunsController,
     ComplianceController,
     DoctorWorkScheduleController,
@@ -292,11 +293,11 @@ Route::group(
                         ->middleware('throttle:ai-estimate')->name('search.medical-records');
 
                     // Prompts favoritos inline para o painel do AiAssistantPanel (Onda 3, P1)
-                    Route::get('runs/my-prompts', [AiRunsController::class, 'myPrompts'])
+                    Route::get('runs/my-prompts', [AiRunPromptsController::class, 'index'])
                         ->middleware('throttle:ai-estimate')->name('my-prompts.index');
-                    Route::post('runs/my-prompts', [AiRunsController::class, 'storeMyPrompt'])
+                    Route::post('runs/my-prompts', [AiRunPromptsController::class, 'store'])
                         ->middleware('throttle:ai-decision')->name('my-prompts.store');
-                    Route::delete('runs/my-prompts/{aiPrompt}', [AiRunsController::class, 'destroyMyPrompt'])
+                    Route::delete('runs/my-prompts/{aiPrompt}', [AiRunPromptsController::class, 'destroy'])
                         ->middleware('throttle:ai-decision')->name('my-prompts.destroy');
                     Route::post('runs/{aiRun}/approve', [AiRunsController::class, 'approve'])
                         ->middleware('throttle:ai-decision')->name('approve');
