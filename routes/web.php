@@ -133,7 +133,7 @@ Route::post('/session/ping', function () {
 Route::group(
     // 2fa entra DEPOIS de entity.selected (precisa da entity na sessão para
     // decidir se exige 2FA via Entity.requires_two_factor).
-    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'entity.selected', '2fa'], 'as' => 'panel.'],
+    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'entity.selected', 'tenant.bind', '2fa'], 'as' => 'panel.'],
     function () {
         Route::get('/', function () {
             return redirect()->route('panel.dashboard');

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToEntity;
 use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
 use DB;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 class MedicalRecord extends Model
 {
     use Auditable;
+    use BelongsToEntity;
 
     // use HasFactory;
     use HasAuditColumns;

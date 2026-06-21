@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\{PatientMood, ScheduleSituation};
+use App\Models\Concerns\BelongsToEntity;
 use App\Presenters\SchedulePresenter;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, Relations\BelongsToMany, Relations\HasMany, SoftDeletes};
@@ -12,6 +13,7 @@ use Laracasts\Presenter\PresentableTrait;
 class Schedule extends Model
 {
     use Auditable;
+    use BelongsToEntity;
     use HasAuditColumns;
     use HasUuids;
     use PresentableTrait;

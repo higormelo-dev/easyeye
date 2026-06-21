@@ -22,6 +22,7 @@ use App\Http\Middleware\{ApiAuthenticateWithIntegrator,
     ParseMultipartFormData,
     RequireTermsAcceptance,
     SetLocale};
+use App\Http\Middleware\BindTenantContext;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -81,6 +82,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ], subdomains: true);
 
         $middleware->alias([
+            'tenant.bind'          => BindTenantContext::class,
             'entity.selected'      => EnsureEntitySelected::class,
             'entity.member'        => EnsureUserBelongsToEntity::class,
             'entity.role'          => EnsureEntityRole::class,

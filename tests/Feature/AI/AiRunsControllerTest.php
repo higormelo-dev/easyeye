@@ -166,7 +166,7 @@ test('store cria run reservada e despacha job', function () {
 
     // No novo modelo, reserva consome COTA primeiro (depois balance).
     // Validamos que o saldo disponível diminuiu — não importa de onde foi descontado.
-    $after = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
+    $after           = AiCreditWallet::query()->where('entity_id', $this->entity->id)->firstOrFail();
     $beforeAvailable = (int) $before->balance + max(0, (int) $before->monthly_quota - (int) $before->monthly_quota_used);
     $afterAvailable  = (int) $after->balance + max(0, (int) $after->monthly_quota - (int) $after->monthly_quota_used);
     expect($afterAvailable)->toBeLessThan($beforeAvailable);
@@ -651,10 +651,13 @@ test('store bloqueia paciente de outra entity (cross-tenant)', function () {
         'patient_id' => $otherPatient->id,
     ]);
 
+    // 404 (não 403): o EntityScope global esconde registros de outra entity,
+    // então o paciente "não existe" para este tenant — isolamento mais forte,
+    // sem revelar a existência do recurso em outra clínica.
     $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEntityUser))
         ->postJson(route('panel.ai-runs.store'), $payload)
-        ->assertForbidden();
+        ->assertNotFound();
 
     expect(AiRun::query()->where('entity_id', $this->entity->id)->count())->toBe(0);
 });

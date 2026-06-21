@@ -6,6 +6,7 @@ namespace App\Domains\AI\Models;
 
 use App\Domains\AI\Services\{AiAnalyticsService, AiQuotaService};
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
+use App\Models\Concerns\BelongsToEntity;
 use App\Models\{Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, User};
 use App\Traits\Auditable;
 use Database\Factories\AI\AiRunFactory;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class AiRun extends Model
 {
     use Auditable;
+    use BelongsToEntity;
     use HasFactory;
     use HasUuids;
 

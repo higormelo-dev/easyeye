@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToEntity;
 use App\Presenters\PatientPresenter;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -12,6 +13,7 @@ use Laracasts\Presenter\PresentableTrait;
 class Patient extends Model
 {
     use Auditable;
+    use BelongsToEntity;
     use HasAuditColumns;
     use HasFactory;
     use HasUuids;

@@ -10,6 +10,7 @@ use App\Domains\AI\Services\{AiCircuitBreakerService, AiProviderManager, AiProvi
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
+use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Singletons: cache por request
+        $this->app->singleton(TenantContext::class);
         $this->app->singleton(FeatureGateService::class);
         $this->app->singleton(AuditService::class);
         $this->app->singleton(VersionService::class);

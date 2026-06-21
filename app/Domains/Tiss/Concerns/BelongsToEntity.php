@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Tiss\Concerns;
 
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\BelongsToEntity as BaseBelongsToEntity;
 
 trait BelongsToEntity
 {
-    public function scopeForEntity(Builder $query, string $entityId): Builder
-    {
-        return $query->where('entity_id', $entityId);
-    }
+    // Herda EntityScope global + auto-set de entity_id + scopeForEntity.
+    use BaseBelongsToEntity;
 
     public function resolveRouteBinding($value, $field = null): ?self
     {
