@@ -149,6 +149,7 @@ return [
     ],
 
     'actions' => [
+        'close'          => 'Close',
         'view'           => 'Details',
         'credit'         => 'Approve and credit',
         'cancel'         => 'Cancel purchase',
@@ -203,6 +204,7 @@ return [
     ],
 
     'detail' => [
+        'title'           => 'Credit purchase order',
         'tab_info'        => 'Information',
         'tab_timeline'    => 'Timeline',
         'tab_metadata'    => 'Metadata',
@@ -210,14 +212,24 @@ return [
         'idempotency_key' => 'Idempotency key',
         'subscription'    => 'Linked subscription',
         'wallet_balance'  => 'Current wallet balance',
+        'requested_at'    => 'Requested at',
+        'requested_by'    => 'Requested by',
+        'credits'         => 'credits',
+        'courtesy'        => 'Courtesy — no charge',
+        'no_charge'       => 'R$ 0.00',
+        'loading'           => 'Loading…',
+        'no_metadata'       => 'No metadata.',
+        'reload'            => 'Reload',
+        'detail_not_loaded' => 'Details not loaded yet — reopen the order.',
     ],
 
     'timeline' => [
         'created'   => 'Purchase created',
-        'credited'  => 'Credited',
+        'credited'  => 'Credits released',
         'cancelled' => 'Cancelled',
         'failed'    => 'Gateway failure',
-        'refunded'  => 'Refunded',
+        'refunded'  => 'Refunded (credits reversed)',
+        'empty'     => 'No events recorded.',
     ],
 
     'errors' => [

@@ -1,13 +1,17 @@
 <script setup>
+import { ref } from 'vue';
 import { Head, Link } from '@inertiajs/vue3';
 import AppLayout              from '@/Layouts/AppLayout.vue';
 import PatientInfoSidebar     from './Components/PatientInfoSidebar.vue';
+import PreviousRecordsCard    from './Components/PreviousRecordsCard.vue';
+import MedicalRecordViewModal from './Components/MedicalRecordViewModal.vue';
 import MedicalRecordForm      from './Components/MedicalRecordForm.vue';
 
 defineProps({
     breadcrumbs:     { type: Array,   default: () => [] },
     patient:         { type: Object,  required: true },
     medicalrecord:   { type: Object,  default: null },
+    previousRecords: { type: Array,   default: () => [] },
     doctors:         { type: Array,   default: () => [] },
     currentDoctorId: { type: String,  default: null },
     canChooseDoctor: { type: Boolean, default: false },
@@ -18,6 +22,17 @@ defineProps({
     storage:         { type: Object,  default: () => ({}) },
     t:               { type: Object,  default: () => ({}) },
 });
+
+const viewOpen = ref(false);
+const viewRecord = ref(null);
+function openView(record) {
+    viewRecord.value = record;
+    viewOpen.value = true;
+}
+function closeView() {
+    viewOpen.value = false;
+    viewRecord.value = null;
+}
 </script>
 
 <template>
@@ -43,6 +58,7 @@ defineProps({
                 <div class="col-12 col-lg-3 col-xl-2">
                     <div class="patient-info-sticky">
                         <PatientInfoSidebar :patient="patient" />
+                        <PreviousRecordsCard :records="previousRecords" :t="t" @view="openView" />
                     </div>
                 </div>
 
@@ -65,5 +81,7 @@ defineProps({
                 </div>
             </div>
         </div>
+
+        <MedicalRecordViewModal :open="viewOpen" :record="viewRecord" :t="t" @close="closeView" />
     </AppLayout>
 </template>

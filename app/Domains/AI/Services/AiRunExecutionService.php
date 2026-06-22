@@ -10,6 +10,7 @@ use App\Domains\AI\Models\AiRun;
 use App\DTOs\AI\AiRequestData;
 use App\Enums\AI\{AiRiskLevel, AiRunStatus};
 use App\Models\PatientExam;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class AiRunExecutionService
@@ -123,8 +124,20 @@ class AiRunExecutionService
             : AiRunStatus::tryFrom((string) $run->status);
 
         if ($status !== AiRunStatus::Failed) {
-            $this->runRepository->markFailed($run, $reason);
+            $this->runRepository->markFailed($run, $this->doctorSafeReason($reason));
         }
+    }
+
+    /**
+     * Mensagem de falha exibida ao médico — NUNCA revela o provedor/modelo de IA
+     * (requisito de produto: a IA é "caixa-preta" para o usuário clínico). O
+     * detalhe técnico cru (com provedor) vai apenas para o log.
+     */
+    private function doctorSafeReason(string $reason): string
+    {
+        Log::warning('AI run failure (raw)', ['reason' => $reason]);
+
+        return __('ai.run_failed_generic');
     }
 
     /**

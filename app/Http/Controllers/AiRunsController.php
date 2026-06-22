@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Domains\AI\Exceptions\InsufficientAiCreditsException;
-use App\Domains\AI\Models\{AiRun};
+use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiAnalyticsService, AiCreditPurchaseService, AiCreditWalletService, AiFeedbackService, AiPayloadEnricher, AiPricingService, AiProviderSettings, AiQuotaService, AiRunDocumentationService, AiRunEstimateService, AiRunExecutionService};
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, EntityGate, FeatureKey};

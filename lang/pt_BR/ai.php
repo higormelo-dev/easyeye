@@ -24,6 +24,7 @@ return [
     'run_created_waiting_review'    => 'Execução criada. O resultado ficará disponível para revisão médica quando o processamento terminar.',
     'run_approved'                  => 'Resultado de IA aprovado com sucesso.',
     'run_rejected'                  => 'Resultado de IA rejeitado.',
+    'run_failed_generic'            => 'Não foi possível concluir a análise no momento. Tente novamente; se persistir, contate o suporte.',
     'run_cancelled'                 => 'Execução de IA cancelada. Créditos não consumidos foram devolvidos.',
     // ── Onda 3 ────────────────────────────────────────────────────────────
     'feedback_saved' => 'Feedback registrado. Obrigado por contribuir.',
@@ -211,9 +212,9 @@ return [
         'no_images'         => 'Selecione ao menos uma imagem para analisar.',
         'failed'            => 'Não foi possível concluir a análise.',
         // ── Step tracking ─────────────────────────────────────────────────
-        'step_generating'    => 'Gerando análise com :provider…',
-        'step_reviewing'     => 'Revisando com :provider…',
-        'step_consolidating' => 'Consolidando resposta com :provider…',
+        'step_generating'    => 'Gerando análise…',
+        'step_reviewing'     => 'Revisando…',
+        'step_consolidating' => 'Consolidando resposta…',
         'step_starting'      => 'Iniciando a análise…',
         'eta_hint'           => 'Tempo estimado: ~:eta s',
         // ── Cancel ────────────────────────────────────────────────────────
@@ -238,8 +239,9 @@ return [
         'quota_used'           => ':consumed/:quota créditos usados este mês (:percent%)',
         'quota_warning'        => 'Atenção: você já consumiu :percent% da cota mensal de IA.',
         'quota_critical'       => 'Cota mensal de IA quase no limite (:percent%). Considere comprar créditos avulsos.',
-        'quota_exhausted'      => 'Cota mensal de IA atingida (:consumed/:quota créditos). Compre créditos avulsos para continuar usando.',
-        'quota_exhausted_hint' => 'Cota mensal atingida — compre créditos avulsos para continuar.',
+        'quota_exhausted'      => 'Cota mensal de IA atingida (:consumed/:quota créditos) e sem créditos avulsos. Compre créditos avulsos para continuar usando.',
+        'quota_exhausted_hint' => 'Cota mensal atingida e sem saldo avulso — compre créditos para continuar.',
+        'quota_spillover'      => 'Cota mensal de IA atingida (:consumed/:quota). As análises agora consomem seus créditos avulsos (:available disponíveis).',
         // Onda 4, C3 — linhagem visível
         'escalation_badge'       => 'Reanálise',
         'escalation_badge_title' => 'Reanálise com modo superior',

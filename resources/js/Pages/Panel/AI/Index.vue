@@ -47,6 +47,16 @@ const usageBarClass = computed(() => {
     return 'bg-success';
 });
 
+// Créditos avulsos (cortesia/comprados) — entram na carteira (balance.balance),
+// NÃO na cota do plano. Quando a cota estoura, o excedente é coberto por eles.
+const purchasedCredits = computed(() => Number(props.balance?.balance ?? 0));
+const quotaOverflow = computed(() => {
+    const quota = Number(analytics.value?.plan_quota ?? 0);
+    const consumed = Number(analytics.value?.consumed?.credits ?? 0);
+    return quota > 0 ? Math.max(0, consumed - quota) : 0;
+});
+const coveredByPurchased = computed(() => quotaOverflow.value > 0 && purchasedCredits.value > 0);
+
 function workflowDisplayLabel(workflow) {
     return label(`workflow_${workflow}`, workflow);
 }
@@ -348,6 +358,11 @@ async function rejectRun() {
                              :aria-valuenow="usagePercent ?? 0"
                              aria-valuemin="0"
                              aria-valuemax="100"></div>
+                    </div>
+                    <div v-if="coveredByPurchased" class="alert alert-info py-1 px-2 mt-2 mb-0 fs-13">
+                        <i class="ti ti-wallet me-1" aria-hidden="true"></i>
+                        Cota do plano esgotada. O excedente ({{ quotaOverflow }}) e os próximos usos são cobertos pelos seus
+                        <strong>créditos avulsos/cortesia</strong> ({{ purchasedCredits }} disponíveis).
                     </div>
                 </div>
 

@@ -18,6 +18,7 @@
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { diffWords } from 'diff';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
 
 const props = defineProps({
     open:      { type: Boolean, required: true },
@@ -106,15 +107,43 @@ const quotaAlertText = computed(() => {
     const tpl = quotaPercent.value >= 90 ? lbl('quota_critical', '') : lbl('quota_warning', '');
     return tpl.replace(':percent', quotaPercent.value);
 });
-// Onda 4, C4 — bloqueio do botão Analisar a partir de 95% da cota mensal.
-// Créditos avulsos comprados (fora da cota) continuam permitindo análise via
-// backend; a UI só desencoraja consumo desnecessário aqui.
-const quotaExhausted = computed(() => quotaPercent.value !== null && quotaPercent.value >= 95);
+// Saldo de créditos avulsos (comprados/cortesia) — separado da cota mensal.
+// balance.balance = avulso; balance.available = quota_remaining + avulso.
+const purchasedCredits = computed(() => Number(props.ai?.balance?.balance ?? 0));
+
+// Cota mensal totalmente consumida (consumed >= quota), independente de avulso.
+const quotaFullyUsed = computed(() => {
+    const q = Number(quota.value?.monthly_quota ?? 0);
+    const c = Number(quota.value?.consumed_credits ?? 0);
+    return q > 0 && c >= q;
+});
+
+// Onda 4, C4 — bloqueio do botão Analisar quando a cota mensal estoura.
+// MAS: créditos avulsos (cortesia/comprados) continuam permitindo análise — o
+// backend consome a cota primeiro e depois o saldo avulso. Só trava de fato
+// quando a cota está ≥95% E não há avulso para cobrir.
+const quotaExhausted = computed(() =>
+    quotaPercent.value !== null
+    && quotaPercent.value >= 95
+    && purchasedCredits.value <= 0,
+);
+
+// Cota esgotada mas há avulso → segue funcionando consumindo avulso (aviso, não bloqueio).
+const usingPurchasedCredits = computed(() => quotaFullyUsed.value && purchasedCredits.value > 0);
+
 const quotaExhaustedText = computed(() => {
     const tpl = lbl('quota_exhausted', '');
     return tpl
         .replace(':consumed', quota.value?.consumed_credits ?? 0)
         .replace(':quota', quota.value?.monthly_quota ?? 0);
+});
+
+const usingPurchasedText = computed(() => {
+    const tpl = lbl('quota_spillover', '');
+    return tpl
+        .replace(':consumed', quota.value?.consumed_credits ?? 0)
+        .replace(':quota', quota.value?.monthly_quota ?? 0)
+        .replace(':available', purchasedCredits.value);
 });
 
 // ── Estado do run ───────────────────────────────────────────────────────────
@@ -229,7 +258,7 @@ watch(() => props.open, (v) => {
         clearAlert();
         resetRun();
         if (props.viewReport?.content) {
-            reviewText.value = props.viewReport.content;
+            reviewText.value = mdToHtml(props.viewReport.content);
             step.value = 'view';
             return;
         }
@@ -263,16 +292,14 @@ const elapsedFmt = computed(() => {
 });
 
 const stepLabel = computed(() => {
-    const provider = providerLabel(currentProvider.value);
-    if (!currentRole.value || !provider) {
-        return lbl('step_starting', lbl('processing', 'Processando análise...'));
-    }
+    // Caixa-preta: o usuário clínico nunca vê o provedor de IA.
     const key = currentRole.value === 'generator' ? 'step_generating'
         : currentRole.value === 'reviewer' ? 'step_reviewing'
             : currentRole.value === 'adjudicator' ? 'step_consolidating'
-                : null;
-    if (!key) return lbl('processing', 'Processando análise...');
-    return lbl(key, '').toString().replace(':provider', provider) || `${provider}…`;
+                : 'step_starting';
+    const text = lbl(key, lbl('processing', 'Processando análise...')).toString();
+
+    return text.replace(/:provider/g, '').replace(/\s{2,}/g, ' ').replace(/\s+…/g, '…').trim();
 });
 
 function url(key, id = null) {
@@ -411,26 +438,98 @@ async function poll() {
     }
 }
 
-function ingestResult(output) {
-    // F3 — preserva o rascunho original para diff posterior contra a edição médica.
-    originalDraft.value = output;
+// ── Markdown → HTML ────────────────────────────────────────────────────────
+// O provedor devolve o laudo em markdown (## títulos, **negrito**, - listas).
+// O TinyMCE renderiza HTML, então convertemos antes de exibir/editar. A saída
+// é re-sanitizada no servidor (Purifier 'medical') na aprovação.
+function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
+function inlineMd(s) {
+    return s
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1<em>$2</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function looksLikeHtml(s) {
+    return /<\/?(p|div|ul|ol|li|h[1-6]|strong|em|br|table|span)\b/i.test(s);
+}
+
+function mdToHtml(raw) {
+    const text = String(raw ?? '').trim();
+    if (!text) return '';
+    if (looksLikeHtml(text)) return text; // já é HTML (documentação salva) — preserva
+
+    const lines = escapeHtml(text).split(/\r?\n/);
+    const out = [];
+    let listType = null;
+    let paragraph = [];
+    const closeList = () => { if (listType) { out.push(`</${listType}>`); listType = null; } };
+    const flushP = () => {
+        if (paragraph.length) { out.push('<p>' + inlineMd(paragraph.join('<br>')) + '</p>'); paragraph = []; }
+    };
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) { flushP(); closeList(); continue; }
+
+        const heading = line.match(/^(#{1,6})\s+(.*)$/);
+        if (heading) {
+            flushP(); closeList();
+            const lvl = heading[1].length;
+            out.push(`<h${lvl}>` + inlineMd(heading[2]) + `</h${lvl}>`);
+            continue;
+        }
+
+        const ul = line.match(/^[-*]\s+(.*)$/);
+        if (ul) {
+            flushP();
+            if (listType !== 'ul') { closeList(); out.push('<ul>'); listType = 'ul'; }
+            out.push('<li>' + inlineMd(ul[1]) + '</li>');
+            continue;
+        }
+
+        const ol = line.match(/^\d+[.)]\s+(.*)$/);
+        if (ol) {
+            flushP();
+            if (listType !== 'ol') { closeList(); out.push('<ol>'); listType = 'ol'; }
+            out.push('<li>' + inlineMd(ol[1]) + '</li>');
+            continue;
+        }
+
+        closeList();
+        paragraph.push(line);
+    }
+    flushP(); closeList();
+    return out.join('');
+}
+
+function ingestResult(output) {
+    // F3 — preserva o rascunho original (já em HTML) para diff posterior contra a edição médica.
     if (isStructured.value) {
         const parsed = parseStructured(output);
         if (parsed) {
-            reviewText.value          = parsed.summary || output;
+            const html = mdToHtml(parsed.summary || output);
+            reviewText.value          = html;
+            originalDraft.value       = html;
             suggestions.diagnosis     = parsed.suggestions.diagnosis;
             suggestions.conduct       = parsed.suggestions.conduct;
             suggestions.observations  = parsed.suggestions.observations;
-            originalDraft.value       = parsed.summary || output;
         } else {
-            reviewText.value          = output;
+            const html = mdToHtml(output);
+            reviewText.value          = html;
+            originalDraft.value       = html;
             suggestions.diagnosis     = '';
             suggestions.conduct       = '';
             suggestions.observations  = '';
         }
     } else {
-        reviewText.value = output;
+        const html = mdToHtml(output);
+        reviewText.value    = html;
+        originalDraft.value = html;
     }
 }
 
@@ -590,7 +689,7 @@ async function fetchHistory() {
 const viewedRunMeta = ref(null);
 
 function openHistory(item) {
-    reviewText.value = item.final_output ?? item.preview ?? '';
+    reviewText.value = mdToHtml(item.final_output ?? item.preview ?? '');
     viewedRunMeta.value = item;
     step.value = 'view';
 }
@@ -828,6 +927,9 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                 <div v-if="step === 'idle' && quotaExhausted" class="alert alert-danger py-2 small mb-0">
                     <i class="ti ti-circle-off me-1" aria-hidden="true"></i>{{ quotaExhaustedText }}
                 </div>
+                <div v-else-if="step === 'idle' && usingPurchasedCredits" class="alert alert-info py-2 small mb-0">
+                    <i class="ti ti-wallet me-1" aria-hidden="true"></i>{{ usingPurchasedText }}
+                </div>
                 <div v-else-if="step === 'idle' && showQuotaAlert" :class="quotaPercent >= 90 ? 'alert alert-danger py-2 small mb-0' : 'alert alert-warning py-2 small mb-0'">
                     <i class="ti ti-alert-triangle me-1" aria-hidden="true"></i>{{ quotaAlertText }}
                 </div>
@@ -965,7 +1067,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                 <template v-else-if="step === 'failed'">
                     <div class="text-center py-3 text-danger">
                         <i class="ti ti-alert-triangle fs-2 d-block mb-1" aria-hidden="true"></i>
-                        <div class="small">{{ !alertMsg ? lbl('failed', 'Não foi possível concluir a análise.') : lbl('retry_hint', 'Você pode tentar novamente.') }}</div>
+                        <div class="small">{{ alertMsg || lbl('failed', 'Não foi possível concluir a análise.') }}</div>
                     </div>
                 </template>
 
@@ -987,7 +1089,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                         <label class="form-label fw-semibold">
                             <i class="ti ti-file-text me-1 text-info" aria-hidden="true"></i>{{ isStructured ? lbl('summary', 'Análise de apoio') : lbl('report', 'Laudo') }}
                         </label>
-                        <textarea ref="textareaResultRef" v-model="reviewText" class="form-control" rows="8"></textarea>
+                        <TinyMceEditor v-model="reviewText" />
                     </div>
 
                     <!-- F3 — Diff visual -->

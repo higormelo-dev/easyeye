@@ -24,6 +24,7 @@ return [
     'run_created_waiting_review'    => 'Run created. The result will be available for medical review when processing finishes.',
     'run_approved'                  => 'AI output approved successfully.',
     'run_rejected'                  => 'AI output rejected.',
+    'run_failed_generic'            => 'The analysis could not be completed at this time. Please try again; if it persists, contact support.',
     'run_cancelled'                 => 'AI run cancelled. Unconsumed credits were refunded.',
     // ── Wave 3 ────────────────────────────────────────────────────────────
     'feedback_saved' => 'Feedback recorded. Thank you for contributing.',
@@ -211,9 +212,9 @@ return [
         'no_images'         => 'Select at least one image to analyze.',
         'failed'            => 'The analysis could not be completed.',
         // ── Step tracking ─────────────────────────────────────────────────
-        'step_generating'    => 'Generating analysis with :provider…',
-        'step_reviewing'     => 'Reviewing with :provider…',
-        'step_consolidating' => 'Consolidating response with :provider…',
+        'step_generating'    => 'Generating analysis…',
+        'step_reviewing'     => 'Reviewing…',
+        'step_consolidating' => 'Consolidating response…',
         'step_starting'      => 'Starting the analysis…',
         'eta_hint'           => 'Estimated time: ~:eta s',
         // ── Cancel ────────────────────────────────────────────────────────
@@ -238,8 +239,9 @@ return [
         'quota_used'           => ':consumed/:quota credits used this month (:percent%)',
         'quota_warning'        => 'Heads up: you have already used :percent% of the monthly AI quota.',
         'quota_critical'       => 'Monthly AI quota nearly exhausted (:percent%). Consider buying extra credits.',
-        'quota_exhausted'      => 'Monthly AI quota reached (:consumed/:quota credits). Buy extra credits to keep using the assistant.',
-        'quota_exhausted_hint' => 'Monthly quota reached — buy extra credits to continue.',
+        'quota_exhausted'      => 'Monthly AI quota reached (:consumed/:quota credits) and no extra credits. Buy extra credits to keep using the assistant.',
+        'quota_exhausted_hint' => 'Monthly quota reached and no extra balance — buy credits to continue.',
+        'quota_spillover'      => 'Monthly AI quota reached (:consumed/:quota). Analyses now consume your extra credits (:available available).',
         // Wave 4, C3 — escalation lineage
         'escalation_badge'       => 'Reanalysis',
         'escalation_badge_title' => 'Reanalysis with higher-tier mode',

@@ -153,6 +153,7 @@ return [
     ],
 
     'actions' => [
+        'close'          => 'Fechar',
         'view'           => 'Detalhes',
         'credit'         => 'Aprovar e creditar',
         'cancel'         => 'Cancelar pedido',
@@ -207,6 +208,7 @@ return [
     ],
 
     'detail' => [
+        'title'           => 'Pedido de compra de créditos',
         'tab_info'        => 'Informações',
         'tab_timeline'    => 'Linha do tempo',
         'tab_metadata'    => 'Metadados',
@@ -214,14 +216,24 @@ return [
         'idempotency_key' => 'Chave de idempotência',
         'subscription'    => 'Assinatura vinculada',
         'wallet_balance'  => 'Saldo atual da carteira',
+        'requested_at'    => 'Solicitado em',
+        'requested_by'    => 'Solicitante',
+        'credits'         => 'créditos',
+        'courtesy'        => 'Cortesia — sem cobrança',
+        'no_charge'       => 'R$ 0,00',
+        'loading'           => 'Carregando…',
+        'no_metadata'       => 'Sem metadados.',
+        'reload'            => 'Recarregar',
+        'detail_not_loaded' => 'Detalhes ainda não carregados — reabra o pedido.',
     ],
 
     'timeline' => [
         'created'   => 'Pedido criado',
-        'credited'  => 'Creditado',
+        'credited'  => 'Créditos liberados',
         'cancelled' => 'Cancelado',
         'failed'    => 'Falha de gateway',
-        'refunded'  => 'Reembolsado',
+        'refunded'  => 'Reembolsado (créditos estornados)',
+        'empty'     => 'Sem eventos registrados.',
     ],
 
     'errors' => [

@@ -1,3 +1,4 @@
+import './bootstrap'; // define window.axios (+ X-Requested-With) — usado pelo Assistente de IA, SearchSelect, EyeImages
 import { createApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';

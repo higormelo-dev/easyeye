@@ -13,7 +13,7 @@ use App\Models\ReportSettingContent;
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
-use Illuminate\Support\Collection;
+use Illuminate\Support\{Collection, Str};
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class MedicalRecordsController extends Controller
@@ -485,6 +485,34 @@ class MedicalRecordsController extends Controller
      * Substitui o antigo commonFormData() do fluxo Blade — agora retorna tudo
      * serializado em arrays puros prontos para consumo Vue.
      */
+    /**
+     * Prontuários anteriores do paciente (somente visualização via modal).
+     * Exclui o registro em edição; escopo de tenant garantido pelo patient_id
+     * (o paciente já vem resolvido dentro da entidade ativa).
+     */
+    private function serializePreviousRecords(Patient $patient, ?MedicalRecord $record): array
+    {
+        return MedicalRecord::query()
+            ->where('patient_id', $patient->id)
+            ->when($record, fn ($q) => $q->where('id', '!=', $record->id))
+            ->with('doctor.person')
+            ->orderByDesc('created_at')
+            ->limit(6)
+            ->get()
+            ->map(fn (MedicalRecord $mr) => [
+                'id'                   => (string) $mr->id,
+                'code'                 => $mr->code,
+                'created_at_formatted' => $mr->created_at?->format('d/m/Y'),
+                'created_at_time'      => $mr->created_at?->format('H:i'),
+                'doctor_name'          => $mr->doctor?->person?->full_name ?? '—',
+                'main_complaint'       => Str::limit((string) $mr->main_complaint, 90) ?: null,
+                'diagnosis_count'      => is_array($mr->diagnosis_cids) ? count($mr->diagnosis_cids) : 0,
+                'is_signed'            => $mr->isSigned(),
+                'show_url'             => route('panel.patients.medicalrecords.show', [$patient, $mr]),
+            ])
+            ->all();
+    }
+
     private function buildFormProps(Patient $patient, ?MedicalRecord $record): array
     {
         $entityId = (string) session('selected_entity_id');
@@ -509,9 +537,10 @@ class MedicalRecordsController extends Controller
                 ['label' => $patient->person?->full_name ?? $patient->code, 'url' => '#', 'active' => false],
                 ['label' => __('actions.medical_records.title'), 'url' => route('panel.patients.medicalrecords.index', $patient), 'active' => false],
             ],
-            'patient'       => $this->serializePatient($patient),
-            'medicalrecord' => $record ? $this->serializeRecord($record) : null,
-            'doctors'       => $this->serializeCatalog($doctors, fn (Doctor $d) => [
+            'patient'         => $this->serializePatient($patient),
+            'medicalrecord'   => $record ? $this->serializeRecord($record) : null,
+            'previousRecords' => $this->serializePreviousRecords($patient, $record),
+            'doctors'         => $this->serializeCatalog($doctors, fn (Doctor $d) => [
                 'id'   => (string) $d->id,
                 'name' => $d->person?->full_name,
             ]),

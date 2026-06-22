@@ -76,7 +76,7 @@ class AiAnalyticsService
      */
     public function averageApproveSeconds(string $entityId, Carbon $start, Carbon $end): ?float
     {
-        return Cache::remember(
+        $cached = Cache::remember(
             $this->cacheKey('avg_approve', $entityId, $start, $end),
             self::CACHE_TTL_SECONDS,
             function () use ($entityId, $start, $end): ?float {
@@ -91,6 +91,10 @@ class AiAnalyticsService
                 return $value !== null ? round((float) $value, 1) : null;
             },
         );
+
+        // Coerção defensiva: cache antigo pode ter sido gravado como string
+        // (Postgres devolve agregados numéricos como string) antes do cast.
+        return $cached !== null ? round((float) $cached, 1) : null;
     }
 
     /**
@@ -100,7 +104,7 @@ class AiAnalyticsService
      */
     public function averageCostPerRecord(string $entityId, Carbon $start, Carbon $end): ?float
     {
-        return Cache::remember(
+        $cached = Cache::remember(
             $this->cacheKey('avg_cost', $entityId, $start, $end),
             self::CACHE_TTL_SECONDS,
             function () use ($entityId, $start, $end): ?float {
@@ -120,6 +124,9 @@ class AiAnalyticsService
                 return $value !== null ? round((float) $value, 1) : null;
             },
         );
+
+        // Coerção defensiva contra cache antigo gravado como string (ver averageApproveSeconds).
+        return $cached !== null ? round((float) $cached, 1) : null;
     }
 
     /**
