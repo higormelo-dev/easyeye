@@ -41,7 +41,6 @@ window.Swal = Swal;
 // ── jQuery plugins ────────────────────────────────────────────────────────────
 import 'jquery-toast-plugin';
 import 'jquery-sparkline';
-import 'jquery-asColorPicker';
 
 // ── Flatpickr (Alpine-friendly datepicker) ────────────────────────────────────
 import flatpickr from 'flatpickr';

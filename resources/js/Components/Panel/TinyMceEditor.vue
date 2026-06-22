@@ -25,6 +25,7 @@ const emit = defineEmits(['update:modelValue']);
 const textareaRef = ref(null);
 let editorInstance = null;
 let syncing = false;
+let usingFallback = false;
 
 /**
  * Carrega o script TinyMCE global apenas uma vez (cache no window).
@@ -94,9 +95,31 @@ async function initEditor() {
     editorInstance = Array.isArray(editors) ? editors[0] : editors;
 }
 
+/**
+ * Fallback: se o TinyMCE não carregar (vendor/CDN indisponível ou ambiente de
+ * teste), mantém o <textarea> nativo editável e sincroniza o v-model na mão.
+ * Evita unhandled rejection e degrada com elegância — o laudo nunca fica preso.
+ */
+function bindFallbackTextarea() {
+    const el = textareaRef.value;
+    if (!el) return;
+    usingFallback = true;
+    el.value = props.modelValue ?? '';
+    el.classList.add('form-control');
+    el.disabled = props.disabled;
+    el.style.minHeight = (typeof props.height === 'number' ? props.height : Number(props.height) || 320) + 'px';
+    el.addEventListener('input', () => emit('update:modelValue', el.value));
+}
+
 onMounted(async () => {
     await nextTick();
-    initEditor();
+    try {
+        await initEditor();
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[TinyMceEditor] fallback para textarea nativo:', e?.message ?? e);
+        bindFallbackTextarea();
+    }
 });
 
 onBeforeUnmount(() => {
@@ -108,6 +131,12 @@ onBeforeUnmount(() => {
 
 // Sync externo → editor (quando parent muda o v-model)
 watch(() => props.modelValue, (v) => {
+    if (usingFallback) {
+        if (textareaRef.value && textareaRef.value.value !== (v ?? '')) {
+            textareaRef.value.value = v ?? '';
+        }
+        return;
+    }
     if (!editorInstance) return;
     const current = editorInstance.getContent();
     if (current === (v ?? '')) return;
@@ -118,6 +147,10 @@ watch(() => props.modelValue, (v) => {
 
 // Toggle readonly quando disabled muda
 watch(() => props.disabled, (d) => {
+    if (usingFallback) {
+        if (textareaRef.value) textareaRef.value.disabled = d;
+        return;
+    }
     if (!editorInstance) return;
     editorInstance.mode.set(d ? 'readonly' : 'design');
 });

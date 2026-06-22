@@ -30,9 +30,6 @@
 /* ── jQuery Toast ──────────────────────────────────────────────────────────── */
 @import 'jquery-toast-plugin/dist/jquery.toast.min.css';
 
-/* ── Color Picker ──────────────────────────────────────────────────────────── */
-@import 'jquery-asColorPicker/dist/css/asColorPicker.css';
-
 /* ── Flatpickr ─────────────────────────────────────────────────────────────── */
 @import 'flatpickr/dist/flatpickr.min.css';
 
