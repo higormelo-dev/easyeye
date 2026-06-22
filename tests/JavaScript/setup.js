@@ -29,6 +29,25 @@ globalThis.fetch = vi.fn(() =>
     }),
 );
 
+// Stub do TinyMCE: o wrapper TinyMceEditor.vue injeta um <script> para carregar
+// o vendor, mas o happy-dom bloqueia carregamento de script (DOMException). Ao
+// pré-popular `window.tinymce`, o loader curto-circuita (sem appendChild) e
+// inicializa um editor fake — zero ruído no stderr, sem rejeição pendente.
+window.tinymce = {
+    init: (cfg) => {
+        const editor = {
+            _content: '',
+            getContent: () => editor._content,
+            setContent: (v) => { editor._content = v ?? ''; },
+            mode: { set: () => {} },
+            remove: () => {},
+            on: () => {},
+        };
+        if (typeof cfg?.setup === 'function') cfg.setup(editor);
+        return Promise.resolve([editor]);
+    },
+};
+
 // CSRF token meta tag (alguns componentes leem dele)
 const csrfMeta = document.createElement('meta');
 csrfMeta.setAttribute('name', 'csrf-token');
