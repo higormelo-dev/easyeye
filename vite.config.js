@@ -63,6 +63,12 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
             }),
         ],
         build: {
+            // `vendor.js` é um bundle vendor deliberado (jQuery + plugins legados +
+            // Bootstrap + DataTables) carregado uma vez. As Pages Vue já fazem
+            // code-split (import.meta.glob lazy). Não quebramos o vendor em chunks
+            // porque o banner injeta jQuery por chunk e reordenar IIFEs legadas é
+            // frágil — então elevamos o limite do aviso em vez de fragmentar.
+            chunkSizeWarningLimit: 900,
             rollupOptions: {
                 output: {
                     // Declara jQuery/$ no topo de CADA chunk para que IIFEs legadas
