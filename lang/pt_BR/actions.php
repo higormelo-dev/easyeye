@@ -338,6 +338,30 @@ return [
     'mood_nervous' => 'Agitado',
     'mood_angry'   => 'Irritado',
 
+    // Tipo de atendimento do agendamento
+    'attendance_type_consultation'     => 'Consulta',
+    'attendance_type_return'           => 'Retorno',
+    'attendance_type_urgency'          => 'Urgência',
+    'attendance_type_preop'            => 'Avaliação pré-operatória',
+    'attendance_type_postop'           => 'Avaliação pós-operatória',
+    'attendance_type_second_opinion'   => 'Segunda opinião',
+    'attendance_type_teleconsultation' => 'Teleconsulta',
+
+    // Especialidade / área oftalmológica do agendamento
+    'specialty_general'         => 'Oftalmologia geral',
+    'specialty_cataract'        => 'Catarata',
+    'specialty_glaucoma'        => 'Glaucoma',
+    'specialty_retina_vitreous' => 'Retina e vítreo',
+    'specialty_cornea'          => 'Córnea',
+    'specialty_pediatric'       => 'Oftalmopediatria',
+    'specialty_strabismus'      => 'Estrabismo',
+    'specialty_neuro'           => 'Neuro-oftalmologia',
+    'specialty_uveitis'         => 'Uveíte',
+    'specialty_oculoplastic'    => 'Plástica ocular',
+    'specialty_refractive'      => 'Refrativa',
+    'specialty_contact_lenses'  => 'Lentes de contato',
+    'specialty_low_vision'      => 'Baixa visão',
+
     // Card de agendamento
     'change_situation'      => 'Alterar situação',
     'patient_mood_label'    => 'Humor do paciente',

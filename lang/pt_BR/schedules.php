@@ -114,6 +114,8 @@ return [
     'form_covenant'            => 'Convênio',
     'form_none'                => 'Nenhum',
     'form_visit_type'          => 'Tipo de consulta',
+    'form_attendance_type'     => 'Tipo de atendimento',
+    'form_specialty_area'      => 'Especialidade / Área',
     'form_telephone'           => 'Telefone',
     'form_cellphone'           => 'Celular',
     'form_whatsapp'            => 'Celular é WhatsApp',

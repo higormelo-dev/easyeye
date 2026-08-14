@@ -338,6 +338,30 @@ return [
     'mood_nervous' => 'Agitated',
     'mood_angry'   => 'Irritated',
 
+    // Schedule attendance type
+    'attendance_type_consultation'     => 'Consultation',
+    'attendance_type_return'           => 'Follow-up',
+    'attendance_type_urgency'          => 'Urgent',
+    'attendance_type_preop'            => 'Pre-op evaluation',
+    'attendance_type_postop'           => 'Post-op evaluation',
+    'attendance_type_second_opinion'   => 'Second opinion',
+    'attendance_type_teleconsultation' => 'Teleconsultation',
+
+    // Schedule specialty / area
+    'specialty_general'         => 'General ophthalmology',
+    'specialty_cataract'        => 'Cataract',
+    'specialty_glaucoma'        => 'Glaucoma',
+    'specialty_retina_vitreous' => 'Retina and vitreous',
+    'specialty_cornea'          => 'Cornea',
+    'specialty_pediatric'       => 'Pediatric ophthalmology',
+    'specialty_strabismus'      => 'Strabismus',
+    'specialty_neuro'           => 'Neuro-ophthalmology',
+    'specialty_uveitis'         => 'Uveitis',
+    'specialty_oculoplastic'    => 'Oculoplastic surgery',
+    'specialty_refractive'      => 'Refractive surgery',
+    'specialty_contact_lenses'  => 'Contact lenses',
+    'specialty_low_vision'      => 'Low vision',
+
     // Schedule card actions
     'change_situation'      => 'Change status',
     'patient_mood_label'    => 'Patient mood',

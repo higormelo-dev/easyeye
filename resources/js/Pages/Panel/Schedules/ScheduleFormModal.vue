@@ -5,15 +5,17 @@ import SlotPicker    from '@/Components/Panel/SlotPicker.vue';
 import SearchSelect  from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
-    open:          { type: Boolean, required: true },
-    editSchedule:  { type: Object,  default: null },
-    prefillData:   { type: Object,  default: null },
-    doctors:       { type: Array,   default: () => [] },
-    covenants:     { type: Array,   default: () => [] },
-    visitTypes:    { type: Array,   default: () => [] },
-    storeUrl:      { type: String,  required: true },
-    defaultDate:   { type: String,  default: '' },
-    t:             { type: Object,  required: true },
+    open:            { type: Boolean, required: true },
+    editSchedule:    { type: Object,  default: null },
+    prefillData:     { type: Object,  default: null },
+    doctors:         { type: Array,   default: () => [] },
+    covenants:       { type: Array,   default: () => [] },
+    visitTypes:      { type: Array,   default: () => [] },
+    attendanceTypes: { type: Array,   default: () => [] },
+    specialties:     { type: Array,   default: () => [] },
+    storeUrl:        { type: String,  required: true },
+    defaultDate:     { type: String,  default: '' },
+    t:               { type: Object,  required: true },
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -39,6 +41,8 @@ const form = ref({
     notes:              '',
     covenant_id:        '',
     visit_id:           '',
+    attendance_type:    '',
+    specialty_area:     '',
     resource_ids:       [],
     waiting_list_id:    '',
     use_recurrence:     false,
@@ -171,6 +175,8 @@ watch(
                 notes:              s.notes ?? '',
                 covenant_id:        s.covenant_id ?? '',
                 visit_id:           s.visit_id ?? '',
+                attendance_type:    s.attendance_type ?? '',
+                specialty_area:     s.specialty_area ?? '',
                 resource_ids:       (s.resources ?? []).map(r => r.id),
                 waiting_list_id:    '',
                 use_recurrence:     false,
@@ -199,6 +205,8 @@ watch(
                 notes:              p?.notes ?? '',
                 covenant_id:        p?.covenant_id ?? '',
                 visit_id:           p?.visit_id ?? '',
+                attendance_type:    p?.attendance_type ?? '',
+                specialty_area:     p?.specialty_area ?? '',
                 resource_ids:       [],
                 waiting_list_id:    p?.id ?? '',
                 use_recurrence:     false,
@@ -384,6 +392,27 @@ async function onSubmit() {
                     <SearchSelect v-model="form.visit_id"
                                   :options="visitTypes"
                                   :placeholder="t.form_none" />
+                </div>
+            </div>
+
+            <!-- ── Tipo de atendimento + Especialidade/Área ─────────────── -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <label class="form-label fw-semibold">{{ t.form_attendance_type }}</label>
+                    <SearchSelect v-model="form.attendance_type"
+                                  :options="attendanceTypes"
+                                  :placeholder="t.form_none"
+                                  :searchable="false"
+                                  :invalid="!!errors.attendance_type" />
+                    <div v-if="errors.attendance_type" class="invalid-feedback d-block">{{ errors.attendance_type[0] }}</div>
+                </div>
+                <div class="col-6">
+                    <label class="form-label fw-semibold">{{ t.form_specialty_area }}</label>
+                    <SearchSelect v-model="form.specialty_area"
+                                  :options="specialties"
+                                  :placeholder="t.form_none"
+                                  :invalid="!!errors.specialty_area" />
+                    <div v-if="errors.specialty_area" class="invalid-feedback d-block">{{ errors.specialty_area[0] }}</div>
                 </div>
             </div>
 

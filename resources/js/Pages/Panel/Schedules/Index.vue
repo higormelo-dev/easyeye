@@ -25,6 +25,8 @@ const props = defineProps({
     doctors:          { type: Array,   default: () => [] },
     covenants:        { type: Array,   default: () => [] },
     visitTypes:       { type: Array,   default: () => [] },
+    attendanceTypes:  { type: Array,   default: () => [] },
+    specialties:      { type: Array,   default: () => [] },
     procedures:       { type: Array,   default: () => [] },
     procedurePrices:  { type: Object,  default: () => ({}) },
     paymentMethods:   { type: Array,   default: () => [] },
@@ -665,6 +667,8 @@ const breadcrumbs = [
             :doctors="doctors"
             :covenants="covenants"
             :visit-types="visitTypes"
+            :attendance-types="attendanceTypes"
+            :specialties="specialties"
             :store-url="storeUrl"
             :t="t"
             @close="formOpen = false; editSchedule = null; prefillData = null"

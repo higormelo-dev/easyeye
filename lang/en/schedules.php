@@ -114,6 +114,8 @@ return [
     'form_covenant'            => 'Insurance',
     'form_none'                => 'None',
     'form_visit_type'          => 'Visit type',
+    'form_attendance_type'     => 'Attendance type',
+    'form_specialty_area'      => 'Specialty / Area',
     'form_telephone'           => 'Phone',
     'form_cellphone'           => 'Mobile',
     'form_whatsapp'            => 'Mobile is WhatsApp',

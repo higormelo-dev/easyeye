@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\{PatientMood, ScheduleSituation};
+use App\Enums\{MedicalSpecialty, PatientMood, ScheduleAttendanceType, ScheduleSituation};
 use App\Models\Concerns\BelongsToEntity;
 use App\Presenters\SchedulePresenter;
 use App\Traits\{Auditable, HasAuditColumns};
@@ -34,6 +34,8 @@ class Schedule extends Model
         'patient_id',
         'covenant_id',
         'visit_id',
+        'attendance_type',
+        'specialty_area',
         'code',
         'full_name',
         'date_time',
@@ -87,14 +89,16 @@ class Schedule extends Model
     protected function casts(): array
     {
         return [
-            'situation'    => ScheduleSituation::class,
-            'patient_mood' => PatientMood::class,
-            'arrived_at'   => 'datetime',
-            'confirmed_at' => 'datetime',
-            'date_time'    => 'datetime',
-            'created_at'   => 'datetime',
-            'updated_at'   => 'datetime',
-            'deleted_at'   => 'datetime',
+            'situation'       => ScheduleSituation::class,
+            'patient_mood'    => PatientMood::class,
+            'attendance_type' => ScheduleAttendanceType::class,
+            'specialty_area'  => MedicalSpecialty::class,
+            'arrived_at'      => 'datetime',
+            'confirmed_at'    => 'datetime',
+            'date_time'       => 'datetime',
+            'created_at'      => 'datetime',
+            'updated_at'      => 'datetime',
+            'deleted_at'      => 'datetime',
         ];
     }
 

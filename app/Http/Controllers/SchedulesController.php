@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, EntityGate, FinancialEntryStatus, PatientMood, PaymentMethod, ScheduleSituation};
+use App\Enums\{ClientRule, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleAttendanceType, ScheduleSituation};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
@@ -52,7 +52,12 @@ class SchedulesController extends Controller
             'visitTypes' => fn () => VisitType::where(function ($q) use ($entityId) {
                 $q->where('entity_id', $entityId)->orWhereNull('entity_id');
             })->where('active', true)->orderBy('name')->get(['id', 'name']),
-            'procedures' => fn () => Procedure::where(function ($q) use ($entityId) {
+            // Listas fixas (não são catálogo configurável por entity como
+            // covenants/visitTypes acima) — ver App\Enums\ScheduleAttendanceType
+            // e App\Enums\MedicalSpecialty.
+            'attendanceTypes' => ScheduleAttendanceType::options(),
+            'specialties'     => MedicalSpecialty::options(),
+            'procedures'      => fn () => Procedure::where(function ($q) use ($entityId) {
                 $q->where('entity_id', $entityId)->orWhereNull('entity_id');
             })->where('active', true)->orderBy('name')->get(['id', 'name']),
             'procedurePrices'  => fn () => $procedurePrices->priceMap((string) $entityId),
@@ -144,8 +149,10 @@ class SchedulesController extends Controller
             'doctor_color'  => $doctor?->color,
 
             // ── Atendimento ───────────────────────────────────────────────
-            'covenant_name'   => $schedule->covenant?->name,
-            'visit_type_name' => $schedule->visitType?->name,
+            'covenant_name'        => $schedule->covenant?->name,
+            'visit_type_name'      => $schedule->visitType?->name,
+            'attendance_type_name' => $schedule->attendance_type?->label(),
+            'specialty_area_name'  => $schedule->specialty_area?->label(),
 
             // ── Situação ──────────────────────────────────────────────────
             'situation'       => $schedule->situation->value,
@@ -738,20 +745,24 @@ class SchedulesController extends Controller
             // Convênio cobrável (faturado via guia): caixa de chegada não
             // auto-abre nem pré-preenche valor cheio — eventual lançamento é
             // tratado como co-participação.
-            'bills_covenant'      => $s->covenant_id !== null && isset($chargingCovenantIds[$s->covenant_id]),
-            'situation'           => $sit?->value,
-            'label'               => $sit?->label() ?? '—',
-            'badge'               => $sit?->badgeClass() ?? 'bg-secondary',
-            'icon'                => $sit?->icon() ?? 'fa-circle',
-            'is_terminal'         => $sit?->isTerminal() ?? false,
-            'allowed_transitions' => $allowedTransitions,
-            'notes'               => $s->notes,
-            'confirmed_at'        => $s->confirmed_at?->format('d/m H:i'),
-            'arrived_at'          => $s->arrived_at?->toIso8601String(),
-            'covenant_name'       => $s->covenant?->name,
-            'visit_name'          => $s->visitType?->name,
-            'visit_procedure_id'  => $s->visitType?->procedure_id,
-            'patient_mood'        => $mood ? [
+            'bills_covenant'       => $s->covenant_id !== null && isset($chargingCovenantIds[$s->covenant_id]),
+            'situation'            => $sit?->value,
+            'label'                => $sit?->label() ?? '—',
+            'badge'                => $sit?->badgeClass() ?? 'bg-secondary',
+            'icon'                 => $sit?->icon() ?? 'fa-circle',
+            'is_terminal'          => $sit?->isTerminal() ?? false,
+            'allowed_transitions'  => $allowedTransitions,
+            'notes'                => $s->notes,
+            'confirmed_at'         => $s->confirmed_at?->format('d/m H:i'),
+            'arrived_at'           => $s->arrived_at?->toIso8601String(),
+            'covenant_name'        => $s->covenant?->name,
+            'visit_name'           => $s->visitType?->name,
+            'visit_procedure_id'   => $s->visitType?->procedure_id,
+            'attendance_type'      => $s->attendance_type?->value,
+            'attendance_type_name' => $s->attendance_type?->label(),
+            'specialty_area'       => $s->specialty_area?->value,
+            'specialty_area_name'  => $s->specialty_area?->label(),
+            'patient_mood'         => $mood ? [
                 'value'      => $mood->value,
                 'label'      => $mood->label(),
                 'icon'       => $mood->icon(),

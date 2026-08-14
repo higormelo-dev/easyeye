@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\{MedicalSpecialty, ScheduleAttendanceType};
 use App\Services\ScheduleService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -96,6 +97,8 @@ class ScheduleRequest extends FormRequest
                     }
                 },
             ],
+            'attendance_type'     => ['nullable', Rule::enum(ScheduleAttendanceType::class)],
+            'specialty_area'      => ['nullable', Rule::enum(MedicalSpecialty::class)],
             'telephone'           => ['nullable', 'string', 'max:20'],
             'cellphone'           => ['nullable', 'string', 'max:20'],
             'cellphone_whatsapp'  => ['nullable', 'boolean'],

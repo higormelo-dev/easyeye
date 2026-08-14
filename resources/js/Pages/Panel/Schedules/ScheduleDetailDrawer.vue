@@ -167,6 +167,14 @@ watch(() => props.open, (val) => {
                         <span class="detail-label">{{ t.drawer_label_covenant ?? 'Convênio' }}</span>
                         <span class="detail-value">{{ schedule.covenant_name ?? '—' }}</span>
                     </div>
+                    <div v-if="schedule.attendance_type_name" class="detail-row">
+                        <span class="detail-label">{{ t.form_attendance_type ?? 'Tipo de atendimento' }}</span>
+                        <span class="detail-value">{{ schedule.attendance_type_name }}</span>
+                    </div>
+                    <div v-if="schedule.specialty_area_name" class="detail-row">
+                        <span class="detail-label">{{ t.form_specialty_area ?? 'Especialidade / Área' }}</span>
+                        <span class="detail-value">{{ schedule.specialty_area_name }}</span>
+                    </div>
                     <div v-if="schedule.arrived_at" class="detail-row">
                         <span class="detail-label">{{ t.drawer_label_arrived ?? 'Chegou em' }}</span>
                         <span class="detail-value">{{ schedule.arrived_at }}</span>
