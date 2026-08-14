@@ -3,6 +3,7 @@ import { ref, watch, computed, nextTick } from 'vue';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import SlotPicker    from '@/Components/Panel/SlotPicker.vue';
 import SearchSelect  from '@/Components/Panel/SearchSelect.vue';
+import PatientFormModal from '@/Pages/Panel/Patients/PatientFormModal.vue';
 
 const props = defineProps({
     open:            { type: Boolean, required: true },
@@ -13,6 +14,14 @@ const props = defineProps({
     visitTypes:      { type: Array,   default: () => [] },
     attendanceTypes: { type: Array,   default: () => [] },
     specialties:     { type: Array,   default: () => [] },
+    // Cadastro completo do paciente (item 3 — "+ Cadastrar" abre o mesmo
+    // PatientFormModal usado em Panel/Patients, em vez do mini-form só-nome
+    // de antes). Ver SchedulesController::index().
+    skinTypes:       { type: Array,   default: () => [] },
+    irisTypes:       { type: Array,   default: () => [] },
+    genders:         { type: Object,  default: () => ({}) },
+    maritalStatuses: { type: Object,  default: () => ({}) },
+    statesOfBrazil:  { type: Object,  default: () => ({}) },
     storeUrl:        { type: String,  required: true },
     defaultDate:     { type: String,  default: '' },
     t:               { type: Object,  required: true },
@@ -57,8 +66,6 @@ const slotPickerRef = ref(null);
 const patientSearch   = ref('');
 const patientResults  = ref([]);
 const patientDebounce = ref(null);
-const showQuickReg    = ref(false);
-const quickName       = ref('');
 
 function onPatientInput() {
     clearTimeout(patientDebounce.value);
@@ -89,23 +96,19 @@ function clearPatient() {
     patientResults.value  = [];
 }
 
-async function quickRegister() {
-    if (!quickName.value.trim()) return;
-    const res = await fetch('/panel/patients/quick', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept':       'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-        },
-        body: JSON.stringify({ full_name: quickName.value.trim() }),
-    });
-    if (res.ok) {
-        const json = await res.json();
-        selectPatient({ id: json.id, full_name: json.full_name, cellphone: '', telephone: '' });
-        showQuickReg.value = false;
-        quickName.value    = '';
-    }
+// ── Cadastro completo (item 3) ───────────────────────────────────────────────
+// "+ Cadastrar" agora abre o mesmo PatientFormModal de Panel/Patients — em
+// modo embedded (ver PatientFormModal.vue), fecha sozinho e já seleciona o
+// paciente recém-criado no agendamento.
+const showFullRegister = ref(false);
+
+function openFullRegister() {
+    showFullRegister.value = true;
+}
+
+function onPatientRegistered(patient) {
+    selectPatient(patient);
+    showFullRegister.value = false;
 }
 
 // ── Recursos ───────────────────────────────────────────────────────────────────
@@ -151,12 +154,11 @@ watch(
         if (!open) return;
 
         // Reset campos auxiliares
-        errors.value         = {};
-        saving.value         = false;
-        patientResults.value = [];
-        showQuickReg.value   = false;
-        quickName.value      = '';
-        resources.value      = [];
+        errors.value          = {};
+        saving.value          = false;
+        patientResults.value  = [];
+        showFullRegister.value = false;
+        resources.value       = [];
         resourcesLoaded.value = false;
 
         if (props.editSchedule) {
@@ -347,25 +349,11 @@ async function onSubmit() {
                     </ul>
                 </div>
                 <div class="mt-1">
-                    <button v-if="!showQuickReg"
-                            type="button"
+                    <button type="button"
                             class="btn btn-link btn-sm p-0 text-decoration-none"
-                            @click="showQuickReg = true">
+                            @click="openFullRegister">
                         <i class="fas fa-plus me-1"></i>{{ t.form_register }}
                     </button>
-                    <div v-else class="d-flex gap-2 mt-1">
-                        <input v-model="quickName"
-                               type="text"
-                               class="form-control form-control-sm"
-                               :placeholder="t.form_patient_name"
-                               @keyup.enter="quickRegister">
-                        <button type="button" class="btn btn-sm btn-success" @click="quickRegister">OK</button>
-                        <button type="button"
-                                class="btn btn-sm btn-secondary"
-                                @click="showQuickReg = false; quickName = ''">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -536,4 +524,18 @@ async function onSubmit() {
         </template>
 
     </CenteredModal>
+
+    <!-- Item 3: cadastro completo do paciente, mesmos campos de Panel/Patients -->
+    <PatientFormModal
+        :open="showFullRegister"
+        embedded
+        :covenants="covenants"
+        :skin-types="skinTypes"
+        :iris-types="irisTypes"
+        :genders="genders"
+        :marital-statuses="maritalStatuses"
+        :states-of-brazil="statesOfBrazil"
+        @close="showFullRegister = false"
+        @saved="onPatientRegistered"
+    />
 </template>

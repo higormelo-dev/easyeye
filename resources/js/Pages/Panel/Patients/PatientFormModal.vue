@@ -13,9 +13,19 @@ const props = defineProps({
     genders:        { type: Object,  default: () => ({}) },
     maritalStatuses:{ type: Object,  default: () => ({}) },
     statesOfBrazil: { type: Object,  default: () => ({}) },
+    // `embedded` — usado quando este modal abre de DENTRO de outro fluxo
+    // (ex.: "+ Cadastrar" no agendamento, ver ScheduleFormModal.vue) em vez
+    // da própria página Panel/Patients. Nesse caso o submit padrão do
+    // Inertia (form.post/put) não serve: ele segue o redirect do backend
+    // pra `panel.patients.index`, o que navegaria pra FORA da Agenda no
+    // meio do fluxo. Em modo embedded o submit vira fetch()+JSON puro
+    // (o backend já suporta isso — PatientsController::store() responde
+    // PatientResource quando `wantsJson()`) e emite `saved` em vez de
+    // fechar via redirect.
+    embedded: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'saved']);
 
 const isEdit    = computed(() => !!props.patientId);
 const title     = computed(() => isEdit.value ? 'Editar Paciente' : 'Novo Paciente');
@@ -86,6 +96,11 @@ watch(() => props.open, async (val) => {
 });
 
 function submit() {
+    if (props.embedded) {
+        submitEmbedded();
+        return;
+    }
+
     if (isEdit.value) {
         form.put(route('panel.patients.update', props.patientId), {
             preserveScroll: true,
@@ -96,6 +111,52 @@ function submit() {
             preserveScroll: true,
             onSuccess: () => emit('close'),
         });
+    }
+}
+
+// Laravel manda {field: [msg, ...]} — os `form.errors.xxx` do template
+// esperam string única (mesmo formato que o Inertia normalmente já entrega
+// sozinho num submit via form.post/put padrão).
+function flattenErrors(errors) {
+    return Object.fromEntries(
+        Object.entries(errors).map(([key, val]) => [key, Array.isArray(val) ? val[0] : val]),
+    );
+}
+
+async function submitEmbedded() {
+    form.processing = true;
+    form.clearErrors();
+
+    const url    = isEdit.value ? route('panel.patients.update', props.patientId) : route('panel.patients.store');
+    const method = isEdit.value ? 'PUT' : 'POST';
+
+    try {
+        const res = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept':       'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify(form.data()),
+        });
+        const json = await res.json();
+
+        if (res.ok) {
+            emit('saved', {
+                id:        json.data?.id ?? props.patientId,
+                code:      json.data?.attributes?.code ?? null,
+                full_name: form.name,
+                cellphone: form.cellphone,
+                telephone: form.telephone,
+            });
+        } else if (res.status === 422 && json.errors) {
+            form.setError(flattenErrors(json.errors));
+        } else {
+            form.setError({ name: json.message ?? 'Erro ao salvar paciente.' });
+        }
+    } finally {
+        form.processing = false;
     }
 }
 
@@ -138,6 +199,22 @@ const tabHasErrors = computed(() => ({
         ['zipcode','address','number','complement','district','city','state','country'].includes(k),
     ),
 }));
+
+// ── Abas com campo obrigatório ainda vazio (destaque azul) ───────────────────
+// Só considera campos REALMENTE obrigatórios (espelha PatientRequest::rules())
+// — Endereço não tem nenhum, então nunca acende (evita ruído: "pendente"
+// precisa sinalizar algo que falta de verdade, não todo campo opcional vazio).
+// `=== ''` em vez de falsy puro: gênero pode valer 0 (Masculino) legitimamente,
+// e `!0` daria falso positivo.
+const isBlank = (v) => v === '' || v === null || v === undefined;
+
+const tabIncomplete = computed(() => ({
+    personal: ['name', 'birth_date', 'gender', 'marital_status', 'national_registry', 'email']
+        .some(k => isBlank(form[k])),
+    clinical: isBlank(form.covenant_id),
+    contact: isBlank(form.cellphone),
+    address: false,
+}));
 </script>
 
 <template>
@@ -159,29 +236,44 @@ const tabHasErrors = computed(() => ({
             <ul class="nav nav-tabs border-0">
                 <li class="nav-item">
                     <button class="nav-link"
-                            :class="{ active: activeTab === 'personal', 'text-danger': tabHasErrors.personal }"
+                            :class="{
+                                active: activeTab === 'personal',
+                                'text-danger': tabHasErrors.personal,
+                                'text-primary fw-semibold': !tabHasErrors.personal && tabIncomplete.personal,
+                            }"
                             type="button"
                             @click="activeTab = 'personal'">
                         <i class="ti ti-user-circle me-1"></i>Pessoal
                         <i v-if="tabHasErrors.personal" class="ti ti-alert-circle text-danger ms-1"></i>
+                        <i v-else-if="tabIncomplete.personal" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
                     </button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link"
-                            :class="{ active: activeTab === 'clinical', 'text-danger': tabHasErrors.clinical }"
+                            :class="{
+                                active: activeTab === 'clinical',
+                                'text-danger': tabHasErrors.clinical,
+                                'text-primary fw-semibold': !tabHasErrors.clinical && tabIncomplete.clinical,
+                            }"
                             type="button"
                             @click="activeTab = 'clinical'">
                         <i class="ti ti-stethoscope me-1"></i>Clínico
                         <i v-if="tabHasErrors.clinical" class="ti ti-alert-circle text-danger ms-1"></i>
+                        <i v-else-if="tabIncomplete.clinical" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
                     </button>
                 </li>
                 <li class="nav-item">
                     <button class="nav-link"
-                            :class="{ active: activeTab === 'contact', 'text-danger': tabHasErrors.contact }"
+                            :class="{
+                                active: activeTab === 'contact',
+                                'text-danger': tabHasErrors.contact,
+                                'text-primary fw-semibold': !tabHasErrors.contact && tabIncomplete.contact,
+                            }"
                             type="button"
                             @click="activeTab = 'contact'">
                         <i class="ti ti-phone me-1"></i>Contato
                         <i v-if="tabHasErrors.contact" class="ti ti-alert-circle text-danger ms-1"></i>
+                        <i v-else-if="tabIncomplete.contact" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
                     </button>
                 </li>
                 <li class="nav-item">
@@ -197,7 +289,11 @@ const tabHasErrors = computed(() => ({
         </template>
 
         <!-- ── Corpo do formulário ───────────────────────────────────────────── -->
-        <form @submit.prevent="submit">
+        <!-- min-height fixo: v-show usa display:none nas abas ocultas (não
+             contribuem pro layout), então sem isso o offcanvas encolhe/cresce
+             a cada troca de aba. Altura calibrada pra caber a aba Pessoal
+             (a mais longa) sem sobra visível nas mais curtas. -->
+        <form class="patient-form-tabs" @submit.prevent="submit">
 
             <!-- TAB: Pessoal -->
             <div v-show="activeTab === 'personal'">
@@ -261,7 +357,7 @@ const tabHasErrors = computed(() => ({
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">E-mail</label>
+                    <label class="form-label">E-mail <span class="text-danger">*</span></label>
                     <input v-model="form.email"
                            type="email"
                            class="form-control"
@@ -291,7 +387,7 @@ const tabHasErrors = computed(() => ({
             <!-- TAB: Clínico -->
             <div v-show="activeTab === 'clinical'">
                 <div class="mb-3">
-                    <label class="form-label">Convênio</label>
+                    <label class="form-label">Convênio <span class="text-danger">*</span></label>
                     <SearchSelect v-model="form.covenant_id"
                                   :options="covenants"
                                   :placeholder="'Selecione'"
@@ -454,3 +550,10 @@ const tabHasErrors = computed(() => ({
 
     </OffcanvasPanel>
 </template>
+
+<style scoped>
+/* Item 2 — tamanho fixo entre abas (ver comentário acima do <form>). */
+.patient-form-tabs {
+    min-height: 480px;
+}
+</style>

@@ -7,7 +7,7 @@ use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryExcep
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
 use App\Jobs\NotifyScheduleChangeJob;
-use App\Models\{Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, VisitType, WaitingList};
+use App\Models\{Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, IrisType, People, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
 use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
@@ -57,6 +57,13 @@ class SchedulesController extends Controller
             // e App\Enums\MedicalSpecialty.
             'attendanceTypes' => ScheduleAttendanceType::options(),
             'specialties'     => MedicalSpecialty::options(),
+            // Cadastro completo do paciente embutido no "+ Cadastrar" (mesmos
+            // dados de Panel/Patients/Index — ver PatientsController::index()).
+            'skinTypes'       => fn () => SkinType::all()->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values()->toArray(),
+            'irisTypes'       => fn () => IrisType::all()->map(fn ($i) => ['id' => $i->id, 'name' => $i->name])->values()->toArray(),
+            'genders'         => People::$genders,
+            'maritalStatuses' => People::$maritalStatuses,
+            'statesOfBrazil'  => People::$statesOfBrazil,
             'procedures'      => fn () => Procedure::where(function ($q) use ($entityId) {
                 $q->where('entity_id', $entityId)->orWhereNull('entity_id');
             })->where('active', true)->orderBy('name')->get(['id', 'name']),

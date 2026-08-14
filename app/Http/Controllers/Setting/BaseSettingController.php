@@ -95,10 +95,22 @@ abstract class BaseSettingController extends Controller
             ],
             'urlTemplates' => [
                 // Vue substitui {id} no client (evita 11 routes :id na hidratação).
-                'show'    => route($this->routePrefix . '.show', ['placeholder' => '__ID__']),
-                'update'  => route($this->routePrefix . '.update', ['placeholder' => '__ID__']),
-                'destroy' => route($this->routePrefix . '.destroy', ['placeholder' => '__ID__']),
-                'restore' => route($this->routePrefix . '.restore', ['placeholder' => '__ID__']),
+                //
+                // BUGFIX: array associativo ['placeholder' => '__ID__'] nunca
+                // preenchia o parâmetro da rota — Laravel casa parâmetro NOMEADO
+                // pelo nome do wildcard, que varia por catálogo (covenant,
+                // skintype, iristype...), nunca é literalmente "placeholder".
+                // Resultado: UrlGenerationException em toda página que passa
+                // por aqui (covenants, skintypes, iristypes, ...).
+                //
+                // Array POSICIONAL (sem chave string) resolve pela ORDEM do
+                // parâmetro, não pelo nome — funciona igual pra qualquer
+                // catálogo já que cada uma dessas rotas tem exatamente 1
+                // parâmetro obrigatório.
+                'show'    => route($this->routePrefix . '.show', ['__ID__']),
+                'update'  => route($this->routePrefix . '.update', ['__ID__']),
+                'destroy' => route($this->routePrefix . '.destroy', ['__ID__']),
+                'restore' => route($this->routePrefix . '.restore', ['__ID__']),
             ],
             'items'   => $this->fetchTableRows($request),
             'filters' => [
