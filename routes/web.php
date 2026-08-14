@@ -38,7 +38,7 @@ use App\Http\Controllers\{
 };
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
-use App\Http\Controllers\PanelDashboardController;
+use App\Http\Controllers\{PanelDashboardController, PreferencesController};
 use App\Http\Controllers\Security\TwoFactorController;
 use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
@@ -147,6 +147,10 @@ Route::group(
 
             return app(PanelDashboardController::class)($request);
         })->name('dashboard');
+
+        // Preferências pessoais (item MELHORIA "mais humano") — endpoint único,
+        // ver PreferencesController.
+        Route::patch('/preferences', [PreferencesController::class, 'update'])->name('preferences.update');
 
         Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');
         Route::get('/eye-images/search', [EyeImagesController::class, 'search'])->name('eye-images.search');

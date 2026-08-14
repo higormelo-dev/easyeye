@@ -114,6 +114,9 @@ class HandleInertiaRequests extends Middleware
                 'photo_url' => Storage::disk('public')->exists($photoPath)
                     ? Storage::disk('public')->url($photoPath)
                     : Vite::asset('resources/img/system/team.png'),
+                // Item MELHORIA "mais humano" — bag de preferências pessoais
+                // (ordem do Dashboard, atalhos favoritos...). Ver UserPreference.
+                'preferences' => $user->preference?->data ?? [],
             ],
             'entity' => [
                 'id'       => $selectedEntityId,

@@ -9,13 +9,19 @@ import { ref } from 'vue';
  *
  * `columns` já vem NA ORDEM ATUAL (o pai é quem decide a ordem real e
  * decide se cada evento é aplicado) — este componente só emite intenção.
+ *
+ * `toggleable` (opcional, default off — não muda nada pros usos existentes):
+ * mostra um botão de olho por item pra mostrar/ocultar, além de reordenar.
+ * Usado por ModuleShortcuts (atalhos favoritos) — `columns` passa a aceitar
+ * um `hidden: bool` opcional por item nesse modo.
  */
 const props = defineProps({
-    columns: { type: Array, required: true }, // [{ key, label }] na ordem atual
-    title:   { type: String, default: 'Ordem das colunas' },
+    columns:    { type: Array,   required: true }, // [{ key, label, hidden? }] na ordem atual
+    title:      { type: String,  default: 'Ordem das colunas' },
+    toggleable: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['move', 'reset']);
+const emit = defineEmits(['move', 'reset', 'toggle']);
 
 const dragIndex   = ref(null);
 const dragOverIdx = ref(null);
@@ -52,7 +58,10 @@ function onDragEnd() {
                     v-for="(col, index) in columns"
                     :key="col.key"
                     class="column-order-item d-flex align-items-center gap-1 px-2 py-1 rounded"
-                    :class="{ 'column-order-item--over': dragOverIdx === index && dragIndex !== index }"
+                    :class="{
+                        'column-order-item--over': dragOverIdx === index && dragIndex !== index,
+                        'column-order-item--hidden': toggleable && col.hidden,
+                    }"
                     draggable="true"
                     @dragstart="onDragStart(index)"
                     @dragenter.prevent="onDragEnter(index)"
@@ -62,6 +71,15 @@ function onDragEnd() {
                 >
                     <i class="ti ti-grip-vertical text-muted column-order-grip"></i>
                     <span class="flex-grow-1 small text-truncate">{{ col.label }}</span>
+                    <button
+                        v-if="toggleable"
+                        type="button"
+                        class="btn btn-sm btn-link p-1 text-muted lh-1"
+                        :title="col.hidden ? 'Mostrar' : 'Ocultar'"
+                        @click="$emit('toggle', col.key)"
+                    >
+                        <i class="ti fs-14" :class="col.hidden ? 'ti-eye-off' : 'ti-eye'"></i>
+                    </button>
                     <button
                         type="button"
                         class="btn btn-sm btn-link p-1 text-muted lh-1"
@@ -104,6 +122,9 @@ function onDragEnd() {
 }
 .column-order-item--over {
     background-color: var(--primary-transparent, rgba(13, 110, 253, .08));
+}
+.column-order-item--hidden {
+    opacity: .5;
 }
 .column-order-grip {
     cursor: grab;
