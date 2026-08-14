@@ -21,6 +21,7 @@ return [
     'kpi_receivable'     => 'A receber',
     'kpi_satisfaction'   => 'Satisfação',
     'kpi_coming_soon'    => 'Em breve',
+    'kpi_open_list'      => 'Ver lista de :label',
 
     // Módulos / Atalhos
     'module_schedule'     => 'Agenda',

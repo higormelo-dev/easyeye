@@ -97,6 +97,30 @@
     box-shadow: var(--ee-shadow-lg) !important;
 }
 
+/* ─── Stat Card clicável (atalho para lista relacionada) ──────────────── */
+.stat-card--clickable {
+    cursor: pointer;
+    color: inherit;
+    text-decoration: none;
+    display: block;
+}
+
+.stat-card--clickable:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+.stat-card-chevron {
+    font-size: 1rem;
+    opacity: .45;
+    transition: opacity .15s ease, transform .15s ease;
+}
+
+.stat-card--clickable:hover .stat-card-chevron {
+    opacity: .9;
+    transform: translateX(2px);
+}
+
 .stat-card .stat-icon {
     width: 56px;
     height: 56px;

@@ -62,6 +62,7 @@ const breadcrumbs = [];
             <KpiCards
                 :stats="stats"
                 :is-doctor="isDoctor"
+                :rule="rule"
                 :is-refreshing="isRefreshing"
                 :t="t"
             />

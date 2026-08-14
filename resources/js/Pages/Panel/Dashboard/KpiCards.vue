@@ -1,12 +1,20 @@
 <script setup>
 import { computed } from 'vue';
+import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
-    stats:       { type: Object,  required: true },
-    isDoctor:    { type: Boolean, default: false },
-    isRefreshing:{ type: Boolean, default: false },
-    t:           { type: Object,  required: true },
+    stats:        { type: Object,  required: true },
+    isDoctor:     { type: Boolean, default: false },
+    rule:         { type: String,  default: '' },
+    isRefreshing: { type: Boolean, default: false },
+    t:            { type: Object,  required: true },
 });
+
+// ── Atalhos: indicador → lista relacionada ───────────────────────────────────
+// `today` aponta pra agenda (panel.schedules.index), rota restrita a
+// admin/doctor/secretary — 'financial' não tem acesso, então fica sem link
+// (evita atalho que estoura 403 via EnsureEntityRole).
+const canOpenSchedule = computed(() => props.rule !== 'financial');
 
 const row1 = computed(() => [
     {
@@ -15,6 +23,7 @@ const row1 = computed(() => [
         value:   props.stats.total_patients,
         label:   props.t.kpi_patients,
         variant: 'patients',
+        url:     route('panel.patients.index'),
     },
     {
         key:     'today',
@@ -22,6 +31,7 @@ const row1 = computed(() => [
         value:   props.stats.today_count,
         label:   props.t.kpi_today,
         variant: 'today',
+        url:     canOpenSchedule.value ? route('panel.schedules.index') : null,
     },
     {
         key:     'doctors',
@@ -29,6 +39,7 @@ const row1 = computed(() => [
         value:   props.stats.total_doctors,
         label:   props.t.kpi_doctors,
         variant: 'doctors',
+        url:     route('panel.doctors.index'),
     },
     {
         key:     'surgeries',
@@ -89,11 +100,15 @@ const row2 = computed(() => {
     <!-- Row 1 -->
     <div class="row g-3 mb-3">
         <div v-for="kpi in row1" :key="kpi.key" class="col-6 col-md-3">
-            <div
+            <component
+                :is="kpi.url ? Link : 'div'"
+                :href="kpi.url ?? undefined"
+                :title="kpi.url ? (t.kpi_open_list ?? 'Ver lista').replace(':label', kpi.label) : null"
                 :class="[
                     'card stat-card h-100',
                     `stat-card--${kpi.variant}`,
                     kpi.soon ? 'stat-card-mock' : '',
+                    kpi.url ? 'stat-card--clickable' : '',
                     isRefreshing && !kpi.soon ? 'stat-card--refreshing' : '',
                 ]"
             >
@@ -112,8 +127,9 @@ const row2 = computed(() => {
                         <div class="stat-label">{{ kpi.label }}</div>
                         <span v-if="kpi.soon" class="stat-badge-soon">{{ t.kpi_coming_soon }}</span>
                     </div>
+                    <i v-if="kpi.url" class="ti ti-chevron-right ms-auto text-muted stat-card-chevron"></i>
                 </div>
-            </div>
+            </component>
         </div>
     </div>
 
