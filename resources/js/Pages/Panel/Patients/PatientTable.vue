@@ -4,6 +4,9 @@ import { Link } from '@inertiajs/vue3';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
+import { useColumnOrder } from '@/composables/useColumnOrder.js';
+import { formatPatientCode } from '@/utils/formatPatientCode.js';
 
 const props = defineProps({
     patients: { type: Object, required: true },
@@ -26,27 +29,69 @@ function sortIcon(col) {
 }
 
 const sortableColClass = 'cursor-pointer user-select-none';
+
+// ── Ordem de colunas personalizável ──────────────────────────────────────────
+// Status/Ações ficam fixas (fora do reorder) — convenção de tabela admin:
+// ações sempre por último, status logo antes. Só as colunas "de conteúdo" do
+// paciente são reordenáveis. Ordem padrão pedida: Nome, Telefone, Cadastro,
+// Código — Gênero entra ao final por não ter sido especificada.
+const COLUMN_DEFS = [
+    { key: 'nome',     label: 'Nome',     sortKey: 'full_name' },
+    { key: 'telefone', label: 'Telefone', sortKey: 'cellphone' },
+    { key: 'cadastro', label: 'Cadastro', sortKey: 'created_at' },
+    { key: 'codigo',   label: 'Código',   sortKey: 'code' },
+    { key: 'genero',   label: 'Gênero',   sortKey: null },
+];
+const DEFAULT_COLUMN_ORDER = ['nome', 'telefone', 'cadastro', 'codigo', 'genero'];
+
+const { order: columnOrder, moveTo: moveColumn, reset: resetColumnOrder } = useColumnOrder(
+    'pat_table_columns_order',
+    DEFAULT_COLUMN_ORDER,
+);
+
+const orderedColumns = computed(() => (
+    columnOrder.value
+        .map((key) => COLUMN_DEFS.find((c) => c.key === key))
+        .filter(Boolean)
+));
 </script>
 
 <template>
+    <!-- Toolbar: personalizar colunas -->
+    <div class="d-flex justify-content-end mb-2">
+        <ActionDropdown
+            title="Personalizar colunas"
+            align="right"
+            :min-width="230"
+            btn-class="bg-white border shadow-sm rounded px-2 py-1 d-flex align-items-center gap-1 fs-13 text-muted"
+        >
+            <template #trigger>
+                <i class="ti ti-adjustments"></i>
+                <span class="d-none d-sm-inline">Colunas</span>
+            </template>
+
+            <ColumnOrderMenu
+                :columns="orderedColumns"
+                @move="moveColumn"
+                @reset="resetColumnOrder"
+            />
+        </ActionDropdown>
+    </div>
+
     <!-- Table -->
     <div class="table-responsive">
         <table class="table table-nowrap table-hover align-middle mb-0">
             <thead class="table-light">
                 <tr>
-                    <th :class="sortableColClass" @click="sort('created_at')">
-                        Cadastro <i :class="sortIcon('created_at')" class="ms-1 fs-11"></i>
-                    </th>
-                    <th :class="sortableColClass" @click="sort('code')">
-                        Código <i :class="sortIcon('code')" class="ms-1 fs-11"></i>
-                    </th>
-                    <th :class="sortableColClass" @click="sort('full_name')">
-                        Nome <i :class="sortIcon('full_name')" class="ms-1 fs-11"></i>
-                    </th>
-                    <th>Gênero</th>
-                    <th :class="sortableColClass" @click="sort('cellphone')">
-                        Telefone <i :class="sortIcon('cellphone')" class="ms-1 fs-11"></i>
-                    </th>
+                    <template v-for="col in orderedColumns" :key="col.key">
+                        <th
+                            :class="col.sortKey ? sortableColClass : ''"
+                            @click="col.sortKey && sort(col.sortKey)"
+                        >
+                            {{ col.label }}
+                            <i v-if="col.sortKey" :class="sortIcon(col.sortKey)" class="ms-1 fs-11"></i>
+                        </th>
+                    </template>
                     <th class="text-center">Status</th>
                     <th class="text-end">Ações</th>
                 </tr>
@@ -59,25 +104,33 @@ const sortableColClass = 'cursor-pointer user-select-none';
                     </td>
                 </tr>
                 <tr v-for="p in patients.data" :key="p.id" :class="{ 'table-secondary opacity-75': p.deleted }">
-                    <td class="text-muted small">{{ p.created_at }}</td>
-                    <td><code class="text-muted small">{{ p.code }}</code></td>
-                    <td>
-                        <div class="d-flex align-items-center gap-2">
-                            <img
-                                :src="p.photo_url"
-                                :alt="p.full_name"
-                                class="rounded-circle"
-                                style="width:30px;height:30px;object-fit:cover;"
-                            >
-                            <span class="fw-medium">{{ p.full_name }}</span>
-                            <i v-if="p.deleted" class="ti ti-trash text-danger ms-1" title="Excluído"></i>
-                        </div>
-                    </td>
-                    <td class="text-muted small">{{ p.gender_label ?? '—' }}</td>
-                    <td class="small">
-                        <i v-if="p.whatsapp" class="fab fa-whatsapp text-success me-1"></i>
-                        {{ p.cellphone ?? '—' }}
-                    </td>
+                    <template v-for="col in orderedColumns" :key="col.key">
+                        <td v-if="col.key === 'cadastro'" class="text-muted small">{{ p.created_at }}</td>
+
+                        <td v-else-if="col.key === 'codigo'">
+                            <code class="text-muted small" :title="p.code">{{ formatPatientCode(p.code) }}</code>
+                        </td>
+
+                        <td v-else-if="col.key === 'nome'">
+                            <div class="d-flex align-items-center gap-2">
+                                <img
+                                    :src="p.photo_url"
+                                    :alt="p.full_name"
+                                    class="rounded-circle"
+                                    style="width:30px;height:30px;object-fit:cover;"
+                                >
+                                <span class="fw-medium">{{ p.full_name }}</span>
+                                <i v-if="p.deleted" class="ti ti-trash text-danger ms-1" title="Excluído"></i>
+                            </div>
+                        </td>
+
+                        <td v-else-if="col.key === 'genero'" class="text-muted small">{{ p.gender_label ?? '—' }}</td>
+
+                        <td v-else-if="col.key === 'telefone'" class="small">
+                            <i v-if="p.whatsapp" class="fab fa-whatsapp text-success me-1"></i>
+                            {{ p.cellphone ?? '—' }}
+                        </td>
+                    </template>
                     <td class="text-center">
                         <span
                             v-if="p.deleted"

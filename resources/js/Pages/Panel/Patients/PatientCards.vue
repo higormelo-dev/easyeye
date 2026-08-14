@@ -4,6 +4,7 @@ import { router } from '@inertiajs/vue3';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import { formatPatientCode } from '@/utils/formatPatientCode.js';
 
 const props = defineProps({
     cardsUrl:      { type: String, required: true },
@@ -86,7 +87,7 @@ onUnmounted(() => removeSuccessListener?.());
                     </div>
 
                     <address class="small text-muted mt-2 mb-1">
-                        <strong>Código:</strong> {{ p.code }}<br>
+                        <strong>Código:</strong> {{ formatPatientCode(p.code) }}<br>
                         <strong>Convênio:</strong> {{ p.covenant ?? 'Não informado' }}<br>
                         <strong>Pele:</strong> {{ p.skin ?? 'Não informado' }}<br>
                         <strong>Íris:</strong> {{ p.iris ?? 'Não informado' }}
