@@ -126,7 +126,13 @@ class PanelDashboardController extends Controller
     private function buildActivation(string $entityId): array
     {
         return array_map(
-            fn ($s) => ['key' => $s['step'], 'label' => $s['label'], 'done' => $s['completed'], 'weight' => $s['weight']],
+            fn ($s) => [
+                'key'      => $s['step'],
+                'label'    => $s['label'],
+                'done'     => $s['completed'],
+                'weight'   => $s['weight'],
+                'required' => $s['required'],
+            ],
             app(ActivationService::class)->getProgress($entityId),
         );
     }

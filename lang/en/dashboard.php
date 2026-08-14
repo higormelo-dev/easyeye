@@ -65,6 +65,7 @@ return [
     'activation_title'        => 'Set up your clinic',
     'activation_subtitle'     => 'Complete the steps to get the most out of the system.',
     'activation_done'         => 'setup complete',
+    'activation_optional'     => 'optional',
     'activation_completed_on' => 'Completed on',
 
     // Live / Polling

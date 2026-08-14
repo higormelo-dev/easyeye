@@ -45,7 +45,10 @@ const color = computed(() => {
                     :class="step.done ? 'border-success bg-success bg-opacity-10' : 'bg-white'"
                 >
                     <i class="flex-shrink-0 fs-16" :class="step.done ? 'ti ti-circle-check text-success' : 'ti ti-circle text-muted'"></i>
-                    <span class="small text-nowrap" :class="step.done ? 'text-success fw-medium' : 'text-muted'">{{ step.label }}</span>
+                    <span class="small text-nowrap" :class="step.done ? 'text-success fw-medium' : 'text-muted'">
+                        {{ step.label }}
+                        <span v-if="!step.done && !step.required" class="text-muted fst-italic">({{ t.activation_optional ?? 'opcional' }})</span>
+                    </span>
                     <span v-if="!step.done" class="fw-semibold small" style="color:#0d6efd">+{{ step.weight }}%</span>
                 </div>
             </div>

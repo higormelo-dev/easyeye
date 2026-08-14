@@ -60,7 +60,7 @@ class ActivationService
     /**
      * Retorna o progresso completo de ativação de uma clínica.
      *
-     * @return array{step: ActivationStep, label: string, weight: int, completed: bool, completed_at: ?string}[]
+     * @return array{step: ActivationStep, label: string, weight: int, required: bool, completed: bool, completed_at: ?string}[]
      */
     public function getProgress(string $entityId): array
     {
@@ -76,10 +76,33 @@ class ActivationService
                 'step'         => $step->value,
                 'label'        => $step->label(),
                 'weight'       => $step->weight(),
+                'required'     => $step->required(),
                 'completed'    => $activation !== null,
                 'completed_at' => $activation?->completed_at?->toIso8601String(),
             ];
         }, ActivationStep::ordered());
+    }
+
+    /**
+     * "Clínica configurada" = todas as etapas obrigatórias concluídas.
+     * Etapas opcionais (ex.: convidar equipe, conectar integrador) continuam
+     * valendo pontos no score, mas não travam esse estado — ver
+     * ActivationStep::required() para o racional.
+     */
+    public function isComplete(string $entityId): bool
+    {
+        $completedValues = EntityActivation::query()
+            ->where('entity_id', $entityId)
+            ->pluck('step')
+            ->toArray();
+
+        foreach (ActivationStep::ordered() as $step) {
+            if ($step->required() && ! in_array($step, $completedValues, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

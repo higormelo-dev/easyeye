@@ -26,9 +26,22 @@ const entity = computed(() => page.props.auth?.entity ?? {});
 const rule   = computed(() => entity.value.rule ?? '');
 const isDoctor = computed(() => rule.value === 'doctor');
 
+// BUGFIX: o card "Configure sua clínica" ficava travado pra sempre em
+// clínicas que nunca convidam um 2º usuário (dono solo) ou nunca conectam
+// um integrador de API (feature opcional) — activationScore nunca batia
+// 100 pra elas mesmo com a clínica 100% operacional. Card some quando as
+// etapas OBRIGATÓRIAS (activation[].required) estiverem concluídas; as
+// opcionais continuam contando ponto no score, só não travam mais o card.
+const activationComplete = computed(() => (
+    props.activation.every((step) => !step.required || step.done)
+));
+
 // Polling: atualiza dados clínicos a cada 30s via partial reload Inertia
+// ('activation'/'activationScore' inclusos pra o card "Configure sua
+// clínica" sumir sozinho assim que a última etapa obrigatória é concluída,
+// sem exigir reload manual da página).
 const { isRefreshing, lastUpdated, refresh } = useDashboardPolling(
-    ['stats', 'scheduleToday', 'recentPatients'],
+    ['stats', 'scheduleToday', 'recentPatients', 'activation', 'activationScore'],
     30_000,
 );
 
@@ -50,9 +63,9 @@ const breadcrumbs = [];
             <!-- ── Welcome Banner ── -->
             <WelcomeBanner :t="t" />
 
-            <!-- ── Activation progress (only when incomplete) ── -->
+            <!-- ── Activation progress (only when etapas obrigatórias pendentes) ── -->
             <Activation
-                v-if="activationScore < 100"
+                v-if="!activationComplete"
                 :activation="activation"
                 :activation-score="activationScore"
                 :t="t"

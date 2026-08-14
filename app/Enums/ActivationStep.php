@@ -46,6 +46,26 @@ enum ActivationStep: string
     }
 
     /**
+     * Etapa obrigatória para considerar a clínica "configurada" (fecha o
+     * card "Configure sua clínica" no Dashboard).
+     *
+     * BUGFIX: o card só sumia com score === 100, mas TeamMemberInvited
+     * (clínica solo, só o dono, nunca convida ninguém) e IntegratorConnected
+     * (exige hardware/API de integrador — feature opcional, não toda clínica
+     * usa) são etapas que boa parte das clínicas legitimamente NUNCA cumpre.
+     * Resultado: o ícone ficava preso pra sempre mesmo com a clínica 100%
+     * operacional. Essas duas continuam contando pro score/analytics (weight
+     * acima inalterado), só não bloqueiam mais o "concluído" do onboarding.
+     */
+    public function required(): bool
+    {
+        return match ($this) {
+            self::TeamMemberInvited, self::IntegratorConnected => false,
+            default => true,
+        };
+    }
+
+    /**
      * Retorna todas as etapas em ordem de importância para o onboarding.
      *
      * @return self[]

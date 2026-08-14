@@ -65,6 +65,7 @@ return [
     'activation_title'        => 'Configure sua clínica',
     'activation_subtitle'     => 'Complete os passos para aproveitar ao máximo o sistema.',
     'activation_done'         => 'setup concluído',
+    'activation_optional'     => 'opcional',
     'activation_completed_on' => 'Concluído em',
 
     // Live / Polling
