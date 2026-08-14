@@ -171,8 +171,12 @@ class AppServiceProvider extends ServiceProvider
         // de IPs corporativos compartilhados. user_id também evita que um admin
         // saturado afete outro.
         //
-        // - manager-read     : 60/min  - cards/listagens (já existe throttle:30,1
-        //                                no grupo de rotas; este é teto adicional)
+        // - manager-read     : 60/min  - cards/listagens (aplicado no grupo de
+        //                                rotas routes/manager.php; era um literal
+        //                                'throttle:30,1' — trocado porque 30/min
+        //                                compartilhado entre TODAS as leituras do
+        //                                painel manager estourava com poucos
+        //                                cliques de paginação)
         // - manager-write    : 30/min  - update/store padrão
         // - manager-destructive : 5/min - cancel/block/destroy/revoke/impersonate
         //                                Ações de alto impacto exigem cadência humana,

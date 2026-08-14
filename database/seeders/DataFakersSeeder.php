@@ -148,6 +148,27 @@ class DataFakersSeeder extends Seeder
                 }
             }
 
+            // BUGFIX: 'financial' era só ~1/7 chance no roleDistribution acima e
+            // podia ainda ser roubado pela promoção a admin logo acima — várias
+            // clínicas de teste ficavam sem nenhum usuário financeiro, sem meio
+            // de um QA testar esse fluxo. Garante ao menos 1 por entity.
+            $hasFinancial = EntityUser::query()
+                ->where('entity_id', $entity->id)
+                ->where('rule', 'financial')
+                ->exists();
+
+            if (! $hasFinancial) {
+                $financialCandidate = EntityUser::query()
+                    ->where('entity_id', $entity->id)
+                    ->whereNotIn('rule', ['admin', 'doctor'])
+                    ->inRandomOrder()
+                    ->first();
+
+                if ($financialCandidate) {
+                    $financialCandidate->update(['rule' => 'financial']);
+                }
+            }
+
             // Assinatura com status variado
             $planId = $planDistribution[array_rand($planDistribution)];
             $status = $statusDistribution[array_rand($statusDistribution)];
@@ -402,6 +423,37 @@ class DataFakersSeeder extends Seeder
             ],
         );
 
+        // Financeiro
+        // BUGFIX: a Clínica Teste Integrador (única com credenciais fixas e
+        // conhecidas) nunca tinha usuário 'financial' — impossível testar o
+        // fluxo financeiro sem depender da distribuição aleatória das outras
+        // entities fake (senha desconhecida, ~14% de chance por usuário).
+        $testFinanceiroPerson = People::updateOrCreate(
+            ['email' => 'financeiro@clinicateste.com'],
+            [
+                'full_name' => 'FINANCEIRO CLÍNICA TESTE',
+                'cellphone' => '',
+            ],
+        );
+        $testFinanceiroUser = User::updateOrCreate(
+            ['email' => 'financeiro@clinicateste.com'],
+            [
+                'name'              => $testFinanceiroPerson->full_name,
+                'email_verified_at' => now(),
+                'password'          => Hash::make('Financeiro@123'),
+            ],
+        );
+        EntityUser::updateOrCreate(
+            [
+                'entity_id' => $testEntity->id,
+                'user_id'   => $testFinanceiroUser->id,
+            ],
+            [
+                'rule'   => 'financial',
+                'active' => true,
+            ],
+        );
+
         $this->createTestEntityData($testEntity);
 
         $testPlanApiAccess     = $integratorTestPlan->featureValue(FeatureKey::HasApiIntegrator) ?? '0';
@@ -436,6 +488,10 @@ class DataFakersSeeder extends Seeder
         $this->command->info('  SECRETÁRIA');
         $this->command->info('  email   : secretaria@clinicateste.com');
         $this->command->info('  password: Secretaria@123');
+        $this->command->info('───────────────────────────────────────────────────────');
+        $this->command->info('  FINANCEIRO');
+        $this->command->info('  email   : financeiro@clinicateste.com');
+        $this->command->info('  password: Financeiro@123');
         $this->command->info('═══════════════════════════════════════════════════════');
         $this->command->info('');
 

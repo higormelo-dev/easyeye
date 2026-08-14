@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Manager;
 
-use App\Enums\EntityGate;
+use App\Enums\{ClientRule, EntityGate};
 use App\Http\Controllers\Controller;
 use App\Models\{Entity, EntityUser};
 use Illuminate\Http\Request;
@@ -75,11 +75,17 @@ class EntityUsersController extends Controller
             && ! $isImpersonating;
 
         return [
-            'id'              => (string) $eu->id,
-            'code'            => (string) $eu->code,
-            'name'            => (string) ($eu->user_name ?? '—'),
-            'email'           => (string) ($eu->user_email ?? '—'),
-            'rule'            => $eu->rule ? ucfirst((string) $eu->rule) : null,
+            'id'    => (string) $eu->id,
+            'code'  => (string) $eu->code,
+            'name'  => (string) ($eu->user_name ?? '—'),
+            'email' => (string) ($eu->user_email ?? '—'),
+            // BUGFIX: ucfirst($eu->rule) exibia o valor cru do enum em inglês
+            // (ex.: "Financial") numa UI pt-BR — dificultava o admin SaaS
+            // localizar visualmente um usuário com perfil financeiro entre
+            // os demais. Usa o label pt-BR do ClientRule quando reconhecido.
+            'rule' => $eu->rule
+                ? (ClientRule::tryFrom((string) $eu->rule)?->label() ?? ucfirst((string) $eu->rule))
+                : null,
             'active'          => (bool) $eu->active,
             'deleted'         => $eu->deleted_at !== null,
             'created_at'      => $eu->created_at?->format('d/m/Y H:i'),

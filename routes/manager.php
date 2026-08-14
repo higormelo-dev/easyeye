@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Route;
 
 // ── Painel administrativo do SaaS ─────────────────────────────────────────────
 // URL base : /panel/manager
-// Middleware: auth, verified, entity.selected, saas.admin, admin.audit, throttle:30,1
+// Middleware: auth, verified, entity.selected, saas.admin, admin.audit, throttle:manager-read
 // Nomes    : manager.*  (separados do panel.* das clínicas)
 // ─────────────────────────────────────────────────────────────────────────────
 Route::group([
@@ -29,7 +29,18 @@ Route::group([
     // 2fa entra DEPOIS de auth/verified (precisa de usuário autenticado)
     // e ANTES de saas.admin (que valida a entity SaaS — não devemos expor
     // contexto SaaS sem 2FA verificado na sessão).
-    'middleware' => ['auth', 'verified', '2fa', 'entity.selected', 'saas.admin', 'admin.audit', 'throttle:30,1'],
+    //
+    // BUGFIX: era 'throttle:30,1' (30 req/min por IP, compartilhado entre
+    // TODAS as rotas de leitura do manager — dashboard, listagem/paginação
+    // de entities, listagem/paginação de usuários por clínica, cards, etc).
+    // Um admin navegando por poucas clínicas de teste já estourava a cota:
+    // o próximo clique (ex.: página 2) recebia 429, e o handler global de
+    // exceptions (bootstrap/app.php) faz redirect()->back() em requests
+    // Inertia — visualmente indistinguível de "o botão não faz nada".
+    // 'manager-read' (AppServiceProvider) já existia definido para este
+    // exato propósito (60/min, por usuário) mas nunca tinha sido aplicado
+    // aqui — o grupo ainda usava o limite literal antigo.
+    'middleware' => ['auth', 'verified', '2fa', 'entity.selected', 'saas.admin', 'admin.audit', 'throttle:manager-read'],
 ], static function () {
     // ── Dashboard ──────────────────────────────────────────────────────────────
     Route::get('/', fn () => redirect()->route('manager.dashboard'));
