@@ -5,6 +5,7 @@ import createServer from '@inertiajs/vue3/server';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { ZiggyVue } from 'ziggy-js';
 import { MotionPlugin } from '@vueuse/motion';
+import phoneMask from './directives/phoneMask.js';
 
 const appName = 'EasyEye';
 
@@ -19,6 +20,7 @@ createServer(page =>
             return createSSRApp({ render: () => h(App, props) })
                 .use(plugin)
                 .use(MotionPlugin)
+                .directive('phone-mask', phoneMask)
                 .use(ZiggyVue, {
                     ...page.props.ziggy,
                     location: new URL(page.props.ziggy.location),

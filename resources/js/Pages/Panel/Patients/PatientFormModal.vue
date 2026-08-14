@@ -351,7 +351,9 @@ const tabHasErrors = computed(() => ({
                 <div class="mb-3">
                     <label class="form-label">Celular <span class="text-danger">*</span></label>
                     <input v-model="form.cellphone"
+                           v-phone-mask="'cellphone'"
                            type="text"
+                           inputmode="numeric"
                            class="form-control"
                            placeholder="(00) 00000-0000"
                            :class="{ 'is-invalid': form.errors.cellphone }">
@@ -369,7 +371,12 @@ const tabHasErrors = computed(() => ({
 
                 <div class="mb-3">
                     <label class="form-label">Telefone fixo</label>
-                    <input v-model="form.telephone" type="text" class="form-control" placeholder="(00) 0000-0000">
+                    <input v-model="form.telephone"
+                           v-phone-mask="'landline'"
+                           type="text"
+                           inputmode="numeric"
+                           class="form-control"
+                           placeholder="(00) 0000-0000">
                 </div>
             </div>
 
