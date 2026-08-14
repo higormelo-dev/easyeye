@@ -1,5 +1,7 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { router } from '@inertiajs/vue3';
+import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 
 const props = defineProps({
     conversionFunnel: { type: Object, required: true },
@@ -7,6 +9,36 @@ const props = defineProps({
 });
 
 const cf = computed(() => props.conversionFunnel);
+
+// ── Seletor de período ───────────────────────────────────────────────────────
+// Reload parcial via Inertia (only: ['conversionFunnel']) — os demais widgets
+// do dashboard não recarregam. `days` reflete o período efetivamente
+// devolvido pelo backend (fonte da verdade), não o clicado localmente, para
+// não dessincronizar se o backend cair no default por período inválido.
+const PERIOD_OPTIONS = [7, 30, 60, 90];
+const loadingPeriod  = ref(false);
+const selectedDays   = ref(cf.value.days ?? 90);
+
+watch(() => cf.value.days, (days) => {
+    if (days) selectedDays.value = days;
+});
+
+function periodLabel(days) {
+    return (props.t.funnel_period_option ?? ':days dias').replace(':days', days);
+}
+
+function selectPeriod(days) {
+    if (days === selectedDays.value || loadingPeriod.value) return;
+
+    loadingPeriod.value = true;
+    router.reload({
+        only: ['conversionFunnel'],
+        data: { funnel_period: days },
+        preserveScroll: true,
+        preserveState: true,
+        onFinish: () => { loadingPeriod.value = false; },
+    });
+}
 
 function rateClass(rate, thresholds) {
     if (rate >= thresholds[0]) return 'conv-rate-badge--good';
@@ -35,11 +67,33 @@ const activeBarWidth = computed(() => {
     <div class="card mgr-chart-card h-100">
         <div class="card-header d-flex align-items-center justify-content-between">
             <span><i class="ti ti-filter me-2"></i>{{ t.conversion_funnel_title }}</span>
-            <span class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13">
-                {{ t.last_90d }}
-            </span>
+
+            <ActionDropdown
+                :title="t.conversion_funnel_title"
+                align="right"
+                :min-width="140"
+                btn-class="badge badge-soft-primary fw-medium border py-1 px-2 border-primary fs-13"
+            >
+                <template #trigger>
+                    <span v-if="loadingPeriod" class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                    {{ (t.funnel_period_label ?? 'Últimos :days dias').replace(':days', selectedDays) }}
+                    <i class="ti ti-chevron-down ms-1"></i>
+                </template>
+
+                <li v-for="days in PERIOD_OPTIONS" :key="days">
+                    <button
+                        type="button"
+                        class="dropdown-item rounded-1 d-flex align-items-center justify-content-between"
+                        :class="{ active: days === selectedDays }"
+                        @click="selectPeriod(days)"
+                    >
+                        {{ periodLabel(days) }}
+                        <i v-if="days === selectedDays" class="ti ti-check ms-2"></i>
+                    </button>
+                </li>
+            </ActionDropdown>
         </div>
-        <div class="card-body">
+        <div class="card-body" :class="{ 'opacity-50 pe-none': loadingPeriod }">
 
             <!-- Etapas do funil -->
             <div class="conv-funnel mb-4">
@@ -121,24 +175,24 @@ const activeBarWidth = computed(() => {
                 </div>
             </div>
 
-            <!-- Taxa dos últimos 90 dias -->
+            <!-- Taxa do período selecionado -->
             <div class="conv-90d-box">
                 <div class="conv-90d-title">
                     <i class="ti ti-calendar-stats me-1"></i>
-                    {{ t.conv_90d_title }}
+                    {{ (t.conv_period_title ?? 'Conversão — trials finalizados (:days d)').replace(':days', cf.days) }}
                 </div>
                 <div class="row g-2 mt-1">
                     <div class="col-4 text-center">
-                        <div class="conv-90d-value">{{ cf.trialsEnded90d }}</div>
+                        <div class="conv-90d-value">{{ cf.trialsEndedPeriod }}</div>
                         <div class="conv-90d-label">{{ t.conv_trials_ended }}</div>
                     </div>
                     <div class="col-4 text-center">
-                        <div class="conv-90d-value text-success">{{ cf.trialsConverted90d }}</div>
+                        <div class="conv-90d-value text-success">{{ cf.trialsConvertedPeriod }}</div>
                         <div class="conv-90d-label">{{ t.conv_converted }}</div>
                     </div>
                     <div class="col-4 text-center">
-                        <div :class="['conv-90d-value', trialRateClass(cf.trialToPaid90dRate)]">
-                            {{ cf.trialToPaid90dRate }}%
+                        <div :class="['conv-90d-value', trialRateClass(cf.trialToPaidPeriodRate)]">
+                            {{ cf.trialToPaidPeriodRate }}%
                         </div>
                         <div class="conv-90d-label">{{ t.conv_rate }}</div>
                     </div>

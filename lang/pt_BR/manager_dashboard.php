@@ -47,7 +47,8 @@ return [
 
     // Funil de conversão
     'conversion_funnel_title' => 'Funil de Conversão',
-    'last_90d'                => 'Últimos 90 dias',
+    'funnel_period_label'     => 'Últimos :days dias',
+    'funnel_period_option'    => ':days dias',
     'funnel_leads'            => 'Leads',
     'funnel_trials'           => 'Trials',
     'funnel_active'           => 'Pagos (Ativos)',
@@ -55,7 +56,7 @@ return [
     'funnel_converted'        => 'converteram',
     'funnel_from_leads'       => 'dos leads',
     'funnel_from_trials'      => 'dos trials',
-    'conv_90d_title'          => 'Conversão — trials finalizados (90d)',
+    'conv_period_title'       => 'Conversão — trials finalizados (:days d)',
     'conv_trials_ended'       => 'Trials encerrados',
     'conv_converted'          => 'Convertidos',
     'conv_rate'               => 'Taxa',

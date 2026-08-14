@@ -47,7 +47,8 @@ return [
 
     // Conversion funnel
     'conversion_funnel_title' => 'Conversion Funnel',
-    'last_90d'                => 'Last 90 days',
+    'funnel_period_label'     => 'Last :days days',
+    'funnel_period_option'    => ':days days',
     'funnel_leads'            => 'Leads',
     'funnel_trials'           => 'Trials',
     'funnel_active'           => 'Paid (Active)',
@@ -55,7 +56,7 @@ return [
     'funnel_converted'        => 'converted',
     'funnel_from_leads'       => 'of leads',
     'funnel_from_trials'      => 'of trials',
-    'conv_90d_title'          => 'Conversion — ended trials (90d)',
+    'conv_period_title'       => 'Conversion — ended trials (:days d)',
     'conv_trials_ended'       => 'Ended trials',
     'conv_converted'          => 'Converted',
     'conv_rate'               => 'Rate',

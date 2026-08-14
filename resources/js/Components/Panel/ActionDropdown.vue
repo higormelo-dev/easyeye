@@ -81,7 +81,7 @@ onBeforeUnmount(close);
 
 <template>
     <button ref="triggerRef" type="button" :class="btnClass" :title="title" @click="toggle">
-        <i :class="icon"></i>
+        <slot name="trigger"><i :class="icon"></i></slot>
     </button>
 
     <Teleport to="body">

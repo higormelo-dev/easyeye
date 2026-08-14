@@ -150,51 +150,64 @@ class ManagerDashboardService
 
     // ── Funil de Conversão ────────────────────────────────────────────────────
 
-    public function getConversionFunnel(): array
+    /**
+     * Períodos aceitos pelo seletor do funil (dias). Qualquer valor fora
+     * desta lista cai no default de 90 — evita cache poluído por valores
+     * arbitrários vindos de query string manipulada.
+     */
+    public const FUNNEL_PERIODS = [7, 30, 60, 90];
+
+    public function getConversionFunnel(int $days = 90): array
     {
-        return Cache::remember('mgr_dashboard.conversion_funnel', self::CACHE_TTL, function () {
-            $now     = Carbon::now();
-            $from90d = $now->copy()->subDays(90);
+        $days = in_array($days, self::FUNNEL_PERIODS, true) ? $days : 90;
 
-            $totalLeads  = PartnerLead::count();
-            $totalTrials = Subscription::whereNotNull('trial_ends_at')->count();
-            $totalActive = Subscription::where('status', SubscriptionStatus::Active->value)->count();
+        return Cache::remember("mgr_dashboard.conversion_funnel:{$days}", self::CACHE_TTL, function () use ($days) {
+            $now  = Carbon::now();
+            $from = $now->copy()->subDays($days);
 
-            // Taxa global Lead → Trial
+            // Funil como coorte do período selecionado: leads/trials/ativos
+            // são todos filtrados por created_at dentro da janela, para que
+            // as taxas entre etapas façam sentido juntas (mesma safra).
+            $totalLeads  = PartnerLead::where('created_at', '>=', $from)->count();
+            $totalTrials = Subscription::whereNotNull('trial_ends_at')->where('created_at', '>=', $from)->count();
+            $totalActive = Subscription::where('status', SubscriptionStatus::Active->value)
+                ->where('created_at', '>=', $from)
+                ->count();
+
             $leadToTrialRate = $totalLeads > 0
                 ? round(min($totalTrials, $totalLeads) / $totalLeads * 100, 1)
                 : 0.0;
 
-            // Taxa global Trial → Pago
             $trialToActiveRate = $totalTrials > 0
                 ? round($totalActive / $totalTrials * 100, 1)
                 : 0.0;
 
-            // Taxa dos últimos 90 dias (trials que já finalizaram)
-            $trialsEnded90d = Subscription::whereNotNull('trial_ends_at')
+            // Trials que já finalizaram dentro do período selecionado.
+            $trialsEndedPeriod = Subscription::whereNotNull('trial_ends_at')
                 ->where('trial_ends_at', '<', $now)
-                ->where('created_at', '>=', $from90d)
+                ->where('created_at', '>=', $from)
                 ->count();
 
-            $trialsConverted90d = Subscription::whereNotNull('trial_ends_at')
+            $trialsConvertedPeriod = Subscription::whereNotNull('trial_ends_at')
                 ->where('trial_ends_at', '<', $now)
-                ->where('created_at', '>=', $from90d)
+                ->where('created_at', '>=', $from)
                 ->where('status', SubscriptionStatus::Active->value)
                 ->count();
 
-            $trialToPaid90dRate = $trialsEnded90d > 0
-                ? round($trialsConverted90d / $trialsEnded90d * 100, 1)
+            $trialToPaidPeriodRate = $trialsEndedPeriod > 0
+                ? round($trialsConvertedPeriod / $trialsEndedPeriod * 100, 1)
                 : 0.0;
 
             return compact(
+                'days',
                 'totalLeads',
                 'totalTrials',
                 'totalActive',
                 'leadToTrialRate',
                 'trialToActiveRate',
-                'trialsEnded90d',
-                'trialsConverted90d',
-                'trialToPaid90dRate',
+                'trialsEndedPeriod',
+                'trialsConvertedPeriod',
+                'trialToPaidPeriodRate',
             );
         });
     }
