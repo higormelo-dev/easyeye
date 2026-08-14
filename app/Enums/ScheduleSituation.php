@@ -59,26 +59,6 @@ enum ScheduleSituation: int
         };
     }
 
-    /**
-     * Situações para as quais é permitido transitar a partir desta.
-     *
-     * @return array<int>
-     */
-    public function allowedTransitions(): array
-    {
-        return match ($this) {
-            self::Scheduled  => [self::Confirmed->value, self::Waiting->value, self::NoShow->value, self::Cancelled->value],
-            self::Confirmed  => [self::Waiting->value, self::NoShow->value, self::Cancelled->value],
-            self::Waiting    => [self::Dilating->value, self::InProgress->value, self::Cancelled->value],
-            self::Dilating   => [self::Exam->value, self::InProgress->value, self::Cancelled->value],
-            self::Exam       => [self::InProgress->value, self::Cancelled->value],
-            self::InProgress => [self::Attended->value, self::Cancelled->value],
-            self::Attended   => [],
-            self::NoShow     => [],
-            self::Cancelled  => [],
-        };
-    }
-
     public function isTerminal(): bool
     {
         return in_array($this, [self::Attended, self::NoShow, self::Cancelled], true);

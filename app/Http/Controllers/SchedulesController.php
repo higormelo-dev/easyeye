@@ -74,11 +74,15 @@ class SchedulesController extends Controller
                 'is_courtesy'       => $m->isCourtesy(),
             ])->values(),
             'canRegisterCash' => Gate::allows(EntityGate::ViewFinancial->value, Entity::find($entityId)),
-            'situations'      => collect(ScheduleSituation::cases())->map(fn ($s) => [
-                'value' => $s->value,
-                'label' => $s->label(),
-                'badge' => $s->badgeClass(),
-                'icon'  => $s->icon(),
+            // Lista completa e fixa — o dropdown de situação no card usa isso
+            // diretamente (todas as opções sempre disponíveis, nenhuma some
+            // depois de selecionada; ver ScheduleCard.vue).
+            'situations' => collect(ScheduleSituation::cases())->map(fn ($s) => [
+                'value'  => $s->value,
+                'label'  => $s->label(),
+                'badge'  => $s->badgeClass(),
+                'icon'   => $s->icon(),
+                'circle' => $s->circleClass(),
             ])->values(),
             'moods' => collect(PatientMood::cases())->map(fn ($m) => [
                 'value'      => $m->value,
@@ -302,12 +306,21 @@ class SchedulesController extends Controller
         $situation = ScheduleSituation::from($request->integer('situation'));
         $notes     = $request->string('notes')->trim()->value() ?: null;
 
-        if ($schedule->situation->isTerminal()) {
-            return response()->json(['message' => __('schedules.already_finalized')], 422);
-        }
-
-        if (! in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
-            return response()->json(['message' => __('schedules.invalid_transition')], 422);
+        // AJUSTE: situação é um campo livremente editável — inclusive pra
+        // "desfazer" um Cancelado/Faltou/Atendido selecionado por engano, sem
+        // precisar recriar o agendamento. Não há mais grafo de transições
+        // permitidas (ScheduleSituation::allowedTransitions() foi removido) —
+        // qualquer situação → qualquer situação é válido.
+        //
+        // Clicar na situação atual de novo é no-op: evita reset indevido de
+        // arrived_at/confirmed_at (ver abaixo) e ruído no histórico.
+        if ($situation === $schedule->situation) {
+            return response()->json([
+                'message'   => __('schedules.situation_updated'),
+                'situation' => $situation->value,
+                'label'     => $situation->label(),
+                'badge'     => $situation->badgeClass(),
+            ]);
         }
 
         // Concluir o atendimento NÃO depende do financeiro por padrão.
@@ -713,17 +726,6 @@ class SchedulesController extends Controller
             ? $s->patient_mood
             : ($s->patient_mood ? PatientMood::tryFrom((int) $s->patient_mood) : null);
 
-        $allowedTransitions = collect($sit?->allowedTransitions() ?? [])->map(function ($val) {
-            $to = ScheduleSituation::from($val);
-
-            return [
-                'value'     => $val,
-                'label'     => $to->label(),
-                'icon'      => $to->icon(),
-                'is_cancel' => $to === ScheduleSituation::Cancelled,
-            ];
-        })->values()->toArray();
-
         return [
             'id'                  => $s->id,
             'time'                => $s->date_time->format('H:i'),
@@ -751,7 +753,6 @@ class SchedulesController extends Controller
             'badge'                => $sit?->badgeClass() ?? 'bg-secondary',
             'icon'                 => $sit?->icon() ?? 'fa-circle',
             'is_terminal'          => $sit?->isTerminal() ?? false,
-            'allowed_transitions'  => $allowedTransitions,
             'notes'                => $s->notes,
             'confirmed_at'         => $s->confirmed_at?->format('d/m H:i'),
             'arrived_at'           => $s->arrived_at?->toIso8601String(),

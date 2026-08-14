@@ -365,8 +365,11 @@ class ScheduleService
     /**
      * Applies a situation transition to multiple schedules belonging to the entity.
      *
-     * Silently skips schedules that are terminal or whose current situation does
-     * not allow the requested transition (partial success — never throws).
+     * AJUSTE: situação é um campo livremente editável (ver
+     * SchedulesController::updateSituation) — não existe mais grafo de
+     * transições permitidas nem bloqueio por "terminal". Skips agora só
+     * cobrem registros que não existem/não pertencem à entity, e o próprio
+     * item já estar na situação-alvo (no-op — evita log/timestamp redundante).
      *
      * Writes a ScheduleSituationLog entry for every record actually updated.
      *
@@ -396,13 +399,7 @@ class ScheduleService
                 continue;
             }
 
-            if ($schedule->situation->isTerminal()) {
-                $skipped++;
-
-                continue;
-            }
-
-            if (! in_array($situation->value, $schedule->situation->allowedTransitions(), true)) {
+            if ($schedule->situation === $situation) {
                 $skipped++;
 
                 continue;

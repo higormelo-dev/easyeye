@@ -147,7 +147,7 @@ class DoctorWorkScheduleController extends Controller
             'entityInterval' => $doctor->entityUser->entity->schedule_interval ?? 15,
             'blocks'         => $blocks,
             'urls'           => [
-                'sync'          => route('panel.doctors.work-schedule.update', $doctor->id),
+                'sync'          => route('panel.doctors.work-schedule.sync', $doctor->id),
                 'store_block'   => route('panel.doctors.blocks.store', $doctor->id),
                 'destroy_block' => url("panel/doctors/{$doctor->id}/blocks"),
                 'back'          => route('panel.doctors.index'),

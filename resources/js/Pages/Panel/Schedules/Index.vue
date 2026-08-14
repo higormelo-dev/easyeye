@@ -633,6 +633,7 @@ const breadcrumbs = [
                                     :is-staff="isStaff"
                                     :is-doctor="isDoctor"
                                     :can-register-cash="canRegisterCash"
+                                    :situations="situations"
                                     :moods="moods"
                                     :selection-mode="selectionMode"
                                     :selected="isSelected(item.id)"

@@ -9,11 +9,16 @@ const props = defineProps({
     isStaff:         { type: Boolean, default: false },
     isDoctor:        { type: Boolean, default: false },
     canRegisterCash: { type: Boolean, default: false },
+    situations:      { type: Array,   default: () => [] },
     moods:           { type: Array,   default: () => [] },
     selectionMode:   { type: Boolean, default: false },
     selected:        { type: Boolean, default: false },
     t:               { type: Object,  required: true },
 });
+
+// App\Enums\ScheduleSituation::Cancelled->value — cancelar segue passando
+// pelo CancelModal (motivo opcional), mesmo valor hardcoded lá.
+const CANCELLED_VALUE = 9;
 
 const emit = defineEmits([
     'toggle-select',
@@ -54,7 +59,9 @@ onMounted(() => {
 onUnmounted(() => clearInterval(timerInterval));
 
 function onSituationClick(trans) {
-    if (trans.is_cancel) {
+    if (trans.value === props.item.situation) return; // já é a situação atual — no-op
+
+    if (trans.value === CANCELLED_VALUE) {
         emit('cancel', props.item);
     } else {
         emit('change-situation', { item: props.item, to: trans.value });
@@ -150,24 +157,30 @@ function onSituationClick(trans) {
                 <div class="d-flex align-items-center flex-shrink-0" style="gap: 8px;" @click.stop>
 
                     <!-- Grupo 1: controles de estado (situação + humor) -->
+                    <!-- AJUSTE: situação/humor editáveis a qualquer momento, inclusive
+                         com agendamento terminal (Atendido/Faltou/Cancelado) — corrige
+                         seleção por engano sem precisar recriar o agendamento. -->
                     <ActionIconGroup
-                        v-if="!item.is_terminal && isStaff && ((item.allowed_transitions.length > 0) || item.patient_id)"
+                        v-if="isStaff && (situations.length > 0 || item.patient_id)"
                         gap="tight"
                     >
-                        <!-- Situation dropdown -->
+                        <!-- Situation dropdown: todas as situações, sempre — nenhuma
+                             some da lista, nenhuma fica "travada" por ser terminal. -->
                         <ActionDropdown
-                            v-if="item.allowed_transitions.length > 0"
+                            v-if="situations.length > 0"
                             icon="fas fa-list-ul"
                             btn-class="ee-action-icon ee-action-icon--default"
                             :title="t.dropdown_situation ?? 'Alterar situação'"
                         >
-                            <li v-for="trans in item.allowed_transitions" :key="trans.value">
+                            <li v-for="trans in situations" :key="trans.value">
                                 <button type="button"
-                                        class="dropdown-item"
+                                        class="dropdown-item d-flex align-items-center"
+                                        :class="{ 'text-muted': trans.value === item.situation }"
+                                        :disabled="trans.value === item.situation"
                                         @click="onSituationClick(trans)">
-                                    <i class="fas fa-circle me-2"
-                                       :class="'text-' + (trans.is_cancel ? 'dark' : 'secondary')"></i>
-                                    {{ trans.label.toUpperCase() }}
+                                    <i class="fas fa-circle me-2" :class="trans.circle"></i>
+                                    <span class="flex-grow-1">{{ trans.label.toUpperCase() }}</span>
+                                    <i v-if="trans.value === item.situation" class="fas fa-check ms-2"></i>
                                 </button>
                             </li>
                         </ActionDropdown>
