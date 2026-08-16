@@ -34,3 +34,8 @@ yarn-error.log
 
 # Claude Code agent worktrees (artefatos de runtime)
 .claude/worktrees/
+
+
+# Ignorar arquivos env
+.env.bak.*
+*.env.bak*
