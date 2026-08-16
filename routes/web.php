@@ -156,6 +156,11 @@ Route::group(
         Route::get('/eye-images/search', [EyeImagesController::class, 'search'])->name('eye-images.search');
         Route::get('/eye-images/patient-urls/{patient}', [EyeImagesController::class, 'patientExamUrls'])->name('eye-images.patient-urls');
         Route::get('/eye-images/image-url/{exam}', [EyeImagesController::class, 'imageUrl'])->name('eye-images.image-url');
+        // Duplicata dedicada da busca de CID-10 (mesmo Cid10SearchController) sem a
+        // restrição de role de `cid10.search` (admin,doctor,secretary) — o Gerenciador
+        // de Imagens não tem entity.role e não vamos afrouxar a rota usada no
+        // prontuário nem restringir quem já acessa Imagens hoje.
+        Route::get('/eye-images/cid10-search', Cid10SearchController::class)->name('eye-images.cid10-search');
         // ══════════════════════════════════════════════════════════════════════
         // ACL: rotas agrupadas por nível mínimo de acesso
         // Middleware entity.role aplica a role check via EnsureEntityRole.

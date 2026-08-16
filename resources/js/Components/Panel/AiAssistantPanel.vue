@@ -19,6 +19,7 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } 
 import { diffWords } from 'diff';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
+import Cid10Picker from '@/Components/Panel/Cid10Picker.vue';
 
 const props = defineProps({
     open:      { type: Boolean, required: true },
@@ -187,6 +188,10 @@ const showDiff    = ref(false);
 const suggestions = reactive({ diagnosis: '', conduct: '', observations: '' });
 const isStructured = computed(() => form.workflow === 'record_assist');
 
+// Diagnóstico (CID-10) do laudo — só faz sentido no fluxo de imagem ocular
+// (isImageFlow), gravado em patient_exams no momento da aprovação.
+const approvalCids = ref([]);
+
 // ── F3 — Diff visual ───────────────────────────────────────────────────────
 const hasEdits = computed(() => originalDraft.value && reviewText.value !== originalDraft.value);
 const diffParts = computed(() => {
@@ -251,6 +256,7 @@ function resetRun() {
     currentProvider.value = '';
     suggestions.diagnosis = suggestions.conduct = suggestions.observations = '';
     viewedRunMeta.value = null;
+    approvalCids.value = [];
 }
 
 watch(() => props.open, (v) => {
@@ -634,6 +640,7 @@ async function approve() {
     try {
         const payload = { final_output: reviewText.value };
         if (hasEdits.value) payload.original_draft = originalDraft.value;
+        if (approvalCids.value.length) payload.diagnosis_cids = approvalCids.value;
         const { data } = await window.axios.post(url('approve', runId.value), payload);
         emit('approved', { run_id: runId.value, output: reviewText.value, data });
         if (data?.requires_record_confirmation) emit('needs-record', { run_id: runId.value });
@@ -811,6 +818,7 @@ function resetReviewState() {
     feedbackPanel.value = false;
     feedbackTags.value = [];
     feedbackNote.value = '';
+    approvalCids.value = [];
 }
 
 // ── Onda 3, P5 — Feedback inline (edit ratio > 30%) ────────────────────────
@@ -1090,6 +1098,18 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                             <i class="ti ti-file-text me-1 text-info" aria-hidden="true"></i>{{ isStructured ? lbl('summary', 'Análise de apoio') : lbl('report', 'Laudo') }}
                         </label>
                         <TinyMceEditor v-model="reviewText" />
+                    </div>
+
+                    <!-- Diagnóstico (CID-10) — só no fluxo de imagem ocular; grava em
+                         patient_exams no approve, alimenta o filtro de Diagnóstico do
+                         Gerenciador de Imagens. -->
+                    <div v-if="isImageFlow">
+                        <Cid10Picker
+                            v-model="approvalCids"
+                            :search-url="ai?.urls?.cid10_search"
+                            :label="lbl('diagnosis_label', 'Diagnóstico (CID-10)')"
+                            :placeholder="lbl('diagnosis_placeholder', 'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…')"
+                        />
                     </div>
 
                     <!-- F3 — Diff visual -->

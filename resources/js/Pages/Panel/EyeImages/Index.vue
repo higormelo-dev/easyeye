@@ -15,6 +15,11 @@ const props = defineProps({
     entity:      { type: Object, required: true },
     doctors:     { type: Array,  default: () => [] },
     patients:    { type: Array,  default: () => [] },
+    exam_types:  { type: Array,  default: () => [] },
+    equipments:  { type: Array,  default: () => [] },
+    filters:     { type: Object, default: () => ({}) },
+    meta:        { type: Object, default: () => ({}) },
+    total_exams: { type: Number, default: 0 },
     urls:        { type: Object, required: true },
     ai:          { type: Object, default: () => ({}) },
     t:           { type: Object, default: () => ({}) },
@@ -27,14 +32,29 @@ const examUrls        = ref({});           // {examId: presignedUrl}
 const brokenUrls      = ref({});           // {examId: true}
 const urlsLoading     = ref(false);
 const loading         = ref(false);
+const loadingMore     = ref(false);
 
-const search       = ref('');
-const period       = ref('hoje');
-const laterality   = ref('');              // '' | 'od' | 'oe' | 'ao'
-const doctorId     = ref('');
-const examTypeId   = ref('');
-const examStatus   = ref('');
+// Paginação server-side (substitui o limit(200) fixo do backend) — ver
+// EyeImagesController::queryPatients().
+const page           = ref(props.meta?.current_page ?? 1);
+const hasMorePatients = ref(!!props.meta?.has_more);
+const totalPatients  = ref(props.meta?.total ?? patients.value.length);
+const examsTotal     = ref(props.total_exams ?? 0);
+
+const search       = ref(props.filters?.search ?? '');
+const period       = ref(props.filters?.period ?? 'hoje');
+const laterality   = ref(props.filters?.eye ?? '');              // '' | 'od' | 'oe' | 'ao'
+const doctorId     = ref(props.filters?.doctor_id ?? '');
+const examTypeId   = ref(props.filters?.exam_type_id ?? '');
+const equipmentId  = ref(props.filters?.equipment_id ?? '');
+const cidCode      = ref(props.filters?.cid_code ?? '');
+const examStatus   = ref(props.filters?.status ?? '');           // '' | 'laudado'
 const showFilters  = ref(false);
+
+// Opções de select — vêm prontas do servidor (filtros server-side não podem
+// mais derivar as opções dos dados já carregados/filtrados no client).
+const examTypeOptions = computed(() => props.exam_types ?? []);
+const equipmentOptions = computed(() => props.equipments ?? []);
 
 const selectedExamIds = ref([]);
 
@@ -72,34 +92,15 @@ const printCols        = ref(2);
 const printOrientation = ref('portrait');
 
 // ── Computed ──────────────────────────────────────────────────────────────
-const availableExamTypes = computed(() => {
-    const map = new Map();
-    for (const p of patients.value) {
-        for (const e of p.exams) {
-            if (e.exam_type && !map.has(e.exam_id)) {
-                map.set(e.exam_id, { id: e.exam_id, name: e.exam_type.name });
-            }
-        }
-    }
-    return [...map.values()].sort((a, b) => (a.name ?? '').localeCompare(b.name ?? ''));
-});
-
-function examMatchesFilters(e) {
-    if (laterality.value) {
-        if (laterality.value === 'ao') {
-            if (e.laterality === 1 || e.laterality === 2) return false;
-        } else {
-            const target = laterality.value === 'od' ? 1 : 2;
-            if (e.laterality !== target) return false;
-        }
-    }
-    if (examTypeId.value && String(e.exam_id) !== String(examTypeId.value)) return false;
-    if (examStatus.value && deriveStatus(e) !== examStatus.value) return false;
-    return true;
-}
-
+/**
+ * Status derivado do exame — 'laudado' reflete o mesmo sinal do badge "IA"
+ * (ai_report.approved), consistente com o filtro server-side de Status
+ * (EyeImagesController::examFilterClosure — fonte de verdade é o AiRun
+ * aprovado, não diagnosis_cids, que é metadado opcional do laudo).
+ */
 function deriveStatus(exam) {
     if (exam.active === false || exam.active === 0) return 'cancelado';
+    if (exam.ai_report?.approved) return 'laudado';
     if (!exam.archive) return 'solicitado';
     return 'realizado';
 }
@@ -112,35 +113,19 @@ function statusLabel(exam) {
     const map = {
         solicitado: props.t?.status_requested ?? 'Solicitado',
         realizado:  props.t?.status_done      ?? 'Realizado',
+        laudado:    props.t?.status_reported  ?? 'Laudado',
         cancelado:  props.t?.status_cancelled ?? 'Cancelado',
     };
     return map[deriveStatus(exam)] ?? '—';
 }
 
-const filteredPatients = computed(() => {
-    let list = patients.value;
-    const q = search.value.trim().toLowerCase();
-    if (q) {
-        list = list.filter(p =>
-            (p.person?.full_name ?? p.full_name ?? '').toLowerCase().includes(q) ||
-            (p.code ?? '').toLowerCase().includes(q),
-        );
-    }
-    if (laterality.value || examTypeId.value || examStatus.value) {
-        list = list.filter(p => p.exams.some(e => examMatchesFilters(e)));
-    }
-    return list;
-});
-
-const filteredExams = computed(() => {
-    if (!selectedPatient.value) return [];
-    return selectedPatient.value.exams.filter(e => examMatchesFilters(e));
-});
-
+// Filtros (busca, olho, tipo, equipamento, diagnóstico, médico, status) agora
+// rodam no backend (EyeImagesController) — patients/selectedPatient.exams já
+// chegam filtrados do servidor, sem filtragem client-side redundante.
 const groupedExams = computed(() => {
     const groups = [];
     const seen = {};
-    for (const exam of filteredExams.value) {
+    for (const exam of (selectedPatient.value?.exams ?? [])) {
         const date    = exam.created_at?.substring(0, 10) ?? 'unknown';
         const equipId = exam.entity_integrator_equipment_id ?? '';
         const typeId  = exam.exam_id ?? '';
@@ -158,8 +143,6 @@ const selectedExamsData = computed(() => {
     if (!selectedPatient.value) return [];
     return selectedPatient.value.exams.filter(e => selectedExamIds.value.includes(e.id));
 });
-
-const totalExams = computed(() => patients.value.reduce((s, p) => s + (p.exams?.length ?? 0), 0));
 
 const viewerActivePanelIndex = computed(() => {
     const exam = viewerPanelExams.value[viewerActivePanel.value];
@@ -288,42 +271,79 @@ async function selectPatient(patient) {
     }
 }
 
-function setDoctor(id) {
-    doctorId.value = id;
-    selectedPatient.value = null;
-    fetchPatients();
-}
-
-async function changePeriod(p) {
-    period.value = p;
-    selectedPatient.value = null;
-    search.value = '';
-    await fetchPatients();
-}
-
+// Limpa os filtros da barra expansível (inclui médico — antes ficava preso
+// mesmo depois de "Limpar"). Mantém `period`: tem controle próprio, sempre
+// visível fora da barra, resetá-lo por aqui seria surpresa pro usuário.
 function clearFilters() {
-    search.value     = '';
-    laterality.value = '';
-    examTypeId.value = '';
-    examStatus.value = '';
+    search.value      = '';
+    laterality.value  = '';
+    examTypeId.value  = '';
+    equipmentId.value = '';
+    cidCode.value     = '';
+    doctorId.value    = '';
+    examStatus.value  = '';
 }
 
-async function fetchPatients() {
-    loading.value = true;
+/**
+ * Depois de qualquer fetch, `selectedPatient` ainda aponta pro objeto antigo
+ * (fora do array `patients` recém-substituído). Re-resolve pelo id: mantém a
+ * seleção com dados atualizados (ex.: exams já refletindo o novo filtro), ou
+ * limpa se o paciente não bate mais nos filtros atuais.
+ */
+function reselectPatientAfterFetch() {
+    if (!selectedPatient.value) return;
+    const fresh = patients.value.find(p => p.id === selectedPatient.value.id);
+    selectedPatient.value = fresh ?? null;
+    if (!fresh) selectedExamIds.value = [];
+}
+
+async function fetchPatients({ reset = true, page: requestedPage = 1 } = {}) {
+    if (reset) loading.value = true; else loadingMore.value = true;
     try {
-        const params = new URLSearchParams({ period: period.value });
-        if (doctorId.value) params.append('doctor_id', doctorId.value);
+        const params = new URLSearchParams({ period: period.value, page: String(requestedPage) });
+        if (search.value)      params.append('search', search.value);
+        if (laterality.value)  params.append('eye', laterality.value);
+        if (examTypeId.value)  params.append('exam_type_id', examTypeId.value);
+        if (equipmentId.value) params.append('equipment_id', equipmentId.value);
+        if (cidCode.value)     params.append('cid_code', cidCode.value);
+        if (doctorId.value)    params.append('doctor_id', doctorId.value);
+        if (examStatus.value)  params.append('status', examStatus.value);
+
         const res = await fetch(`${props.urls.search}?${params}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
         });
         const data = await res.json();
-        patients.value = data.patients ?? [];
+        const rows = data.patients ?? [];
+        patients.value        = reset ? rows : [...patients.value, ...rows];
+        page.value             = data.meta?.current_page ?? requestedPage;
+        hasMorePatients.value  = !!data.meta?.has_more;
+        totalPatients.value    = data.meta?.total ?? patients.value.length;
+        examsTotal.value       = data.total_exams ?? examsTotal.value;
+        reselectPatientAfterFetch();
     } catch (e) {
         console.error('Erro ao buscar pacientes:', e);
     } finally {
-        loading.value = false;
+        loading.value     = false;
+        loadingMore.value = false;
     }
 }
+
+function loadMorePatients() {
+    if (!hasMorePatients.value || loadingMore.value) return;
+    fetchPatients({ reset: false, page: page.value + 1 });
+}
+
+// Fluxo único: qualquer filtro muda → debounce 400ms → refetch do zero.
+// Substitui os caminhos duplicados anteriores (computed client-side pra
+// busca/olho/tipo/status + fetch manual só pra período/médico).
+let filterTimer = null;
+watch(
+    [search, period, laterality, examTypeId, equipmentId, cidCode, doctorId, examStatus],
+    () => {
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(() => fetchPatients({ reset: true, page: 1 }), 400);
+    },
+);
 
 // ── Viewer ────────────────────────────────────────────────────────────────
 function openViewerModal(exams, startIndex = 0) {
@@ -934,20 +954,20 @@ const printEntity = computed(() => props.entity ?? {});
             </div>
         </template>
 
-        <PageHeader title="Imagens oftálmicas" :subtitle="`${totalExams} exames`" />
+        <PageHeader title="Imagens oftálmicas" :subtitle="`${examsTotal} exames`" />
 
         <!-- ── Card de filtros ───────────────────────────────────────────────── -->
         <div class="card mb-3">
             <div class="card-body py-2 px-3">
 
                 <div class="row g-2 align-items-center">
-                    <div class="col-12 col-sm-4 col-md-3">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text"><i class="fa fa-search"></i></span>
-                            <input type="text" class="form-control"
+                    <div class="col-12 col-sm-5 col-md-4">
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="fa fa-search"></i></span>
+                            <input type="text" class="form-control border-start-0"
                                    placeholder="Buscar paciente..."
                                    v-model="search" @keydown.escape="search = ''">
-                            <button v-if="search" class="btn btn-outline-secondary" type="button"
+                            <button v-if="search" class="btn btn-outline-secondary border-start-0" type="button"
                                     @click="search = ''">
                                 <i class="fa fa-times"></i>
                             </button>
@@ -964,8 +984,7 @@ const printEntity = computed(() => props.entity ?? {});
                                           {value:'90',label:'Últimos 90 dias'},
                                       ]"
                                       :value-key="'value'" :label-key="'label'"
-                                      :clearable="false"
-                                      @change="changePeriod" />
+                                      :clearable="false" />
                     </div>
 
                     <div class="col-6 col-sm-auto">
@@ -1009,27 +1028,33 @@ const printEntity = computed(() => props.entity ?? {});
                         </div>
                     </div>
 
-                    <div class="col-12 col-sm-6 col-md-3">
-                        <SearchSelect v-model="examTypeId" :options="availableExamTypes"
+                    <div class="col-12 col-sm-6 col-lg-2">
+                        <SearchSelect v-model="examTypeId" :options="examTypeOptions"
                                       :placeholder="'Todos os exames'" />
                     </div>
 
-                    <div class="col-12 col-sm-6 col-md-2">
-                        <SearchSelect v-model="examStatus"
-                                      :options="[
-                                          {value:'solicitado',label:'Solicitado'},
-                                          {value:'realizado',label:'Realizado'},
-                                          {value:'laudado',label:'Laudado'},
-                                          {value:'cancelado',label:'Cancelado'},
-                                      ]"
-                                      :value-key="'value'" :label-key="'label'"
-                                      :placeholder="'Todos status'" />
+                    <div class="col-12 col-sm-6 col-lg-2">
+                        <SearchSelect v-model="equipmentId" :options="equipmentOptions"
+                                      :placeholder="'Todos equipamentos'" />
                     </div>
 
-                    <div class="col-12 col-sm-6 col-md-3">
+                    <div class="col-12 col-sm-6 col-lg-2">
+                        <SearchSelect v-model="cidCode"
+                                      :remote-search-url="urls.cid10_search"
+                                      :remote-min-chars="2"
+                                      :placeholder="'Todos diagnósticos (CID-10)'" />
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-2">
                         <SearchSelect v-model="doctorId" :options="doctors"
-                                      :placeholder="'Todos médicos'"
-                                      @change="setDoctor" />
+                                      :placeholder="'Todos médicos'" />
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-2">
+                        <SearchSelect v-model="examStatus"
+                                      :options="[{value:'laudado',label:'Laudado'}]"
+                                      :value-key="'value'" :label-key="'label'"
+                                      :placeholder="'Todos status'" />
                     </div>
 
                     <div class="col-auto">
@@ -1056,12 +1081,17 @@ const printEntity = computed(() => props.entity ?? {});
                         </div>
 
                         <div v-else style="max-height:520px;overflow-y:auto;overflow-x:hidden;">
-                            <p v-if="filteredPatients.length === 0" class="text-muted text-center small py-3 mb-0">
-                                Nenhum paciente encontrado.
-                            </p>
+                            <div v-if="patients.length === 0" class="text-center small py-3">
+                                <p class="text-muted mb-1">Nenhum paciente encontrado.</p>
+                                <button v-if="search && period === 'hoje'" type="button"
+                                        class="btn btn-sm btn-link p-0"
+                                        @click="period = '90'">
+                                    Buscar nos últimos 90 dias
+                                </button>
+                            </div>
 
                             <div
-                                v-for="patient in filteredPatients" :key="patient.id"
+                                v-for="patient in patients" :key="patient.id"
                                 class="d-flex align-items-center gap-2 px-1 py-1 rounded mb-1 patient-item"
                                 :class="{ 'patient-item-active': selectedPatient?.id === patient.id }"
                                 @click="selectPatient(patient)"
@@ -1084,10 +1114,18 @@ const printEntity = computed(() => props.entity ?? {});
                                     {{ patient.exams.length }}
                                 </span>
                             </div>
+
+                            <button v-if="hasMorePatients" type="button"
+                                    class="btn btn-sm btn-outline-secondary w-100 mt-1"
+                                    :disabled="loadingMore"
+                                    @click="loadMorePatients">
+                                <span v-if="loadingMore" class="spinner-border spinner-border-sm me-1"></span>
+                                Carregar mais
+                            </button>
                         </div>
 
                         <div v-if="!loading" class="text-muted px-1 mt-1" style="font-size:.65rem;">
-                            {{ filteredPatients.length }} paciente(s)
+                            {{ patients.length }} de {{ totalPatients }} paciente(s)
                         </div>
                     </div>
                 </div>
@@ -1158,7 +1196,7 @@ const printEntity = computed(() => props.entity ?? {});
                                     <p class="text-muted small mt-1 mb-0">Carregando imagens...</p>
                                 </div>
 
-                                <p v-else-if="filteredExams.length === 0" class="text-muted text-center small py-4">
+                                <p v-else-if="selectedPatient.exams.length === 0" class="text-muted text-center small py-4">
                                     Nenhum exame encontrado.
                                 </p>
 

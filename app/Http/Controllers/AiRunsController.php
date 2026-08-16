@@ -557,6 +557,12 @@ class AiRunsController extends Controller
         $validated = $request->validate([
             'final_output'   => ['nullable', 'string', 'max:65000'],
             'original_draft' => ['nullable', 'string', 'max:65000'],
+            // Diagnóstico (CID-10) do laudo — opcional, populado manualmente pelo
+            // médico no momento do approve (Gerenciador de Imagens). Mesma forma de
+            // StoreMedicalRecordRequest::diagnosis_cids.
+            'diagnosis_cids'               => ['sometimes', 'nullable', 'array', 'max:20'],
+            'diagnosis_cids.*.code'        => ['required_with:diagnosis_cids', 'string', 'max:10'],
+            'diagnosis_cids.*.description' => ['required_with:diagnosis_cids', 'string', 'max:500'],
         ]);
 
         $finalOutput = isset($validated['final_output']) && trim($validated['final_output']) !== ''
@@ -570,10 +576,16 @@ class AiRunsController extends Controller
             ? (string) $validated['original_draft']
             : null;
 
+        // Só grava se a chave veio no payload (array vazio explícito não apaga
+        // um diagnóstico já salvo em aprovação anterior do mesmo run).
+        $diagnosisCids = $request->has('diagnosis_cids')
+            ? array_values($validated['diagnosis_cids'] ?? [])
+            : null;
+
         $persistResult = ['attached' => false, 'requires_record_confirmation' => false, 'consultation_date' => null];
 
         try {
-            DB::transaction(function () use ($aiRun, $finalOutput, $originalDraft, &$persistResult): void {
+            DB::transaction(function () use ($aiRun, $finalOutput, $originalDraft, $diagnosisCids, $entityId, &$persistResult): void {
                 $lockedRun = AiRun::query()
                     ->whereKey($aiRun->id)
                     ->lockForUpdate()
@@ -600,6 +612,17 @@ class AiRunsController extends Controller
                 }
 
                 $lockedRun->update($updates);
+
+                // Diagnóstico do laudo — só exames de imagem ocular têm o pivot
+                // ai_run_patient_exam populado; runs de outros workflows (record_assist
+                // etc.) simplesmente não têm exames aqui, então este bloco não afeta
+                // esses fluxos mesmo que o front envie diagnosis_cids por engano.
+                if (! empty($diagnosisCids)) {
+                    $lockedRun->exams()
+                        ->wherePivot('entity_id', $entityId)
+                        ->get()
+                        ->each(fn (PatientExam $exam) => $exam->update(['diagnosis_cids' => $diagnosisCids]));
+                }
 
                 $persistResult = $this->documentationService->persistFromApprovedRun($lockedRun->fresh(), $finalOutput);
             });

@@ -26,9 +26,19 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'change']);
 
+// Onda 4 / C2 fix — em modo remoto, o Multiselect limpa o texto de busca ao
+// selecionar uma opção; isso zera `remoteOptions` (ver watch(searchTerm)
+// abaixo) e o valor selecionado perde o label (Multiselect não acha mais o
+// objeto correspondente em `effectiveOptions`). Fixamos a opção escolhida
+// aqui e a reinjetamos em `effectiveOptions` até o valor mudar de novo.
+const selectedOption = ref(null);
+
 const value = computed({
     get: () => (props.modelValue === '' ? null : props.modelValue),
     set: (v) => {
+        selectedOption.value = v == null
+            ? null
+            : (effectiveOptions.value.find((o) => o[props.valueKey] === v) ?? selectedOption.value);
         const out = v ?? '';
         emit('update:modelValue', out);
         emit('change', out);
@@ -38,8 +48,14 @@ const value = computed({
 // ── Onda 4 / C2 — busca remota debounced ───────────────────────────────────
 const remoteOptions = ref([]);
 const effectiveOptions = computed(() => {
-    if (!props.remoteSearchUrl) return props.options;
-    return remoteOptions.value.length ? remoteOptions.value : props.options;
+    const base = props.remoteSearchUrl
+        ? (remoteOptions.value.length ? remoteOptions.value : props.options)
+        : props.options;
+
+    const sel = selectedOption.value;
+    if (!sel) return base;
+
+    return base.some((o) => o[props.valueKey] === sel[props.valueKey]) ? base : [sel, ...base];
 });
 
 const searchTerm = ref('');
