@@ -496,11 +496,11 @@ async function rejectRun() {
             <div class="row g-3">
                 <div class="col-lg-7">
                     <div class="border rounded p-3 bg-white">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                             <h6 class="fw-semibold mb-0">{{ label('runs', 'Execuções') }}</h6>
                             <SearchSelect
                                 v-model="statusFilter"
-                                class="w-auto"
+                                class="ai-status-filter"
                                 :options="statusFilterOptions"
                                 :value-key="'value'"
                                 :label-key="'label'"
@@ -579,6 +579,39 @@ async function rejectRun() {
                             <div class="mb-2"><strong>{{ label('patient', 'Paciente') }}:</strong> {{ selectedRun.patient || '-' }}</div>
                             <div class="mb-2"><strong>{{ label('medical_record', 'Prontuário') }}:</strong> {{ selectedRun.medical_record_code || '-' }}</div>
 
+                            <!-- MELHORIA — contexto clínico do exame analisado (só existe no
+                                 fluxo de imagem ocular; runs de prontuário/texto não têm exame
+                                 vinculado, então esta seção some nesse caso). -->
+                            <template v-if="selectedRun.exam_context">
+                                <div class="mb-2" v-if="selectedRun.exam_context.exam_types?.length">
+                                    <strong>{{ label('exam_type', 'Tipo de exame') }}:</strong>
+                                    {{ selectedRun.exam_context.exam_types.join(', ') }}
+                                </div>
+                                <div class="mb-2" v-if="selectedRun.exam_context.exam_date">
+                                    <strong>{{ label('exam_date', 'Data do exame') }}:</strong>
+                                    {{ selectedRun.exam_context.exam_date }}
+                                </div>
+                                <div class="mb-2" v-if="selectedRun.exam_context.doctors?.length">
+                                    <strong>{{ label('exam_doctor', 'Médico responsável') }}:</strong>
+                                    {{ selectedRun.exam_context.doctors.join(', ') }}
+                                </div>
+                                <div class="mb-2" v-if="selectedRun.exam_context.diagnoses?.length">
+                                    <strong>{{ label('exam_diagnosis', 'Diagnóstico') }}:</strong>
+                                    <span
+                                        v-for="(d, i) in selectedRun.exam_context.diagnoses"
+                                        :key="i"
+                                        class="badge me-1"
+                                        :class="d.is_primary ? 'bg-primary-subtle text-primary' : 'bg-secondary-subtle text-secondary'"
+                                        :title="d.is_primary ? label('diagnosis_primary', 'Diagnóstico principal') : ''"
+                                    >{{ d.description }}</span>
+                                </div>
+                            </template>
+
+                            <div class="mb-2" v-if="selectedRun.analysis_summary">
+                                <strong>{{ label('analysis_summary', 'Resumo da análise') }}:</strong>
+                                <div class="text-muted fs-13" style="white-space: pre-wrap;">{{ selectedRun.analysis_summary }}</div>
+                            </div>
+
                             <label class="form-label mt-2">{{ label('editable_draft', 'Rascunho editável') }}</label>
                             <textarea v-model="draftOutput" rows="8" class="form-control"></textarea>
 
@@ -602,3 +635,14 @@ async function rejectRun() {
         </div>
     </AppLayout>
 </template>
+
+<style>
+/* MELHORIA — filtro de status estava "w-auto" (encolhe pro conteúdo atual),
+   deixando o texto das opções (ex.: "Aguardando aprovação") espremido no
+   dropdown. Largura mínima fixa resolve sem quebrar responsividade (o
+   flex-wrap no header já cuida de telas estreitas). */
+.ai-status-filter {
+    min-width: 220px;
+    max-width: 100%;
+}
+</style>

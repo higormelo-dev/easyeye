@@ -253,6 +253,10 @@ class AiRunsController extends Controller
             'approvedBy:id,name',
             'providerCalls' => fn ($query) => $query->orderBy('created_at'),
             'parent:id,mode,status,workflow',
+            // MELHORIA — caixa "Detalhes" do painel de IA: contexto clínico do(s)
+            // exame(s) analisado(s) (tipo, data, médico, diagnóstico já registrado).
+            'exams.examType:id,name',
+            'exams.doctor.person:id,full_name',
         ]);
 
         $parentSummary = null;
@@ -264,6 +268,37 @@ class AiRunsController extends Controller
                 'mode'     => $aiRun->parent->mode?->value,
                 'status'   => $aiRun->parent->status?->value,
                 'workflow' => (string) $aiRun->parent->workflow,
+            ];
+        }
+
+        // MELHORIA — resume o contexto clínico do(s) exame(s) vinculados ao run
+        // (fluxo de imagem ocular) para a caixa "Detalhes" no dashboard. Runs de
+        // prontuário (texto) não têm exame vinculado — exam_context fica null.
+        $examContext = null;
+
+        if ($aiRun->exams->isNotEmpty()) {
+            $firstExam = $aiRun->exams->first();
+
+            $diagnoses = $aiRun->exams
+                ->flatMap(fn (PatientExam $exam) => collect($exam->diagnosis_cids ?? []))
+                ->unique(fn (array $d) => $d['code'] ?? $d['custom_diagnosis_id'] ?? $d['description'] ?? '')
+                ->sortByDesc(fn (array $d) => (bool) ($d['is_primary'] ?? false))
+                ->map(fn (array $d) => [
+                    'description' => (string) ($d['description'] ?? $d['code'] ?? ''),
+                    'is_primary'  => (bool) ($d['is_primary'] ?? false),
+                ])
+                ->values();
+
+            $examContext = [
+                'exam_types' => $aiRun->exams->pluck('examType.name')->filter()->unique()->values()->all(),
+                'exam_date'  => ($firstExam->exam_performed_at ?? $firstExam->created_at)?->format('d/m/Y'),
+                'doctors'    => $aiRun->exams
+                    ->map(fn (PatientExam $exam) => $exam->doctor?->person?->full_name)
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all(),
+                'diagnoses' => $diagnoses->all(),
             ];
         }
 
@@ -293,6 +328,8 @@ class AiRunsController extends Controller
             'error_message'       => $aiRun->error_message,
             'patient'             => $aiRun->patient?->person?->full_name ?? $aiRun->patient?->code,
             'medical_record_code' => $aiRun->medicalRecord?->code,
+            'exam_context'        => $examContext,
+            'analysis_summary'    => $aiRun->input_summary['user_prompt'] ?? null,
             'requested_by'        => $aiRun->requestedBy?->name,
             'approved_by'         => $aiRun->approvedBy?->name,
             'approved_at'         => $aiRun->approved_at?->format('d/m/Y H:i'),
@@ -1226,6 +1263,12 @@ class AiRunsController extends Controller
             'select_run'                  => __('ai.select_run'),
             'patient'                     => __('actions.patient'),
             'medical_record'              => __('ai.medical_record'),
+            'exam_type'                   => __('ai.exam_type'),
+            'exam_date'                   => __('ai.exam_date'),
+            'exam_doctor'                 => __('ai.exam_doctor'),
+            'exam_diagnosis'              => __('ai.exam_diagnosis'),
+            'diagnosis_primary'           => __('ai.diagnosis_primary'),
+            'analysis_summary'            => __('ai.analysis_summary'),
             'editable_draft'              => __('ai.editable_draft'),
             'rejection_reason_optional'   => __('ai.rejection_reason_optional'),
             'status_pending'              => __('ai.status_pending'),
