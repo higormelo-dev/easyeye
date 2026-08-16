@@ -7,6 +7,8 @@ use App\Http\Controllers\{
     ComplianceController,
     DoctorWorkScheduleController,
     DoctorsController,
+    ExamDiagnosisController,
+    ExternalExamImportController,
     EyeImagesController,
     Financial\BillingController as FinancialBillingController,
     Financial\CashClosingController,
@@ -161,6 +163,31 @@ Route::group(
         // de Imagens não tem entity.role e não vamos afrouxar a rota usada no
         // prontuário nem restringir quem já acessa Imagens hoje.
         Route::get('/eye-images/cid10-search', Cid10SearchController::class)->name('eye-images.cid10-search');
+
+        // Diagnóstico do exame (CID-10 + customizados da clínica). Diferente das
+        // rotas de leitura acima, estas escrevem em patient_exams.diagnosis_cids
+        // e criam entity_custom_diagnoses — por isso ganham entity.role aqui
+        // mesmo o restante de /eye-images não tendo essa restrição. O Gate
+        // EntityGate::IssueReport (exclusivo de doctor) é checado dentro do
+        // controller, então admin passa pelo middleware mas ainda leva 403
+        // no Gate ao tentar criar/gravar diagnóstico — só o médico assina.
+        Route::get('/eye-images/diagnoses/search', [ExamDiagnosisController::class, 'search'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.diagnoses.search');
+        Route::post('/eye-images/diagnoses', [ExamDiagnosisController::class, 'store'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.diagnoses.store');
+        Route::put('/eye-images/exams/{exam}/diagnosis', [ExamDiagnosisController::class, 'updateDiagnosis'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.diagnosis.update');
+
+        // Importar exame externo (upload manual, sem integrador). entity.role
+        // cobre admin/doctor/secretary; o Gate EntityGate::ImportExternalExam
+        // (checado dentro do controller) replica a mesma allowlist de roles —
+        // redundante de propósito, mesmo padrão do bloco de diagnóstico acima.
+        Route::post('/eye-images/import', [ExternalExamImportController::class, 'store'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.import.store');
         // ══════════════════════════════════════════════════════════════════════
         // ACL: rotas agrupadas por nível mínimo de acesso
         // Middleware entity.role aplica a role check via EnsureEntityRole.

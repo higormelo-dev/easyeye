@@ -54,4 +54,9 @@ return [
     'ai_no_selection'    => 'Select at least one image to analyze.',
     'ai_report'          => 'AI report',
     'ai_reported_badge'  => 'Reported (AI)',
+
+    // Import external exam
+    'import' => [
+        'success' => 'Exam imported successfully.',
+    ],
 ];

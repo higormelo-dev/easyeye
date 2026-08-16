@@ -170,6 +170,23 @@ class AuthServiceProvider extends ServiceProvider
         });
 
         /**
+         * Importar exame externo (upload manual) no Gerenciador de Imagens.
+         * Admin, Doctor e Secretary têm acesso — é ato administrativo de
+         * anexar arquivo, não ato clínico — não requer IssueReport.
+         */
+        Gate::define(EntityGate::ImportExternalExam->value, function (User $user, Entity $entity): bool {
+            if (! $entity->isClient()) {
+                return false;
+            }
+
+            return $user->hasAnyRoleInEntity($entity, [
+                ClientRule::Admin,
+                ClientRule::Doctor,
+                ClientRule::Secretary,
+            ]);
+        });
+
+        /**
          * Gerenciar configurações da entity: dados cadastrais, convênios,
          * tipos de consulta, integrações.
          * Somente admin da entity cliente.

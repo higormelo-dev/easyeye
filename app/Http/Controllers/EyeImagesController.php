@@ -89,6 +89,14 @@ class EyeImagesController extends Controller
                 // shape=select + placeholder __Q__: formato remoto consumido por
                 // SearchSelect.vue (filtro de Diagnóstico da barra de filtros).
                 'cid10_search' => route('panel.eye-images.cid10-search', ['shape' => 'select']) . '&q=__Q__',
+                // Diagnóstico do exame (CID-10 + customizados da clínica) — ver
+                // ExamDiagnosisController.
+                'diagnoses_search'      => route('panel.eye-images.diagnoses.search'),
+                'diagnoses_store'       => route('panel.eye-images.diagnoses.store'),
+                'exam_diagnosis_update' => route('panel.eye-images.exams.diagnosis.update', ['exam' => '__ID__']),
+                // Importar exame externo (upload manual, sem integrador) — ver
+                // ExternalExamImportController.
+                'import_store' => route('panel.eye-images.import.store'),
             ],
             'ai' => [
                 'enabled'          => $canEyeImage || $hasExamAssistant || $canConsensus,
@@ -260,6 +268,12 @@ class EyeImagesController extends Controller
                 'equipment_name' => $e->equipment?->name,
                 'diagnosis_cids' => $e->diagnosis_cids ?? [],
                 'ai_report'      => $this->examAiReport($e),
+                // Origem do exame (Importar exame externo) — ver App\Enums\ExamSource.
+                'source'            => $e->source?->value,
+                'is_external'       => $e->isExternal(),
+                'external_origin'   => $e->external_origin,
+                'exam_performed_at' => optional($e->exam_performed_at)->toIso8601String(),
+                'import_batch_id'   => $e->import_batch_id,
             ])->all(),
         ])->all();
     }
@@ -389,6 +403,14 @@ class EyeImagesController extends Controller
 
             if ($f->cidCode) {
                 $q->whereJsonContains('diagnosis_cids', [['code' => $f->cidCode]]);
+            }
+
+            if ($f->customDiagnosisId) {
+                $q->whereJsonContains('diagnosis_cids', [['custom_diagnosis_id' => $f->customDiagnosisId]]);
+            }
+
+            if ($f->source) {
+                $q->where('source', $f->source);
             }
 
             if ($f->status === 'laudado') {

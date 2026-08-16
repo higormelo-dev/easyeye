@@ -52,6 +52,9 @@ enum EntityGate: string
     /** Emitir laudos e prontuários médicos (doctor). */
     case IssueReport = 'entity.issue-report';
 
+    /** Importar exame externo (upload manual) no Gerenciador de Imagens (admin, doctor, secretary). */
+    case ImportExternalExam = 'entity.import-external-exam';
+
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';
 

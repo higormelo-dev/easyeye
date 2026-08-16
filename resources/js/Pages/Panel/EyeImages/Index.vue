@@ -4,6 +4,8 @@ import AppLayout  from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
+import DiagnosisManagerModal from '@/Components/Panel/DiagnosisManagerModal.vue';
+import ImportExternalExamModal from '@/Components/Panel/ImportExternalExamModal.vue';
 
 /**
  * Eye Images — porta fiel da implementação Alpine.js original.
@@ -49,6 +51,7 @@ const examTypeId   = ref(props.filters?.exam_type_id ?? '');
 const equipmentId  = ref(props.filters?.equipment_id ?? '');
 const cidCode      = ref(props.filters?.cid_code ?? '');
 const examStatus   = ref(props.filters?.status ?? '');           // '' | 'laudado'
+const examSource   = ref(props.filters?.source ?? '');           // '' | 'integrator' | 'external_import'
 const showFilters  = ref(false);
 
 // Opções de select — vêm prontas do servidor (filtros server-side não podem
@@ -144,6 +147,14 @@ const selectedExamsData = computed(() => {
     return selectedPatient.value.exams.filter(e => selectedExamIds.value.includes(e.id));
 });
 
+// Exame "em foco" pro botão Diagnóstico — reaproveita o mesmo estado usado
+// no contexto do AiAssistantPanel (selectedExamIds/selectedExamsData): só
+// fica definido quando exatamente 1 exame está selecionado (diagnóstico é
+// por exame, não em lote como a análise de IA).
+const focusedExam = computed(() => (
+    selectedExamsData.value.length === 1 ? selectedExamsData.value[0] : null
+));
+
 const viewerActivePanelIndex = computed(() => {
     const exam = viewerPanelExams.value[viewerActivePanel.value];
     if (!exam) return -1;
@@ -192,6 +203,21 @@ function avatarColor(name) {
 
 function latLabel(v) {
     return ({ 1: 'OD', 2: 'OE' })[v] ?? 'AO';
+}
+
+/**
+ * Diagnóstico principal do exame (diagnosis_cids com is_primary=true) — badge
+ * do thumbnail. Retorna null quando não há diagnóstico ou nenhum marcado
+ * como principal (não força um fallback pro primeiro item).
+ */
+function primaryDiagnosisLabel(exam) {
+    const cids = Array.isArray(exam?.diagnosis_cids) ? exam.diagnosis_cids : [];
+    return cids.find(d => d.is_primary)?.description ?? null;
+}
+
+function truncateText(text, max = 16) {
+    if (!text) return '';
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
 /**
@@ -271,6 +297,22 @@ async function selectPatient(patient) {
     }
 }
 
+// ── Importar exame externo ───────────────────────────────────────────────
+const showImportModal = ref(false);
+
+function openImportModal() {
+    showImportModal.value = true;
+}
+
+// Reload parcial: reusa o mesmo fetch de busca/filtro (props.urls.search) em
+// vez de deixar o redirect do backend recarregar a página inteira — mantém
+// filtros/paciente selecionado/viewer intactos. O toast de sucesso já vem do
+// flash('success') do redirect (AppLayout exibe automaticamente).
+function onExternalExamImported() {
+    showImportModal.value = false;
+    fetchPatients({ reset: true, page: 1 });
+}
+
 // Limpa os filtros da barra expansível (inclui médico — antes ficava preso
 // mesmo depois de "Limpar"). Mantém `period`: tem controle próprio, sempre
 // visível fora da barra, resetá-lo por aqui seria surpresa pro usuário.
@@ -282,6 +324,7 @@ function clearFilters() {
     cidCode.value     = '';
     doctorId.value    = '';
     examStatus.value  = '';
+    examSource.value  = '';
 }
 
 /**
@@ -308,6 +351,7 @@ async function fetchPatients({ reset = true, page: requestedPage = 1 } = {}) {
         if (cidCode.value)     params.append('cid_code', cidCode.value);
         if (doctorId.value)    params.append('doctor_id', doctorId.value);
         if (examStatus.value)  params.append('status', examStatus.value);
+        if (examSource.value)  params.append('source', examSource.value);
 
         const res = await fetch(`${props.urls.search}?${params}`, {
             headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
@@ -338,7 +382,7 @@ function loadMorePatients() {
 // busca/olho/tipo/status + fetch manual só pra período/médico).
 let filterTimer = null;
 watch(
-    [search, period, laterality, examTypeId, equipmentId, cidCode, doctorId, examStatus],
+    [search, period, laterality, examTypeId, equipmentId, cidCode, doctorId, examStatus, examSource],
     () => {
         clearTimeout(filterTimer);
         filterTimer = setTimeout(() => fetchPatients({ reset: true, page: 1 }), 400);
@@ -928,6 +972,44 @@ function openExistingReport(exam) {
     aiPanelOpen.value  = true;
 }
 
+// ── Diagnóstico do exame ─────────────────────────────────────────────────
+const diagnosisModalOpen = ref(false);
+const diagnosisModalExam = ref(null);
+
+function openDiagnosisModal() {
+    if (!focusedExam.value) return;
+    diagnosisModalExam.value = focusedExam.value;
+    diagnosisModalOpen.value = true;
+}
+
+// urls.exam_diagnosis_update chega como template com placeholder __ID__
+// (mesmo padrão de patient_urls/image_url) — resolvido aqui com o id do
+// exame em foco no momento em que o modal abre.
+const diagnosisModalUrls = computed(() => ({
+    search: props.urls?.diagnoses_search ?? '',
+    store:  props.urls?.diagnoses_store ?? '',
+    update: diagnosisModalExam.value && props.urls?.exam_diagnosis_update
+        ? props.urls.exam_diagnosis_update.replace('__ID__', diagnosisModalExam.value.id)
+        : '',
+}));
+
+/**
+ * Merge local do exame salvo — evita reload de página inteira. Busca pelo id
+ * em `patients.value` (em vez de mutar `diagnosisModalExam` direto) porque um
+ * refetch de filtros enquanto o modal está aberto substitui os objetos de
+ * `patients.value` por inteiro, o que deixaria `diagnosisModalExam` órfão.
+ */
+function onDiagnosisUpdated(payload) {
+    if (!payload?.id) return;
+    for (const patient of patients.value) {
+        const exam = patient.exams?.find(e => e.id === payload.id);
+        if (exam) {
+            exam.diagnosis_cids = payload.diagnosis_cids ?? [];
+            break;
+        }
+    }
+}
+
 // Opções para SearchSelect (arrays de objetos {value,label}).
 const aiWorkflowOptions = computed(() =>
     aiWorkflows.value.map((workflow) => ({ value: workflow, label: aiWorkflowLabel(workflow) })),
@@ -943,6 +1025,14 @@ const printEntity = computed(() => props.entity ?? {});
 <template>
     <AppLayout title="Imagens oftálmicas" :breadcrumbs="breadcrumbs">
         <template #top-actions>
+            <div v-if="focusedExam" class="header-item d-none d-sm-flex me-2">
+                <button class="btn btn-outline-info d-inline-flex align-items-center gap-1"
+                        type="button" title="Diagnóstico do exame selecionado"
+                        @click="openDiagnosisModal">
+                    <i class="ti ti-stethoscope fs-16"></i>
+                    <span class="fw-medium">Diagnóstico</span>
+                </button>
+            </div>
             <div v-if="aiEnabled" class="header-item d-none d-sm-flex me-2">
                 <button class="btn btn-liner-gradient d-inline-flex align-items-center gap-1"
                         type="button" :title="aiLabel('assistance_button', 'Assistente de IA')"
@@ -998,7 +1088,7 @@ const printEntity = computed(() => props.entity ?? {});
                     </div>
 
                     <div class="col col-md d-flex justify-content-end">
-                        <button type="button" class="btn btn-primary btn-sm">
+                        <button type="button" class="btn btn-primary btn-sm" @click="openImportModal">
                             <i class="fa fa-plus"></i> Novo
                         </button>
                     </div>
@@ -1055,6 +1145,16 @@ const printEntity = computed(() => props.entity ?? {});
                                       :options="[{value:'laudado',label:'Laudado'}]"
                                       :value-key="'value'" :label-key="'label'"
                                       :placeholder="'Todos status'" />
+                    </div>
+
+                    <div class="col-12 col-sm-6 col-lg-2">
+                        <SearchSelect v-model="examSource"
+                                      :options="[
+                                          {value:'integrator',label:'Da clínica'},
+                                          {value:'external_import',label:'Importado'},
+                                      ]"
+                                      :value-key="'value'" :label-key="'label'"
+                                      :placeholder="'Todas origens'" />
                     </div>
 
                     <div class="col-auto">
@@ -1148,6 +1248,12 @@ const printEntity = computed(() => props.entity ?? {});
                                 </small>
                             </span>
                             <div class="flex-grow-1"></div>
+                            <button v-if="focusedExam" type="button"
+                                    class="btn btn-outline-info btn-sm" style="font-size:.72rem;"
+                                    title="Diagnóstico do exame selecionado"
+                                    @click="openDiagnosisModal">
+                                <i class="fa fa-stethoscope me-1"></i>Diagnóstico
+                            </button>
                             <a :href="`/panel/patients/${selectedPatient.id}/medicalrecords`"
                                target="_blank" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">
                                 Prontuário <i class="fa fa-external-link ms-1"></i>
@@ -1256,6 +1362,23 @@ const printEntity = computed(() => props.entity ?? {});
                                                  class="position-relative"
                                                  style="cursor:pointer;flex-shrink:0;"
                                                  @click="toggleExamSelection(exam.id)">
+
+                                                <!-- Badges topo-esquerda: diagnóstico principal + origem externa (empilhados, sem colidir) -->
+                                                <div class="position-absolute top-0 start-0 d-flex flex-column align-items-start gap-1"
+                                                     style="z-index:1;margin:3px;max-width:70px;">
+                                                    <span v-if="primaryDiagnosisLabel(exam)"
+                                                          class="badge bg-success-subtle text-success-emphasis"
+                                                          style="font-size:.5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;"
+                                                          :title="primaryDiagnosisLabel(exam)">
+                                                        <i class="fa fa-stethoscope me-1"></i>{{ truncateText(primaryDiagnosisLabel(exam)) }}
+                                                    </span>
+                                                    <span v-if="exam.is_external"
+                                                          class="badge bg-warning-subtle text-warning"
+                                                          style="font-size:.5rem;white-space:nowrap;"
+                                                          title="Exame importado (fonte externa, sem integrador)">
+                                                        <i class="fa fa-file-import me-1"></i>Importado
+                                                    </span>
+                                                </div>
 
                                                 <!-- Badge lateralidade -->
                                                 <span class="position-absolute top-0 end-0 rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
@@ -1791,6 +1914,31 @@ const printEntity = computed(() => props.entity ?? {});
             @close="aiPanelOpen = false"
             @approved="onAiApproved"
             @needs-record="onAiNeedsRecord"
+        />
+
+        <!-- Diagnóstico do exame em foco (CID-10 + customizados da clínica) -->
+        <DiagnosisManagerModal
+            :open="diagnosisModalOpen"
+            :exam="diagnosisModalExam"
+            :urls="diagnosisModalUrls"
+            @close="diagnosisModalOpen = false"
+            @updated="onDiagnosisUpdated"
+        />
+
+        <!-- Importar exame externo (upload manual, sem integrador) -->
+        <ImportExternalExamModal
+            :open="showImportModal"
+            :patient="selectedPatient"
+            :doctors="doctors"
+            :exam-types="examTypeOptions"
+            :equipments="equipmentOptions"
+            :urls="{
+                import_store: urls.import_store,
+                diagnosis_search: urls.diagnoses_search,
+                diagnosis_store: urls.diagnoses_store,
+            }"
+            @close="showImportModal = false"
+            @imported="onExternalExamImported"
         />
     </AppLayout>
 </template>

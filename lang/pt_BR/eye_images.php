@@ -54,4 +54,9 @@ return [
     'ai_no_selection'    => 'Selecione ao menos uma imagem para analisar.',
     'ai_report'          => 'Laudo da IA',
     'ai_reported_badge'  => 'Laudado (IA)',
+
+    // Importar exame externo
+    'import' => [
+        'success' => 'Exame importado com sucesso.',
+    ],
 ];

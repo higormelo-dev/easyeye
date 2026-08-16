@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Domains\AI\Models\AiRun;
+use App\Enums\ExamSource;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -37,6 +38,10 @@ class PatientExam extends Model
         'laterality',
         'diagnosis_cids',
         'active',
+        'source',
+        'external_origin',
+        'exam_performed_at',
+        'import_batch_id',
     ];
 
     /**
@@ -79,10 +84,12 @@ class PatientExam extends Model
     protected function casts(): array
     {
         return [
-            'laterality'     => 'integer',
-            'diagnosis_cids' => 'array',
-            'created_at'     => 'datetime',
-            'updated_at'     => 'datetime',
+            'laterality'        => 'integer',
+            'diagnosis_cids'    => 'array',
+            'source'            => ExamSource::class,
+            'exam_performed_at' => 'datetime',
+            'created_at'        => 'datetime',
+            'updated_at'        => 'datetime',
         ];
     }
 
@@ -125,5 +132,18 @@ class PatientExam extends Model
         return new Attribute(
             get: fn () => $this->archive ? Storage::disk('s3')->temporaryUrl($this->archive, now()->addDay(1)) : null,
         );
+    }
+
+    public function isExternal(): bool
+    {
+        return $this->source === ExamSource::ExternalImport;
+    }
+
+    /**
+     * Exames importados manualmente de fonte externa (não capturados via integrador).
+     */
+    public function scopeExternal($query)
+    {
+        return $query->where('source', ExamSource::ExternalImport);
     }
 }
