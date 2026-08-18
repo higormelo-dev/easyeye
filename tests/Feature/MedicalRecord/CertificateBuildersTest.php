@@ -82,7 +82,11 @@ it('anexa observações ao final do atestado de comparecimento', function () {
 
     $r->assertCreated();
     $doc = MedicalRecordDocumentation::first();
-    expect($doc->content)->toContain('pmr-observations')
+    // Bloco de observações usa <hr> + inline styles (não mais a classe
+    // pmr-observations) — workaround do bug de border-top + position:fixed
+    // do wkhtmltopdf 0.12.6, ver MedicalRecordQuickActionService::appendObservations().
+    expect($doc->content)->toContain('Observações:')
+        ->and($doc->content)->toContain('<hr style=')
         ->and($doc->content)->toContain('Paciente acompanhado pela esposa.')
         ->and($doc->content)->toContain('<br />'); // nl2br aplicado
 });

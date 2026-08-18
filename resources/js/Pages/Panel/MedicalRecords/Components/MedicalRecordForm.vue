@@ -152,6 +152,54 @@ const tonometryStampedTime = ref(
 const presbyopiaAddition  = ref(0);
 const presbyopiaObsForm   = reactive({ content: '' });
 
+// Evoluções clínicas (texto livre, append-only) — histórico por PACIENTE,
+// atravessa prontuários. Carregado sob demanda ao abrir o modal.
+const showEvolutionModal = ref(false);
+const evolutions         = ref([]);
+const evolutionsLoaded   = ref(false);
+const evolutionText      = ref('');
+const evolutionBusy      = ref(false);
+
+async function openEvolutionModal() {
+    showEvolutionModal.value = true;
+    if (evolutionsLoaded.value || !props.urls.evolutions_index) return;
+    try {
+        const res = await fetch(props.urls.evolutions_index, {
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        if (res.ok) {
+            evolutions.value = (await res.json()).data ?? [];
+            evolutionsLoaded.value = true;
+        }
+    } catch (e) {
+        console.error('Failed to load evolutions:', e);
+    }
+}
+
+async function saveEvolution() {
+    const content = evolutionText.value.trim();
+    if (!content || evolutionBusy.value || !props.urls.evolutions_store) return;
+    evolutionBusy.value = true;
+    try {
+        const res = await fetch(props.urls.evolutions_store, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ content }),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            alert(err.message ?? tt('evolution_save_error', 'Não foi possível registrar a evolução.'));
+            return;
+        }
+        evolutions.value.unshift(await res.json());
+        evolutionText.value = '';
+    } catch (e) {
+        console.error('Evolution save error:', e);
+    } finally {
+        evolutionBusy.value = false;
+    }
+}
+
 // Documentações
 const documentations = ref(r?.documentations ?? []);
 // Mantém a lista sincronizada após reload parcial (ex.: novo laudo de IA aprovado).
@@ -1395,42 +1443,6 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </table>
                     </div>
 
-                    <!-- Paquimetria / Gonioscopia -->
-                    <div class="pmr-section mb-1">
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <label class="pmr-label">{{ tt('pachymetry', 'Paquimetria') }}</label>
-                                <div class="d-flex gap-1">
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text pmr-eye-badge">OD</span>
-                                        <input v-model="form.pachymetry_right" type="number" name="pachymetry_right" step="1" min="0"
-                                               class="form-control form-control-sm text-center" placeholder="μm" :disabled="isLocked">
-                                    </div>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text pmr-eye-badge">OE</span>
-                                        <input v-model="form.pachymetry_left" type="number" name="pachymetry_left" step="1" min="0"
-                                               class="form-control form-control-sm text-center" placeholder="μm" :disabled="isLocked">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <label class="pmr-label">{{ tt('gonioscopy', 'Gonioscopia') }}</label>
-                                <div class="d-flex gap-1">
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text pmr-eye-badge">OD</span>
-                                        <input v-model="form.gonioscopy_right" type="text" name="gonioscopy_right"
-                                               class="form-control form-control-sm" :disabled="isLocked">
-                                    </div>
-                                    <div class="input-group input-group-sm">
-                                        <span class="input-group-text pmr-eye-badge">OE</span>
-                                        <input v-model="form.gonioscopy_left" type="text" name="gonioscopy_left"
-                                               class="form-control form-control-sm" :disabled="isLocked">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
             </div>
 
@@ -1589,6 +1601,41 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
                 </div>
 
+                <!-- Paquimetria / Gonioscopia — movidos da tela principal para cá
+                     (parâmetros específicos, não precisam poluir o prontuário base) -->
+                <div class="row g-2 mb-2">
+                    <div class="col-12 col-md-6">
+                        <label class="pmr-label">{{ tt('pachymetry', 'Paquimetria') }}</label>
+                        <div class="d-flex gap-1">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <input v-model="form.pachymetry_right" type="number" name="pachymetry_right" step="1" min="0"
+                                       class="form-control form-control-sm text-center" placeholder="μm" :disabled="isLocked">
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <input v-model="form.pachymetry_left" type="number" name="pachymetry_left" step="1" min="0"
+                                       class="form-control form-control-sm text-center" placeholder="μm" :disabled="isLocked">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="pmr-label">{{ tt('gonioscopy', 'Gonioscopia') }}</label>
+                        <div class="d-flex gap-1">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <input v-model="form.gonioscopy_right" type="text" name="gonioscopy_right"
+                                       class="form-control form-control-sm" :disabled="isLocked">
+                            </div>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <input v-model="form.gonioscopy_left" type="text" name="gonioscopy_left"
+                                       class="form-control form-control-sm" :disabled="isLocked">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row g-2 mb-2">
                     <div class="col-12 col-md-6">
                         <label class="pmr-label">{{ tt('lenses_obs', 'Observação de lentes') }}</label>
@@ -1735,6 +1782,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
                 </button>
 
+                <!-- Evolução: histórico é por paciente, então abre mesmo em modo
+                     create (leitura); gravar exige prontuário salvo + médico. -->
+                <button type="button" class="btn pmr-doc-img-btn"
+                        :title="tt('evolution', 'Evolução')"
+                        @click="openEvolutionModal">
+                    <i class="fas fa-notes-medical" style="font-size:1.6rem;color:#009688;"></i>
+                    <span class="pmr-doc-img-btn-label">{{ tt('evolution', 'Evolução') }}</span>
+                </button>
+
                 <button type="button" class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
                         :title="isEdit ? tt('documentations', 'Documentações') : tt('save_first', 'Salve primeiro')"
                         :disabled="!isEdit"
@@ -1824,6 +1880,62 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </button>
                         <span v-else></span>
                         <button type="button" class="btn btn-secondary btn-sm" @click="showDocumentationsModal = false">{{ tt('close','Fechar') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Evolução: histórico cronológico + texto livre -->
+    <Teleport to="body">
+        <div v-if="showEvolutionModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
+             @click.self="showEvolutionModal = false">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title"><i class="fas fa-notes-medical me-2" style="color:#009688;"></i>{{ tt('evolution', 'Evolução') }}</h6>
+                        <button type="button" class="btn-close" @click="showEvolutionModal = false"></button>
+                    </div>
+                    <div class="modal-body p-3">
+                        <!-- Nova evolução: só médico, com prontuário salvo e não assinado -->
+                        <div v-if="isDoctor && !isLocked" class="mb-3">
+                            <label class="pmr-label">{{ tt('evolution_new', 'Nova evolução') }}</label>
+                            <textarea v-model="evolutionText" rows="4" class="form-control form-control-sm"
+                                      :placeholder="tt('evolution_ph', 'Descreva a evolução clínica do paciente...')"
+                                      :disabled="evolutionBusy || !isEdit"></textarea>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <small v-if="!isEdit" class="text-muted">{{ tt('save_first', 'Salve primeiro o prontuário') }}</small>
+                                <span v-else></span>
+                                <button type="button" class="btn btn-primary btn-sm"
+                                        :disabled="!isEdit || evolutionBusy || !evolutionText.trim()"
+                                        @click="saveEvolution">
+                                    <span v-if="evolutionBusy" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="fas fa-plus me-1"></i>{{ tt('evolution_save', 'Registrar evolução') }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Histórico cronológico (mais recente primeiro) -->
+                        <label class="pmr-label">{{ tt('evolution_history', 'Histórico de evoluções') }}</label>
+                        <div v-if="evolutions.length === 0" class="text-center text-muted small py-3">
+                            {{ tt('no_evolutions', 'Nenhuma evolução registrada para este paciente.') }}
+                        </div>
+                        <div v-else class="d-flex flex-column gap-2">
+                            <div v-for="ev in evolutions" :key="ev.id" class="border rounded p-2 bg-light">
+                                <div class="d-flex justify-content-between flex-wrap gap-1 mb-1">
+                                    <span class="fw-semibold" style="font-size:.82rem;color:#00695c;">
+                                        <i class="fas fa-user-md me-1"></i>{{ ev.doctor_name || '—' }}
+                                    </span>
+                                    <span class="text-muted" style="font-size:.78rem;">
+                                        <i class="far fa-clock me-1"></i>{{ ev.created_at }}
+                                    </span>
+                                </div>
+                                <div style="font-size:.85rem;white-space:pre-wrap;">{{ ev.content }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-secondary btn-sm" @click="showEvolutionModal = false">{{ tt('close','Fechar') }}</button>
                     </div>
                 </div>
             </div>

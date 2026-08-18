@@ -689,6 +689,9 @@ class MedicalRecordsController extends Controller
             'indication_search' => route('panel.indications.search'),
             'procedure_format'  => route('panel.procedure-solicitation.format-line'),
             'cid10_search'      => route('panel.cid10.search'),
+            // Histórico de evoluções é por PACIENTE (atravessa prontuários) —
+            // disponível também no create, antes de salvar o prontuário atual.
+            'evolutions_index' => route('panel.patients.evolutions.index', $patient),
         ];
 
         if ($isEdit && $record) {
@@ -703,6 +706,10 @@ class MedicalRecordsController extends Controller
             $urls['quick_action_template'] = route(
                 'panel.patients.medicalrecords.quick-actions.issue',
                 [$patient, $record, '__ACTION__'],
+            );
+            $urls['evolutions_store'] = route(
+                'panel.patients.medicalrecords.evolutions.store',
+                [$patient, $record],
             );
             $urls['exam_template_template'] = route(
                 'panel.patients.medicalrecords.exam-template',

@@ -33,6 +33,7 @@ use App\Http\Controllers\{
 };
 use App\Http\Controllers\{
     MedicalRecordDocumentationsController,
+    MedicalRecordEvolutionsController,
     MedicalRecordFilesController,
     MedicalRecordQuickActionsController,
     MedicalRecordsController,
@@ -303,6 +304,17 @@ Route::group(
                 'patients/{patient}/medicalrecords/{medicalrecord}/quick-actions/{action}',
                 [MedicalRecordQuickActionsController::class, 'issue'],
             )->name('patients.medicalrecords.quick-actions.issue');
+            // Evoluções clínicas (texto livre, append-only). Leitura no grupo
+            // admin/doctor/secretary; escrita restringida a médico DENTRO do
+            // controller via Gate IssueReport (mesmo padrão das quick actions).
+            Route::get(
+                'patients/{patient}/evolutions',
+                [MedicalRecordEvolutionsController::class, 'index'],
+            )->name('patients.evolutions.index');
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/evolutions',
+                [MedicalRecordEvolutionsController::class, 'store'],
+            )->name('patients.medicalrecords.evolutions.store');
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/exam-template/{exam}',
                 [MedicalRecordQuickActionsController::class, 'examTemplate'],
