@@ -232,6 +232,7 @@ return [
         'doctors'                  => 'Doctors',
         'patients'                 => 'Patients',
         'entities'                 => 'Entities',
+        'finance'                  => 'Finance',
         'settings'                 => 'Settings',
         'access_control'           => 'Access Control',
         'covenants'                => 'Covenants',

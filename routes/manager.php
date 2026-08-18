@@ -8,6 +8,7 @@ use App\Http\Controllers\Manager\{
     EntityIntegratorsController,
     EntityUserIntegratorsController,
     EntityUsersController,
+    FinanceController,
     GatewaysController,
     ImpersonateController,
     ManagerDashboardController,
@@ -174,6 +175,33 @@ Route::group([
     Route::get('subscriptions/{subscription}/invoices', [SubscriptionsController::class, 'invoices'])->name('subscriptions.invoices');
     Route::get('subscriptions/{subscription}/retries', [SubscriptionsController::class, 'retries'])->name('subscriptions.retries');
     Route::resource('subscriptions', SubscriptionsController::class)->only('index', 'show', 'update');
+
+    // ── Finanças internas do EasyEye (P&L do próprio SaaS + IA) ────────────────
+    // Gate SaasOwnerFinancial (mais restrito que SaasFinancial) verificado
+    // dentro de CADA ação do controller — ver FinanceController::authorizeSaasEntity().
+    // Nunca isento de admin.audit (leitura do P&L fica registrada em audit_logs
+    // como qualquer outra rota deste grupo — ver LogAdminAccess::SKIP_ROUTES,
+    // que deliberadamente NÃO inclui nada daqui).
+    Route::get('finance', [FinanceController::class, 'index'])->name('finance.index');
+    Route::post('finance/expenses', [FinanceController::class, 'storeExpense'])
+        ->middleware('throttle:manager-destructive')
+        ->name('finance.expenses.store');
+    Route::patch('finance/expenses/{expense}', [FinanceController::class, 'updateExpense'])
+        ->middleware('throttle:manager-destructive')
+        ->name('finance.expenses.update');
+    Route::delete('finance/expenses/{expense}', [FinanceController::class, 'destroyExpense'])
+        ->middleware('throttle:manager-destructive')
+        ->name('finance.expenses.destroy');
+    // Digest/chat disparam execução de IA (custo real) — mesmo throttle
+    // destrutivo dos demais endpoints custosos do manager.
+    Route::post('finance/ai/digest', [FinanceController::class, 'digest'])
+        ->middleware('throttle:manager-destructive')
+        ->name('finance.digest');
+    Route::post('finance/ai/chat', [FinanceController::class, 'chat'])
+        ->middleware('throttle:manager-destructive')
+        ->name('finance.chat');
+    Route::get('finance/ai/runs/{aiRun}', [FinanceController::class, 'showAiRun'])
+        ->name('finance.ai-runs.show');
 
     // ── Modelos de Documento Globais ───────────────────────────────────────────
     Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');

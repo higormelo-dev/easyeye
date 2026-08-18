@@ -6,9 +6,10 @@ namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Models\AiRun;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
-use App\Enums\{ClientRule, FeatureKey};
-use App\Models\{MedicalRecord, Patient, PatientExam};
+use App\Enums\{ClientRule, EntityGate, FeatureKey};
+use App\Models\{Entity, MedicalRecord, Patient, PatientExam};
 use App\Services\FeatureGateService;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Centraliza o enriquecimento + sanitização do payload de execução de IA.
@@ -38,6 +39,26 @@ class AiPayloadEnricher
         'fundoscopy_right', 'fundoscopy_left', 'gonioscopy_right', 'gonioscopy_left',
         'observation_of_lenses', 'clinical_conduct', 'observation_general', 'diagnosis_hypothesis',
     ];
+
+    /**
+     * Workflows de chat livre multi-turno (têm histórico de conversa via
+     * conversation_id — ver buildConversationHistory()). assistant_chat é o
+     * assistente clínico do médico; platform_finance_chat é o "converse com
+     * os dados" do P&L interno do SaaS — mesma mecânica, contextos disjuntos.
+     *
+     * @var list<string>
+     */
+    private const CHAT_WORKFLOWS = ['assistant_chat', 'platform_finance_chat'];
+
+    /**
+     * Workflows do P&L interno do EasyEye — NUNCA gated por FeatureKey de
+     * plano de clínica (não é benefício vendável a clientes) e SEMPRE gated
+     * pelo Gate SaasOwnerFinancial (dono/admin do SaaS), não por qualquer
+     * ClientRule de clínica. Ver EntityGate::SaasOwnerFinancial.
+     *
+     * @var list<string>
+     */
+    private const PLATFORM_FINANCE_WORKFLOWS = ['platform_finance_digest', 'platform_finance_chat'];
 
     public function __construct(
         private readonly AiMedicalContextBuilder $contextBuilder,
@@ -106,6 +127,24 @@ class AiPayloadEnricher
         // conversa multi-turno via conversation_id (ver buildConversationHistory).
         if ($workflow === 'assistant_chat') {
             $payload['system_prompt'] = __('ai.assistant_chat_system_prompt');
+            $payload['expects_json']  = false;
+        }
+
+        // P&L interno do EasyEye — digest estruturado (ganhando/perdendo/
+        // oportunidades/ações, cada item com o dado que fundamenta a
+        // conclusão). O `context` (resumo financeiro do período) já vem
+        // pronto do controller — o enricher só fixa o system prompt e o
+        // formato de saída; ver Manager\FinanceController.
+        if ($workflow === 'platform_finance_digest') {
+            $payload['system_prompt'] = __('ai.platform_finance_digest_system_prompt');
+            $payload['expects_json']  = true;
+        }
+
+        // "Converse com os dados" do P&L interno — chat livre multi-turno,
+        // mesmo padrão do assistant_chat, mas contexto e prompt exclusivos
+        // do financeiro da plataforma (nunca dado clínico/paciente).
+        if ($workflow === 'platform_finance_chat') {
+            $payload['system_prompt'] = __('ai.platform_finance_chat_system_prompt');
             $payload['expects_json']  = false;
         }
 
@@ -193,6 +232,21 @@ class AiPayloadEnricher
                 abort(403, __('ai.feature_chat_unavailable'));
             }
         }
+
+        // P&L interno: nunca FeatureKey (não é plano vendável a clínica) —
+        // exclusivamente Gate::SaasOwnerFinancial (admin OU dono do SaaS na
+        // própria entity SaaS). `$entityId` aqui já é a entity SaaS (o
+        // controller resolve via session('selected_entity_id') com o painel
+        // manager selecionado nela) — se um usuário de CLÍNICA de algum jeito
+        // acionar este workflow, `$entity->isSaas()` é false dentro do Gate
+        // e o authorize() já barra, mas o check explícito documenta a intenção.
+        if (in_array($workflow, self::PLATFORM_FINANCE_WORKFLOWS, true)) {
+            $entity = Entity::findOrFail($entityId);
+
+            if (! Gate::forUser(auth()->user())->allows(EntityGate::SaasOwnerFinancial->value, $entity)) {
+                abort(403, __('ai.feature_platform_finance_unavailable'));
+            }
+        }
     }
 
     /**
@@ -243,8 +297,10 @@ class AiPayloadEnricher
             ]);
         }
 
-        if ((string) ($payload['workflow'] ?? '') === 'assistant_chat' && ! empty($payload['conversation_id'])) {
-            $history = $this->buildConversationHistory((string) $payload['conversation_id'], $entityId);
+        $workflow = (string) ($payload['workflow'] ?? '');
+
+        if (in_array($workflow, self::CHAT_WORKFLOWS, true) && ! empty($payload['conversation_id'])) {
+            $history = $this->buildConversationHistory((string) $payload['conversation_id'], $entityId, $workflow);
 
             if ($history !== []) {
                 $context['conversation_history'] = $history;
@@ -255,20 +311,23 @@ class AiPayloadEnricher
     }
 
     /**
-     * Últimos turnos da mesma conversa (chat flutuante) para dar memória
-     * multi-turno ao assistente. Escopo estrito: mesma entity + mesmo
-     * solicitante — nunca vaza conversa de outro médico/clínica pelo
-     * conversation_id (UUID gerado no cliente, sem controle de posse próprio).
+     * Últimos turnos da mesma conversa (assistant_chat OU platform_finance_chat)
+     * para dar memória multi-turno ao assistente. Escopo estrito: mesma
+     * entity + mesmo solicitante + mesmo workflow — nunca mistura o histórico
+     * do chat clínico com o do chat financeiro (mesmo se algum dia colidissem
+     * conversation_id por acaso), e nunca vaza conversa de outro
+     * médico/admin pelo conversation_id (UUID gerado no cliente, sem
+     * controle de posse próprio).
      *
      * @return list<array{role: string, content: string}>
      */
-    private function buildConversationHistory(string $conversationId, string $entityId): array
+    private function buildConversationHistory(string $conversationId, string $entityId, string $workflow): array
     {
         $runs = AiRun::query()
             ->where('entity_id', $entityId)
             ->where('conversation_id', $conversationId)
             ->where('requested_by', (string) auth()->id())
-            ->where('workflow', 'assistant_chat')
+            ->where('workflow', $workflow)
             ->whereIn('status', [AiRunStatus::Approved->value, AiRunStatus::WaitingApproval->value])
             // `id` como desempate: mensagens do chat podem cair no mesmo
             // segundo de created_at (respostas rápidas em sequência) — HasUuids

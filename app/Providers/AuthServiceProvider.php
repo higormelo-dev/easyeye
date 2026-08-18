@@ -86,6 +86,19 @@ class AuthServiceProvider extends ServiceProvider
         });
 
         /**
+         * P&L interno do EasyEye + análise por IA. Admin do SaaS OU dono
+         * (is_owner=true, independente do rule) — mais restrito que
+         * SaasFinancial: um Financial que não é admin nem owner não vê isto.
+         */
+        Gate::define(EntityGate::SaasOwnerFinancial->value, function (User $user, Entity $entity): bool {
+            if (! $entity->isSaas()) {
+                return false;
+            }
+
+            return $user->hasRoleInEntity($entity, SaasRule::Admin) || $user->isOwnerOfEntity($entity);
+        });
+
+        /**
          * Iniciar "usar como" para um usuário de uma entity cliente.
          * Admin e Support do SaaS têm acesso.
          */

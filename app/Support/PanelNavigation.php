@@ -2,7 +2,8 @@
 
 namespace App\Support;
 
-use App\Enums\{ClientRule, FeatureKey};
+use App\Enums\{ClientRule, FeatureKey, SaasRule};
+use App\Models\Entity;
 use App\Services\FeatureGateService;
 
 class PanelNavigation
@@ -221,6 +222,24 @@ class PanelNavigation
         return $nav;
     }
 
+    /**
+     * `is_owner` do usuário logado na entity SaaS selecionada — checagem sob
+     * demanda (não cacheada em sessão, ao contrário de selected_entity_user_rule),
+     * usada só para decidir se o item "Finanças" aparece no menu.
+     */
+    private static function currentUserOwnsSelectedEntity(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        $entity = Entity::find(session('selected_entity_id'));
+
+        return $entity && $user->isOwnerOfEntity($entity);
+    }
+
     private static function canSeeAi(?string $rule): bool
     {
         if (! in_array($rule, [ClientRule::Admin->value, ClientRule::Doctor->value, ClientRule::Secretary->value], true)) {
@@ -241,7 +260,7 @@ class PanelNavigation
 
     private static function managerNav(): array
     {
-        return [
+        $nav = [
             [
                 'key'   => 'dashboard',
                 'route' => 'panel.dashboard',
@@ -249,6 +268,27 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.dashboard'),
                 'match' => ['panel.dashboard'],
             ],
+        ];
+
+        // P&L interno do EasyEye: item de menu só aparece pra quem realmente
+        // vai passar no Gate SaasOwnerFinancial (admin OU dono) — evita um
+        // Financial/Support ver o link e cair num 403 ao clicar. Única
+        // checagem deste arquivo que consulta o banco (is_owner não é
+        // cacheado em sessão como selected_entity_user_rule) — aceitável:
+        // só roda pra staff do manager, não no hot path das clínicas.
+        $rule = session('selected_entity_user_rule');
+
+        if ($rule === SaasRule::Admin->value || self::currentUserOwnsSelectedEntity()) {
+            $nav[] = [
+                'key'   => 'finance',
+                'route' => 'manager.finance.index',
+                'icon'  => 'ti ti-report-money',
+                'label' => __('actions.sidemenu.finance'),
+                'match' => ['manager.finance.*'],
+            ];
+        }
+
+        return array_merge($nav, [
             [
                 'key'   => 'entities',
                 'route' => 'manager.entities.index',
@@ -318,6 +358,6 @@ class PanelNavigation
                 'label' => __('manager_hardening.entity_2fa_section'),
                 'match' => ['panel.setting.security.*'],
             ],
-        ];
+        ]);
     }
 }

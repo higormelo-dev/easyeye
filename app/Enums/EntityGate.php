@@ -32,6 +32,15 @@ enum EntityGate: string
     /** Acesso a dados financeiros do SaaS (admin ou financial). */
     case SaasFinancial = 'saas.financial';
 
+    /**
+     * P&L interno do EasyEye (receita/despesa/lucro do próprio SaaS) + análise
+     * por IA. Mais restrito que SaasFinancial de propósito: o pedido de produto
+     * é "exclusiva dos donos/administradores gerais" — nunca menciona o papel
+     * Financial (que hoje também cobre um funcionário de cobrança/contas a
+     * receber). Admin OU is_owner=true; Financial sozinho NÃO passa aqui.
+     */
+    case SaasOwnerFinancial = 'saas.owner-financial';
+
     /** Iniciar "usar como" para um usuário de uma entity cliente (admin ou support). */
     case SaasImpersonate = 'saas.impersonate';
 

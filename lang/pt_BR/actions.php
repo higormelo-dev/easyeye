@@ -233,6 +233,7 @@ return [
         'doctors'               => 'Médicos',
         'patients'              => 'Pacientes',
         'entities'              => 'Empresas',
+        'finance'               => 'Finanças',
         'settings'              => 'Configurações',
         'access_control'        => 'Controle de acesso',
         'covenants'             => 'Convênios',
