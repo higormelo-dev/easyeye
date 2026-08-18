@@ -42,6 +42,11 @@ const props = defineProps({
     items:        { type: Array,  default: () => [] },
     filters:      { type: Object, default: () => ({}) },
     t:            { type: Object, default: () => ({}) },
+    // Tab-bar de navegação entre catálogos irmãos (ex.: os 8 sub-catálogos
+    // oftalmológicos agrupados sob "Parâmetros oftalmológicos"). `null`/vazio
+    // quando o catálogo não participa de nenhum grupo — tab-bar fica oculta.
+    // Cada aba é um <a href> de navegação real (full-reload), não estado JS.
+    tabsGroup:    { type: Array,  default: () => null },
 });
 
 // ── Search com debounce ─────────────────────────────────────────────────────
@@ -176,6 +181,16 @@ const totalLabel = computed(() => `${props.t.total_label ?? 'Total:'} ${props.it
                     </button>
                 </template>
             </PageHeader>
+
+            <!-- Tab-bar entre catálogos irmãos (ex.: sub-catálogos oftalmológicos).
+                 Navegação real de página — cada aba é um <a href> normal. -->
+            <ul v-if="tabsGroup?.length" class="nav nav-pills mb-3">
+                <li v-for="tab in tabsGroup" :key="tab.url" class="nav-item">
+                    <a :href="tab.url" class="nav-link" :class="{ active: tab.active }">
+                        {{ tab.label }}
+                    </a>
+                </li>
+            </ul>
 
             <!-- Toolbar -->
             <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">

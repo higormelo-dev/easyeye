@@ -24,7 +24,15 @@ const props = defineProps({
     remoteMinChars:  { type: Number,  default: 2 },
 });
 
-const emit = defineEmits(['update:modelValue', 'change']);
+// `option-selected` — Onda IOL Lenses: emite o OBJETO completo da opção
+// escolhida (ou `null` ao limpar), não só o valor escalar do v-model. Só
+// existe porque `change`/`update:modelValue` já emitem apenas o valor cru
+// (contrato antigo preservado p/ os ~15 consumidores existentes) — quando o
+// caller precisa dos DEMAIS campos da linha remota (ex.: IolLensFormModal
+// lendo manufacturer/model_name/category/image_url do catálogo global pra
+// auto-preencher o resto do form), esse evento novo e opcional resolve sem
+// quebrar ninguém que já usa o componente.
+const emit = defineEmits(['update:modelValue', 'change', 'option-selected']);
 
 // Onda 4 / C2 fix — em modo remoto, o Multiselect limpa o texto de busca ao
 // selecionar uma opção; isso zera `remoteOptions` (ver watch(searchTerm)
@@ -42,6 +50,7 @@ const value = computed({
         const out = v ?? '';
         emit('update:modelValue', out);
         emit('change', out);
+        emit('option-selected', selectedOption.value);
     },
 });
 
@@ -76,8 +85,12 @@ watch(searchTerm, (q) => {
             const url = props.remoteSearchUrl.replace('__Q__', encodeURIComponent(term));
             const { data } = await window.axios.get(url);
             const rows = Array.isArray(data?.data) ? data.data : [];
-            // Normaliza para a forma esperada pelo Multiselect via valueKey/labelKey.
+            // Normaliza para a forma esperada pelo Multiselect via valueKey/labelKey,
+            // preservando (`...r` primeiro) os DEMAIS campos originais da linha —
+            // necessário pro `option-selected` acima devolver o objeto completo
+            // (ex.: manufacturer/model_name/category/image_url), não só id/label.
             remoteOptions.value = rows.map((r) => ({
+                ...r,
                 [props.valueKey]: r.id ?? r[props.valueKey],
                 [props.labelKey]: r.label ?? r[props.labelKey],
                 sub_label: r.sub_label ?? '',

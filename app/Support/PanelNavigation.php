@@ -123,54 +123,98 @@ class PanelNavigation
             $canSeeOwnGateways = $entityId !== ''
                 && $featureGate->can($entityId, FeatureKey::HasOwnPaymentGateways);
 
-            $settingsChildren = [
-                ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*']],
-                ['route' => 'panel.setting.skintypes.index', 'label' => __('actions.sidemenu.skintypes'), 'match' => ['panel.setting.skintypes.*']],
-                ['route' => 'panel.setting.iristypes.index', 'label' => __('actions.sidemenu.iristypes'), 'match' => ['panel.setting.iristypes.*']],
-                ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
-                ['route' => 'panel.setting.additiontypes.index', 'label' => __('actions.sidemenu.additiontypes'), 'match' => ['panel.setting.additiontypes.*']],
-                ['route' => 'panel.setting.surgerytypes.index', 'label' => __('actions.sidemenu.surgerytypes'), 'match' => ['panel.setting.surgerytypes.*']],
-                ['route' => 'panel.setting.covertesttypes.index', 'label' => __('actions.sidemenu.colorvisiontypes'), 'match' => ['panel.setting.covertesttypes.*']],
-                ['route' => 'panel.setting.colorvisiontypes.index', 'label' => __('actions.sidemenu.colorvisiontypes'), 'match' => ['panel.setting.colorvisiontypes.*']],
-                ['route' => 'panel.setting.visualacuitytypes.index', 'label' => __('actions.sidemenu.visualacuitytypes'), 'match' => ['panel.setting.visualacuitytypes.*']],
-                ['route' => 'panel.setting.lenses.index', 'label' => __('actions.sidemenu.lenses'), 'match' => ['panel.setting.lenses.*']],
-                ['route' => 'panel.setting.nearpointconvergences.index', 'label' => __('actions.sidemenu.nearpointconvergences'), 'match' => ['panel.setting.nearpointconvergences.*']],
-                ['route' => 'panel.setting.report-settings.index', 'label' => __('actions.report_settings.title'), 'match' => ['panel.setting.report-settings.*']],
+            // ── Configurações reorganizadas em 5 categorias (era 1 grupo
+            // flat com 12+ itens soltos + "Controle de acesso" à parte).
+            // "Usuários" e "Segurança" saem do antigo grupo solto e entram
+            // nas categorias semanticamente corretas abaixo.
+
+            // Clínica: recursos físicos da clínica (salas/equipamentos),
+            // segurança/2FA e gateway de pagamento próprio (se habilitado).
+            $clinicalChildren = [
+                // Rota/controller continuam "resources" — só o label do menu
+                // muda para "Unidades / salas" (ClinicResource não é renomeado).
+                ['route' => 'panel.setting.resources.index', 'label' => __('actions.sidemenu.clinic_resources'), 'match' => ['panel.setting.resources.*']],
+                ['route' => 'panel.setting.security.index', 'label' => __('manager_hardening.entity_2fa_section'), 'match' => ['panel.setting.security.*']],
             ];
 
             // Gateways de pagamento — só aparece se o plano da clínica habilitar.
             if ($canSeeOwnGateways) {
-                $settingsChildren[] = ['route' => 'panel.setting.gateways.index', 'label' => __('actions.sidemenu.payment_gateways'), 'match' => ['panel.setting.gateways.*']];
+                $clinicalChildren[] = ['route' => 'panel.setting.gateways.index', 'label' => __('actions.sidemenu.payment_gateways'), 'match' => ['panel.setting.gateways.*']];
             }
 
-            $settingsChildren[] = ['route' => 'panel.setting.resources.index', 'label' => __('actions.sidemenu.resources'), 'match' => ['panel.setting.resources.*']];
+            // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
+            $attendanceChildren = [
+                ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*']],
+                ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
+                ['route' => 'panel.setting.surgerytypes.index', 'label' => __('actions.sidemenu.surgerytypes'), 'match' => ['panel.setting.surgerytypes.*']],
+                ['route' => 'panel.setting.iollenses.index', 'label' => __('actions.sidemenu.iol_lenses'), 'match' => ['panel.setting.iollenses.*']],
+            ];
+
+            // Usuários e permissões: identidade + RBAC granular (roles).
+            $usersChildren = [
+                ['route' => 'panel.accesscontrol.users.index', 'label' => __('actions.users'), 'match' => ['panel.accesscontrol.users.*']],
+                ['route' => 'panel.accesscontrol.roles.index', 'label' => __('actions.sidemenu.roles'), 'match' => ['panel.accesscontrol.roles.*']],
+            ];
+
+            // Documentos: modelos de documentação clínica (receituários,
+            // laudos, atestados...) via DocumentationType — um único item.
+            $documentsChildren = [
+                ['route' => 'panel.setting.report-settings.index', 'label' => __('actions.report_settings.title'), 'match' => ['panel.setting.report-settings.*']],
+            ];
+
+            // Oftalmologia: os 8 sub-catálogos clínicos viram ABAS dentro de
+            // uma única página ("Parâmetros oftalmológicos"), não itens soltos
+            // no menu (ver BaseSettingController::$tabsGroup). O match cobre
+            // as 8 rotas para o item de menu ficar "ativo" em qualquer aba.
+            $ophthalmologyMatch = [
+                'panel.setting.skintypes.*',
+                'panel.setting.iristypes.*',
+                'panel.setting.additiontypes.*',
+                'panel.setting.visualacuitytypes.*',
+                'panel.setting.colorvisiontypes.*',
+                'panel.setting.nearpointconvergences.*',
+                'panel.setting.covertesttypes.*',
+                'panel.setting.lenses.*',
+            ];
+            $ophthalmologyChildren = [
+                ['route' => 'panel.setting.skintypes.index', 'label' => __('actions.sidemenu.ophthalmology_parameters'), 'match' => $ophthalmologyMatch],
+            ];
 
             $nav[] = ['section' => __('actions.sidemenu.settings')];
             $nav[] = [
-                'key'      => 'settings',
-                'icon'     => 'ti ti-settings',
-                'label'    => __('actions.sidemenu.settings'),
-                'match'    => ['panel.setting.*'],
-                'children' => $settingsChildren,
+                'key'      => 'settings-clinical',
+                'icon'     => 'ti ti-building-hospital',
+                'label'    => __('actions.sidemenu.settings_clinical'),
+                'match'    => array_merge(...array_column($clinicalChildren, 'match')),
+                'children' => $clinicalChildren,
             ];
-
-            $nav[] = ['section' => __('actions.sidemenu.access_control')];
             $nav[] = [
-                'key'   => 'users',
-                'route' => 'panel.accesscontrol.users.index',
-                'icon'  => 'ti ti-users-group',
-                'label' => __('actions.users'),
-                'match' => ['panel.accesscontrol.users.*'],
+                'key'      => 'settings-attendance',
+                'icon'     => 'ti ti-clipboard-list',
+                'label'    => __('actions.sidemenu.settings_attendance'),
+                'match'    => array_merge(...array_column($attendanceChildren, 'match')),
+                'children' => $attendanceChildren,
             ];
-            // Segurança / 2FA por empresa fica em Controle de acesso —
-            // semanticamente mais próximo de "usuários e autenticação" do
-            // que de "configurações operacionais (convênios, lentes, etc.)".
             $nav[] = [
-                'key'   => 'security',
-                'route' => 'panel.setting.security.index',
-                'icon'  => 'ti ti-shield-lock',
-                'label' => __('manager_hardening.entity_2fa_section'),
-                'match' => ['panel.setting.security.*'],
+                'key'      => 'settings-users',
+                'icon'     => 'ti ti-users-group',
+                'label'    => __('actions.sidemenu.settings_users'),
+                'match'    => array_merge(...array_column($usersChildren, 'match')),
+                'children' => $usersChildren,
+            ];
+            $nav[] = [
+                'key'      => 'settings-documents',
+                'icon'     => 'ti ti-file-text',
+                'label'    => __('actions.sidemenu.settings_documents'),
+                'match'    => array_merge(...array_column($documentsChildren, 'match')),
+                'children' => $documentsChildren,
+            ];
+            $nav[] = [
+                'key'      => 'settings-ophthalmology',
+                'icon'     => 'ti ti-eye',
+                'label'    => __('actions.sidemenu.settings_ophthalmology'),
+                'match'    => $ophthalmologyMatch,
+                'children' => $ophthalmologyChildren,
             ];
         }
 

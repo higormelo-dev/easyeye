@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call(EntityAndUserAdministratorSeeder::class);
+        $this->call(PermissionsSeeder::class);
         $this->call(SubscriptionSettingSeeder::class);
         $this->call(PlanSeeder::class);
         $this->call(BillingGatewaysSeeder::class);

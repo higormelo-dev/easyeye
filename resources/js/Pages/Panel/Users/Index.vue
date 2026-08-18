@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, Link } from '@inertiajs/vue3';
 import AppLayout     from '@/Layouts/AppLayout.vue';
 import PageHeader    from '@/Components/Panel/PageHeader.vue';
 import SearchInput   from '@/Components/Panel/SearchInput.vue';
@@ -92,6 +92,9 @@ const breadcrumbs = [
                 @set-view="setView"
             >
                 <template #actions>
+                    <Link :href="route('panel.accesscontrol.roles.index')" class="btn btn-light btn-sm">
+                        <i class="ti ti-shield-lock me-1"></i>Perfis e permissões
+                    </Link>
                     <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
                         <i class="ti ti-plus me-1"></i>{{ t.new_user }}
                     </button>

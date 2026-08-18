@@ -1161,24 +1161,13 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
                 <div class="col-12 col-lg-4 pmr-risk-wrap">
                     <!--
-                        Título + legenda inline:
-                          - Vermelho (danger):   paciente TEM a condição → alerta clínico imediato
-                          - Amarelo (warning):   histórico familiar → atenção/monitoramento
-                        A legenda fica ao lado do título para contexto imediato.
+                        Título sem legenda: cores continuam Vermelho (danger, paciente TEM)
+                        e Amarelo (warning, histórico familiar), mas a identificação
+                        já aparece nos próprios switches (labels "Próprio"/"Familiar"),
+                        então a legenda ao lado do título ficava redundante.
                     -->
                     <div class="d-flex align-items-baseline flex-wrap gap-2 mb-1">
                         <label class="pmr-label mb-0">{{ tt('clinical_history', 'Antecedentes clínicos') }}</label>
-                        <span class="pmr-risk-legend d-inline-flex align-items-center gap-2 flex-wrap">
-                            <span class="d-inline-flex align-items-center gap-1">
-                                <span class="pmr-risk-dot pmr-risk-dot--self"></span>
-                                <small class="text-muted">{{ tt('self', 'Próprio') }} = paciente tem</small>
-                            </span>
-                            <span class="text-muted small">·</span>
-                            <span class="d-inline-flex align-items-center gap-1">
-                                <span class="pmr-risk-dot pmr-risk-dot--family"></span>
-                                <small class="text-muted">{{ tt('family', 'Familiar') }} = histórico</small>
-                            </span>
-                        </span>
                     </div>
 
                     <div class="row g-1 pmr-risk-grid">

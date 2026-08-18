@@ -327,6 +327,9 @@ return [
             'name_unique'          => 'This name is already being used by another equipment.',
             'serial_number_unique' => 'This serial number is already being used by another equipment.',
         ],
+        'entity_iol_lens' => [
+            'diopter_max_gte' => 'The maximum diopter must be greater than or equal to the minimum diopter.',
+        ],
         'validation_invalid' => [
             'default_message'          => 'Data is invalid.',
             'not_exam_identifier'      => 'Exam identifier not found',

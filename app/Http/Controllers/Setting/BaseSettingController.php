@@ -39,6 +39,33 @@ abstract class BaseSettingController extends Controller
     /** Chave usada em traduções/UI para identificar o módulo (ex.: `skintypes`). */
     protected string $viewSlot = '';
 
+    /**
+     * Grupo de "abas" de navegação entre catálogos irmãos (ex.: os 8
+     * sub-catálogos oftalmológicos que hoje são acessados via tabs dentro
+     * de "Parâmetros oftalmológicos" em vez de itens soltos no menu).
+     *
+     * `null` (padrão) = catálogo não participa de nenhum grupo de abas.
+     * Controllers filhos que fazem parte de um grupo setam no construtor:
+     *
+     *   $this->tabsGroup = [
+     *       ['route' => 'panel.setting.skintypes.index', 'label' => '...'],
+     *       ['route' => 'panel.setting.iristypes.index', 'label' => '...'],
+     *       ...
+     *   ];
+     *
+     * A MESMA lista (com todas as entradas do grupo, o próprio catálogo
+     * incluído) é replicada em cada controller do grupo — cada aba precisa
+     * saber navegar para as demais. Ver `getTabsGroup()`.
+     *
+     * @var list<array{route: string, label: string}>|null
+     */
+    protected ?array $tabsGroup = null;
+
+    protected function getTabsGroup(): ?array
+    {
+        return $this->tabsGroup;
+    }
+
     /** Campos editáveis (whitelist mass-assignment para o form). */
     protected array $crudFields = ['name' => '', 'active' => true];
 
@@ -88,7 +115,15 @@ abstract class BaseSettingController extends Controller
             'columns'    => $this->getColumns(),
             'fields'     => $this->getFormFields(),
             'crudFields' => $this->crudFields,
-            'routes'     => [
+            // Tab-bar de navegação entre catálogos irmãos (ex.: os 8
+            // sub-catálogos oftalmológicos). `null` quando o catálogo não
+            // participa de nenhum grupo — Vue esconde a tab-bar nesse caso.
+            'tabsGroup' => $this->getTabsGroup() ? array_map(fn ($t) => [
+                'url'    => route($t['route']),
+                'label'  => $t['label'],
+                'active' => $t['route'] === $this->routePrefix . '.index',
+            ], $this->getTabsGroup()) : null,
+            'routes' => [
                 'index' => route($this->routePrefix . '.index'),
                 'store' => route($this->routePrefix . '.store'),
                 'cards' => route($this->routePrefix . '.cards'),

@@ -95,6 +95,24 @@ onUnmounted(() => {
     sessionEvents.forEach(e => document.removeEventListener(e, resetTimers));
 });
 
+// BUG — item de menu com nome de rota inexistente/desatualizado no Ziggy
+// (deploy com bundle JS obsoleto, drift entre routes/web.php e
+// PanelNavigation.php) fazia `route()` lançar exceção não capturada dentro
+// do render do menu. Como o menu é renderizado uma única vez pro array
+// inteiro, UM item quebrado derrubava a árvore de componentes inteira —
+// tela fica preta/em branco (nada monta, nem header nem conteúdo). Um item
+// com rota inválida agora vira link inerte (href="#") em vez de quebrar a
+// página toda; erro é reportado ao Sentry para investigação.
+function safeRoute(name, params) {
+    try {
+        return route(name, params);
+    } catch (error) {
+        window.Sentry?.captureException?.(error, { extra: { route: name } });
+        console.error(`[AppLayout] Rota de menu inválida: "${name}"`, error);
+        return '#';
+    }
+}
+
 // ── Sidebar active state ───────────────────────────────────────────────────
 function isActive(matchPatterns) {
     const current = route().current();
@@ -411,7 +429,7 @@ onUnmounted(() => {
                                         </a>
                                         <ul :style="isMenuOpen(item) ? 'display:block;' : ''">
                                             <li v-for="child in item.children" :key="child.route">
-                                                <a :href="route(child.route)"
+                                                <a :href="safeRoute(child.route)"
                                                    :class="{ active: isActive(child.match) }">
                                                     <i v-if="child.icon" :class="child.icon + ' me-1'"></i>
                                                     {{ child.label }}
@@ -422,7 +440,7 @@ onUnmounted(() => {
 
                                     <!-- Simple item -->
                                     <li v-else>
-                                        <a :href="route(item.route)"
+                                        <a :href="safeRoute(item.route)"
                                            :class="{ active: isActive(item.match) }">
                                             <i :class="item.icon"></i>
                                             <span>{{ item.label }}</span>

@@ -6,7 +6,7 @@ use App\Presenters\EntityUserPresenter;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany};
 use Laracasts\Presenter\PresentableTrait;
 
 class EntityUser extends Model
@@ -98,5 +98,17 @@ class EntityUser extends Model
     public function doctor(): BelongsTo
     {
         return $this->belongsTo(Doctor::class, 'id', 'entity_user_id');
+    }
+
+    /**
+     * Perfis customizados (RBAC granular ADITIVO) atribuídos a esta
+     * membership. Camada opt-in por cima da rule fixa (entity_users.rule) —
+     * ver App\Traits\HasEntityRoles::hasPermissionInEntity().
+     */
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(Role::class, 'entity_user_role')
+            ->using(EntityUserRole::class)
+            ->withTimestamps();
     }
 }

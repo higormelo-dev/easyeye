@@ -238,7 +238,7 @@ return [
         'covenants'             => 'Convênios',
         'skintypes'             => 'Tipos de cútis',
         'iristypes'             => 'Tipos de iris',
-        'visittypes'            => 'Tipos de visita',
+        'visittypes'            => 'Tipos de atendimento',
         'surgerytypes'          => 'Tipos de cirurgia',
         'covertesttypes'        => 'Tipos de teste de cobertura',
         'colorvisiontypes'      => 'Tipos de visão cromática',
@@ -246,6 +246,7 @@ return [
         'visualacuitytypes'     => 'Tipos de acuidade visual',
         'schedules'             => 'Agendas',
         'lenses'                => 'Lentes',
+        'iol_lenses'            => 'Lentes de Catarata',
         'nearpointconvergences' => 'Convergências de ponto próximo',
         'medical_records'       => 'Prontuários',
         'reports'               => 'Relatórios',
@@ -268,6 +269,17 @@ return [
         'ai_assistant'          => 'Assistente de IA',
         'ai_usage'              => 'Consumo & dashboard',
         'ai_prompts'            => 'Meus prompts',
+        'roles'                 => 'Perfis e permissões',
+        // Label específico do MENU para o CRUD de recursos físicos
+        // (ClinicResource) — a página em si continua "Recursos"
+        // (actions.sidemenu.resources), só o item de menu muda.
+        'clinic_resources'         => 'Unidades / salas',
+        'ophthalmology_parameters' => 'Parâmetros oftalmológicos',
+        'settings_clinical'        => 'Clínica',
+        'settings_attendance'      => 'Atendimento',
+        'settings_users'           => 'Usuários e permissões',
+        'settings_documents'       => 'Documentos',
+        'settings_ophthalmology'   => 'Oftalmologia',
     ],
     'reports' => [
         'schedules'         => 'Relatório de Produção',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Traits;
 
 use App\Enums\{ClientRule, SaasRule};
+use App\Enums\Permission as PermissionEnum;
 use App\Models\{Entity, EntityUser};
 use BackedEnum;
 
@@ -26,6 +27,16 @@ trait HasEntityRoles
      * @var array<string, string|null>
      */
     private array $entityRuleCache = [];
+
+    /**
+     * Per-request in-memory cache keyed by "{entityId}:{permissionValue}".
+     * Same rationale as $entityRuleCache — avoids redundant queries when the
+     * same permission is checked multiple times for the same entity (e.g.
+     * once in middleware, again in a Vue prop/gate check within the request).
+     *
+     * @var array<string, bool>
+     */
+    private array $entityPermissionCache = [];
 
     // -------------------------------------------------------------------------
     // Core lookup
@@ -82,6 +93,28 @@ trait HasEntityRoles
             unset($this->entityRuleCache[$entity->id]);
         } else {
             $this->entityRuleCache = [];
+        }
+
+        $this->flushEntityPermissionCache($entity);
+    }
+
+    /**
+     * Flush the in-memory permission cache for a specific entity (or all
+     * entities). Useful after updating a user's custom Role assignments in
+     * the same request cycle.
+     */
+    public function flushEntityPermissionCache(?Entity $entity = null): void
+    {
+        if ($entity === null) {
+            $this->entityPermissionCache = [];
+
+            return;
+        }
+
+        foreach (array_keys($this->entityPermissionCache) as $cacheKey) {
+            if (str_starts_with($cacheKey, $entity->id . ':')) {
+                unset($this->entityPermissionCache[$cacheKey]);
+            }
         }
     }
 
@@ -154,6 +187,60 @@ trait HasEntityRoles
     public function hasNoneOfRolesInEntity(Entity $entity, array $roles): bool
     {
         return ! $this->hasAnyRoleInEntity($entity, $roles);
+    }
+
+    // -------------------------------------------------------------------------
+    // Granular permission checks (RBAC customizado ADITIVO)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Return true when the user has the given granular Permission in the
+     * entity — seja por bypass de admin (ClientRule::Admin), seja por
+     * possuir uma Role customizada (app/Models/Role) atribuída ao seu
+     * EntityUser nessa entity que contenha essa permission.
+     *
+     * COMPLIANCE — REGRA INEGOCIÁVEL:
+     * Este método é para permissões administrativas/operacionais
+     * NÃO-CLÍNICAS (ver App\Enums\Permission). NUNCA usar para gates
+     * clínicos/regulatórios travados — ex: emissão/assinatura de laudo
+     * (EntityGate::IssueReport), prescrição, ou qualquer outra ação hoje
+     * gated diretamente por ClientRule::Doctor. Esses continuam e devem
+     * continuar usando hasRoleInEntity($entity, ClientRule::Doctor) direto,
+     * fora do alcance de qualquer Role customizada — mesmo que uma clínica
+     * crie uma Role customizada com todas as permissions existentes
+     * atribuídas, ela JAMAIS destrava essas ações. O sistema de Role é uma
+     * camada aditiva puramente administrativa por cima da ClientRule fixa.
+     *
+     * O resultado é cacheado em memória por request (chave entity+permission).
+     */
+    public function hasPermissionInEntity(Entity $entity, PermissionEnum $permission): bool
+    {
+        $cacheKey = $entity->id . ':' . $permission->value;
+
+        if (array_key_exists($cacheKey, $this->entityPermissionCache)) {
+            return $this->entityPermissionCache[$cacheKey];
+        }
+
+        // Bypass: admin da ClientRule fixa sempre tem acesso administrativo
+        // total — mesmo padrão já usado no resto do sistema (ManageUsers,
+        // ManageSettings, etc. em AuthServiceProvider).
+        if ($this->hasRoleInEntity($entity, ClientRule::Admin)) {
+            return $this->entityPermissionCache[$cacheKey] = true;
+        }
+
+        $entityUser = $this->entityUserFor($entity);
+
+        if ($entityUser === null) {
+            return $this->entityPermissionCache[$cacheKey] = false;
+        }
+
+        $hasPermission = $entityUser->roles()
+            ->whereHas('permissions', function ($query) use ($permission): void {
+                $query->where('key', $permission->value);
+            })
+            ->exists();
+
+        return $this->entityPermissionCache[$cacheKey] = $hasPermission;
     }
 
     /**

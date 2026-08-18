@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\{
+    AccessControl\RolesController,
     AiCreditPurchasesController,
     AiRunPromptsController,
     AiRunsController,
@@ -46,6 +47,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
     CovenantsController,
     CoverTestTypesController,
+    IolLensesController,
     IrisTypesController,
     LensesController,
     NearPointConvergencesController,
@@ -195,7 +197,11 @@ Route::group(
         // ══════════════════════════════════════════════════════════════════════
 
         // ── admin + secretary + doctor + financial: pacientes e médicos ───────
-        Route::middleware('entity.role:admin,financial,doctor,secretary')->group(function () {
+        // permission:patients.manage,... — RBAC granular ADITIVO (ver App\Enums\
+        // Permission): quem tem a permission customizada patients.manage acessa
+        // mesmo sem esses roles fixos; os roles fixos abaixo continuam com o
+        // MESMO acesso que já tinham (fallback puramente aditivo, zero regressão).
+        Route::middleware('permission:patients.manage,admin,financial,doctor,secretary')->group(function () {
             Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');
             Route::get('doctors/{doctor}/edit-data', [DoctorsController::class, 'editData'])->name('doctors.editData');
             Route::get('doctors/{doctor}/work-schedule/data', [DoctorWorkScheduleController::class, 'data'])->name('doctors.work-schedule.data');
@@ -418,7 +424,9 @@ Route::group(
         Route::delete('notices/{notice}', [NoticesController::class, 'destroy'])->name('notices.destroy');
 
         // ── admin + financial: relatórios gerenciais ──────────────────────────
-        Route::middleware('entity.role:admin,financial')->group(function () {
+        // permission:financial.manage,... — mesmo padrão do bloco de pacientes
+        // acima: fallback aditivo, os roles fixos mantêm o acesso que já tinham.
+        Route::middleware('permission:financial.manage,admin,financial')->group(function () {
             Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
             Route::get('reports/schedules', [ReportsController::class, 'schedules'])->name('reports.schedules');
             Route::get('reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('reports.absenteeism');
@@ -480,7 +488,13 @@ Route::group(
                 });
             });
 
-        // ── admin only: compliance, controle de acesso, configurações ─────────
+        // ── admin only: compliance, controle de acesso, segurança, gateways ───
+        // "Chave do cofre" do RBAC — gestão de Roles/atribuição de perfil e o
+        // CRUD de usuários NUNCA são delegáveis via Permission customizada
+        // (auto-escalonamento: um usuário com essas permissões poderia criar
+        // uma Role com todas as permissions e se auto-atribuir). Segurança
+        // (2FA) e Gateways de pagamento seguem a mesma regra — ficam
+        // estritamente admin-only, sem exceção.
         Route::middleware('entity.role:admin')->group(function () {
             Route::get('reports/compliance', [ComplianceController::class, 'index'])->name('reports.compliance');
             Route::get('reports/compliance/audit', [ComplianceController::class, 'exportAuditLogs'])->name('reports.compliance.audit');
@@ -490,6 +504,11 @@ Route::group(
                 Route::get('users/cards', [UsersController::class, 'cards'])->name('users.cards');
                 Route::resource('users', UsersController::class);
                 Route::get('users/{user}/restore', [UsersController::class, 'restore'])->name('users.restore');
+                Route::patch('users/{user}/roles', [UsersController::class, 'updateRoles'])->name('users.roles.update');
+
+                // Gestão de Roles customizadas (RBAC granular ADITIVO) — CRUD
+                // completo é "chave do cofre", igual accesscontrol.users acima.
+                Route::resource('roles', RolesController::class)->except(['create', 'edit', 'show']);
             });
 
             Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
@@ -499,6 +518,30 @@ Route::group(
                     ->middleware('throttle:manager-destructive') // ação rara e de alto impacto
                     ->name('security.two-factor.toggle');
 
+                // ── Gateways de Pagamento do Tenant ────────────────────────
+                // Feature `has_own_payment_gateways` libera a clínica a cadastrar
+                // gateways próprios (Asaas, MP, etc.). Padrão off — a clínica usa
+                // o gateway centralizado do SaaS para suas cobranças (covenants).
+                Route::middleware('feature:has_own_payment_gateways')->group(function () {
+                    Route::get('gateways', [TenantGatewayController::class, 'index'])->name('gateways.index');
+                    Route::get('gateways/{gateway}/credentials', [TenantGatewayController::class, 'credentials'])->name('gateways.credentials');
+                    Route::post('gateways/{gateway}/credentials', [TenantGatewayController::class, 'storeCredential'])->name('gateways.credentials.store');
+                    Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [TenantGatewayController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
+                });
+            });
+        });
+
+        // ── piloto RBAC granular: catálogos administrativos simples ───────────
+        // `permission:settings.manage` (App\Http\Middleware\EnsureEntityPermission)
+        // troca o antigo `entity.role:admin` SÓ para estes 11 catálogos +
+        // report-settings. hasPermissionInEntity() faz bypass de admin
+        // internamente, então admin continua com acesso total; agora uma Role
+        // customizada com a permission `settings.manage` também libera.
+        // NÃO estender este middleware a nenhuma outra rota sem revisar a
+        // regra de compliance em App\Enums\Permission — Roles customizadas
+        // são uma camada ADITIVA puramente administrativa, nunca clínica.
+        Route::middleware('permission:settings.manage')->group(function () {
+            Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
                 Route::get('covenants/cards', [CovenantsController::class, 'cards'])->name('covenants.cards');
                 Route::resource('covenants', CovenantsController::class);
                 Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])->name('covenants.restore');
@@ -554,16 +597,23 @@ Route::group(
                 Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');
                 Route::resource('report-settings', ReportSettingsController::class);
 
-                // ── Gateways de Pagamento do Tenant ────────────────────────
-                // Feature `has_own_payment_gateways` libera a clínica a cadastrar
-                // gateways próprios (Asaas, MP, etc.). Padrão off — a clínica usa
-                // o gateway centralizado do SaaS para suas cobranças (covenants).
-                Route::middleware('feature:has_own_payment_gateways')->group(function () {
-                    Route::get('gateways', [TenantGatewayController::class, 'index'])->name('gateways.index');
-                    Route::get('gateways/{gateway}/credentials', [TenantGatewayController::class, 'credentials'])->name('gateways.credentials');
-                    Route::post('gateways/{gateway}/credentials', [TenantGatewayController::class, 'storeCredential'])->name('gateways.credentials.store');
-                    Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [TenantGatewayController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
-                });
+                // Inventário de lentes IOL (catarata) da clínica — dado DA
+                // CLÍNICA (entity_id obrigatório), diferente do catálogo
+                // GLOBAL de modelos (iol_lens_models, sem escopo). `search`
+                // fica ANTES do resource pra não colidir com `iollenses/{id}`.
+                // `show` é mantido (fora do `except`) pro modal de detalhe/
+                // edição abrir via JSON ao clicar num card — ver decisão em
+                // IolLensesController::show(). `create`/`edit` ficam de fora:
+                // é SPA/modal (Inertia), não há tela dedicada server-rendered.
+                Route::get('iollenses/search', [IolLensesController::class, 'search'])->name('iollenses.search');
+                // parameters(): binding implícito casa pelo NOME do parâmetro
+                // da rota com o do método do controller — sem isso, o
+                // wildcard viraria `{iollense}` (singular automático) mas os
+                // métodos tipam `EntityIolLens $entityIolLens`, e o model
+                // nunca seria resolvido. Mesmo ajuste já usado em ai-prompts.
+                Route::resource('iollenses', IolLensesController::class)
+                    ->parameters(['iollenses' => 'entityIolLens'])
+                    ->except(['create', 'edit']);
             });
         });
 

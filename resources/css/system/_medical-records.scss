@@ -145,21 +145,6 @@
     margin-bottom: .35rem !important;
 }
 
-/* ── Legenda das cores ────────────────────────────────────────────────── */
-.pmr-form .pmr-risk-legend {
-    font-size: .65rem;
-    line-height: 1.2;
-    flex-wrap: wrap;
-}
-.pmr-form .pmr-risk-dot {
-    display: inline-block;
-    width: .55rem;
-    height: .55rem;
-    border-radius: 50%;
-}
-.pmr-form .pmr-risk-dot--self   { background: #f62d51; }
-.pmr-form .pmr-risk-dot--family { background: #ffbc34; }
-
 .pmr-form .pmr-toggle-label {
     font-size: .66rem;
     color: #64748b;

@@ -330,6 +330,9 @@ return [
             'name_unique'          => 'Este nome já está sendo usado por outro equipamento.',
             'serial_number_unique' => 'Este número de série já está sendo usado por outro equipamento.',
         ],
+        'entity_iol_lens' => [
+            'diopter_max_gte' => 'A dioptria máxima deve ser maior ou igual à dioptria mínima.',
+        ],
         'validation_invalid' => [
             'default_message'          => 'Dados de validação inválidos',
             'not_exam_identifier'      => 'Identificador de exame não encontrado',

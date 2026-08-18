@@ -5,13 +5,14 @@ namespace App\Http\Controllers;
 use App\DTOs\ActionPolicy;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
-use App\Models\{EntityUser, User};
+use App\Models\{EntityUser, Role, User};
 use App\Services\EntityUserService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
 use Illuminate\Support\Facades\{DB, Storage, Vite};
+use Illuminate\Validation\Rule;
 use Inertia\{Inertia, Response};
 
 class UsersController extends Controller
@@ -226,10 +227,71 @@ class UsersController extends Controller
         }
 
         $record = $this->service->findByIdOrCode($id);
+        $record->loadMissing('roles');
 
         return response()->json([
             'data' => new EntityUserResource($record),
+            // Perfis customizados (RBAC granular ADITIVO) — alimenta o
+            // multi-select "Perfis adicionais" no form de edição de usuário.
+            'role_ids' => $record->roles->pluck('id')->values()->all(),
+            'roles'    => Role::query()
+                ->where('entity_id', session('selected_entity_id'))
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Role $role) => ['id' => $role->id, 'name' => $role->name])
+                ->values()
+                ->all(),
         ]);
+    }
+
+    /**
+     * Sincroniza os perfis customizados (Role) atribuídos a este EntityUser.
+     *
+     * Endpoint dedicado (em vez de acoplar em update()) porque update() já
+     * serve o formulário base de edição (rule/active) via EntityUserRequest
+     * + EntityUserService, compartilhado com o fluxo de criação — misturar
+     * role_ids ali obrigaria alterar uma Request/Service usados por outro
+     * fluxo, risco desnecessário pra uma feature nova e isolada. Um PATCH
+     * dedicado mantém o blast radius restrito a este método.
+     *
+     * Multi-tenant: role_ids validados via Rule::exists escopado à entity da
+     * sessão (nunca confia em id de request) + findByIdOrCode() já escopa o
+     * EntityUser-alvo à mesma entity.
+     */
+    public function updateRoles(Request $request, string $id): JsonResponse|RedirectResponse
+    {
+        $entityId = session('selected_entity_id');
+
+        $request->validate([
+            'role_ids'   => ['array'],
+            'role_ids.*' => [
+                'string',
+                Rule::exists('roles', 'id')->where(
+                    fn ($query) => $query->where('entity_id', $entityId)->whereNull('deleted_at'),
+                ),
+            ],
+        ]);
+
+        $record = $this->service->findByIdOrCode($id);
+
+        DB::transaction(function () use ($record, $request): void {
+            $record->roles()->sync($request->input('role_ids', []));
+        });
+
+        $record->load('roles');
+        $messageReturn = 'Perfis do usuário atualizados com sucesso.';
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'message' => $messageReturn,
+                'data'    => [
+                    'role_ids' => $record->roles->pluck('id')->values()->all(),
+                ],
+            ]);
+        }
+
+        return redirect(action('\\' . static::class . '@index'))
+            ->with('message', $messageReturn);
     }
 
     /**

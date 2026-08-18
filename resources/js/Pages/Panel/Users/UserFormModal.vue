@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 const props = defineProps({
@@ -30,10 +30,31 @@ const roleOptions = computed(() =>
     Object.entries(props.roles).map(([value, label]) => ({ value, label })),
 );
 
+// ── Perfis adicionais (RBAC granular ADITIVO) ───────────────────────────────
+// Só faz sentido em edição: um EntityUser precisa existir (e ter seu id)
+// antes de poder receber perfis customizados via entity_user_role — não há
+// como atribuir perfil "durante" a criação, já que o registro ainda não
+// existe. `availableRoles`/`selectedRoleIds` são estado local (não vêm de
+// prop) porque só existem depois do fetch de edição — nome deliberadamente
+// diferente da prop `roles` (que é o dicionário rule->label do perfil base).
+const availableRoles  = ref([]);
+const selectedRoleIds = ref([]);
+
+function toggleRole(id) {
+    const idx = selectedRoleIds.value.indexOf(id);
+    if (idx === -1) {
+        selectedRoleIds.value.push(id);
+    } else {
+        selectedRoleIds.value.splice(idx, 1);
+    }
+}
+
 function resetForm() {
     form.reset();
     form.clearErrors();
     loadErr.value = '';
+    availableRoles.value  = [];
+    selectedRoleIds.value = [];
 }
 
 async function loadEditData(id) {
@@ -55,6 +76,23 @@ async function loadEditData(id) {
     } finally {
         loading.value = false;
     }
+
+    // Fetch separado (endpoint `edit()`) só para role_ids/roles — não usa o
+    // `data` desta resposta (EntityUserResource, formato aninhado diferente
+    // do `show()` acima) e falha silenciosamente: é uma seção secundária do
+    // form, não deve bloquear a edição dos dados principais do usuário.
+    try {
+        const res  = await fetch(route('panel.accesscontrol.users.edit', id), {
+            headers: { Accept: 'application/json' },
+        });
+        const json = await res.json();
+        if (res.ok) {
+            availableRoles.value  = json.roles ?? [];
+            selectedRoleIds.value = json.role_ids ?? [];
+        }
+    } catch {
+        // silencioso — seção "Perfis adicionais" fica vazia, resto do form funciona
+    }
 }
 
 watch(() => props.open, async (val) => {
@@ -64,13 +102,33 @@ watch(() => props.open, async (val) => {
     }
 });
 
+// UX: perfis adicionais são sincronizados numa chamada PATCH dedicada (ver
+// UsersController::updateRoles()) disparada DEPOIS que o form principal
+// salva com sucesso — não misturamos role_ids no useForm principal porque
+// update() usa EntityUserRequest/EntityUserService, compartilhados com o
+// fluxo de criação (mesmo racional documentado no backend). Optamos por um
+// único botão "Salvar" (em vez de dois botões separados) por ser mais
+// simples pro usuário; o encadeamento acontece só em onSuccess do form
+// principal, então se os dados base falharem a validação, perfis nem chegam
+// a ser sincronizados.
 function submit() {
-    const opts = { preserveScroll: true, onSuccess: () => emit('close') };
+    const opts = {
+        preserveScroll: true,
+        onSuccess: () => (isEdit.value ? syncRoles() : emit('close')),
+    };
     if (isEdit.value) {
         form.put(route('panel.accesscontrol.users.update', props.userId), opts);
     } else {
         form.post(route('panel.accesscontrol.users.store'), opts);
     }
+}
+
+function syncRoles() {
+    router.patch(
+        route('panel.accesscontrol.users.roles.update', props.userId),
+        { role_ids: selectedRoleIds.value },
+        { preserveScroll: true, onFinish: () => emit('close') },
+    );
 }
 </script>
 
@@ -165,6 +223,29 @@ function submit() {
                                     id="usfActive"
                                 >
                                 <label class="form-check-label" for="usfActive">{{ t.field_active }}</label>
+                            </div>
+                        </div>
+
+                        <!-- Perfis adicionais (edit only — RBAC granular ADITIVO) -->
+                        <div v-if="isEdit" class="mb-3">
+                            <label class="form-label fw-semibold">Perfis adicionais</label>
+                            <div v-if="availableRoles.length === 0" class="small text-muted">
+                                Nenhum perfil customizado cadastrado nesta clínica.
+                            </div>
+                            <div v-else class="border rounded p-2" style="max-height: 160px; overflow-y: auto;">
+                                <div v-for="r in availableRoles" :key="r.id" class="form-check">
+                                    <input
+                                        :id="`ufmRole${r.id}`"
+                                        type="checkbox"
+                                        class="form-check-input"
+                                        :checked="selectedRoleIds.includes(r.id)"
+                                        @change="toggleRole(r.id)"
+                                    >
+                                    <label class="form-check-label small" :for="`ufmRole${r.id}`">{{ r.name }}</label>
+                                </div>
+                            </div>
+                            <div class="form-text">
+                                Permissões administrativas adicionais, além do perfil base acima.
                             </div>
                         </div>
 
