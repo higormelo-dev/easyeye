@@ -10,6 +10,7 @@ return [
     'feature_exam_unavailable'      => 'Your plan does not include AI exam assistant.',
     'feature_report_unavailable'    => 'Your plan does not include AI report drafting.',
     'feature_eye_image_unavailable' => 'Your plan does not include AI ocular image analysis.',
+    'feature_chat_unavailable'      => 'Your plan does not include the virtual AI assistant.',
     'eye_image_exams_required'      => 'Select at least one image for AI analysis.',
     'record_opened'                 => 'Medical record opened and report saved.',
     'record_patient_missing'        => 'Could not identify the patient to open the medical record.',
@@ -124,6 +125,7 @@ return [
     'workflow_report_drafting'              => 'Report drafting',
     'workflow_consensus_review'             => 'Consistency review',
     'workflow_eye_image_analysis'           => 'Ocular image analysis',
+    'workflow_assistant_chat'               => 'Virtual assistant',
     'workflow_record_assist'                => 'Case analysis (record)',
 
     // Server-side system prompt for ocular image analysis.
@@ -133,6 +135,15 @@ return [
     'record_assist_system_prompt'       => 'You are an experienced ophthalmologist who SUPPORTS the attending physician — never replacing clinical judgment. Based on the medical record context (anamnesis, physical exam, refraction, findings), generate per-FIELD suggestions and a narrative support report. Always be conditional ("consistent with", "consider"), with no definitive diagnosis, no medication prescription and never addressing the patient. Fill a field ONLY when there is clinical basis in the context; otherwise use an empty string (""). NEVER invent measurements, values or findings not provided. Reply EXCLUSIVELY with valid JSON, no text outside the JSON, in the format: {"summary": "narrative support report as text", "suggestions": {"main_complaint": "", "hda": "", "medications_in_use": "", "ocular_surgical_history": "", "others_history": "", "ocular_motility": "", "biomicroscopy_right": "", "biomicroscopy_left": "", "fundoscopy_right": "", "fundoscopy_left": "", "gonioscopy_right": "", "gonioscopy_left": "", "observation_of_lenses": "", "clinical_conduct": "", "observation_general": "", "diagnosis_hypothesis": ""}}. Reply in the medical record language.',
     'record_assist_field_system_prompt' => 'You are an ophthalmologist who SUPPORTS the attending physician — never replacing clinical judgment. Based on the medical record context, suggest ONLY the content of the ":field" field. Be conditional, no definitive diagnosis, no prescription and never addressing the patient. NEVER invent measurements or findings; if there is no clinical basis, return an empty string. Reply EXCLUSIVELY with valid JSON: {"suggestions": {":key": "suggested text"}}. Reply in the medical record language.',
     'record_assist_record_required'     => 'Select a medical record for the AI analysis.',
+
+    'assistant_chat_system_prompt' => 'You are a virtual assistant supporting ophthalmology clinical practice, integrated into the EasyEye system. Free, multi-turn conversation with the physician — not a structured report workflow. '
+        . 'You can help with: medication and dosage questions, treatment options, disease and management information, drafting and organizing medical texts (reports, evolution notes, referrals), and general ophthalmology and clinical practice questions. '
+        . 'CRITICAL RULE on medications/doses/treatment: NEVER present the answer as a medical order or ready-to-use prescription. Always answer as DECISION SUPPORT — use conditional language ("the usual regimen is...", "references indicate...", "consider..."), cite the source/reference when known (package insert, medical society guideline, protocol), and end that type of answer reinforcing that the final conduct, dose, and prescription must be validated and defined by the responsible physician for the specific patient. '
+        . 'Never address the patient directly — you speak to the healthcare professional. Never invent clinical data that was not provided. '
+        . 'If given patient/record/exam context (provided only when the physician explicitly authorizes it), use it to personalize the answer, without revealing data beyond what was sent and without assuming unprovided information. When asked to "draft an evolution note" or a "report/referral template" from the context, generate an objective text, ready for the physician to review and adjust — make clear it is a DRAFT for review. '
+        . 'If the question falls outside the clinical/administrative scope of the system, answer briefly and redirect. Always answer in the language of the question (default: Brazilian Portuguese), directly and without padding.',
+    'assistant_chat_context_note' => 'Context authorized by the physician for this question (data already minimized/anonymized by the system — use only what is here):',
+    'assistant_chat_history_note' => 'This conversation\'s history (previous messages, most recent last):',
 
     // Labels of the clinical fields supported by the medical-record AI.
     'record_fields' => [
@@ -359,5 +370,35 @@ return [
         'minutes_short'      => 'min',
         'seconds_short'      => 's',
         'credits_short'      => 'cr',
+    ],
+
+    'chat_widget' => [
+        'title'                 => 'Virtual assistant',
+        'subtitle'              => 'Quick support for the clinical routine',
+        'disclaimer'            => 'Decision support — does not replace clinical judgment. Doses and conduct must be validated by the physician.',
+        'placeholder'           => 'Ask about medications, conduct, or ask for help drafting a text...',
+        'send'                  => 'Send',
+        'new_conversation'      => 'New conversation',
+        'minimize'              => 'Minimize',
+        'expand'                => 'Expand',
+        'collapse'              => 'Collapse',
+        'close'                 => 'Close',
+        'thinking'              => 'Thinking...',
+        'empty_state'           => 'Send a question to get started. Your conversation stays in this session until you clear it.',
+        'error_generic'         => 'Could not get an answer. Please try again.',
+        'context_available'     => 'Use this screen\'s context',
+        'context_hint'          => 'When enabled, the assistant receives already minimized/anonymized clinical data from what you are viewing — only turn this on if you want the answer to consider it.',
+        'context_active'        => 'Context active',
+        'insert_as_evolution'   => 'Insert as evolution note',
+        'inserted_as_evolution' => 'Added to the record\'s evolution notes.',
+        'quota_low'             => 'AI credits low this month.',
+        'quick_prompts'         => [
+            'Medication/dose question' => 'What are the options and usual dosing regimen for',
+            'Treatment options'        => 'What are the treatment options for',
+            'Report template'          => 'Draft a report template for',
+            'Evolution note template'  => 'Draft an evolution note based on the current context',
+            'Referral template'        => 'Draft a referral for',
+            'Organize text'            => 'Reorganize and improve the clarity of this text: ',
+        ],
     ],
 ];

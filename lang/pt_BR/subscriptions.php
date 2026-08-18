@@ -43,6 +43,7 @@ return [
         'has_ai_report_drafting'    => 'Redação de laudos com IA',
         'has_ai_consensus'          => 'Revisão inteligente de consistência',
         'has_ai_eye_image_analysis' => 'Análise de imagem ocular com IA',
+        'has_ai_chat_assistant'     => 'Assistente virtual de IA (chat flutuante)',
         'has_api_integrator'        => 'Integração com equipamentos oftalmológicos',
         'has_own_payment_gateways'  => 'Gateways de pagamento próprios da clínica',
         'ai_monthly_credits'        => 'Créditos mensais de IA',

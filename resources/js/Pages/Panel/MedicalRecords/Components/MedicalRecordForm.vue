@@ -7,6 +7,7 @@ import TinyMceEditor   from '@/Components/Panel/TinyMceEditor.vue';
 import SearchSelect    from '@/Components/Panel/SearchSelect.vue';
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
+import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 
 /**
  * MedicalRecordForm — Port fiel de _form.blade.php (1744 LOC) +
@@ -322,7 +323,22 @@ onMounted(async () => {
     const params = new URLSearchParams(window.location.search);
     const sid = params.get('schedule_id');
     if (sid) form.schedule_id = sid;
+
+    // Disponibiliza este prontuário como contexto OPCIONAL do Assistente
+    // Virtual flutuante (AiFloatingAssistant, montado no AppLayout) — ainda
+    // exige o médico ativar o toggle "Usar contexto desta tela" no widget
+    // pra qualquer dado ser enviado. Exemplo do pedido de produto: "dentro
+    // do prontuário: monte uma evolução com essas informações".
+    if (r?.id) {
+        setAiContext({
+            patient_id: props.patient.id,
+            medical_record_id: r.id,
+            label: `Prontuário — ${props.patient.full_name ?? props.patient.code ?? ''}`,
+        });
+    }
 });
+
+onBeforeUnmount(clearAiContext);
 
 watch(tonometryStampedTime, (v) => { form.tonometer_time = v; });
 

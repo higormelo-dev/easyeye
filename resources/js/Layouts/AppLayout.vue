@@ -4,6 +4,7 @@ import { usePage, router } from '@inertiajs/vue3';
 import logoSvg from '@img/system/logo.svg';
 import logoSmallSvg from '@img/system/logo-small.svg';
 import logoWhiteSvg from '@img/system/logo-white.svg';
+import AiFloatingAssistant from '@/Components/Panel/AiFloatingAssistant.vue';
 
 const props = defineProps({
     title:       { type: String, default: '' },
@@ -18,6 +19,7 @@ const nav       = computed(() => page.props.nav ?? []);
 const locales   = computed(() => page.props.locales ?? []);
 const flash     = computed(() => page.props.flash ?? {});
 const entities  = computed(() => auth.value.entities ?? []);
+const aiAssistant = computed(() => page.props.aiAssistant ?? { enabled: false });
 
 // ── Dark mode ──────────────────────────────────────────────────────────────
 const isDark = ref(false);
@@ -501,6 +503,12 @@ onUnmounted(() => {
             </div>
         </div>
         <!-- ═══════════════════ END PAGE WRAPPER ═══════════════════ -->
+
+        <!-- Assistente Virtual de IA — montado uma única vez aqui (layout
+             persistente do Inertia), sobrevive à navegação entre páginas do
+             painel sem perder a conversa. Gate (isDoctor + feature) já vem
+             resolvido do backend em page.props.aiAssistant.enabled. -->
+        <AiFloatingAssistant v-if="aiAssistant.enabled" :ai="aiAssistant" />
 
     </div>
 </template>

@@ -32,6 +32,16 @@ class AiRunDocumentationService
      */
     public function persistFromApprovedRun(AiRun $aiRun, string $finalOutput): array
     {
+        // BUGFIX/GUARDA: o Assistente Virtual (workflow=assistant_chat) é uma
+        // conversa livre de apoio, NUNCA um documento clínico estruturado —
+        // aprovar uma resposta de chat (approve() é auto-chamado pelo widget
+        // ao terminar) não pode silenciosamente gravar o texto como documentação
+        // no prontuário do DIA da consulta só porque o médico deu contexto de
+        // um paciente. Só os workflows de laudo/prontuário fazem essa escrita.
+        if ($aiRun->workflow === 'assistant_chat') {
+            return ['attached' => false, 'requires_record_confirmation' => false, 'consultation_date' => null];
+        }
+
         $consultationDate = null;
 
         if ($aiRun->medical_record_id) {

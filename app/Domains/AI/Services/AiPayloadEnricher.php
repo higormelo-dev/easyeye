@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\AI\Services;
 
-use App\Enums\AI\AiRunMode;
-use App\Enums\FeatureKey;
+use App\Domains\AI\Models\AiRun;
+use App\Enums\AI\{AiRunMode, AiRunStatus};
+use App\Enums\{ClientRule, FeatureKey};
 use App\Models\{MedicalRecord, Patient, PatientExam};
 use App\Services\FeatureGateService;
 
@@ -59,7 +60,7 @@ class AiPayloadEnricher
         $this->validateFeatureByWorkflow((string) $payload['workflow'], $entityId);
         $this->validateContextOwnership($payload, $entityId);
 
-        $payload['context'] = $this->buildContext($payload);
+        $payload['context'] = $this->buildContext($payload, $entityId);
 
         $guarded                           = $this->promptGuardrails->sanitizePayload($payload);
         $guarded['payload']['_guardrails'] = $guarded['guardrails'];
@@ -97,6 +98,15 @@ class AiPayloadEnricher
                 : __('ai.record_assist_system_prompt');
 
             $payload['expects_json'] = true;
+        }
+
+        // Assistente virtual flutuante (chat livre, qualquer tela do painel).
+        // Diferente dos outros workflows: sem medical_record_id obrigatório,
+        // sem expects_json (resposta é texto livre), e com histórico de
+        // conversa multi-turno via conversation_id (ver buildConversationHistory).
+        if ($workflow === 'assistant_chat') {
+            $payload['system_prompt'] = __('ai.assistant_chat_system_prompt');
+            $payload['expects_json']  = false;
         }
 
         return $payload;
@@ -168,6 +178,21 @@ class AiPayloadEnricher
         if ($workflow === 'consensus_review' && ! $this->featureGate->can($entityId, FeatureKey::HasAiConsensus)) {
             abort(403, __('ai.feature_consensus_unavailable'));
         }
+
+        if ($workflow === 'assistant_chat') {
+            if (! $this->featureGate->can($entityId, FeatureKey::HasAiChatAssistant)) {
+                abort(403, __('ai.feature_chat_unavailable'));
+            }
+
+            // Defesa em profundidade: approve() já é doctor-only (Gate
+            // IssueReport), mas store() sozinho não era — sem este check,
+            // secretária/admin/financeiro conseguiam criar runs de chat que
+            // reservam crédito e nunca são aprovados (ninguém com permissão
+            // pra aprovar), vazando reserva até expirar. Bloqueia na origem.
+            if (session('selected_entity_user_rule') !== ClientRule::Doctor->value) {
+                abort(403, __('ai.feature_chat_unavailable'));
+            }
+        }
     }
 
     /**
@@ -195,7 +220,7 @@ class AiPayloadEnricher
      *
      * @return array<string, mixed>
      */
-    private function buildContext(array $payload): array
+    private function buildContext(array $payload, string $entityId): array
     {
         $userContext = (array) ($payload['context'] ?? []);
 
@@ -207,16 +232,69 @@ class AiPayloadEnricher
             ? MedicalRecord::query()->find((string) $payload['medical_record_id'])
             : null;
 
-        if (! $patient && ! $record) {
-            return $userContext;
+        $context = $userContext;
+
+        if ($patient || $record) {
+            $serverContext = $this->contextBuilder->build($patient, $record);
+
+            // Server context tem prioridade (anonimização + minimização).
+            $context = array_merge($userContext, $serverContext, [
+                '_built_by' => 'AiMedicalContextBuilder',
+            ]);
         }
 
-        $serverContext = $this->contextBuilder->build($patient, $record);
+        if ((string) ($payload['workflow'] ?? '') === 'assistant_chat' && ! empty($payload['conversation_id'])) {
+            $history = $this->buildConversationHistory((string) $payload['conversation_id'], $entityId);
 
-        // Server context tem prioridade (anonimização + minimização).
-        return array_merge($userContext, $serverContext, [
-            '_built_by' => 'AiMedicalContextBuilder',
-        ]);
+            if ($history !== []) {
+                $context['conversation_history'] = $history;
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * Últimos turnos da mesma conversa (chat flutuante) para dar memória
+     * multi-turno ao assistente. Escopo estrito: mesma entity + mesmo
+     * solicitante — nunca vaza conversa de outro médico/clínica pelo
+     * conversation_id (UUID gerado no cliente, sem controle de posse próprio).
+     *
+     * @return list<array{role: string, content: string}>
+     */
+    private function buildConversationHistory(string $conversationId, string $entityId): array
+    {
+        $runs = AiRun::query()
+            ->where('entity_id', $entityId)
+            ->where('conversation_id', $conversationId)
+            ->where('requested_by', (string) auth()->id())
+            ->where('workflow', 'assistant_chat')
+            ->whereIn('status', [AiRunStatus::Approved->value, AiRunStatus::WaitingApproval->value])
+            // `id` como desempate: mensagens do chat podem cair no mesmo
+            // segundo de created_at (respostas rápidas em sequência) — HasUuids
+            // gera UUID ordenado (v7-like), então id desc é cronologicamente
+            // estável mesmo quando created_at colide.
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->limit(6)
+            ->get(['input_summary', 'final_output'])
+            ->reverse();
+
+        $history = [];
+
+        foreach ($runs as $run) {
+            $userPrompt = (string) ($run->input_summary['user_prompt'] ?? '');
+
+            if ($userPrompt !== '') {
+                $history[] = ['role' => 'user', 'content' => $userPrompt];
+            }
+
+            if (! empty($run->final_output)) {
+                $history[] = ['role' => 'assistant', 'content' => (string) $run->final_output];
+            }
+        }
+
+        return $history;
     }
 
     /**

@@ -29,7 +29,8 @@ class StoreAiRunRequest extends BaseRequest
 
         return $gate->can($entityId, FeatureKey::HasAiExamAssistant)
             || $gate->can($entityId, FeatureKey::HasAiReportDrafting)
-            || $gate->can($entityId, FeatureKey::HasAiEyeImageAnalysis);
+            || $gate->can($entityId, FeatureKey::HasAiEyeImageAnalysis)
+            || $gate->can($entityId, FeatureKey::HasAiChatAssistant);
     }
 
     /**
@@ -38,7 +39,7 @@ class StoreAiRunRequest extends BaseRequest
     public function rules(): array
     {
         return [
-            'workflow'          => ['required', 'string', 'in:exam_assistant,report_drafting,consensus_review,eye_image_analysis,record_assist'],
+            'workflow'          => ['required', 'string', 'in:exam_assistant,report_drafting,consensus_review,eye_image_analysis,record_assist,assistant_chat'],
             'mode'              => ['required', 'string', 'in:economy,validated,consensus'],
             'risk_level'        => ['required', 'string', 'in:low,medium,high'],
             'patient_id'        => ['nullable', 'uuid', 'exists:patients,id'],
@@ -53,6 +54,10 @@ class StoreAiRunRequest extends BaseRequest
             'max_output_tokens' => ['nullable', 'integer', 'min:64', 'max:8192'],
             // record_assist single-field: campo clínico alvo (validado no enricher).
             'field' => ['nullable', 'string', 'max:60'],
+            // assistant_chat: agrupa turnos de uma mesma conversa (gerado no
+            // cliente ao abrir/iniciar o widget). Sem controle de posse próprio
+            // — o enricher escopa a busca de histórico por entity_id + requested_by.
+            'conversation_id' => ['nullable', 'uuid'],
         ];
     }
 

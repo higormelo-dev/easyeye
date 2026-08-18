@@ -27,6 +27,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasAiExamAssistant->value  => '0',
                     FeatureKey::HasAiReportDrafting->value => '0',
                     FeatureKey::HasAiConsensus->value      => '0',
+                    FeatureKey::HasAiChatAssistant->value  => '0',
                     FeatureKey::HasApiIntegrator->value    => '0',
                     FeatureKey::AiMonthlyCredits->value    => '0',
                     FeatureKey::ApiMonthlyExamSends->value => '0',
@@ -48,6 +49,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasAiExamAssistant->value  => '0',
                     FeatureKey::HasAiReportDrafting->value => '1',
                     FeatureKey::HasAiConsensus->value      => '0',
+                    FeatureKey::HasAiChatAssistant->value  => '1',
                     FeatureKey::HasApiIntegrator->value    => '0',
                     FeatureKey::AiMonthlyCredits->value    => '30',  // degustação — excedente R$ 2,50/crédito
                     FeatureKey::ApiMonthlyExamSends->value => '0',
@@ -69,6 +71,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '1',
                     FeatureKey::HasAiConsensus->value      => '1',
+                    FeatureKey::HasAiChatAssistant->value  => '1',
                     FeatureKey::HasApiIntegrator->value    => '1',
                     FeatureKey::AiMonthlyCredits->value    => '80',  // franquia — excedente R$ 2,00/crédito
                     FeatureKey::ApiMonthlyExamSends->value => '0',   // ilimitado → cap interno 1000

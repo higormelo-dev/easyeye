@@ -10,6 +10,7 @@ return [
     'feature_exam_unavailable'      => 'Seu plano não possui o assistente de exame com IA.',
     'feature_report_unavailable'    => 'Seu plano não possui elaboração de laudo com IA.',
     'feature_eye_image_unavailable' => 'Seu plano não possui análise de imagem ocular com IA.',
+    'feature_chat_unavailable'      => 'Seu plano não possui o assistente virtual de IA.',
     'eye_image_exams_required'      => 'Selecione ao menos uma imagem para a análise com IA.',
     'record_opened'                 => 'Prontuário aberto e laudo registrado.',
     'record_patient_missing'        => 'Não foi possível identificar o paciente para abrir o prontuário.',
@@ -125,6 +126,7 @@ return [
     'workflow_consensus_review'             => 'Revisão de consistência',
     'workflow_eye_image_analysis'           => 'Análise de imagem ocular',
     'workflow_record_assist'                => 'Análise do caso (prontuário)',
+    'workflow_assistant_chat'               => 'Assistente virtual',
 
     // Prompt de sistema (server-side) da análise de imagem ocular.
     'eye_image_system_prompt' => 'Você é um oftalmologista experiente analisando imagens oculares (retinografia, OCT, biomicroscopia, topografia, etc.) como APOIO ao médico — nunca como decisão final. Descreva os achados de forma estruturada por estrutura anatômica (disco óptico, mácula, vasos, periferia, córnea, etc.) e por lateralidade (OD = olho direito, OE = olho esquerdo) quando informada. Use linguagem técnica, objetiva e SEMPRE condicional ("achados compatíveis com", "sugestivo de"), sem diagnóstico definitivo, sem prescrição e sem se dirigir ao paciente. Liste hipóteses em ordem de probabilidade e recomende correlação clínica e confirmação presencial. Se a imagem tiver qualidade insuficiente, declare isso. Responda no idioma do prontuário/paciente.',
@@ -133,6 +135,20 @@ return [
     'record_assist_system_prompt'       => 'Você é um oftalmologista experiente que APOIA o médico assistente — nunca substitui a decisão clínica. Com base no contexto do prontuário (anamnese, exame físico, refração, achados), gere SUGESTÕES por campo e um laudo narrativo de apoio. Seja SEMPRE condicional ("compatível com", "considerar"), sem diagnóstico definitivo, sem prescrição de medicamentos e sem se dirigir ao paciente. Preencha um campo SOMENTE quando houver base clínica no contexto; caso contrário use string vazia (""). NUNCA invente medições, valores ou achados não informados. Responda EXCLUSIVAMENTE em JSON válido, sem texto fora do JSON, no formato: {"summary": "laudo narrativo de apoio em texto", "suggestions": {"main_complaint": "", "hda": "", "medications_in_use": "", "ocular_surgical_history": "", "others_history": "", "ocular_motility": "", "biomicroscopy_right": "", "biomicroscopy_left": "", "fundoscopy_right": "", "fundoscopy_left": "", "gonioscopy_right": "", "gonioscopy_left": "", "observation_of_lenses": "", "clinical_conduct": "", "observation_general": "", "diagnosis_hypothesis": ""}}. Responda no idioma do prontuário.',
     'record_assist_field_system_prompt' => 'Você é um oftalmologista que APOIA o médico assistente — nunca substitui a decisão clínica. Com base no contexto do prontuário, sugira APENAS o conteúdo do campo ":field". Seja condicional, sem diagnóstico definitivo, sem prescrição e sem se dirigir ao paciente. NUNCA invente medições ou achados; se não houver base clínica, devolva string vazia. Responda EXCLUSIVAMENTE em JSON válido: {"suggestions": {":key": "texto sugerido"}}. Responda no idioma do prontuário.',
     'record_assist_record_required'     => 'Selecione um prontuário para a análise de IA.',
+
+    // Prompt de sistema (server-side) do Assistente Virtual flutuante (chat
+    // livre, workflow=assistant_chat). Regra de negócio central (ticket
+    // "Assistente virtual de IA"): em perguntas de dose/tratamento, a IA NUNCA
+    // responde como ordem médica — sempre como apoio à decisão, com fontes
+    // quando possível, e deixando explícito que a conduta final é do médico.
+    'assistant_chat_system_prompt' => 'Você é um assistente virtual de apoio à prática clínica oftalmológica, integrado ao sistema EasyEye. Conversa livre e multi-turno com o médico — não é um workflow de laudo estruturado. '
+        . 'Você pode ajudar com: dúvidas sobre medicamentos e posologia, esquemas de tratamento, informações sobre doenças e condutas, elaboração e organização de textos médicos (relatórios, laudos, evoluções, encaminhamentos), e dúvidas gerais de oftalmologia e prática clínica. '
+        . 'REGRA CRÍTICA sobre medicamentos/doses/tratamento: NUNCA apresente a resposta como uma ordem médica ou prescrição pronta para uso. Responda sempre como APOIO À DECISÃO — use linguagem condicional ("esquema usual é...", "referências indicam...", "considerar..."), cite a fonte/referência quando souber (bula, diretriz de sociedade médica, protocolo), e finalize esse tipo de resposta reforçando que a conduta final, a dose e a prescrição devem ser validadas e definidas pelo médico responsável, considerando o paciente específico. '
+        . 'Nunca se dirija ao paciente diretamente — você fala com o profissional de saúde. Nunca invente dado clínico não informado. '
+        . 'Se receber contexto de um paciente/prontuário/exame (fornecido apenas quando o médico autorizar explicitamente), use-o para personalizar a resposta, mas sem revelar dados fora do que foi enviado e sem presumir informações não fornecidas. Quando pedirem para "montar uma evolução" ou "modelo de laudo/encaminhamento" a partir do contexto, gere um texto objetivo, em português, pronto para o médico revisar e ajustar — deixe claro que é um RASCUNHO para revisão. '
+        . 'Se a pergunta fugir do escopo clínico/administrativo do sistema, responda brevemente e redirecione. Responda sempre no idioma da pergunta (padrão: português do Brasil), de forma direta e sem enrolação.',
+    'assistant_chat_context_note' => 'Contexto autorizado pelo médico para esta pergunta (dados já minimizados/anonimizados pelo sistema — use apenas o que estiver aqui):',
+    'assistant_chat_history_note' => 'Histórico desta conversa (mensagens anteriores, mais recentes por último):',
 
     // Rótulos dos campos clínicos suportados pela IA do prontuário.
     'record_fields' => [
@@ -359,5 +375,40 @@ return [
         'minutes_short'      => 'min',
         'seconds_short'      => 's',
         'credits_short'      => 'cr',
+    ],
+
+    // Widget flutuante do Assistente Virtual (disponível em qualquer tela do
+    // painel, workflow=assistant_chat) — labels distintos do painel de análise
+    // estruturada (`assistant` acima) porque a interação é chat livre, não
+    // um fluxo de gerar→revisar→aprovar campo a campo.
+    'chat_widget' => [
+        'title'                 => 'Assistente virtual',
+        'subtitle'              => 'Apoio rápido à rotina médica',
+        'disclaimer'            => 'Apoio à decisão — não substitui julgamento clínico. Doses e condutas devem ser validadas pelo médico.',
+        'placeholder'           => 'Pergunte sobre medicamentos, condutas, ou peça ajuda para redigir um texto...',
+        'send'                  => 'Enviar',
+        'new_conversation'      => 'Nova conversa',
+        'minimize'              => 'Minimizar',
+        'expand'                => 'Ampliar',
+        'collapse'              => 'Compactar',
+        'close'                 => 'Fechar',
+        'thinking'              => 'Pensando...',
+        'empty_state'           => 'Envie uma pergunta para começar. Suas conversas não saem desta sessão até você limpar.',
+        'error_generic'         => 'Não foi possível obter resposta. Tente novamente.',
+        'context_available'     => 'Usar contexto desta tela',
+        'context_hint'          => 'Ao ativar, o assistente recebe dados clínicos já minimizados/anonimizados do que você está vendo — só pergunte assim se quiser que a resposta considere isso.',
+        'context_active'        => 'Contexto ativo',
+        'insert_as_evolution'   => 'Inserir como evolução',
+        'inserted_as_evolution' => 'Adicionado às evoluções do prontuário.',
+        'quota_low'             => 'Créditos de IA baixos neste mês.',
+        // Sugestões rápidas — cobrem os casos de uso citados no pedido do produto.
+        'quick_prompts' => [
+            'Dúvida sobre medicamento/dose' => 'Quais são as opções e esquema posológico usual para',
+            'Esquema de tratamento'         => 'Quais são as opções de tratamento para',
+            'Modelo de laudo'               => 'Monte um modelo de laudo para',
+            'Modelo de evolução'            => 'Monte uma evolução com base no contexto atual',
+            'Modelo de encaminhamento'      => 'Redija um encaminhamento para',
+            'Organizar texto'               => 'Reorganize e melhore a clareza deste texto: ',
+        ],
     ],
 ];

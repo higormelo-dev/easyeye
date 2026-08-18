@@ -33,6 +33,7 @@ class AiRun extends Model
         'approved_by',
         'cancelled_by',
         'parent_run_id',
+        'conversation_id',
         'workflow',
         'mode',
         'risk_level',

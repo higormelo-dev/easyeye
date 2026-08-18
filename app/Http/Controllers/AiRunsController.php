@@ -9,10 +9,12 @@ use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiAnalyticsService, AiCreditPurchaseService, AiCreditWalletService, AiFeedbackService, AiPayloadEnricher, AiPricingService, AiProviderSettings, AiQuotaService, AiRunDocumentationService, AiRunEstimateService, AiRunExecutionService};
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, EntityGate, FeatureKey};
+use App\Enums\DataAccessPurpose;
 use App\Http\Requests\AI\{EstimateAiRunRequest, StoreAiRunRequest};
 use App\Jobs\AI\RunAiWorkflowJob;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, Subscription};
 use App\Services\FeatureGateService;
+use App\Traits\LogsDataAccess;
 use DomainException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Carbon;
@@ -21,6 +23,8 @@ use Inertia\{Inertia, Response as InertiaResponse};
 
 class AiRunsController extends Controller
 {
+    use LogsDataAccess;
+
     public function __construct(
         private readonly AiCreditWalletService $walletService,
         private readonly AiPricingService $pricingService,
@@ -497,6 +501,7 @@ class AiRunsController extends Controller
                     'workflow'          => $payload['workflow'],
                     'mode'              => $payload['mode'],
                     'risk_level'        => $payload['risk_level'],
+                    'conversation_id'   => $payload['conversation_id'] ?? null,
                     'status'            => AiRunStatus::Pending->value,
                     'estimated_credits' => $estimate->normalizedCredits,
                     'reserved_credits'  => 0,
@@ -570,6 +575,19 @@ class AiRunsController extends Controller
         // de reserva foi efetivamente commitada — protege contra race conditions
         // se a transaction for retentada ou se dispatchSync for usado.
         RunAiWorkflowJob::dispatch((string) $run->id)->afterCommit();
+
+        // CFM Res. 2.227/2018 + LGPD Art. 37 — toda execução de IA que usa
+        // contexto de paciente é, ela mesma, um acesso a dado clínico sensível
+        // (mesmo minimizado/anonimizado pelo AiMedicalContextBuilder). Registra
+        // aqui porque cobre TODOS os workflows (record_assist, eye_image_analysis,
+        // assistant_chat, ...) num único ponto — não existia antes desta run.
+        if (! empty($payload['patient_id'])) {
+            $patient = Patient::query()->find((string) $payload['patient_id']);
+
+            if ($patient) {
+                $this->logAccess($patient, DataAccessPurpose::PatientCare, patientId: (string) $patient->id);
+            }
+        }
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -1062,8 +1080,14 @@ class AiRunsController extends Controller
         $hasExamAssistant  = $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant);
         $hasReportDrafting = $this->featureGate->can($entityId, FeatureKey::HasAiReportDrafting);
         $hasEyeImage       = $this->featureGate->can($entityId, FeatureKey::HasAiEyeImageAnalysis);
+        // BUGFIX: sem este OR, um plano com SOMENTE o assistente de chat
+        // habilitado (sem exam/report/eye-image) tomava 403 aqui em show()/
+        // approve()/reject()/cancel() — mesmo tendo passado pelo gate correto
+        // (HasAiChatAssistant) em AiPayloadEnricher::validateFeatureByWorkflow()
+        // no momento do store(). Esse guard geral cobre TODOS os workflows.
+        $hasChatAssistant = $this->featureGate->can($entityId, FeatureKey::HasAiChatAssistant);
 
-        if (! $hasExamAssistant && ! $hasReportDrafting && ! $hasEyeImage) {
+        if (! $hasExamAssistant && ! $hasReportDrafting && ! $hasEyeImage && ! $hasChatAssistant) {
             abort(403, __('ai.feature_unavailable'));
         }
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Domains\AI\Services\AiAssistantWidgetPropsBuilder;
 use App\Models\{Entity, Partner};
 use App\Support\PanelNavigation;
 use Illuminate\Http\Request;
@@ -75,6 +76,17 @@ class HandleInertiaRequests extends Middleware
             'nav' => fn () => ($request->routeIs('panel.*') || $request->routeIs('manager.*')) && $request->user()
                 ? PanelNavigation::build()
                 : [],
+
+            // Widget flutuante do Assistente Virtual de IA — disponível em
+            // QUALQUER tela do painel (não manager.*: gestão SaaS não é
+            // rotina clínica). Lazy (fn ()) + gate interno no builder
+            // (isDoctor + feature) evita custo em toda request de quem não vê o widget.
+            'aiAssistant' => fn () => $request->routeIs('panel.*') && $request->user() && session('selected_entity_id')
+                ? app(AiAssistantWidgetPropsBuilder::class)->build(
+                    (string) session('selected_entity_id'),
+                    session('selected_entity_user_rule'),
+                )
+                : ['enabled' => false],
 
             // Portal de Parceiros: partner ativo da sessão (compartilhado pelo
             // PortalLayout para mostrar nome/email/code no header).

@@ -41,6 +41,7 @@ return [
         'has_ai_report_drafting'    => 'AI report drafting',
         'has_ai_consensus'          => 'Intelligent consistency review',
         'has_ai_eye_image_analysis' => 'AI ocular image analysis',
+        'has_ai_chat_assistant'     => 'Virtual AI assistant (floating chat)',
         'has_api_integrator'        => 'Ophthalmic equipment integration',
         'has_own_payment_gateways'  => 'Clinic-owned payment gateways',
         'ai_monthly_credits'        => 'Monthly AI credits',
