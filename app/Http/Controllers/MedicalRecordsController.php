@@ -549,7 +549,7 @@ class MedicalRecordsController extends Controller
             'isDoctor'        => $isDoctor,
             'isEdit'          => $isEdit,
             'catalogs'        => [
-                'visual_acuity_types' => $this->serializeCatalog(VisualAcuityType::orderBy('name')->get()),
+                'visual_acuity_types' => $this->serializeCatalog(VisualAcuityType::orderBy('scale')->get()),
                 'color_vision_types'  => $this->serializeCatalog(ColorVisionType::orderBy('name')->get()),
                 'cover_test_types'    => $this->serializeCatalog(CoverTestType::orderBy('name')->get()),
                 'near_point_types'    => $this->serializeCatalog(NearPointConvergence::orderBy('name')->get()),

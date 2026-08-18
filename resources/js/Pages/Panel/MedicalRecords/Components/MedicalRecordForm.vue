@@ -1216,11 +1216,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             <div class="row g-2 align-items-start">
                 <div class="col-12 col-lg-8">
                     <label class="pmr-label">{{ tt('complaint', 'Queixa principal') }}</label>
-                    <input v-model="form.main_complaint" type="text" name="main_complaint"
-                           class="form-control form-control-sm"
-                           :class="{ 'is-invalid': form.errors.main_complaint }"
-                           :placeholder="tt('complaint_ph', 'Descreva a queixa principal...')"
-                           :disabled="isLocked">
+                    <textarea v-model="form.main_complaint" name="main_complaint" rows="4"
+                              class="form-control form-control-sm"
+                              :class="{ 'is-invalid': form.errors.main_complaint }"
+                              :placeholder="tt('complaint_ph', 'Descreva a queixa principal...')"
+                              :disabled="isLocked"></textarea>
                 </div>
 
                 <div class="col-12 col-lg-4 pmr-risk-wrap">
