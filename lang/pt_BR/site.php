@@ -62,6 +62,46 @@ return [
         ['value' => 'R$0', 'label' => 'Taxa de implantação'],
     ],
 
+    // ── Problemas que o EasyEye resolve ──────────────────────────────────
+    // Posicionada logo após o hero/métricas: mostra as dores da rotina ANTES
+    // de qualquer funcionalidade ou preço, para o visitante se reconhecer no
+    // problema antes de ver a solução.
+    'problems' => [
+        'label'    => 'O dia a dia sem o EasyEye',
+        'title'    => 'Sua clínica ainda perde tempo (e dinheiro) com isso?',
+        'subtitle' => 'Problemas comuns em clínicas oftalmológicas que ainda dependem de papel, planilhas soltas e sistemas genéricos.',
+        'items'    => [
+            ['icon' => 'bi-file-earmark-x', 'title' => 'Prontuário em papel ou planilhas soltas', 'text' => 'Histórico do paciente espalhado, difícil de consultar na consulta seguinte e sujeito a perda.'],
+            ['icon' => 'bi-images', 'title' => 'Exames e imagens sem organização', 'text' => 'Fotos e exames de aparelhos espalhados em pen-drive, e-mail ou pastas — ninguém encontra rápido.'],
+            ['icon' => 'bi-calendar-x', 'title' => 'Agenda manual, no-show e retrabalho', 'text' => 'Sem confirmação automática, faltas derrubam a produtividade do dia e da equipe.'],
+            ['icon' => 'bi-clock-history', 'title' => 'Laudos e documentos demorados', 'text' => 'Cada atestado, receituário ou laudo é redigido do zero, sem modelo nem padronização.'],
+            ['icon' => 'bi-receipt-cutoff', 'title' => 'Faturamento TISS manual e cheio de glosa', 'text' => 'Guias preenchidas à mão, retrabalho com convênio e receita que demora a entrar no caixa.'],
+            ['icon' => 'bi-diagram-3', 'title' => 'Sistemas soltos, sem visão única do paciente', 'text' => 'Agenda, prontuário e exames em ferramentas diferentes — a equipe perde tempo cruzando informação.'],
+        ],
+        'bridge' => 'É exatamente isso que o EasyEye resolve.',
+    ],
+
+    // ── Benefícios (o que a clínica GANHA) ───────────────────────────────
+    // Framing de resultado/benefício — distinto de "features" abaixo, que é
+    // a lista técnica/operacional de capacidades. Ordem e itens definidos
+    // pelo pedido de produto (gerenciador de imagens, prontuário, agenda,
+    // integração com equipamentos, laudos, IA, gestão da clínica, histórico).
+    'benefits' => [
+        'label'    => 'Benefícios',
+        'title'    => 'O que sua clínica ganha com o EasyEye',
+        'subtitle' => 'Cada módulo foi pensado para a rotina real de uma clínica oftalmológica — do consultório à recepção.',
+        'items'    => [
+            ['icon' => 'bi-images', 'color' => 'icon-teal', 'title' => 'Gerenciador de imagens oftalmológicas', 'text' => 'Centralize e organize exames e imagens dos pacientes num único lugar, por olho e por data — sem pen-drive, sem pasta perdida.'],
+            ['icon' => 'bi-file-medical', 'color' => 'icon-blue', 'title' => 'Prontuário oftalmológico', 'text' => 'Informações clínicas, histórico e acompanhamento do paciente sempre organizados e disponíveis na consulta.'],
+            ['icon' => 'bi-calendar3', 'color' => 'icon-mint', 'title' => 'Agenda', 'text' => 'Organize médicos, horários e atendimentos da clínica com confirmação automática e menos no-show.'],
+            ['icon' => 'bi-hdd-network', 'color' => 'icon-purple', 'title' => 'Integração com equipamentos', 'text' => 'Facilite o envio e armazenamento dos exames realizados diretamente nos aparelhos da clínica.'],
+            ['icon' => 'bi-file-earmark-medical', 'color' => 'icon-orange', 'title' => 'Laudos e documentos', 'text' => 'Crie e mantenha laudos, prescrições, relatórios e demais documentos clínicos dentro do próprio sistema.'],
+            ['icon' => 'bi-stars', 'color' => 'icon-red', 'title' => 'Assistente de IA', 'text' => 'Apoio ao médico na rotina e na elaboração de documentos — sempre como apoio à decisão, nunca substituindo o julgamento clínico.'],
+            ['icon' => 'bi-building-gear', 'color' => 'icon-blue', 'title' => 'Gestão da clínica', 'text' => 'Centralize informações administrativas e operacionais da clínica em um único ambiente.'],
+            ['icon' => 'bi-clock-history', 'color' => 'icon-teal', 'title' => 'Histórico do paciente', 'text' => 'Consultas, exames, imagens e documentos reunidos em um único histórico, acessível a qualquer momento.'],
+        ],
+    ],
+
     'features' => [
         'label'    => 'Funcionalidades',
         'title'    => 'Tudo que sua clínica precisa, em um único lugar',
@@ -87,6 +127,62 @@ return [
             ['title' => 'Crie sua conta em minutos', 'text' => 'Cadastro rápido, sem burocracia. Configure sua clínica, adicione médicos e defina horários de atendimento.'],
             ['title' => 'Importe seus pacientes', 'text' => 'Importe sua base de pacientes via CSV ou cadastre manualmente. Histórico e prontuários migrados com segurança.'],
             ['title' => 'Comece a atender', 'text' => 'Sua equipe treinada em horas. Suporte dedicado na implantação e atendimento contínuo para crescer com você.'],
+        ],
+    ],
+
+    // ── Demonstração visual (tour do produto) ────────────────────────────
+    // 4 abas com mockup do próprio módulo — mesmo padrão de upgrade
+    // automático para screenshot real do `how.screenshot_hint` (ver
+    // demoImages no controller: public/site/images/demo-{key}.png).
+    'demo' => [
+        'label'    => 'Conheça o sistema',
+        'title'    => 'Veja o EasyEye por dentro',
+        'subtitle' => 'Uma prévia das telas que sua equipe vai usar todos os dias.',
+        'tabs'     => [
+            ['key' => 'prontuario', 'icon' => 'bi-file-medical', 'label' => 'Prontuário', 'caption' => 'Anamnese, refração, biomicroscopia e fundoscopia organizados por consulta.'],
+            ['key' => 'agenda', 'icon' => 'bi-calendar3', 'label' => 'Agenda', 'caption' => 'Múltiplos médicos e salas na mesma visão, com status de cada atendimento.'],
+            ['key' => 'imagens', 'icon' => 'bi-images', 'label' => 'Gerenciador de imagens', 'caption' => 'Exames e fotos organizados por olho, tipo e data — busca rápida por paciente.'],
+            ['key' => 'laudos', 'icon' => 'bi-file-earmark-medical', 'label' => 'Laudos & Documentos', 'caption' => 'Modelos prontos para laudo, receituário, atestado e encaminhamento.'],
+        ],
+        'screenshot_placeholder' => 'Prévia do módulo',
+    ],
+
+    // ── Diferenciais ──────────────────────────────────────────────────────
+    'differentiators' => [
+        'label'    => 'Diferenciais',
+        'title'    => 'Por que clínicas escolhem o EasyEye',
+        'subtitle' => 'Não é um sistema de gestão genérico adaptado para saúde — é feito para a rotina oftalmológica desde o primeiro dia.',
+        'items'    => [
+            ['icon' => 'bi-eye', 'title' => 'Especialista em oftalmologia', 'text' => 'Campos, laudos e fluxos pensados para a rotina do consultório oftalmológico — não um EMR genérico adaptado.'],
+            ['icon' => 'bi-file-earmark-check-fill', 'title' => 'TISS 3.06 homologado', 'text' => 'Geração, envio e retorno de guias TISS homologados pela ANS, com pré-validação para reduzir glosas.'],
+            ['icon' => 'bi-shield-fill-check', 'title' => 'Compliance CFM & LGPD nativo', 'text' => 'Trilha de auditoria, versionamento de prontuário e assinatura digital desde a arquitetura — não é um adendo.'],
+            ['icon' => 'bi-stars', 'title' => 'IA como apoio, não como decisão', 'text' => 'Assistente de IA sempre com fontes quando possível e conduta final validada pelo médico responsável.'],
+            ['icon' => 'bi-headset', 'title' => 'Suporte que entende de clínica', 'text' => 'Time de suporte especializado em rotina oftalmológica, não um atendimento genérico de TI.'],
+            ['icon' => 'bi-diagram-3-fill', 'title' => 'Multi-clínica com visão única', 'text' => 'Gerencie várias unidades com um único login e relatórios consolidados.'],
+        ],
+
+        // Callout de destaque — exclusividades do Plano Pro. Optotipos e
+        // estoque ainda não existem no produto: framing deliberado como
+        // "novidade / em breve" (decisão de produto), nunca "já incluído".
+        'pro_callout' => [
+            'eyebrow' => 'Exclusivo do Plano Pro',
+            'title'   => 'O Pro vai além do prontuário',
+            'text'    => 'Quem assina o Plano Pro tem acesso a ferramentas de gestão adicionais que nenhum outro plano oferece.',
+            'items'   => [
+                [
+                    'icon'  => 'bi-eye',
+                    'badge' => 'Novidade',
+                    'title' => 'Programa completo de optotipos',
+                    'text'  => 'Os principais testes da rotina oftalmológica dentro do próprio ecossistema EasyEye: ETDRS, Snellen, Ishihara, C de Landolt, E direcional, optotipos infantis, testes de contraste e outros.',
+                ],
+                [
+                    'icon'  => 'bi-box-seam',
+                    'badge' => 'Novidade',
+                    'title' => 'Gerenciamento e controle de estoque',
+                    'text'  => 'Acompanhe e organize materiais e produtos utilizados na operação da clínica, direto no sistema.',
+                ],
+            ],
+            'cta' => 'Conhecer o Plano Pro',
         ],
     ],
 
@@ -144,6 +240,10 @@ return [
         'trial_text'     => ':days dias grátis para testar',
         'empty_title'    => 'Planos em breve',
         'empty_subtitle' => 'Estamos preparando os melhores planos para sua clínica. Entre em contato e saiba mais.',
+        // Mini-callout dentro do card Pro — mesmos itens do differentiators.pro_callout,
+        // versão compacta pra reforçar no exato momento da comparação de planos.
+        'pro_exclusive_label' => 'Recursos adicionais do Pro',
+        'pro_exclusive_new'   => 'Novidade',
     ],
 
     'faq' => [

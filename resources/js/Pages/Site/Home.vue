@@ -57,7 +57,7 @@
 
     <SiteLayout :t="t" :routes="routes" :app-name="appName" :has-hero="true">
 
-        <!-- ═══════════════════ HERO ═══════════════════ -->
+        <!-- ═══════════════════ HERO (apresentação do EasyEye) ═══════════════════ -->
         <section class="hero">
             <div class="hero-blob hero-blob-1"></div>
             <div class="hero-blob hero-blob-2"></div>
@@ -77,7 +77,7 @@
                             <a :href="routes.register" class="btn btn-primary btn-lg">
                                 {{ t.hero.cta_primary }} <i class="bi bi-arrow-right"></i>
                             </a>
-                            <a href="#como-funciona" class="btn btn-outline-white btn-lg">
+                            <a href="#demonstracao" class="btn btn-outline-white btn-lg">
                                 <i class="bi bi-play-circle"></i> {{ t.hero.cta_secondary }}
                             </a>
                         </div>
@@ -156,7 +156,49 @@
             </div>
         </div>
 
-        <!-- ═══════════════════ FEATURES ═══════════════════ -->
+        <!-- ═══════════════════ PROBLEMAS QUE RESOLVE ═══════════════════ -->
+        <section class="problems" id="problemas">
+            <div class="container">
+                <div class="problems-header text-center">
+                    <span class="section-label">{{ t.problems.label }}</span>
+                    <h2 class="section-title">{{ t.problems.title }}</h2>
+                    <p class="section-sub text-center">{{ t.problems.subtitle }}</p>
+                </div>
+                <div class="problems-grid">
+                    <div v-for="item in t.problems.items" :key="item.title" class="problem-card">
+                        <div class="problem-icon"><i :class="'bi ' + item.icon"></i></div>
+                        <h3>{{ item.title }}</h3>
+                        <p>{{ item.text }}</p>
+                    </div>
+                </div>
+                <div class="problems-bridge">
+                    <i class="bi bi-arrow-down-circle-fill"></i>
+                    <span>{{ t.problems.bridge }}</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════ BENEFÍCIOS ═══════════════════ -->
+        <section class="benefits" id="beneficios">
+            <div class="container">
+                <div class="benefits-header text-center">
+                    <span class="section-label">{{ t.benefits.label }}</span>
+                    <h2 class="section-title">{{ t.benefits.title }}</h2>
+                    <p class="section-sub text-center">{{ t.benefits.subtitle }}</p>
+                </div>
+                <div class="benefits-grid">
+                    <div v-for="item in t.benefits.items" :key="item.title" class="benefit-card">
+                        <div :class="['benefit-icon', item.color]">
+                            <i :class="'bi ' + item.icon"></i>
+                        </div>
+                        <h3>{{ item.title }}</h3>
+                        <p>{{ item.text }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════ FUNCIONALIDADES ═══════════════════ -->
         <section class="features" id="funcionalidades">
             <div class="container">
                 <div class="features-header">
@@ -209,6 +251,170 @@
                             <p style="font-size:13px;margin-top:4px;"><code>{{ t.how.screenshot_hint }}</code></p>
                         </div>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════ DEMONSTRAÇÃO VISUAL (tour do produto) ═══════════════════ -->
+        <section class="demo" id="demonstracao">
+            <div class="container">
+                <div class="demo-header text-center">
+                    <span class="section-label">{{ t.demo.label }}</span>
+                    <h2 class="section-title">{{ t.demo.title }}</h2>
+                    <p class="section-sub text-center">{{ t.demo.subtitle }}</p>
+                </div>
+
+                <div class="demo-tabs">
+                    <button
+                        v-for="(tab, i) in t.demo.tabs"
+                        :key="tab.key"
+                        type="button"
+                        :class="['demo-tab', { active: activeDemoTab === i }]"
+                        @click="activeDemoTab = i"
+                    >
+                        <i :class="'bi ' + tab.icon"></i> {{ tab.label }}
+                    </button>
+                </div>
+
+                <div class="demo-panel-wrap">
+                    <template v-for="(tab, i) in t.demo.tabs" :key="tab.key">
+                        <div v-show="activeDemoTab === i" class="demo-panel">
+                            <div class="demo-mockup">
+                                <div class="demo-mockup-bar">
+                                    <span class="mockup-dot mockup-dot-r"></span>
+                                    <span class="mockup-dot mockup-dot-y"></span>
+                                    <span class="mockup-dot mockup-dot-g"></span>
+                                    <div class="demo-mockup-url"></div>
+                                </div>
+
+                                <img v-if="demoImages?.[tab.key]" :src="asset('site/images/demo-' + tab.key + '.png')" :alt="tab.label" style="width:100%;display:block;">
+
+                                <div v-else class="demo-mockup-body">
+                                    <!-- Prontuário -->
+                                    <template v-if="tab.key === 'prontuario'">
+                                        <div class="demo-chips">
+                                            <span class="demo-chip active">Anamnese</span>
+                                            <span class="demo-chip">Refração</span>
+                                            <span class="demo-chip">Biomicroscopia</span>
+                                            <span class="demo-chip">Conduta</span>
+                                        </div>
+                                        <div class="demo-record-grid">
+                                            <div>
+                                                <div v-for="w in ['85%','65%','92%','48%','70%']" :key="w" class="demo-field-row">
+                                                    <div class="demo-field-label"></div>
+                                                    <div class="demo-field-line" :style="'width:' + w"></div>
+                                                </div>
+                                            </div>
+                                            <div class="demo-refraction-box">
+                                                <div class="demo-refraction-row" style="color:var(--navy);">
+                                                    <span></span><span>Esf.</span><span>Cil.</span><span>Eixo</span>
+                                                </div>
+                                                <div class="demo-refraction-row"><span>OD</span><span class="demo-refraction-cell"></span><span class="demo-refraction-cell"></span><span class="demo-refraction-cell"></span></div>
+                                                <div class="demo-refraction-row"><span>OE</span><span class="demo-refraction-cell"></span><span class="demo-refraction-cell"></span><span class="demo-refraction-cell"></span></div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Agenda -->
+                                    <template v-else-if="tab.key === 'agenda'">
+                                        <div class="demo-chips">
+                                            <span class="demo-chip active"><i class="bi bi-person-circle"></i> Dra. Ana</span>
+                                            <span class="demo-chip"><i class="bi bi-person-circle"></i> Dr. Carlos</span>
+                                            <span class="demo-chip"><i class="bi bi-person-circle"></i> Dr. Bruno</span>
+                                        </div>
+                                        <div class="demo-agenda-grid">
+                                            <div v-for="d in ['Seg','Ter','Qua','Qui','Sex']" :key="d" class="demo-agenda-col">
+                                                <div class="demo-agenda-col-head">{{ d }}</div>
+                                                <div
+                                                    v-for="slot in agendaSlots(d)"
+                                                    :key="slot.top"
+                                                    class="demo-agenda-slot"
+                                                    :style="`background:${slot.bg};margin-top:${slot.top}px;height:${slot.h}px;`"
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Gerenciador de Imagens -->
+                                    <template v-else-if="tab.key === 'imagens'">
+                                        <div class="demo-chips">
+                                            <span class="demo-chip active">Todos</span>
+                                            <span class="demo-chip">OD</span>
+                                            <span class="demo-chip">OE</span>
+                                            <span class="demo-chip">Retinografia</span>
+                                        </div>
+                                        <div class="demo-images-grid">
+                                            <div v-for="img in demoImageThumbs" :key="img.tag + img.grad" class="demo-image-thumb" :style="'background:' + img.grad">
+                                                <span class="tag">{{ img.tag }}</span>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    <!-- Laudos & Documentos -->
+                                    <template v-else-if="tab.key === 'laudos'">
+                                        <div class="demo-docs-list">
+                                            <div v-for="doc in demoDocs" :key="doc.title" class="demo-doc-row">
+                                                <div class="demo-doc-icon" :style="'background:' + doc.iconBg + ';color:' + doc.iconColor">
+                                                    <i :class="'bi ' + doc.icon"></i>
+                                                </div>
+                                                <div class="demo-doc-lines">
+                                                    <div class="demo-doc-line" style="width:60%;"></div>
+                                                    <div class="demo-doc-line"></div>
+                                                </div>
+                                                <span class="demo-doc-status" :style="'background:' + doc.statusBg + ';color:' + doc.statusColor">{{ doc.status }}</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                            <p class="demo-caption">{{ tab.caption }}</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════ DIFERENCIAIS ═══════════════════ -->
+        <section class="differentiators" id="diferenciais">
+            <div class="container">
+                <div class="diff-header text-center">
+                    <span class="section-label">{{ t.differentiators.label }}</span>
+                    <h2 class="section-title">{{ t.differentiators.title }}</h2>
+                    <p class="section-sub text-center">{{ t.differentiators.subtitle }}</p>
+                </div>
+
+                <div class="diff-grid">
+                    <div v-for="item in t.differentiators.items" :key="item.title" class="diff-card">
+                        <div class="diff-icon"><i :class="'bi ' + item.icon"></i></div>
+                        <div>
+                            <h3>{{ item.title }}</h3>
+                            <p>{{ item.text }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Callout: exclusividades do Plano Pro -->
+                <div class="pro-callout">
+                    <div class="pro-callout-badge">{{ t.differentiators.pro_callout.eyebrow }}</div>
+                    <h3>{{ t.differentiators.pro_callout.title }}</h3>
+                    <p class="pro-callout-text">{{ t.differentiators.pro_callout.text }}</p>
+
+                    <div class="pro-callout-items">
+                        <div v-for="item in t.differentiators.pro_callout.items" :key="item.title" class="pro-callout-item">
+                            <div class="pro-callout-item-icon"><i :class="'bi ' + item.icon"></i></div>
+                            <div>
+                                <div class="pro-callout-item-head">
+                                    <h4>{{ item.title }}</h4>
+                                    <span class="pro-callout-item-badge">{{ item.badge }}</span>
+                                </div>
+                                <p>{{ item.text }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <a href="#precos" class="btn btn-featured">
+                        {{ t.differentiators.pro_callout.cta }} <i class="bi bi-arrow-right"></i>
+                    </a>
                 </div>
             </div>
         </section>
@@ -322,6 +528,19 @@
                                 {{ feature.display_label }}
                             </li>
                         </ul>
+
+                        <!-- Recursos exclusivos do Pro — bloco estático, à parte da lista
+                             dinâmica de features acima (não depende de PlanFeature no banco).
+                             Optotipos/estoque ainda não existem no produto: badge "Novidade"
+                             deixa isso explícito, nunca apresentado como já incluído. -->
+                        <div v-if="plan.slug === 'pro'" class="pricing-pro-extra">
+                            <div class="pricing-pro-extra-label">{{ t.pricing.pro_exclusive_label }}</div>
+                            <div v-for="item in t.differentiators.pro_callout.items" :key="item.title" class="pricing-pro-extra-item">
+                                <i :class="'bi ' + item.icon"></i>
+                                <span>{{ item.title }}</span>
+                                <span class="pricing-pro-extra-badge">{{ t.pricing.pro_exclusive_new }}</span>
+                            </div>
+                        </div>
 
                         <a v-if="plan.is_free"
                            href="mailto:contato@easyeye.com.br"
@@ -591,10 +810,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import SiteLayout from '@/Layouts/SiteLayout.vue';
 import axios from 'axios';
+import { initSiteAnimations } from '@/site-animations';
 
 const props = defineProps({
     t: { type: Object, required: true },
@@ -602,11 +822,52 @@ const props = defineProps({
     routes: { type: Object, required: true },
     appName: { type: String, default: 'EasyEye' },
     howImageExists: { type: Boolean, default: false },
+    demoImages: { type: Object, default: () => ({}) },
     seo: { type: Object, default: () => ({}) },
 });
 
 // ─── HOW IT WORKS ───
 const howActiveStep = ref(0);
+
+// ─── DEMONSTRAÇÃO VISUAL ───
+const activeDemoTab = ref(0);
+
+// Dados fixos do mockup CSS (fallback enquanto não há screenshot real em
+// public/site/images/demo-*.png — ver demoImages, montado no controller).
+const demoImageThumbs = [
+    { tag: 'OD', grad: 'linear-gradient(135deg,#1E5EBF,#00B4D8)' },
+    { tag: 'OE', grad: 'linear-gradient(135deg,#6c63ff,#00B4D8)' },
+    { tag: 'OD', grad: 'linear-gradient(135deg,#06D6A0,#1E5EBF)' },
+    { tag: 'OE', grad: 'linear-gradient(135deg,#f97316,#f59e0b)' },
+    { tag: 'OD', grad: 'linear-gradient(135deg,#00B4D8,#6c63ff)' },
+    { tag: 'OE', grad: 'linear-gradient(135deg,#1E5EBF,#06D6A0)' },
+    { tag: 'OD', grad: 'linear-gradient(135deg,#f59e0b,#ef4444)' },
+    { tag: 'OE', grad: 'linear-gradient(135deg,#6c63ff,#1E5EBF)' },
+];
+
+const demoDocs = [
+    { icon: 'bi-file-earmark-medical', iconBg: 'rgba(30,94,191,.1)', iconColor: '#1E5EBF', status: 'Assinado', statusBg: 'rgba(6,214,160,.12)', statusColor: '#06D6A0' },
+    { icon: 'bi-capsule', iconBg: 'rgba(108,99,255,.1)', iconColor: '#6c63ff', status: 'Assinado', statusBg: 'rgba(6,214,160,.12)', statusColor: '#06D6A0' },
+    { icon: 'bi-file-earmark-check', iconBg: 'rgba(0,180,216,.1)', iconColor: '#00B4D8', status: 'Rascunho', statusBg: 'rgba(245,158,11,.12)', statusColor: '#f59e0b' },
+    { icon: 'bi-file-earmark-arrow-up', iconBg: 'rgba(249,115,22,.1)', iconColor: '#f97316', status: 'Assinado', statusBg: 'rgba(6,214,160,.12)', statusColor: '#06D6A0' },
+];
+
+// Blocos de horário fake por dia da semana (mockup da Agenda) — determinístico
+// (sem Math.random) para não gerar hidratação divergente entre SSR e client.
+const AGENDA_PALETTE = ['#06D6A0', '#1E5EBF', '#00B4D8', '#6c63ff', '#f97316'];
+function agendaSlots(day) {
+    const seed = day.charCodeAt(0) + day.length;
+    const count = 2 + (seed % 3);
+    return Array.from({ length: count }, (_, i) => ({
+        top: i === 0 ? 4 + ((seed + i) % 20) : 8,
+        h: 20 + ((seed * (i + 1)) % 30),
+        bg: `rgba(${hexToRgb(AGENDA_PALETTE[(seed + i) % AGENDA_PALETTE.length])},.75)`,
+    }));
+}
+function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
 
 // ─── FAQ ───
 const faqOpen = ref(null);
@@ -653,4 +914,15 @@ async function submitContact() {
 function asset(path) {
     return '/' + path;
 }
+
+// ─── ANIMAÇÕES (GSAP + ScrollTrigger) ───
+// Client-only: SSR não tem viewport/scroll, e site-animations.js mexe direto
+// no DOM (ScrollTrigger, gsap.context) — nunca deve rodar durante a renderização SSR.
+let cleanupAnimations = null;
+onMounted(() => {
+    cleanupAnimations = initSiteAnimations();
+});
+onUnmounted(() => {
+    cleanupAnimations?.();
+});
 </script>

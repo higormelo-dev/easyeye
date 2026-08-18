@@ -12,13 +12,17 @@
  *   2.  Hero visual        — parallax sutil do mockup + cards flutuantes
  *   3.  Hero blobs         — movimento decorativo contínuo (ambiente)
  *   4.  Metrics counter    — incrementa números quando entra na viewport
- *   5.  Features stagger   — cards sobem em sequência
- *   6.  How steps          — passos aparecem um a um
- *   7.  Compliance badges  — pop sequencial
- *   8.  Testimonials       — cards fade-up
- *   9.  Pricing cards      — scale-in com destaque no featured
- *   10. FAQ items          — fade-up suave
- *   11. Contact cards      — fade-up
+ *   5.  Problems stagger   — cards de dor sobem em sequência
+ *   6.  Benefits stagger   — cards de benefício sobem em sequência
+ *   7.  Features stagger   — cards sobem em sequência
+ *   8.  How steps          — passos aparecem um a um
+ *   9.  Demo tabs          — painel do tour do produto entra com fade+scale
+ *   10. Differentiators    — cards + callout do Plano Pro
+ *   11. Compliance badges  — pop sequencial
+ *   12. Testimonials       — cards fade-up
+ *   13. Pricing cards      — scale-in com destaque no featured
+ *   14. FAQ items          — fade-up suave
+ *   15. Contact cards      — fade-up
  */
 
 import gsap from 'gsap';
@@ -54,7 +58,7 @@ export function initSiteAnimations() {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
         // Garante que elementos não fiquem invisíveis se algum CSS usar opacity:0 como estado inicial
-        gsap.set('.hero-title, .hero-sub, .hero-ctas, .hero-trust, .feature-card, .testimonial-card, .pricing-card, .faq-item, .contact-card', {
+        gsap.set('.hero-title, .hero-sub, .hero-ctas, .hero-trust, .problem-card, .benefit-card, .feature-card, .diff-card, .pro-callout, .testimonial-card, .pricing-card, .faq-item, .contact-card', {
             clearProps: 'all',
         });
         return () => {};
@@ -125,14 +129,32 @@ export function initSiteAnimations() {
             });
         });
 
-        // ── 5. Features stagger ──────────────────────────────────────────────
+        // ── 5. Problems stagger ──────────────────────────────────────────────
+        gsap.from('.problem-card', {
+            ...REVEAL_OPTS,
+            stagger: 0.08,
+            scrollTrigger: { trigger: '#problemas', start: 'top 80%', once: true },
+        });
+        gsap.from('.problems-bridge', {
+            opacity: 0, y: 12, duration: 0.6, ease: 'power2.out',
+            scrollTrigger: { trigger: '.problems-bridge', start: 'top 90%', once: true },
+        });
+
+        // ── 6. Benefits stagger ──────────────────────────────────────────────
+        gsap.from('.benefit-card', {
+            ...REVEAL_OPTS,
+            stagger: 0.07,
+            scrollTrigger: { trigger: '#beneficios', start: 'top 80%', once: true },
+        });
+
+        // ── 7. Features stagger ──────────────────────────────────────────────
         gsap.from('.feature-card', {
             ...REVEAL_OPTS,
             stagger: 0.1,
             scrollTrigger: { trigger: '#funcionalidades', start: 'top 80%', once: true },
         });
 
-        // ── 6. How steps ─────────────────────────────────────────────────────
+        // ── 8. How steps ─────────────────────────────────────────────────────
         gsap.from('.how-step-num, .how-step-content', {
             x: -24, opacity: 0, duration: 0.7, stagger: 0.08, ease: 'power2.out',
             scrollTrigger: { trigger: '#como-funciona', start: 'top 75%', once: true },
@@ -142,20 +164,42 @@ export function initSiteAnimations() {
             scrollTrigger: { trigger: '#como-funciona', start: 'top 75%', once: true },
         });
 
-        // ── 7. Compliance badges ─────────────────────────────────────────────
+        // ── 9. Demo tabs (tour do produto) ───────────────────────────────────
+        gsap.from('.demo-tab', {
+            y: 12, opacity: 0, duration: 0.5, stagger: 0.05, ease: 'power2.out',
+            scrollTrigger: { trigger: '#demonstracao', start: 'top 78%', once: true },
+        });
+        gsap.from('.demo-panel-wrap', {
+            scale: 0.97, opacity: 0, duration: 0.7, ease: 'power2.out',
+            scrollTrigger: { trigger: '#demonstracao', start: 'top 70%', once: true },
+        });
+
+        // ── 10. Differentiators + Pro callout ────────────────────────────────
+        gsap.from('.diff-card', {
+            ...REVEAL_OPTS,
+            y: 20,
+            stagger: 0.08,
+            scrollTrigger: { trigger: '#diferenciais', start: 'top 80%', once: true },
+        });
+        gsap.from('.pro-callout', {
+            scale: 0.96, opacity: 0, duration: 0.8, ease: 'power2.out',
+            scrollTrigger: { trigger: '.pro-callout', start: 'top 85%', once: true },
+        });
+
+        // ── 11. Compliance badges ─────────────────────────────────────────────
         gsap.from('.compliance-badges > *', {
             scale: 0.85, opacity: 0, duration: 0.5, stagger: 0.08, ease: 'back.out(1.6)',
             scrollTrigger: { trigger: '.compliance', start: 'top 80%', once: true },
         });
 
-        // ── 8. Testimonials ──────────────────────────────────────────────────
+        // ── 12. Testimonials ──────────────────────────────────────────────────
         gsap.from('.testimonial-card', {
             ...REVEAL_OPTS,
             stagger: 0.12,
             scrollTrigger: { trigger: '#depoimentos', start: 'top 80%', once: true },
         });
 
-        // ── 9. Pricing cards ─────────────────────────────────────────────────
+        // ── 13. Pricing cards ─────────────────────────────────────────────────
         gsap.from('.pricing-card', {
             y: 40, scale: 0.96, opacity: 0, duration: 0.7, stagger: 0.1, ease: 'power2.out',
             scrollTrigger: { trigger: '#precos', start: 'top 80%', once: true },
@@ -174,7 +218,7 @@ export function initSiteAnimations() {
             });
         }
 
-        // ── 10. FAQ items ────────────────────────────────────────────────────
+        // ── 14. FAQ items ────────────────────────────────────────────────────
         gsap.from('.faq-item', {
             ...REVEAL_OPTS,
             y: 20,
@@ -183,7 +227,7 @@ export function initSiteAnimations() {
             scrollTrigger: { trigger: '#faq', start: 'top 85%', once: true },
         });
 
-        // ── 11. Contact cards ────────────────────────────────────────────────
+        // ── 15. Contact cards ────────────────────────────────────────────────
         gsap.from('.contact-card', {
             ...REVEAL_OPTS,
             stagger: 0.12,

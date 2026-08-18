@@ -62,6 +62,37 @@ return [
         ['value' => 'R$0', 'label' => 'Implementation fee'],
     ],
 
+    'problems' => [
+        'label'    => 'Life without EasyEye',
+        'title'    => 'Is your clinic still losing time (and money) on this?',
+        'subtitle' => 'Common problems in ophthalmology clinics still running on paper, loose spreadsheets and generic systems.',
+        'items'    => [
+            ['icon' => 'bi-file-earmark-x', 'title' => 'Paper charts or loose spreadsheets', 'text' => 'Patient history scattered around, hard to find at the next visit and at risk of being lost.'],
+            ['icon' => 'bi-images', 'title' => 'Exams and images with no organization', 'text' => 'Photos and device exams spread across a USB drive, email or folders — nobody finds them fast.'],
+            ['icon' => 'bi-calendar-x', 'title' => 'Manual scheduling, no-shows and rework', 'text' => 'Without automatic confirmation, no-shows wreck the team\'s productivity for the day.'],
+            ['icon' => 'bi-clock-history', 'title' => 'Slow reports and documents', 'text' => 'Every certificate, prescription or report is written from scratch, with no template or standard.'],
+            ['icon' => 'bi-receipt-cutoff', 'title' => 'Manual TISS billing full of denials', 'text' => 'Claims filled by hand, rework with insurers, and revenue that takes too long to land.'],
+            ['icon' => 'bi-diagram-3', 'title' => 'Disconnected systems, no single patient view', 'text' => 'Scheduling, records and exams in different tools — the team wastes time cross-referencing.'],
+        ],
+        'bridge' => 'That\'s exactly what EasyEye solves.',
+    ],
+
+    'benefits' => [
+        'label'    => 'Benefits',
+        'title'    => 'What your clinic gains with EasyEye',
+        'subtitle' => 'Every module was built for the real routine of an ophthalmology clinic — from the exam room to the front desk.',
+        'items'    => [
+            ['icon' => 'bi-images', 'color' => 'icon-teal', 'title' => 'Ophthalmology image manager', 'text' => 'Centralize and organize patient exams and images in one place, by eye and by date — no USB drives, no lost folders.'],
+            ['icon' => 'bi-file-medical', 'color' => 'icon-blue', 'title' => 'Ophthalmology-specific record', 'text' => 'Clinical information, history and patient follow-up always organized and available during the visit.'],
+            ['icon' => 'bi-calendar3', 'color' => 'icon-mint', 'title' => 'Scheduling', 'text' => 'Organize doctors, time slots and appointments with automatic confirmation and fewer no-shows.'],
+            ['icon' => 'bi-hdd-network', 'color' => 'icon-purple', 'title' => 'Device integration', 'text' => 'Make it easy to send and store exams performed directly on the clinic\'s equipment.'],
+            ['icon' => 'bi-file-earmark-medical', 'color' => 'icon-orange', 'title' => 'Reports & documents', 'text' => 'Create and keep reports, prescriptions and other clinical documents inside the system itself.'],
+            ['icon' => 'bi-stars', 'color' => 'icon-red', 'title' => 'AI assistant', 'text' => 'Support for the doctor\'s routine and document drafting — always as decision support, never replacing clinical judgment.'],
+            ['icon' => 'bi-building-gear', 'color' => 'icon-blue', 'title' => 'Clinic management', 'text' => 'Centralize the clinic\'s administrative and operational information in a single place.'],
+            ['icon' => 'bi-clock-history', 'color' => 'icon-teal', 'title' => 'Patient history', 'text' => 'Visits, exams, images and documents brought together in a single history, accessible anytime.'],
+        ],
+    ],
+
     'features' => [
         'label'    => 'Features',
         'title'    => 'Everything your clinic needs, in one place',
@@ -87,6 +118,54 @@ return [
             ['title' => 'Create your account in minutes', 'text' => 'Quick registration, no hassle. Configure your clinic, add doctors and set appointment schedules.'],
             ['title' => 'Import your patients', 'text' => 'Import your patient base via CSV or register manually. History and records migrated safely.'],
             ['title' => 'Start seeing patients', 'text' => 'Your team trained in hours. Dedicated implementation support and ongoing service to grow with you.'],
+        ],
+    ],
+
+    'demo' => [
+        'label'    => 'See the system',
+        'title'    => 'A look inside EasyEye',
+        'subtitle' => 'A preview of the screens your team will use every day.',
+        'tabs'     => [
+            ['key' => 'prontuario', 'icon' => 'bi-file-medical', 'label' => 'Patient record', 'caption' => 'History, refraction, biomicroscopy and fundoscopy organized by visit.'],
+            ['key' => 'agenda', 'icon' => 'bi-calendar3', 'label' => 'Scheduling', 'caption' => 'Multiple doctors and rooms in a single view, with status for every appointment.'],
+            ['key' => 'imagens', 'icon' => 'bi-images', 'label' => 'Image manager', 'caption' => 'Exams and photos organized by eye, type and date — fast search per patient.'],
+            ['key' => 'laudos', 'icon' => 'bi-file-earmark-medical', 'label' => 'Reports & documents', 'caption' => 'Ready-made templates for reports, prescriptions, certificates and referrals.'],
+        ],
+        'screenshot_placeholder' => 'Module preview',
+    ],
+
+    'differentiators' => [
+        'label'    => 'Why EasyEye',
+        'title'    => 'Why clinics choose EasyEye',
+        'subtitle' => 'Not a generic management system adapted for healthcare — built for the ophthalmology routine from day one.',
+        'items'    => [
+            ['icon' => 'bi-eye', 'title' => 'Ophthalmology specialist', 'text' => 'Fields, reports and workflows designed for the ophthalmology practice — not a generic EMR adapted after the fact.'],
+            ['icon' => 'bi-file-earmark-check-fill', 'title' => 'TISS 3.06 certified', 'text' => 'TISS claim generation, submission and return processing certified by ANS, with pre-validation to cut denials.'],
+            ['icon' => 'bi-shield-fill-check', 'title' => 'CFM & LGPD compliance, native', 'text' => 'Audit trail, record versioning and digital signature built into the architecture — not bolted on.'],
+            ['icon' => 'bi-stars', 'title' => 'AI as support, not as decision', 'text' => 'AI assistant with sources when available, final conduct always validated by the responsible physician.'],
+            ['icon' => 'bi-headset', 'title' => 'Support that understands clinics', 'text' => 'A support team specialized in the ophthalmology routine, not generic IT helpdesk.'],
+            ['icon' => 'bi-diagram-3-fill', 'title' => 'Multi-clinic with a single view', 'text' => 'Manage multiple units with one login and consolidated reports.'],
+        ],
+
+        'pro_callout' => [
+            'eyebrow' => 'Exclusive to the Pro plan',
+            'title'   => 'Pro goes beyond the patient record',
+            'text'    => 'Pro plan subscribers get access to additional management tools no other plan offers.',
+            'items'   => [
+                [
+                    'icon'  => 'bi-eye',
+                    'badge' => 'Coming soon',
+                    'title' => 'Full visual acuity testing suite',
+                    'text'  => 'The main tests used in everyday ophthalmology, right inside the EasyEye ecosystem: ETDRS, Snellen, Ishihara, Landolt C, tumbling E, pediatric optotypes, contrast tests and more.',
+                ],
+                [
+                    'icon'  => 'bi-box-seam',
+                    'badge' => 'Coming soon',
+                    'title' => 'Inventory management & control',
+                    'text'  => 'Track and organize materials and supplies used in the clinic\'s operations, right inside the system.',
+                ],
+            ],
+            'cta' => 'Explore the Pro plan',
         ],
     ],
 
@@ -133,17 +212,19 @@ return [
     ],
 
     'pricing' => [
-        'label'          => 'Pricing',
-        'title'          => 'Plans for every clinic size',
-        'subtitle'       => 'No implementation fees. Cancel anytime.',
-        'trial_suffix'   => 'Try free for :days days.',
-        'featured_badge' => 'Most popular',
-        'contact_cta'    => 'Talk to an expert',
-        'on_request'     => 'Contact us',
-        'get_started'    => 'Get started free',
-        'trial_text'     => ':days days free trial',
-        'empty_title'    => 'Plans coming soon',
-        'empty_subtitle' => 'We are preparing the best plans for your clinic. Get in touch to learn more.',
+        'label'               => 'Pricing',
+        'title'               => 'Plans for every clinic size',
+        'subtitle'            => 'No implementation fees. Cancel anytime.',
+        'trial_suffix'        => 'Try free for :days days.',
+        'featured_badge'      => 'Most popular',
+        'contact_cta'         => 'Talk to an expert',
+        'on_request'          => 'Contact us',
+        'get_started'         => 'Get started free',
+        'trial_text'          => ':days days free trial',
+        'empty_title'         => 'Plans coming soon',
+        'empty_subtitle'      => 'We are preparing the best plans for your clinic. Get in touch to learn more.',
+        'pro_exclusive_label' => 'Additional Pro features',
+        'pro_exclusive_new'   => 'Coming soon',
     ],
 
     'faq' => [

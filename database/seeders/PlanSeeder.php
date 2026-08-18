@@ -41,7 +41,14 @@ class PlanSeeder extends Seeder
                 'billing_cycle' => BillingCycle::Monthly,
                 'active'        => true,
                 'sort_order'    => 2,
-                'features'      => [
+                // BUGFIX: nenhum plano tinha is_featured=true (coluna default
+                // false, nunca setada aqui) — a landing page tem todo um
+                // mecanismo de destaque ("Mais popular", card navy, scale-up)
+                // que nunca acendia. Pro é o meio-termo (preço x recursos),
+                // destino natural do badge — e é o plano com os diferenciais
+                // (optotipos/estoque) que o produto quer deixar mais evidentes.
+                'is_featured' => true,
+                'features'    => [
                     FeatureKey::MaxUsers->value            => '10',
                     FeatureKey::MaxPatients->value         => '5000',
                     FeatureKey::MaxDoctors->value          => '3',

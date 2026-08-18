@@ -18,6 +18,7 @@ class SiteController extends Controller
             ->get()
             ->map(fn (Plan $plan) => [
                 'id'                 => $plan->id,
+                'slug'               => $plan->slug,
                 'name'               => $plan->name,
                 'description'        => $plan->description,
                 'price'              => $plan->price,
@@ -96,10 +97,20 @@ class SiteController extends Controller
             ],
         ];
 
+        // Demonstração visual (tour do produto) — mesmo padrão do `howImageExists`
+        // já existente: cada aba tem upgrade automático pra screenshot real assim
+        // que o arquivo for colocado em public/site/images/, sem precisar mexer
+        // no front. Hoje nenhum existe → todas as abas caem no mockup CSS.
+        $demoTabs   = ['prontuario', 'agenda', 'imagens', 'laudos'];
+        $demoImages = collect($demoTabs)
+            ->mapWithKeys(fn (string $tab) => [$tab => file_exists(public_path("site/images/demo-{$tab}.png"))])
+            ->toArray();
+
         return Inertia::render('Site/Home', [
             'plans'          => $plans,
             'appName'        => config('app.name', 'EasyEye'),
             'howImageExists' => file_exists(public_path('site/images/how-it-works.png')),
+            'demoImages'     => $demoImages,
             't'              => array_merge(trans('site'), ['pricing_credit_note_html' => $creditNote]),
             'routes'         => [
                 'siteHome'     => route('site.home'),
