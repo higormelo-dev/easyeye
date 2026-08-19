@@ -470,14 +470,22 @@
     overflow: hidden;
     border: 1px solid $border;
     box-shadow: $shadow-lg;
-    min-height: 400px;
+    position: relative;
+    // Mesma proporção do screenshot (site/images/how-it-works.png) para a
+    // imagem preencher o quadro inteiro sem corte nem faixas.
+    aspect-ratio: 10 / 7;
     display: flex;
     align-items: center;
     justify-content: center;
 
-    img { width: 100%; height: 100%; object-fit: cover; }
-
-    @include below($bp-lg) { min-height: 250px; }
+    img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
 }
 
 .how-visual-placeholder {
