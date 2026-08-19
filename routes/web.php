@@ -530,6 +530,11 @@ Route::group(
                     ->middleware('throttle:manager-destructive') // ação rara e de alto impacto
                     ->name('security.two-factor.toggle');
 
+                // WhatsApp (Z-API): a configuração NÃO fica aqui — é exclusiva
+                // do dono do SaaS em /panel/manager/whatsapp (a conta Z-API e
+                // o Client-Token pertencem à empresa dona do SaaS; a clínica
+                // usufrui do número próprio sem nunca ver credencial).
+
                 // ── Gateways de Pagamento do Tenant ────────────────────────
                 // Feature `has_own_payment_gateways` libera a clínica a cadastrar
                 // gateways próprios (Asaas, MP, etc.). Padrão off — a clínica usa

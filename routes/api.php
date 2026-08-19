@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
     PatientExamsController,
     PatientsController,
     SchedulesController};
+use App\Http\Controllers\Api\WhatsAppWebhookController;
 use App\Http\Controllers\Billing\WebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -40,4 +41,12 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
 
 Route::post('billing/webhooks/{gateway}', WebhookController::class)
     ->name('billing.webhooks')
+    ->middleware('throttle:240,1');
+
+// Webhook "ao receber" da Z-API (WhatsApp) — URL por clínica via token
+// aleatório; tenant identificado pelo token + cross-check do instanceId no
+// payload (ver WhatsAppWebhookController). Sem auth de sessão: rota pública
+// idempotente, mesmo padrão do webhook de billing acima.
+Route::post('whatsapp/webhooks/{token}', WhatsAppWebhookController::class)
+    ->name('whatsapp.webhooks')
     ->middleware('throttle:240,1');

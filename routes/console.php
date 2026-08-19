@@ -63,3 +63,21 @@ Schedule::command('ai:purge-feedbacks')
     ->weeklyOn(0, '03:00')
     ->name('ai:purge-feedbacks')
     ->withoutOverlapping();
+
+// WhatsApp (Z-API) — confirmação de consulta: roda de hora em hora dentro do
+// horário comercial; a idempotência é do banco (1 confirmação por consulta),
+// então repetição nunca duplica mensagem. Horário restrito por respeito ao
+// paciente (nada de mensagem de madrugada).
+Schedule::command('whatsapp:send-confirmations')
+    ->hourly()
+    ->between('8:00', '20:00')
+    ->name('whatsapp:send-confirmations')
+    ->withoutOverlapping();
+
+// WhatsApp (Z-API) — pesquisa de satisfação pós-atendimento (delay por
+// clínica; max_age_days evita spam retroativo ao ativar a feature).
+Schedule::command('whatsapp:send-surveys')
+    ->hourly()
+    ->between('9:00', '20:00')
+    ->name('whatsapp:send-surveys')
+    ->withoutOverlapping();

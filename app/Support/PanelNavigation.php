@@ -338,6 +338,13 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.ai_credit_purchases'),
                 'match' => ['manager.ai-credit-purchases.*'],
             ],
+            [
+                'key'   => 'whatsapp',
+                'route' => 'manager.whatsapp.index',
+                'icon'  => 'ti ti-brand-whatsapp',
+                'label' => __('whatsapp.title'),
+                'match' => ['manager.whatsapp.*'],
+            ],
 
             // ── Controle de acesso ──────────────────────────────────────────
             // Agrupa identidade + autenticação (usuários + 2FA da entity SaaS).

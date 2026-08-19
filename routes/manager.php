@@ -15,7 +15,8 @@ use App\Http\Controllers\Manager\{
     PartnersController,
     PlansController,
     ReportSettingsController,
-    SubscriptionsController
+    SubscriptionsController,
+    WhatsAppController
 };
 use Illuminate\Support\Facades\Route;
 
@@ -202,6 +203,16 @@ Route::group([
         ->name('finance.chat');
     Route::get('finance/ai/runs/{aiRun}', [FinanceController::class, 'showAiRun'])
         ->name('finance.ai-runs.show');
+
+    // ── WhatsApp (Z-API) por clínica ───────────────────────────────────────────
+    // Configuração EXCLUSIVA do dono/admin do SaaS (Gate SaasAdminPanel dentro
+    // do controller): a conta Z-API pertence à empresa dona — cada clínica
+    // ganha uma instância (número próprio), mas nunca vê as credenciais.
+    Route::get('whatsapp', [WhatsAppController::class, 'index'])->name('whatsapp.index');
+    Route::patch('whatsapp/{entity}', [WhatsAppController::class, 'update'])
+        ->middleware('throttle:manager-destructive')
+        ->name('whatsapp.update');
+    Route::post('whatsapp/{entity}/test', [WhatsAppController::class, 'test'])->name('whatsapp.test');
 
     // ── Modelos de Documento Globais ───────────────────────────────────────────
     Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\{MedicalSpecialty, PatientMood, ScheduleAttendanceType, ScheduleSituation};
 use App\Models\Concerns\BelongsToEntity;
+use App\Models\WhatsApp\WhatsAppMessage;
 use App\Presenters\SchedulePresenter;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\{Casts\Attribute, Model, Relations\BelongsTo, Relations\BelongsToMany, Relations\HasMany, SoftDeletes};
@@ -146,6 +147,14 @@ class Schedule extends Model
     public function situationLogs(): HasMany
     {
         return $this->hasMany(ScheduleSituationLog::class)->orderBy('created_at');
+    }
+
+    /**
+     * Mensagens WhatsApp (confirmação/pesquisa) vinculadas a este agendamento.
+     */
+    public function whatsappMessages(): HasMany
+    {
+        return $this->hasMany(WhatsAppMessage::class, 'schedule_id');
     }
 
     /**
