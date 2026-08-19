@@ -542,6 +542,32 @@ describe('instância GLOBAL do SaaS (padrão pra clínica sem número próprio)'
             ->and(WhatsAppSetting::query()->whereNull('entity_id')->count())->toBe(1);
     });
 
+    it('clear_credentials remove as credenciais da clínica (volta pra "não configurado")', function () {
+        actingAsSaas($this, SaasRule::Admin->value);
+
+        // beforeEach deixa $this->setting COM credenciais.
+        expect($this->setting->hasCredentials())->toBeTrue();
+
+        $response = callManagerUpdate($this, [
+            'active'                    => false,
+            'confirmation_enabled'      => true,
+            'confirmation_hours_before' => 24,
+            'survey_enabled'            => true,
+            'survey_delay_hours'        => 2,
+            'clear_credentials'         => true,
+        ]);
+
+        expect($response->getStatusCode())->toBe(200)
+            ->and($response->getData(true)['has_credentials'])->toBeFalse();
+
+        $setting = $this->setting->fresh();
+        expect($setting->hasCredentials())->toBeFalse()
+            ->and($setting->instance_id)->toBeNull();
+
+        $audit = DB::table('audit_logs')->where('event', 'manager.whatsapp_settings.updated')->latest('id')->first();
+        expect($audit)->not->toBeNull();
+    });
+
     it('[SEGURANÇA] staff que não é Admin do SaaS não configura a global', function () {
         actingAsSaas($this, SaasRule::Support->value);
 

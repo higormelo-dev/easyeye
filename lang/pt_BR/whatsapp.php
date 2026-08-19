@@ -25,14 +25,17 @@ return [
     'no_credentials' => 'Configure as credenciais da Z-API primeiro.',
 
     'credentials' => [
-        'title'          => 'Credenciais da instância Z-API',
-        'hint'           => 'OPCIONAL — sem credenciais próprias, a clínica envia pela instância padrão do sistema. Para usar número próprio: crie uma instância em z-api.io, conecte o número pelo QR Code no painel deles e cole aqui os 3 dados. Os tokens são armazenados criptografados e nunca são exibidos de volta.',
-        'instance_id'    => 'ID da instância',
-        'instance_token' => 'Token da instância',
-        'client_token'   => 'Client-Token (token de segurança da conta)',
-        'configured'     => 'Credenciais configuradas',
-        'not_configured' => 'Credenciais pendentes',
-        'replace_hint'   => 'Preencha os 3 campos para substituir as credenciais atuais. Deixe em branco para manter.',
+        'title'                => 'Credenciais da instância Z-API',
+        'hint'                 => 'OPCIONAL — sem credenciais próprias, a clínica envia pela instância padrão do sistema. Para usar número próprio: crie uma instância em z-api.io, conecte o número pelo QR Code no painel deles e cole aqui os 3 dados. Os tokens são armazenados criptografados e nunca são exibidos de volta.',
+        'clear'                => 'Remover credenciais',
+        'clear_confirm'        => 'Remover as credenciais desta clínica? Ela volta a enviar pela instância padrão do sistema (ou fica sem envio, se a padrão não estiver configurada).',
+        'clear_global_confirm' => 'Remover as credenciais da instância padrão? TODAS as clínicas sem número próprio ficam sem envio até novas credenciais serem salvas.',
+        'instance_id'          => 'ID da instância',
+        'instance_token'       => 'Token da instância',
+        'client_token'         => 'Client-Token (token de segurança da conta)',
+        'configured'           => 'Credenciais configuradas',
+        'not_configured'       => 'Credenciais pendentes',
+        'replace_hint'         => 'Preencha os 3 campos para substituir as credenciais atuais. Deixe em branco para manter.',
     ],
 
     'connection' => [

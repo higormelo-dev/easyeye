@@ -116,6 +116,34 @@ async function testConnection() {
     }
 }
 
+// Remove as credenciais salvas da clínica — ela volta a usar a instância
+// padrão (ou fica "Não configurado" se a global não existir).
+async function clearCredentials() {
+    if (!editing.value?.setting?.has_credentials) return;
+    if (!window.confirm(props.t.credentials.clear_confirm)) return;
+    saving.value = true;
+    errors.value = {};
+    try {
+        const { data } = await window.axios.patch(url('update', editing.value.id), {
+            active:                    form.active,
+            confirmation_enabled:      form.confirmation_enabled,
+            confirmation_hours_before: form.confirmation_hours_before,
+            survey_enabled:            form.survey_enabled,
+            survey_delay_hours:        form.survey_delay_hours,
+            clear_credentials:         true,
+        }, { headers: { 'X-CSRF-TOKEN': csrf() } });
+        savedFlash.value = data.message;
+        setTimeout(() => { savedFlash.value = ''; }, 3000);
+        if (editing.value.setting) editing.value.setting.has_credentials = false;
+        testResult.value = null;
+        router.reload({ only: ['clinics'], preserveScroll: true });
+    } catch (e) {
+        errors.value = e.response?.data?.errors ?? {};
+    } finally {
+        saving.value = false;
+    }
+}
+
 const configuredCount = computed(() => props.clinics.filter(c => c.setting?.has_credentials).length);
 const activeCount     = computed(() => props.clinics.filter(c => c.setting?.active).length);
 
@@ -150,6 +178,27 @@ async function saveGlobal() {
         gWebhookWarn.value = !data.webhook_ok;
         setTimeout(() => { gFlash.value = ''; }, 3000);
         gForm.instance_id = gForm.instance_token = gForm.client_token = '';
+        router.reload({ only: ['global'], preserveScroll: true });
+    } catch (e) {
+        gErrors.value = e.response?.data?.errors ?? {};
+    } finally {
+        gSaving.value = false;
+    }
+}
+
+async function clearGlobalCredentials() {
+    if (!props.global?.has_credentials) return;
+    if (!window.confirm(props.t.credentials.clear_global_confirm)) return;
+    gSaving.value = true;
+    gErrors.value = {};
+    try {
+        const { data } = await window.axios.patch(props.routes.global_update, {
+            active: gForm.active,
+            clear_credentials: true,
+        }, { headers: { 'X-CSRF-TOKEN': csrf() } });
+        gFlash.value = data.message;
+        setTimeout(() => { gFlash.value = ''; }, 3000);
+        gResult.value = null;
         router.reload({ only: ['global'], preserveScroll: true });
     } catch (e) {
         gErrors.value = e.response?.data?.errors ?? {};
@@ -247,7 +296,13 @@ async function testGlobal() {
                         <span v-else-if="gResult?.ok" class="badge bg-warning-subtle text-warning-emphasis">{{ t.connection.disconnected }}</span>
                         <span v-else-if="gResult" class="badge bg-danger-subtle text-danger">{{ gResult.error }}</span>
 
-                        <button type="button" class="btn btn-primary btn-sm ms-auto" :disabled="gSaving" @click="saveGlobal">
+                        <button v-if="global?.has_credentials" type="button"
+                                class="btn btn-outline-danger btn-sm ms-auto"
+                                :disabled="gSaving" @click="clearGlobalCredentials">
+                            <i class="fas fa-trash-can me-1"></i>{{ t.credentials.clear }}
+                        </button>
+
+                        <button type="button" class="btn btn-primary btn-sm" :class="{ 'ms-auto': !global?.has_credentials }" :disabled="gSaving" @click="saveGlobal">
                             <span v-if="gSaving" class="spinner-border spinner-border-sm me-1"></span>
                             <i v-else class="fas fa-save me-1"></i>{{ t.save }}
                         </button>
@@ -365,6 +420,12 @@ async function testGlobal() {
                                     <span v-if="testResult?.ok && testResult.connected" class="badge bg-success-subtle text-success">{{ t.connection.connected }}</span>
                                     <span v-else-if="testResult?.ok" class="badge bg-warning-subtle text-warning-emphasis">{{ t.connection.disconnected }}</span>
                                     <span v-else-if="testResult" class="badge bg-danger-subtle text-danger">{{ testResult.error }}</span>
+
+                                    <button v-if="editing?.setting?.has_credentials" type="button"
+                                            class="btn btn-outline-danger btn-sm ms-auto"
+                                            :disabled="saving" @click="clearCredentials">
+                                        <i class="fas fa-trash-can me-1"></i>{{ t.credentials.clear }}
+                                    </button>
                                 </div>
                             </div>
 

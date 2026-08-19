@@ -104,6 +104,8 @@ class WhatsAppController extends Controller
             'instance_id'    => ['nullable', 'string', 'max:100', 'required_with:instance_token,client_token'],
             'instance_token' => ['nullable', 'string', 'max:200', 'required_with:instance_id,client_token'],
             'client_token'   => ['nullable', 'string', 'max:200', 'required_with:instance_id,instance_token'],
+            // Remove as credenciais salvas (clínica volta pra instância global).
+            'clear_credentials' => ['sometimes', 'boolean'],
         ]);
 
         $setting = WhatsAppSetting::query()->firstOrNew(['entity_id' => (string) $entity->id]);
@@ -121,8 +123,13 @@ class WhatsAppController extends Controller
         ]);
 
         $credentialsChanged = false;
+        $credentialsCleared = false;
 
-        if (! empty($data['instance_id'])) {
+        if (! empty($data['clear_credentials'])) {
+            $setting->credentials = null;
+            $setting->instance_id = null;
+            $credentialsCleared   = true;
+        } elseif (! empty($data['instance_id'])) {
             $setting->credentials = [
                 'instance_id'    => $data['instance_id'],
                 'instance_token' => $data['instance_token'],
@@ -159,6 +166,7 @@ class WhatsAppController extends Controller
                 'confirmation_enabled' => $data['confirmation_enabled'],
                 'survey_enabled'       => $data['survey_enabled'],
                 'credentials_changed'  => $credentialsChanged,
+                'credentials_cleared'  => $credentialsCleared,
             ],
             request: $request,
         );
@@ -200,10 +208,11 @@ class WhatsAppController extends Controller
         $this->authorizeSaasEntity();
 
         $data = $request->validate([
-            'active'         => ['required', 'boolean'],
-            'instance_id'    => ['nullable', 'string', 'max:100', 'required_with:instance_token,client_token'],
-            'instance_token' => ['nullable', 'string', 'max:200', 'required_with:instance_id,client_token'],
-            'client_token'   => ['nullable', 'string', 'max:200', 'required_with:instance_id,instance_token'],
+            'active'            => ['required', 'boolean'],
+            'instance_id'       => ['nullable', 'string', 'max:100', 'required_with:instance_token,client_token'],
+            'instance_token'    => ['nullable', 'string', 'max:200', 'required_with:instance_id,client_token'],
+            'client_token'      => ['nullable', 'string', 'max:200', 'required_with:instance_id,instance_token'],
+            'clear_credentials' => ['sometimes', 'boolean'],
         ]);
 
         $setting = WhatsAppSetting::query()->whereNull('entity_id')->first()
@@ -221,8 +230,13 @@ class WhatsAppController extends Controller
         $setting->active = $data['active'];
 
         $credentialsChanged = false;
+        $credentialsCleared = false;
 
-        if (! empty($data['instance_id'])) {
+        if (! empty($data['clear_credentials'])) {
+            $setting->credentials = null;
+            $setting->instance_id = null;
+            $credentialsCleared   = true;
+        } elseif (! empty($data['instance_id'])) {
             $setting->credentials = [
                 'instance_id'    => $data['instance_id'],
                 'instance_token' => $data['instance_token'],
@@ -253,6 +267,7 @@ class WhatsAppController extends Controller
             newValues: [
                 'active'              => $data['active'],
                 'credentials_changed' => $credentialsChanged,
+                'credentials_cleared' => $credentialsCleared,
             ],
             request: $request,
         );
