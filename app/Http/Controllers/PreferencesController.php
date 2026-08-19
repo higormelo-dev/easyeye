@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\UserPreference;
 use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Validation\Rule;
 
 /**
  * Preferências pessoais do usuário (item MELHORIA "mais humano" — ver
@@ -24,6 +25,19 @@ class PreferencesController extends Controller
     private const ALLOWED_KEYS = [
         'dashboard_widget_order',
         'favorite_shortcuts',
+        'medical_record_layout',
+    ];
+
+    /**
+     * Seções personalizáveis do prontuário (espelha SECTION_DEFS em
+     * MedicalRecordForm.vue). Queixa/antecedentes e Campos adicionais são
+     * fixos — não entram aqui de propósito (main_complaint é obrigatória).
+     *
+     * @var list<string>
+     */
+    private const RECORD_SECTIONS = [
+        'cromatica_ppc_cover', 'av_sem_tono', 'dinamica', 'estatica',
+        'adicao', 'av_com', 'biomicroscopia', 'fundoscopia', 'obs_geral',
     ];
 
     public function update(Request $request): JsonResponse
@@ -34,6 +48,19 @@ class PreferencesController extends Controller
             'favorite_shortcuts'          => ['sometimes', 'array'],
             'favorite_shortcuts.*.key'    => ['required_with:favorite_shortcuts', 'string'],
             'favorite_shortcuts.*.hidden' => ['sometimes', 'boolean'],
+            // Prontuário personalizado por médico: modo default de abertura
+            // (padrão EasyEye / meu modelo / texto livre) + layout customizado
+            // (ordem por coluna + seções ocultas). Chaves de seção validadas
+            // contra a lista fixa — client não grava chave arbitrária no bag.
+            'medical_record_layout'                 => ['sometimes', 'array'],
+            'medical_record_layout.default_mode'    => ['required_with:medical_record_layout', Rule::in(['default', 'custom', 'free'])],
+            'medical_record_layout.custom'          => ['sometimes', 'nullable', 'array'],
+            'medical_record_layout.custom.left'     => ['sometimes', 'array'],
+            'medical_record_layout.custom.left.*'   => [Rule::in(self::RECORD_SECTIONS)],
+            'medical_record_layout.custom.right'    => ['sometimes', 'array'],
+            'medical_record_layout.custom.right.*'  => [Rule::in(self::RECORD_SECTIONS)],
+            'medical_record_layout.custom.hidden'   => ['sometimes', 'array'],
+            'medical_record_layout.custom.hidden.*' => [Rule::in(self::RECORD_SECTIONS)],
         ]);
 
         // Request::only() já filtra pra só as chaves permitidas — qualquer

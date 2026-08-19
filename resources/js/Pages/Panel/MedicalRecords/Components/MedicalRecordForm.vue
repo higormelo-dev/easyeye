@@ -1,6 +1,6 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
-import { useForm, router } from '@inertiajs/vue3';
+import { useForm, router, usePage } from '@inertiajs/vue3';
 import { validatePayload } from '@/utils/formRulesValidator.js';
 import PdfPreviewModal from './PdfPreviewModal.vue';
 import TinyMceEditor   from '@/Components/Panel/TinyMceEditor.vue';
@@ -152,6 +152,133 @@ const tonometryStampedTime = ref(
 // Presbiopia
 const presbyopiaAddition  = ref(0);
 const presbyopiaObsForm   = reactive({ content: '' });
+
+// ──────────────────────────────────────────────────────────────────────────
+// Prontuário personalizado por médico (3 modos: padrão EasyEye / meu modelo /
+// texto livre). Preferência persiste no bag UserPreference (chave
+// medical_record_layout) via PATCH panel.preferences.update — por USUÁRIO,
+// não por clínica: o modelo de atendimento é estilo pessoal do médico.
+//
+// IMPORTANTE (integridade): personalização só muda EXIBIÇÃO. Seções ocultas
+// usam display:none (nunca v-if) — o estado do useForm continua inteiro e o
+// submit envia TODOS os campos, então dados já preenchidos num prontuário
+// antigo nunca são perdidos por causa do layout do médico atual.
+// ──────────────────────────────────────────────────────────────────────────
+const SECTION_DEFS = [
+    { key: 'cromatica_ppc_cover', col: 'left',  label: 'Visão cromática / PPC / Cover test' },
+    { key: 'av_sem_tono',         col: 'left',  label: 'A/V sem correção + Tonometria' },
+    { key: 'dinamica',            col: 'left',  label: 'Refração dinâmica' },
+    { key: 'estatica',            col: 'left',  label: 'Refração estática' },
+    { key: 'adicao',              col: 'right', label: 'Adição / Longe / Perto' },
+    { key: 'av_com',              col: 'right', label: 'A/V com correção' },
+    { key: 'biomicroscopia',      col: 'right', label: 'Biomicroscopia' },
+    { key: 'fundoscopia',         col: 'right', label: 'Fundoscopia' },
+    { key: 'obs_geral',           col: 'right', label: 'Observação geral' },
+];
+
+// Snapshot local da preferência (Inertia shared props não re-hidratam após
+// PATCH via axios — mantemos o espelho atualizado aqui).
+const persistedLayout = ref(usePage().props.auth?.user?.preferences?.medical_record_layout ?? null);
+
+const recordMode = ref(persistedLayout.value?.default_mode ?? 'default'); // default | custom | free
+const isCustomMode = computed(() => recordMode.value === 'custom');
+const isFreeMode   = computed(() => recordMode.value === 'free');
+
+function seedLayout() {
+    const saved = persistedLayout.value?.custom ?? null;
+    const buildColumn = (col) => {
+        const defaults   = SECTION_DEFS.filter(s => s.col === col).map(s => s.key);
+        const savedOrder = (saved?.[col] ?? []).filter(k => defaults.includes(k));
+        // Seções novas (adicionadas depois do médico salvar o modelo) entram
+        // no fim da coluna — nunca somem silenciosamente.
+        return [...savedOrder, ...defaults.filter(k => !savedOrder.includes(k))];
+    };
+    return {
+        left:   buildColumn('left'),
+        right:  buildColumn('right'),
+        hidden: (saved?.hidden ?? []).filter(k => SECTION_DEFS.some(s => s.key === k)),
+    };
+}
+const sectionLayout = reactive(seedLayout());
+
+function sectionStyle(key) {
+    if (isFreeMode.value) return {};             // colunas inteiras já somem no modo livre
+    if (!isCustomMode.value) return {};          // modo padrão EasyEye: layout intacto
+    const def   = SECTION_DEFS.find(s => s.key === key);
+    const order = sectionLayout[def.col].indexOf(key);
+    const style = { order: order >= 0 ? order : 99 };
+    if (sectionLayout.hidden.includes(key)) style.display = 'none';
+    return style;
+}
+
+function moveSection(col, key, dir) {
+    const arr = sectionLayout[col];
+    const i   = arr.indexOf(key);
+    const j   = i + dir;
+    if (i < 0 || j < 0 || j >= arr.length) return;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+}
+
+function toggleSection(key) {
+    const i = sectionLayout.hidden.indexOf(key);
+    if (i >= 0) sectionLayout.hidden.splice(i, 1);
+    else sectionLayout.hidden.push(key);
+}
+
+function sectionLabel(key) {
+    return SECTION_DEFS.find(s => s.key === key)?.label ?? key;
+}
+
+const showLayoutModal = ref(false);
+const layoutSaving    = ref(false);
+const layoutSavedFlash = ref('');
+
+async function persistPreference(patch) {
+    layoutSaving.value = true;
+    try {
+        const payload = {
+            default_mode: patch.default_mode ?? persistedLayout.value?.default_mode ?? 'default',
+        };
+        const custom = patch.custom ?? persistedLayout.value?.custom ?? null;
+        if (custom) payload.custom = custom;
+
+        const { data } = await window.axios.patch(route('panel.preferences.update'), {
+            medical_record_layout: payload,
+        });
+        persistedLayout.value = data.data?.medical_record_layout ?? payload;
+        return true;
+    } catch (e) {
+        console.error('Failed to persist medical record layout:', e);
+        return false;
+    } finally {
+        layoutSaving.value = false;
+    }
+}
+
+async function saveMyLayout() {
+    const ok = await persistPreference({
+        custom: {
+            left:   [...sectionLayout.left],
+            right:  [...sectionLayout.right],
+            hidden: [...sectionLayout.hidden],
+        },
+    });
+    if (ok) {
+        layoutSavedFlash.value = tt('layout_saved', 'Modelo salvo!');
+        setTimeout(() => { layoutSavedFlash.value = ''; }, 2500);
+    }
+}
+
+const isCurrentModeDefault = computed(() =>
+    (persistedLayout.value?.default_mode ?? 'default') === recordMode.value);
+
+async function saveDefaultMode() {
+    const ok = await persistPreference({ default_mode: recordMode.value });
+    if (ok) {
+        layoutSavedFlash.value = tt('default_mode_saved', 'Definido como seu padrão!');
+        setTimeout(() => { layoutSavedFlash.value = ''; }, 2500);
+    }
+}
 
 // Evoluções clínicas (texto livre, append-only) — histórico por PACIENTE,
 // atravessa prontuários. Carregado sob demanda ao abrir o modal.
@@ -1211,6 +1338,42 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             </div>
         </div>
 
+        <!-- Modelo de prontuário (padrão / meu modelo / texto livre) — só médico -->
+        <div v-if="isDoctor" class="px-3 pt-2 d-flex align-items-center gap-2 flex-wrap pmr-mode-bar">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn"
+                        :class="recordMode === 'default' ? 'btn-primary' : 'btn-outline-secondary'"
+                        @click="recordMode = 'default'">
+                    <i class="fas fa-eye me-1"></i>{{ tt('mode_default', 'Padrão EasyEye') }}
+                </button>
+                <button type="button" class="btn"
+                        :class="recordMode === 'custom' ? 'btn-primary' : 'btn-outline-secondary'"
+                        @click="recordMode = 'custom'">
+                    <i class="fas fa-user-pen me-1"></i>{{ tt('mode_custom', 'Meu prontuário') }}
+                </button>
+                <button type="button" class="btn"
+                        :class="recordMode === 'free' ? 'btn-primary' : 'btn-outline-secondary'"
+                        @click="recordMode = 'free'">
+                    <i class="fas fa-align-left me-1"></i>{{ tt('mode_free', 'Texto livre') }}
+                </button>
+            </div>
+
+            <button v-if="isCustomMode" type="button" class="btn btn-outline-primary btn-sm"
+                    @click="showLayoutModal = true">
+                <i class="fas fa-sliders me-1"></i>{{ tt('customize', 'Personalizar') }}
+            </button>
+
+            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none"
+                    :disabled="isCurrentModeDefault || layoutSaving"
+                    :title="tt('default_mode_hint', 'Novos atendimentos abrirão neste formato')"
+                    @click="saveDefaultMode">
+                <i :class="isCurrentModeDefault ? 'fas fa-star text-warning' : 'far fa-star'" class="me-1"></i>
+                {{ isCurrentModeDefault ? tt('is_default_mode', 'Seu padrão') : tt('set_default_mode', 'Definir como meu padrão') }}
+            </button>
+
+            <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{ layoutSavedFlash }}</span>
+        </div>
+
         <!-- Queixa + Switches clínicos -->
         <div class="pmr-section pmr-top-strip px-3 pt-2 pb-0 bg-white">
             <div class="row g-2 align-items-start">
@@ -1290,14 +1453,29 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             </div>
         </div>
 
+        <!-- Modo texto livre: uma área única de evolução, gravada no campo
+             ESTRUTURADO observation_general do prontuário (integridade: dado
+             continua no lugar certo independente do modelo usado). v-show nas
+             colunas (não v-if): campos preenchidos continuam no submit. -->
+        <div v-if="isFreeMode" class="px-3 pt-1 pb-2">
+            <label class="pmr-label">{{ tt('free_text_label', 'Evolução / atendimento (texto livre)') }}</label>
+            <textarea v-model="form.observation_general" rows="14"
+                      class="form-control form-control-sm"
+                      :placeholder="tt('free_text_ph', 'Descreva livremente o atendimento...')"
+                      :disabled="isLocked"></textarea>
+            <small class="text-muted d-block mt-1">
+                <i class="fas fa-database me-1"></i>{{ tt('free_text_hint', 'Gravado no campo "Observações" do prontuário — os dados continuam estruturados no histórico do paciente.') }}
+            </small>
+        </div>
+
         <!-- Duas colunas principais -->
-        <div class="row g-2 px-3 pt-1 pb-1 pmr-main-columns">
+        <div v-show="!isFreeMode" class="row g-2 px-3 pt-1 pb-1 pmr-main-columns">
             <!-- COLUNA ESQUERDA -->
             <div class="col-12 col-lg-6 pe-lg-2">
-                <div class="pmr-main-panel">
+                <div class="pmr-main-panel" :class="{ 'd-flex flex-column': isCustomMode }">
 
                     <!-- Vis. cromática / PPC / Cover test -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('cromatica_ppc_cover')">
                         <div class="row g-2">
                             <div class="col-4">
                                 <label class="pmr-label">{{ tt('chromatic_vision', 'Vis. cromática') }}</label>
@@ -1321,7 +1499,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
 
                     <!-- A/V sem correção + Tonometria -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('av_sem_tono')">
                         <div class="row g-2">
                             <div class="col-6">
                                 <label class="pmr-label">{{ tt('av_without', 'A/V sem correção') }}</label>
@@ -1381,7 +1559,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
 
                     <!-- Dinâmica -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('dinamica')">
                         <label class="pmr-label">{{ tt('dynamic', 'Dinâmica') }}</label>
                         <table class="pmr-table">
                             <thead><tr><th style="width:36px;"></th><th>{{ tt('spherical','Esf.') }}</th><th>{{ tt('cylindrical','Cil.') }}</th><th>{{ tt('axis','Eixo') }}</th></tr></thead>
@@ -1421,7 +1599,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
 
                     <!-- Estática -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('estatica')">
                         <label class="pmr-label">{{ tt('static', 'Estática') }}</label>
                         <table class="pmr-table">
                             <thead><tr><th style="width:36px;"></th><th>{{ tt('spherical','Esf.') }}</th><th>{{ tt('cylindrical','Cil.') }}</th><th>{{ tt('axis','Eixo') }}</th></tr></thead>
@@ -1464,10 +1642,10 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
             <!-- COLUNA DIREITA -->
             <div class="col-12 col-lg-6 ps-lg-2">
-                <div class="pmr-main-panel">
+                <div class="pmr-main-panel" :class="{ 'd-flex flex-column': isCustomMode }">
 
                     <!-- Adição / Longe / Perto + Calc -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('adicao')">
                         <div class="row g-2 align-items-end">
                             <div class="col-3">
                                 <label class="pmr-label">{{ tt('addition', 'Adição') }}</label>
@@ -1519,7 +1697,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
 
                     <!-- A/V com correção -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('av_com')">
                         <label class="pmr-label">{{ tt('av_with', 'A/V com correção') }}</label>
                         <div class="d-flex gap-1">
                             <div class="input-group input-group-sm">
@@ -1538,7 +1716,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
 
                     <!-- Biomicroscopia -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('biomicroscopia')">
                         <label class="pmr-label">{{ tt('biomicroscopy', 'Biomicroscopia') }}</label>
                         <div class="d-flex gap-1 mb-1">
                             <span class="pmr-eye-inline">OD</span>
@@ -1555,7 +1733,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
 
                     <!-- Fundoscopia -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('fundoscopia')">
                         <label class="pmr-label">{{ tt('fundoscopy', 'Fundoscopia') }}</label>
                         <div class="d-flex gap-1 mb-1">
                             <span class="pmr-eye-inline">OD</span>
@@ -1572,7 +1750,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
 
                     <!-- Observação geral -->
-                    <div class="pmr-section mb-1">
+                    <div class="pmr-section mb-1" :style="sectionStyle('obs_geral')">
                         <label class="pmr-label">{{ tt('general_obs', 'Observações') }}</label>
                         <textarea v-model="form.observation_general" name="observation_general" rows="2"
                                   class="form-control form-control-sm" :disabled="isLocked"></textarea>
@@ -1583,7 +1761,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         </div>
 
         <!-- Seção colapsável: HDA / Histórico / Diagnóstico / Conduta -->
-        <div class="px-3 pb-2">
+        <div v-show="!isFreeMode" class="px-3 pb-2">
             <div class="pmr-collapse-toggle mb-2" data-bs-toggle="collapse" data-bs-target="#pmr-extra-fields" role="button">
                 <i class="fas fa-chevron-down me-1 pmr-collapse-icon"></i>
                 <span class="pmr-label mb-0 d-inline">{{ tt('extra_fields', 'Campos adicionais') }}</span>
@@ -1896,6 +2074,67 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </button>
                         <span v-else></span>
                         <button type="button" class="btn btn-secondary btn-sm" @click="showDocumentationsModal = false">{{ tt('close','Fechar') }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
+    <!-- Personalizar meu prontuário: visibilidade + ordem das seções por coluna -->
+    <Teleport to="body">
+        <div v-if="showLayoutModal" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
+             @click.self="showLayoutModal = false">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title"><i class="fas fa-sliders me-2 text-primary"></i>{{ tt('customize_title', 'Personalizar meu prontuário') }}</h6>
+                        <button type="button" class="btn-close" @click="showLayoutModal = false"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">
+                            {{ tt('customize_hint', 'Escolha quais seções aparecem e a ordem em cada coluna. Seções ocultas não perdem dados já preenchidos — apenas saem da sua visualização.') }}
+                        </p>
+                        <div class="row g-3">
+                            <div v-for="col in ['left', 'right']" :key="col" class="col-md-6">
+                                <div class="fw-semibold small mb-2">
+                                    {{ col === 'left' ? tt('left_column', 'Coluna esquerda') : tt('right_column', 'Coluna direita') }}
+                                </div>
+                                <div v-for="(key, index) in sectionLayout[col]" :key="key"
+                                     class="d-flex align-items-center gap-2 border rounded px-2 py-1 mb-1"
+                                     :class="{ 'opacity-50': sectionLayout.hidden.includes(key) }">
+                                    <input type="checkbox" class="form-check-input m-0"
+                                           :checked="!sectionLayout.hidden.includes(key)"
+                                           :id="`layout-${key}`"
+                                           @change="toggleSection(key)">
+                                    <label :for="`layout-${key}`" class="flex-grow-1 small mb-0" style="cursor:pointer;">
+                                        {{ sectionLabel(key) }}
+                                    </label>
+                                    <button type="button" class="btn btn-sm btn-link p-0 px-1"
+                                            :disabled="index === 0"
+                                            @click="moveSection(col, key, -1)">
+                                        <i class="fas fa-chevron-up"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-link p-0 px-1"
+                                            :disabled="index === sectionLayout[col].length - 1"
+                                            @click="moveSection(col, key, 1)">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer py-2 d-flex justify-content-between">
+                        <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{ layoutSavedFlash }}</span>
+                        <span v-else></span>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-secondary btn-sm" @click="showLayoutModal = false">
+                                {{ tt('close', 'Fechar') }}
+                            </button>
+                            <button type="button" class="btn btn-primary btn-sm" :disabled="layoutSaving" @click="saveMyLayout">
+                                <span v-if="layoutSaving" class="spinner-border spinner-border-sm me-1"></span>
+                                <i v-else class="fas fa-floppy-disk me-1"></i>{{ tt('save_my_layout', 'Salvar como meu modelo') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
