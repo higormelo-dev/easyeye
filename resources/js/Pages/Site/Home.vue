@@ -814,7 +814,6 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Head } from '@inertiajs/vue3';
 import SiteLayout from '@/Layouts/SiteLayout.vue';
 import axios from 'axios';
-import { initSiteAnimations } from '@/site-animations';
 
 const props = defineProps({
     t: { type: Object, required: true },
@@ -915,12 +914,19 @@ function asset(path) {
     return '/' + path;
 }
 
-// ─── ANIMAÇÕES (GSAP + ScrollTrigger) ───
-// Client-only: SSR não tem viewport/scroll, e site-animations.js mexe direto
-// no DOM (ScrollTrigger, gsap.context) — nunca deve rodar durante a renderização SSR.
+// ─── ANIMAÇÕES (GSAP) ───
+// Import DINÂMICO e client-only: gsap/ScrollTrigger nunca entram no bundle
+// SSR nem rodam em Node. E por regra (pós-incidente "site em branco"),
+// animação nunca é condição de visibilidade — se este import falhar, a
+// página fica 100% visível mesmo assim; só perde o floreio do hero.
 let cleanupAnimations = null;
-onMounted(() => {
-    cleanupAnimations = initSiteAnimations();
+onMounted(async () => {
+    try {
+        const { initSiteAnimations } = await import('@/site-animations');
+        cleanupAnimations = initSiteAnimations();
+    } catch (e) {
+        console.error('Site animations failed to load (page stays fully visible):', e);
+    }
 });
 onUnmounted(() => {
     cleanupAnimations?.();
