@@ -163,14 +163,33 @@ class WhatsAppController extends Controller
 
     /**
      * Testa a conexão da instância Z-API da clínica (GET /status).
+     *
+     * Aceita credenciais no corpo da requisição para testar ANTES de salvar
+     * (usadas de forma transiente, nunca persistidas nem logadas). Sem corpo,
+     * testa as credenciais já armazenadas da clínica.
      */
-    public function test(Entity $entity): JsonResponse
+    public function test(Request $request, Entity $entity): JsonResponse
     {
         $this->authorizeSaasEntity();
 
-        $setting = WhatsAppSetting::query()
-            ->where('entity_id', (string) $entity->id)
-            ->first();
+        $adHoc = $request->validate([
+            'instance_id'    => ['nullable', 'string', 'max:255', 'required_with:instance_token,client_token'],
+            'instance_token' => ['nullable', 'string', 'max:255', 'required_with:instance_id,client_token'],
+            'client_token'   => ['nullable', 'string', 'max:255', 'required_with:instance_id,instance_token'],
+        ]);
+
+        if (! empty($adHoc['instance_id'])) {
+            $setting              = new WhatsAppSetting();
+            $setting->credentials = [
+                'instance_id'    => $adHoc['instance_id'],
+                'instance_token' => $adHoc['instance_token'],
+                'client_token'   => $adHoc['client_token'],
+            ];
+        } else {
+            $setting = WhatsAppSetting::query()
+                ->where('entity_id', (string) $entity->id)
+                ->first();
+        }
 
         if (! $setting || ! $setting->hasCredentials()) {
             return response()->json(['ok' => false, 'error' => __('whatsapp.no_credentials')], 422);

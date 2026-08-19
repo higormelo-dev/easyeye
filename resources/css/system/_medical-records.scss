@@ -159,7 +159,8 @@
     border: 1px solid #d2d9e1;
     border-radius: 3px;
     padding: .58rem;
-    height: 100%;
+    // Sem height:100%: a coluna com menos seções terminava com um vão em
+    // branco gigante dentro do card só para igualar a altura da coluna irmã.
 }
 
 .pmr-form .pmr-section {
@@ -769,4 +770,12 @@
 // não quebra linha por padrão e estourava em telas estreitas (< ~420px).
 .pmr-mode-bar .btn-group {
     flex-wrap: wrap;
+}
+
+// Par OD/OE (chip + select): o input-group do Bootstrap quebra linha
+// internamente quando aperta, descolando o chip do seu select. flex-nowrap
+// no grupo + largura mínima aqui: o PAR inteiro quebra como unidade.
+.pmr-form .pmr-eye-group {
+    flex: 1 1 150px;
+    min-width: 150px;
 }

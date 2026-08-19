@@ -244,7 +244,7 @@
                     </div>
 
                     <div class="how-visual">
-                        <img v-if="howImageExists" :src="asset('site/images/how-it-works.png')" :alt="t.how.screenshot_alt">
+                        <img v-if="howImageExists" :src="asset('site/images/how-it-works.png') + '?v=' + howImageExists" :alt="t.how.screenshot_alt">
                         <div v-else class="how-visual-placeholder">
                             <i class="bi bi-display"></i>
                             <p style="font-size:15px;">{{ t.how.screenshot_placeholder }}</p>
@@ -287,7 +287,7 @@
                                     <div class="demo-mockup-url"></div>
                                 </div>
 
-                                <img v-if="demoImages?.[tab.key]" :src="asset('site/images/demo-' + tab.key + '.png')" :alt="tab.label" style="width:100%;display:block;">
+                                <img v-if="demoImages?.[tab.key]" :src="asset('site/images/demo-' + tab.key + '.png') + '?v=' + demoImages[tab.key]" :alt="tab.label" style="width:100%;display:block;">
 
                                 <div v-else class="demo-mockup-body">
                                     <!-- Prontuário -->
@@ -820,7 +820,8 @@ const props = defineProps({
     plans: { type: Array, default: () => [] },
     routes: { type: Object, required: true },
     appName: { type: String, default: 'EasyEye' },
-    howImageExists: { type: Boolean, default: false },
+    // false quando não existe; filemtime (int) quando existe — usado como ?v= cache-buster
+    howImageExists: { type: [Boolean, Number], default: false },
     demoImages: { type: Object, default: () => ({}) },
     seo: { type: Object, default: () => ({}) },
 });

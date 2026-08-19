@@ -2,8 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\SaasRule;
-use App\Enums\{ScheduleSituation};
+use App\Enums\{SaasRule, ScheduleSituation};
 use App\Http\Controllers\Manager\WhatsAppController;
 use App\Jobs\WhatsApp\SendWhatsAppMessageJob;
 use App\Models\{Entity, Schedule, ScheduleSituationLog, User};
@@ -14,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{DB, Queue};
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 uses(RefreshDatabase::class);
@@ -275,6 +275,16 @@ describe('configurações no MANAGER (exclusivas do dono do SaaS)', function () 
             ->update($request, $test->entity);
     }
 
+    function callManagerTest($test, array $payload)
+    {
+        $request = Request::create('/panel/manager/whatsapp/x/test', 'POST', $payload);
+        $request->setLaravelSession(app('session.store'));
+        $request->setUserResolver(fn () => auth()->user());
+
+        return app(WhatsAppController::class)
+            ->test($request, $test->entity);
+    }
+
     it('[SEGURANÇA] credenciais ficam criptografadas at rest', function () {
         $raw = DB::table('whatsapp_settings')->where('id', $this->setting->id)->value('credentials');
 
@@ -336,5 +346,44 @@ describe('configurações no MANAGER (exclusivas do dono do SaaS)', function () 
             'active'         => true, 'confirmation_enabled' => true, 'confirmation_hours_before' => 24,
             'survey_enabled' => true, 'survey_delay_hours' => 2,
         ]))->toThrow(NotFoundHttpException::class);
+    });
+
+    it('testar conexão aceita credenciais digitadas ANTES de salvar, sem persistir nada', function () {
+        actingAsSaas($this, SaasRule::Admin->value);
+
+        // Clínica virgem: sem WhatsAppSetting algum (o beforeEach cria um
+        // para $this->entity — aqui queremos o fluxo "primeira configuração").
+        $this->entity = Entity::factory()->create(['is_client' => true]);
+
+        $response = callManagerTest($this, [
+            'instance_id'    => 'ADHOC-INST',
+            'instance_token' => 'ADHOC-TOK',
+            'client_token'   => 'ADHOC-CT',
+        ]);
+
+        expect($response->getStatusCode())->toBe(200)
+            ->and($response->getData(true)['ok'])->toBeTrue()
+            ->and($response->getData(true)['connected'])->toBeTrue();
+
+        // Teste é transiente: nada foi salvo pra clínica.
+        expect(WhatsAppSetting::query()->where('entity_id', $this->entity->id)->exists())->toBeFalse();
+    });
+
+    it('testar conexão com credenciais parciais falha na validação (all-or-none)', function () {
+        actingAsSaas($this, SaasRule::Admin->value);
+
+        expect(fn () => callManagerTest($this, ['instance_id' => 'SO-O-ID']))
+            ->toThrow(ValidationException::class);
+    });
+
+    it('testar conexão sem credenciais digitadas nem salvas retorna 422', function () {
+        actingAsSaas($this, SaasRule::Admin->value);
+
+        $this->entity = Entity::factory()->create(['is_client' => true]);
+
+        $response = callManagerTest($this, []);
+
+        expect($response->getStatusCode())->toBe(422)
+            ->and($response->getData(true)['ok'])->toBeFalse();
     });
 });

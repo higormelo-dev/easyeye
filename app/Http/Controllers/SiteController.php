@@ -100,16 +100,23 @@ class SiteController extends Controller
         // Demonstração visual (tour do produto) — mesmo padrão do `howImageExists`
         // já existente: cada aba tem upgrade automático pra screenshot real assim
         // que o arquivo for colocado em public/site/images/, sem precisar mexer
-        // no front. Hoje nenhum existe → todas as abas caem no mockup CSS.
+        // no front. Valor = filemtime (truthy) usado como cache-buster `?v=` no
+        // front: screenshot recapturado com o mesmo nome fura o cache do browser.
         $demoTabs   = ['prontuario', 'agenda', 'imagens', 'laudos'];
         $demoImages = collect($demoTabs)
-            ->mapWithKeys(fn (string $tab) => [$tab => file_exists(public_path("site/images/demo-{$tab}.png"))])
+            ->mapWithKeys(function (string $tab) {
+                $path = public_path("site/images/demo-{$tab}.png");
+
+                return [$tab => file_exists($path) ? filemtime($path) : false];
+            })
             ->toArray();
+
+        $howImagePath = public_path('site/images/how-it-works.png');
 
         return Inertia::render('Site/Home', [
             'plans'          => $plans,
             'appName'        => config('app.name', 'EasyEye'),
-            'howImageExists' => file_exists(public_path('site/images/how-it-works.png')),
+            'howImageExists' => file_exists($howImagePath) ? filemtime($howImagePath) : false,
             'demoImages'     => $demoImages,
             't'              => array_merge(trans('site'), ['pricing_credit_note_html' => $creditNote]),
             'routes'         => [

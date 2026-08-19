@@ -36,6 +36,7 @@ return [
         'testing'      => 'Testando...',
         'connected'    => 'Instância conectada ao WhatsApp! ✅',
         'disconnected' => 'Instância encontrada, mas o WhatsApp NÃO está conectado — escaneie o QR Code no painel da Z-API.',
+        'fill_first'   => 'Preencha os 3 campos de credenciais (ou salve) para testar.',
     ],
 
     'webhook' => [

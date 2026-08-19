@@ -85,12 +85,22 @@ async function save() {
 const testing    = ref(false);
 const testResult = ref(null);
 
+// Credenciais recém-digitadas (ainda não salvas) — completas quando os 3
+// campos estão preenchidos. Permite testar ANTES de salvar.
+const typedCredentials = computed(() =>
+    form.instance_id && form.instance_token && form.client_token
+        ? { instance_id: form.instance_id, instance_token: form.instance_token, client_token: form.client_token }
+        : null,
+);
+
+const canTest = computed(() => Boolean(typedCredentials.value || editing.value?.setting?.has_credentials));
+
 async function testConnection() {
     if (!editing.value) return;
     testing.value = true;
     testResult.value = null;
     try {
-        const { data } = await window.axios.post(url('test', editing.value.id), {}, {
+        const { data } = await window.axios.post(url('test', editing.value.id), typedCredentials.value ?? {}, {
             headers: { 'X-CSRF-TOKEN': csrf() },
         });
         testResult.value = data;
@@ -212,7 +222,9 @@ const activeCount     = computed(() => props.clinics.filter(c => c.setting?.acti
 
                                 <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
                                     <button type="button" class="btn btn-outline-secondary btn-sm"
-                                            :disabled="testing || !editing?.setting?.has_credentials" @click="testConnection">
+                                            :disabled="testing || !canTest"
+                                            :title="canTest ? '' : t.connection.fill_first"
+                                            @click="testConnection">
                                         <span v-if="testing" class="spinner-border spinner-border-sm me-1"></span>
                                         <i v-else class="fas fa-plug me-1"></i>
                                         {{ testing ? t.connection.testing : t.connection.test }}

@@ -1503,14 +1503,14 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div class="row g-2">
                             <div class="col-6">
                                 <label class="pmr-label">{{ tt('av_without', 'A/V sem correção') }}</label>
-                                <div class="d-flex gap-1">
-                                    <div class="input-group input-group-sm">
+                                <div class="d-flex gap-1 flex-wrap">
+                                    <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                         <span class="input-group-text pmr-eye-badge">OD</span>
                                         <SearchSelect v-model="form.visual_acuity_without_correction_right_id"
                                                       :options="visualAcuityTypes"
                                                       :placeholder="'—'" :disabled="isLocked" />
                                     </div>
-                                    <div class="input-group input-group-sm">
+                                    <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                         <span class="input-group-text pmr-eye-badge">OE</span>
                                         <SearchSelect v-model="form.visual_acuity_without_correction_left_id"
                                                       :options="visualAcuityTypes"
@@ -1520,19 +1520,19 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             </div>
                             <div class="col-6">
                                 <label class="pmr-label">{{ tt('tonometry', 'Tonometria') }}</label>
-                                <div class="d-flex gap-1 align-items-center">
-                                    <div class="input-group input-group-sm" style="max-width:90px;">
+                                <div class="d-flex gap-1 align-items-center flex-wrap">
+                                    <div class="input-group input-group-sm flex-nowrap" style="max-width:90px;">
                                         <span class="input-group-text pmr-eye-badge">OD</span>
                                         <input v-model="form.tonometer_right" type="number" name="tonometer_right" step="0.5" min="0"
                                                class="form-control form-control-sm text-center"
-                                               placeholder="00" :disabled="isLocked"
+                                               placeholder="00" :disabled="isLocked" style="min-width:0;"
                                                @click="$event.target.select()">
                                     </div>
-                                    <div class="input-group input-group-sm" style="max-width:90px;">
+                                    <div class="input-group input-group-sm flex-nowrap" style="max-width:90px;">
                                         <span class="input-group-text pmr-eye-badge">OE</span>
                                         <input v-model="form.tonometer_left" type="number" name="tonometer_left" step="0.5" min="0"
                                                class="form-control form-control-sm text-center"
-                                               placeholder="00" :disabled="isLocked"
+                                               placeholder="00" :disabled="isLocked" style="min-width:0;"
                                                @click="$event.target.select()">
                                     </div>
                                     <input
@@ -1699,14 +1699,14 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <!-- A/V com correção -->
                     <div class="pmr-section mb-1" :style="sectionStyle('av_com')">
                         <label class="pmr-label">{{ tt('av_with', 'A/V com correção') }}</label>
-                        <div class="d-flex gap-1">
-                            <div class="input-group input-group-sm">
+                        <div class="d-flex gap-1 flex-wrap">
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
                                 <SearchSelect v-model="form.visual_acuity_with_correction_right_id"
                                               :options="visualAcuityTypes"
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="input-group input-group-sm">
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
                                 <SearchSelect v-model="form.visual_acuity_with_correction_left_id"
                                               :options="visualAcuityTypes"
