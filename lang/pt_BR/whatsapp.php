@@ -20,6 +20,7 @@ return [
         'global_title'        => 'Instância padrão do sistema',
         'global_hint'         => 'Número de WhatsApp do próprio SaaS usado por TODAS as clínicas que não plugarem um número próprio. Cole aqui as credenciais da instância contratada em z-api.io; o webhook "Ao receber" é configurado automaticamente ao salvar (a URL abaixo também pode ser colada manualmente no painel da Z-API).',
         'global_active'       => 'Instância padrão ativa (clínicas sem número próprio enviam por ela)',
+        'mock_warning'        => 'MODO SIMULAÇÃO (WHATSAPP_DRIVER=mock): nenhuma mensagem sai de verdade e o webhook NÃO é configurado na Z-API — tudo é apenas registrado em log. Para ativar de fato, defina WHATSAPP_DRIVER=zapi no .env do servidor e limpe o cache de config.',
     ],
 
     'no_credentials' => 'Configure as credenciais da Z-API primeiro.',

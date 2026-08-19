@@ -71,6 +71,9 @@ class WhatsAppController extends Controller
 
         return Inertia::render('Panel/Manager/WhatsApp/Index', [
             'clinics' => $clinics,
+            // 'mock' = simulação (nada sai pra Z-API de verdade) — o painel
+            // avisa em destaque pra ninguém achar que configurou e não foi.
+            'driver' => (string) config('whatsapp.driver', 'mock'),
             // Instância global do SaaS — padrão pra clínica sem número próprio.
             'global' => $global ? [
                 'active'          => $global->active,

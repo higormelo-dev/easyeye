@@ -13,6 +13,8 @@ const props = defineProps({
     clinics: { type: Array,  default: () => [] },
     // Instância Z-API GLOBAL do SaaS (padrão pra clínica sem número próprio).
     global:  { type: Object, default: null },
+    // 'zapi' = envia de verdade; 'mock' = simulação (nada sai pra Z-API).
+    driver:  { type: String, default: 'mock' },
     routes:  { type: Object, required: true },
     t:       { type: Object, required: true },
 });
@@ -227,6 +229,11 @@ async function testGlobal() {
     <AppLayout :title="t.title" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
             <PageHeader :title="t.title" :subtitle="t.manager_subtitle" />
+
+            <div v-if="driver === 'mock'" class="alert alert-warning d-flex align-items-center gap-2">
+                <i class="fas fa-triangle-exclamation"></i>
+                <div>{{ t.manager.mock_warning }}</div>
+            </div>
 
             <div class="d-flex gap-2 mb-3">
                 <span class="badge bg-light text-dark border">{{ clinics.length }} {{ t.manager.clinics }}</span>
