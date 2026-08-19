@@ -56,16 +56,20 @@ class SendWhatsAppMessageJob implements ShouldQueue, ShouldBeUnique
             ->where('entity_id', $message->entity_id)
             ->first();
 
-        if (! $setting || ! $setting->isOperational()) {
+        // Credenciais: as da clínica quando plugou número próprio; senão a
+        // instância GLOBAL do SaaS (fallback padrão do produto).
+        $credentials = $setting?->active ? $setting->sendingCredentials() : null;
+
+        if ($credentials === null) {
             $message->update([
                 'status' => WhatsAppMessage::STATUS_FAILED,
-                'error'  => 'Configuração WhatsApp inativa ou sem credenciais.',
+                'error'  => 'Configuração WhatsApp inativa ou sem credenciais (própria ou global).',
             ]);
 
             return;
         }
 
-        $result = $client->sendText($setting, $message->phone, $message->body);
+        $result = $client->sendText($credentials, $message->phone, $message->body);
 
         if (! $result['ok']) {
             // Lança pra fila re-tentar; o erro fica registrado desde já.

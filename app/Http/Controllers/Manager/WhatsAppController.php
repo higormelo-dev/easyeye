@@ -39,7 +39,8 @@ class WhatsAppController extends Controller
     {
         $this->authorizeSaasEntity();
 
-        $settings = WhatsAppSetting::query()->get()->keyBy('entity_id');
+        $settings = WhatsAppSetting::query()->whereNotNull('entity_id')->get()->keyBy('entity_id');
+        $global   = WhatsAppSetting::globalSetting();
 
         $clinics = Entity::query()
             ->where('is_client', true)
@@ -70,9 +71,18 @@ class WhatsAppController extends Controller
 
         return Inertia::render('Panel/Manager/WhatsApp/Index', [
             'clinics' => $clinics,
-            'routes'  => [
-                'update' => route('manager.whatsapp.update', ['entity' => '__ID__']),
-                'test'   => route('manager.whatsapp.test', ['entity' => '__ID__']),
+            // Instância global do SaaS — padrão pra clínica sem número próprio.
+            'global' => $global ? [
+                'active'          => $global->active,
+                'has_credentials' => $global->hasCredentials(),
+                'instance_id'     => $global->instance_id,
+                'webhook_url'     => route('whatsapp.webhooks', $global->webhook_token),
+            ] : null,
+            'routes' => [
+                'update'        => route('manager.whatsapp.update', ['entity' => '__ID__']),
+                'test'          => route('manager.whatsapp.test', ['entity' => '__ID__']),
+                'global_update' => route('manager.whatsapp.global.update'),
+                'global_test'   => route('manager.whatsapp.global.test'),
             ],
             't' => trans('whatsapp'),
         ]);
@@ -172,6 +182,102 @@ class WhatsAppController extends Controller
     {
         $this->authorizeSaasEntity();
 
+        $stored = WhatsAppSetting::query()
+            ->where('entity_id', (string) $entity->id)
+            ->first();
+
+        // Sem credencial própria (digitada ou salva), o teste cai na
+        // instância global — é por ela que esta clínica enviaria.
+        return $this->runConnectionTest($request, $stored ?? WhatsAppSetting::globalSetting());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Instância GLOBAL do SaaS (padrão para clínicas sem número próprio)
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function updateGlobal(Request $request): JsonResponse
+    {
+        $this->authorizeSaasEntity();
+
+        $data = $request->validate([
+            'active'         => ['required', 'boolean'],
+            'instance_id'    => ['nullable', 'string', 'max:100', 'required_with:instance_token,client_token'],
+            'instance_token' => ['nullable', 'string', 'max:200', 'required_with:instance_id,client_token'],
+            'client_token'   => ['nullable', 'string', 'max:200', 'required_with:instance_id,instance_token'],
+        ]);
+
+        $setting = WhatsAppSetting::query()->whereNull('entity_id')->first()
+            ?? new WhatsAppSetting(['entity_id' => null]);
+
+        if (! $setting->exists) {
+            $setting->webhook_token = WhatsAppSetting::generateWebhookToken();
+            // Toggles de fluxo não se aplicam à linha global (são por clínica).
+            $setting->confirmation_enabled      = false;
+            $setting->survey_enabled            = false;
+            $setting->confirmation_hours_before = 24;
+            $setting->survey_delay_hours        = 2;
+        }
+
+        $setting->active = $data['active'];
+
+        $credentialsChanged = false;
+
+        if (! empty($data['instance_id'])) {
+            $setting->credentials = [
+                'instance_id'    => $data['instance_id'],
+                'instance_token' => $data['instance_token'],
+                'client_token'   => $data['client_token'],
+            ];
+            $setting->instance_id = $data['instance_id'];
+            $credentialsChanged   = true;
+        }
+
+        $setting->save();
+
+        $webhookResult = ['ok' => true];
+
+        if ($credentialsChanged && $setting->hasCredentials()) {
+            $webhookResult = $this->client->updateReceivedWebhook(
+                $setting,
+                route('whatsapp.webhooks', $setting->webhook_token),
+            );
+        }
+
+        $this->audit->recordAdminAction(
+            event: 'manager.whatsapp_global.updated',
+            targetEntityId: null,
+            targetUserId: null,
+            auditableType: WhatsAppSetting::class,
+            auditableId: (string) $setting->id,
+            reason: 'Configuração da instância Z-API GLOBAL do SaaS',
+            newValues: [
+                'active'              => $data['active'],
+                'credentials_changed' => $credentialsChanged,
+            ],
+            request: $request,
+        );
+
+        return response()->json([
+            'message'         => __('whatsapp.saved'),
+            'webhook_ok'      => $webhookResult['ok'],
+            'webhook_url'     => route('whatsapp.webhooks', $setting->webhook_token),
+            'has_credentials' => $setting->hasCredentials(),
+        ]);
+    }
+
+    public function testGlobal(Request $request): JsonResponse
+    {
+        $this->authorizeSaasEntity();
+
+        return $this->runConnectionTest($request, WhatsAppSetting::globalSetting());
+    }
+
+    /**
+     * Testa credenciais ad-hoc do corpo da requisição (transientes, nunca
+     * persistidas nem logadas) ou, sem corpo, as do $stored.
+     */
+    private function runConnectionTest(Request $request, ?WhatsAppSetting $stored): JsonResponse
+    {
         $adHoc = $request->validate([
             'instance_id'    => ['nullable', 'string', 'max:255', 'required_with:instance_token,client_token'],
             'instance_token' => ['nullable', 'string', 'max:255', 'required_with:instance_id,client_token'],
@@ -186,9 +292,7 @@ class WhatsAppController extends Controller
                 'client_token'   => $adHoc['client_token'],
             ];
         } else {
-            $setting = WhatsAppSetting::query()
-                ->where('entity_id', (string) $entity->id)
-                ->first();
+            $setting = $stored;
         }
 
         if (! $setting || ! $setting->hasCredentials()) {

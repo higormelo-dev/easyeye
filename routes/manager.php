@@ -209,6 +209,12 @@ Route::group([
     // do controller): a conta Z-API pertence à empresa dona — cada clínica
     // ganha uma instância (número próprio), mas nunca vê as credenciais.
     Route::get('whatsapp', [WhatsAppController::class, 'index'])->name('whatsapp.index');
+    // Instância GLOBAL do SaaS (padrão pra clínica sem número próprio) —
+    // rotas fixas ANTES de whatsapp/{entity} pra não colidir com o binding.
+    Route::patch('whatsapp/global', [WhatsAppController::class, 'updateGlobal'])
+        ->middleware('throttle:manager-destructive')
+        ->name('whatsapp.global.update');
+    Route::post('whatsapp/global/test', [WhatsAppController::class, 'testGlobal'])->name('whatsapp.global.test');
     Route::patch('whatsapp/{entity}', [WhatsAppController::class, 'update'])
         ->middleware('throttle:manager-destructive')
         ->name('whatsapp.update');

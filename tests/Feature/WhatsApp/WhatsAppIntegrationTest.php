@@ -387,3 +387,169 @@ describe('configurações no MANAGER (exclusivas do dono do SaaS)', function () 
             ->and($response->getData(true)['ok'])->toBeFalse();
     });
 });
+
+describe('instância GLOBAL do SaaS (padrão pra clínica sem número próprio)', function () {
+    function createGlobalSetting(array $overrides = []): WhatsAppSetting
+    {
+        return WhatsAppSetting::create(array_merge([
+            'entity_id'                 => null,
+            'credentials'               => ['instance_id' => 'GINST', 'instance_token' => 'GTOK', 'client_token' => 'GCT'],
+            'instance_id'               => 'GINST',
+            'webhook_token'             => 'global-webhook-token-000000000000000000000000000',
+            'active'                    => true,
+            'confirmation_enabled'      => false,
+            'survey_enabled'            => false,
+            'confirmation_hours_before' => 24,
+            'survey_delay_hours'        => 2,
+        ], $overrides));
+    }
+
+    /** Clínica SEM credencial própria (usa a global) + consulta agendada. */
+    function createClinicUsingGlobal($test): array
+    {
+        $entity  = Entity::factory()->create(['is_client' => true, 'name' => 'CLINICA SEM NUMERO']);
+        $setting = WhatsAppSetting::create([
+            'entity_id'                 => $entity->id,
+            'credentials'               => null,
+            'webhook_token'             => 'clinic-no-creds-token-00000000000000000000000000',
+            'active'                    => true,
+            'confirmation_enabled'      => true,
+            'confirmation_hours_before' => 24,
+            'survey_enabled'            => true,
+            'survey_delay_hours'        => 0,
+        ]);
+        $doctor   = createDoctorForEntity($entity);
+        $schedule = Schedule::query()->create([
+            'entity_id' => $entity->id,
+            'doctor_id' => $doctor->id,
+            'full_name' => 'JOANA GLOBAL',
+            'cellphone' => '61988887777',
+            'date_time' => now()->addHours(5),
+            'situation' => ScheduleSituation::Scheduled->value,
+            'active'    => true,
+        ]);
+
+        return [$entity, $setting, $schedule];
+    }
+
+    it('clínica sem credencial própria envia confirmação pela instância global', function () {
+        createGlobalSetting();
+        [, , $schedule] = createClinicUsingGlobal($this);
+
+        $this->artisan('whatsapp:send-confirmations')->assertSuccessful();
+
+        $message = WhatsAppMessage::query()
+            ->where('schedule_id', $schedule->id)
+            ->where('kind', 'confirmation')
+            ->first();
+
+        expect($message)->not->toBeNull();
+
+        // Job resolve credenciais da global e envia (driver mock).
+        (new SendWhatsAppMessageJob((string) $message->id))->handle(app(ZApiClient::class));
+
+        expect($message->fresh()->status)->toBe('sent');
+    });
+
+    it('sem global e sem credencial própria, envio falha com trilha', function () {
+        [, , $schedule] = createClinicUsingGlobal($this);
+
+        $this->artisan('whatsapp:send-confirmations')->assertSuccessful();
+
+        $message = WhatsAppMessage::query()
+            ->where('schedule_id', $schedule->id)->where('kind', 'confirmation')->first();
+
+        // Sem global: comando nem enfileira (filtro), então não há mensagem.
+        expect($message)->toBeNull();
+    });
+
+    it('webhook GLOBAL casa a resposta com a clínica certa e confirma a consulta', function () {
+        Queue::fake([SendWhatsAppMessageJob::class]);
+        $global                = createGlobalSetting();
+        [$entity, , $schedule] = createClinicUsingGlobal($this);
+
+        // Outbound enviado pela global (pendente de resposta).
+        $out = app(WhatsAppService::class)->queueConfirmation(
+            WhatsAppSetting::query()->where('entity_id', $entity->id)->first(),
+            $schedule,
+        );
+        $out->update(['status' => 'sent', 'sent_at' => now(), 'zapi_message_id' => 'out-g1']);
+
+        $response = $this->postJson('/api/whatsapp/webhooks/' . $global->webhook_token, [
+            'type'       => 'ReceivedCallback',
+            'instanceId' => 'GINST',
+            'messageId'  => 'in-g-' . uniqid(),
+            'fromMe'     => false,
+            'phone'      => '5561988887777',
+            'text'       => ['message' => '1'],
+        ]);
+
+        $response->assertOk();
+
+        expect($schedule->fresh()->situation)->toBe(ScheduleSituation::Confirmed);
+
+        // Inbound ganhou o entity_id da clínica casada (trilha por tenant).
+        $inbound = WhatsAppMessage::query()->where('direction', 'in')->latest('created_at')->first();
+        expect($inbound->entity_id)->toBe($entity->id);
+    });
+
+    it('[SEGURANÇA] webhook global NÃO casa resposta de clínica com número próprio', function () {
+        Queue::fake([SendWhatsAppMessageJob::class]);
+        $global = createGlobalSetting();
+
+        // $this->entity (beforeEach) TEM credencial própria — a resposta do
+        // paciente dela chega pelo webhook DELA, nunca pelo global.
+        $out = app(WhatsAppService::class)->queueConfirmation($this->setting, $this->schedule->fresh());
+        $out->update(['status' => 'sent', 'sent_at' => now(), 'zapi_message_id' => 'out-own']);
+
+        $this->postJson('/api/whatsapp/webhooks/' . $global->webhook_token, [
+            'type'       => 'ReceivedCallback',
+            'instanceId' => 'GINST',
+            'messageId'  => 'in-x-' . uniqid(),
+            'fromMe'     => false,
+            'phone'      => '5561999998888',
+            'text'       => ['message' => '1'],
+        ])->assertOk();
+
+        // Nada casou: consulta continua Scheduled.
+        expect($this->schedule->fresh()->situation)->toBe(ScheduleSituation::Scheduled);
+    });
+
+    it('updateGlobal salva credenciais criptografadas e é singleton', function () {
+        actingAsSaas($this, SaasRule::Admin->value);
+
+        $request = Request::create('/panel/manager/whatsapp/global', 'PATCH', [
+            'active'         => true,
+            'instance_id'    => 'GNEW',
+            'instance_token' => 'GNEWTOK',
+            'client_token'   => 'GNEWCT',
+        ]);
+        $request->setLaravelSession(app('session.store'));
+        $request->setUserResolver(fn () => auth()->user());
+
+        $response = app(WhatsAppController::class)->updateGlobal($request);
+
+        expect($response->getStatusCode())->toBe(200);
+
+        $global = WhatsAppSetting::globalSetting();
+        expect($global)->not->toBeNull()
+            ->and($global->credentials['instance_token'])->toBe('GNEWTOK')
+            ->and(json_encode($response->getData(true)))->not->toContain('GNEWTOK');
+
+        // Segunda chamada atualiza a MESMA linha (singleton).
+        $response2 = app(WhatsAppController::class)->updateGlobal($request);
+        expect($response2->getStatusCode())->toBe(200)
+            ->and(WhatsAppSetting::query()->whereNull('entity_id')->count())->toBe(1);
+    });
+
+    it('[SEGURANÇA] staff que não é Admin do SaaS não configura a global', function () {
+        actingAsSaas($this, SaasRule::Support->value);
+
+        $request = Request::create('/panel/manager/whatsapp/global', 'PATCH', ['active' => true]);
+        $request->setLaravelSession(app('session.store'));
+        $request->setUserResolver(fn () => auth()->user());
+
+        expect(fn () => app(WhatsAppController::class)->updateGlobal($request))
+            ->toThrow(AuthorizationException::class);
+    });
+});

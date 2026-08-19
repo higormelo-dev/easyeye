@@ -157,8 +157,14 @@ class WhatsAppService
      * Processa uma mensagem recebida: casa com a última confirmação/pesquisa
      * pendente de resposta daquele telefone e aplica o efeito. Retorna a
      * mensagem de agradecimento a enviar (ou null se nada casou).
+     *
+     * Instância GLOBAL (setting sem entity): a resposta pode ser de qualquer
+     * clínica que envia pela global — o match por telefone é feito entre as
+     * clínicas SEM credencial própria (quem tem número próprio recebe pelo
+     * webhook da própria instância, nunca aqui). $inbound, quando passado,
+     * ganha o entity_id da clínica casada (trilha por tenant completa).
      */
-    public function handleInbound(WhatsAppSetting $setting, string $phone, string $text): ?string
+    public function handleInbound(WhatsAppSetting $setting, string $phone, string $text, ?WhatsAppMessage $inbound = null): ?string
     {
         $normalized = self::normalizePhone($phone);
 
@@ -166,17 +172,33 @@ class WhatsAppService
             return null;
         }
 
-        $pending = WhatsAppMessage::query()
-            ->where('entity_id', $setting->entity_id)
+        $query = WhatsAppMessage::query()
             ->where('direction', 'out')
             ->where('status', WhatsAppMessage::STATUS_SENT)
             ->where('phone', $normalized)
             ->whereIn('kind', [WhatsAppMessage::KIND_CONFIRMATION, WhatsAppMessage::KIND_SURVEY])
-            ->orderByDesc('sent_at')
-            ->first();
+            ->orderByDesc('sent_at');
+
+        if ($setting->isGlobal()) {
+            $entityIdsUsingGlobal = WhatsAppSetting::query()
+                ->whereNotNull('entity_id')
+                ->get()
+                ->filter(fn (WhatsAppSetting $s) => ! $s->hasCredentials())
+                ->pluck('entity_id');
+
+            $query->whereIn('entity_id', $entityIdsUsingGlobal);
+        } else {
+            $query->where('entity_id', $setting->entity_id);
+        }
+
+        $pending = $query->first();
 
         if (! $pending) {
             return null;
+        }
+
+        if ($inbound !== null && $inbound->entity_id === null) {
+            $inbound->update(['entity_id' => $pending->entity_id]);
         }
 
         return $pending->kind === WhatsAppMessage::KIND_CONFIRMATION

@@ -73,4 +73,44 @@ class WhatsAppSetting extends Model
     {
         return $this->active && $this->hasCredentials();
     }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Instância GLOBAL do SaaS (entity_id NULL — singleton via unique parcial)
+    // ──────────────────────────────────────────────────────────────────────
+
+    public function isGlobal(): bool
+    {
+        return $this->entity_id === null;
+    }
+
+    /** A linha global do SaaS, se existir. */
+    public static function globalSetting(): ?self
+    {
+        return self::query()->whereNull('entity_id')->first();
+    }
+
+    /**
+     * Setting cujas CREDENCIAIS devem ser usadas para enviar por esta clínica:
+     * as próprias quando plugou número próprio; senão a instância global do
+     * SaaS (se operacional). Null = não há como enviar.
+     */
+    public function sendingCredentials(): ?self
+    {
+        if ($this->hasCredentials()) {
+            return $this;
+        }
+
+        $global = self::globalSetting();
+
+        return $global && $global->isOperational() ? $global : null;
+    }
+
+    /**
+     * A clínica consegue enviar mensagens? (toggles próprios ativos + alguma
+     * credencial disponível — própria ou global).
+     */
+    public function canSend(): bool
+    {
+        return $this->active && $this->sendingCredentials() !== null;
+    }
 }

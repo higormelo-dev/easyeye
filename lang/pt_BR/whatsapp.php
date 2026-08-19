@@ -15,14 +15,18 @@ return [
         'status_active'       => 'Ativo',
         'status_inactive'     => 'Configurado (inativo)',
         'status_unconfigured' => 'Não configurado',
+        'status_via_global'   => 'Ativo (instância padrão)',
         'configure'           => 'Configurar',
+        'global_title'        => 'Instância padrão do sistema',
+        'global_hint'         => 'Número de WhatsApp do próprio SaaS usado por TODAS as clínicas que não plugarem um número próprio. Cole aqui as credenciais da instância contratada em z-api.io; o webhook "Ao receber" é configurado automaticamente ao salvar (a URL abaixo também pode ser colada manualmente no painel da Z-API).',
+        'global_active'       => 'Instância padrão ativa (clínicas sem número próprio enviam por ela)',
     ],
 
     'no_credentials' => 'Configure as credenciais da Z-API primeiro.',
 
     'credentials' => [
         'title'          => 'Credenciais da instância Z-API',
-        'hint'           => 'Crie sua instância em z-api.io, conecte seu número de WhatsApp pelo QR Code no painel deles e cole aqui os 3 dados da instância. Os tokens são armazenados criptografados e nunca são exibidos de volta.',
+        'hint'           => 'OPCIONAL — sem credenciais próprias, a clínica envia pela instância padrão do sistema. Para usar número próprio: crie uma instância em z-api.io, conecte o número pelo QR Code no painel deles e cole aqui os 3 dados. Os tokens são armazenados criptografados e nunca são exibidos de volta.',
         'instance_id'    => 'ID da instância',
         'instance_token' => 'Token da instância',
         'client_token'   => 'Client-Token (token de segurança da conta)',

@@ -28,11 +28,16 @@ class SendWhatsAppConfirmationsCommand extends Command
 
     public function handle(WhatsAppService $service): int
     {
+        // Clínica envia com credenciais próprias OU pela instância global do
+        // SaaS — a linha global (entity_id null) não é uma clínica, sai daqui.
+        $globalOk = WhatsAppSetting::globalSetting()?->isOperational() ?? false;
+
         $settings = WhatsAppSetting::query()
+            ->whereNotNull('entity_id')
             ->where('active', true)
             ->where('confirmation_enabled', true)
             ->get()
-            ->filter(fn (WhatsAppSetting $s) => $s->hasCredentials());
+            ->filter(fn (WhatsAppSetting $s) => $s->hasCredentials() || $globalOk);
 
         $queued = 0;
 

@@ -11,6 +11,8 @@ import PageHeader from '@/Components/Panel/PageHeader.vue';
  */
 const props = defineProps({
     clinics: { type: Array,  default: () => [] },
+    // Instância Z-API GLOBAL do SaaS (padrão pra clínica sem número próprio).
+    global:  { type: Object, default: null },
     routes:  { type: Object, required: true },
     t:       { type: Object, required: true },
 });
@@ -93,7 +95,10 @@ const typedCredentials = computed(() =>
         : null,
 );
 
-const canTest = computed(() => Boolean(typedCredentials.value || editing.value?.setting?.has_credentials));
+// Sem credencial própria o teste da clínica cai na instância global.
+const canTest = computed(() => Boolean(
+    typedCredentials.value || editing.value?.setting?.has_credentials || props.global?.has_credentials,
+));
 
 async function testConnection() {
     if (!editing.value) return;
@@ -113,6 +118,60 @@ async function testConnection() {
 
 const configuredCount = computed(() => props.clinics.filter(c => c.setting?.has_credentials).length);
 const activeCount     = computed(() => props.clinics.filter(c => c.setting?.active).length);
+
+// ── Instância GLOBAL do SaaS ─────────────────────────────────────────────────
+const gForm = reactive({
+    active: props.global?.active ?? true,
+    instance_id: '', instance_token: '', client_token: '',
+});
+const gSaving  = ref(false);
+const gFlash   = ref('');
+const gErrors  = ref({});
+const gTesting = ref(false);
+const gResult  = ref(null);
+const gWebhookWarn = ref(false);
+
+const gTypedCredentials = computed(() =>
+    gForm.instance_id && gForm.instance_token && gForm.client_token
+        ? { instance_id: gForm.instance_id, instance_token: gForm.instance_token, client_token: gForm.client_token }
+        : null,
+);
+const gCanTest = computed(() => Boolean(gTypedCredentials.value || props.global?.has_credentials));
+
+async function saveGlobal() {
+    gSaving.value = true;
+    gErrors.value = {};
+    gWebhookWarn.value = false;
+    try {
+        const { data } = await window.axios.patch(props.routes.global_update, gForm, {
+            headers: { 'X-CSRF-TOKEN': csrf() },
+        });
+        gFlash.value = data.message;
+        gWebhookWarn.value = !data.webhook_ok;
+        setTimeout(() => { gFlash.value = ''; }, 3000);
+        gForm.instance_id = gForm.instance_token = gForm.client_token = '';
+        router.reload({ only: ['global'], preserveScroll: true });
+    } catch (e) {
+        gErrors.value = e.response?.data?.errors ?? {};
+    } finally {
+        gSaving.value = false;
+    }
+}
+
+async function testGlobal() {
+    gTesting.value = true;
+    gResult.value = null;
+    try {
+        const { data } = await window.axios.post(props.routes.global_test, gTypedCredentials.value ?? {}, {
+            headers: { 'X-CSRF-TOKEN': csrf() },
+        });
+        gResult.value = data;
+    } catch (e) {
+        gResult.value = { ok: false, error: e.response?.data?.error ?? 'Erro ao testar.' };
+    } finally {
+        gTesting.value = false;
+    }
+}
 </script>
 
 <template>
@@ -124,6 +183,76 @@ const activeCount     = computed(() => props.clinics.filter(c => c.setting?.acti
                 <span class="badge bg-light text-dark border">{{ clinics.length }} {{ t.manager.clinics }}</span>
                 <span class="badge bg-info-subtle text-info border border-info-subtle">{{ configuredCount }} {{ t.manager.configured }}</span>
                 <span class="badge bg-success-subtle text-success border border-success-subtle">{{ activeCount }} {{ t.manager.active }}</span>
+            </div>
+
+            <!-- Instância GLOBAL do SaaS -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                        <h6 class="mb-0">
+                            <i class="fab fa-whatsapp text-success me-2"></i>{{ t.manager.global_title }}
+                            <span v-if="global?.has_credentials && global?.active"
+                                  class="badge bg-success-subtle text-success border border-success-subtle ms-2">{{ t.manager.status_active }}</span>
+                            <span v-else-if="global?.has_credentials"
+                                  class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-2">{{ t.manager.status_inactive }}</span>
+                            <span v-else class="badge bg-light text-muted border ms-2">{{ t.manager.status_unconfigured }}</span>
+                        </h6>
+                        <span v-if="gFlash" class="badge bg-success-subtle text-success">{{ gFlash }}</span>
+                    </div>
+                    <p class="text-muted small mb-3">{{ t.manager.global_hint }}</p>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small">{{ t.credentials.instance_id }}</label>
+                            <input v-model="gForm.instance_id" type="text" class="form-control form-control-sm"
+                                   :class="{ 'is-invalid': gErrors.instance_id }" autocomplete="off"
+                                   :placeholder="global?.instance_id ?? ''">
+                            <div v-if="gErrors.instance_id" class="invalid-feedback">{{ gErrors.instance_id[0] }}</div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small">{{ t.credentials.instance_token }}</label>
+                            <input v-model="gForm.instance_token" type="password" class="form-control form-control-sm"
+                                   :class="{ 'is-invalid': gErrors.instance_token }" autocomplete="new-password">
+                            <div v-if="gErrors.instance_token" class="invalid-feedback">{{ gErrors.instance_token[0] }}</div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label small">{{ t.credentials.client_token }}</label>
+                            <input v-model="gForm.client_token" type="password" class="form-control form-control-sm"
+                                   :class="{ 'is-invalid': gErrors.client_token }" autocomplete="new-password">
+                            <div v-if="gErrors.client_token" class="invalid-feedback">{{ gErrors.client_token[0] }}</div>
+                        </div>
+                    </div>
+
+                    <div class="form-check form-switch mb-2">
+                        <input id="gActive" v-model="gForm.active" class="form-check-input" type="checkbox">
+                        <label for="gActive" class="form-check-label small">{{ t.manager.global_active }}</label>
+                    </div>
+
+                    <div v-if="global?.webhook_url" class="mb-2">
+                        <div class="fw-semibold small mb-1">{{ t.webhook.title }}</div>
+                        <div v-if="gWebhookWarn" class="alert alert-warning py-1 small mb-2">{{ t.webhook.warn_failed }}</div>
+                        <code class="d-block bg-light border rounded p-2 text-break" style="font-size:.7rem;">{{ global.webhook_url }}</code>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-secondary btn-sm"
+                                :disabled="gTesting || !gCanTest"
+                                :title="gCanTest ? '' : t.connection.fill_first"
+                                @click="testGlobal">
+                            <span v-if="gTesting" class="spinner-border spinner-border-sm me-1"></span>
+                            <i v-else class="fas fa-plug me-1"></i>
+                            {{ gTesting ? t.connection.testing : t.connection.test }}
+                        </button>
+                        <span v-if="gResult?.ok && gResult.connected" class="badge bg-success-subtle text-success">{{ t.connection.connected }}</span>
+                        <span v-else-if="gResult?.ok" class="badge bg-warning-subtle text-warning-emphasis">{{ t.connection.disconnected }}</span>
+                        <span v-else-if="gResult" class="badge bg-danger-subtle text-danger">{{ gResult.error }}</span>
+
+                        <button type="button" class="btn btn-primary btn-sm ms-auto" :disabled="gSaving" @click="saveGlobal">
+                            <span v-if="gSaving" class="spinner-border spinner-border-sm me-1"></span>
+                            <i v-else class="fas fa-save me-1"></i>{{ t.save }}
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="card">
@@ -145,6 +274,10 @@ const activeCount     = computed(() => props.clinics.filter(c => c.setting?.acti
                                 <span v-if="clinic.setting?.active && clinic.setting?.has_credentials"
                                       class="badge bg-success-subtle text-success border border-success-subtle">
                                     <i class="fab fa-whatsapp me-1"></i>{{ t.manager.status_active }}
+                                </span>
+                                <span v-else-if="clinic.setting?.active && global?.has_credentials && global?.active"
+                                      class="badge bg-info-subtle text-info border border-info-subtle">
+                                    <i class="fab fa-whatsapp me-1"></i>{{ t.manager.status_via_global }}
                                 </span>
                                 <span v-else-if="clinic.setting?.has_credentials"
                                       class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">

@@ -30,11 +30,16 @@ class SendWhatsAppSurveysCommand extends Command
     {
         $maxAgeDays = (int) config('whatsapp.survey.max_age_days', 3);
 
+        // Clínica envia com credenciais próprias OU pela instância global do
+        // SaaS — a linha global (entity_id null) não é uma clínica, sai daqui.
+        $globalOk = WhatsAppSetting::globalSetting()?->isOperational() ?? false;
+
         $settings = WhatsAppSetting::query()
+            ->whereNotNull('entity_id')
             ->where('active', true)
             ->where('survey_enabled', true)
             ->get()
-            ->filter(fn (WhatsAppSetting $s) => $s->hasCredentials());
+            ->filter(fn (WhatsAppSetting $s) => $s->hasCredentials() || $globalOk);
 
         $queued = 0;
 

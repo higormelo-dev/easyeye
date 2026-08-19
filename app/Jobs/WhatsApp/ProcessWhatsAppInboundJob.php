@@ -51,24 +51,30 @@ class ProcessWhatsAppInboundJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
-        $setting = WhatsAppSetting::query()
-            ->where('entity_id', $inbound->entity_id)
-            ->first();
+        // entity_id NULL = inbound chegou pelo webhook da instância GLOBAL do
+        // SaaS; o handleInbound resolve a clínica pelo telefone e backfilla.
+        $setting = $inbound->entity_id === null
+            ? WhatsAppSetting::globalSetting()
+            : WhatsAppSetting::query()->where('entity_id', $inbound->entity_id)->first();
 
         if (! $setting) {
             return;
         }
 
-        $ack = $service->handleInbound($setting, $inbound->phone, $inbound->body);
+        $ack = $service->handleInbound($setting, $inbound->phone, $inbound->body, $inbound);
 
-        if ($ack === null || ! $setting->isOperational()) {
+        // Ack sai pelas credenciais que atendem esta setting (próprias ou,
+        // na global, ela mesma).
+        $credentials = $setting->active ? $setting->sendingCredentials() : null;
+
+        if ($ack === null || $credentials === null) {
             return;
         }
 
         // Ack direto (sem passar pela fila de novo): resposta imediata dá a
         // sensação de conversa; se falhar, registra mas não re-tenta — o ack
         // é cortesia, o efeito principal (confirmação/score) já foi aplicado.
-        $result = $client->sendText($setting, $inbound->phone, $ack);
+        $result = $client->sendText($credentials, $inbound->phone, $ack);
 
         WhatsAppMessage::create([
             'entity_id'       => $inbound->entity_id,
