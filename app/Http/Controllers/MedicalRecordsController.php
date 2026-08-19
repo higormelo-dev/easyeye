@@ -13,7 +13,7 @@ use App\Models\ReportSettingContent;
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
-use Illuminate\Support\{Collection, Str};
+use Illuminate\Support\{Str};
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class MedicalRecordsController extends Controller
@@ -548,13 +548,23 @@ class MedicalRecordsController extends Controller
             'canChooseDoctor' => (bool) $canChooseDoctor,
             'isDoctor'        => $isDoctor,
             'isEdit'          => $isEdit,
-            'catalogs'        => [
-                'visual_acuity_types' => $this->serializeCatalog(VisualAcuityType::orderBy('scale')->get()),
-                'color_vision_types'  => $this->serializeCatalog(ColorVisionType::orderBy('name')->get()),
-                'cover_test_types'    => $this->serializeCatalog(CoverTestType::orderBy('name')->get()),
-                'near_point_types'    => $this->serializeCatalog(NearPointConvergence::orderBy('name')->get()),
-                'addition_types'      => $this->serializeCatalog(AdditionType::orderBy('name')->get()),
-                'lenses'              => $this->serializeCatalog(Lense::orderBy('name')->get()),
+            // BUGFIX (tenant isolation): estas queries não filtravam entity_id —
+            // tipos CUSTOMIZADOS cadastrados por uma clínica em panel/setting/*
+            // apareciam nos dropdowns do prontuário de TODAS as outras clínicas
+            // (vazamento de dado entre tenants + poluição da lista). Escopo agora
+            // espelha o do BaseSettingController: globais (null) + os da clínica.
+            //
+            // Acuidade visual: orderBy scale + name — scale ordena da melhor
+            // (20/15) pra pior (20/400) e depois os qualitativos (ver
+            // VisualAcuityTypesSeeder); `name` desempata os customizados de
+            // clínica, que ficam com scale default 0.
+            'catalogs' => [
+                'visual_acuity_types' => $this->serializeCatalog($this->scopedCatalog(VisualAcuityType::query(), $entityId)->orderBy('scale')->orderBy('name')->get()),
+                'color_vision_types'  => $this->serializeCatalog($this->scopedCatalog(ColorVisionType::query(), $entityId)->orderBy('name')->get()),
+                'cover_test_types'    => $this->serializeCatalog($this->scopedCatalog(CoverTestType::query(), $entityId)->orderBy('name')->get()),
+                'near_point_types'    => $this->serializeCatalog($this->scopedCatalog(NearPointConvergence::query(), $entityId)->orderBy('name')->get()),
+                'addition_types'      => $this->serializeCatalog($this->scopedCatalog(AdditionType::query(), $entityId)->orderBy('name')->get()),
+                'lenses'              => $this->serializeCatalog($this->scopedCatalog(Lense::query(), $entityId)->orderBy('name')->get()),
                 'documentation_types' => $this->documentationService->getTypes(),
                 'available_templates' => $this->documentationService->getActiveTemplates($entityId),
                 'exam_reports'        => array_map(
@@ -723,9 +733,19 @@ class MedicalRecordsController extends Controller
 
     /**
      * @template T of \Illuminate\Database\Eloquent\Model
-     *
-     * @param Collection<int,T> $collection
      */
+    /**
+     * Escopo de tenant para catálogos clínicos do prontuário: registros
+     * GLOBAIS (entity_id null, seedados) + os CUSTOMIZADOS da clínica ativa.
+     * Mesmo recorte usado em BaseSettingController::fetchTableRows().
+     */
+    private function scopedCatalog($query, string $entityId)
+    {
+        return $query->where(
+            fn ($q) => $q->where('entity_id', $entityId)->orWhereNull('entity_id'),
+        );
+    }
+
     private function serializeCatalog($collection, ?callable $mapper = null): array
     {
         $mapper ??= fn ($item) => [
