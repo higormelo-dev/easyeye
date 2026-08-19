@@ -1647,25 +1647,25 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <!-- Adição / Longe / Perto + Calc -->
                     <div class="pmr-section mb-1" :style="sectionStyle('adicao')">
                         <div class="row g-2 align-items-end">
-                            <div class="col-6 col-xxl-3">
+                            <div class="col-6">
                                 <label class="pmr-label">{{ tt('addition', 'Adição') }}</label>
                                 <SearchSelect v-model="form.addition_type_id"
                                               :options="additionTypes"
                                               :placeholder="tt('select', 'Selecione')" :disabled="isLocked" />
                             </div>
-                            <div class="col-6 col-xxl-3">
+                            <div class="col-6">
                                 <label class="pmr-label">{{ tt('lens_away', 'Longe') }}</label>
                                 <SearchSelect v-model="form.lens_away_id"
                                               :options="lenses"
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="col-6 col-xxl-3">
+                            <div class="col-6">
                                 <label class="pmr-label">{{ tt('lens_near', 'Perto') }}</label>
                                 <SearchSelect v-model="form.lens_near_id"
                                               :options="lenses"
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="col-6 col-xxl-3 d-flex gap-1">
+                            <div class="col-6 d-flex gap-1 align-items-end">
                                 <input v-model.number="presbyopiaAddition" type="number" step="0.25"
                                        class="form-control form-control-sm" placeholder="Add." :disabled="isLocked">
                                 <button type="button" class="btn btn-outline-secondary btn-sm"
