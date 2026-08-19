@@ -10,8 +10,9 @@
 /public/system/images/*
 !/public/system/images/users
 /public/site/images/*
-# Screenshots reais do sistema usados na seção demo da landing — commitar
+# Screenshots reais do sistema usados na landing (demo + como funciona) — commitar
 !/public/site/images/demo-*.png
+!/public/site/images/how-it-works.png
 /storage/*.key
 /storage/pail
 /vendor
