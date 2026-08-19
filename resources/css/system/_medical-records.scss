@@ -763,3 +763,10 @@
         min-height: calc(.54rem * 1.1 * 2);
     }
 }
+
+// ── Responsividade do prontuário ────────────────────────────────────────────
+// Barra de modos (Padrão/Meu prontuário/Texto livre): btn-group do Bootstrap
+// não quebra linha por padrão e estourava em telas estreitas (< ~420px).
+.pmr-mode-bar .btn-group {
+    flex-wrap: wrap;
+}

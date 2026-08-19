@@ -1377,7 +1377,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         <!-- Queixa + Switches clínicos -->
         <div class="pmr-section pmr-top-strip px-3 pt-2 pb-0 bg-white">
             <div class="row g-2 align-items-start">
-                <div class="col-12 col-lg-8">
+                <div class="col-12 col-xl-8">
                     <label class="pmr-label">{{ tt('complaint', 'Queixa principal') }}</label>
                     <textarea v-model="form.main_complaint" name="main_complaint" rows="4"
                               class="form-control form-control-sm"
@@ -1386,7 +1386,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                               :disabled="isLocked"></textarea>
                 </div>
 
-                <div class="col-12 col-lg-4 pmr-risk-wrap">
+                <div class="col-12 col-xl-4 pmr-risk-wrap">
                     <!--
                         Título sem legenda: cores continuam Vermelho (danger, paciente TEM)
                         e Amarelo (warning, histórico familiar), mas a identificação
@@ -1471,7 +1471,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         <!-- Duas colunas principais -->
         <div v-show="!isFreeMode" class="row g-2 px-3 pt-1 pb-1 pmr-main-columns">
             <!-- COLUNA ESQUERDA -->
-            <div class="col-12 col-lg-6 pe-lg-2">
+            <div class="col-12 col-xl-6 pe-xl-2">
                 <div class="pmr-main-panel" :class="{ 'd-flex flex-column': isCustomMode }">
 
                     <!-- Vis. cromática / PPC / Cover test -->
@@ -1641,31 +1641,31 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             </div>
 
             <!-- COLUNA DIREITA -->
-            <div class="col-12 col-lg-6 ps-lg-2">
+            <div class="col-12 col-xl-6 ps-xl-2">
                 <div class="pmr-main-panel" :class="{ 'd-flex flex-column': isCustomMode }">
 
                     <!-- Adição / Longe / Perto + Calc -->
                     <div class="pmr-section mb-1" :style="sectionStyle('adicao')">
                         <div class="row g-2 align-items-end">
-                            <div class="col-3">
+                            <div class="col-6 col-xxl-3">
                                 <label class="pmr-label">{{ tt('addition', 'Adição') }}</label>
                                 <SearchSelect v-model="form.addition_type_id"
                                               :options="additionTypes"
                                               :placeholder="tt('select', 'Selecione')" :disabled="isLocked" />
                             </div>
-                            <div class="col-3">
+                            <div class="col-6 col-xxl-3">
                                 <label class="pmr-label">{{ tt('lens_away', 'Longe') }}</label>
                                 <SearchSelect v-model="form.lens_away_id"
                                               :options="lenses"
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="col-3">
+                            <div class="col-6 col-xxl-3">
                                 <label class="pmr-label">{{ tt('lens_near', 'Perto') }}</label>
                                 <SearchSelect v-model="form.lens_near_id"
                                               :options="lenses"
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="col-3 d-flex gap-1">
+                            <div class="col-6 col-xxl-3 d-flex gap-1">
                                 <input v-model.number="presbyopiaAddition" type="number" step="0.25"
                                        class="form-control form-control-sm" placeholder="Add." :disabled="isLocked">
                                 <button type="button" class="btn btn-outline-secondary btn-sm"

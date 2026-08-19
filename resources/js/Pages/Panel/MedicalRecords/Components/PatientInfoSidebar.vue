@@ -48,7 +48,7 @@ const genderLabel = computed(() => {
                  :style="{ background: avatarColor }">
                 {{ initials }}
             </div>
-            <h6 class="mb-0 fw-semibold text-truncate" :title="patient.full_name">
+            <h6 class="mb-0 fw-semibold" :title="patient.full_name">
                 {{ patient.full_name ?? '—' }}
             </h6>
             <small class="text-muted d-block">{{ patient.code }}</small>
