@@ -13,7 +13,7 @@ use App\Models\ReportSettingContent;
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
-use Illuminate\Support\{Str};
+use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class MedicalRecordsController extends Controller
@@ -495,7 +495,16 @@ class MedicalRecordsController extends Controller
         return MedicalRecord::query()
             ->where('patient_id', $patient->id)
             ->when($record, fn ($q) => $q->where('id', '!=', $record->id))
-            ->with('doctor.person')
+            ->with([
+                'doctor.person',
+                // Nomes das acuidades pro RESUMO CLÍNICO lateral — o caso de
+                // uso do painel é "quanto estava o grau/PIO/AV na última
+                // consulta?" sem abrir modal nem sair do prontuário atual.
+                'visualAcuityTypeWithoutCorrectionRight:id,name',
+                'visualAcuityTypeWithoutCorrectionLeft:id,name',
+                'visualAcuityTypeWitCorrectionRight:id,name',
+                'visualAcuityTypeWitCorrectionLeft:id,name',
+            ])
             ->orderByDesc('created_at')
             ->limit(6)
             ->get()
@@ -509,8 +518,62 @@ class MedicalRecordsController extends Controller
                 'diagnosis_count'      => is_array($mr->diagnosis_cids) ? count($mr->diagnosis_cids) : 0,
                 'is_signed'            => $mr->isSigned(),
                 'show_url'             => route('panel.patients.medicalrecords.show', [$patient, $mr]),
+                // ── Resumo clínico (comparação rápida durante o atendimento) ──
+                'summary' => [
+                    'av_sc'      => $this->eyePair($mr->visualAcuityTypeWithoutCorrectionRight?->name, $mr->visualAcuityTypeWithoutCorrectionLeft?->name),
+                    'av_cc'      => $this->eyePair($mr->visualAcuityTypeWitCorrectionRight?->name, $mr->visualAcuityTypeWitCorrectionLeft?->name),
+                    'refraction' => $this->eyePair(
+                        $this->refractionText($mr->dynamic_spherical_right, $mr->dynamic_cylindrical_right, $mr->dynamic_axis_right),
+                        $this->refractionText($mr->dynamic_spherical_left, $mr->dynamic_cylindrical_left, $mr->dynamic_axis_left),
+                    ),
+                    'pio'       => $this->eyePair($mr->tonometer_right, $mr->tonometer_left, ' mmHg'),
+                    'diagnoses' => collect(is_array($mr->diagnosis_cids) ? $mr->diagnosis_cids : [])
+                        ->map(fn ($d) => (string) ($d['description'] ?? $d['code'] ?? ''))
+                        ->filter()
+                        ->values()
+                        ->all(),
+                    'conduct' => Str::limit((string) $mr->clinical_conduct, 140) ?: null,
+                ],
             ])
             ->all();
+    }
+
+    /**
+     * "OD x | OE y" — omite o olho sem dado; null quando ambos vazios
+     * (a UI esconde a linha inteira).
+     */
+    private function eyePair(mixed $right, mixed $left, string $suffix = ''): ?string
+    {
+        $parts = [];
+
+        if ($right !== null && $right !== '') {
+            $parts[] = 'OD ' . $right;
+        }
+
+        if ($left !== null && $left !== '') {
+            $parts[] = 'OE ' . $left;
+        }
+
+        return $parts === [] ? null : implode(' | ', $parts) . $suffix;
+    }
+
+    /**
+     * "-1,50 / -0,50 × 180°" a partir de esférico/cilíndrico/eixo (refração
+     * dinâmica) — campos livres formatados pelo próprio form (formatLens).
+     */
+    private function refractionText(?string $spherical, ?string $cylindrical, ?string $axis): ?string
+    {
+        $out = trim((string) $spherical);
+
+        if (trim((string) $cylindrical) !== '') {
+            $out .= ($out !== '' ? ' / ' : '') . trim((string) $cylindrical);
+        }
+
+        if (trim((string) $axis) !== '') {
+            $out .= ' × ' . trim((string) $axis);
+        }
+
+        return $out === '' ? null : $out;
     }
 
     private function buildFormProps(Patient $patient, ?MedicalRecord $record): array
