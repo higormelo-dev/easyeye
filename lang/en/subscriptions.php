@@ -43,7 +43,6 @@ return [
         'has_ai_eye_image_analysis' => 'AI ocular image analysis',
         'has_ai_chat_assistant'     => 'Virtual AI assistant (floating chat)',
         'has_api_integrator'        => 'Ophthalmic equipment integration',
-        'has_own_payment_gateways'  => 'Clinic-owned payment gateways',
         'ai_monthly_credits'        => 'Monthly AI credits',
         'api_monthly_exam_sends'    => 'Integrator exam sends (monthly)',
         'plan_upgrade_required'     => 'Your plan does not include equipment integration. Upgrade to continue.',

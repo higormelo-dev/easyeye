@@ -393,14 +393,14 @@
                     </div>
                 </div>
 
-                <!-- Callout: exclusividades do Plano Pro -->
+                <!-- Callout: exclusividades do Plano Premium -->
                 <div class="pro-callout">
-                    <div class="pro-callout-badge">{{ t.differentiators.pro_callout.eyebrow }}</div>
-                    <h3>{{ t.differentiators.pro_callout.title }}</h3>
-                    <p class="pro-callout-text">{{ t.differentiators.pro_callout.text }}</p>
+                    <div class="pro-callout-badge">{{ t.differentiators.premium_callout.eyebrow }}</div>
+                    <h3>{{ t.differentiators.premium_callout.title }}</h3>
+                    <p class="pro-callout-text">{{ t.differentiators.premium_callout.text }}</p>
 
                     <div class="pro-callout-items">
-                        <div v-for="item in t.differentiators.pro_callout.items" :key="item.title" class="pro-callout-item">
+                        <div v-for="item in t.differentiators.premium_callout.items" :key="item.title" class="pro-callout-item">
                             <div class="pro-callout-item-icon"><i :class="'bi ' + item.icon"></i></div>
                             <div>
                                 <div class="pro-callout-item-head">
@@ -413,7 +413,7 @@
                     </div>
 
                     <a href="#precos" class="btn btn-featured">
-                        {{ t.differentiators.pro_callout.cta }} <i class="bi bi-arrow-right"></i>
+                        {{ t.differentiators.premium_callout.cta }} <i class="bi bi-arrow-right"></i>
                     </a>
                 </div>
             </div>
@@ -529,16 +529,16 @@
                             </li>
                         </ul>
 
-                        <!-- Recursos exclusivos do Pro — bloco estático, à parte da lista
+                        <!-- Recursos exclusivos do Premium — bloco estático, à parte da lista
                              dinâmica de features acima (não depende de PlanFeature no banco).
                              Optotipos/estoque ainda não existem no produto: badge "Novidade"
                              deixa isso explícito, nunca apresentado como já incluído. -->
-                        <div v-if="plan.slug === 'pro'" class="pricing-pro-extra">
-                            <div class="pricing-pro-extra-label">{{ t.pricing.pro_exclusive_label }}</div>
-                            <div v-for="item in t.differentiators.pro_callout.items" :key="item.title" class="pricing-pro-extra-item">
+                        <div v-if="plan.slug === 'premium'" class="pricing-pro-extra">
+                            <div class="pricing-pro-extra-label">{{ t.pricing.premium_exclusive_label }}</div>
+                            <div v-for="item in t.differentiators.premium_callout.items" :key="item.title" class="pricing-pro-extra-item">
                                 <i :class="'bi ' + item.icon"></i>
                                 <span>{{ item.title }}</span>
-                                <span class="pricing-pro-extra-badge">{{ t.pricing.pro_exclusive_new }}</span>
+                                <span class="pricing-pro-extra-badge">{{ t.pricing.premium_exclusive_new }}</span>
                             </div>
                         </div>
 

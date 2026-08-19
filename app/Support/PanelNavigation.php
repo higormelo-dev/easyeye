@@ -119,29 +119,20 @@ class PanelNavigation
         }
 
         if ($isAdmin) {
-            $entityId          = (string) session('selected_entity_id');
-            $featureGate       = app(FeatureGateService::class);
-            $canSeeOwnGateways = $entityId !== ''
-                && $featureGate->can($entityId, FeatureKey::HasOwnPaymentGateways);
-
             // ── Configurações reorganizadas em 5 categorias (era 1 grupo
             // flat com 12+ itens soltos + "Controle de acesso" à parte).
             // "Usuários" e "Segurança" saem do antigo grupo solto e entram
             // nas categorias semanticamente corretas abaixo.
 
-            // Clínica: recursos físicos da clínica (salas/equipamentos),
-            // segurança/2FA e gateway de pagamento próprio (se habilitado).
+            // Clínica: recursos físicos da clínica (salas/equipamentos) e
+            // segurança/2FA. Gateways próprios da clínica: REMOVIDO — a
+            // funcionalidade não existe mais para clínicas.
             $clinicalChildren = [
                 // Rota/controller continuam "resources" — só o label do menu
                 // muda para "Unidades / salas" (ClinicResource não é renomeado).
                 ['route' => 'panel.setting.resources.index', 'label' => __('actions.sidemenu.clinic_resources'), 'match' => ['panel.setting.resources.*']],
                 ['route' => 'panel.setting.security.index', 'label' => __('manager_hardening.entity_2fa_section'), 'match' => ['panel.setting.security.*']],
             ];
-
-            // Gateways de pagamento — só aparece se o plano da clínica habilitar.
-            if ($canSeeOwnGateways) {
-                $clinicalChildren[] = ['route' => 'panel.setting.gateways.index', 'label' => __('actions.sidemenu.payment_gateways'), 'match' => ['panel.setting.gateways.*']];
-            }
 
             // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
             $attendanceChildren = [

@@ -45,8 +45,9 @@ class PlanSeeder extends Seeder
                 // false, nunca setada aqui) — a landing page tem todo um
                 // mecanismo de destaque ("Mais popular", card navy, scale-up)
                 // que nunca acendia. Pro é o meio-termo (preço x recursos),
-                // destino natural do badge — e é o plano com os diferenciais
-                // (optotipos/estoque) que o produto quer deixar mais evidentes.
+                // destino natural do badge "Mais popular". Os diferenciais
+                // exclusivos (optotipos/estoque) são do PREMIUM — ver
+                // site.differentiators.premium_callout.
                 'is_featured' => true,
                 'features'    => [
                     FeatureKey::MaxUsers->value            => '10',

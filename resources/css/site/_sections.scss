@@ -1082,13 +1082,16 @@
     }
 }
 
-// Recursos exclusivos do Pro dentro do próprio card (o Pro é sempre o
-// featured hoje — ver PlanSeeder is_featured — então este bloco só existe
-// sobre o fundo navy; sem variante clara).
+// Recursos exclusivos do PREMIUM dentro do próprio card. O Premium NÃO é o
+// card featured (o "Mais popular" é o Pro), então o padrão aqui é a variante
+// CLARA (card branco); o override `.featured &` mantém legível caso o
+// destaque mude de plano no futuro.
 .pricing-pro-extra {
     margin: -8px 0 24px;
     padding-top: 20px;
-    border-top: 1px dashed rgba(#fff, .2);
+    border-top: 1px dashed $border;
+
+    .pricing-card.featured & { border-top-color: rgba(#fff, .2); }
 }
 
 .pricing-pro-extra-label {
@@ -1096,8 +1099,10 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: .05em;
-    color: rgba(#fff, .5);
+    color: $text-muted;
     margin-bottom: 10px;
+
+    .pricing-card.featured & { color: rgba(#fff, .5); }
 }
 
 .pricing-pro-extra-item {
@@ -1105,12 +1110,18 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: rgba(#fff, .85);
+    color: $text;
     margin-bottom: 8px;
 
     &:last-child { margin-bottom: 0; }
 
-    i { color: $teal-lt; font-size: 15px; flex-shrink: 0; }
+    i { color: $teal; font-size: 15px; flex-shrink: 0; }
+
+    .pricing-card.featured & {
+        color: rgba(#fff, .85);
+
+        i { color: $teal-lt; }
+    }
 }
 
 .pricing-pro-extra-badge {

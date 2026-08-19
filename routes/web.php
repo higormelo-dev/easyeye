@@ -55,7 +55,6 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     ResourcesController,
     SkinTypesController,
     SurgeryTypesController,
-    TenantGatewayController,
     VisitTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\AiDoctorPromptsController;
@@ -535,16 +534,10 @@ Route::group(
                 // o Client-Token pertencem à empresa dona do SaaS; a clínica
                 // usufrui do número próprio sem nunca ver credencial).
 
-                // ── Gateways de Pagamento do Tenant ────────────────────────
-                // Feature `has_own_payment_gateways` libera a clínica a cadastrar
-                // gateways próprios (Asaas, MP, etc.). Padrão off — a clínica usa
-                // o gateway centralizado do SaaS para suas cobranças (covenants).
-                Route::middleware('feature:has_own_payment_gateways')->group(function () {
-                    Route::get('gateways', [TenantGatewayController::class, 'index'])->name('gateways.index');
-                    Route::get('gateways/{gateway}/credentials', [TenantGatewayController::class, 'credentials'])->name('gateways.credentials');
-                    Route::post('gateways/{gateway}/credentials', [TenantGatewayController::class, 'storeCredential'])->name('gateways.credentials.store');
-                    Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [TenantGatewayController::class, 'revokeCredential'])->name('gateways.credentials.revoke');
-                });
+                // Gateways de pagamento próprios da clínica: REMOVIDO — a
+                // funcionalidade não existe mais para clínicas (todas usam o
+                // gateway centralizado do SaaS). Os gateways do próprio SaaS
+                // continuam em /panel/manager/gateways (manager.gateways.*).
             });
         });
 

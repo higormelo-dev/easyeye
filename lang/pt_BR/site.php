@@ -161,13 +161,13 @@ return [
             ['icon' => 'bi-diagram-3-fill', 'title' => 'Multi-clínica com visão única', 'text' => 'Gerencie várias unidades com um único login e relatórios consolidados.'],
         ],
 
-        // Callout de destaque — exclusividades do Plano Pro. Optotipos e
+        // Callout de destaque — exclusividades do Plano Premium. Optotipos e
         // estoque ainda não existem no produto: framing deliberado como
         // "novidade / em breve" (decisão de produto), nunca "já incluído".
-        'pro_callout' => [
-            'eyebrow' => 'Exclusivo do Plano Pro',
-            'title'   => 'O Pro vai além do prontuário',
-            'text'    => 'Quem assina o Plano Pro tem acesso a ferramentas de gestão adicionais que nenhum outro plano oferece.',
+        'premium_callout' => [
+            'eyebrow' => 'Exclusivo do Plano Premium',
+            'title'   => 'O Premium vai além do prontuário',
+            'text'    => 'Quem assina o Plano Premium tem acesso a ferramentas de gestão adicionais que nenhum outro plano oferece.',
             'items'   => [
                 [
                     'icon'  => 'bi-eye',
@@ -182,7 +182,7 @@ return [
                     'text'  => 'Acompanhe e organize materiais e produtos utilizados na operação da clínica, direto no sistema.',
                 ],
             ],
-            'cta' => 'Conhecer o Plano Pro',
+            'cta' => 'Conhecer o Plano Premium',
         ],
     ],
 
@@ -240,10 +240,10 @@ return [
         'trial_text'     => ':days dias grátis para testar',
         'empty_title'    => 'Planos em breve',
         'empty_subtitle' => 'Estamos preparando os melhores planos para sua clínica. Entre em contato e saiba mais.',
-        // Mini-callout dentro do card Pro — mesmos itens do differentiators.pro_callout,
+        // Mini-callout dentro do card Premium — mesmos itens do differentiators.premium_callout,
         // versão compacta pra reforçar no exato momento da comparação de planos.
-        'pro_exclusive_label' => 'Recursos adicionais do Pro',
-        'pro_exclusive_new'   => 'Novidade',
+        'premium_exclusive_label' => 'Recursos adicionais do Premium',
+        'premium_exclusive_new'   => 'Novidade',
     ],
 
     'faq' => [

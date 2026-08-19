@@ -187,8 +187,8 @@ it('nenhuma rota do menu de Assistente de IA (médico) está quebrada', function
     assertAllRoutesResolve($routes);
 });
 
-it('nenhuma rota do menu de gateways de pagamento próprios está quebrada', function () {
-    $entity          = entityWithFeatures([FeatureKey::HasOwnPaymentGateways]);
+it('gateways de pagamento próprios da clínica NÃO existem mais (menu e rotas removidos)', function () {
+    $entity          = entityWithFeatures([]);
     $admin           = User::factory()->create();
     $adminEntityUser = createEntityUser($entity, $admin, ClientRule::Admin->value);
 
@@ -196,9 +196,9 @@ it('nenhuma rota do menu de gateways de pagamento próprios está quebrada', fun
 
     $routes = collectNavRoutes(PanelNavigation::build());
 
-    expect($routes)->toContain('panel.setting.gateways.index');
-
-    assertAllRoutesResolve($routes);
+    // Funcionalidade retirada do produto: nem item de menu, nem rota registrada.
+    expect($routes)->not->toContain('panel.setting.gateways.index')
+        ->and(Route::has('panel.setting.gateways.index'))->toBeFalse();
 });
 
 it('nenhuma rota do menu de gestão SaaS (manager, entity não-cliente) está quebrada', function () {

@@ -24,9 +24,8 @@ enum FeatureKey: string
     // Assistente virtual flutuante (chat livre, disponível em qualquer tela do
     // painel) — independente das outras flags de IA porque é um produto à
     // parte (chat de apoio geral, não workflow de laudo/prontuário estruturado).
-    case HasAiChatAssistant    = 'has_ai_chat_assistant';
-    case HasApiIntegrator      = 'has_api_integrator';
-    case HasOwnPaymentGateways = 'has_own_payment_gateways';
+    case HasAiChatAssistant = 'has_ai_chat_assistant';
+    case HasApiIntegrator   = 'has_api_integrator';
 
     // Limites mensais de créditos IA (integer, 0 = ilimitado)
     case AiMonthlyCredits = 'ai_monthly_credits';
@@ -47,7 +46,6 @@ enum FeatureKey: string
             self::HasAiEyeImageAnalysis => __('subscriptions.features.has_ai_eye_image_analysis'),
             self::HasAiChatAssistant    => __('subscriptions.features.has_ai_chat_assistant'),
             self::HasApiIntegrator      => __('subscriptions.features.has_api_integrator'),
-            self::HasOwnPaymentGateways => __('subscriptions.features.has_own_payment_gateways'),
             self::AiMonthlyCredits      => __('subscriptions.features.ai_monthly_credits'),
             self::ApiMonthlyExamSends   => __('subscriptions.features.api_monthly_exam_sends'),
         };
@@ -63,7 +61,6 @@ enum FeatureKey: string
             self::HasAiEyeImageAnalysis,
             self::HasAiChatAssistant,
             self::HasApiIntegrator,
-            self::HasOwnPaymentGateways,
         ]);
     }
 

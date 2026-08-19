@@ -11,7 +11,7 @@ use Inertia\Testing\AssertableInertia as Assert;
  *
  * Cobre especificamente os dois bugs reais corrigidos nesta mudança:
  *  - nenhum plano tinha is_featured=true (o card "Mais popular" nunca acendia);
- *  - plan.slug não ia para o front (o callout exclusivo do Pro dependia disso).
+ *  - plan.slug não ia para o front (o callout exclusivo do Premium dependia disso).
  * E trava a decisão de produto: optotipos/estoque nunca aparecem como já
  * incluídos — sempre com o selo "novidade/em breve".
  */
@@ -31,7 +31,7 @@ it('renderiza a home com todas as novas seções de conteúdo', function () {
                 ->has('t.benefits.items', 8)
                 ->has('t.demo.tabs', 4)
                 ->has('t.differentiators.items')
-                ->has('t.differentiators.pro_callout.items', 2)
+                ->has('t.differentiators.premium_callout.items', 2)
                 ->has('demoImages.prontuario')
                 ->has('demoImages.agenda')
                 ->has('demoImages.imagens')
@@ -61,9 +61,9 @@ it('optotipos e estoque nunca são apresentados como já incluídos — sempre c
     $this->get(route('site.home'))
         ->assertInertia(
             fn (Assert $page) => $page
-                ->where('t.differentiators.pro_callout.items.0.badge', fn ($badge) => $badge !== '' && strtolower((string) $badge) !== 'incluído')
-                ->where('t.differentiators.pro_callout.items.1.badge', fn ($badge) => $badge !== '' && strtolower((string) $badge) !== 'incluído')
-                ->where('t.pricing.pro_exclusive_new', fn ($label) => $label !== ''),
+                ->where('t.differentiators.premium_callout.items.0.badge', fn ($badge) => $badge !== '' && strtolower((string) $badge) !== 'incluído')
+                ->where('t.differentiators.premium_callout.items.1.badge', fn ($badge) => $badge !== '' && strtolower((string) $badge) !== 'incluído')
+                ->where('t.pricing.premium_exclusive_new', fn ($label) => $label !== ''),
         );
 });
 

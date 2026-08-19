@@ -1,12 +1,17 @@
 <?php
 
-use App\Enums\FeatureKey;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
  * Adiciona a feature `has_own_payment_gateways` aos planos existentes.
+ *
+ * NOTA (2026-08-19): a feature foi REMOVIDA do produto (clínicas não têm mais
+ * gateways próprios) — o case do enum FeatureKey não existe mais, por isso
+ * esta migration usa a string literal (histórico precisa rodar em instalação
+ * nova). A migration 2026_08_19_000000_remove_own_payment_gateways_feature
+ * apaga as linhas logo em seguida.
  *
  * Padrão: desabilitado em todos os planos. A configuração de gateways próprios
  * (Asaas, MP, etc.) é uma necessidade pontual — a clínica usa o gateway
@@ -26,20 +31,20 @@ return new class() extends Migration {
     {
         // Default off em todos os planos — clínica usa gateway centralizado do SaaS.
         $this->syncFeatures('basico', [
-            FeatureKey::HasOwnPaymentGateways->value => '0',
+            'has_own_payment_gateways' => '0',
         ]);
         $this->syncFeatures('pro', [
-            FeatureKey::HasOwnPaymentGateways->value => '0',
+            'has_own_payment_gateways' => '0',
         ]);
         $this->syncFeatures('premium', [
-            FeatureKey::HasOwnPaymentGateways->value => '0',
+            'has_own_payment_gateways' => '0',
         ]);
     }
 
     public function down(): void
     {
         DB::table('plan_features')
-            ->where('feature', FeatureKey::HasOwnPaymentGateways->value)
+            ->where('feature', 'has_own_payment_gateways')
             ->delete();
     }
 

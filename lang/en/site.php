@@ -147,10 +147,10 @@ return [
             ['icon' => 'bi-diagram-3-fill', 'title' => 'Multi-clinic with a single view', 'text' => 'Manage multiple units with one login and consolidated reports.'],
         ],
 
-        'pro_callout' => [
-            'eyebrow' => 'Exclusive to the Pro plan',
-            'title'   => 'Pro goes beyond the patient record',
-            'text'    => 'Pro plan subscribers get access to additional management tools no other plan offers.',
+        'premium_callout' => [
+            'eyebrow' => 'Exclusive to the Premium plan',
+            'title'   => 'Premium goes beyond the patient record',
+            'text'    => 'Premium plan subscribers get access to additional management tools no other plan offers.',
             'items'   => [
                 [
                     'icon'  => 'bi-eye',
@@ -165,7 +165,7 @@ return [
                     'text'  => 'Track and organize materials and supplies used in the clinic\'s operations, right inside the system.',
                 ],
             ],
-            'cta' => 'Explore the Pro plan',
+            'cta' => 'Explore the Premium plan',
         ],
     ],
 
@@ -212,19 +212,19 @@ return [
     ],
 
     'pricing' => [
-        'label'               => 'Pricing',
-        'title'               => 'Plans for every clinic size',
-        'subtitle'            => 'No implementation fees. Cancel anytime.',
-        'trial_suffix'        => 'Try free for :days days.',
-        'featured_badge'      => 'Most popular',
-        'contact_cta'         => 'Talk to an expert',
-        'on_request'          => 'Contact us',
-        'get_started'         => 'Get started free',
-        'trial_text'          => ':days days free trial',
-        'empty_title'         => 'Plans coming soon',
-        'empty_subtitle'      => 'We are preparing the best plans for your clinic. Get in touch to learn more.',
-        'pro_exclusive_label' => 'Additional Pro features',
-        'pro_exclusive_new'   => 'Coming soon',
+        'label'                   => 'Pricing',
+        'title'                   => 'Plans for every clinic size',
+        'subtitle'                => 'No implementation fees. Cancel anytime.',
+        'trial_suffix'            => 'Try free for :days days.',
+        'featured_badge'          => 'Most popular',
+        'contact_cta'             => 'Talk to an expert',
+        'on_request'              => 'Contact us',
+        'get_started'             => 'Get started free',
+        'trial_text'              => ':days days free trial',
+        'empty_title'             => 'Plans coming soon',
+        'empty_subtitle'          => 'We are preparing the best plans for your clinic. Get in touch to learn more.',
+        'premium_exclusive_label' => 'Additional Premium features',
+        'premium_exclusive_new'   => 'Coming soon',
     ],
 
     'faq' => [
