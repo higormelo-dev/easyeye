@@ -32,7 +32,9 @@ class DataFakersSeeder extends Seeder
 {
     private const INTEGRATOR_TEST_ENTITY_NAME = 'Clínica Teste Integrador';
 
-    private const INTEGRATOR_TEST_ENTITY_SUBDOMAIN = 'clinica-teste-integrador';
+    // Público: reutilizado por EnsureTestFinancialProfilesCommand para achar
+    // a mesma clínica de teste sem duplicar o literal em dois lugares.
+    public const INTEGRATOR_TEST_ENTITY_SUBDOMAIN = 'clinica-teste-integrador';
 
     /**
      * Run the database seeds.
