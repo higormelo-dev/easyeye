@@ -775,4 +775,8 @@ return [
         'col_rate'        => 'Taxa',
         'col_period'      => 'Período',
     ],
+
+    'medication_presets' => [
+        'posology_saved' => 'Posologia salva como sua preferência para este medicamento.',
+    ],
 ];

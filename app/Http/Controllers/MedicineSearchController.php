@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\Medicine;
+use App\Models\{DoctorMedicationPreset, Medicine};
 use Illuminate\Http\{JsonResponse, Request};
 
 /**
@@ -40,6 +40,14 @@ class MedicineSearchController extends Controller
             ->limit(20)
             ->get(['id', 'name', 'dosage', 'frequency', 'duration', 'instructions', 'medicine_presentation_id']);
 
+        // Preset do médico logado (minha posologia/favorito) por medicamento —
+        // prefill da sugestão de posologia no modal do receituário.
+        $presets = DoctorMedicationPreset::query()
+            ->where('entity_user_id', session('selected_entity_user_id'))
+            ->whereIn('medicine_id', $results->pluck('id'))
+            ->get()
+            ->keyBy('medicine_id');
+
         return response()->json(
             $results->map(fn (Medicine $m) => [
                 'id'           => $m->id,
@@ -49,6 +57,8 @@ class MedicineSearchController extends Controller
                 'duration'     => $m->duration,
                 'instructions' => $m->instructions,
                 'presentation' => $m->presentation?->name,
+                'my_posology'  => $presets->get($m->id)?->posology,
+                'is_favorite'  => (bool) ($presets->get($m->id)?->is_favorite ?? false),
             ]),
         );
     }

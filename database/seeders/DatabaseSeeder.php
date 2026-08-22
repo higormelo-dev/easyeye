@@ -29,6 +29,9 @@ class DatabaseSeeder extends Seeder
         $this->call(CoverTestTypesSeeder::class);
         $this->call(ColorVisionTypesSeeder::class);
         $this->call(VisualAcuityTypesSeeder::class);
+        // Base global de medicamentos oftalmológicos (receituário — busca +
+        // sugestão de posologia). Idempotente.
+        $this->call(OphthalmicMedicinesSeeder::class);
         $this->call(LensesSeeder::class);
         $this->call(NearPointConvergencesSeeder::class);
         $this->call(MedicinePresentationsSeeder::class);

@@ -40,7 +40,7 @@ use App\Http\Controllers\{
     SiteController,
     SubscriptionExpiredController,
 };
-use App\Http\Controllers\CallPanelDisplayController;
+use App\Http\Controllers\{CallPanelDisplayController, MedicationPresetsController};
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
 use App\Http\Controllers\{PanelDashboardController, PreferencesController};
@@ -243,6 +243,19 @@ Route::group(
                 ->name('medicines.search');
             Route::post('medication-prescription/format-line', MedicationPrescriptionFormatController::class)
                 ->name('medication-prescription.format-line');
+
+            // Presets do médico no receituário (Recentes | Favoritos + "minha
+            // posologia") — prescrição é ato médico, role doctor obrigatória.
+            Route::middleware('entity.role:doctor')->group(function () {
+                Route::get('medication-presets', [MedicationPresetsController::class, 'index'])
+                    ->name('medication-presets.index');
+                Route::post('medication-presets/use', [MedicationPresetsController::class, 'recordUse'])
+                    ->name('medication-presets.use');
+                Route::post('medication-presets/posology', [MedicationPresetsController::class, 'savePosology'])
+                    ->name('medication-presets.posology');
+                Route::post('medication-presets/favorite', [MedicationPresetsController::class, 'toggleFavorite'])
+                    ->name('medication-presets.favorite');
+            });
 
             // F6 — Solicitação de procedimentos (autocomplete + format-line)
             Route::get('procedures/search', ProcedureSearchController::class)

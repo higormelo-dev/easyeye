@@ -775,10 +775,15 @@ class MedicalRecordsController extends Controller
             'tonometry_pdf'     => route('panel.patients.tonometry-pdf', $patient),
             'medicine_search'   => route('panel.medicines.search'),
             'medication_format' => route('panel.medication-prescription.format-line'),
-            'procedure_search'  => route('panel.procedures.search'),
-            'indication_search' => route('panel.indications.search'),
-            'procedure_format'  => route('panel.procedure-solicitation.format-line'),
-            'cid10_search'      => route('panel.cid10.search'),
+            // Presets do médico no receituário (Recentes | Favoritos + posologia)
+            'medication_presets'          => route('panel.medication-presets.index'),
+            'medication_presets_use'      => route('panel.medication-presets.use'),
+            'medication_presets_posology' => route('panel.medication-presets.posology'),
+            'medication_presets_favorite' => route('panel.medication-presets.favorite'),
+            'procedure_search'            => route('panel.procedures.search'),
+            'indication_search'           => route('panel.indications.search'),
+            'procedure_format'            => route('panel.procedure-solicitation.format-line'),
+            'cid10_search'                => route('panel.cid10.search'),
             // Histórico de evoluções é por PACIENTE (atravessa prontuários) —
             // disponível também no create, antes de salvar o prontuário atual.
             'evolutions_index' => route('panel.patients.evolutions.index', $patient),

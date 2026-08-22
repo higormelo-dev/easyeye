@@ -381,6 +381,15 @@ const medSearchResults  = ref([]);
 const medSearchOpen     = ref(false);
 const medSearchLoading  = ref(false);
 const maxMedicines      = 5;
+// Busca inteligente + posologia: abas Recentes | Favoritos | Buscar, seleção
+// com sugestão de posologia editável (minha posologia > genérica da base) e
+// presets por médico. Ver MedicationPresetsController.
+const medTab            = ref('search');   // search | recents | favorites
+const medPresets        = ref({ recents: [], favorites: [] });
+const selectedMed       = ref(null);
+const posologyDraft     = ref('');
+const posologySaving    = ref(false);
+const posologySavedFlash = ref(false);
 
 // F6 — Procedimentos + Indicações
 const procSelected     = ref([]);
@@ -940,7 +949,120 @@ async function openExam(examType, subtype = null) {
 // ──────────────────────────────────────────────────────────────────────────
 // F5 — Medicamentos
 // ──────────────────────────────────────────────────────────────────────────
-function openMedicationPrescription() { showMedicationModal.value = true; }
+function openMedicationPrescription() {
+    showMedicationModal.value = true;
+    selectedMed.value = null;
+    posologyDraft.value = '';
+    medTab.value = 'search';
+    loadMedPresets();
+}
+
+async function loadMedPresets() {
+    if (!props.urls.medication_presets) return;
+    try {
+        const res = await fetch(props.urls.medication_presets, { headers: { Accept: 'application/json' } });
+        if (res.ok) medPresets.value = await res.json();
+    } catch { /**/ }
+}
+
+// Posologia genérica da base (sugestão default quando o médico não tem a dele)
+function genericPosology(item) {
+    const usage = [item.dosage, item.frequency].filter(Boolean).join(' ')
+        + (item.duration ? ` por ${item.duration}` : '');
+    const lines = [];
+    if (usage.trim()) lines.push(usage.trim());
+    if (item.instructions) lines.push(`Obs: ${item.instructions}`);
+    return lines.join('\n');
+}
+
+// Fluxo: buscar/aba → SELECIONAR → sugerir posologia (editável) → confirmar.
+// Nada entra na receita sem passar pelo draft editável.
+function selectMedicine(item) {
+    if (!item?.id) return;
+    selectedMed.value   = item;
+    posologyDraft.value = item.my_posology || genericPosology(item);
+    posologySavedFlash.value = false;
+    medSearchOpen.value = false;
+}
+
+function cancelSelection() {
+    selectedMed.value = null;
+    posologyDraft.value = '';
+}
+
+async function confirmAddMedicine() {
+    const item = selectedMed.value;
+    if (!item) return;
+    if (prescription.value.length >= maxMedicines) return;
+    if (prescription.value.some((m) => m.id === item.id)) { cancelSelection(); return; }
+
+    if (props.urls.medication_format) {
+        try {
+            const res = await fetch(props.urls.medication_format, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+                body: JSON.stringify({ medicine_id: item.id, posology: posologyDraft.value }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                medicineLists.value += data.line ?? '';
+            }
+        } catch (e) {
+            console.error('Format line error:', e);
+        }
+    }
+
+    prescription.value.push(item);
+    medSearchQuery.value = '';
+    medSearchResults.value = [];
+    cancelSelection();
+
+    // Contadores das abas Recentes/Favoritos — falha não bloqueia a receita.
+    if (props.urls.medication_presets_use) {
+        fetch(props.urls.medication_presets_use, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ medicine_id: item.id }),
+        }).then(() => loadMedPresets()).catch(() => {});
+    }
+}
+
+async function saveMyPosology() {
+    const item = selectedMed.value;
+    if (!item || !props.urls.medication_presets_posology) return;
+    posologySaving.value = true;
+    try {
+        const res = await fetch(props.urls.medication_presets_posology, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ medicine_id: item.id, posology: posologyDraft.value }),
+        });
+        if (res.ok) {
+            item.my_posology = posologyDraft.value.trim() || null;
+            posologySavedFlash.value = true;
+            setTimeout(() => { posologySavedFlash.value = false; }, 2500);
+            loadMedPresets();
+        }
+    } finally {
+        posologySaving.value = false;
+    }
+}
+
+async function toggleMedFavorite(item) {
+    if (!item?.id || !props.urls.medication_presets_favorite) return;
+    const target = !item.is_favorite;
+    item.is_favorite = target; // otimista
+    try {
+        await fetch(props.urls.medication_presets_favorite, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
+            body: JSON.stringify({ medicine_id: item.id, favorite: target }),
+        });
+        loadMedPresets();
+    } catch {
+        item.is_favorite = !target;
+    }
+}
 
 async function searchMedicines() {
     const q = (medSearchQuery.value || '').trim();
@@ -963,31 +1085,6 @@ async function searchMedicines() {
     }
 }
 
-async function addMedicine(item) {
-    if (!item?.id) return;
-    if (prescription.value.length >= maxMedicines) return;
-    if (prescription.value.some((m) => m.id === item.id)) return;
-    if (props.urls.medication_format) {
-        try {
-            const res = await fetch(props.urls.medication_format, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf(), Accept: 'application/json' },
-                body: JSON.stringify({ medicine_id: item.id }),
-            });
-            if (res.ok) {
-                const data = await res.json();
-                medicineLists.value += data.line ?? '';
-            }
-        } catch (e) {
-            console.error('Format line error:', e);
-        }
-    }
-    prescription.value.push(item);
-    medSearchQuery.value = '';
-    medSearchResults.value = [];
-    medSearchOpen.value = false;
-}
-
 function removeMedicine(idx) {
     if (idx >= 0 && idx < prescription.value.length) prescription.value.splice(idx, 1);
 }
@@ -995,6 +1092,7 @@ function removeMedicine(idx) {
 function clearMedicines() {
     prescription.value = []; medicineLists.value = ''; medSearchQuery.value = '';
     medSearchResults.value = []; medSearchOpen.value = false;
+    cancelSelection();
 }
 
 function submitMedicationPrescription() {
@@ -2264,8 +2362,30 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <button type="button" class="btn-close" @click="showMedicationModal = false"></button>
                     </div>
                     <div class="modal-body">
-                        <label class="pmr-label mb-1">Adicionar medicamento</label>
-                        <div class="position-relative mb-2">
+                        <!-- Abas: Buscar | Recentes | Favoritos -->
+                        <ul class="nav nav-pills nav-sm mb-2 gap-1">
+                            <li class="nav-item">
+                                <button type="button" class="nav-link py-1 px-2" style="font-size:.8rem;"
+                                        :class="{ active: medTab === 'search' }" @click="medTab = 'search'">
+                                    <i class="fas fa-search me-1"></i>Buscar
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link py-1 px-2" style="font-size:.8rem;"
+                                        :class="{ active: medTab === 'recents' }" @click="medTab = 'recents'">
+                                    <i class="fas fa-clock-rotate-left me-1"></i>Recentes
+                                </button>
+                            </li>
+                            <li class="nav-item">
+                                <button type="button" class="nav-link py-1 px-2" style="font-size:.8rem;"
+                                        :class="{ active: medTab === 'favorites' }" @click="medTab = 'favorites'">
+                                    <i class="fas fa-star me-1"></i>Favoritos
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- Buscar -->
+                        <div v-show="medTab === 'search'" class="position-relative mb-2">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text"><i class="fas fa-search"></i></span>
                                 <input v-model="medSearchQuery" type="text" class="form-control form-control-sm"
@@ -2281,12 +2401,75 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 style="z-index:1080;top:100%;max-height:280px;overflow-y:auto;">
                                 <li v-for="item in medSearchResults" :key="item.id"
                                     class="list-group-item list-group-item-action py-1 px-2" style="cursor:pointer;font-size:.82rem;"
-                                    @mousedown.prevent="addMedicine(item)">
+                                    @mousedown.prevent="selectMedicine(item)">
+                                    <i v-if="item.is_favorite" class="fas fa-star text-warning me-1" style="font-size:.7rem;"></i>
                                     <span class="fw-semibold">{{ item.name }}</span>
                                     <span v-if="item.presentation" class="text-muted ms-1">({{ item.presentation }})</span>
+                                    <span v-if="item.my_posology" class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">minha posologia</span>
                                 </li>
                             </ul>
                         </div>
+
+                        <!-- Recentes / Favoritos -->
+                        <div v-show="medTab !== 'search'" class="mb-2">
+                            <ul v-if="(medTab === 'recents' ? medPresets.recents : medPresets.favorites).length > 0"
+                                class="list-group" style="max-height:220px;overflow-y:auto;">
+                                <li v-for="item in (medTab === 'recents' ? medPresets.recents : medPresets.favorites)" :key="item.id"
+                                    class="list-group-item list-group-item-action d-flex align-items-center py-1 px-2"
+                                    style="cursor:pointer;font-size:.82rem;"
+                                    @click="selectMedicine(item)">
+                                    <span class="flex-grow-1">
+                                        <span class="fw-semibold">{{ item.name }}</span>
+                                        <span v-if="item.presentation" class="text-muted ms-1">({{ item.presentation }})</span>
+                                        <span v-if="item.my_posology" class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">minha posologia</span>
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-link p-0"
+                                            :title="item.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
+                                            @click.stop="toggleMedFavorite(item)">
+                                        <i class="fa-star" :class="item.is_favorite ? 'fas text-warning' : 'far text-muted'"></i>
+                                    </button>
+                                </li>
+                            </ul>
+                            <p v-else class="text-muted small mb-0 py-2">
+                                <i class="fas fa-info-circle me-1"></i>
+                                {{ medTab === 'recents' ? 'Medicamentos que você prescrever aparecem aqui.' : 'Marque a estrela num medicamento para tê-lo sempre à mão.' }}
+                            </p>
+                        </div>
+
+                        <!-- Seleção: sugestão de posologia (editável — nada entra
+                             na receita sem confirmação do médico) -->
+                        <div v-if="selectedMed" class="border rounded p-2 mb-2 bg-light">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="fw-semibold" style="font-size:.85rem;">
+                                    {{ selectedMed.name }}
+                                    <span v-if="selectedMed.presentation" class="text-muted">({{ selectedMed.presentation }})</span>
+                                </span>
+                                <button type="button" class="btn btn-sm btn-link p-0"
+                                        :title="selectedMed.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
+                                        @click="toggleMedFavorite(selectedMed)">
+                                    <i class="fa-star" :class="selectedMed.is_favorite ? 'fas text-warning' : 'far text-muted'"></i>
+                                </button>
+                                <button type="button" class="btn-close ms-auto" style="font-size:.6rem;" @click="cancelSelection"></button>
+                            </div>
+                            <label class="pmr-label mb-1" style="font-size:.72rem;">
+                                Posologia sugerida — revise e edite antes de adicionar
+                                <span v-if="selectedMed.my_posology" class="badge bg-primary-subtle text-primary ms-1" style="font-size:.6rem;">sua posologia salva</span>
+                            </label>
+                            <textarea v-model="posologyDraft" class="form-control form-control-sm" rows="3"
+                                      placeholder="Dose, frequência, duração e orientações…"></textarea>
+                            <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                                <button type="button" class="btn btn-primary btn-sm" @click="confirmAddMedicine">
+                                    <i class="fas fa-plus me-1"></i>Adicionar à receita
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm"
+                                        :disabled="posologySaving" @click="saveMyPosology">
+                                    <span v-if="posologySaving" class="spinner-border spinner-border-sm me-1"></span>
+                                    <i v-else class="fas fa-bookmark me-1"></i>Salvar como minha posologia
+                                </button>
+                                <span v-if="posologySavedFlash" class="badge bg-success-subtle text-success">Posologia salva!</span>
+                            </div>
+                        </div>
+
                         <div v-if="prescription.length >= maxMedicines" class="alert alert-warning py-1 px-2 small mb-2">
                             <i class="fas fa-exclamation-triangle me-1"></i>Limite de {{ maxMedicines }} medicamentos atingido.
                         </div>

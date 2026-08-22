@@ -25,6 +25,9 @@ class MedicationPrescriptionFormatController extends Controller
     {
         $validated = $request->validate([
             'medicine_id' => ['required', 'uuid', 'exists:medicines,id'],
+            // Posologia confirmada/editada pelo médico no modal — opcional;
+            // sem ela, formata com a posologia genérica da base.
+            'posology' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $entityId = session('selected_entity_id');
@@ -35,7 +38,7 @@ class MedicationPrescriptionFormatController extends Controller
             ->findOrFail($validated['medicine_id']);
 
         return response()->json([
-            'line' => $this->service->formatLine($medicine),
+            'line' => $this->service->formatLine($medicine, $validated['posology'] ?? null),
         ]);
     }
 }
