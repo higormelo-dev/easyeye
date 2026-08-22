@@ -254,4 +254,19 @@ return [
     'cash_entry_duplicate'       => 'Este agendamento já possui uma entrada no caixa.',
     'cash_entry_required'        => 'Lance no caixa (ou marque Cortesia) antes de concluir o atendimento.',
     'cash_copay_notice'          => 'Atendimento de convênio: registre aqui apenas a co-participação do paciente. O valor do convênio é faturado à parte via guia.',
+
+    // ── Agenda do médico: fluxo de atendimento ────────────────────────────────
+    'btn_attend' => 'Iniciar atendimento',
+    'btn_call'   => 'Chamar paciente',
+    'call_sent'  => 'Chamada enviada ao painel da sala de espera.',
+
+    // ── Painel de chamadas (TV) — Configurações ───────────────────────────────
+    'call_panel_title'    => 'Painel de chamadas',
+    'call_panel_subtitle' => 'Chame pacientes para o consultório em uma TV na sala de espera, com aviso por voz.',
+    'call_panel_enable'   => 'Ativar painel de chamadas nesta clínica',
+    'call_panel_hint'     => 'Com o recurso ativo, a Agenda ganha o botão "Chamar paciente". A chamada aparece na TV e é anunciada por voz (ex.: "Paciente João — Dra. Ana Lima").',
+    'call_panel_url'      => 'URL da TV (abra no navegador da televisão)',
+    'call_panel_open'     => 'Abrir painel',
+    'call_panel_regen'    => 'Gerar novo link (invalida o atual)',
+    'call_panel_saved'    => 'Configurações do painel de chamadas salvas.',
 ];

@@ -40,6 +40,7 @@ use App\Http\Controllers\{
     SiteController,
     SubscriptionExpiredController,
 };
+use App\Http\Controllers\CallPanelDisplayController;
 use App\Http\Controllers\{Cid10SearchController, IndicationSearchController, MedicalRecordValidationRulesController, MedicationPrescriptionFormatController, MedicineSearchController, ProcedureSearchController, ProcedureSolicitationFormatController, TonometryPdfController};
 use App\Http\Controllers\Docs\ApiDocsController;
 use App\Http\Controllers\{PanelDashboardController, PreferencesController};
@@ -57,7 +58,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     SurgeryTypesController,
     VisitTypesController,
     VisualAcuityTypesController};
-use App\Http\Controllers\Setting\AiDoctorPromptsController;
+use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController};
 use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
@@ -127,6 +128,12 @@ Route::get('/go', function () {
 })->name('go');
 
 // Página exibida quando a assinatura está inativa/expirada
+// ── Painel/TV de chamadas da sala de espera (público por token da clínica) ──
+// Sem auth: roda na TV da recepção. Token aleatório + 404 genérico
+// anti-enumeração; só snapshots de nome passam por aqui (ver controller).
+Route::get('/call-panel/{token}', [CallPanelDisplayController::class, 'show'])->name('call-panel.show');
+Route::get('/call-panel/{token}/feed', [CallPanelDisplayController::class, 'feed'])->name('call-panel.feed');
+
 Route::get('/subscription/expired', SubscriptionExpiredController::class)
     ->middleware(['auth', 'verified', 'entity.selected'])
     ->name('subscription.expired');
@@ -399,6 +406,10 @@ Route::group(
             Route::post('schedules/bulk-update', [SchedulesController::class, 'bulkUpdate'])->name('schedules.bulk-update');
             Route::post('schedules/bulk-reschedule', [SchedulesController::class, 'bulkReschedule'])->name('schedules.bulk-reschedule');
             Route::patch('schedules/{schedule}/situation', [SchedulesController::class, 'updateSituation'])->name('schedules.situation');
+            // Agenda do médico: iniciar atendimento (abre o prontuário do
+            // agendamento) e chamar paciente pro painel/TV da sala de espera.
+            Route::get('schedules/{schedule}/attend', [SchedulesController::class, 'attend'])->name('schedules.attend');
+            Route::post('schedules/{schedule}/call', [SchedulesController::class, 'callPatient'])->name('schedules.call');
             Route::post('schedules/{schedule}/reschedule', [SchedulesController::class, 'reschedule'])->name('schedules.reschedule');
             Route::patch('schedules/{schedule}/mood', [SchedulesController::class, 'updateMood'])->name('schedules.mood');
             Route::post('schedules/{schedule}/cash-entry', [SchedulesController::class, 'storeCashEntry'])->name('schedules.cash-entry.store');
@@ -552,6 +563,10 @@ Route::group(
         // são uma camada ADITIVA puramente administrativa, nunca clínica.
         Route::middleware('permission:settings.manage')->group(function () {
             Route::group(['prefix' => 'setting', 'as' => 'setting.'], function () {
+                // Painel de chamadas da sala de espera (TV) — opcional por clínica
+                Route::get('call-panel', [CallPanelController::class, 'index'])->name('call-panel.index');
+                Route::patch('call-panel', [CallPanelController::class, 'update'])->name('call-panel.update');
+
                 Route::get('covenants/cards', [CovenantsController::class, 'cards'])->name('covenants.cards');
                 Route::resource('covenants', CovenantsController::class);
                 Route::get('covenants/{covenant}/restore', [CovenantsController::class, 'restore'])->name('covenants.restore');

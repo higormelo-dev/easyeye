@@ -42,6 +42,8 @@ const props = defineProps({
     isDoctor:         { type: Boolean, default: false },
     isStaff:          { type: Boolean, default: false },
     canRegisterCash:  { type: Boolean, default: false },
+    // Painel de chamadas (TV) habilitado nesta clínica — mostra o "Chamar paciente"
+    callPanelEnabled: { type: Boolean, default: false },
     t:                { type: Object,  default: () => ({}) },
 });
 
@@ -271,6 +273,19 @@ async function onCashSaved() {
     }
 
     router.reload({ only: ['scheduleItems'] });
+}
+
+// ── Chamar paciente (painel/TV da sala de espera) ─────────────────────────────
+async function onCallPatient(item) {
+    const res = await fetch(item.call_url, {
+        method: 'POST',
+        headers: {
+            'Accept':       'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+    });
+    const json = await res.json().catch(() => ({}));
+    showToast(json.message ?? (res.ok ? 'Chamada enviada.' : 'Erro ao chamar.'), res.ok ? 'success' : 'error');
 }
 
 // ── Situation / mood change ────────────────────────────────────────────────────
@@ -638,6 +653,7 @@ const breadcrumbs = [
                                     :is-staff="isStaff"
                                     :is-doctor="isDoctor"
                                     :can-register-cash="canRegisterCash"
+                                    :call-panel-enabled="callPanelEnabled"
                                     :situations="situations"
                                     :moods="moods"
                                     :selection-mode="selectionMode"
@@ -651,6 +667,7 @@ const breadcrumbs = [
                                     @change-situation="onChangeSituation"
                                     @change-mood="onChangeMood"
                                     @register-cash="openCashEntry"
+                                    @call="onCallPatient"
                                 />
                                 <EventCard v-else :item="item" :t="t" />
                             </template>

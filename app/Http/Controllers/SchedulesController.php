@@ -7,7 +7,7 @@ use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryExcep
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
 use App\Jobs\NotifyScheduleChangeJob;
-use App\Models\{Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, IrisType, People, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
+use App\Models\{Covenant, Doctor, Entity, FinancialCashEntry, FinancialCategory, IrisType, MedicalRecord, PatientCall, People, Procedure, Schedule, ScheduleEvent, ScheduleSituationLog, SkinType, VisitType, WaitingList};
 use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
@@ -106,8 +106,59 @@ class SchedulesController extends Controller
             ],
             'isDoctor' => ! is_null($loggedDoctor),
             'isStaff'  => in_array(session('user_rule'), [ClientRule::Admin->value, ClientRule::Secretary->value], true),
-            't'        => trans('schedules'),
+            // Painel de chamadas (TV da sala de espera) — opcional por clínica.
+            'callPanelEnabled' => (bool) Entity::whereKey(session('selected_entity_id'))->value('call_panel_enabled'),
+            't'                => trans('schedules'),
         ]);
+    }
+
+    /**
+     * "Iniciar atendimento" (Agenda do médico): abre o prontuário DO
+     * agendamento — o existente, se este atendimento já tem prontuário, ou o
+     * create já vinculado (?schedule_id=). A transição pra "Em consulta"
+     * acontece na abertura do prontuário (ScheduleFlowGuard).
+     */
+    public function attend(Schedule $schedule): RedirectResponse
+    {
+        $this->authorizeSchedule($schedule);
+        abort_unless($schedule->patient_id, 404);
+
+        $record = MedicalRecord::query()
+            ->where('schedule_id', $schedule->id)
+            ->whereNull('deleted_at')
+            ->first();
+
+        return $record
+            ? redirect()->route('panel.patients.medicalrecords.edit', [$schedule->patient_id, $record->id])
+            : redirect()->route('panel.patients.medicalrecords.create', [
+                'patient'     => $schedule->patient_id,
+                'schedule_id' => $schedule->id,
+            ]);
+    }
+
+    /**
+     * "Chamar paciente": emite chamada pro painel/TV da sala de espera.
+     * Nomes são snapshot — o painel público nunca consulta o cadastro.
+     */
+    public function callPatient(Schedule $schedule): JsonResponse
+    {
+        $this->authorizeSchedule($schedule);
+
+        $enabled = (bool) Entity::whereKey($schedule->entity_id)->value('call_panel_enabled');
+        abort_unless($enabled, 404);
+
+        $schedule->loadMissing(['patient.person', 'doctor.entityUser.user']);
+
+        PatientCall::create([
+            'entity_id'                => $schedule->entity_id,
+            'schedule_id'              => $schedule->id,
+            'patient_name'             => $schedule->full_name ?: ($schedule->patient?->person?->full_name ?? '—'),
+            'doctor_name'              => $schedule->doctor?->entityUser?->user?->name,
+            'called_by_entity_user_id' => session('selected_entity_user_id'),
+            'created_at'               => now(),
+        ]);
+
+        return response()->json(['message' => __('schedules.call_sent')]);
     }
 
     public function show(Schedule $schedule): JsonResponse|RedirectResponse
@@ -744,13 +795,17 @@ class SchedulesController extends Controller
             'patient_id'          => $s->patient_id,
             'patient_url'         => $s->patient_id ? route('panel.patients.show', $s->patient_id) : null,
             'medical_records_url' => $s->patient_id ? route('panel.patients.medicalrecords.index', $s->patient_id) : null,
-            'show_url'            => route('panel.schedules.show', $s->id),
-            'situation_url'       => route('panel.schedules.situation', $s->id),
-            'mood_url'            => route('panel.schedules.mood', $s->id),
-            'reschedule_url'      => route('panel.schedules.reschedule', $s->id),
-            'cash_entry_url'      => route('panel.schedules.cash-entry.store', $s->id),
-            'covenant_id'         => $s->covenant_id,
-            'has_cash_entry'      => isset($cashEntryScheduleIds[$s->id]),
+            // "Iniciar atendimento" (Agenda do médico) — precisa de paciente
+            // vinculado; abre o prontuário DESTE agendamento (attend()).
+            'attend_url'     => $s->patient_id ? route('panel.schedules.attend', $s->id) : null,
+            'call_url'       => route('panel.schedules.call', $s->id),
+            'show_url'       => route('panel.schedules.show', $s->id),
+            'situation_url'  => route('panel.schedules.situation', $s->id),
+            'mood_url'       => route('panel.schedules.mood', $s->id),
+            'reschedule_url' => route('panel.schedules.reschedule', $s->id),
+            'cash_entry_url' => route('panel.schedules.cash-entry.store', $s->id),
+            'covenant_id'    => $s->covenant_id,
+            'has_cash_entry' => isset($cashEntryScheduleIds[$s->id]),
             // Convênio cobrável (faturado via guia): caixa de chegada não
             // auto-abre nem pré-preenche valor cheio — eventual lançamento é
             // tratado como co-participação.

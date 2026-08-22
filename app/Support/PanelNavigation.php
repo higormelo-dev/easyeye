@@ -136,6 +136,7 @@ class PanelNavigation
 
             // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
             $attendanceChildren = [
+                ['route' => 'panel.setting.call-panel.index', 'label' => __('schedules.call_panel_title'), 'match' => ['panel.setting.call-panel.*']],
                 ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*']],
                 ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
                 ['route' => 'panel.setting.surgerytypes.index', 'label' => __('actions.sidemenu.surgerytypes'), 'match' => ['panel.setting.surgerytypes.*']],

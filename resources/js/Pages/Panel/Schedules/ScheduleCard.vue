@@ -9,6 +9,8 @@ const props = defineProps({
     isStaff:         { type: Boolean, default: false },
     isDoctor:        { type: Boolean, default: false },
     canRegisterCash: { type: Boolean, default: false },
+    // Painel de chamadas (TV da sala de espera) habilitado nesta clínica
+    callPanelEnabled: { type: Boolean, default: false },
     situations:      { type: Array,   default: () => [] },
     moods:           { type: Array,   default: () => [] },
     selectionMode:   { type: Boolean, default: false },
@@ -29,6 +31,7 @@ const emit = defineEmits([
     'change-situation',
     'change-mood',
     'register-cash',
+    'call',
 ]);
 
 // ── Waiting timer ──────────────────────────────────────────────────────────────
@@ -156,12 +159,34 @@ function onSituationClick(trans) {
                 <!-- Actions -->
                 <div class="d-flex align-items-center flex-shrink-0" style="gap: 8px;" @click.stop>
 
+                    <!-- Iniciar atendimento (Agenda do MÉDICO): ação principal —
+                         abre o prontuário DESTE agendamento; o status vira
+                         "Em consulta" na abertura (ScheduleFlowGuard). -->
+                    <a v-if="isDoctor && item.attend_url && !item.is_terminal"
+                       :href="item.attend_url"
+                       class="btn btn-success btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
+                       :title="t.btn_attend ?? 'Iniciar atendimento'">
+                        <i class="fas fa-play"></i>
+                        <span class="d-none d-lg-inline">{{ t.btn_attend ?? 'Iniciar atendimento' }}</span>
+                    </a>
+
+                    <!-- Chamar paciente (painel/TV da sala de espera) — opcional
+                         por clínica (Config. > Painel de chamadas). -->
+                    <ActionIconButton
+                        v-if="callPanelEnabled && !item.is_terminal"
+                        icon="fas fa-bullhorn"
+                        :title="t.btn_call ?? 'Chamar paciente'"
+                        @click="emit('call', item)"
+                    />
+
                     <!-- Grupo 1: controles de estado (situação + humor) -->
                     <!-- AJUSTE: situação/humor editáveis a qualquer momento, inclusive
                          com agendamento terminal (Atendido/Faltou/Cancelado) — corrige
-                         seleção por engano sem precisar recriar o agendamento. -->
+                         seleção por engano sem precisar recriar o agendamento.
+                         Situação também pro MÉDICO (fluxo Dilatação/Exame manual);
+                         humor segue só staff. -->
                     <ActionIconGroup
-                        v-if="isStaff && (situations.length > 0 || item.patient_id)"
+                        v-if="(isStaff || isDoctor) && (situations.length > 0 || item.patient_id)"
                         gap="tight"
                     >
                         <!-- Situation dropdown: todas as situações, sempre — nenhuma
@@ -185,9 +210,9 @@ function onSituationClick(trans) {
                             </li>
                         </ActionDropdown>
 
-                        <!-- Mood dropdown -->
+                        <!-- Mood dropdown (recepção) -->
                         <ActionDropdown
-                            v-if="item.patient_id"
+                            v-if="isStaff && item.patient_id"
                             :icon="'fas ' + (item.patient_mood ? item.patient_mood.icon : 'fa-theater-masks')"
                             btn-class="ee-action-icon ee-action-icon--default"
                             :title="t.dropdown_mood ?? 'Humor do paciente'"
@@ -223,9 +248,10 @@ function onSituationClick(trans) {
                             @click="emit('register-cash', item)"
                         />
 
-                        <!-- Edit -->
+                        <!-- Edit — função administrativa: fora da Agenda do médico
+                             (remarcação/organização é papel da secretaria). -->
                         <ActionIconButton
-                            v-if="!item.is_terminal"
+                            v-if="isStaff && !item.is_terminal"
                             icon="fas fa-edit"
                             :title="t.btn_edit ?? 'Editar'"
                             @click="emit('edit', item)"
@@ -248,8 +274,11 @@ function onSituationClick(trans) {
                             :href="item.medical_records_url"
                         />
 
-                        <!-- View -->
+                        <!-- View (histórico do agendamento) — pro médico o
+                             histórico clínico relevante já vive no prontuário
+                             (resumo de consultas anteriores). -->
                         <ActionIconButton
+                            v-if="isStaff"
                             icon="fas fa-eye"
                             :title="t.btn_view ?? 'Visualizar'"
                             @click="emit('view', item)"
