@@ -1,8 +1,8 @@
 <script setup>
 import { ref, watch, computed } from 'vue';
-import { useForm } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
-import SearchSelect from '@/Components/Panel/SearchSelect.vue';
+import PatientFormSections from '@/Pages/Panel/Patients/PatientFormSections.vue';
+import { usePatientForm } from '@/Support/usePatientForm.js';
 
 const props = defineProps({
     open:           { type: Boolean, required: true },
@@ -13,15 +13,12 @@ const props = defineProps({
     genders:        { type: Object,  default: () => ({}) },
     maritalStatuses:{ type: Object,  default: () => ({}) },
     statesOfBrazil: { type: Object,  default: () => ({}) },
-    // `embedded` — usado quando este modal abre de DENTRO de outro fluxo
-    // (ex.: "+ Cadastrar" no agendamento, ver ScheduleFormModal.vue) em vez
-    // da própria página Panel/Patients. Nesse caso o submit padrão do
-    // Inertia (form.post/put) não serve: ele segue o redirect do backend
-    // pra `panel.patients.index`, o que navegaria pra FORA da Agenda no
-    // meio do fluxo. Em modo embedded o submit vira fetch()+JSON puro
-    // (o backend já suporta isso — PatientsController::store() responde
-    // PatientResource quando `wantsJson()`) e emite `saved` em vez de
-    // fechar via redirect.
+    // `embedded` — usado quando este modal abre de DENTRO de outro fluxo em
+    // vez da própria página Panel/Patients. O submit padrão do Inertia
+    // (form.post/put) não serve: ele segue o redirect do backend pra
+    // `panel.patients.index`, navegando pra fora do fluxo hospedeiro. Em modo
+    // embedded o submit vira fetch()+JSON (backend já responde
+    // PatientResource quando wantsJson()) e emite `saved` em vez de redirect.
     embedded: { type: Boolean, default: false },
 });
 
@@ -30,74 +27,26 @@ const emit = defineEmits(['close', 'saved']);
 const isEdit    = computed(() => !!props.patientId);
 const title     = computed(() => isEdit.value ? 'Editar Paciente' : 'Novo Paciente');
 const activeTab = ref('personal');
-const loading   = ref(false);
 
-const form = useForm({
-    // Clínico
-    covenant_id: '',
-    card_number: '',
-    skin_id:     '',
-    iris_id:     '',
-    active:      true,
-    // Pessoal
-    name:              '',
-    nickname:          '',
-    national_registry: '',
-    birth_date:        '',
-    gender:            '',
-    marital_status:    '',
-    email:             '',
-    mother_name:       '',
-    father_name:       '',
-    // Documento
-    state_registry:         '',
-    state_registry_agency:  '',
-    state_registry_initial: '',
-    state_registry_date:    '',
-    // Contato
-    telephone: '',
-    cellphone: '',
-    whatsapp:  false,
-    // Endereço
-    zipcode:    '',
-    address:    '',
-    number:     '',
-    complement: '',
-    district:   '',
-    city:       '',
-    state:      '',
-    country:    'Brasil',
-});
-
-function resetForm() {
-    form.reset();
-    form.clearErrors();
-    activeTab.value = 'personal';
-}
-
-async function loadEditData(id) {
-    loading.value = true;
-    try {
-        const res  = await fetch(route('panel.patients.editData', id));
-        const json = await res.json();
-        const d    = json.data;
-        Object.keys(form).forEach((key) => {
-            if (key in d) form[key] = d[key] ?? form[key];
-        });
-    } finally {
-        loading.value = false;
-    }
-}
+// Toda a lógica do formulário (campos, load, save embedded, CEP, badges de
+// aba) vive em usePatientForm — compartilhada com o agendamento
+// (ScheduleFormModal), que renderiza as mesmas abas inline.
+const {
+    form, loading, resetForm, loadEditData, savePatient, lookupCep,
+    genderOptions, maritalOptions, stateOptions, tabHasErrors, tabIncomplete,
+} = usePatientForm(props);
 
 watch(() => props.open, async (val) => {
     if (!val) return;
     resetForm();
+    activeTab.value = 'personal';
     if (props.patientId) await loadEditData(props.patientId);
 });
 
-function submit() {
+async function submit() {
     if (props.embedded) {
-        submitEmbedded();
+        const result = await savePatient(props.patientId);
+        if (result.ok) emit('saved', result.patient);
         return;
     }
 
@@ -114,107 +63,12 @@ function submit() {
     }
 }
 
-// Laravel manda {field: [msg, ...]} — os `form.errors.xxx` do template
-// esperam string única (mesmo formato que o Inertia normalmente já entrega
-// sozinho num submit via form.post/put padrão).
-function flattenErrors(errors) {
-    return Object.fromEntries(
-        Object.entries(errors).map(([key, val]) => [key, Array.isArray(val) ? val[0] : val]),
-    );
-}
-
-async function submitEmbedded() {
-    form.processing = true;
-    form.clearErrors();
-
-    const url    = isEdit.value ? route('panel.patients.update', props.patientId) : route('panel.patients.store');
-    const method = isEdit.value ? 'PUT' : 'POST';
-
-    try {
-        const res = await fetch(url, {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept':       'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-            },
-            body: JSON.stringify(form.data()),
-        });
-        const json = await res.json();
-
-        if (res.ok) {
-            emit('saved', {
-                id:        json.data?.id ?? props.patientId,
-                code:      json.data?.attributes?.code ?? null,
-                full_name: form.name,
-                cellphone: form.cellphone,
-                telephone: form.telephone,
-            });
-        } else if (res.status === 422 && json.errors) {
-            form.setError(flattenErrors(json.errors));
-        } else {
-            form.setError({ name: json.message ?? 'Erro ao salvar paciente.' });
-        }
-    } finally {
-        form.processing = false;
-    }
-}
-
-async function lookupCep() {
-    const cep = form.zipcode.replace(/\D/g, '');
-    if (cep.length !== 8) return;
-    try {
-        const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-        const d   = await res.json();
-        if (!d.erro) {
-            form.address  = d.logradouro ?? form.address;
-            form.district = d.bairro     ?? form.district;
-            form.city     = d.localidade ?? form.city;
-            form.state    = d.uf         ?? form.state;
-        }
-    } catch { /**/ }
-}
-
-const genderOptions = computed(() =>
-    Object.entries(props.genders).map(([v, l]) => ({ value: Number(v), label: l })),
-);
-const maritalOptions = computed(() =>
-    Object.entries(props.maritalStatuses).map(([v, l]) => ({ value: Number(v), label: l })),
-);
-const stateOptions = computed(() =>
-    Object.entries(props.statesOfBrazil).map(([v, l]) => ({ value: v, label: l })),
-);
-
-const tabHasErrors = computed(() => ({
-    personal: Object.keys(form.errors).some(k =>
-        ['name','nickname','national_registry','birth_date','gender','marital_status','email','mother_name','father_name'].includes(k),
-    ),
-    clinical: Object.keys(form.errors).some(k =>
-        ['covenant_id','card_number','skin_id','iris_id'].includes(k),
-    ),
-    contact: Object.keys(form.errors).some(k =>
-        ['telephone','cellphone','whatsapp'].includes(k),
-    ),
-    address: Object.keys(form.errors).some(k =>
-        ['zipcode','address','number','complement','district','city','state','country'].includes(k),
-    ),
-}));
-
-// ── Abas com campo obrigatório ainda vazio (destaque azul) ───────────────────
-// Só considera campos REALMENTE obrigatórios (espelha PatientRequest::rules())
-// — Endereço não tem nenhum, então nunca acende (evita ruído: "pendente"
-// precisa sinalizar algo que falta de verdade, não todo campo opcional vazio).
-// `=== ''` em vez de falsy puro: gênero pode valer 0 (Masculino) legitimamente,
-// e `!0` daria falso positivo.
-const isBlank = (v) => v === '' || v === null || v === undefined;
-
-const tabIncomplete = computed(() => ({
-    personal: ['name', 'birth_date', 'gender', 'marital_status', 'national_registry', 'email']
-        .some(k => isBlank(form[k])),
-    clinical: isBlank(form.covenant_id),
-    contact: isBlank(form.cellphone),
-    address: false,
-}));
+const tabs = [
+    { key: 'personal', label: 'Pessoal',  icon: 'ti ti-user-circle' },
+    { key: 'clinical', label: 'Clínico',  icon: 'ti ti-stethoscope' },
+    { key: 'contact',  label: 'Contato',  icon: 'ti ti-phone' },
+    { key: 'address',  label: 'Endereço', icon: 'ti ti-map-pin' },
+];
 </script>
 
 <template>
@@ -234,55 +88,18 @@ const tabIncomplete = computed(() => ({
         <!-- ── Abas ─────────────────────────────────────────────────────────── -->
         <template #tabs>
             <ul class="nav nav-tabs border-0">
-                <li class="nav-item">
+                <li v-for="tab in tabs" :key="tab.key" class="nav-item">
                     <button class="nav-link"
                             :class="{
-                                active: activeTab === 'personal',
-                                'text-danger': tabHasErrors.personal,
-                                'text-primary fw-semibold': !tabHasErrors.personal && tabIncomplete.personal,
+                                active: activeTab === tab.key,
+                                'text-danger': tabHasErrors[tab.key],
+                                'text-primary fw-semibold': !tabHasErrors[tab.key] && tabIncomplete[tab.key],
                             }"
                             type="button"
-                            @click="activeTab = 'personal'">
-                        <i class="ti ti-user-circle me-1"></i>Pessoal
-                        <i v-if="tabHasErrors.personal" class="ti ti-alert-circle text-danger ms-1"></i>
-                        <i v-else-if="tabIncomplete.personal" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link"
-                            :class="{
-                                active: activeTab === 'clinical',
-                                'text-danger': tabHasErrors.clinical,
-                                'text-primary fw-semibold': !tabHasErrors.clinical && tabIncomplete.clinical,
-                            }"
-                            type="button"
-                            @click="activeTab = 'clinical'">
-                        <i class="ti ti-stethoscope me-1"></i>Clínico
-                        <i v-if="tabHasErrors.clinical" class="ti ti-alert-circle text-danger ms-1"></i>
-                        <i v-else-if="tabIncomplete.clinical" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link"
-                            :class="{
-                                active: activeTab === 'contact',
-                                'text-danger': tabHasErrors.contact,
-                                'text-primary fw-semibold': !tabHasErrors.contact && tabIncomplete.contact,
-                            }"
-                            type="button"
-                            @click="activeTab = 'contact'">
-                        <i class="ti ti-phone me-1"></i>Contato
-                        <i v-if="tabHasErrors.contact" class="ti ti-alert-circle text-danger ms-1"></i>
-                        <i v-else-if="tabIncomplete.contact" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link"
-                            :class="{ active: activeTab === 'address', 'text-danger': tabHasErrors.address }"
-                            type="button"
-                            @click="activeTab = 'address'">
-                        <i class="ti ti-map-pin me-1"></i>Endereço
-                        <i v-if="tabHasErrors.address" class="ti ti-alert-circle text-danger ms-1"></i>
+                            @click="activeTab = tab.key">
+                        <i :class="tab.icon" class="me-1"></i>{{ tab.label }}
+                        <i v-if="tabHasErrors[tab.key]" class="ti ti-alert-circle text-danger ms-1"></i>
+                        <i v-else-if="tabIncomplete[tab.key]" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
                     </button>
                 </li>
             </ul>
@@ -294,246 +111,18 @@ const tabIncomplete = computed(() => ({
              a cada troca de aba. Altura calibrada pra caber a aba Pessoal
              (a mais longa) sem sobra visível nas mais curtas. -->
         <form class="patient-form-tabs" @submit.prevent="submit">
-
-            <!-- TAB: Pessoal -->
-            <div v-show="activeTab === 'personal'">
-                <div class="mb-3">
-                    <label class="form-label">Nome completo <span class="text-danger">*</span></label>
-                    <input v-model="form.name"
-                           type="text"
-                           class="form-control"
-                           :class="{ 'is-invalid': form.errors.name }">
-                    <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Apelido</label>
-                    <input v-model="form.nickname" type="text" class="form-control">
-                </div>
-
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label class="form-label">Data de nascimento <span class="text-danger">*</span></label>
-                        <input v-model="form.birth_date"
-                               type="date"
-                               class="form-control"
-                               :class="{ 'is-invalid': form.errors.birth_date }">
-                        <div v-if="form.errors.birth_date" class="invalid-feedback">{{ form.errors.birth_date }}</div>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">Gênero <span class="text-danger">*</span></label>
-                        <SearchSelect v-model="form.gender"
-                                      :options="genderOptions"
-                                      :value-key="'value'"
-                                      :label-key="'label'"
-                                      :placeholder="'Selecione'"
-                                      :clearable="false"
-                                      :invalid="!!form.errors.gender" />
-                        <div v-if="form.errors.gender" class="invalid-feedback d-block">{{ form.errors.gender }}</div>
-                    </div>
-                </div>
-
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label class="form-label">Estado civil <span class="text-danger">*</span></label>
-                        <SearchSelect v-model="form.marital_status"
-                                      :options="maritalOptions"
-                                      :value-key="'value'"
-                                      :label-key="'label'"
-                                      :placeholder="'Selecione'"
-                                      :clearable="false"
-                                      :invalid="!!form.errors.marital_status" />
-                        <div v-if="form.errors.marital_status" class="invalid-feedback d-block">{{ form.errors.marital_status }}</div>
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">CPF <span class="text-danger">*</span></label>
-                        <input v-model="form.national_registry"
-                               type="text"
-                               class="form-control"
-                               placeholder="000.000.000-00"
-                               :class="{ 'is-invalid': form.errors.national_registry }">
-                        <div v-if="form.errors.national_registry" class="invalid-feedback">{{ form.errors.national_registry }}</div>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">E-mail <span class="text-danger">*</span></label>
-                    <input v-model="form.email"
-                           type="email"
-                           class="form-control"
-                           :class="{ 'is-invalid': form.errors.email }">
-                    <div v-if="form.errors.email" class="invalid-feedback">{{ form.errors.email }}</div>
-                </div>
-
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label class="form-label">Nome da mãe</label>
-                        <input v-model="form.mother_name" type="text" class="form-control">
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">Nome do pai</label>
-                        <input v-model="form.father_name" type="text" class="form-control">
-                    </div>
-                </div>
-
-                <div v-if="isEdit" class="mb-3">
-                    <div class="form-check form-switch">
-                        <input id="chkActive" v-model="form.active" class="form-check-input" type="checkbox">
-                        <label class="form-check-label" for="chkActive">Paciente ativo</label>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: Clínico -->
-            <div v-show="activeTab === 'clinical'">
-                <div class="mb-3">
-                    <label class="form-label">Convênio <span class="text-danger">*</span></label>
-                    <SearchSelect v-model="form.covenant_id"
-                                  :options="covenants"
-                                  :placeholder="'Selecione'"
-                                  :invalid="!!form.errors.covenant_id" />
-                    <div v-if="form.errors.covenant_id" class="invalid-feedback d-block">{{ form.errors.covenant_id }}</div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Número da carteirinha</label>
-                    <input v-model="form.card_number" type="text" class="form-control">
-                </div>
-
-                <div class="row g-3 mb-3">
-                    <div class="col-6">
-                        <label class="form-label">Tipo de pele</label>
-                        <SearchSelect v-model="form.skin_id"
-                                      :options="skinTypes"
-                                      :placeholder="'Não informado'" />
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label">Tipo de íris</label>
-                        <SearchSelect v-model="form.iris_id"
-                                      :options="irisTypes"
-                                      :placeholder="'Não informado'" />
-                    </div>
-                </div>
-
-                <div class="card border-0 bg-light p-3 mt-2">
-                    <p class="text-muted small fw-medium mb-2">Registro estadual (opcional)</p>
-                    <div class="row g-3">
-                        <div class="col-6">
-                            <label class="form-label small">RG</label>
-                            <input v-model="form.state_registry" type="text" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">Órgão emissor</label>
-                            <input v-model="form.state_registry_agency" type="text" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">UF do RG</label>
-                            <SearchSelect v-model="form.state_registry_initial"
-                                          :options="stateOptions"
-                                          :value-key="'value'"
-                                          :label-key="'value'"
-                                          :placeholder="'—'" />
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label small">Data do RG</label>
-                            <input v-model="form.state_registry_date" type="date" class="form-control form-control-sm">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB: Contato -->
-            <div v-show="activeTab === 'contact'">
-                <div class="mb-3">
-                    <label class="form-label">Celular <span class="text-danger">*</span></label>
-                    <input v-model="form.cellphone"
-                           v-phone-mask="'cellphone'"
-                           type="text"
-                           inputmode="numeric"
-                           class="form-control"
-                           placeholder="(00) 00000-0000"
-                           :class="{ 'is-invalid': form.errors.cellphone }">
-                    <div v-if="form.errors.cellphone" class="invalid-feedback">{{ form.errors.cellphone }}</div>
-                </div>
-
-                <div class="mb-3">
-                    <div class="form-check">
-                        <input id="chkWhatsapp" v-model="form.whatsapp" class="form-check-input" type="checkbox">
-                        <label class="form-check-label" for="chkWhatsapp">
-                            <i class="fab fa-whatsapp text-success me-1"></i>Este celular tem WhatsApp
-                        </label>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Telefone fixo</label>
-                    <input v-model="form.telephone"
-                           v-phone-mask="'landline'"
-                           type="text"
-                           inputmode="numeric"
-                           class="form-control"
-                           placeholder="(00) 0000-0000">
-                </div>
-            </div>
-
-            <!-- TAB: Endereço -->
-            <div v-show="activeTab === 'address'">
-                <div class="mb-3">
-                    <label class="form-label">CEP</label>
-                    <div class="input-group">
-                        <input v-model="form.zipcode"
-                               type="text"
-                               class="form-control"
-                               placeholder="00000-000"
-                               @blur="lookupCep">
-                        <button type="button" class="btn btn-outline-secondary" @click="lookupCep">
-                            <i class="ti ti-search"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Logradouro</label>
-                    <input v-model="form.address" type="text" class="form-control">
-                </div>
-
-                <div class="row g-3 mb-3">
-                    <div class="col-4">
-                        <label class="form-label">Número</label>
-                        <input v-model="form.number" type="text" class="form-control">
-                    </div>
-                    <div class="col-8">
-                        <label class="form-label">Complemento</label>
-                        <input v-model="form.complement" type="text" class="form-control">
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Bairro</label>
-                    <input v-model="form.district" type="text" class="form-control">
-                </div>
-
-                <div class="row g-3 mb-3">
-                    <div class="col-8">
-                        <label class="form-label">Cidade</label>
-                        <input v-model="form.city" type="text" class="form-control">
-                    </div>
-                    <div class="col-4">
-                        <label class="form-label">UF</label>
-                        <SearchSelect v-model="form.state"
-                                      :options="stateOptions"
-                                      :value-key="'value'"
-                                      :label-key="'value'"
-                                      :placeholder="'—'" />
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">País</label>
-                    <input v-model="form.country" type="text" class="form-control">
-                </div>
-            </div>
-
+            <PatientFormSections
+                :form="form"
+                :section="activeTab"
+                :covenants="covenants"
+                :skin-types="skinTypes"
+                :iris-types="irisTypes"
+                :gender-options="genderOptions"
+                :marital-options="maritalOptions"
+                :state-options="stateOptions"
+                :is-edit="isEdit"
+                :lookup-cep="lookupCep"
+            />
         </form>
 
         <!-- ── Rodapé ────────────────────────────────────────────────────────── -->
@@ -552,7 +141,7 @@ const tabIncomplete = computed(() => ({
 </template>
 
 <style scoped>
-/* Item 2 — tamanho fixo entre abas (ver comentário acima do <form>). */
+/* Tamanho fixo entre abas (ver comentário acima do <form>). */
 .patient-form-tabs {
     min-height: 480px;
 }

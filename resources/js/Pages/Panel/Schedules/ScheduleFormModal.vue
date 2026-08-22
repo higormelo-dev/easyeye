@@ -3,7 +3,8 @@ import { ref, watch, computed, nextTick } from 'vue';
 import CenteredModal from '@/Components/Panel/CenteredModal.vue';
 import SlotPicker    from '@/Components/Panel/SlotPicker.vue';
 import SearchSelect  from '@/Components/Panel/SearchSelect.vue';
-import PatientFormModal from '@/Pages/Panel/Patients/PatientFormModal.vue';
+import PatientFormSections from '@/Pages/Panel/Patients/PatientFormSections.vue';
+import { usePatientForm } from '@/Support/usePatientForm.js';
 
 const props = defineProps({
     open:            { type: Boolean, required: true },
@@ -14,9 +15,10 @@ const props = defineProps({
     visitTypes:      { type: Array,   default: () => [] },
     attendanceTypes: { type: Array,   default: () => [] },
     specialties:     { type: Array,   default: () => [] },
-    // Cadastro completo do paciente (item 3 — "+ Cadastrar" abre o mesmo
-    // PatientFormModal usado em Panel/Patients, em vez do mini-form só-nome
-    // de antes). Ver SchedulesController::index().
+    // Cadastro completo do paciente DENTRO do agendamento: as abas
+    // Pessoal/Clínico/Contato/Endereço (mesmos campos de Pacientes >
+    // Editar Paciente, via PatientFormSections + usePatientForm) ficam na
+    // mesma janela, ao lado da aba Agendamento. Ver SchedulesController::index().
     skinTypes:       { type: Array,   default: () => [] },
     irisTypes:       { type: Array,   default: () => [] },
     genders:         { type: Object,  default: () => ({}) },
@@ -59,6 +61,53 @@ const form = ref({
     recurrence_until:   '',
 });
 
+// ── Abas (Agendamento + cadastro do paciente) ─────────────────────────────────
+// Primeira aba = fluxo rápido atual da Agenda; as demais reaproveitam os
+// mesmos campos de Pacientes > Editar Paciente. Tudo salva junto no
+// "Salvar e vincular": primeiro o paciente (se criado/alterado), depois o
+// agendamento já vinculado.
+const activeTab = ref('schedule');
+
+const patientTabs = [
+    { key: 'personal', label: 'Pessoal',  icon: 'ti ti-user-circle' },
+    { key: 'clinical', label: 'Clínico',  icon: 'ti ti-stethoscope' },
+    { key: 'contact',  label: 'Contato',  icon: 'ti ti-phone' },
+    { key: 'address',  label: 'Endereço', icon: 'ti ti-map-pin' },
+];
+
+const {
+    form: patientForm,
+    loading: patientLoading,
+    resetForm: resetPatientForm,
+    loadEditData,
+    savePatient,
+    lookupCep,
+    genderOptions,
+    maritalOptions,
+    stateOptions,
+    tabHasErrors,
+    tabIncomplete,
+} = usePatientForm(props);
+
+// Abas do paciente "em uso": paciente vinculado ou algo digitado nelas.
+// Controla os badges de pendência (não poluir quem só faz o fluxo rápido)
+// e se o submit precisa salvar o paciente.
+const patientTabsActive = computed(() => Boolean(form.value.patient_id || patientForm.isDirty));
+
+function goToPatientTabs() {
+    // Prefill de cortesia: aproveita o que a secretária já digitou na aba
+    // Agendamento pra não redigitar no cadastro.
+    if (!patientForm.name && (form.value.full_name || patientSearch.value)) {
+        patientForm.name = form.value.full_name || patientSearch.value;
+    }
+    if (!patientForm.cellphone && form.value.cellphone) patientForm.cellphone = form.value.cellphone;
+    if (!patientForm.telephone && form.value.telephone) patientForm.telephone = form.value.telephone;
+    if (!patientForm.whatsapp && form.value.cellphone_whatsapp) patientForm.whatsapp = true;
+    if (!patientForm.covenant_id && form.value.covenant_id) patientForm.covenant_id = form.value.covenant_id;
+
+    activeTab.value = 'personal';
+}
+
 // ── SlotPicker ref ─────────────────────────────────────────────────────────────
 const slotPickerRef = ref(null);
 
@@ -87,6 +136,10 @@ function selectPatient(p) {
     form.value.telephone  = p.telephone ?? '';
     patientSearch.value   = p.full_name;
     patientResults.value  = [];
+
+    // Carrega o cadastro completo nas abas — a secretária pode completar
+    // os dados na hora; só vira UPDATE se ela alterar algo (isDirty).
+    loadEditData(p.id);
 }
 
 function clearPatient() {
@@ -94,21 +147,7 @@ function clearPatient() {
     form.value.full_name  = '';
     patientSearch.value   = '';
     patientResults.value  = [];
-}
-
-// ── Cadastro completo (item 3) ───────────────────────────────────────────────
-// "+ Cadastrar" agora abre o mesmo PatientFormModal de Panel/Patients — em
-// modo embedded (ver PatientFormModal.vue), fecha sozinho e já seleciona o
-// paciente recém-criado no agendamento.
-const showFullRegister = ref(false);
-
-function openFullRegister() {
-    showFullRegister.value = true;
-}
-
-function onPatientRegistered(patient) {
-    selectPatient(patient);
-    showFullRegister.value = false;
+    resetPatientForm();
 }
 
 // ── Recursos ───────────────────────────────────────────────────────────────────
@@ -157,9 +196,10 @@ watch(
         errors.value          = {};
         saving.value          = false;
         patientResults.value  = [];
-        showFullRegister.value = false;
         resources.value       = [];
         resourcesLoaded.value = false;
+        activeTab.value       = 'schedule';
+        resetPatientForm();
 
         if (props.editSchedule) {
             const s    = props.editSchedule;
@@ -186,6 +226,9 @@ watch(
                 recurrence_until:   '',
             };
             patientSearch.value = s.full_name ?? '';
+
+            // Paciente vinculado: abas já abrem com o cadastro completo.
+            if (s.patient_id) loadEditData(s.patient_id);
 
             // Navega o SlotPicker para a data do agendamento
             await nextTick();
@@ -217,6 +260,8 @@ watch(
             };
             patientSearch.value = p?.full_name ?? '';
 
+            if (p?.patient_id) loadEditData(p.patient_id);
+
             // Navega o SlotPicker para a data; se há datetime prefill o slot fica pré-selecionado
             const resetDate = prefillDatetime
                 ? prefillDatetime.substring(0, 10)
@@ -235,11 +280,35 @@ const submitUrl = computed(() =>
         : props.storeUrl,
 );
 
+function firstPatientTabWithError() {
+    return patientTabs.find(tab => tabHasErrors.value[tab.key])?.key ?? 'personal';
+}
+
 async function onSubmit() {
     if (saving.value) return;
     saving.value = true;
     errors.value = {};
 
+    // 1) Cadastro do paciente preenchido/alterado nas abas → salva ANTES do
+    //    agendamento (cria ou atualiza) e vincula. Erro de validação leva
+    //    direto pra aba com problema, sem perder nada do agendamento.
+    if (patientForm.isDirty) {
+        const result = await savePatient(form.value.patient_id || null);
+
+        if (!result.ok) {
+            activeTab.value = firstPatientTabWithError();
+            saving.value    = false;
+            return;
+        }
+
+        form.value.patient_id = result.patient.id;
+        form.value.full_name  = result.patient.full_name || form.value.full_name;
+        if (!form.value.cellphone && result.patient.cellphone) form.value.cellphone = result.patient.cellphone;
+        if (!form.value.telephone && result.patient.telephone) form.value.telephone = result.patient.telephone;
+        patientSearch.value = result.patient.full_name || patientSearch.value;
+    }
+
+    // 2) Agendamento (fluxo original)
     const body = {
         ...form.value,
         date_time:        form.value.date_time || null,
@@ -264,6 +333,7 @@ async function onSubmit() {
         emit('saved', json);
     } else if (res.status === 422) {
         errors.value = json.errors ?? {};
+        activeTab.value = 'schedule';
     } else {
         if (window.showErrorToast) window.showErrorToast(json.message ?? 'Erro ao salvar.');
     }
@@ -280,7 +350,37 @@ async function onSubmit() {
             </h5>
         </template>
 
+        <!-- ── Abas: Agendamento + cadastro completo do paciente ─────────── -->
+        <ul class="nav nav-tabs mb-3 schedule-form-tabs">
+            <li class="nav-item">
+                <button class="nav-link"
+                        :class="{ active: activeTab === 'schedule', 'text-danger': Object.keys(errors).length > 0 }"
+                        type="button"
+                        @click="activeTab = 'schedule'">
+                    <i class="ti ti-calendar-event me-1"></i>Agendamento
+                    <i v-if="Object.keys(errors).length > 0" class="ti ti-alert-circle text-danger ms-1"></i>
+                </button>
+            </li>
+            <li v-for="tab in patientTabs" :key="tab.key" class="nav-item">
+                <button class="nav-link"
+                        :class="{
+                            active: activeTab === tab.key,
+                            'text-danger': tabHasErrors[tab.key],
+                            'text-primary fw-semibold': !tabHasErrors[tab.key] && patientTabsActive && tabIncomplete[tab.key],
+                        }"
+                        type="button"
+                        @click="activeTab = tab.key">
+                    <i :class="tab.icon" class="me-1"></i>{{ tab.label }}
+                    <i v-if="tabHasErrors[tab.key]" class="ti ti-alert-circle text-danger ms-1"></i>
+                    <i v-else-if="patientTabsActive && tabIncomplete[tab.key]" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
+                </button>
+            </li>
+        </ul>
+
         <form @submit.prevent="onSubmit">
+
+            <!-- ════════════ ABA: AGENDAMENTO (fluxo rápido atual) ════════════ -->
+            <div v-show="activeTab === 'schedule'">
 
             <!-- ── Médico ────────────────────────────────────────────────── -->
             <div v-if="doctors.length !== 1" class="mb-3">
@@ -349,9 +449,11 @@ async function onSubmit() {
                     </ul>
                 </div>
                 <div class="mt-1">
+                    <!-- Leva pras abas de cadastro na MESMA janela (aproveita o
+                         que já foi digitado aqui) — sem sair da Agenda. -->
                     <button type="button"
                             class="btn btn-link btn-sm p-0 text-decoration-none"
-                            @click="openFullRegister">
+                            @click="goToPatientTabs">
                         <i class="fas fa-plus me-1"></i>{{ t.form_register }}
                     </button>
                 </div>
@@ -508,6 +610,41 @@ async function onSubmit() {
                 </div>
             </div>
 
+            </div><!-- /aba Agendamento -->
+
+            <!-- ════════════ ABAS: CADASTRO DO PACIENTE ════════════ -->
+            <div v-show="activeTab !== 'schedule'" class="schedule-patient-tabs">
+                <div v-if="patientLoading" class="py-2 d-flex align-items-center gap-2">
+                    <span class="spinner-border spinner-border-sm text-secondary"></span>
+                    <span class="text-muted small">{{ t.loading }}</span>
+                </div>
+
+                <div v-else>
+                    <div class="alert alert-light border small py-2 d-flex align-items-center gap-2 mb-3">
+                        <i class="ti ti-info-circle text-primary"></i>
+                        <span v-if="form.patient_id">
+                            Editando o cadastro de <strong>{{ patientSearch || form.full_name }}</strong> — as alterações são salvas junto com o agendamento.
+                        </span>
+                        <span v-else>
+                            Novo paciente — o cadastro é criado e vinculado ao clicar em <strong>{{ t.form_save_link }}</strong>.
+                        </span>
+                    </div>
+
+                    <PatientFormSections
+                        :form="patientForm"
+                        :section="activeTab"
+                        :covenants="covenants"
+                        :skin-types="skinTypes"
+                        :iris-types="irisTypes"
+                        :gender-options="genderOptions"
+                        :marital-options="maritalOptions"
+                        :state-options="stateOptions"
+                        :is-edit="!!form.patient_id"
+                        :lookup-cep="lookupCep"
+                    />
+                </div>
+            </div>
+
         </form>
 
         <template #footer>
@@ -516,26 +653,20 @@ async function onSubmit() {
             </button>
             <button type="button"
                     class="btn btn-primary px-4"
-                    :disabled="saving"
+                    :disabled="saving || patientForm.processing"
                     @click="onSubmit">
-                <span v-if="saving" class="spinner-border spinner-border-sm me-1"></span>
+                <span v-if="saving || patientForm.processing" class="spinner-border spinner-border-sm me-1"></span>
                 {{ saving ? t.saving : t.form_save_link }}
             </button>
         </template>
 
     </CenteredModal>
-
-    <!-- Item 3: cadastro completo do paciente, mesmos campos de Panel/Patients -->
-    <PatientFormModal
-        :open="showFullRegister"
-        embedded
-        :covenants="covenants"
-        :skin-types="skinTypes"
-        :iris-types="irisTypes"
-        :genders="genders"
-        :marital-statuses="maritalStatuses"
-        :states-of-brazil="statesOfBrazil"
-        @close="showFullRegister = false"
-        @saved="onPatientRegistered"
-    />
 </template>
+
+<style scoped>
+/* Altura mínima nas abas do paciente: v-show esconde sem ocupar espaço e o
+   modal ficaria "pulando" a cada troca de aba. */
+.schedule-patient-tabs {
+    min-height: 480px;
+}
+</style>
