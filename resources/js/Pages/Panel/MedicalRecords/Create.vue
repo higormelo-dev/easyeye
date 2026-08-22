@@ -6,6 +6,7 @@ import PatientInfoSidebar     from './Components/PatientInfoSidebar.vue';
 import PreviousRecordsCard    from './Components/PreviousRecordsCard.vue';
 import MedicalRecordViewModal from './Components/MedicalRecordViewModal.vue';
 import MedicalRecordForm      from './Components/MedicalRecordForm.vue';
+import ScheduleFlowGuard      from './Components/ScheduleFlowGuard.vue';
 
 defineProps({
     breadcrumbs:     { type: Array,   default: () => [] },
@@ -17,11 +18,16 @@ defineProps({
     canChooseDoctor: { type: Boolean, default: false },
     isDoctor:        { type: Boolean, default: false },
     isEdit:          { type: Boolean, default: false },
+    // Fluxo Agenda ↔ Prontuário (ver ScheduleFlowGuard.vue) — no create chega
+    // via ?schedule_id= quando o atendimento é aberto a partir da Agenda.
+    scheduleFlow:    { type: Object,  default: null },
     catalogs:        { type: Object,  required: true },
     urls:            { type: Object,  required: true },
     storage:         { type: Object,  default: () => ({}) },
     t:               { type: Object,  default: () => ({}) },
 });
+
+const flowGuard = ref(null);
 
 const viewOpen = ref(false);
 const viewRecord = ref(null);
@@ -44,7 +50,15 @@ function closeView() {
             <div class="row mb-3 align-items-center">
                 <div class="col-12 col-auto">
                     <div class="btn-group" role="group">
-                        <Link :href="urls.list" class="btn btn-outline-white btn-sm">
+                        <!-- Com fluxo de agendamento ativo, sair passa pelo
+                             ScheduleFlowGuard (Finalizar/Dilatar/Exame/Continuar). -->
+                        <button v-if="flowGuard?.active"
+                                type="button"
+                                class="btn btn-outline-white btn-sm"
+                                @click="flowGuard.requestExit()">
+                            <i class="fas fa-arrow-left me-1"></i>{{ t.title ?? 'Prontuários' }}
+                        </button>
+                        <Link v-else :href="urls.list" class="btn btn-outline-white btn-sm">
                             <i class="fas fa-arrow-left me-1"></i>{{ t.title ?? 'Prontuários' }}
                         </Link>
                         <Link :href="urls.create" class="btn btn-primary btn-sm">
@@ -83,5 +97,13 @@ function closeView() {
         </div>
 
         <MedicalRecordViewModal :open="viewOpen" :record="viewRecord" :t="t" @close="closeView" />
+
+        <ScheduleFlowGuard
+            ref="flowGuard"
+            :flow="scheduleFlow"
+            :is-doctor="isDoctor"
+            :locked="false"
+            :exit-url="urls.list"
+        />
     </AppLayout>
 </template>

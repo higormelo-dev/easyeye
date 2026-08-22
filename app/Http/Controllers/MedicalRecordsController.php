@@ -8,7 +8,7 @@ use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey};
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
-    MedicalRecord, NearPointConvergence, Patient, VisualAcuityType};
+    MedicalRecord, NearPointConvergence, Patient, Schedule, VisualAcuityType};
 use App\Models\ReportSettingContent;
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, UsageMeterService};
 use App\Traits\LogsDataAccess;
@@ -582,6 +582,18 @@ class MedicalRecordsController extends Controller
         $entity   = Entity::find($entityId);
         $isEdit   = (bool) $record;
 
+        // ── Fluxo Agenda ↔ Prontuário ────────────────────────────────────
+        // Quando o atendimento está vinculado a um agendamento (edit: pelo
+        // record; create: ?schedule_id= vindo da Agenda), o front usa isso
+        // pra: (a) marcar "Em consulta" automaticamente quando o médico abre
+        // o prontuário e (b) perguntar o destino do paciente ao sair
+        // (Finalizar/Dilatar/Exame/Continuar). Situação atual vai junto pra
+        // guarda no front: estados terminais nunca são rebaixados.
+        $flowScheduleId = $record?->schedule_id ?? request('schedule_id');
+        $flowSchedule   = $flowScheduleId
+            ? Schedule::query()->where('entity_id', $entityId)->find($flowScheduleId)
+            : null;
+
         $doctors = Doctor::with(['person', 'entityUser'])
             ->whereHas('entityUser', fn ($q) => $q->where('entity_id', $entityId))
             ->get();
@@ -611,6 +623,11 @@ class MedicalRecordsController extends Controller
             'canChooseDoctor' => (bool) $canChooseDoctor,
             'isDoctor'        => $isDoctor,
             'isEdit'          => $isEdit,
+            'scheduleFlow'    => $flowSchedule ? [
+                'id'         => (string) $flowSchedule->id,
+                'situation'  => $flowSchedule->situation->value,
+                'update_url' => route('panel.schedules.situation', $flowSchedule),
+            ] : null,
             // BUGFIX (tenant isolation): estas queries não filtravam entity_id —
             // tipos CUSTOMIZADOS cadastrados por uma clínica em panel/setting/*
             // apareciam nos dropdowns do prontuário de TODAS as outras clínicas
