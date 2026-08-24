@@ -1798,6 +1798,16 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                     </ul>
                                 </div>
                             </div>
+                            <!-- Obs. da prescrição de lentes — MOVIDO do bloco
+                                 HDA (era "Observação de lentes" duplicando o
+                                 registro longe da prescrição). Mesmo campo/
+                                 dado: observation_of_lenses. -->
+                            <div class="col-12">
+                                <label class="pmr-label">{{ tt('lenses_obs_short', 'Obs.') }}</label>
+                                <textarea v-model="form.observation_of_lenses" name="observation_of_lenses" rows="1"
+                                          class="form-control form-control-sm" :disabled="isLocked"
+                                          :placeholder="tt('lenses_obs_ph', 'Observações da prescrição de lentes…')"></textarea>
+                            </div>
                         </div>
                     </div>
 
@@ -1947,13 +1957,6 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     </div>
                 </div>
 
-                <div class="row g-2 mb-2">
-                    <div class="col-12 col-md-6">
-                        <label class="pmr-label">{{ tt('lenses_obs', 'Observação de lentes') }}</label>
-                        <textarea v-model="form.observation_of_lenses" name="observation_of_lenses" rows="2"
-                                  class="form-control form-control-sm" :disabled="isLocked"></textarea>
-                    </div>
-                </div>
                 </div><!-- /grupo Anamnese -->
 
                 <!-- ══ GRUPO 2: Conclusão da consulta ══ -->
