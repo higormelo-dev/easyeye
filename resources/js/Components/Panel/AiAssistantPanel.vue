@@ -988,34 +988,34 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                         </select>
                     </div>
 
-                    <!-- F2 — Quick picks (chips de categoria + prompts) -->
+                    <!-- F2 — Quick picks (layout enxuto — ticket "reformular IA"):
+                         categorias num select compacto em vez de fileira de
+                         botões; prompts como lista discreta de links. Mesmas
+                         funcionalidades, menos ruído visual. -->
                     <div v-if="isCategorizedPicks && categories.length">
-                        <label class="form-label small fw-semibold">{{ lbl('quick_picks_label', 'Sugestões rápidas') }}</label>
-                        <div class="d-flex flex-wrap gap-1 mb-2">
-                            <button v-for="cat in categories" :key="cat" type="button"
-                                    class="btn btn-sm"
-                                    :class="cat === effectiveCategory ? 'btn-info text-white' : 'btn-outline-secondary'"
-                                    @click="activeCategory = cat">
-                                {{ cat }}
-                            </button>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <label class="form-label small fw-semibold mb-0">{{ lbl('quick_picks_label', 'Sugestões rápidas') }}</label>
+                            <select v-model="activeCategory" class="form-select form-select-sm w-auto ms-auto" style="max-width:180px;">
+                                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+                            </select>
                         </div>
-                        <div class="d-flex flex-wrap gap-1">
+                        <div class="d-flex flex-column gap-1">
                             <button v-for="(q, i) in activePrompts" :key="i" type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    :class="{ active: form.user_prompt === q }"
+                                    class="btn btn-sm text-start ai-suggestion-link"
+                                    :class="form.user_prompt === q ? 'btn-info-subtle fw-semibold' : 'btn-link text-decoration-none p-0'"
                                     @click="form.user_prompt = q">
-                                {{ q }}
+                                <i class="ti ti-sparkles me-1 opacity-50"></i>{{ q }}
                             </button>
                         </div>
                     </div>
                     <div v-else-if="activePrompts.length">
-                        <label class="form-label small fw-semibold">{{ lbl('quick_picks_label', 'Sugestões rápidas') }}</label>
-                        <div class="d-flex flex-wrap gap-1">
+                        <label class="form-label small fw-semibold mb-1">{{ lbl('quick_picks_label', 'Sugestões rápidas') }}</label>
+                        <div class="d-flex flex-column gap-1">
                             <button v-for="(q, i) in activePrompts" :key="i" type="button"
-                                    class="btn btn-sm btn-outline-secondary"
-                                    :class="{ active: form.user_prompt === q }"
+                                    class="btn btn-sm text-start ai-suggestion-link"
+                                    :class="form.user_prompt === q ? 'btn-info-subtle fw-semibold' : 'btn-link text-decoration-none p-0'"
                                     @click="form.user_prompt = q">
-                                {{ q }}
+                                <i class="ti ti-sparkles me-1 opacity-50"></i>{{ q }}
                             </button>
                         </div>
                     </div>

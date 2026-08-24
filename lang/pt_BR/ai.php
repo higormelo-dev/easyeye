@@ -146,6 +146,7 @@ return [
         . 'REGRA CRÍTICA sobre medicamentos/doses/tratamento: NUNCA apresente a resposta como uma ordem médica ou prescrição pronta para uso. Responda sempre como APOIO À DECISÃO — use linguagem condicional ("esquema usual é...", "referências indicam...", "considerar..."), cite a fonte/referência quando souber (bula, diretriz de sociedade médica, protocolo), e finalize esse tipo de resposta reforçando que a conduta final, a dose e a prescrição devem ser validadas e definidas pelo médico responsável, considerando o paciente específico. '
         . 'Nunca se dirija ao paciente diretamente — você fala com o profissional de saúde. Nunca invente dado clínico não informado. '
         . 'Se receber contexto de um paciente/prontuário/exame (fornecido apenas quando o médico autorizar explicitamente), use-o para personalizar a resposta, mas sem revelar dados fora do que foi enviado e sem presumir informações não fornecidas. Quando pedirem para "montar uma evolução" ou "modelo de laudo/encaminhamento" a partir do contexto, gere um texto objetivo, em português, pronto para o médico revisar e ajustar — deixe claro que é um RASCUNHO para revisão. '
+        . 'Ao criar DOCUMENTOS (laudo oftalmológico, laudo para concurso, relatório de baixa visão/benefício, relatório médico, encaminhamento, atestado, declaração): se o médico não especificou qual documento quer, pergunte antes; conduza a criação pela conversa; use SOMENTE dados do contexto autorizado ou informados pelo médico — se faltar informação necessária para aquele tipo de documento, LISTE explicitamente o que falta e peça, em vez de presumir ou inventar. '
         . 'Se a pergunta fugir do escopo clínico/administrativo do sistema, responda brevemente e redirecione. Responda sempre no idioma da pergunta (padrão: português do Brasil), de forma direta e sem enrolação.',
     'assistant_chat_context_note' => 'Contexto autorizado pelo médico para esta pergunta (dados já minimizados/anonimizados pelo sistema — use apenas o que estiver aqui):',
     'assistant_chat_history_note' => 'Histórico desta conversa (mensagens anteriores, mais recentes por último):',
@@ -422,6 +423,14 @@ return [
         'insert_as_evolution'   => 'Inserir como evolução',
         'inserted_as_evolution' => 'Adicionado às evoluções do prontuário.',
         'quota_low'             => 'Créditos de IA baixos neste mês.',
+        // Welcome conversacional + atalhos contextuais (reforma da IA)
+        'welcome_title'       => 'Como posso ajudar?',
+        'welcome_sub'         => 'Pergunte livremente ou escolha um atalho.',
+        'sc_case'             => 'Analisar caso',
+        'sc_exam'             => 'Analisar exame',
+        'sc_document'         => 'Criar documento',
+        'sc_question'         => 'Dúvida clínica',
+        'sc_question_prefill' => 'Tenho uma dúvida clínica: ',
         // Sugestões rápidas — cobrem os casos de uso citados no pedido do produto.
         'quick_prompts' => [
             'Dúvida sobre medicamento/dose' => 'Quais são as opções e esquema posológico usual para',

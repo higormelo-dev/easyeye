@@ -295,6 +295,10 @@
     background: #ffffff;
     border-top: 1px solid #d5dbe3;
     border-bottom: 1px solid #d5dbe3;
+    /* Corredor pro FAB do Assistente de IA (fixed, canto inferior direito):
+       sem isso o FAB cobria o botão verde Salvar/Finalizar — o médico
+       clicava pra finalizar e abria a IA (ticket "separar IA de finalizar"). */
+    padding-right: 84px !important;
 }
 
 .pmr-form .pmr-bottom-bar .pmr-label {

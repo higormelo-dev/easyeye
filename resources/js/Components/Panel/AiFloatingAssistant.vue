@@ -75,16 +75,62 @@ const useContext = ref(false);
 watch(() => aiAssistantContext.patient_id, () => { useContext.value = false; });
 watch(() => aiAssistantContext.medical_record_id, () => { useContext.value = false; });
 
-// ── Quick prompts ─────────────────────────────────────────────────────────────
-const quickPrompts = computed(() => {
-    const raw = tt('quick_prompts', {});
-    return typeof raw === 'object' && raw ? Object.entries(raw) : [];
+// ── Atalhos do welcome ("Como posso ajudar?") ────────────────────────────────
+// 4 ações principais, sensíveis ao contexto da tela (ticket "reformular IA"):
+// Analisar caso / Analisar exame só aparecem quando a tela oferece o contexto;
+// Criar documento conduz POR CONVERSA (a IA pergunta qual documento) e nunca
+// inventa dado — se faltar informação, lista o que falta.
+const shortcuts = computed(() => {
+    const list = [];
+
+    if (aiAssistantContext.medical_record_id) {
+        list.push({
+            icon: 'fas fa-stethoscope',
+            label: tt('sc_case', 'Analisar caso'),
+            context: true,
+            send: 'Analise este atendimento com os dados já preenchidos no prontuário: faça um resumo do caso, liste hipóteses diagnósticas com justificativa e aponte pontos de atenção e sugestões de conduta/seguimento. Cite quais dados do prontuário sustentam cada conclusão.',
+        });
+    }
+
+    if ((aiAssistantContext.exam_ids ?? []).length > 0) {
+        list.push({
+            icon: 'fas fa-eye',
+            label: tt('sc_exam', 'Analisar exame'),
+            context: true,
+            send: 'Analise os exames disponíveis no contexto desta tela: descreva os achados relevantes e me ajude a estruturar o laudo.',
+        });
+    }
+
+    list.push({
+        icon: 'fas fa-file-medical',
+        label: tt('sc_document', 'Criar documento'),
+        context: Boolean(aiAssistantContext.medical_record_id || aiAssistantContext.patient_id),
+        send: 'Quero criar um documento médico (laudo oftalmológico, laudo para concurso, relatório de baixa visão/benefício, relatório médico, encaminhamento, atestado, declaração ou outro). Pergunte-me qual documento eu preciso e conduza a criação: use SOMENTE as informações do contexto disponível ou as que eu fornecer — se algum dado necessário estiver faltando, liste o que falta em vez de presumir.',
+    });
+
+    list.push({
+        icon: 'fas fa-circle-question',
+        label: tt('sc_question', 'Dúvida clínica'),
+        context: false,
+        prefill: tt('sc_question_prefill', 'Tenho uma dúvida clínica: '),
+    });
+
+    return list;
 });
-function applyQuickPrompt(prefix) {
-    userPrompt.value = prefix;
+
+function runShortcut(shortcut) {
+    if (shortcut.context && hasContextAvailable.value) useContext.value = true;
+
+    if (shortcut.send) {
+        userPrompt.value = shortcut.send;
+        sendMessage();
+        return;
+    }
+
+    userPrompt.value = shortcut.prefill ?? '';
     nextTick(() => {
         textareaEl.value?.focus();
-        textareaEl.value?.setSelectionRange(prefix.length, prefix.length);
+        textareaEl.value?.setSelectionRange(userPrompt.value.length, userPrompt.value.length);
     });
 }
 
@@ -332,8 +378,18 @@ onBeforeUnmount(cancelPolling);
 
                 <!-- Mensagens -->
                 <div ref="messagesEl" class="ai-chat-messages">
-                    <div v-if="messages.length === 0" class="ai-chat-empty">
-                        {{ tt('empty_state', 'Envie uma pergunta para começar.') }}
+                    <!-- Welcome conversacional: "Como posso ajudar?" + atalhos
+                         contextuais — a conversa é o elemento principal. -->
+                    <div v-if="messages.length === 0" class="ai-chat-welcome">
+                        <div class="ai-chat-welcome-title">{{ tt('welcome_title', 'Como posso ajudar?') }}</div>
+                        <div class="ai-chat-welcome-sub">{{ tt('welcome_sub', 'Pergunte livremente ou escolha um atalho.') }}</div>
+                        <div class="ai-chat-shortcuts">
+                            <button v-for="shortcut in shortcuts" :key="shortcut.label" type="button"
+                                    class="ai-shortcut" @click="runShortcut(shortcut)">
+                                <i :class="shortcut.icon"></i>
+                                <span>{{ shortcut.label }}</span>
+                            </button>
+                        </div>
                     </div>
 
                     <template v-for="msg in messages" :key="msg.id">
@@ -355,14 +411,6 @@ onBeforeUnmount(cancelPolling);
                             </div>
                         </div>
                     </template>
-                </div>
-
-                <!-- Quick prompts -->
-                <div v-if="messages.length === 0 && quickPrompts.length" class="ai-chat-quick-prompts">
-                    <button v-for="[label, prefix] in quickPrompts" :key="label" type="button"
-                            class="ai-quick-chip" @click="applyQuickPrompt(prefix)">
-                        {{ label }}
-                    </button>
                 </div>
 
                 <!-- Composer -->
@@ -387,8 +435,11 @@ onBeforeUnmount(cancelPolling);
 .ai-floating-assistant {
     position: fixed;
     right: 20px;
-    bottom: 20px;
+    bottom: 24px;
     z-index: 1200;
+    /* Colisão com o botão verde "Salvar/Finalizar" do prontuário: resolvida
+       do lado do prontuário — a bottom-bar reserva um corredor à direita
+       (padding-right em .pmr-bottom-bar) pro FAB nunca cobrir o salvar. */
 }
 
 .ai-fab {
@@ -498,6 +549,48 @@ onBeforeUnmount(cancelPolling);
     background: #fafafc;
 }
 .ai-chat-empty { color: #94a3b8; font-size: .8rem; text-align: center; margin-top: 1.5rem; }
+
+/* Welcome "Como posso ajudar?" + atalhos contextuais */
+.ai-chat-welcome {
+    text-align: center;
+    padding: 1.4rem .6rem .6rem;
+}
+.ai-chat-welcome-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1f2937;
+}
+.ai-chat-welcome-sub {
+    font-size: .76rem;
+    color: #94a3b8;
+    margin: .2rem 0 .9rem;
+}
+.ai-chat-shortcuts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.ai-shortcut {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: .65rem .4rem;
+    border: 1px solid #e5e7eb;
+    border-radius: .55rem;
+    background: #fff;
+    font-size: .74rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    transition: border-color .12s ease, background .12s ease, transform .12s ease;
+}
+.ai-shortcut i { font-size: 1rem; color: #6c5ce7; }
+.ai-shortcut:hover {
+    border-color: #6c5ce7;
+    background: #f6f4ff;
+    transform: translateY(-1px);
+}
 
 .ai-msg { display: flex; }
 .ai-msg--user { justify-content: flex-end; }
