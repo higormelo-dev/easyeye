@@ -338,11 +338,11 @@
     </div>
     <div class="col col-4">
         <span class="field-label">{{ __('pdf.lens_away') }}</span>
-        <span class="field-value">{{ $record->lensAway?->name ?? '—' }}</span>
+        <span class="field-value">{{ $record->lens_away_names_text ?: '—' }}</span>
     </div>
     <div class="col col-4">
         <span class="field-label">{{ __('pdf.lens_near') }}</span>
-        <span class="field-value">{{ $record->lensNear?->name ?? '—' }}</span>
+        <span class="field-value">{{ $record->lens_near_names_text ?: '—' }}</span>
     </div>
 </div>
 @endif

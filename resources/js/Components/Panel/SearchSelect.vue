@@ -11,7 +11,7 @@ import Multiselect from '@vueform/multiselect';
 //     que ficam visíveis. As `options` iniciais ainda funcionam como seed.
 //   - remoteMinChars: número mínimo de caracteres para disparar a busca.
 const props = defineProps({
-    modelValue:      { type: [String, Number, Boolean, null], default: null },
+    modelValue:      { type: [String, Number, Boolean, Array, null], default: null },
     options:         { type: Array,   default: () => [] },
     valueKey:        { type: String,  default: 'id' },
     labelKey:        { type: String,  default: 'name' },
@@ -26,6 +26,10 @@ const props = defineProps({
     // default do tema = 10rem). Listas longas (ex.: acuidade visual) passam
     // um valor maior pra reduzir rolagem.
     listHeight:      { type: String,  default: '' },
+    // Seleção múltipla (mode="tags" do multiselect): v-model vira ARRAY e
+    // cada escolha aparece como chip removível individualmente — usado nas
+    // características de lente do prontuário (Multifocal + Antirreflexo...).
+    multiple:        { type: Boolean, default: false },
 });
 
 // `option-selected` — Onda IOL Lenses: emite o OBJETO completo da opção
@@ -46,8 +50,22 @@ const emit = defineEmits(['update:modelValue', 'change', 'option-selected']);
 const selectedOption = ref(null);
 
 const value = computed({
-    get: () => (props.modelValue === '' ? null : props.modelValue),
+    get: () => {
+        if (props.multiple) return Array.isArray(props.modelValue) ? props.modelValue : [];
+
+        return props.modelValue === '' ? null : props.modelValue;
+    },
     set: (v) => {
+        // Modo tags: v-model é sempre ARRAY (nunca degrada pra '' — o
+        // multiselect em mode="tags" quebra com valor não-array).
+        if (props.multiple) {
+            const arr = Array.isArray(v) ? v : (v == null ? [] : [v]);
+            emit('update:modelValue', arr);
+            emit('change', arr);
+
+            return;
+        }
+
         selectedOption.value = v == null
             ? null
             : (effectiveOptions.value.find((o) => o[props.valueKey] === v) ?? selectedOption.value);
@@ -120,10 +138,11 @@ function onSearchChange(q) {
         :value-prop="valueKey"
         :label="labelKey"
         :track-by="labelKey"
+        :mode="multiple ? 'tags' : 'single'"
         :searchable="searchable"
         :can-clear="clearable"
         :can-deselect="clearable"
-        :close-on-select="true"
+        :close-on-select="!multiple"
         :placeholder="placeholder"
         :disabled="disabled"
         no-options-text="Nenhuma opção"

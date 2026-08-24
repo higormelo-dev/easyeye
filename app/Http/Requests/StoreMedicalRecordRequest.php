@@ -79,6 +79,11 @@ class StoreMedicalRecordRequest extends FormRequest
             'addition_type_id'                          => ['nullable', 'uuid', 'exists:addition_types,id'],
             'lens_away_id'                              => ['nullable', 'uuid', 'exists:lenses,id'],
             'lens_near_id'                              => ['nullable', 'uuid', 'exists:lenses,id'],
+            // Multi-características de lente (Multifocal + Antirreflexo...)
+            'lens_away_ids'   => ['nullable', 'array', 'max:10'],
+            'lens_away_ids.*' => ['uuid', 'exists:lenses,id'],
+            'lens_near_ids'   => ['nullable', 'array', 'max:10'],
+            'lens_near_ids.*' => ['uuid', 'exists:lenses,id'],
             // Anamnese — CBO (main_complaint obrigatória; mensagem em validation.custom.main_complaint.required)
             'main_complaint'          => ['required', 'string', 'max:5000'],
             'hda'                     => ['nullable', 'string', 'max:10000'],

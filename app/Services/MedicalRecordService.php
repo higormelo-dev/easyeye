@@ -135,6 +135,17 @@ class MedicalRecordService
             }
         }
 
+        // Multi-características de lente: limpa o array e SINCRONIZA o single
+        // legado com o primeiro item — consumidores antigos (relations
+        // lensAway/lensNear) continuam funcionando.
+        foreach (['lens_away' => 'lens_away_ids', 'lens_near' => 'lens_near_ids'] as $legacy => $multi) {
+            if (array_key_exists($multi, $data)) {
+                $ids                   = array_values(array_unique(array_filter((array) $data[$multi])));
+                $data[$multi]          = $ids ?: null;
+                $data[$legacy . '_id'] = $ids[0] ?? null;
+            }
+        }
+
         foreach ($nullableNumerics as $field) {
             if (array_key_exists($field, $data)) {
                 $data[$field] = blank($data[$field]) ? null : $data[$field];

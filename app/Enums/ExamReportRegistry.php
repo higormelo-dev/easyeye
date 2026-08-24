@@ -154,7 +154,7 @@ enum ExamReportRegistry: string
                     'static_spherical_right', 'static_spherical_left',
                     'static_cylindrical_right', 'static_cylindrical_left',
                     'static_axis_right', 'static_axis_left',
-                    'lensAway.name', 'lensNear.name', 'observation_of_lenses',
+                    'lens_away_names_text', 'lens_near_names_text', 'observation_of_lenses',
                 ],
             ],
         };

@@ -77,6 +77,11 @@ class UpdateMedicalRecordRequest extends FormRequest
             'addition_type_id'                          => ['sometimes', 'nullable', 'uuid', 'exists:addition_types,id'],
             'lens_away_id'                              => ['sometimes', 'nullable', 'uuid', 'exists:lenses,id'],
             'lens_near_id'                              => ['sometimes', 'nullable', 'uuid', 'exists:lenses,id'],
+            // Multi-características de lente (Multifocal + Antirreflexo...)
+            'lens_away_ids'   => ['sometimes', 'nullable', 'array', 'max:10'],
+            'lens_away_ids.*' => ['uuid', 'exists:lenses,id'],
+            'lens_near_ids'   => ['sometimes', 'nullable', 'array', 'max:10'],
+            'lens_near_ids.*' => ['uuid', 'exists:lenses,id'],
             // Anamnese — CBO
             'main_complaint'          => ['sometimes', 'nullable', 'string', 'max:5000'],
             'hda'                     => ['sometimes', 'nullable', 'string', 'max:10000'],

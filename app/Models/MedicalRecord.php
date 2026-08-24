@@ -45,6 +45,11 @@ class MedicalRecord extends Model
         'addition_type_id',
         'lens_away_id',
         'lens_near_id',
+        // Multi-características de lente (Multifocal + Antirreflexo...) —
+        // arrays de ids de lenses; os singles acima recebem o 1º item
+        // (retrocompat, ver MedicalRecordService::normalize).
+        'lens_away_ids',
+        'lens_near_ids',
         'code',
         // Anamnese — CBO
         'main_complaint',
@@ -167,7 +172,37 @@ class MedicalRecord extends Model
             'signed_at'      => 'datetime',
             'is_locked'      => 'boolean',
             'diagnosis_cids' => 'array',
+            'lens_away_ids'  => 'array',
+            'lens_near_ids'  => 'array',
         ];
+    }
+
+    /**
+     * Nomes das características de lente, na ordem escolhida pelo médico,
+     * unidos por " + " (ex.: "MULTIFOCAL + ANTIRREFLEXO"). Fallback pro
+     * single legado quando o array está vazio (registros antigos).
+     */
+    public function lensNamesText(?array $ids, ?string $legacyName): string
+    {
+        $ids = array_values(array_filter($ids ?? []));
+
+        if ($ids === []) {
+            return $legacyName ?? '';
+        }
+
+        $names = Lense::query()->whereIn('id', $ids)->pluck('name', 'id');
+
+        return collect($ids)->map(fn ($id) => $names[$id] ?? null)->filter()->implode(' + ');
+    }
+
+    public function getLensAwayNamesTextAttribute(): string
+    {
+        return $this->lensNamesText($this->lens_away_ids, $this->lensAway?->name);
+    }
+
+    public function getLensNearNamesTextAttribute(): string
+    {
+        return $this->lensNamesText($this->lens_near_ids, $this->lensNear?->name);
     }
 
     public function patient(): BelongsTo

@@ -222,8 +222,10 @@ class MedicalRecordsController extends Controller
             'static_cylindrical_left'                => $medicalrecord->static_cylindrical_left,
             'static_axis_right'                      => $medicalrecord->static_axis_right,
             'static_axis_left'                       => $medicalrecord->static_axis_left,
-            'lens_away'                              => $medicalrecord->lensAway?->name,
-            'lens_near'                              => $medicalrecord->lensNear?->name,
+            // Multi-características: "MULTIFOCAL + ANTIRREFLEXO" (fallback
+            // interno pro single de registros antigos)
+            'lens_away' => $medicalrecord->lens_away_names_text ?: null,
+            'lens_near' => $medicalrecord->lens_near_names_text ?: null,
             // Achados
             'biomicroscopy_right'   => $medicalrecord->biomicroscopy_right,
             'biomicroscopy_left'    => $medicalrecord->biomicroscopy_left,
@@ -900,6 +902,8 @@ class MedicalRecordsController extends Controller
             'addition_type_id'                          => $r->addition_type_id ? (string) $r->addition_type_id : null,
             'lens_away_id'                              => $r->lens_away_id ? (string) $r->lens_away_id : null,
             'lens_near_id'                              => $r->lens_near_id ? (string) $r->lens_near_id : null,
+            'lens_away_ids'                             => $r->lens_away_ids ?? ($r->lens_away_id ? [(string) $r->lens_away_id] : []),
+            'lens_near_ids'                             => $r->lens_near_ids ?? ($r->lens_near_id ? [(string) $r->lens_near_id] : []),
 
             // Refração dinâmica
             'dynamic_spherical_right'   => $r->dynamic_spherical_right,

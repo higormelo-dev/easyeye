@@ -83,8 +83,10 @@ const form = useForm({
     cover_test_type_id:        r?.cover_test_type_id ?? '',
     color_vision_type_id:      r?.color_vision_type_id ?? '',
     addition_type_id:          r?.addition_type_id ?? '',
-    lens_away_id:              r?.lens_away_id ?? '',
-    lens_near_id:              r?.lens_near_id ?? '',
+    // Multi-características de lente (Multifocal + Antirreflexo...) — array;
+    // fallback: registro antigo com single vira array de 1.
+    lens_away_ids:             r?.lens_away_ids ?? (r?.lens_away_id ? [r.lens_away_id] : []),
+    lens_near_ids:             r?.lens_near_ids ?? (r?.lens_near_id ? [r.lens_near_id] : []),
 
     // Refração dinâmica
     dynamic_spherical_right:   r?.dynamic_spherical_right ?? '0.00',
@@ -1754,14 +1756,18 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                             </div>
                             <div class="col-6">
                                 <label class="pmr-label">{{ tt('lens_away', 'Longe') }}</label>
-                                <SearchSelect v-model="form.lens_away_id"
+                                <!-- Multi: cada característica vira chip removível
+                                     (Multifocal + Antirreflexo...) -->
+                                <SearchSelect v-model="form.lens_away_ids"
                                               :options="lenses"
+                                              multiple
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="col-6">
                                 <label class="pmr-label">{{ tt('lens_near', 'Perto') }}</label>
-                                <SearchSelect v-model="form.lens_near_id"
+                                <SearchSelect v-model="form.lens_near_ids"
                                               :options="lenses"
+                                              multiple
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="col-6 d-flex gap-1 align-items-end">
