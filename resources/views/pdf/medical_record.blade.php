@@ -90,6 +90,23 @@
         padding-top: 4px;
     }
     .page-break { page-break-before: always; }
+
+    /* ── Quebra de página (wkhtmltopdf) ──────────────────────────────
+       Bloco/tabela que não cabe no espaço restante vai INTEIRO pra
+       próxima página; se a seção for maior que uma página, o motor
+       quebra mesmo assim, mas respeitando .row e tr (nunca corta um
+       campo ou linha da tabela no meio). */
+    .section        { page-break-inside: avoid; }
+    .section-title  { page-break-after: avoid; page-break-inside: avoid; }
+    .row            { page-break-inside: avoid; }
+    .bool-grid      { page-break-inside: avoid; }
+    table.clinical  { page-break-inside: avoid; }
+    table.clinical tr { page-break-inside: avoid; }
+    /* wkhtmltopdf repete o <thead> na página seguinte SOBREPONDO a
+       primeira linha (bug conhecido) — display:table-row-group desativa
+       a repetição; como a tabela inteira tem avoid, o cabeçalho
+       acompanha o bloco. */
+    table.clinical thead { display: table-row-group; }
 </style>
 </head>
 <body>
@@ -120,6 +137,7 @@
 </div>
 
 <!-- ─── DADOS DO PACIENTE ─────────────────────────────────────────────────── -->
+<div class="section">
 <div class="section-title">{{ __('pdf.section_patient_data') }}</div>
 <div class="row">
     <div class="col col-6">
@@ -167,8 +185,10 @@
         <span class="field-value">{{ $patient->covenant?->name ?? __('pdf.private_payment') }}</span>
     </div>
 </div>
+</div>
 
 <!-- ─── ANAMNESE ──────────────────────────────────────────────────────────── -->
+<div class="section">
 <div class="section-title">{{ __('pdf.section_anamnesis') }}</div>
 @if($record->main_complaint)
 <div class="row"><div class="col col-12">
@@ -208,8 +228,10 @@
     <span class="field-value">{{ $record->medications_in_use }}</span>
 </div></div>
 @endif
+</div>
 
 <!-- ─── EXAME FÍSICO ───────────────────────────────────────────────────────── -->
+<div class="section">
 <div class="section-title">{{ __('pdf.section_physical_exam') }}</div>
 <div class="row">
     <div class="col col-4">
@@ -283,8 +305,10 @@
     </div>
 </div>
 @endif
+</div>
 
 <!-- ─── REFRAÇÃO ───────────────────────────────────────────────────────────── -->
+<div class="section">
 <div class="section-title">{{ __('pdf.section_refraction') }}</div>
 <table class="clinical">
     <thead>
@@ -346,8 +370,10 @@
     </div>
 </div>
 @endif
+</div>
 
 <!-- ─── ACHADOS CLÍNICOS ───────────────────────────────────────────────────── -->
+<div class="section">
 @if($record->biomicroscopy_right || $record->biomicroscopy_left || $record->fundoscopy_right || $record->fundoscopy_left)
 <div class="section-title">{{ __('pdf.section_clinical_findings') }}</div>
 <div class="row">
@@ -383,8 +409,10 @@
     <span class="field-value">{{ $record->observation_of_lenses }}</span>
 </div></div>
 @endif
+</div>
 
 <!-- ─── DIAGNÓSTICO & CONDUTA ─────────────────────────────────────────────── -->
+<div class="section">
 @php $hasDiagnosis = !empty($record->diagnosis_cids); @endphp
 @if($hasDiagnosis || $record->clinical_conduct)
 <div class="section-title">{{ __('pdf.section_diagnosis_conduct') }}</div>
@@ -415,6 +443,7 @@
 </div></div>
 @endif
 @endif
+</div>
 
 <!-- ─── ASSINATURA (ancorada no rodapé via position:fixed) ─────────────────── -->
 @php
