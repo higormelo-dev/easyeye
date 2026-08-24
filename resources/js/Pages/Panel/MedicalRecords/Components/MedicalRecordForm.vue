@@ -1771,8 +1771,10 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="col-6 d-flex gap-1 align-items-end">
-                                <input v-model.number="presbyopiaAddition" type="number" step="0.25"
-                                       class="form-control form-control-sm" placeholder="Add." :disabled="isLocked">
+                                <!-- Campo "Add." saiu daqui (ticket "Add. → OBS."):
+                                     a adição da presbiopia agora é informada DENTRO
+                                     do modal da calculadora (lápis), único lugar que
+                                     a consome. O espaço vira o OBS. livre abaixo. -->
                                 <button type="button" class="btn btn-outline-secondary btn-sm"
                                         :disabled="isLocked"
                                         @click="openPresbyopiaCalc"
@@ -1803,10 +1805,10 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                  registro longe da prescrição). Mesmo campo/
                                  dado: observation_of_lenses. -->
                             <div class="col-12">
-                                <label class="pmr-label">{{ tt('lenses_obs_short', 'Obs.') }}</label>
+                                <label class="pmr-label">{{ tt('lenses_obs_short', 'OBS.') }}</label>
                                 <textarea v-model="form.observation_of_lenses" name="observation_of_lenses" rows="1"
                                           class="form-control form-control-sm" :disabled="isLocked"
-                                          :placeholder="tt('lenses_obs_ph', 'Observações da prescrição de lentes…')"></textarea>
+                                          :placeholder="tt('lenses_obs_ph', 'Uso contínuo, orientações, preferência de lente…')"></textarea>
                             </div>
                         </div>
                     </div>
@@ -2860,6 +2862,14 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <button type="button" class="btn-close" @click="showPresbyopiaObsModal = false"></button>
                     </div>
                     <div class="modal-body">
+                        <!-- Adição da presbiopia — morava na barra como "Add.";
+                             agora vive aqui, junto do cálculo que a usa. -->
+                        <label class="pmr-label mb-1">{{ tt('presbyopia_addition', 'Adição (D)') }}</label>
+                        <input v-model.number="presbyopiaAddition" type="number" step="0.25"
+                               class="form-control form-control-sm mb-2" style="max-width:140px;"
+                               :placeholder="'ex.: 2.50'">
+
+                        <label class="pmr-label mb-1">{{ tt('lenses_obs', 'Observação de lentes') }}</label>
                         <textarea v-model="presbyopiaObsForm.content" class="form-control form-control-sm" rows="6"
                                   :placeholder="tt('presbyopia_obs_ph','Observações sobre as lentes...')"></textarea>
                     </div>
