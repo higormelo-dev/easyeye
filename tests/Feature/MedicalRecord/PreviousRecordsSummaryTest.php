@@ -71,9 +71,10 @@ it('serializa o resumo clínico da consulta anterior (AV, refração, PIO, diagn
     $summary = $previous[0]['summary'];
 
     expect($summary['av_sc'])->toBe('OD 20/20 | OE 20/25')
-        ->and($summary['refraction'])->toBe('OD -1,50 / -0,50 × 180º | OE -1,25')
+        ->and($summary['refraction_od'])->toBe('-1,50 / -0,50 × 180º')
+        ->and($summary['refraction_oe'])->toBe('-1,25')
         ->and($summary['pio'])->toBe('OD 14 | OE 15 mmHg')
-        ->and($summary['diagnoses'])->toBe(['Miopia'])
+        ->and($summary['diagnoses'])->toBe(['H52.1 – Miopia'])
         ->and($summary['conduct'])->toBe('Prescrição de óculos e retorno em 1 ano.');
 });
 
@@ -89,7 +90,9 @@ it('omite linhas sem dado (null) — a UI esconde a linha inteira', function () 
 
     expect($summary['av_sc'])->toBeNull()
         ->and($summary['av_cc'])->toBeNull()
-        ->and($summary['refraction'])->toBeNull()
+        ->and($summary['refraction_od'])->toBeNull()
+        ->and($summary['refraction_oe'])->toBeNull()
+        ->and($summary['addition'])->toBeNull()
         ->and($summary['pio'])->toBeNull()
         ->and($summary['diagnoses'])->toBe([])
         ->and($summary['conduct'])->toBeNull();

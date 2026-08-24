@@ -506,6 +506,7 @@ class MedicalRecordsController extends Controller
                 'visualAcuityTypeWithoutCorrectionLeft:id,name',
                 'visualAcuityTypeWitCorrectionRight:id,name',
                 'visualAcuityTypeWitCorrectionLeft:id,name',
+                'additionType:id,name',
             ])
             ->orderByDesc('created_at')
             ->limit(6)
@@ -522,15 +523,17 @@ class MedicalRecordsController extends Controller
                 'show_url'             => route('panel.patients.medicalrecords.show', [$patient, $mr]),
                 // ── Resumo clínico (comparação rápida durante o atendimento) ──
                 'summary' => [
-                    'av_sc'      => $this->eyePair($mr->visualAcuityTypeWithoutCorrectionRight?->name, $mr->visualAcuityTypeWithoutCorrectionLeft?->name),
-                    'av_cc'      => $this->eyePair($mr->visualAcuityTypeWitCorrectionRight?->name, $mr->visualAcuityTypeWitCorrectionLeft?->name),
-                    'refraction' => $this->eyePair(
-                        $this->refractionText($mr->dynamic_spherical_right, $mr->dynamic_cylindrical_right, $mr->dynamic_axis_right),
-                        $this->refractionText($mr->dynamic_spherical_left, $mr->dynamic_cylindrical_left, $mr->dynamic_axis_left),
-                    ),
-                    'pio'       => $this->eyePair($mr->tonometer_right, $mr->tonometer_left, ' mmHg'),
+                    'av_sc' => $this->eyePair($mr->visualAcuityTypeWithoutCorrectionRight?->name, $mr->visualAcuityTypeWithoutCorrectionLeft?->name),
+                    'av_cc' => $this->eyePair($mr->visualAcuityTypeWitCorrectionRight?->name, $mr->visualAcuityTypeWitCorrectionLeft?->name),
+                    // Refração POR OLHO em linhas separadas (ticket "grau
+                    // cortado"): melhor uma linha a mais que esconder o grau.
+                    'refraction_od' => $this->refractionText($mr->dynamic_spherical_right, $mr->dynamic_cylindrical_right, $mr->dynamic_axis_right),
+                    'refraction_oe' => $this->refractionText($mr->dynamic_spherical_left, $mr->dynamic_cylindrical_left, $mr->dynamic_axis_left),
+                    'addition'      => $mr->additionType?->name,
+                    'pio'           => $this->eyePair($mr->tonometer_right, $mr->tonometer_left, ' mmHg'),
+                    // "H40.1 – Glaucoma..." — código + descrição juntos.
                     'diagnoses' => collect(is_array($mr->diagnosis_cids) ? $mr->diagnosis_cids : [])
-                        ->map(fn ($d) => (string) ($d['description'] ?? $d['code'] ?? ''))
+                        ->map(fn ($d) => trim(implode(' – ', array_filter([(string) ($d['code'] ?? ''), (string) ($d['description'] ?? '')]))))
                         ->filter()
                         ->values()
                         ->all(),

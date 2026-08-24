@@ -75,7 +75,9 @@ function toggleExpand(record) {
                     </div>
                 </div>
 
-                <!-- Resumo clínico compacto — sempre visível ("quanto estava o grau?") -->
+                <!-- Resumo clínico compacto — sempre visível ("quanto estava o grau?").
+                     Refração POR OLHO em linhas próprias e SEM truncate: melhor
+                     quebrar linha do que esconder o grau (ticket). -->
                 <div v-if="r.summary" class="prev-records__summary mt-1">
                     <div v-if="r.summary.av_sc" class="prev-records__summary-line">
                         <span class="prev-records__tag">AV s/c</span>{{ r.summary.av_sc }}
@@ -83,9 +85,20 @@ function toggleExpand(record) {
                     <div v-if="r.summary.av_cc" class="prev-records__summary-line">
                         <span class="prev-records__tag">AV c/c</span>{{ r.summary.av_cc }}
                     </div>
-                    <div v-if="r.summary.refraction" class="prev-records__summary-line">
-                        <span class="prev-records__tag">Ref</span>{{ r.summary.refraction }}
-                    </div>
+                    <template v-if="r.summary.refraction_od || r.summary.refraction_oe">
+                        <div class="prev-records__summary-line prev-records__summary-line--strong">
+                            <span class="prev-records__tag">Ref</span>
+                        </div>
+                        <div v-if="r.summary.refraction_od" class="prev-records__summary-line prev-records__summary-line--indent">
+                            <span class="prev-records__eye">OD:</span>{{ r.summary.refraction_od }}
+                        </div>
+                        <div v-if="r.summary.refraction_oe" class="prev-records__summary-line prev-records__summary-line--indent">
+                            <span class="prev-records__eye">OE:</span>{{ r.summary.refraction_oe }}
+                        </div>
+                        <div v-if="r.summary.addition" class="prev-records__summary-line prev-records__summary-line--indent">
+                            <span class="prev-records__eye">Ad:</span>{{ r.summary.addition }}
+                        </div>
+                    </template>
                     <div v-if="r.summary.pio" class="prev-records__summary-line">
                         <span class="prev-records__tag">PIO</span>{{ r.summary.pio }}
                     </div>
@@ -165,9 +178,24 @@ function toggleExpand(record) {
 .prev-records__summary-line {
     font-size: .72rem;
     color: var(--bs-body-color);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Sem truncate: dado clínico NUNCA cortado — quebra de linha permitida
+       (o grau completo vale mais que uma linha a menos). */
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.prev-records__summary-line--strong {
+    line-height: 1;
+}
+.prev-records__summary-line--indent {
+    padding-left: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.prev-records__eye {
+    display: inline-block;
+    min-width: 26px;
+    font-weight: 700;
+    font-size: .64rem;
+    color: var(--bs-secondary-color);
 }
 .prev-records__tag {
     display: inline-block;
