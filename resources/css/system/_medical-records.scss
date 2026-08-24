@@ -779,3 +779,19 @@
     flex: 1 1 150px;
     min-width: 150px;
 }
+
+// Grupos da área expansível do prontuário (Anamnese/Histórico × Conclusão
+// da consulta) — só organização visual, mesmos campos de sempre.
+.pmr-form .pmr-field-group {
+    border-left: 3px solid #d8e2ec;
+    padding-left: .75rem;
+}
+
+.pmr-form .pmr-field-group-title {
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--pmr-blue-dark, #258dc0);
+    margin-bottom: .5rem;
+}

@@ -1867,6 +1867,18 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             </div>
 
             <div id="pmr-extra-fields" class="collapse">
+                <!-- Reorganização (ticket "Organizar HDA"): mesmos campos de
+                     sempre, agrupados pelo MOMENTO da consulta — Anamnese/
+                     Histórico (antes do exame) e Conclusão (fechamento).
+                     Display-only: nenhum campo novo, nenhum dado muda. -->
+
+                <!-- ══ GRUPO 1: Anamnese / Histórico ══ -->
+                <div class="pmr-field-group mb-3">
+                    <div class="pmr-field-group-title">
+                        <i class="fas fa-comment-medical me-1"></i>{{ tt('group_anamnesis', 'Anamnese / Histórico') }}
+                        <small class="text-muted fw-normal ms-1">{{ tt('group_anamnesis_hint', 'início da consulta') }}</small>
+                    </div>
+
                 <div class="row g-2 mb-2">
                     <div class="col-12">
                         <label class="pmr-label">{{ tt('hda', 'HDA') }}</label>
@@ -1935,6 +1947,17 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <textarea v-model="form.observation_of_lenses" name="observation_of_lenses" rows="2"
                                   class="form-control form-control-sm" :disabled="isLocked"></textarea>
                     </div>
+                </div>
+                </div><!-- /grupo Anamnese -->
+
+                <!-- ══ GRUPO 2: Conclusão da consulta ══ -->
+                <div class="pmr-field-group">
+                    <div class="pmr-field-group-title">
+                        <i class="fas fa-flag-checkered me-1"></i>{{ tt('group_conclusion', 'Conclusão da consulta') }}
+                        <small class="text-muted fw-normal ms-1">{{ tt('group_conclusion_hint', 'diagnóstico e fechamento') }}</small>
+                    </div>
+
+                <div class="row g-2 mb-2">
                     <div class="col-12">
                         <label class="pmr-label">{{ tt('cid10', 'CID-10') }}</label>
                         <input type="hidden" name="diagnosis_cids" :value="serializedCids">
@@ -1996,6 +2019,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </div>
                     </div>
                 </div>
+                </div><!-- /grupo Conclusão -->
             </div>
         </div>
 
