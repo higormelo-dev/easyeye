@@ -5,29 +5,36 @@ namespace Database\Seeders;
 use App\Models\VisitType;
 use Illuminate\Database\Seeder;
 
+/**
+ * Tipos de consulta GLOBAIS (entity_id null) — lista inicial enxuta do
+ * agendamento. A clínica complementa/reativa itens em Configurações.
+ *
+ * GOTCHA que causou duplicatas em produção: o model tem HasUppercaseName
+ * (mutator salva o nome em MAIÚSCULO). O updateOrCreate antigo buscava por
+ * Title Case, nunca encontrava o registro salvo e cada rodada do seeder
+ * recriava o catálogo inteiro. A chave de busca DEVE estar exatamente como o
+ * banco armazena (uppercase) e fixar entity_id null. O unique parcial
+ * visit_types_global_name_unique (migration 2026_08_23) garante no banco.
+ */
 class VisitTypesSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         $visitTypes = [
-            'Consulta médica', 'Consulta de retorno',
-            'Consulta de urgência/emergência', 'Exame oftalmológico',
-            'Exame complementar', 'Mapeamento de retina',
-            'Consulta pré-operatória', 'Consulta pós-operatória',
-            'Procedimento ambulatorial', 'Procedimento terapêutico',
-            'Triagem', 'Avaliação técnica/enfermagem',
-            'Avaliação para óculos ou lentes', 'Atendimento de óptica',
-            'Atendimento administrativo', 'Teleconsulta',
+            'Consulta',
+            'Retorno',
+            'Urgência',
+            'Avaliação pré-operatória',
+            'Avaliação pós-operatória',
+            'Segunda opinião',
+            'Teleconsulta',
+            'Triagem',
         ];
 
         foreach ($visitTypes as $visitType) {
-            $name = mb_convert_case($visitType, MB_CASE_TITLE, 'UTF-8');
-
             VisitType::query()->updateOrCreate(
-                ['name' => $name],
+                // Chave espelha o que o mutator grava: MAIÚSCULO + global.
+                ['entity_id' => null, 'name' => mb_strtoupper($visitType, 'UTF-8')],
                 ['active' => true],
             );
         }
