@@ -375,7 +375,9 @@ function closePdfPreview() {
     margin-bottom: .375rem;
 }
 .detail-label { font-weight: 600; color: var(--bs-body-color); }
-.detail-value { color: var(--bs-secondary-color); word-break: break-word; }
+/* pre-line: preserva quebras de linha/parágrafos como o médico escreveu —
+   essencial pros atendimentos em texto livre no histórico. */
+.detail-value { color: var(--bs-secondary-color); word-break: break-word; white-space: pre-line; }
 
 .nav-tabs .nav-link {
     font-size: .875rem;

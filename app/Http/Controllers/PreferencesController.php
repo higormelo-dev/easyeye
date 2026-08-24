@@ -26,6 +26,11 @@ class PreferencesController extends Controller
         'dashboard_widget_order',
         'favorite_shortcuts',
         'medical_record_layout',
+        // Modelo pessoal do prontuário em TEXTO LIVRE (ticket "simplificar
+        // texto livre"): um texto salvo pelo médico (ex.: esqueleto HDA:/AP:/
+        // AV:/BIO:/FO:/HD:/CD:) que pré-preenche a caixa nos próximos
+        // atendimentos. Diferente do layout estruturado acima.
+        'free_text_template',
     ];
 
     /**
@@ -61,6 +66,7 @@ class PreferencesController extends Controller
             'medical_record_layout.custom.right.*'  => [Rule::in(self::RECORD_SECTIONS)],
             'medical_record_layout.custom.hidden'   => ['sometimes', 'array'],
             'medical_record_layout.custom.hidden.*' => [Rule::in(self::RECORD_SECTIONS)],
+            'free_text_template'                    => ['sometimes', 'nullable', 'string', 'max:20000'],
         ]);
 
         // Request::only() já filtra pra só as chaves permitidas — qualquer

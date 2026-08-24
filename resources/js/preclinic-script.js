@@ -13,22 +13,25 @@ Template Name: Preclinic - Bootstrap Admin Template
 	// Mobile menu sidebar overlay
 	$('body').append('<div class="sidebar-overlay"></div>');
 
+	// SPA-safe (Inertia): NUNCA usar a referência $wrapper capturada no load —
+	// o Vue troca o nó .main-wrapper ao navegar e a referência antiga fica
+	// morta (sintoma: overlay escurece mas o menu não desliza). Re-seleciona
+	// no clique e delega tudo no document (sobrevive a re-render).
 	$(document).on('click', '#mobile_btn', function() {
-		$wrapper.toggleClass('slide-nav');
+		$('.main-wrapper').toggleClass('slide-nav');
 		$('.sidebar-overlay').toggleClass('opened');
 		$('html').addClass('menu-opened');
 		return false;
 	});
-	$(".sidebar-close").on("click", function () {
-		$wrapper.removeClass('slide-nav');
+	$(document).on('click', '.sidebar-close', function () {
+		$('.main-wrapper').removeClass('slide-nav');
 		$('.sidebar-overlay').removeClass('opened');
 		$('html').removeClass('menu-opened');
 	});
 
-	$(".sidebar-overlay").on("click", function () {
+	$(document).on('click', '.sidebar-overlay', function () {
 		$('html').removeClass('menu-opened');
-		$(this).removeClass('opened');
-		$wrapper.removeClass('slide-nav');
+		$('.main-wrapper').removeClass('slide-nav');
 		$('.sidebar-overlay').removeClass('opened');
 	});
 

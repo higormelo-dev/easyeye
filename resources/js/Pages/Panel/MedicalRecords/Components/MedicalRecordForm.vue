@@ -236,6 +236,45 @@ const showLayoutModal = ref(false);
 const layoutSaving    = ref(false);
 const layoutSavedFlash = ref('');
 
+// ── Modelo pessoal de TEXTO LIVRE (preferences.free_text_template) ─────────
+// Texto salvo pelo médico (ex.: esqueleto HDA:/AP:/AV:/BIO:/FO:/HD:/CD:) que
+// pré-preenche a caixa quando ele entra no modo livre com a caixa vazia.
+const freeTextTemplate      = ref(usePage().props.auth?.user?.preferences?.free_text_template ?? '');
+const freeTemplateSaving    = ref(false);
+const freeTemplateSavedFlash = ref(false);
+
+async function saveFreeTextTemplate() {
+    const content = (form.observation_general || '').trim();
+    if (!content || freeTemplateSaving.value) return;
+    freeTemplateSaving.value = true;
+    try {
+        const { data } = await window.axios.patch(route('panel.preferences.update'), {
+            free_text_template: content,
+        });
+        freeTextTemplate.value = data.data?.free_text_template ?? content;
+        freeTemplateSavedFlash.value = true;
+        setTimeout(() => { freeTemplateSavedFlash.value = false; }, 2500);
+    } catch (e) {
+        console.error('Failed to persist free text template:', e);
+    } finally {
+        freeTemplateSaving.value = false;
+    }
+}
+
+function applyFreeTextTemplate() {
+    if (!freeTextTemplate.value) return;
+    const current = (form.observation_general || '').trim();
+    if (current && !window.confirm(tt('free_template_overwrite', 'A caixa já tem conteúdo. Substituir pelo seu modelo?'))) return;
+    form.observation_general = freeTextTemplate.value;
+}
+
+// Entrou no modo livre com a caixa vazia → abre já com o modelo do médico.
+watch(isFreeMode, (free) => {
+    if (free && !(form.observation_general || '').trim() && freeTextTemplate.value) {
+        form.observation_general = freeTextTemplate.value;
+    }
+});
+
 async function persistPreference(patch) {
     layoutSaving.value = true;
     try {
@@ -1475,8 +1514,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
             <span v-if="layoutSavedFlash" class="badge bg-success-subtle text-success">{{ layoutSavedFlash }}</span>
         </div>
 
-        <!-- Queixa + Switches clínicos -->
-        <div class="pmr-section pmr-top-strip px-3 pt-2 pb-0 bg-white">
+        <!-- Queixa + Switches clínicos — some no TEXTO LIVRE (ticket
+             "simplificar texto livre": só a caixa; queixa vira opcional no
+             backend quando a evolução livre está preenchida). v-show, não
+             v-if: valores preenchidos continuam no submit. -->
+        <div v-show="!isFreeMode" class="pmr-section pmr-top-strip px-3 pt-2 pb-0 bg-white">
             <div class="row g-2 align-items-start">
                 <div class="col-12 col-xl-8">
                     <label class="pmr-label">{{ tt('complaint', 'Queixa principal') }}</label>
@@ -1560,13 +1602,28 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
              colunas (não v-if): campos preenchidos continuam no submit. -->
         <div v-if="isFreeMode" class="px-3 pt-1 pb-2">
             <label class="pmr-label">{{ tt('free_text_label', 'Evolução / atendimento (texto livre)') }}</label>
-            <textarea v-model="form.observation_general" rows="14"
+            <textarea v-model="form.observation_general" rows="16"
                       class="form-control form-control-sm"
                       :placeholder="tt('free_text_ph', 'Descreva livremente o atendimento...')"
                       :disabled="isLocked"></textarea>
-            <small class="text-muted d-block mt-1">
-                <i class="fas fa-database me-1"></i>{{ tt('free_text_hint', 'Gravado no campo "Observações" do prontuário — os dados continuam estruturados no histórico do paciente.') }}
-            </small>
+            <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                <!-- Modelo pessoal: salva o texto atual como esqueleto pros
+                     próximos atendimentos (ex.: HDA:/AP:/AV:/BIO:/FO:/HD:/CD:) -->
+                <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none"
+                        :disabled="freeTemplateSaving || isLocked || !(form.observation_general || '').trim()"
+                        @click="saveFreeTextTemplate">
+                    <i class="fas fa-bookmark me-1"></i>{{ tt('free_template_save', 'Salvar como meu modelo de texto livre') }}
+                </button>
+                <button v-if="freeTextTemplate" type="button" class="btn btn-link btn-sm p-0 text-decoration-none"
+                        :disabled="isLocked"
+                        @click="applyFreeTextTemplate">
+                    <i class="fas fa-file-import me-1"></i>{{ tt('free_template_apply', 'Usar meu modelo') }}
+                </button>
+                <span v-if="freeTemplateSavedFlash" class="badge bg-success-subtle text-success">{{ tt('free_template_saved', 'Modelo salvo!') }}</span>
+                <small class="text-muted ms-auto">
+                    <i class="fas fa-database me-1"></i>{{ tt('free_text_hint', 'Gravado no campo "Observações" do prontuário — os dados continuam estruturados no histórico do paciente.') }}
+                </small>
+            </div>
         </div>
 
         <!-- Duas colunas principais -->

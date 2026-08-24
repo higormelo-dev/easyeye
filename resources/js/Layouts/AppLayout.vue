@@ -73,7 +73,7 @@ function showSessionWarning() {
         },
     }).then(result => {
         if (result.isConfirmed) {
-            fetch(route('session.ping'), {
+            fetch(safeRoute('session.ping'), {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
             }).then(r => r.ok ? resetTimers() : window.location.reload())
@@ -117,7 +117,12 @@ function safeRoute(name, params) {
 
 // ── Sidebar active state ───────────────────────────────────────────────────
 function isActive(matchPatterns) {
-    const current = route().current();
+    // Guard: se o helper route() estiver indisponível/quebrado, item fica
+    // inativo em vez de derrubar a árvore (mesma classe de bug do safeRoute).
+    let current = null;
+    try {
+        current = route().current();
+    } catch { /* menu sem estado ativo é melhor que tela em branco */ }
     return matchPatterns.some(p => {
         if (p.endsWith('*')) return current?.startsWith(p.slice(0, -2).replace('.*', ''));
         return current === p;
@@ -152,9 +157,9 @@ function isMenuOpen(item) {
 
 // ── Entity switch ──────────────────────────────────────────────────────────
 function switchEntity(entityUserId) {
-    router.post(route('selectentity.store'), { entity_user_id: entityUserId }, {
+    router.post(safeRoute('selectentity.store'), { entity_user_id: entityUserId }, {
         preserveScroll: false,
-        onSuccess: () => router.visit(route('panel.dashboard')),
+        onSuccess: () => router.visit(safeRoute('panel.dashboard')),
     });
 }
 
@@ -164,12 +169,12 @@ function entityInitials(name) {
 
 // ── Logout ─────────────────────────────────────────────────────────────────
 function logout() {
-    router.post(route('logout'));
+    router.post(safeRoute('logout'));
 }
 
 // ── Impersonation exit ─────────────────────────────────────────────────────
 function exitImpersonation() {
-    router.delete(route('manager.impersonate.destroy'));
+    router.delete(safeRoute('manager.impersonate.destroy'));
 }
 
 // ── Flash messages (Vue-controlled + auto-dismiss 6s) ─────────────────────
@@ -226,7 +231,7 @@ onUnmounted(() => {
         <header class="navbar-header">
             <div class="page-container topbar-menu">
                 <div class="d-flex align-items-center gap-2">
-                    <a :href="route('panel.dashboard')" class="logo">
+                    <a :href="safeRoute('panel.dashboard')" class="logo">
                         <span class="logo-light">
                             <span class="logo-lg"><img :src="logoSvg" alt="EasyEye"></span>
                             <span class="logo-sm"><img :src="logoSmallSvg" alt="EasyEye"></span>
@@ -290,7 +295,7 @@ onUnmounted(() => {
                                     <span class="d-block fs-13">{{ user.email }}</span>
                                 </div>
                             </div>
-                            <a :href="route('panel.profile.edit')" class="dropdown-item">
+                            <a :href="safeRoute('panel.profile.edit')" class="dropdown-item">
                                 <i class="ti ti-user-circle me-1 align-middle"></i>
                                 <span class="align-middle">Editar perfil</span>
                             </a>
@@ -318,13 +323,13 @@ onUnmounted(() => {
         <div class="sidebar" id="sidebar">
             <div class="sidebar-logo">
                 <div>
-                    <a :href="route('panel.dashboard')" class="logo logo-normal">
+                    <a :href="safeRoute('panel.dashboard')" class="logo logo-normal">
                         <img :src="logoSvg" alt="EasyEye">
                     </a>
-                    <a :href="route('panel.dashboard')" class="logo-small">
+                    <a :href="safeRoute('panel.dashboard')" class="logo-small">
                         <img :src="logoSmallSvg" alt="EasyEye">
                     </a>
-                    <a :href="route('panel.dashboard')" class="dark-logo">
+                    <a :href="safeRoute('panel.dashboard')" class="dark-logo">
                         <img :src="logoWhiteSvg" alt="EasyEye">
                     </a>
                 </div>

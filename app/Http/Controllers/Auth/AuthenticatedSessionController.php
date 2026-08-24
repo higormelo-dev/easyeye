@@ -71,7 +71,14 @@ class AuthenticatedSessionController extends Controller
             return $this->redirectForInertia($request, route('panel.dashboard'));
         }
 
-        return redirect()->intended(route('panel.dashboard', absolute: false));
+        // BUG — full reload obrigatório: o login parte do rootView guest-app
+        // (sem @routes/Ziggy, sem vendor.js/jQuery). Um redirect Inertia comum
+        // navegaria via SPA e montaria o painel dentro do blade guest — menu
+        // mobile morto, `route is not defined` e telas em branco intermitentes.
+        return $this->redirectForInertia(
+            $request,
+            session()->pull('url.intended', route('panel.dashboard')),
+        );
     }
 
     /**

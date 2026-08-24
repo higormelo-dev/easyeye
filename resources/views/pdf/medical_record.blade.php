@@ -48,7 +48,8 @@
     .col-12{ width: 100%; }
 
     .field-label { font-size: 8.5pt; color: #777; display: block; }
-    .field-value { font-size: 10.5pt; word-break: break-word; }
+    /* pre-line: preserva quebras de linha do texto livre/observações. */
+    .field-value { font-size: 10.5pt; word-break: break-word; white-space: pre-line; }
     .field-value.empty { color: #aaa; font-style: italic; }
 
     /* ── Table (ex: refração) ────────────────────────────────────── */

@@ -60,7 +60,16 @@ class AuthenticatedEntityController extends Controller
             return $this->redirectToPanelDashboard($request);
         }
 
-        return redirect()->intended(route('panel.dashboard', absolute: false));
+        // Full reload obrigatório: a seleção de entidade roda no rootView
+        // guest-app (sem @routes/vendor.js). Navegação SPA para o painel
+        // montaria o AppLayout sem Ziggy/jQuery — menu mobile morto.
+        $intendedUrl = session()->pull('url.intended', route('panel.dashboard'));
+
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($intendedUrl);
+        }
+
+        return redirect()->to($intendedUrl);
     }
 
     private function redirectToPanelDashboard(Request $request): HttpResponse

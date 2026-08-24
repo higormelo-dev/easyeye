@@ -84,8 +84,10 @@ class StoreMedicalRecordRequest extends FormRequest
             'lens_away_ids.*' => ['uuid', 'exists:lenses,id'],
             'lens_near_ids'   => ['nullable', 'array', 'max:10'],
             'lens_near_ids.*' => ['uuid', 'exists:lenses,id'],
-            // Anamnese — CBO (main_complaint obrigatória; mensagem em validation.custom.main_complaint.required)
-            'main_complaint'          => ['required', 'string', 'max:5000'],
+            // Anamnese — CBO. Obrigatória, EXCETO no modo texto livre (a
+            // evolução vai inteira em observation_general e a tela não mostra
+            // o campo de queixa — ticket "simplificar texto livre").
+            'main_complaint'          => ['required_without:observation_general', 'nullable', 'string', 'max:5000'],
             'hda'                     => ['nullable', 'string', 'max:10000'],
             'diabetic'                => ['nullable', 'boolean'],
             'diabetic_family'         => ['nullable', 'boolean'],

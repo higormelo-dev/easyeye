@@ -209,19 +209,12 @@ class MedicalRecordsController extends Controller
             'visual_acuity_without_correction_left'  => $medicalrecord->visualAcuityTypeWithoutCorrectionLeft?->name,
             'visual_acuity_with_correction_right'    => $medicalrecord->visualAcuityTypeWitCorrectionRight?->name,
             'visual_acuity_with_correction_left'     => $medicalrecord->visualAcuityTypeWitCorrectionLeft?->name,
-            'dynamic_spherical_right'                => $medicalrecord->dynamic_spherical_right,
-            'dynamic_spherical_left'                 => $medicalrecord->dynamic_spherical_left,
-            'dynamic_cylindrical_right'              => $medicalrecord->dynamic_cylindrical_right,
-            'dynamic_cylindrical_left'               => $medicalrecord->dynamic_cylindrical_left,
-            'dynamic_axis_right'                     => $medicalrecord->dynamic_axis_right,
-            'dynamic_axis_left'                      => $medicalrecord->dynamic_axis_left,
-            'addition_type'                          => $medicalrecord->additionType?->name,
-            'static_spherical_right'                 => $medicalrecord->static_spherical_right,
-            'static_spherical_left'                  => $medicalrecord->static_spherical_left,
-            'static_cylindrical_right'               => $medicalrecord->static_cylindrical_right,
-            'static_cylindrical_left'                => $medicalrecord->static_cylindrical_left,
-            'static_axis_right'                      => $medicalrecord->static_axis_right,
-            'static_axis_left'                       => $medicalrecord->static_axis_left,
+            // Refração dinâmica/estática: bloco TODO em default (0.00/0.00/0°,
+            // valores pré-preenchidos do form) = não preenchido de verdade →
+            // vira null e o histórico esconde (ticket "não mostrar vazios").
+            ...$this->refractionBlockOrNull($medicalrecord, 'dynamic'),
+            'addition_type' => $medicalrecord->additionType?->name,
+            ...$this->refractionBlockOrNull($medicalrecord, 'static'),
             // Multi-características: "MULTIFOCAL + ANTIRREFLEXO" (fallback
             // interno pro single de registros antigos)
             'lens_away' => $medicalrecord->lens_away_names_text ?: null,
@@ -540,6 +533,43 @@ class MedicalRecordsController extends Controller
                     'conduct' => Str::limit((string) $mr->clinical_conduct, 140) ?: null,
                 ],
             ])
+            ->all();
+    }
+
+    /**
+     * Bloco de refração (dynamic|static) pro show(): quando os 6 valores do
+     * bloco são apenas o DEFAULT do form (0.00 / 0.00 / 0°) ou vazios, o
+     * bloco inteiro vira null — o histórico (modal/drawer) esconde as linhas.
+     * Bloco com QUALQUER valor real preenchido sai íntegro. Nada é apagado
+     * do banco — é só exibição.
+     *
+     * @return array<string, ?string>
+     */
+    private function refractionBlockOrNull(MedicalRecord $record, string $prefix): array
+    {
+        $fields = [
+            "{$prefix}_spherical_right", "{$prefix}_spherical_left",
+            "{$prefix}_cylindrical_right", "{$prefix}_cylindrical_left",
+            "{$prefix}_axis_right", "{$prefix}_axis_left",
+        ];
+
+        $isDefault = function (?string $value): bool {
+            $v = trim((string) $value);
+
+            if ($v === '') {
+                return true;
+            }
+
+            // 0.00 / 0,00 / 0 / 0° / 0º / +0.00 / -0,00...
+            $normalized = str_replace(['°', 'º', ','], ['', '', '.'], $v);
+
+            return is_numeric($normalized) && (float) $normalized === 0.0;
+        };
+
+        $allDefault = collect($fields)->every(fn (string $f) => $isDefault($record->{$f}));
+
+        return collect($fields)
+            ->mapWithKeys(fn (string $f) => [$f => $allDefault ? null : $record->{$f}])
             ->all();
     }
 
