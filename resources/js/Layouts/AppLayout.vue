@@ -33,7 +33,19 @@ function toggleDark() {
     isDark.value = !isDark.value;
     const theme = isDark.value ? 'dark' : 'light';
     document.documentElement.setAttribute('data-bs-theme', theme);
-    localStorage.setItem('ee-panel-theme', theme);
+    try {
+        localStorage.setItem('ee-panel-theme', theme);
+        // Manter o config do preclinic-theme-script em sincronia — ele tem
+        // precedência no próximo boot (sessionStorage __THEME_CONFIG__) e
+        // reaplicaria o tema antigo por cima do que o usuário escolheu aqui.
+        const raw = sessionStorage.getItem('__THEME_CONFIG__');
+        if (raw) {
+            const cfg = JSON.parse(raw);
+            cfg.theme = theme;
+            sessionStorage.setItem('__THEME_CONFIG__', JSON.stringify(cfg));
+        }
+        if (window.config) window.config.theme = theme;
+    } catch { /* storage indisponível: tema vale só até o reload */ }
 }
 
 // ── Session timeout ────────────────────────────────────────────────────────
@@ -299,6 +311,19 @@ onUnmounted(() => {
                                 <i class="ti ti-user-circle me-1 align-middle"></i>
                                 <span class="align-middle">Editar perfil</span>
                             </a>
+                            <!-- Atalhos de configuração — só admin da clínica (mesmo
+                                 gate do grupo Configurações da sidebar) -->
+                            <template v-if="entity.is_client && entity.rule === 'admin'">
+                                <div class="dropdown-divider"></div>
+                                <a :href="safeRoute('panel.setting.resources.index')" class="dropdown-item">
+                                    <i class="ti ti-settings me-1 align-middle"></i>
+                                    <span class="align-middle">Configurações da clínica</span>
+                                </a>
+                                <a :href="safeRoute('panel.accesscontrol.users.index')" class="dropdown-item">
+                                    <i class="ti ti-shield-lock me-1 align-middle"></i>
+                                    <span class="align-middle">Usuários e permissões</span>
+                                </a>
+                            </template>
                             <template v-if="auth.impersonating">
                                 <div class="dropdown-divider"></div>
                                 <button type="button" class="dropdown-item text-danger" @click="exitImpersonation">

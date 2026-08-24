@@ -19,6 +19,28 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('favicon-192.png') }}">
+    {{-- Tema salvo pelo toggle do header (AppLayout.toggleDark grava em
+         localStorage). Aplicar ANTES do theme-script/CSS: sem isso o dark
+         mode morre a cada full reload — o theme-script só lê o atributo
+         data-bs-theme já presente no <html> + sessionStorage próprio. --}}
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('ee-panel-theme');
+                if (t !== 'dark' && t !== 'light') return;
+                document.documentElement.setAttribute('data-bs-theme', t);
+                // theme-script dá precedência ao __THEME_CONFIG__ do
+                // sessionStorage sobre o atributo — sincronizar, senão ele
+                // reaplica o tema antigo por cima deste boot.
+                var raw = sessionStorage.getItem('__THEME_CONFIG__');
+                if (raw) {
+                    var cfg = JSON.parse(raw);
+                    cfg.theme = t;
+                    sessionStorage.setItem('__THEME_CONFIG__', JSON.stringify(cfg));
+                }
+            } catch (e) { /* storage bloqueado: segue tema default */ }
+        })();
+    </script>
     {{-- Theme config: executa antes do paint para evitar flash de tema --}}
     <script src="{{ asset('js/preclinic-theme-script.js') }}"></script>
     {{-- jQuery síncrono: vendor.js + alguns plugins Bootstrap dependem de $ global
