@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
  *
  * Cobre os dois ajustes do ticket "Ajustes no Prontuário Médico":
  *  - acuidade visual ordenada da melhor (20/15) pra pior (20/400), depois os
- *    qualitativos (CONTA DEDOS → VULTOS → PL → SPL);
+ *    qualitativos (CD 1M..CD 5M → VULTOS → PL → SPL);
  * e o bug corrigido junto:
  *  - [SEGURANÇA] tipos customizados de uma clínica NÃO vazam pro dropdown
  *    de outra clínica (as queries de catálogo não filtravam entity_id).
@@ -65,14 +65,15 @@ it('acuidade visual vem ordenada da melhor pra pior, com 20/15 presente e qualit
     // clínica por scale, não alfabética — alfabética colocaria 20/100 antes).
     $pos = array_flip($names);
 
-    expect($pos)->toHaveKeys(['20/15', '20/20', '20/80', '20/100', '20/400', 'CONTA DEDOS', 'VULTOS', 'PL', 'SPL'])
+    expect($pos)->toHaveKeys(['20/15', '20/20', '20/80', '20/100', '20/400', 'CD 1M', 'CD 5M', 'VULTOS', 'PL', 'SPL'])
         ->and($pos['20/15'])->toBeLessThan($pos['20/20'])
         ->and($pos['20/20'])->toBeLessThan($pos['20/25'])
         ->and($pos['20/80'])->toBeLessThan($pos['20/100'])
         ->and($pos['20/100'])->toBeLessThan($pos['20/200'])
         ->and($pos['20/200'])->toBeLessThan($pos['20/400'])
-        ->and($pos['20/400'])->toBeLessThan($pos['CONTA DEDOS'])
-        ->and($pos['CONTA DEDOS'])->toBeLessThan($pos['VULTOS'])
+        ->and($pos['20/400'])->toBeLessThan($pos['CD 1M'])
+        ->and($pos['CD 1M'])->toBeLessThan($pos['CD 5M'])
+        ->and($pos['CD 5M'])->toBeLessThan($pos['VULTOS'])
         ->and($pos['VULTOS'])->toBeLessThan($pos['PL'])
         ->and($pos['PL'])->toBeLessThan($pos['SPL']);
 });

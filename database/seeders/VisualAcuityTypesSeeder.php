@@ -46,10 +46,19 @@ class VisualAcuityTypesSeeder extends Seeder
             ['scale' => 20, 'name' => '20/350'],
             ['scale' => 21, 'name' => '20/375'],
             ['scale' => 22, 'name' => '20/400'],
-            ['scale' => 23, 'name' => 'CONTA DEDOS'],
-            ['scale' => 24, 'name' => 'VULTOS'],
-            ['scale' => 25, 'name' => 'PL'],
-            ['scale' => 26, 'name' => 'SPL'],
+            // Conta Dedos COM distância (requisito clínico): o prontuário
+            // mostra "CONTA DEDOS" + seletor de distância (AcuitySelect.vue),
+            // mas o dado gravado é o FK direto pra CD 1M..CD 5M — estruturado
+            // e já compacto em PDFs/resumos. O antigo "CONTA DEDOS" (sem
+            // distância) foi desativado pela migration 2026_08_23_010000.
+            ['scale' => 23, 'name' => 'CD 1M'],
+            ['scale' => 24, 'name' => 'CD 2M'],
+            ['scale' => 25, 'name' => 'CD 3M'],
+            ['scale' => 26, 'name' => 'CD 4M'],
+            ['scale' => 27, 'name' => 'CD 5M'],
+            ['scale' => 28, 'name' => 'VULTOS'],
+            ['scale' => 29, 'name' => 'PL'],
+            ['scale' => 30, 'name' => 'SPL'],
         ];
 
         foreach ($types as $type) {

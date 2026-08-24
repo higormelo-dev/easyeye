@@ -22,6 +22,10 @@ const props = defineProps({
     invalid:         { type: Boolean, default: false },
     remoteSearchUrl: { type: String,  default: '' },
     remoteMinChars:  { type: Number,  default: 2 },
+    // Altura máxima da lista aberta (--ms-max-height do @vueform/multiselect;
+    // default do tema = 10rem). Listas longas (ex.: acuidade visual) passam
+    // um valor maior pra reduzir rolagem.
+    listHeight:      { type: String,  default: '' },
 });
 
 // `option-selected` — Onda IOL Lenses: emite o OBJETO completo da opção
@@ -111,6 +115,7 @@ function onSearchChange(q) {
         v-model="value"
         class="search-select"
         :class="{ 'is-invalid': invalid }"
+        :style="listHeight ? { '--ms-max-height': listHeight } : {}"
         :options="effectiveOptions"
         :value-prop="valueKey"
         :label="labelKey"

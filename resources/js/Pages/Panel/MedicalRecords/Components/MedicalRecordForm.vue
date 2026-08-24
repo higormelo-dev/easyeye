@@ -5,6 +5,7 @@ import { validatePayload } from '@/utils/formRulesValidator.js';
 import PdfPreviewModal from './PdfPreviewModal.vue';
 import TinyMceEditor   from '@/Components/Panel/TinyMceEditor.vue';
 import SearchSelect    from '@/Components/Panel/SearchSelect.vue';
+import AcuitySelect    from '@/Pages/Panel/MedicalRecords/Components/AcuitySelect.vue';
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
@@ -1604,13 +1605,13 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 <div class="d-flex gap-1 flex-wrap">
                                     <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                         <span class="input-group-text pmr-eye-badge">OD</span>
-                                        <SearchSelect v-model="form.visual_acuity_without_correction_right_id"
+                                        <AcuitySelect v-model="form.visual_acuity_without_correction_right_id"
                                                       :options="visualAcuityTypes"
                                                       :placeholder="'—'" :disabled="isLocked" />
                                     </div>
                                     <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                         <span class="input-group-text pmr-eye-badge">OE</span>
-                                        <SearchSelect v-model="form.visual_acuity_without_correction_left_id"
+                                        <AcuitySelect v-model="form.visual_acuity_without_correction_left_id"
                                                       :options="visualAcuityTypes"
                                                       :placeholder="'—'" :disabled="isLocked" />
                                     </div>
@@ -1800,13 +1801,13 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <div class="d-flex gap-1 flex-wrap">
                             <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OD</span>
-                                <SearchSelect v-model="form.visual_acuity_with_correction_right_id"
+                                <AcuitySelect v-model="form.visual_acuity_with_correction_right_id"
                                               :options="visualAcuityTypes"
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
                             <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
                                 <span class="input-group-text pmr-eye-badge">OE</span>
-                                <SearchSelect v-model="form.visual_acuity_with_correction_left_id"
+                                <AcuitySelect v-model="form.visual_acuity_with_correction_left_id"
                                               :options="visualAcuityTypes"
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
