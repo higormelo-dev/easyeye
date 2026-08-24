@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ClientRule;
 use App\Models\{Covenant, Doctor, Entity, Patient, People, User, VisualAcuityType};
-use Database\Seeders\VisualAcuityTypesSeeder;
+use Database\Seeders\{ColorVisionTypesSeeder, CoverTestTypesSeeder, NearPointConvergencesSeeder, VisualAcuityTypesSeeder};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -111,4 +111,28 @@ it('reseed é idempotente e corrige scales antigos sem duplicar registros globai
     expect(VisualAcuityType::whereNull('entity_id')->count())->toBe($before)
         ->and((int) VisualAcuityType::whereNull('entity_id')->where('name', '20/20')->value('scale'))->toBe(2)
         ->and((int) VisualAcuityType::whereNull('entity_id')->where('name', '20/15')->value('scale'))->toBe(1);
+});
+
+it('Visão Cromática, PPC e Cover Test abrem com o resultado NORMAL primeiro', function () {
+    $this->seed(ColorVisionTypesSeeder::class);
+    $this->seed(NearPointConvergencesSeeder::class);
+    $this->seed(CoverTestTypesSeeder::class);
+    // Rodar 2x também NÃO pode duplicar (gotcha do HasUppercaseName)
+    $this->seed(ColorVisionTypesSeeder::class);
+    $this->seed(CoverTestTypesSeeder::class);
+
+    $response = $this->get(route('panel.patients.medicalrecords.create', $this->patient));
+    $response->assertOk();
+    $catalogs = $response->viewData('page')['props']['catalogs'];
+
+    $color = array_column($catalogs['color_vision_types'], 'name');
+    $ppc   = array_column($catalogs['near_point_types'], 'name');
+    $cover = array_column($catalogs['cover_test_types'], 'name');
+
+    expect($color[0])->toBe('NORMAL')
+        ->and($ppc[0])->toBe('NORMAL')
+        ->and($cover[0])->toBe('NORMAL (ORTOFORIA)')
+        // sem duplicatas após reseed
+        ->and(count($color))->toBe(count(array_unique($color)))
+        ->and(count($cover))->toBe(count(array_unique($cover)));
 });

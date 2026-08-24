@@ -640,9 +640,12 @@ class MedicalRecordsController extends Controller
             // clínica, que ficam com scale default 0.
             'catalogs' => [
                 'visual_acuity_types' => $this->serializeCatalog($this->scopedCatalog(VisualAcuityType::query(), $entityId)->orderBy('scale')->orderBy('name')->get()),
-                'color_vision_types'  => $this->serializeCatalog($this->scopedCatalog(ColorVisionType::query(), $entityId)->orderBy('name')->get()),
-                'cover_test_types'    => $this->serializeCatalog($this->scopedCatalog(CoverTestType::query(), $entityId)->orderBy('name')->get()),
-                'near_point_types'    => $this->serializeCatalog($this->scopedCatalog(NearPointConvergence::query(), $entityId)->orderBy('name')->get()),
+                // Normal-first (ticket "opções normais primeiro"): a maioria
+                // dos pacientes tem resultado normal — NORMAL/NORMAL (ORTOFORIA)
+                // abre a lista; alterações seguem em ordem alfabética.
+                'color_vision_types'  => $this->serializeCatalog($this->scopedCatalog(ColorVisionType::query(), $entityId)->orderByRaw("(CASE WHEN name ILIKE 'NORMAL%' THEN 0 ELSE 1 END), name")->get()),
+                'cover_test_types'    => $this->serializeCatalog($this->scopedCatalog(CoverTestType::query(), $entityId)->orderByRaw("(CASE WHEN name ILIKE 'NORMAL%' THEN 0 ELSE 1 END), name")->get()),
+                'near_point_types'    => $this->serializeCatalog($this->scopedCatalog(NearPointConvergence::query(), $entityId)->orderByRaw("(CASE WHEN name ILIKE 'NORMAL%' THEN 0 ELSE 1 END), name")->get()),
                 'addition_types'      => $this->serializeCatalog($this->scopedCatalog(AdditionType::query(), $entityId)->orderBy('name')->get()),
                 'lenses'              => $this->serializeCatalog($this->scopedCatalog(Lense::query(), $entityId)->orderBy('name')->get()),
                 'documentation_types' => $this->documentationService->getTypes(),

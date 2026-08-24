@@ -19,8 +19,12 @@ class ColorVisionTypesSeeder extends Seeder
         ];
 
         foreach ($types as $type) {
+            // Chave em MAIÚSCULO + entity null: o model tem HasUppercaseName
+            // (mutator salva uppercase) — buscar por Title Case nunca acha o
+            // registro salvo e cada rodada duplicaria o catálogo (mesmo
+            // gotcha corrigido no VisitTypesSeeder).
             ColorVisionType::query()->firstOrCreate(
-                ['name' => $type],
+                ['entity_id' => null, 'name' => mb_strtoupper($type, 'UTF-8')],
                 ['active' => true],
             );
         }
