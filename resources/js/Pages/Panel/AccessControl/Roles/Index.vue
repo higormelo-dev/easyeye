@@ -20,6 +20,9 @@ import RoleFormModal   from './RoleFormModal.vue';
  */
 const props = defineProps({
     roles:               { type: Array,  default: () => [] },
+    // Perfis FIXOS da plataforma (ClientRule) — pré-definidos pelo SaaS,
+    // somente leitura: [{ value, label, description }].
+    systemProfiles:      { type: Array,  default: () => [] },
     availablePermissions: { type: Array,  default: () => [] },
     breadcrumbs:         { type: Array,  default: () => [] },
     routes:              { type: Object, required: true }, // { index, store, update, destroy } — update/destroy com __ID__
@@ -35,6 +38,16 @@ const filteredRoles = computed(() => {
     return props.roles.filter((role) => (
         role.name?.toLowerCase().includes(term)
         || role.description?.toLowerCase().includes(term)
+    ));
+});
+
+const filteredSystemProfiles = computed(() => {
+    const term = search.value.trim().toLowerCase();
+    if (!term) return props.systemProfiles;
+
+    return props.systemProfiles.filter((profile) => (
+        profile.label?.toLowerCase().includes(term)
+        || profile.description?.toLowerCase().includes(term)
     ));
 });
 
@@ -62,7 +75,7 @@ function onDelete(role) {
         <div class="container-fluid py-3">
 
             <!-- ── Header ─────────────────────────────────────────────────── -->
-            <PageHeader title="Perfis de acesso" :total="filteredRoles.length">
+            <PageHeader title="Perfis de acesso" :total="filteredSystemProfiles.length + filteredRoles.length">
                 <template #actions>
                     <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
                         <i class="ti ti-plus me-1"></i>Novo perfil
@@ -73,7 +86,9 @@ function onDelete(role) {
             <!-- ── Aviso de limite do sistema ────────────────────────────── -->
             <div class="alert alert-info small py-2 mb-3">
                 <i class="ti ti-info-circle me-1"></i>
-                Perfis customizados concedem permissões administrativas adicionais. Ações
+                Os <strong>perfis do sistema</strong> já vêm pré-definidos pela plataforma e são
+                atribuídos a cada usuário no cadastro de usuários. Os <strong>perfis
+                customizados</strong> concedem permissões administrativas adicionais. Ações
                 clínicas (laudos, prescrições) continuam exclusivas de médicos, independente
                 de perfil.
             </div>
@@ -85,11 +100,38 @@ function onDelete(role) {
                 max-width="340px"
             />
 
+            <!-- ── Perfis do sistema (pré-definidos pelo SaaS) ────────────── -->
+            <template v-if="filteredSystemProfiles.length > 0">
+                <h6 class="text-uppercase text-muted fs-12 fw-semibold mt-3 mb-2">
+                    <i class="ti ti-building-store me-1"></i>Perfis do sistema
+                </h6>
+                <div class="row g-3 mb-4">
+                    <div v-for="profile in filteredSystemProfiles" :key="profile.value" class="col-sm-6 col-lg-4 col-xl-3">
+                        <div class="card card-body h-100 border-primary-subtle bg-light-subtle">
+                            <div class="d-flex align-items-start justify-content-between mb-2">
+                                <h6 class="mb-0 fw-semibold text-truncate" :title="profile.label">
+                                    <i class="ti ti-shield-check me-1 text-primary"></i>{{ profile.label }}
+                                </h6>
+                                <span class="badge badge-soft-primary rounded fs-11 flex-shrink-0 ms-1">
+                                    <i class="ti ti-lock me-1"></i>Padrão
+                                </span>
+                            </div>
+                            <p class="small text-muted mb-0">{{ profile.description }}</p>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- ── Perfis customizados da clínica ─────────────────────────── -->
+            <h6 class="text-uppercase text-muted fs-12 fw-semibold mt-3 mb-2">
+                <i class="ti ti-adjustments me-1"></i>Perfis customizados
+            </h6>
+
             <!-- ── Empty state ────────────────────────────────────────────── -->
             <div v-if="filteredRoles.length === 0" class="text-center text-muted py-5">
                 <i class="ti ti-shield-off fs-1 mb-2 d-block opacity-40"></i>
                 <p class="small mb-0">
-                    {{ roles.length === 0 ? 'Nenhum perfil customizado cadastrado.' : 'Nenhum perfil encontrado para esta busca.' }}
+                    {{ roles.length === 0 ? 'Nenhum perfil customizado cadastrado. Os perfis do sistema acima já cobrem os papéis padrão da clínica.' : 'Nenhum perfil encontrado para esta busca.' }}
                 </p>
             </div>
 

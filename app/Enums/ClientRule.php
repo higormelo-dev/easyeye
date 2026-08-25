@@ -27,6 +27,28 @@ enum ClientRule: string
     }
 
     /**
+     * O que cada perfil FIXO pode fazer, em pt-BR, derivado dos Gates em
+     * AuthServiceProvider (EntityGate) e dos middlewares entity.role das
+     * rotas. Exibido na tela de Perfis de acesso como catálogo somente
+     * leitura — manter em sincronia ao alterar qualquer Gate/rota.
+     */
+    public function description(): string
+    {
+        return match ($this) {
+            self::Admin => 'Acesso administrativo total: usuários e permissões, '
+                . 'configurações da clínica, financeiro, agenda e importação de exames. '
+                . 'Ações clínicas (laudos, prescrições) continuam exclusivas de médicos.',
+            self::Financial => 'Dados e relatórios financeiros da clínica.',
+            self::Doctor => 'Agenda, atendimento e prontuário, emissão de laudos e '
+                . 'prescrições, importação de exames.',
+            self::Secretary => 'Agenda (criar, editar e remarcar), cadastro de pacientes '
+                . 'e importação de exames.',
+            self::User => 'Acesso básico de membro da clínica, sem permissões '
+                . 'administrativas ou clínicas.',
+        };
+    }
+
+    /**
      * All valid string values for this context.
      *
      * @return string[]

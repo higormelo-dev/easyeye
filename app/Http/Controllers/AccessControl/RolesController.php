@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\AccessControl;
 
+use App\Enums\ClientRule;
 use App\Enums\Permission as PermissionEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RoleRequest;
@@ -63,6 +64,15 @@ class RolesController extends Controller
             // quebra o primeiro render sem erro capturado, tela fica em
             // branco. ->resolve() força o array desembrulhado.
             'roles'                => RoleResource::collection($roles)->resolve(),
+            // Perfis FIXOS da plataforma (ClientRule) — pré-definidos pelo
+            // SaaS, somente leitura na tela. O perfil de cada usuário é
+            // escolhido no cadastro de usuários; as Roles customizadas acima
+            // são apenas a camada ADITIVA administrativa.
+            'systemProfiles' => collect(ClientRule::cases())->map(fn (ClientRule $rule) => [
+                'value'       => $rule->value,
+                'label'       => $rule->label(),
+                'description' => $rule->description(),
+            ])->values()->all(),
             'availablePermissions' => $this->groupedAvailablePermissions(),
             'routes'               => [
                 'index' => route('panel.accesscontrol.roles.index'),

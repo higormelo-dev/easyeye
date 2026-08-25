@@ -21,11 +21,21 @@ class EnsureEntitySelected
         }
 
         if (! session('selected_entity_user_id')) {
-            if (count(Auth::user()->entityUsers) > 1) {
+            // Só vínculos ativos e não deletados: um vínculo soft-deletado ou
+            // inativo aqui selecionaria uma entity onde o role check do
+            // EnsureEntityRole (que filtra deleted_at) retorna null → 403 em
+            // todas as rotas com entity.role, mesmo com o rule correto no
+            // vínculo ativo.
+            $entityUsers = Auth::user()->entityUsers()
+                ->where('active', true)
+                ->whereNull('deleted_at')
+                ->get();
+
+            if ($entityUsers->count() > 1) {
                 return redirect()->route('selectentity.create');
             }
 
-            $entityUser = Auth::user()->entityUsers->first();
+            $entityUser = $entityUsers->first();
 
             if ($entityUser) {
                 session([
