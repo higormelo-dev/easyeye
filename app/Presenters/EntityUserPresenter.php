@@ -2,18 +2,18 @@
 
 namespace App\Presenters;
 
-use App\Models\User;
+use App\Models\SystemProfile;
 use Laracasts\Presenter\Presenter;
 
 class EntityUserPresenter extends Presenter
 {
     public function getClientRule(): string
     {
-        return $this->rule ? User::$rolesOfClients[$this->rule] : '';
+        return SystemProfile::labelFor(SystemProfile::CONTEXT_CLIENT, $this->rule);
     }
 
     public function getRule(): string
     {
-        return $this->rule ? User::$rolesOfManager[$this->rule] : '';
+        return SystemProfile::labelFor(SystemProfile::CONTEXT_SAAS, $this->rule);
     }
 }

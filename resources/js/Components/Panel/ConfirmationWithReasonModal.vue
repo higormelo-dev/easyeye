@@ -83,7 +83,7 @@ const btnClass = computed(() => `btn btn-${props.confirmVariant} btn-sm`);
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
-                        <i class="ti ti-shield-lock-filled me-1 text-warning"></i>
+                        <i class="ti ti-shield-lock me-1 text-warning"></i>
                         {{ title || t.modal_title || 'Confirmar ação' }}
                     </h5>
                     <button type="button" class="btn-close" :disabled="saving" @click="close"></button>

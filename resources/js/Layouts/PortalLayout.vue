@@ -54,7 +54,7 @@ function isActive(routeNameStart) {
         >
             <div class="container-fluid px-4">
                 <Link :href="route('portal.dashboard')" class="navbar-brand fw-semibold">
-                    <i class="ti ti-handshake me-2"></i>
+                    <i class="ti ti-heart-handshake me-2"></i>
                     Portal de Parceiros
                 </Link>
 

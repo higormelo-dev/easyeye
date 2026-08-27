@@ -321,6 +321,9 @@ return [
         'generic' => [
             'required' => 'The :attribute field is required.',
         ],
+        'company_phone' => [
+            'invalid' => 'Enter a valid WhatsApp number with area code (10 or 11 digits).',
+        ],
         'entity_integrator_equipment' => [
             'ip_unique'            => 'This IP address is already being used by another equipment.',
             'mac_unique'           => 'This MAC address is already being used by another equipment.',

@@ -59,7 +59,7 @@ const defaultOpen = ref(false);
                     class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle"
                     style="width:42px;height:42px;background:#fdd835;"
                 >
-                    <i class="ti ti-star-filled text-dark fs-20"></i>
+                    <i class="ti ti-star text-dark fs-20"></i>
                 </div>
                 <div class="flex-grow-1">
                     <div class="fw-bold mb-0" style="color:#5d4037;">{{ t.default_banner_title }}</div>

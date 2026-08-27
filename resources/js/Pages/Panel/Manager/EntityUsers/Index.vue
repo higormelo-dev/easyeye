@@ -120,7 +120,7 @@ function confirmImpersonate() {
                         <tbody>
                             <tr v-if="users.data.length === 0">
                                 <td colspan="7" class="text-center text-muted py-5">
-                                    <i class="ti ti-users-off fs-1 d-block mb-2"></i>
+                                    <i class="ti ti-user-off fs-1 d-block mb-2"></i>
                                     {{ t.empty_list ?? 'Nenhum usuário encontrado.' }}
                                 </td>
                             </tr>

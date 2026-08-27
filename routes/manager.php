@@ -44,67 +44,94 @@ Route::group([
     // aqui — o grupo ainda usava o limite literal antigo.
     'middleware' => ['auth', 'verified', '2fa', 'entity.selected', 'saas.admin', 'admin.audit', 'throttle:manager-read'],
 ], static function () {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ACL POR PAPEL SAAS (saas.role — EnsureSaasRole)
+    // `saas.admin` valida apenas que a entity da sessão é a do SaaS, NUNCA o
+    // papel do usuário nela. Sem os grupos abaixo, qualquer membro ativo da
+    // entity SaaS (inclusive rule 'user') executava ações administrativas por
+    // URL direta — o menu esconder o manager é UI, não autorização.
+    // Módulos que já fazem Gate fino por action no controller (Créditos IA,
+    // Provedores IA, Finanças internas, WhatsApp) ficam FORA dos grupos para
+    // não regredir os papéis que os Gates deliberadamente aceitam.
+    // ═══════════════════════════════════════════════════════════════════════════
+
     // ── Dashboard ──────────────────────────────────────────────────────────────
-    Route::get('/', fn () => redirect()->route('manager.dashboard'));
-    Route::get('/dashboard', ManagerDashboardController::class)->name('dashboard');
+    // Landing page do manager pós-login: todos os papéis SaaS operacionais.
+    // Rule 'user' (Usuário Comum SaaS) fica de fora — não tem função no manager.
+    Route::middleware('saas.role:admin,financial,support')->group(function () {
+        Route::get('/', fn () => redirect()->route('manager.dashboard'));
+        Route::get('/dashboard', ManagerDashboardController::class)->name('dashboard');
+    });
 
-    // ── Empresas (Clínicas) ────────────────────────────────────────────────────
-    Route::get('entities/cards', [EntitiesController::class, 'cards'])->name('entities.cards');
-    Route::get('entities/{entity}/edit-data', [EntitiesController::class, 'editData'])->name('entities.edit-data');
-    Route::get('entities/{entity}/users', [EntityUsersController::class, 'index'])->name('entities.users');
-    Route::delete('entities/{entity}', [EntitiesController::class, 'destroy'])
-        ->middleware('throttle:manager-destructive')
-        ->name('entities.destroy');
-    // Admin SaaS força 2FA em uma entity (ação de alto impacto — rate-limited)
-    Route::patch('entities/{entity}/two-factor', [EntitiesController::class, 'toggleTwoFactor'])
-        ->middleware('throttle:manager-destructive')
-        ->name('entities.two-factor.toggle');
-    Route::resource('entities', EntitiesController::class)->except('create', 'edit', 'destroy');
+    // ── Empresas (Clínicas) — admin only ───────────────────────────────────────
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('entities/cards', [EntitiesController::class, 'cards'])->name('entities.cards');
+        Route::get('entities/{entity}/edit-data', [EntitiesController::class, 'editData'])->name('entities.edit-data');
+        Route::delete('entities/{entity}', [EntitiesController::class, 'destroy'])
+            ->middleware('throttle:manager-destructive')
+            ->name('entities.destroy');
+        // Admin SaaS força 2FA em uma entity (ação de alto impacto — rate-limited)
+        Route::patch('entities/{entity}/two-factor', [EntitiesController::class, 'toggleTwoFactor'])
+            ->middleware('throttle:manager-destructive')
+            ->name('entities.two-factor.toggle');
+        Route::resource('entities', EntitiesController::class)->except('create', 'edit', 'destroy');
 
-    // ── Usuários Integradores ──────────────────────────────────────────────────
-    Route::get('entities/{entity}/user-integrators/{userIntegrator}/edit-data', [EntityUserIntegratorsController::class, 'editData'])->name('entities.user-integrators.edit-data');
-    Route::patch('entities/{entity}/user-integrators/{userIntegrator}/activate', [EntityUserIntegratorsController::class, 'activate'])->name('entities.user-integrators.activate');
-    Route::put('entities/{entity}/user-integrators/{userIntegrator}/restore', [EntityUserIntegratorsController::class, 'restore'])->name('entities.user-integrators.restore');
-    Route::resource('entities.user-integrators', EntityUserIntegratorsController::class)->except('create', 'edit');
+        // ── Usuários Integradores ──────────────────────────────────────────────
+        Route::get('entities/{entity}/user-integrators/{userIntegrator}/edit-data', [EntityUserIntegratorsController::class, 'editData'])->name('entities.user-integrators.edit-data');
+        Route::patch('entities/{entity}/user-integrators/{userIntegrator}/activate', [EntityUserIntegratorsController::class, 'activate'])->name('entities.user-integrators.activate');
+        Route::put('entities/{entity}/user-integrators/{userIntegrator}/restore', [EntityUserIntegratorsController::class, 'restore'])->name('entities.user-integrators.restore');
+        Route::resource('entities.user-integrators', EntityUserIntegratorsController::class)->except('create', 'edit');
 
-    // ── Integradores (sob Usuário Integrador) ──────────────────────────────────
-    Route::get('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/edit-data', [EntityIntegratorsController::class, 'editData'])->name('entities.user-integrators.integrators.edit-data');
-    Route::patch('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/activate', [EntityIntegratorsController::class, 'activate'])->name('entities.user-integrators.integrators.activate');
-    Route::put('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/restore', [EntityIntegratorsController::class, 'restore'])->name('entities.user-integrators.integrators.restore');
-    Route::resource('entities.user-integrators.integrators', EntityIntegratorsController::class)->except('create', 'edit');
+        // ── Integradores (sob Usuário Integrador) ──────────────────────────────
+        Route::get('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/edit-data', [EntityIntegratorsController::class, 'editData'])->name('entities.user-integrators.integrators.edit-data');
+        Route::patch('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/activate', [EntityIntegratorsController::class, 'activate'])->name('entities.user-integrators.integrators.activate');
+        Route::put('entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/restore', [EntityIntegratorsController::class, 'restore'])->name('entities.user-integrators.integrators.restore');
+        Route::resource('entities.user-integrators.integrators', EntityIntegratorsController::class)->except('create', 'edit');
 
-    // ── Equipamentos ───────────────────────────────────────────────────────────
-    Route::resource('entities.user-integrators.integrators.equipments', EntityIntegratorEquipmentsController::class)->only('index', 'show');
+        // ── Equipamentos ───────────────────────────────────────────────────────
+        Route::resource('entities.user-integrators.integrators.equipments', EntityIntegratorEquipmentsController::class)->only('index', 'show');
+    });
 
-    // ── Impersonação (apenas o INÍCIO — exige saas.admin) ──────────────────────
-    // O encerramento (destroy) é registrado fora deste grupo, pois durante a
-    // impersonação o `selected_entity_is_client` está true e o middleware
-    // `saas.admin` bloquearia justamente a rota usada para SAIR da impersonação.
-    Route::post('entities/{entity}/impersonate/{entityUser}', [ImpersonateController::class, 'store'])
-        ->middleware('throttle:manager-destructive')
-        ->name('entities.impersonate');
+    // ── Usuários das empresas + Impersonação — admin ou support ───────────────
+    // Os controllers já autorizam via Gate SaasImpersonate (admin|support);
+    // o middleware repete a regra como defesa em profundidade na borda HTTP.
+    Route::middleware('saas.role:admin,support')->group(function () {
+        Route::get('entities/{entity}/users', [EntityUsersController::class, 'index'])->name('entities.users');
 
-    // ── Planos ─────────────────────────────────────────────────────────────────
-    Route::get('plans/cards', [PlansController::class, 'cards'])->name('plans.cards');
-    Route::delete('plans/{plan}', [PlansController::class, 'destroy'])
-        ->middleware('throttle:manager-destructive')
-        ->name('plans.destroy');
-    Route::resource('plans', PlansController::class)->except('create', 'edit', 'destroy');
+        // Apenas o INÍCIO da impersonação. O encerramento (destroy) é
+        // registrado fora deste grupo, pois durante a impersonação o
+        // `selected_entity_is_client` está true e o middleware `saas.admin`
+        // bloquearia justamente a rota usada para SAIR da impersonação.
+        Route::post('entities/{entity}/impersonate/{entityUser}', [ImpersonateController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('entities.impersonate');
+    });
 
-    // ── Parceiros ──────────────────────────────────────────────────────────────
-    // Rotas de export antes do resource para evitar conflito com /partners/{partner}.
-    Route::get('partners/export/pdf', [PartnersController::class, 'exportPdf'])->name('partners.export.pdf');
-    Route::get('partners/export/excel', [PartnersController::class, 'exportExcel'])->name('partners.export.excel');
-    Route::get('partners/{partner}/edit-data', [PartnersController::class, 'editData'])->name('partners.edit-data');
-    Route::get('partners/{partner}', [PartnersController::class, 'show'])->name('partners.show');
-    Route::patch('partners/{partner}/leads/{lead}/advance', [PartnersController::class, 'advanceLead'])->name('partners.leads.advance');
-    Route::patch('partners/commissions/{commission}/pay', [PartnersController::class, 'payCommission'])
-        ->middleware('throttle:manager-destructive')
-        ->name('partners.commission.pay');
-    Route::delete('partners/{partner}', [PartnersController::class, 'destroy'])
-        ->middleware('throttle:manager-destructive')
-        ->name('partners.destroy');
-    Route::resource('partners', PartnersController::class)->except('create', 'edit', 'show', 'destroy');
+    // ── Planos — admin only ────────────────────────────────────────────────────
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('plans/cards', [PlansController::class, 'cards'])->name('plans.cards');
+        Route::delete('plans/{plan}', [PlansController::class, 'destroy'])
+            ->middleware('throttle:manager-destructive')
+            ->name('plans.destroy');
+        Route::resource('plans', PlansController::class)->except('create', 'edit', 'destroy');
+    });
+
+    // ── Parceiros — admin ou financial (comissões = domínio financeiro) ────────
+    Route::middleware('saas.role:admin,financial')->group(function () {
+        // Rotas de export antes do resource para evitar conflito com /partners/{partner}.
+        Route::get('partners/export/pdf', [PartnersController::class, 'exportPdf'])->name('partners.export.pdf');
+        Route::get('partners/export/excel', [PartnersController::class, 'exportExcel'])->name('partners.export.excel');
+        Route::get('partners/{partner}/edit-data', [PartnersController::class, 'editData'])->name('partners.edit-data');
+        Route::get('partners/{partner}', [PartnersController::class, 'show'])->name('partners.show');
+        Route::patch('partners/{partner}/leads/{lead}/advance', [PartnersController::class, 'advanceLead'])->name('partners.leads.advance');
+        Route::patch('partners/commissions/{commission}/pay', [PartnersController::class, 'payCommission'])
+            ->middleware('throttle:manager-destructive')
+            ->name('partners.commission.pay');
+        Route::delete('partners/{partner}', [PartnersController::class, 'destroy'])
+            ->middleware('throttle:manager-destructive')
+            ->name('partners.destroy');
+        Route::resource('partners', PartnersController::class)->except('create', 'edit', 'show', 'destroy');
+    });
 
     // ── Compra de créditos IA ──────────────────────────────────────────────────
     // Gerencia pedidos das clínicas: aprovar pagamento (creditar), cancelar,
@@ -147,35 +174,39 @@ Route::group([
         ->middleware('throttle:manager-destructive')
         ->name('ai-providers.update');
 
-    // ── Gateways de Pagamento ──────────────────────────────────────────────────
-    Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');
-    Route::patch('gateways/{gateway}/set-default', [GatewaysController::class, 'setDefault'])->name('gateways.set-default');
-    Route::patch('gateways/{gateway}/toggle-active', [GatewaysController::class, 'toggleActive'])->name('gateways.toggle-active');
-    Route::patch('gateways/{gateway}/priority', [GatewaysController::class, 'updatePriority'])->name('gateways.priority');
-    Route::get('gateways/{gateway}/credentials', [GatewaysController::class, 'credentials'])->name('gateways.credentials');
-    Route::post('gateways/{gateway}/credentials', [GatewaysController::class, 'storeCredential'])
-        ->middleware('throttle:manager-destructive')
-        ->name('gateways.credentials.store');
-    Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [GatewaysController::class, 'revokeCredential'])
-        ->middleware('throttle:manager-destructive')
-        ->name('gateways.credentials.revoke');
-    Route::get('gateways/{gateway}/entity-access', [GatewaysController::class, 'entityAccess'])->name('gateways.entity-access');
-    Route::patch('gateways/{gateway}/entity-access/{entity}', [GatewaysController::class, 'toggleEntityAccess'])->name('gateways.entity-access.toggle');
+    // ── Gateways de Pagamento — admin only (credenciais = máxima criticidade) ──
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('gateways', [GatewaysController::class, 'index'])->name('gateways.index');
+        Route::patch('gateways/{gateway}/set-default', [GatewaysController::class, 'setDefault'])->name('gateways.set-default');
+        Route::patch('gateways/{gateway}/toggle-active', [GatewaysController::class, 'toggleActive'])->name('gateways.toggle-active');
+        Route::patch('gateways/{gateway}/priority', [GatewaysController::class, 'updatePriority'])->name('gateways.priority');
+        Route::get('gateways/{gateway}/credentials', [GatewaysController::class, 'credentials'])->name('gateways.credentials');
+        Route::post('gateways/{gateway}/credentials', [GatewaysController::class, 'storeCredential'])
+            ->middleware('throttle:manager-destructive')
+            ->name('gateways.credentials.store');
+        Route::patch('gateways/{gateway}/credentials/{credential}/revoke', [GatewaysController::class, 'revokeCredential'])
+            ->middleware('throttle:manager-destructive')
+            ->name('gateways.credentials.revoke');
+        Route::get('gateways/{gateway}/entity-access', [GatewaysController::class, 'entityAccess'])->name('gateways.entity-access');
+        Route::patch('gateways/{gateway}/entity-access/{entity}', [GatewaysController::class, 'toggleEntityAccess'])->name('gateways.entity-access.toggle');
+    });
 
-    // ── Assinaturas ────────────────────────────────────────────────────────────
-    Route::get('subscriptions/cards', [SubscriptionsController::class, 'cards'])->name('subscriptions.cards');
-    Route::post('subscriptions/activate', [SubscriptionsController::class, 'activate'])->name('subscriptions.activate');
-    Route::post('subscriptions/trial', [SubscriptionsController::class, 'startTrial'])->name('subscriptions.trial');
-    Route::post('subscriptions/cancel', [SubscriptionsController::class, 'cancel'])
-        ->middleware('throttle:manager-destructive')
-        ->name('subscriptions.cancel');
-    Route::post('subscriptions/settings', [SubscriptionsController::class, 'updateSettings'])->name('subscriptions.settings');
-    Route::patch('subscriptions/block-access', [SubscriptionsController::class, 'blockAccess'])
-        ->middleware('throttle:manager-destructive')
-        ->name('subscriptions.block-access');
-    Route::get('subscriptions/{subscription}/invoices', [SubscriptionsController::class, 'invoices'])->name('subscriptions.invoices');
-    Route::get('subscriptions/{subscription}/retries', [SubscriptionsController::class, 'retries'])->name('subscriptions.retries');
-    Route::resource('subscriptions', SubscriptionsController::class)->only('index', 'show', 'update');
+    // ── Assinaturas — admin ou financial (operação de cobrança) ────────────────
+    Route::middleware('saas.role:admin,financial')->group(function () {
+        Route::get('subscriptions/cards', [SubscriptionsController::class, 'cards'])->name('subscriptions.cards');
+        Route::post('subscriptions/activate', [SubscriptionsController::class, 'activate'])->name('subscriptions.activate');
+        Route::post('subscriptions/trial', [SubscriptionsController::class, 'startTrial'])->name('subscriptions.trial');
+        Route::post('subscriptions/cancel', [SubscriptionsController::class, 'cancel'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.cancel');
+        Route::post('subscriptions/settings', [SubscriptionsController::class, 'updateSettings'])->name('subscriptions.settings');
+        Route::patch('subscriptions/block-access', [SubscriptionsController::class, 'blockAccess'])
+            ->middleware('throttle:manager-destructive')
+            ->name('subscriptions.block-access');
+        Route::get('subscriptions/{subscription}/invoices', [SubscriptionsController::class, 'invoices'])->name('subscriptions.invoices');
+        Route::get('subscriptions/{subscription}/retries', [SubscriptionsController::class, 'retries'])->name('subscriptions.retries');
+        Route::resource('subscriptions', SubscriptionsController::class)->only('index', 'show', 'update');
+    });
 
     // ── Finanças internas do EasyEye (P&L do próprio SaaS + IA) ────────────────
     // Gate SaasOwnerFinancial (mais restrito que SaasFinancial) verificado
@@ -220,20 +251,22 @@ Route::group([
         ->name('whatsapp.update');
     Route::post('whatsapp/{entity}/test', [WhatsAppController::class, 'test'])->name('whatsapp.test');
 
-    // ── Modelos de Documento Globais ───────────────────────────────────────────
-    Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
-    Route::get('report-settings/{report_setting}/show-data', [ReportSettingsController::class, 'show'])->name('report-settings.show');
-    Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');
-    Route::post('report-settings/{report_setting}/publish', [ReportSettingsController::class, 'publish'])
-        ->middleware('throttle:manager-destructive')
-        ->name('report-settings.publish');
-    Route::post('report-settings/{report_setting}/archive', [ReportSettingsController::class, 'archive'])
-        ->middleware('throttle:manager-destructive')
-        ->name('report-settings.archive');
-    Route::delete('report-settings/{report_setting}', [ReportSettingsController::class, 'destroy'])
-        ->middleware('throttle:manager-destructive')
-        ->name('report-settings.destroy');
-    Route::resource('report-settings', ReportSettingsController::class)->except('show', 'destroy');
+    // ── Modelos de Documento Globais — admin only ──────────────────────────────
+    Route::middleware('saas.role:admin')->group(function () {
+        Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
+        Route::get('report-settings/{report_setting}/show-data', [ReportSettingsController::class, 'show'])->name('report-settings.show');
+        Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');
+        Route::post('report-settings/{report_setting}/publish', [ReportSettingsController::class, 'publish'])
+            ->middleware('throttle:manager-destructive')
+            ->name('report-settings.publish');
+        Route::post('report-settings/{report_setting}/archive', [ReportSettingsController::class, 'archive'])
+            ->middleware('throttle:manager-destructive')
+            ->name('report-settings.archive');
+        Route::delete('report-settings/{report_setting}', [ReportSettingsController::class, 'destroy'])
+            ->middleware('throttle:manager-destructive')
+            ->name('report-settings.destroy');
+        Route::resource('report-settings', ReportSettingsController::class)->except('show', 'destroy');
+    });
 });
 
 // ── Encerramento da impersonação ─────────────────────────────────────────────

@@ -123,7 +123,7 @@ defineExpose({ setSaving, setError });
                     <div class="modal-header">
                         <div>
                             <h5 class="modal-title">
-                                <i class="ti ti-coin-plus me-2 text-success"></i>
+                                <i class="ti ti-cash-plus me-2 text-success"></i>
                                 {{ t?.manual?.modal_title ?? 'Conceder crédito a uma clínica' }}
                             </h5>
                             <small class="text-muted d-block mt-1">
@@ -141,7 +141,7 @@ defineExpose({ setSaving, setError });
                                 v-if="!permissions?.create_manual_unlimited"
                                 class="alert alert-warning d-flex align-items-start gap-2 small mb-3 py-2"
                             >
-                                <i class="ti ti-shield-half-filled mt-1"></i>
+                                <i class="ti ti-shield-half mt-1"></i>
                                 <div>
                                     {{ (t?.manual?.limit_warning ?? 'Limite diário: :limit créditos.')
                                         .replace(':limit', permissions?.support_daily_limit ?? '?')
@@ -266,7 +266,7 @@ defineExpose({ setSaving, setError });
                                 {{ t?.manual?.cancel ?? 'Cancelar' }}
                             </button>
                             <button type="submit" class="btn btn-success" :disabled="!isValid || saving">
-                                <i class="ti ti-coin-plus me-1"></i>
+                                <i class="ti ti-cash-plus me-1"></i>
                                 {{ saving ? '...' : (t?.manual?.submit ?? 'Conceder crédito') }}
                             </button>
                         </div>

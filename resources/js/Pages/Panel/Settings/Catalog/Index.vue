@@ -278,7 +278,7 @@ const totalLabel = computed(() => `${props.t.total_label ?? 'Total:'} ${props.it
                                     </span>
                                     <span v-if="item.is_global"
                                           class="badge badge-soft-info rounded ms-1 fs-11" :title="t.status_global">
-                                        <i class="ti ti-star-filled"></i>
+                                        <i class="ti ti-star"></i>
                                     </span>
                                 </td>
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\{ClientRule, SaasRule};
-use App\Models\Entity;
+use App\Models\{Entity, SystemProfile};
 
 /**
  * Centralizes all rule-validation logic for the entity context.
@@ -43,13 +43,31 @@ final class EntityRoleService
      * Return key-value options (value => label) for the given entity,
      * ready to be used in select inputs.
      *
+     * Labels vêm do catálogo system_profiles (pré-definido pelo dono do
+     * SaaS, editável na Fase 4); as KEYS continuam ancoradas nos enums —
+     * validação/autorização nunca lê a tabela (ver validRuleValues()).
+     * SystemProfile::labelMap() já faz fallback para o catálogo hardcoded
+     * quando a tabela está vazia.
+     *
      * @return array<string, string>
      */
     public function validRuleOptions(Entity $entity): array
     {
-        return $entity->isSaas()
-            ? SaasRule::options()
-            : ClientRule::options();
+        $context = $entity->isSaas()
+            ? SystemProfile::CONTEXT_SAAS
+            : SystemProfile::CONTEXT_CLIENT;
+
+        $labels = SystemProfile::labelMap($context);
+
+        // Interseção com as keys válidas do enum: uma linha extra/órfã na
+        // tabela nunca vira opção de rule inexistente no select.
+        $options = [];
+
+        foreach ($this->validRuleValues($entity) as $value) {
+            $options[$value] = $labels[$value] ?? $value;
+        }
+
+        return $options;
     }
 
     /**
@@ -74,9 +92,19 @@ final class EntityRoleService
     /**
      * Return the label for a rule value within the entity context.
      * Returns the raw value when it is not a recognised rule.
+     * Labels vêm de system_profiles (com fallback hardcoded) — ver
+     * validRuleOptions() para o racional.
      */
     public function labelFor(Entity $entity, string $rule): string
     {
-        return $this->parse($entity, $rule)?->label() ?? $rule;
+        if ($this->parse($entity, $rule) === null) {
+            return $rule;
+        }
+
+        $context = $entity->isSaas()
+            ? SystemProfile::CONTEXT_SAAS
+            : SystemProfile::CONTEXT_CLIENT;
+
+        return SystemProfile::labelFor($context, $rule);
     }
 }

@@ -330,7 +330,7 @@ const statusOptions = computed(() => [
                     <div class="card-body">
                         <div class="d-flex align-items-start gap-3 mb-3">
                             <div class="flex-shrink-0">
-                                <i class="ti ti-shield-lock-filled fs-1"
+                                <i class="ti ti-shield-lock fs-1"
                                    :class="twoFactor.requires ? 'text-success' : 'text-muted'"></i>
                             </div>
                             <div class="flex-grow-1">

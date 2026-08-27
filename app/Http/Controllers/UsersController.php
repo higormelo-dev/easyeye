@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\DTOs\ActionPolicy;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
-use App\Models\{EntityUser, Role, User};
+use App\Models\{EntityUser, Role, SystemProfile, User};
 use App\Services\EntityUserService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
@@ -57,7 +57,7 @@ class UsersController extends Controller
 
         $isClient = session()->get('selected_entity_is_client');
         $entityId = session()->get('selected_entity_id');
-        $rolesMap = $isClient ? User::$rolesOfClients : User::$rolesOfManager;
+        $rolesMap = SystemProfile::labelMap($isClient ? SystemProfile::CONTEXT_CLIENT : SystemProfile::CONTEXT_SAAS);
 
         $data = $entityUsers->map(function (EntityUser $eu) use ($rolesMap, $entityId) {
             $userPhotoPath = 'users/' . $eu->user_id . '.jpg';
@@ -102,7 +102,7 @@ class UsersController extends Controller
         $sortBy       = in_array($sortBy, $allowedSorts, true) ? $sortBy : 'created_at';
         $sortDir      = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
 
-        $rolesMap = $isClient ? User::$rolesOfClients : User::$rolesOfManager;
+        $rolesMap = SystemProfile::labelMap($isClient ? SystemProfile::CONTEXT_CLIENT : SystemProfile::CONTEXT_SAAS);
 
         $query = EntityUser::query()
             ->withTrashed()

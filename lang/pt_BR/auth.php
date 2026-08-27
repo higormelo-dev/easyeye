@@ -75,6 +75,9 @@ return [
         'password'           => 'Senha',
         'confirm_password'   => 'Confirmar senha',
         'company_name'       => 'Nome da clínica / empresa',
+        'whatsapp'           => 'WhatsApp do responsável',
+        'whatsapp_hint'      => 'Enviaremos um código de confirmação por WhatsApp.',
+        'whatsapp_invalid'   => 'Informe um número válido com DDD.',
         'cnpj'               => 'CNPJ',
         'optional'           => 'opcional',
         'choose_plan'        => 'Escolha um plano',
@@ -137,6 +140,20 @@ return [
         'step_3'        => 'Crie uma nova senha e acesse o sistema',
         'security_note' => 'Link válido por 60 minutos',
         'link_expiry'   => 'Link expira em 60 min',
+    ],
+
+    'phone_verification' => [
+        'required'         => 'Confirme seu WhatsApp para continuar.',
+        'code_sent'        => 'Código enviado para o seu WhatsApp.',
+        'verified'         => 'WhatsApp confirmado com sucesso.',
+        'already_verified' => 'Seu WhatsApp já está confirmado.',
+        'invalid_code'     => 'Código inválido ou expirado. Solicite um novo código.',
+        'unavailable'      => 'Envio por WhatsApp temporariamente indisponível. Tente novamente em instantes.',
+        'banner_title'     => 'Confirme seu WhatsApp',
+        'banner_text'      => 'Enviamos um código de 6 dígitos para o número informado no cadastro.',
+        'resend'           => 'Reenviar código',
+        'confirm'          => 'Confirmar',
+        'placeholder'      => 'Código de 6 dígitos',
     ],
 
     'panel' => [

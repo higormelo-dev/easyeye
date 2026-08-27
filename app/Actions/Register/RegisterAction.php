@@ -2,8 +2,10 @@
 
 namespace App\Actions\Register;
 
+use App\Services\Auth\PhoneVerificationService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class RegisterAction
 {
@@ -41,6 +43,17 @@ class RegisterAction
 
         // E-mails dispatched após commit para não travar a transação
         event(new Registered($result['user']));
+
+        // Código de verificação do WhatsApp do responsável — segundo canal de
+        // contato confirmado (o time comercial usa o número validado para
+        // finalizar a venda do plano). Nunca pode quebrar o registro:
+        // indisponibilidade da instância Z-API só loga e o usuário reenvia
+        // depois pelo banner do painel.
+        try {
+            app(PhoneVerificationService::class)->sendCode($result['user']);
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         return $result;
     }

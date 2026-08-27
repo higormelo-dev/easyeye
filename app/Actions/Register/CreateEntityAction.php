@@ -18,8 +18,10 @@ class CreateEntityAction
             'subdomain'             => $this->generateSubdomain($data['company_name']),
             'national_registration' => $data['company_cnpj'] ?? null,
             'email'                 => $data['email'],
-            'is_client'             => true,
-            'active'                => true,
+            // WhatsApp do responsável — contato comercial da empresa.
+            'cellphone' => $data['company_phone'] ?? null,
+            'is_client' => true,
+            'active'    => true,
         ]);
 
         $entity->skipAutoTrial = true;

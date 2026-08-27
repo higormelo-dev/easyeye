@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\AccessControl;
 
-use App\Enums\ClientRule;
 use App\Enums\Permission as PermissionEnum;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RoleRequest;
 use App\Http\Resources\RoleResource;
-use App\Models\{PermissionRecord, Role};
+use App\Models\{PermissionRecord, Role, SystemProfile};
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\DB;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -63,16 +62,13 @@ class RolesController extends Controller
             // computed de busca) — sem ->resolve(), o objeto {data:[...]}
             // quebra o primeiro render sem erro capturado, tela fica em
             // branco. ->resolve() força o array desembrulhado.
-            'roles'                => RoleResource::collection($roles)->resolve(),
-            // Perfis FIXOS da plataforma (ClientRule) — pré-definidos pelo
-            // SaaS, somente leitura na tela. O perfil de cada usuário é
-            // escolhido no cadastro de usuários; as Roles customizadas acima
-            // são apenas a camada ADITIVA administrativa.
-            'systemProfiles' => collect(ClientRule::cases())->map(fn (ClientRule $rule) => [
-                'value'       => $rule->value,
-                'label'       => $rule->label(),
-                'description' => $rule->description(),
-            ])->values()->all(),
+            'roles' => RoleResource::collection($roles)->resolve(),
+            // Perfis FIXOS da plataforma — pré-definidos pelo dono do SaaS
+            // (tabela system_profiles, fallback hardcoded), somente leitura
+            // na tela. O perfil de cada usuário é escolhido no cadastro de
+            // usuários; as Roles customizadas acima são apenas a camada
+            // ADITIVA administrativa.
+            'systemProfiles'       => SystemProfile::catalogFor(SystemProfile::CONTEXT_CLIENT),
             'availablePermissions' => $this->groupedAvailablePermissions(),
             'routes'               => [
                 'index' => route('panel.accesscontrol.roles.index'),

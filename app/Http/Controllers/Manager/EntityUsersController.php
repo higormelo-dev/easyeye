@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Manager;
 
-use App\Enums\{ClientRule, EntityGate};
+use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
-use App\Models\{Entity, EntityUser};
+use App\Models\{Entity, EntityUser, SystemProfile};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -82,9 +82,10 @@ class EntityUsersController extends Controller
             // BUGFIX: ucfirst($eu->rule) exibia o valor cru do enum em inglês
             // (ex.: "Financial") numa UI pt-BR — dificultava o admin SaaS
             // localizar visualmente um usuário com perfil financeiro entre
-            // os demais. Usa o label pt-BR do ClientRule quando reconhecido.
+            // os demais. Label pt-BR vem de system_profiles (catálogo
+            // pré-definido pelo dono do SaaS, com fallback hardcoded).
             'rule' => $eu->rule
-                ? (ClientRule::tryFrom((string) $eu->rule)?->label() ?? ucfirst((string) $eu->rule))
+                ? SystemProfile::labelFor(SystemProfile::CONTEXT_CLIENT, (string) $eu->rule)
                 : null,
             'active'          => (bool) $eu->active,
             'deleted'         => $eu->deleted_at !== null,

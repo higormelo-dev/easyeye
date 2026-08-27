@@ -48,7 +48,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                         <span>{{ t.panel?.feature_schedule }}</span>
                     </div>
                     <div class="ee-login-feature">
-                        <div class="ee-login-feature-ico"><i class="ti ti-file-medical"></i></div>
+                        <div class="ee-login-feature-ico"><i class="ti ti-report-medical"></i></div>
                         <span>{{ t.panel?.feature_record }}</span>
                     </div>
                     <div class="ee-login-feature">

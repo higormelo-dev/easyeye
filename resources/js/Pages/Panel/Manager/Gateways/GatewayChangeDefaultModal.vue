@@ -76,7 +76,7 @@ function isDefault(g) {
                             >
                                 <div class="flex-grow-1">
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <i v-if="isDefault(g)" class="ti ti-star-filled" style="color:#f9a825;"></i>
+                                        <i v-if="isDefault(g)" class="ti ti-star" style="color:#f9a825;"></i>
                                         <span class="fw-semibold small">{{ g.name }}</span>
                                         <span class="badge badge-soft-secondary text-uppercase" style="font-size:.68rem;">{{ g.code }}</span>
                                         <span v-if="isDefault(g)" class="badge" style="background:#fdd835;color:#5d4037;font-size:.68rem;">

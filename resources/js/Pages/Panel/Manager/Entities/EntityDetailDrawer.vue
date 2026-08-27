@@ -138,7 +138,7 @@ watch(() => props.open, (val) => {
                         <span class="detail-value">
                             <span v-if="entity.requires_two_factor"
                                   class="badge badge-soft-success rounded text-success border border-success">
-                                <i class="ti ti-shield-lock-filled me-1"></i>{{ t.detail_2fa_yes ?? 'Sim' }}
+                                <i class="ti ti-shield-lock me-1"></i>{{ t.detail_2fa_yes ?? 'Sim' }}
                             </span>
                             <span v-else class="badge badge-soft-secondary rounded">
                                 {{ t.detail_2fa_no ?? 'Não' }}

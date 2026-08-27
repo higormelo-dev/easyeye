@@ -1,9 +1,12 @@
 <?php
 
 use App\Enums\SubscriptionStatus;
+use App\Models\AuditLog;
 use App\Models\{Plan, Subscription, SubscriptionSetting, User};
 use App\Services\TrialService;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\{Cache, Event};
+use Illuminate\Support\Str;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -19,6 +22,7 @@ function registrationPayload(array $overrides = []): array
         'password'              => 'Password1!',
         'password_confirmation' => 'Password1!',
         'company_name'          => 'Clínica Silva',
+        'company_phone'         => '11988887777',
         'company_cnpj'          => null,
         'plan_id'               => null,
     ], $overrides);
@@ -39,7 +43,7 @@ function setTrialDays(int $days): void
 describe('Fluxo de registro', function () {
     beforeEach(function () {
         // Bloqueia apenas o evento Registered (envio de email) sem interceptar eventos de modelo
-        Event::fake([\Illuminate\Auth\Events\Registered::class]);
+        Event::fake([Registered::class]);
 
         // Trial de 14 dias como padrão em todos os testes deste grupo
         setTrialDays(14);
@@ -158,7 +162,7 @@ describe('Fluxo de registro', function () {
         // Simula falha no serviço de trial (ocorre depois que User e Entity já foram criados)
         $this->mock(TrialService::class)
             ->shouldReceive('startManualTrial')
-            ->andThrow(new \RuntimeException('Falha simulada no gateway'));
+            ->andThrow(new RuntimeException('Falha simulada no gateway'));
 
         $response = $this->postJson('/register', registrationPayload());
 
@@ -235,5 +239,29 @@ describe('Fluxo de registro', function () {
             'company_cnpj' => '12345678000195',
         ]))->assertUnprocessable()
             ->assertJsonValidationErrors('company_cnpj');
+    });
+
+    // BUG de regressão — 500 (FK 23503 em audit_logs) quando a sessão
+    // carregava um selected_entity_id de entity já excluída (empresa de
+    // teste apagada no manager, banco re-seedado). AuditService agora
+    // preserva a trilha com entity_id NULL em vez de derrubar o registro.
+    it('não quebra quando a sessão aponta para uma entity inexistente', function () {
+        Plan::factory()->create(['sort_order' => 1]);
+
+        $this->withSession(['selected_entity_id' => (string) Str::uuid()])
+            ->postJson('/register', registrationPayload())
+            ->assertOk();
+
+        $user = User::where('email', 'joao@example.com')->firstOrFail();
+
+        // Trilha preservada: evento created do User gravado, com entity_id null
+        // (a entity fantasma da sessão não contamina o log).
+        $log = AuditLog::where('auditable_type', User::class)
+            ->where('auditable_id', $user->id)
+            ->where('event', 'created')
+            ->first();
+
+        expect($log)->not->toBeNull();
+        expect($log->entity_id)->toBeNull();
     });
 });

@@ -71,7 +71,7 @@ function fmtDate(iso) {
                     class="btn btn-sm btn-primary"
                     @click="emit('add-credit', wallet.entity_id)"
                 >
-                    <i class="ti ti-coin-plus me-1"></i>
+                    <i class="ti ti-cash-plus me-1"></i>
                     {{ t?.internal_wallet?.add_credit ?? 'Adicionar créditos' }}
                 </button>
             </div>

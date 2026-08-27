@@ -14,6 +14,9 @@ class CreateUserAction
             'email'    => $data['email'],
             'password' => Hash::make($data['password']),
             'locale'   => $data['locale'] ?? app()->getLocale(),
+            // WhatsApp do responsável (só dígitos, DDD + número) — verificado
+            // por código OTP após o registro (PhoneVerificationService).
+            'phone' => $data['company_phone'] ?? null,
         ]);
     }
 }

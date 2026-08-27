@@ -321,6 +321,9 @@ return [
         'generic' => [
             'required' => 'É obrigatória a indicação de um valor para o campo :attribute.',
         ],
+        'company_phone' => [
+            'invalid' => 'Informe um número de WhatsApp válido com DDD (10 ou 11 dígitos).',
+        ],
         'surgery_type' => [
             'name_unique' => 'Já existe um :attribute com este nome nesta categoria.',
         ],

@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\{
     NewPasswordController,
     PasswordController,
     PasswordResetLinkController,
+    PhoneVerificationController,
     RegisteredUserController,
     VerifyEmailController
 };
@@ -58,6 +59,22 @@ Route::middleware('auth')->group(function () {
     Route::post('email/verification-notification', [EmailVerificationNotificationController::class, 'store'])
         ->middleware('throttle:6,1')
         ->name('verification.send');
+
+    // ── Verificação de WhatsApp do responsável (código OTP via Z-API) ────────
+    // Par do fluxo de e-mail acima: confirma o segundo canal de contato
+    // capturado no /register. O gate `phone.verified` (grupo /panel)
+    // redireciona para verify-phone até a confirmação. Reenvio 3/10min;
+    // confirmação 6/min (o service ainda limita 5 erros por código).
+    Route::get('verify-phone', [PhoneVerificationController::class, 'show'])
+        ->name('phone.verification.notice');
+
+    Route::post('phone/verification-code', [PhoneVerificationController::class, 'send'])
+        ->middleware('throttle:3,10')
+        ->name('phone.verification.send');
+
+    Route::post('phone/verification-confirm', [PhoneVerificationController::class, 'confirm'])
+        ->middleware('throttle:6,1')
+        ->name('phone.verification.confirm');
 
     Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
         ->name('password.confirm');

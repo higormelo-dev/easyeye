@@ -67,7 +67,7 @@ async function setDefault() {
         >
             <!-- Name + badges -->
             <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
-                <i v-if="gateway.is_default" class="ti ti-star-filled flex-shrink-0" style="color:#f9a825;"></i>
+                <i v-if="gateway.is_default" class="ti ti-star flex-shrink-0" style="color:#f9a825;"></i>
                 <span class="fw-bold text-truncate">{{ gateway.name }}</span>
                 <span class="badge badge-soft-secondary text-uppercase flex-shrink-0" style="font-size:.7rem;letter-spacing:.04em;">
                     {{ gateway.code }}
@@ -204,7 +204,7 @@ async function setDefault() {
                     disabled
                     style="border-color:#fdd835;color:#f9a825;"
                 >
-                    <i class="ti ti-star-filled me-1"></i>{{ t.btn_current_default }}
+                    <i class="ti ti-star me-1"></i>{{ t.btn_current_default }}
                 </button>
             </template>
         </div>

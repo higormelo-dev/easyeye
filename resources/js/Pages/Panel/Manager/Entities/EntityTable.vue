@@ -103,7 +103,7 @@ function onSort(payload) { emit('sort', payload); }
                             class="badge badge-soft-success rounded text-success border border-success fs-11 ms-1"
                             :title="t.badge_2fa_required_hint ?? 'Esta empresa exige 2FA de todos os usuários'"
                         >
-                            <i class="ti ti-shield-lock-filled me-1"></i>2FA
+                            <i class="ti ti-shield-lock me-1"></i>2FA
                         </span>
                     </td>
 

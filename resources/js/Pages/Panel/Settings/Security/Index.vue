@@ -75,7 +75,7 @@ function toggle() {
                 <div class="card-body p-4">
                     <div class="d-flex align-items-start gap-3 mb-3">
                         <div class="flex-shrink-0">
-                            <i class="ti ti-shield-lock-filled fs-1"
+                            <i class="ti ti-shield-lock fs-1"
                                :class="isEnabled ? 'text-success' : 'text-muted'"></i>
                         </div>
                         <div class="flex-grow-1">

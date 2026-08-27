@@ -519,7 +519,7 @@ function providerIcon(provider) {
                         class="btn btn-success btn-sm flex-shrink-0"
                         @click="openManualModal()"
                     >
-                        <i class="ti ti-coin-plus me-1"></i>
+                        <i class="ti ti-cash-plus me-1"></i>
                         {{ t?.actions?.create_manual ?? 'Conceder crédito à clínica' }}
                     </button>
                 </div>

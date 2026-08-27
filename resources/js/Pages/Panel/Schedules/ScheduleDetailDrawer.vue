@@ -226,7 +226,7 @@ watch(() => props.open, (val) => {
                 </div>
                 <ul v-else class="list-unstyled mb-0">
                     <li v-for="r in schedule.resources" :key="r.id" class="d-flex align-items-start gap-2 mb-2">
-                        <i class="ti ti-circle-filled text-primary mt-1" style="font-size:.5rem;"></i>
+                        <i class="ti ti-circle-dot text-primary mt-1" style="font-size:.5rem;"></i>
                         <div class="flex-grow-1">
                             <div class="fw-medium small">{{ r.name }}</div>
                             <div v-if="r.type || r.code" class="text-muted" style="font-size:.75rem;">

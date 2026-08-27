@@ -377,7 +377,7 @@ async function sendChat() {
                                 <div class="pf-bar-row-head">
                                     <span>
                                         {{ row.label }}
-                                        <i v-if="row.auto" class="ti ti-bolt-filled pf-auto-icon" :title="t.breakdown.auto_hint"></i>
+                                        <i v-if="row.auto" class="ti ti-bolt pf-auto-icon" :title="t.breakdown.auto_hint"></i>
                                     </span>
                                     <strong>{{ brl(row.amount) }}</strong>
                                 </div>

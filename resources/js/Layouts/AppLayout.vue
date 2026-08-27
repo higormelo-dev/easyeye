@@ -234,6 +234,10 @@ onUnmounted(() => {
     clearTimeout(flashSuccessTimer);
     clearTimeout(flashErrorTimer);
 });
+
+// A verificação de WhatsApp saiu do banner: virou etapa de onboarding com
+// gate próprio (middleware phone.verified → página Auth/VerifyPhone) — quem
+// chega ao painel já confirmou e-mail e WhatsApp.
 </script>
 
 <template>
@@ -296,7 +300,7 @@ onUnmounted(() => {
                            data-bs-toggle="dropdown" data-bs-offset="0,22">
                             <img :src="user.photo_url" width="32" class="rounded-circle d-flex" :alt="user.name">
                             <span class="online text-success">
-                                <i class="ti ti-circle-filled d-flex bg-white rounded-circle border border-1 border-white"></i>
+                                <i class="ti ti-circle-dot d-flex bg-white rounded-circle border border-1 border-white"></i>
                             </span>
                         </a>
                         <div class="dropdown-menu dropdown-menu-end dropdown-menu-md p-2">

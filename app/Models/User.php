@@ -38,6 +38,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'password',
         'locale',
+        'phone',
     ];
 
     /**
@@ -51,38 +52,8 @@ class User extends Authenticatable implements MustVerifyEmail
         // 2FA: nunca exposto em JSON. Apenas TwoFactorService deve ler.
         'two_factor_secret',
         'two_factor_recovery_codes',
-    ];
-
-    /**
-     * Roles of clients.
-     *
-     * 'admin'     => 'Administrador',
-     * 'financial' => 'Financeiro',
-     * 'doctor'    => 'Médico',
-     * 'secretary' => 'Secretária',
-     * 'user'      => 'Usuário Comum',
-     */
-    public static array $rolesOfClients = [
-        'admin'     => 'Administrador',
-        'financial' => 'Financeiro',
-        'doctor'    => 'Médico',
-        'secretary' => 'Secretária',
-        'user'      => 'Usuário Comum',
-    ];
-
-    /**
-     * Roles of the management system.
-     *
-     * 'admin'     => 'Administrador',
-     * 'financial' => 'Financeiro',
-     * 'support'   => 'Suporte',
-     * 'user'      => 'Usuário Comum',
-     */
-    public static array $rolesOfManager = [
-        'admin'     => 'Administrador',
-        'financial' => 'Financeiro',
-        'support'   => 'Suporte',
-        'user'      => 'Usuário Comum',
+        // OTP de verificação de WhatsApp: hash nunca exposto em JSON.
+        'phone_verification_code',
     ];
 
     /**
@@ -105,6 +76,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'two_factor_secret'         => 'encrypted',
             'two_factor_recovery_codes' => 'encrypted',
             'two_factor_confirmed_at'   => 'datetime',
+            // Verificação de WhatsApp do responsável (OTP via Z-API)
+            'phone_verified_at'             => 'datetime',
+            'phone_verification_expires_at' => 'datetime',
         ];
     }
 

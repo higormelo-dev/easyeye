@@ -59,7 +59,7 @@ function display(item, col) {
                     {{ t.status_inactive ?? 'Inativo' }}
                 </span>
                 <span v-if="item.is_global" class="badge bg-info ms-1">
-                    <i class="ti ti-star-filled me-1"></i>{{ t.status_global ?? 'Padrão do sistema' }}
+                    <i class="ti ti-star me-1"></i>{{ t.status_global ?? 'Padrão do sistema' }}
                 </span>
             </div>
 

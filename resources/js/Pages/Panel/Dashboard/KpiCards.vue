@@ -43,7 +43,7 @@ const row1 = computed(() => [
     },
     {
         key:     'surgeries',
-        icon:    'ti ti-scalpel',
+        icon:    'ti ti-cut',
         value:   null,
         label:   props.t.kpi_surgeries,
         variant: 'surgeries',

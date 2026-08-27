@@ -31,6 +31,36 @@ const form = ref({
 const errors = ref({});
 const loading = ref(false);
 
+// ── Máscaras BR (WhatsApp e CNPJ) ──────────────────────────────
+// Formatação client-side apenas — o backend re-normaliza para dígitos
+// (RegisterRequest::prepareForValidation) e valida de novo. Sem lib:
+// dois campos não justificam dependência (inputmask do package.json é
+// legado jQuery, nunca usado nas páginas Vue).
+function maskPhone(value) {
+    const d = (value || '').replace(/\D/g, '').slice(0, 11);
+    if (d.length <= 2)  return d.length ? `(${d}` : '';
+    if (d.length <= 6)  return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+    if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+function maskCnpj(value) {
+    const d = (value || '').replace(/\D/g, '').slice(0, 14);
+    if (d.length <= 2)  return d;
+    if (d.length <= 5)  return `${d.slice(0, 2)}.${d.slice(2)}`;
+    if (d.length <= 8)  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5)}`;
+    if (d.length <= 12) return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8)}`;
+    return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`;
+}
+
+function onPhoneInput(event) {
+    form.value.company_phone = maskPhone(event.target.value);
+}
+
+function onCnpjInput(event) {
+    form.value.company_cnpj = maskCnpj(event.target.value);
+}
+
 // ── Email availability ─────────────────────────────────────────
 const emailAvailable = ref(null);
 const emailChecking = ref(false);
@@ -112,6 +142,16 @@ function validateStep1() {
 function validateStep2() {
     const e = {};
     if (!form.value.company_name) e.company_name = required;
+
+    // WhatsApp do responsável: obrigatório — 10-11 dígitos (DDD + número).
+    // Backend valida de novo (RegisterRequest) e envia código OTP após o registro.
+    const phoneDigits = (form.value.company_phone || '').replace(/\D/g, '');
+    if (!phoneDigits) {
+        e.company_phone = required;
+    } else if (phoneDigits.length < 10 || phoneDigits.length > 11) {
+        e.company_phone = props.tAuth.register?.whatsapp_invalid ?? 'Informe um número válido com DDD.';
+    }
+
     errors.value = e;
     return Object.keys(e).length === 0;
 }
@@ -420,16 +460,21 @@ const showPwd2 = ref(false);
 
                                     <div class="reg-field">
                                         <label class="reg-label">
-                                            {{ tAuth.register?.phone }}
-                                            <span class="opt">({{ tAuth.register?.optional }})</span>
+                                            {{ tAuth.register?.whatsapp ?? 'WhatsApp do responsável' }}
+                                            <span class="req">*</span>
                                         </label>
                                         <input
-                                            v-model="form.company_phone"
+                                            :value="form.company_phone"
                                             type="tel"
                                             class="reg-input"
+                                            :class="{ 'is-error': errors.company_phone }"
                                             autocomplete="tel"
                                             placeholder="(00) 00000-0000"
+                                            maxlength="15"
+                                            @input="onPhoneInput"
                                         >
+                                        <span v-if="errors.company_phone" class="reg-error">{{ errors.company_phone }}</span>
+                                        <span v-else class="reg-hint">{{ tAuth.register?.whatsapp_hint ?? 'Enviaremos um código de confirmação por WhatsApp.' }}</span>
                                     </div>
 
                                     <div class="reg-field">
@@ -438,12 +483,14 @@ const showPwd2 = ref(false);
                                             <span class="opt">({{ tAuth.register?.optional }})</span>
                                         </label>
                                         <input
-                                            v-model="form.company_cnpj"
+                                            :value="form.company_cnpj"
                                             type="text"
+                                            inputmode="numeric"
                                             class="reg-input"
                                             :class="{ 'is-error': errors.company_cnpj }"
                                             maxlength="18"
                                             placeholder="00.000.000/0000-00"
+                                            @input="onCnpjInput"
                                         >
                                         <span v-if="errors.company_cnpj" class="reg-error">{{ errors.company_cnpj }}</span>
                                     </div>

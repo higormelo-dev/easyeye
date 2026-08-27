@@ -77,6 +77,9 @@ return [
         'password'           => 'Password',
         'confirm_password'   => 'Confirm password',
         'company_name'       => 'Clinic / company name',
+        'whatsapp'           => 'Owner WhatsApp number',
+        'whatsapp_hint'      => 'We will send a confirmation code via WhatsApp.',
+        'whatsapp_invalid'   => 'Enter a valid number with area code.',
         'cnpj'               => 'CNPJ',
         'optional'           => 'optional',
         'choose_plan'        => 'Choose a plan',
@@ -139,6 +142,20 @@ return [
         'step_3'        => 'Create a new password and sign in',
         'security_note' => 'Link valid for 60 minutes',
         'link_expiry'   => 'Link expires in 60 min',
+    ],
+
+    'phone_verification' => [
+        'required'         => 'Confirm your WhatsApp to continue.',
+        'code_sent'        => 'Code sent to your WhatsApp.',
+        'verified'         => 'WhatsApp confirmed successfully.',
+        'already_verified' => 'Your WhatsApp is already confirmed.',
+        'invalid_code'     => 'Invalid or expired code. Request a new one.',
+        'unavailable'      => 'WhatsApp delivery temporarily unavailable. Try again shortly.',
+        'banner_title'     => 'Confirm your WhatsApp',
+        'banner_text'      => 'We sent a 6-digit code to the number provided at sign-up.',
+        'resend'           => 'Resend code',
+        'confirm'          => 'Confirm',
+        'placeholder'      => '6-digit code',
     ],
 
     'panel' => [

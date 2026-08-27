@@ -99,7 +99,7 @@ const tabs = [
                             @click="activeTab = tab.key">
                         <i :class="tab.icon" class="me-1"></i>{{ tab.label }}
                         <i v-if="tabHasErrors[tab.key]" class="ti ti-alert-circle text-danger ms-1"></i>
-                        <i v-else-if="tabIncomplete[tab.key]" class="ti ti-circle-filled text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
+                        <i v-else-if="tabIncomplete[tab.key]" class="ti ti-circle-dot text-primary ms-1" style="font-size:.5rem;vertical-align:middle;"></i>
                     </button>
                 </li>
             </ul>

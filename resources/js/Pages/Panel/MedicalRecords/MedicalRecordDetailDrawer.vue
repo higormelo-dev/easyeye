@@ -213,7 +213,7 @@ function closePdfPreview() {
 
                 <!-- Refração -->
                 <section v-if="detail.dynamic_spherical_right || detail.dynamic_spherical_left || detail.static_spherical_right" class="detail-section">
-                    <h6 class="detail-section__title"><i class="ti ti-glasses me-1"></i>Refração</h6>
+                    <h6 class="detail-section__title"><i class="ti ti-eyeglass-2 me-1"></i>Refração</h6>
                     <div class="small">
                         <table class="table table-sm table-borderless mb-2">
                             <thead class="table-light">
