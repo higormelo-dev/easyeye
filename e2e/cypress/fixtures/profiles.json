@@ -1,0 +1,74 @@
+{
+  "clinic.admin": {
+    "email": "admin@clinicateste.com",
+    "password": "Admin@123",
+    "landing": "/panel/dashboard",
+    "type": "clinic",
+    "rule": "admin",
+    "entity": "CLÍNICA TESTE INTEGRADOR"
+  },
+  "clinic.doctor": {
+    "email": "dra.ana@clinicateste.com",
+    "password": "Medico@123",
+    "landing": "/panel/dashboard",
+    "type": "clinic",
+    "rule": "doctor",
+    "entity": "CLÍNICA TESTE INTEGRADOR"
+  },
+  "clinic.secretary": {
+    "email": "secretaria@clinicateste.com",
+    "password": "Secretaria@123",
+    "landing": "/panel/dashboard",
+    "type": "clinic",
+    "rule": "secretary",
+    "entity": "CLÍNICA TESTE INTEGRADOR"
+  },
+  "clinic.financial": {
+    "email": "financeiro@clinicateste.com",
+    "password": "Financeiro@123",
+    "landing": "/panel/dashboard",
+    "type": "clinic",
+    "rule": "financial",
+    "entity": "CLÍNICA TESTE INTEGRADOR"
+  },
+  "saas.admin": {
+    "email": "higor_ap89@icloud.com",
+    "password": "Admin@2024!",
+    "landing": "/panel/manager/dashboard",
+    "type": "saas",
+    "rule": "admin",
+    "entity": "medicalgroup"
+  },
+  "clinic.user": {
+    "email": null,
+    "password": null,
+    "landing": "/panel/dashboard",
+    "type": "clinic",
+    "rule": "user",
+    "todo": "SEM CREDENCIAL SEEDADA — criar usuário com rule 'user' na CLÍNICA TESTE INTEGRADOR e preencher email/password aqui; depois remover o describe.skip dos specs deste perfil."
+  },
+  "saas.financial": {
+    "email": null,
+    "password": null,
+    "landing": "/panel/manager/dashboard",
+    "type": "saas",
+    "rule": "financial",
+    "todo": "SEM CREDENCIAL SEEDADA — criar usuário com SaasRule 'financial' na entity SaaS (medicalgroup) e preencher email/password aqui; depois remover o describe.skip dos specs deste perfil."
+  },
+  "saas.support": {
+    "email": null,
+    "password": null,
+    "landing": "/panel/manager/dashboard",
+    "type": "saas",
+    "rule": "support",
+    "todo": "SEM CREDENCIAL SEEDADA — criar usuário com SaasRule 'support' na entity SaaS (medicalgroup) e preencher email/password aqui; depois remover o describe.skip dos specs deste perfil."
+  },
+  "saas.user": {
+    "email": null,
+    "password": null,
+    "landing": "/panel/manager/dashboard",
+    "type": "saas",
+    "rule": "user",
+    "todo": "SEM CREDENCIAL SEEDADA — criar usuário com SaasRule 'user' na entity SaaS (medicalgroup) e preencher email/password aqui; depois remover o describe.skip dos specs deste perfil."
+  }
+}

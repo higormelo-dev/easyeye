@@ -1,0 +1,12 @@
+{
+  "name": "easyeye-e2e",
+  "private": true,
+  "devDependencies": {
+    "cypress": "^14",
+    "otplib": "^12.0.1"
+  },
+  "scripts": {
+    "cy:open": "cypress open --browser chrome",
+    "cy:run": "cypress run --browser chrome"
+  }
+}
