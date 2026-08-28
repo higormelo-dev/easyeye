@@ -127,9 +127,12 @@ class TwoFactorController extends Controller
             request: $request,
         );
 
+        // `redirect`: destino do botão "Já guardei. Continuar" na tela de
+        // recovery codes — mesma regra do verify (intended ou dashboard).
         return response()->json([
             'message'        => __('two_factor.enabled'),
             'recovery_codes' => $result['recovery_codes'],
+            'redirect'       => $this->postVerifyRedirect(),
         ]);
     }
 
