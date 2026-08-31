@@ -22,6 +22,7 @@ class GeminiProvider implements AiProviderInterface
         $startedAt   = microtime(true);
 
         $response = Http::baseUrl($this->baseUrl())
+            ->withOptions(config('ai.http_force_ipv4') ? ['force_ip_resolve' => 'v4'] : [])
             ->acceptJson()
             ->asJson()
             ->withHeaders(['x-goog-api-key' => $this->apiKey()])

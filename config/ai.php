@@ -8,6 +8,11 @@ return [
     // Define se usa providers reais (API externa) ou fakes (teste/local sem chave).
     'provider_runtime' => env('AI_PROVIDER_RUNTIME', 'fake'),
 
+    // Força resolução IPv4 nas chamadas aos provedores LLM. Necessário em
+    // hospedagens com IPv6 anunciado mas sem rota de saída (ex.: PaaS de
+    // homologação): o cURL tenta o AAAA primeiro e pendura até o timeout.
+    'http_force_ipv4' => filter_var(env('AI_HTTP_FORCE_IPV4', false), FILTER_VALIDATE_BOOL),
+
     // User-Agent enviado pelos providers reais. Identifica EasyEye no destino
     // (logs do fornecedor, rate-limit dashboards, abuse reports). Inclui URL
     // de contato para que o time deles consiga abrir contato em incidentes.
