@@ -32,8 +32,11 @@ return new class extends Migration {
 
     public function up(): void
     {
-        if (app()->environment('testing')) {
-            return; // suíte controla o catálogo explicitamente por teste
+        // Pula APENAS sob PHPUnit/Pest (a suíte controla o catálogo por teste).
+        // NÃO usar environment('testing'): o servidor de homologação roda com
+        // APP_ENV=testing e a migration ficaria como "Ran" sem fazer nada.
+        if (defined('PHPUNIT_COMPOSER_INSTALL')) {
+            return;
         }
 
         (new AiModelPriceSeeder())->run();
