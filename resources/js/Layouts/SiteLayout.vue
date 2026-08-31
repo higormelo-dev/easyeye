@@ -48,7 +48,7 @@
                                     >
                                         <span>{{ locale.flag }}</span>
                                         {{ locale.native }}
-                                        <i v-if="locale.active" class="bi bi-check2 check"></i>
+                                        <i v-if="locale.active" class="ti ti-check check"></i>
                                     </a>
                                 </div>
                             </Transition>
@@ -63,7 +63,7 @@
                             :enter="{ opacity: 1, y: 0, transition: { duration: 400, delay: 200 } }"
                             :hovered="{ y: -2, transition: { duration: 200 } }"
                         >
-                            <i class="bi bi-box-arrow-in-right"></i> {{ t.nav.login }}
+                            <i class="ti ti-login"></i> {{ t.nav.login }}
                         </a>
                         <a
                             :href="routes.register"
@@ -74,7 +74,7 @@
                             :enter="{ opacity: 1, y: 0, transition: { duration: 400, delay: 300 } }"
                             :hovered="{ y: -2, scale: 1.03, transition: { duration: 200 } }"
                         >
-                            {{ t.nav.get_started }} <i class="bi bi-arrow-right"></i>
+                            {{ t.nav.get_started }} <i class="ti ti-arrow-right"></i>
                         </a>
                     </div>
 
@@ -107,10 +107,10 @@
 
                 <div class="mobile-ctas">
                     <a :href="routes.go" class="btn btn-outline" style="justify-content:center;">
-                        <i class="bi bi-box-arrow-in-right"></i> {{ t.nav.login }}
+                        <i class="ti ti-login"></i> {{ t.nav.login }}
                     </a>
                     <a :href="routes.register" class="btn btn-primary" style="justify-content:center;">
-                        {{ t.nav.get_started }} <i class="bi bi-arrow-right"></i>
+                        {{ t.nav.get_started }} <i class="ti ti-arrow-right"></i>
                     </a>
                 </div>
             </div>
@@ -129,10 +129,10 @@
                         </a>
                         <p>{{ t.footer.tagline }}</p>
                         <div class="footer-social">
-                            <a href="#" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
-                            <a href="#" aria-label="LinkedIn"><i class="bi bi-linkedin"></i></a>
-                            <a href="#" aria-label="YouTube"><i class="bi bi-youtube"></i></a>
-                            <a href="#" aria-label="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+                            <a href="#" aria-label="Instagram"><i class="ti ti-brand-instagram"></i></a>
+                            <a href="#" aria-label="LinkedIn"><i class="ti ti-brand-linkedin"></i></a>
+                            <a href="#" aria-label="YouTube"><i class="ti ti-brand-youtube"></i></a>
+                            <a href="#" aria-label="WhatsApp"><i class="ti ti-brand-whatsapp"></i></a>
                         </div>
                     </div>
 

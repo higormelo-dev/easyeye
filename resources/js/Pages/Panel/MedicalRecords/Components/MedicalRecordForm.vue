@@ -1458,8 +1458,11 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         <div v-if="!isEdit" class="alert alert-info d-flex align-items-start gap-2 m-3 mb-0" role="alert">
             <i class="fas fa-info-circle mt-1 flex-shrink-0"></i>
             <span class="small">
-                Preencha pelo menos a <strong>{{ tt('complaint', 'Queixa principal') }}</strong>
-                e clique em <strong>Salvar</strong> para começar a editar o prontuário.
+                {{ tt('create_hint_before', 'Preencha pelo menos a') }}
+                <strong>{{ tt('complaint', 'Queixa principal') }}</strong>
+                {{ tt('create_hint_middle', 'e clique em') }}
+                <strong>{{ tt('save', 'Salvar') }}</strong>
+                {{ tt('create_hint_after', 'para começar a editar o prontuário.') }}
             </span>
         </div>
 

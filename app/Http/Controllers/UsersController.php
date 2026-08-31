@@ -317,7 +317,7 @@ class UsersController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): Application|View|JsonResponse
+    public function destroy(string $id): Application|View|JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
 
@@ -350,7 +350,7 @@ class UsersController extends Controller
     /**
      * Restore the specified resource from storage.
      */
-    public function restore(string $id): Application|View|JsonResponse
+    public function restore(string $id): Application|View|JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
 

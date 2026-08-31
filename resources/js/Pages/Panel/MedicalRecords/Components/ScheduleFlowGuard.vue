@@ -21,6 +21,7 @@ import { router } from '@inertiajs/vue3';
  * já inclusos).
  */
 const props = defineProps({
+    t:        { type: Object,  default: () => ({}) },
     flow:     { type: Object,  default: null }, // { id, situation, update_url }
     isDoctor: { type: Boolean, default: false },
     locked:   { type: Boolean, default: false },
@@ -105,29 +106,29 @@ defineExpose({ requestExit, active });
 const options = [
     {
         target: SITUATION.ATTENDED,
-        label: 'Finalizar consulta',
-        hint: 'Atendimento concluído — status vira "Atendido".',
+        label: props.t.flow_finish ?? 'Finalizar consulta',
+        hint: props.t.flow_finish_hint ?? 'Atendimento concluído — status vira "Atendido".',
         icon: 'fas fa-check-double',
         btn: 'btn-success',
     },
     {
         target: SITUATION.DILATING,
-        label: 'Dilatar',
-        hint: 'Status vira "Dilatando" e o prontuário continua aberto pra quando o paciente voltar.',
+        label: props.t.flow_dilate ?? 'Dilatar',
+        hint: props.t.flow_dilate_hint ?? 'Status vira "Dilatando" e o prontuário continua aberto pra quando o paciente voltar.',
         icon: 'fas fa-eye-dropper',
         btn: 'btn-outline-primary',
     },
     {
         target: SITUATION.EXAM,
-        label: 'Realizar exame',
-        hint: 'Status vira "Em exame" e o prontuário continua aberto pra quando o paciente voltar.',
+        label: props.t.flow_exam ?? 'Realizar exame',
+        hint: props.t.flow_exam_hint ?? 'Status vira "Em exame" e o prontuário continua aberto pra quando o paciente voltar.',
         icon: 'fas fa-stethoscope',
         btn: 'btn-outline-primary',
     },
     {
         target: null,
-        label: 'Continuar atendimento',
-        hint: 'Sai da tela mantendo "Em consulta" — nada é finalizado.',
+        label: props.t.flow_continue ?? 'Continuar atendimento',
+        hint: props.t.flow_continue_hint ?? 'Sai da tela mantendo "Em consulta" — nada é finalizado.',
         icon: 'fas fa-user-md',
         btn: 'btn-outline-secondary',
     },
@@ -137,33 +138,36 @@ const options = [
 <template>
     <Teleport to="body">
         <div v-if="open" class="modal fade show d-block" style="background:rgba(0,0,0,.5);z-index:1080;" @click.self="open = false">
-            <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-dialog modal-dialog-centered sfg-dialog">
                 <div class="modal-content">
                     <div class="modal-header py-2">
                         <h6 class="modal-title">
-                            <i class="fas fa-route me-2 text-primary"></i>O que acontece com o paciente agora?
+                            <i class="fas fa-route me-2 text-primary"></i>{{ t.flow_title ?? 'O que acontece com o paciente agora?' }}
                         </h6>
                         <button type="button" class="btn-close" @click="open = false"></button>
                     </div>
                     <div class="modal-body">
                         <p class="text-muted small mb-3">
-                            Fechar o prontuário não finaliza a consulta — escolha o destino do paciente na Agenda.
+                            {{ t.flow_subtitle ?? 'Fechar o prontuário não finaliza a consulta — escolha o destino do paciente na Agenda.' }}
                         </p>
 
                         <div v-if="error" class="alert alert-warning py-2 small">{{ error }}</div>
 
                         <div class="d-grid gap-2">
+                            <!-- sfg-option: o tema define altura fixa/nowrap em .btn,
+                                 fazendo o hint vazar da borda — as regras scoped
+                                 abaixo neutralizam isso sem depender do tema. -->
                             <button v-for="opt in options"
                                     :key="opt.label"
                                     type="button"
-                                    class="btn text-start d-flex align-items-center gap-3 py-2"
+                                    class="btn sfg-option"
                                     :class="opt.btn"
                                     :disabled="busy"
                                     @click="choose(opt.target)">
-                                <i :class="opt.icon" class="fs-5"></i>
-                                <span>
-                                    <span class="d-block fw-semibold">{{ opt.label }}</span>
-                                    <span class="d-block small opacity-75">{{ opt.hint }}</span>
+                                <span class="sfg-option__icon"><i :class="opt.icon"></i></span>
+                                <span class="sfg-option__text">
+                                    <span class="sfg-option__label">{{ opt.label }}</span>
+                                    <span class="sfg-option__hint">{{ opt.hint }}</span>
                                 </span>
                             </button>
                         </div>
@@ -173,3 +177,60 @@ const options = [
         </div>
     </Teleport>
 </template>
+
+<style scoped>
+.sfg-dialog {
+    max-width: 520px;
+}
+
+/* Neutraliza altura fixa e nowrap que o tema aplica em .btn — cada opção é
+   um "cartão" com ícone fixo à esquerda e texto que quebra livremente. */
+.sfg-option {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: .65rem .85rem;
+    text-align: start;
+    white-space: normal;
+    line-height: 1.35;
+    border-radius: .5rem;
+}
+
+.sfg-option__icon {
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .18);
+    font-size: .95rem;
+}
+
+/* Nas variantes outline o fundo do círculo acompanha a cor do botão. */
+.sfg-option.btn-outline-primary .sfg-option__icon,
+.sfg-option.btn-outline-secondary .sfg-option__icon,
+.sfg-option.btn-outline-info .sfg-option__icon {
+    background: rgba(13, 110, 253, .1);
+}
+
+.sfg-option__text {
+    display: block;
+    min-width: 0;
+}
+
+.sfg-option__label {
+    display: block;
+    font-weight: 600;
+}
+
+.sfg-option__hint {
+    display: block;
+    font-size: .8rem;
+    opacity: .8;
+    overflow-wrap: anywhere;
+}
+</style>

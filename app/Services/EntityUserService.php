@@ -18,7 +18,7 @@ class EntityUserService
         return DB::transaction(function () use ($request) {
             $user = $this->findOrCreateUser($request);
 
-            return $this->findOrCreateEntityUser($user);
+            return $this->findOrCreateEntityUser($user, $request->rule);
         });
     }
 
@@ -113,7 +113,7 @@ class EntityUserService
     /**
      * Find or create entity user.
      */
-    private function findOrCreateEntityUser(User $user): EntityUser
+    private function findOrCreateEntityUser(User $user, string $rule): EntityUser
     {
         $existingRecord = EntityUser::query()
             ->withTrashed()
@@ -127,7 +127,7 @@ class EntityUserService
             }
 
             $existingRecord->update([
-                'rule'   => 'doctor',
+                'rule'   => $rule,
                 'active' => true,
             ]);
 
@@ -137,7 +137,7 @@ class EntityUserService
         return EntityUser::create([
             'entity_id' => session()->get('selected_entity_id'),
             'user_id'   => $user->id,
-            'rule'      => 'doctor',
+            'rule'      => $rule,
             'active'    => true,
         ]);
     }

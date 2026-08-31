@@ -33,8 +33,11 @@ class EntityUserResource extends JsonResource
                 'user'   => $this->user->toArray(),
             ];
 
-            if ($this->rule === 'doctor') {
-                $data['relationships']['person'] = $this->doctor->person->toArray();
+            // Null-safe: um EntityUser com rule doctor pode não ter registro
+            // clínico de Doctor associado (ex.: vínculo criado fora do fluxo
+            // de médicos) — sem isso o show/store JSON estoura 500.
+            if ($this->rule === 'doctor' && $this->doctor) {
+                $data['relationships']['person'] = $this->doctor->person?->toArray();
                 $data['relationships']['doctor'] = $this->doctor->toArray();
             }
         }

@@ -799,3 +799,44 @@
     color: var(--pmr-blue-dark, #258dc0);
     margin-bottom: .5rem;
 }
+
+// ── Padronização de altura dos selects (29/08/2026) ─────────────────────────
+// Os inputs do prontuário são `form-control-sm`, mas os selects (SearchSelect/
+// AcuitySelect = @vueform/multiselect, e <select class="form-select">) vinham
+// na métrica padrão (~38px) — maiores que os inputs ao lado. Este bloco iguala
+// tudo à métrica sm do Bootstrap: padding .25/.5rem, fonte .875rem,
+// min-height calc(1.5em + .5rem + 2px).
+.pmr-screen {
+    .search-select.multiselect {
+        --ms-py: .25rem;
+        --ms-px: .5rem;
+        --ms-font-size: .875rem;
+        --ms-option-font-size: .875rem;
+        --ms-line-height: 1.5;
+        --ms-radius: .25rem;
+        // height (não só min-height): o wrapper interno do @vueform soma ~2px
+        // e deixava o controle em 33px vs 31px do form-control-sm.
+        height: calc(1.5em + .5rem + 2px);
+        min-height: calc(1.5em + .5rem + 2px);
+    }
+
+    .search-select.multiselect .multiselect-wrapper {
+        min-height: 0;
+        height: 100%;
+    }
+
+    // Caret/clear do multiselect acompanham a altura reduzida.
+    .search-select.multiselect .multiselect-caret,
+    .search-select.multiselect .multiselect-clear {
+        transform: scale(.85);
+    }
+
+    select.form-select:not(.form-select-sm) {
+        padding-top: .25rem;
+        padding-bottom: .25rem;
+        padding-left: .5rem;
+        font-size: .875rem;
+        border-radius: .25rem;
+        min-height: calc(1.5em + .5rem + 2px);
+    }
+}

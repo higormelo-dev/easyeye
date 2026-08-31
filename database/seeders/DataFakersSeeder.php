@@ -119,7 +119,7 @@ class DataFakersSeeder extends Seeder
 
         $this->command->info('⏳ Vinculando Users a Entities...');
         $users->each(function ($user) use ($entities, $roleDistribution) {
-            $numberOfEntities = fake()->numberBetween(1, 4);
+            $numberOfEntities = fake()->numberBetween(1, min(4, $entities->count()));
             $selectedEntities = $entities->random($numberOfEntities);
 
             $selectedEntities->each(function ($entity) use ($user, $roleDistribution) {
@@ -510,7 +510,7 @@ class DataFakersSeeder extends Seeder
         $entitiesWithPatients = [];
 
         foreach ($people as $person) {
-            $numberOfEntities = fake()->numberBetween(1, 3);
+            $numberOfEntities = fake()->numberBetween(1, min(3, $entities->count()));
             $selectedEntities = $entities->random($numberOfEntities);
 
             foreach ($selectedEntities as $entity) {
@@ -566,7 +566,9 @@ class DataFakersSeeder extends Seeder
                 'password' => Hash::make('123456789'),
             ]);
 
-            $numberOfEntities = fake()->numberBetween(1, 6);
+            // random(N) lança se N > itens disponíveis — ambientes com poucas
+            // entities (ex.: teste) quebravam aqui.
+            $numberOfEntities = fake()->numberBetween(1, min(6, $entities->count()));
             $selectedEntities = $entities->random($numberOfEntities);
 
             foreach ($selectedEntities as $entity) {

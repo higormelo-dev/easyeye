@@ -42,10 +42,14 @@ class PatientImportsController extends Controller
             'imports'        => $imports->map(fn (PatientImport $i) => $this->serializeImport($i)),
             'pending_import' => $pendingImport ? $this->serializeImport($pendingImport) : null,
             'preview_id'     => session('import_preview_id'),
-            'plan_status'    => [
-                'max'       => $planStatus['max'] ?? null,
-                'used'      => $planStatus['used'] ?? 0,
-                'available' => $planStatus['available'] ?? null,
+            // BUG-FIX (achado pelo E2E Cypress): FeatureGateService::status()
+            // devolve o DTO FeatureStatus — o acesso como array quebrava a
+            // página com 500. Mapeia para o contrato que o Import.vue espera
+            // (max/used/available; null = ilimitado).
+            'plan_status' => [
+                'max'       => $planStatus->isUnlimited ? null : $planStatus->limit,
+                'used'      => $planStatus->used,
+                'available' => $planStatus->isUnlimited ? null : $planStatus->remaining,
             ],
             'urls' => [
                 'store'    => route('panel.patients.import.store'),

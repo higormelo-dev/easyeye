@@ -23,7 +23,9 @@ Cypress.Commands.add('loginAs', (key) => {
   Cypress.env('lastProfileKey', key);
 
   cy.session(
-    ['easyeye', profile.email],
+    // v2: chave versionada — invalida sessões antigas cacheadas no modo
+    // interativo (podiam carregar locale EN/tema trocados manualmente).
+    ['easyeye', 'v2', profile.email],
     () => {
       cy.visit('/login');
       // Sem ids/names no form (v-model): usar seletores estruturais.
@@ -33,6 +35,9 @@ Cypress.Commands.add('loginAs', (key) => {
       cy.get('form button[type=submit]').should('not.be.disabled').click();
       // Landing por URL: clínica -> /panel/dashboard, SaaS -> /panel/manager/dashboard.
       cy.url({ timeout: 20000 }).should('include', profile.landing);
+      // Locale determinístico: as asserções das specs são pt-BR; uma sessão
+      // que trocou de idioma no navegador interativo quebraria tudo.
+      cy.request('/locale/pt_BR');
     },
     {
       cacheAcrossSpecs: true,
@@ -56,12 +61,26 @@ Cypress.Commands.add('loginAs', (key) => {
  * Tela em branco (Ziggy/Vue não montou) estoura o timeout do cy.get.
  */
 Cypress.Commands.add('expectPanelPage', (marker) => {
+  // Se a navegação caiu na página de ERRO do sistema (Error.vue), falha
+  // imediatamente com o status/título reais — diagnóstico direto em vez de
+  // "sidebar nunca apareceu" 15s depois.
+  cy.get('body').then(($b) => {
+    const $err = $b.find('.ee-error');
+    if ($err.length) {
+      const status = $err.find('.ee-error__status').text().trim();
+      const title  = $err.find('.ee-error__title').text().trim();
+      const text   = $err.find('.ee-error__text').text().trim();
+      throw new Error(`Página de erro do sistema: ${status} — ${title}. ${text}`);
+    }
+  });
   cy.get('#sidebar-menu, .ee-auth-form', { timeout: 15000 }).should('be.visible');
-  cy.get('body').should(($body) => {
+  // .then + booleanos: o should() com o texto do body imprimia a página
+  // INTEIRA (window.translations etc.) no log do runner a cada assert verde.
+  cy.get('body', { log: false }).then(($body) => {
     const text = $body.text();
-    expect($body.children().length, 'body não-vazio').to.be.greaterThan(0);
-    expect(text, 'sem Internal Server Error').to.not.include('Internal Server Error');
-    expect(text, 'sem Page Expired').to.not.include('Page Expired');
+    expect($body.children().length > 0, 'body não-vazio').to.be.true;
+    expect(text.includes('Internal Server Error'), 'body contém "Internal Server Error"').to.be.false;
+    expect(text.includes('Page Expired'), 'body contém "Page Expired"').to.be.false;
   });
   if (marker) {
     if (/^[#.\[]/.test(marker)) {

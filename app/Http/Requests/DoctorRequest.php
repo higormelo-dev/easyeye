@@ -117,6 +117,7 @@ class DoctorRequest extends FormRequest
         if ($this->isMethod('POST')) {
             $rules['password'] = [
                 'required_without:type_method',
+                'confirmed',
                 Password::min(8)
                     ->letters()
                     ->mixedCase()
@@ -126,13 +127,6 @@ class DoctorRequest extends FormRequest
             ];
             $rules['password_confirmation'] = [
                 'required_without:type_method',
-                'confirmed',
-                Password::min(8)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols()
-                    ->uncompromised(),
             ];
         } elseif ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
             $rules['active'] = ['required', 'boolean'];

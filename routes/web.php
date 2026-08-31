@@ -210,13 +210,22 @@ Route::group(
         // Permission): quem tem a permission customizada patients.manage acessa
         // mesmo sem esses roles fixos; os roles fixos abaixo continuam com o
         // MESMO acesso que já tinham (fallback puramente aditivo, zero regressão).
-        Route::middleware('permission:patients.manage,admin,financial,doctor,secretary')->group(function () {
+        // ── Médicos: SEM o rule doctor ────────────────────────────────────────
+        // Decisão de produto (29/08/2026): médico não lista/gerencia o cadastro
+        // de MÉDICOS — isso é gestão administrativa (admin/secretária/
+        // financeiro). O médico continua vendo colegas no contexto da AGENDA
+        // (schedules/resources) e mantém sua escala editável pelos fluxos
+        // administrativos. O menu já escondia; agora a rota também nega.
+        Route::middleware('permission:patients.manage,admin,financial,secretary')->group(function () {
             Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');
             Route::get('doctors/{doctor}/edit-data', [DoctorsController::class, 'editData'])->name('doctors.editData');
             Route::get('doctors/{doctor}/work-schedule/data', [DoctorWorkScheduleController::class, 'data'])->name('doctors.work-schedule.data');
             Route::get('doctors/{doctor}/work-schedule', [DoctorWorkScheduleController::class, 'index'])->name('doctors.work-schedule.index');
             Route::resource('doctors', DoctorsController::class);
+        });
 
+        // ── admin + secretary + doctor + financial: pacientes ─────────────────
+        Route::middleware('permission:patients.manage,admin,financial,doctor,secretary')->group(function () {
             Route::get('patients/cards', [PatientsController::class, 'cards'])->name('patients.cards');
             Route::get('patients/search', [PatientsController::class, 'search'])->name('patients.search');
             Route::post('patients/quick', [PatientsController::class, 'quickStore'])->name('patients.quick');

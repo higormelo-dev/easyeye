@@ -146,11 +146,18 @@ class CashFlowController extends Controller
         return back()->withErrors(['entry_date' => $e->getMessage()]);
     }
 
-    public function destroy(FinancialCashEntry $entry): RedirectResponse
+    public function destroy(Request $request, FinancialCashEntry $entry): RedirectResponse|JsonResponse
     {
         $this->authorizeFinancial();
 
         $entry->delete();
+
+        // A UI exclui via fetch(DELETE) com Accept: application/json — um
+        // redirect back() faria o fetch REPETIR o DELETE na URL de destino
+        // (302 preserva método para não-POST) e terminar em 405.
+        if ($request->expectsJson()) {
+            return response()->json(['message' => $this->getDeleteMessage()]);
+        }
 
         return back()->with('message', $this->getDeleteMessage());
     }

@@ -82,7 +82,11 @@ class PatientRequest extends FormRequest
                 'required_without:type_method',
                 'string',
                 'max:255',
-                'email:rfc,dns',
+                // Checagem de MX/DNS só em produção: em development/testing o
+                // lookup trava domínios de teste (.test, fixtures do Cypress/
+                // Pest) e adiciona latência/flakiness de rede à validação.
+                // RFC continua valendo em todos os ambientes.
+                app()->environment('production') ? 'email:rfc,dns' : 'email:rfc',
                 Rule::unique('people', 'email')
                     ->ignore($this->getIgnoredPersonId(), 'id')
                     ->where(function ($query) {

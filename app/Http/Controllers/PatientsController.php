@@ -385,7 +385,10 @@ class PatientsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): Application|View|JsonResponse
+    // BUG-FIX (achado pelo E2E Cypress): o tipo de retorno não incluía
+    // RedirectResponse — TODA exclusão de paciente pela UI (não-JSON)
+    // estourava TypeError 500 ao retornar o redirect final.
+    public function destroy(string $id): Application|View|JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
 

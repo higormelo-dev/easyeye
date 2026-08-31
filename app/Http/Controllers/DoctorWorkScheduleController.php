@@ -173,6 +173,29 @@ class DoctorWorkScheduleController extends Controller
             'days.*.ranges.*.ends_at'   => ['required', 'date_format:H:i'],
         ]);
 
+        // Faixas duplicadas/sobrepostas no MESMO dia violariam o índice único
+        // (dws_doctor_day_start_unique) e estouravam 500 dentro da transação —
+        // valida antes e responde 422 legível. (Achado pelo E2E Cypress.)
+        $seen = [];
+
+        foreach ($request->input('days') as $dayData) {
+            if (! ($dayData['active'] ?? false)) {
+                continue;
+            }
+
+            foreach ($dayData['ranges'] as $range) {
+                $key = $dayData['day'] . '|' . $range['starts_at'];
+
+                if (isset($seen[$key])) {
+                    return response()->json([
+                        'message' => __('actions.work_schedule_duplicate_range'),
+                        'errors'  => ['days' => [__('actions.work_schedule_duplicate_range')]],
+                    ], 422);
+                }
+                $seen[$key] = true;
+            }
+        }
+
         DB::transaction(function () use ($doctor, $request) {
             $doctor->update(['schedule_interval' => $request->input('schedule_interval')]);
 

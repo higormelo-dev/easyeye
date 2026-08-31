@@ -4,7 +4,7 @@
 // Meus prompts), fila de espera (sem menu); forbidden: accesscontrol, setting
 // resources, financeiro, relatórios, compliance, manager.
 // Regra do projeto: menu ≠ autorização — doctor NÃO vê "Médicos" no menu,
-// mas GET /panel/doctors responde 200 (permission:patients.manage inclui doctor).
+// e GET /panel/doctors NEGA (29/08: bloco de médicos exclui o rule doctor).
 
 describe('Perfil clinic.doctor — matriz de acesso', () => {
   beforeEach(() => {
@@ -145,14 +145,15 @@ describe('Perfil clinic.doctor — matriz de acesso', () => {
   });
 
   // ── Menu ≠ autorização ──────────────────────────────────────────────────
-  it('não vê "Médicos" no menu, mas GET /panel/doctors responde 200', () => {
+  it('não vê "Médicos" no menu E a rota nega (decisão de produto 29/08: gestão de médicos é administrativa)', () => {
     cy.visit('/panel/dashboard');
     cy.get('#sidebar-menu a[href$="/panel/doctors"]').should('not.exist');
     cy.get('#sidebar-menu').contains('a', 'Médicos').should('not.exist');
 
-    cy.request({ url: '/panel/doctors', failOnStatusCode: false })
-      .its('status')
-      .should('eq', 200);
+    // Antes a rota respondia 200 (menu só escondia); agora o bloco de rotas
+    // de médicos exclui o rule doctor — defesa real, não só UI.
+    cy.expectForbidden('/panel/doctors');
+    cy.expectForbidden('/panel/doctors/cards');
   });
 
   // ── Forbidden ───────────────────────────────────────────────────────────
@@ -236,5 +237,279 @@ describe('Perfil clinic.doctor — matriz de acesso', () => {
 
     cy.url({ timeout: 20000 }).should('match', /\/(login)?$/);
     cy.get('#sidebar-menu').should('not.exist');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROCEDIMENTOS COMPLETOS — o coração do trabalho do médico, ponta a ponta:
+// atendimento (agenda → prontuário → salvar → finalizar), receituário
+// (APIs exclusivas de médico), prompts de IA (CRUD) e a própria escala.
+// Dados "CY-DOC" nascem por seed (e2e/scripts/seed-cydoc.php) e são
+// totalmente removidos ao final. NÃO assinamos prontuário: assinatura trava
+// o registro por compliance (Signable/CFM) e criaria resíduo indelével.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Perfil clinic.doctor — procedimentos completos', () => {
+  beforeEach(() => {
+    cy.loginAs('clinic.doctor');
+  });
+
+  it('atendimento completo: Iniciar atendimento → prontuário → salvar → Finalizar consulta → Atendido', () => {
+    // Agendamento de hoje pronto para atender (paciente CY-DOC + Dra. Ana).
+    // Verifica o stdout do seed: falha de ambiente aparece aqui com clareza,
+    // não como "card não encontrado" 15s depois.
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-cydoc.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'cydoc:');
+
+    cy.visit('/panel/schedules');
+    cy.expectPanelPage();
+
+    // Sessão interativa pode carregar filtros/busca/data residuais da agenda
+    // (persistem por sessão) — a BUSCA explícita isola o card do CY-DOC de
+    // qualquer estado herdado; um reload cobre corrida de render.
+    const findCyDocCard = () => {
+      cy.get('input[placeholder]').filter((_, el) => /buscar|paciente/i.test(el.placeholder))
+        .first().clear().type('CY-DOC');
+      cy.wait(700); // debounce da busca
+    };
+    findCyDocCard();
+    cy.get('body').then(($b) => {
+      if ($b.find('.schedule-card:contains("CY-DOC PACIENTE")').length === 0) {
+        cy.reload();
+        cy.expectPanelPage();
+        findCyDocCard();
+      }
+    });
+    cy.contains('.schedule-card', 'CY-DOC PACIENTE', { timeout: 15000 }).should('be.visible');
+
+    // Botão verde "Iniciar atendimento" (só médicos veem) abre o prontuário
+    // DESTE agendamento; a abertura muda a situação para "Em consulta".
+    cy.contains('.schedule-card', 'CY-DOC PACIENTE')
+      .find('a.btn-success').first()
+      .then(($a) => { $a[0].click(); });
+
+    cy.url({ timeout: 20000 }).should('include', '/medicalrecords');
+    cy.expectPanelPage();
+    cy.contains('CY-DOC PACIENTE', { timeout: 15000 }).should('be.visible');
+
+    // Salvar o prontuário (rascunho, sem assinar). Se o modo Texto Livre
+    // estiver ativo, documenta uma linha; nos demais modos salva o registro
+    // base — o backend só exige doctor_id.
+    cy.get('body').then(($b) => {
+      const ta = $b.find('textarea[placeholder^="Descreva livremente"]');
+      if (ta.length) {
+        cy.wrap(ta.first()).type('CY-DOC: atendimento de teste E2E — sem valor clínico.');
+      }
+    });
+    cy.intercept('POST', '**/medicalrecords').as('storeRecord');
+    cy.get('button.pmr-save-btn').first().click();
+    cy.wait('@storeRecord', { timeout: 20000 }).then((i) => {
+      expect(i.response.statusCode, `salvar prontuário: ${JSON.stringify(i.response.body).slice(0, 300)}`)
+        .to.be.lessThan(400);
+    });
+    // Redireciona para a edição do prontuário criado.
+    cy.url({ timeout: 20000 }).should('match', /medicalrecords\/[0-9a-f-]+/);
+
+    // Sair pelo botão do cabeçalho → ScheduleFlowGuard pergunta o desfecho.
+    cy.get('button.btn-outline-white:has(i.fa-arrow-left)').first().click();
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.contains('button', 'Finalizar consulta').click();
+
+    // O exitUrl do FlowGuard leva à lista de prontuários do paciente.
+    cy.url({ timeout: 20000 }).should('match', /patients\/[0-9a-f-]+\/medicalrecords$/);
+    cy.expectPanelPage();
+
+    // Na agenda, o card do CY-DOC está "Atendido" (busca explícita de novo —
+    // imune a filtros residuais da sessão interativa).
+    cy.visit('/panel/schedules');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|paciente/i.test(el.placeholder))
+      .first().clear().type('CY-DOC');
+    cy.contains('.schedule-card', 'CY-DOC PACIENTE', { timeout: 15000 })
+      .should('contain.text', 'Atendido');
+
+    // Limpeza total (prontuário não assinado, agendamento, paciente).
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-cydoc.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
+  });
+
+  it('prontuário completo: atestado, evolução, anexo, tonometria e Assistente de IA', () => {
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-cydoc.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'cydoc:');
+
+    // Runtime de IA: geração de verdade SÓ com provider fake (não gastar
+    // créditos reais do usuário sem consentimento).
+    cy.exec(`cd .. && php artisan tinker --execute="echo config('ai.provider_runtime');"`, { timeout: 30000 })
+      .its('stdout').then((runtime) => {
+        cy.wrap(runtime.trim().split('\n').pop()).as('aiRuntime');
+      });
+
+    // Entra no atendimento e salva o prontuário (destrava a barra de docs).
+    cy.visit('/panel/schedules');
+    cy.get('input[placeholder]').filter((_, el) => /buscar|paciente/i.test(el.placeholder))
+      .first().clear().type('CY-DOC');
+    cy.contains('.schedule-card', 'CY-DOC PACIENTE', { timeout: 15000 })
+      .find('a.btn-success').first().then(($a) => { $a[0].click(); });
+    cy.url({ timeout: 20000 }).should('include', '/medicalrecords');
+    cy.get('.pmr-form', { timeout: 15000 }).should('exist');
+
+    // Queixa principal: satisfaz a validação (required_without observação)
+    // em QUALQUER modo de prontuário — é o fluxo clínico real.
+    cy.get('.pmr-form textarea[placeholder^="Descreva a queixa"], .pmr-form textarea[placeholder^="Descreva livremente"]')
+      .filter(':visible:not(:disabled)')
+      .first().type('CY-DOC: queixa de teste E2E, baixa acuidade visual.');
+
+    // Tonometria: OD/OE preenchidos ANTES do salvar (ficam no registro).
+    cy.get('.pmr-form input[placeholder="00"]').eq(0).clear().type('12');
+    cy.get('.pmr-form input[placeholder="00"]').eq(1).clear().type('14');
+
+    cy.get('button.pmr-save-btn').first().click();
+    // Comportamento REAL do app: save com schedule_id redireciona para a
+    // AGENDA (redirectAfterSave). O registro fica salvo e vinculado ao
+    // agendamento — comprovar via banco e abrir a EDIÇÃO direto (URL real),
+    // sem depender do card da agenda (que pode reabrir um "Novo Prontuário").
+    cy.url({ timeout: 20000 }).should('include', '/panel/schedules');
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/mr-url-cydoc.php';"`, { timeout: 40000 })
+      .its('stdout').then((out) => {
+        const m = out.match(/mr:(\S+)/);
+        expect(m, `URL de edição do prontuário salvo (stdout: ${out.slice(-200)})`).to.not.be.null;
+        cy.wrap(m[1]).as('mrUrl');
+        cy.visit(m[1]);
+      });
+    cy.get('.pmr-form', { timeout: 15000 }).should('exist');
+
+    // ── Atestado médico (quick action com payload dias) ────────────────────
+    // issueQuickAction tem guards com alert() (médico não selecionado etc.) —
+    // Cypress aceita alerts em silêncio; aqui viram erro com a mensagem.
+    cy.on('window:alert', (msg) => { throw new Error(`ALERT da aplicação: ${msg}`); });
+    cy.intercept('POST', '**/quick-actions/medical-certificate').as('cert');
+    // Dois botões contêm "Atestado" — mirar no "Atestado Médico" (tem o
+    // campo de dias); o de Comparecimento é outro quick-action.
+    cy.get('.pmr-doc-img-btn-label')
+      .filter((_, el) => /M[ée]dico/.test(el.textContent))
+      .first().closest('button').click({ force: true });
+    cy.get('.ee-modal__dialog:visible, .modal.show, .modal.d-block', { timeout: 10000 })
+      .last().within(() => {
+        // O preview de dias re-renderiza o modal no input — type() perderia o
+        // nó; invoke('val')+trigger atualiza o v-model deterministicamente.
+        cy.get('input[type=number]:visible', { timeout: 15000 })
+          .first().should('not.be.disabled')
+          .invoke('val', '2').trigger('input');
+        // "Emitir" fica desabilitado enquanto a pré-visualização carrega —
+        // aguardar habilitar (force:true em botão disabled não dispara JS).
+        cy.contains('button', /Emitir/, { timeout: 15000 })
+          .should('not.be.disabled')
+          .click();
+      });
+    // Emissão via fetch: comprovar o POST e o documento na tela de edição.
+    cy.wait('@cert', { timeout: 20000 }).then(({ response }) => {
+      expect(response.statusCode, `atestado: ${JSON.stringify(response.body).slice(0, 300)}`)
+        .to.be.lessThan(400);
+    });
+    cy.get('body').type('{esc}'); // fecha o preview de PDF do quick action
+    cy.get('.pmr-form', { timeout: 15000 }).should('exist');
+    cy.contains(/Atestado/, { timeout: 15000 }).should('exist');
+
+    // ── Evolução clínica ───────────────────────────────────────────────────
+    cy.intercept('POST', '**/evolutions').as('evo');
+    cy.contains('.pmr-doc-img-btn-label', /Evolução/).first().closest('button').click({ force: true });
+    cy.get('.ee-modal__dialog:visible, .modal.show, .modal.d-block', { timeout: 10000 })
+      .last().within(() => {
+        cy.get('textarea:visible').first().type('CY-DOC evolução de teste E2E.');
+        cy.contains('button', /Registrar|Salvar/).click({ force: true });
+      });
+    cy.wait('@evo', { timeout: 20000 }).its('response.statusCode').should('be.lessThan', 400);
+    cy.get('body').type('{esc}');
+
+    // ── Anexo (upload real — valida também o disco private) ────────────────
+    cy.intercept('POST', '**/files').as('upFile');
+    cy.contains('.pmr-doc-img-btn-label', /Anexo/).first().closest('button').click({ force: true });
+    cy.get('.ee-modal__dialog:visible, .modal.show, .modal.d-block', { timeout: 10000 })
+      .last().within(() => {
+        // PDF mínimo 100% ASCII — modal valida por extensão (quota.accept_mimes)
+        // e servidor por conteúdo (mimes:). PDF em texto puro sobrevive ao proxy
+        // do cy.intercept, que corrompe corpos multipart binários (PNG falha 422).
+        const miniPdf = [
+          '%PDF-1.4',
+          '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj',
+          '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj',
+          '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj',
+          'xref', '0 4', 'trailer<</Size 4/Root 1 0 R>>', '%%EOF', '',
+        ].join('\n');
+        cy.get('input[type=file]').first().selectFile({
+          contents: Cypress.Buffer.from(miniPdf),
+          fileName: 'cy-doc-anexo.pdf',
+          mimeType: 'application/pdf',
+        }, { force: true });
+        cy.contains('button', /Enviar/, { timeout: 15000 })
+          .should('not.be.disabled').click();
+      });
+    cy.wait('@upFile', { timeout: 20000 }).then(({ response }) => {
+      expect(response.statusCode, `upload anexo: ${JSON.stringify(response.body).slice(0, 500)}`)
+        .to.be.lessThan(400);
+    });
+    cy.get('body').type('{esc}');
+
+    // ── Assistente de IA ───────────────────────────────────────────────────
+    cy.get('.ai-fab', { timeout: 10000 }).should('be.visible').click();
+    cy.get('.ai-floating-assistant', { timeout: 10000 })
+      .find('textarea, input[type=text]').filter(':visible').should('exist');
+    cy.get('@aiRuntime').then((runtime) => {
+      if (runtime === 'fake') {
+        cy.get('.ai-floating-assistant').find('textarea:visible, input[type=text]:visible')
+          .first().type('Resuma o paciente');
+        cy.get('.ai-floating-assistant').find('button[type=submit], button:has(i.ti-send), button')
+          .filter((_, el) => /enviar|send/i.test((el.title || '') + el.innerHTML))
+          .first().click({ force: true });
+        cy.get('.ai-floating-assistant', { timeout: 30000 })
+          .should('contain.text', 'CY-DOC PACIENTE');
+      } else {
+        cy.log(`AI runtime="${runtime}" — geração pulada (não gastar créditos reais)`);
+      }
+    });
+
+    // Limpeza total.
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-cydoc.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
+  });
+
+  it('receituário: APIs exclusivas do médico respondem (presets, medicamentos, CID-10)', () => {
+    cy.visit('/panel/dashboard');
+    cy.expectPanelPage();
+
+    // medication-presets é DOCTOR-ONLY (entity.role:doctor) — prova o acesso.
+    cy.request('/panel/medication-presets').then((r) => {
+      expect(r.status).to.eq(200);
+    });
+    cy.request('/panel/medicines/search?q=olho').its('status').should('eq', 200);
+    cy.request('/panel/cid10/search?q=glaucoma').its('status').should('eq', 200);
+  });
+
+  it('prompts de IA: criar, ver na lista e excluir (CRUD exclusivo do médico)', () => {
+    const NAME = `CY prompt ${Date.now().toString().slice(-6)}`;
+    cy.visit('/panel/setting/ai-prompts');
+    cy.expectPanelPage('Meus prompts de IA');
+
+    cy.contains('button', 'Novo prompt').click();
+    cy.get('.modal.show, .modal.d-block').should('be.visible').within(() => {
+      cy.get('input[type=text]:visible').first().type(NAME);
+      cy.get('textarea:visible').first().type('Resuma o quadro clínico do paciente em 3 linhas.');
+      cy.contains('button', /Salvar|Criar/).click();
+    });
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('not.exist');
+    cy.contains(NAME, { timeout: 10000 }).should('be.visible');
+
+    cy.on('window:confirm', () => true);
+    cy.contains(NAME).closest('div:has(button)')
+      .find('button').filter((_, el) => /excluir|trash/i.test((el.title || '') + el.textContent + el.innerHTML))
+      .first().click({ force: true });
+    cy.contains(NAME, { timeout: 10000 }).should('not.exist');
+  });
+
+  it('página de escala de médicos também nega (vive sob /panel/doctors)', () => {
+    // A escala é gerida por admin/secretária (coberta na spec da secretária).
+    // O médico segue vendo colegas/slots pelo contexto da AGENDA.
+    cy.visit('/panel/dashboard');
+    cy.expectPanelPage();
+    cy.request({ url: '/panel/doctors/cards', failOnStatusCode: false })
+      .its('status').should('eq', 403);
   });
 });

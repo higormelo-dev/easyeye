@@ -38,6 +38,19 @@ return [
             'report' => false,
         ],
 
+        // BUG-FIX (achado pelo E2E Cypress): PatientImportService e
+        // MedicalRecordFilesController usam Storage::disk('private'), mas o
+        // disco nunca foi declarado — upload de importação de pacientes e
+        // download de anexos de prontuário quebravam com 500 ("Disk [private]
+        // does not have a configured driver"). Mesmo root do disco local.
+        'private' => [
+            'driver' => 'local',
+            'root'   => storage_path('app/private'),
+            'serve'  => false,
+            'throw'  => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver'     => 'local',
             'root'       => storage_path('app/public'),

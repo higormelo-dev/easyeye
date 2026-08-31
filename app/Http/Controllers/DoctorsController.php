@@ -344,7 +344,7 @@ class DoctorsController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): Application|View|JsonResponse
+    public function destroy(string $id): Application|View|JsonResponse|RedirectResponse
     {
         Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
 

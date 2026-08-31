@@ -65,7 +65,7 @@
                 <div class="hero-inner">
                     <div class="hero-text">
                         <div class="badge-pill">
-                            <i class="bi bi-stars"></i>
+                            <i class="ti ti-sparkles"></i>
                             {{ t.hero.badge }}
                         </div>
                         <h1 class="hero-title">
@@ -75,10 +75,10 @@
                         <p class="hero-sub">{{ t.hero.subtitle }}</p>
                         <div class="hero-ctas">
                             <a :href="routes.register" class="btn btn-primary btn-lg">
-                                {{ t.hero.cta_primary }} <i class="bi bi-arrow-right"></i>
+                                {{ t.hero.cta_primary }} <i class="ti ti-arrow-right"></i>
                             </a>
                             <a href="#demonstracao" class="btn btn-outline-white btn-lg">
-                                <i class="bi bi-play-circle"></i> {{ t.hero.cta_secondary }}
+                                <i class="ti ti-player-play"></i> {{ t.hero.cta_secondary }}
                             </a>
                         </div>
                         <div class="hero-trust">
@@ -92,7 +92,7 @@
                     <div class="hero-visual">
                         <div class="hero-float-card card-top" style="border-left: 3px solid #06d6a0;">
                             <div class="icon" style="background:rgba(6,214,160,.1)">
-                                <i class="bi bi-calendar-check" style="color:#06d6a0"></i>
+                                <i class="ti ti-calendar-check" style="color:#06d6a0"></i>
                             </div>
                             <div>
                                 <div style="font-size:11px;color:#64748b;font-weight:500;">{{ t.hero.card_today }}</div>
@@ -132,7 +132,7 @@
 
                         <div class="hero-float-card card-bottom" style="border-left: 3px solid #f97316;">
                             <div class="icon" style="background:rgba(249,115,22,.1)">
-                                <i class="bi bi-shield-check" style="color:#f97316"></i>
+                                <i class="ti ti-shield-check" style="color:#f97316"></i>
                             </div>
                             <div>
                                 <div style="font-size:11px;color:#64748b;font-weight:500;">{{ t.hero.card_compliance_lbl }}</div>
@@ -172,7 +172,7 @@
                     </div>
                 </div>
                 <div class="problems-bridge">
-                    <i class="bi bi-arrow-down-circle-fill"></i>
+                    <i class="ti ti-circle-arrow-down"></i>
                     <span>{{ t.problems.bridge }}</span>
                 </div>
             </div>
@@ -246,7 +246,7 @@
                     <div class="how-visual">
                         <img v-if="howImageExists" :src="asset('site/images/how-it-works.png') + '?v=' + howImageExists" :alt="t.how.screenshot_alt">
                         <div v-else class="how-visual-placeholder">
-                            <i class="bi bi-display"></i>
+                            <i class="ti ti-device-desktop"></i>
                             <p style="font-size:15px;">{{ t.how.screenshot_placeholder }}</p>
                             <p style="font-size:13px;margin-top:4px;"><code>{{ t.how.screenshot_hint }}</code></p>
                         </div>
@@ -318,9 +318,9 @@
                                     <!-- Agenda -->
                                     <template v-else-if="tab.key === 'agenda'">
                                         <div class="demo-chips">
-                                            <span class="demo-chip active"><i class="bi bi-person-circle"></i> Dra. Ana</span>
-                                            <span class="demo-chip"><i class="bi bi-person-circle"></i> Dr. Carlos</span>
-                                            <span class="demo-chip"><i class="bi bi-person-circle"></i> Dr. Bruno</span>
+                                            <span class="demo-chip active"><i class="ti ti-user-circle"></i> Dra. Ana</span>
+                                            <span class="demo-chip"><i class="ti ti-user-circle"></i> Dr. Carlos</span>
+                                            <span class="demo-chip"><i class="ti ti-user-circle"></i> Dr. Bruno</span>
                                         </div>
                                         <div class="demo-agenda-grid">
                                             <div v-for="d in ['Seg','Ter','Qua','Qui','Sex']" :key="d" class="demo-agenda-col">
@@ -413,7 +413,7 @@
                     </div>
 
                     <a href="#precos" class="btn btn-featured">
-                        {{ t.differentiators.premium_callout.cta }} <i class="bi bi-arrow-right"></i>
+                        {{ t.differentiators.premium_callout.cta }} <i class="ti ti-arrow-right"></i>
                     </a>
                 </div>
             </div>
@@ -478,11 +478,11 @@
                 </div>
 
                 <div v-if="!plans.length" style="text-align:center;padding:60px 20px;">
-                    <i class="bi bi-box-seam" style="font-size:56px;color:var(--border);display:block;margin-bottom:16px;"></i>
+                    <i class="ti ti-package" style="font-size:56px;color:var(--border);display:block;margin-bottom:16px;"></i>
                     <p style="font-size:18px;font-weight:600;color:var(--navy);margin-bottom:8px;">{{ t.pricing.empty_title }}</p>
                     <p style="color:var(--text-muted);margin-bottom:24px;">{{ t.pricing.empty_subtitle }}</p>
                     <a href="mailto:contato@easyeye.com.br" class="btn btn-primary">
-                        <i class="bi bi-chat-dots"></i> {{ t.pricing.contact_cta }}
+                        <i class="ti ti-message-dots"></i> {{ t.pricing.contact_cta }}
                     </a>
                 </div>
 
@@ -510,7 +510,7 @@
                         </div>
 
                         <div v-if="plan.trial_days" :style="plan.is_featured ? 'font-size:13px;margin-bottom:16px;color:rgba(255,255,255,.65);font-weight:600;' : 'font-size:13px;margin-bottom:16px;color:var(--mint);font-weight:600;'">
-                            <i class="bi bi-gift"></i>
+                            <i class="ti ti-gift"></i>
                             {{ t.pricing.trial_text?.replace(':days', plan.trial_days) }}
                         </div>
 
@@ -552,7 +552,7 @@
                            :href="routes.register"
                            class="btn btn-featured btn-primary"
                            style="width:100%;justify-content:center;">
-                            {{ t.pricing.get_started }} <i class="bi bi-arrow-right"></i>
+                            {{ t.pricing.get_started }} <i class="ti ti-arrow-right"></i>
                         </a>
                         <a v-else
                            :href="routes.register"
@@ -564,7 +564,7 @@
                 </div>
 
                 <div v-if="plans.length" class="pricing-credit-note">
-                    <i class="bi bi-info-circle-fill"></i>
+                    <i class="ti ti-info-circle"></i>
                     <p v-html="t.pricing_credit_note_html"></p>
                 </div>
             </div>
@@ -608,53 +608,53 @@
                 <div class="contact-cards">
                     <div class="contact-card">
                         <div class="contact-card-icon icon-teal">
-                            <i class="bi bi-whatsapp"></i>
+                            <i class="ti ti-brand-whatsapp"></i>
                         </div>
                         <h3>{{ t.contact.sales.title }}</h3>
                         <p class="contact-card-desc">{{ t.contact.sales.desc }}</p>
                         <div class="contact-card-meta">
-                            <i class="bi bi-clock"></i> {{ t.contact.sales.hours }}
+                            <i class="ti ti-clock"></i> {{ t.contact.sales.hours }}
                         </div>
                         <div class="contact-card-meta" style="margin-bottom:20px;">
-                            <i class="bi bi-whatsapp"></i> {{ t.contact.sales.channel }}
+                            <i class="ti ti-brand-whatsapp"></i> {{ t.contact.sales.channel }}
                         </div>
                         <a href="https://wa.me/5500000000000" target="_blank" rel="noopener noreferrer"
                            class="btn btn-primary" style="width:100%;justify-content:center;">
-                            <i class="bi bi-whatsapp"></i> {{ t.contact.sales.cta }}
+                            <i class="ti ti-brand-whatsapp"></i> {{ t.contact.sales.cta }}
                         </a>
                     </div>
 
                     <div class="contact-card">
                         <div class="contact-card-icon icon-blue">
-                            <i class="bi bi-headset"></i>
+                            <i class="ti ti-headset"></i>
                         </div>
                         <h3>{{ t.contact.support.title }}</h3>
                         <p class="contact-card-desc">{{ t.contact.support.desc }}</p>
                         <div class="contact-card-meta">
-                            <i class="bi bi-clock"></i> {{ t.contact.support.hours }}
+                            <i class="ti ti-clock"></i> {{ t.contact.support.hours }}
                         </div>
                         <div class="contact-card-meta" style="margin-bottom:20px;">
-                            <i class="bi bi-envelope"></i> {{ t.contact.support.channel }}
+                            <i class="ti ti-mail"></i> {{ t.contact.support.channel }}
                         </div>
                         <a :href="'mailto:' + t.contact.support.channel"
                            class="btn btn-outline" style="width:100%;justify-content:center;">
-                            <i class="bi bi-envelope"></i> {{ t.contact.support.cta }}
+                            <i class="ti ti-mail"></i> {{ t.contact.support.cta }}
                         </a>
                     </div>
 
                     <div class="contact-card highlight">
                         <div class="contact-card-badge">{{ t.contact.trial.badge }}</div>
                         <div class="contact-card-icon" style="background:rgba(255,255,255,.1);color:var(--teal);">
-                            <i class="bi bi-rocket-takeoff"></i>
+                            <i class="ti ti-rocket"></i>
                         </div>
                         <h3>{{ t.contact.trial.title }}</h3>
                         <p class="contact-card-desc">{{ t.contact.trial.desc?.replace(':days', trialDays) }}</p>
                         <div class="contact-card-meta" style="margin-bottom:20px;">
-                            <i class="bi bi-check-circle-fill"></i> {{ t.contact.trial.note }}
+                            <i class="ti ti-circle-check"></i> {{ t.contact.trial.note }}
                         </div>
                         <a :href="routes.register"
                            class="btn" style="background:var(--teal);color:#fff;width:100%;justify-content:center;">
-                            {{ t.contact.trial.cta }} <i class="bi bi-arrow-right"></i>
+                            {{ t.contact.trial.cta }} <i class="ti ti-arrow-right"></i>
                         </a>
                     </div>
                 </div>
@@ -662,7 +662,7 @@
                 <div class="contact-main">
                     <div class="contact-form-box">
                         <div v-if="contactSent" class="cf-success">
-                            <div class="cf-success-icon"><i class="bi bi-check2-circle"></i></div>
+                            <div class="cf-success-icon"><i class="ti ti-circle-check"></i></div>
                             <h3>{{ t.contact.form.success_title }}</h3>
                             <p>{{ t.contact.form.success_body }}</p>
                         </div>
@@ -731,7 +731,7 @@
 
                     <div class="contact-aside">
                         <div class="contact-aside-item">
-                            <div class="contact-aside-icon icon-teal"><i class="bi bi-whatsapp"></i></div>
+                            <div class="contact-aside-icon icon-teal"><i class="ti ti-brand-whatsapp"></i></div>
                             <div>
                                 <h4>WhatsApp</h4>
                                 <p>
@@ -741,7 +741,7 @@
                             </div>
                         </div>
                         <div class="contact-aside-item">
-                            <div class="contact-aside-icon icon-blue"><i class="bi bi-envelope"></i></div>
+                            <div class="contact-aside-icon icon-blue"><i class="ti ti-mail"></i></div>
                             <div>
                                 <h4>E-mail</h4>
                                 <p>
@@ -751,14 +751,14 @@
                             </div>
                         </div>
                         <div class="contact-aside-item">
-                            <div class="contact-aside-icon icon-mint"><i class="bi bi-clock"></i></div>
+                            <div class="contact-aside-icon icon-mint"><i class="ti ti-clock"></i></div>
                             <div>
                                 <h4>{{ t.contact.aside.hours_title }}</h4>
                                 <p>{{ t.contact.aside.hours_body }}</p>
                             </div>
                         </div>
                         <div class="contact-aside-item">
-                            <div class="contact-aside-icon icon-purple"><i class="bi bi-chat-dots"></i></div>
+                            <div class="contact-aside-icon icon-purple"><i class="ti ti-message-dots"></i></div>
                             <div>
                                 <h4>{{ t.contact.aside.chat_title }}</h4>
                                 <p>{{ t.contact.aside.chat_body }}</p>
@@ -774,16 +774,16 @@
 
                 <div class="contact-trust">
                     <div class="contact-trust-item">
-                        <i class="bi bi-lock-fill"></i> <span>{{ t.contact.trust_ssl }}</span>
+                        <i class="ti ti-lock"></i> <span>{{ t.contact.trust_ssl }}</span>
                     </div>
                     <div class="contact-trust-item">
-                        <i class="bi bi-shield-fill-check"></i> <span>{{ t.contact.trust_lgpd }}</span>
+                        <i class="ti ti-shield-check"></i> <span>{{ t.contact.trust_lgpd }}</span>
                     </div>
                     <div class="contact-trust-item">
-                        <i class="bi bi-patch-check-fill"></i> <span>{{ t.contact.trust_cfm }}</span>
+                        <i class="ti ti-rosette-discount-check"></i> <span>{{ t.contact.trust_cfm }}</span>
                     </div>
                     <div class="contact-trust-item">
-                        <i class="bi bi-star-fill" style="color:#f59e0b;"></i> <span>{{ t.contact.trust_nps }}</span>
+                        <i class="ti ti-star" style="color:#f59e0b;"></i> <span>{{ t.contact.trust_nps }}</span>
                     </div>
                 </div>
             </div>
@@ -796,10 +796,10 @@
                 <p>{{ t.cta.subtitle }}</p>
                 <div class="cta-final-btns">
                     <a :href="routes.register" class="btn btn-primary btn-lg">
-                        {{ t.cta.primary }} <i class="bi bi-arrow-right"></i>
+                        {{ t.cta.primary }} <i class="ti ti-arrow-right"></i>
                     </a>
                     <a href="mailto:contato@easyeye.com.br" class="btn btn-outline-white btn-lg">
-                        <i class="bi bi-chat-dots"></i> {{ t.cta.secondary }}
+                        <i class="ti ti-message-dots"></i> {{ t.cta.secondary }}
                     </a>
                 </div>
                 <p class="cta-note">{{ t.cta.note }}</p>

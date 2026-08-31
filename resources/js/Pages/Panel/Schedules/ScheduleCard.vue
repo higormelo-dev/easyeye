@@ -162,12 +162,15 @@ function onSituationClick(trans) {
                     <!-- Iniciar atendimento (Agenda do MÉDICO): ação principal —
                          abre o prontuário DESTE agendamento; o status vira
                          "Em consulta" na abertura (ScheduleFlowGuard). -->
+                    <!-- Ícone-only por decisão de produto (29/08): o rótulo
+                         cortava em cards comprimidos. Play do Tabler (mesma
+                         família dos botões vizinhos) + tooltip acessível. -->
                     <a v-if="isDoctor && item.attend_url && !item.is_terminal"
                        :href="item.attend_url"
-                       class="btn btn-success btn-sm d-inline-flex align-items-center gap-1 flex-shrink-0"
-                       :title="t.btn_attend ?? 'Iniciar atendimento'">
-                        <i class="fas fa-play"></i>
-                        <span class="d-none d-lg-inline">{{ t.btn_attend ?? 'Iniciar atendimento' }}</span>
+                       class="btn btn-success btn-sm d-inline-flex align-items-center justify-content-center flex-shrink-0 px-2"
+                       :title="t.btn_attend ?? 'Iniciar atendimento'"
+                       :aria-label="t.btn_attend ?? 'Iniciar atendimento'">
+                        <i class="ti ti-player-play fs-16"></i>
                     </a>
 
                     <!-- Chamar paciente (painel/TV da sala de espera) — opcional

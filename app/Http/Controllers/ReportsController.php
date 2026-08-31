@@ -119,7 +119,7 @@ class ReportsController extends Controller
         return Inertia::render('Panel/Reports/Schedules', array_merge($payload, [
             'schedules' => $schedules->map(fn (Schedule $s) => [
                 'date_time'       => $s->date_time?->format('d/m/Y H:i'),
-                'patient_name'    => $s->patient?->person?->name,
+                'patient_name'    => $s->patient?->person?->full_name,
                 'doctor_name'     => $s->doctor?->user_name,
                 'covenant'        => $s->covenant?->name,
                 'visit_type'      => $s->visitType?->name,
@@ -202,7 +202,7 @@ class ReportsController extends Controller
         return Inertia::render('Panel/Reports/Absenteeism', array_merge($payload, [
             'schedules' => $schedules->map(fn (Schedule $s) => [
                 'date_time'       => $s->date_time?->format('d/m/Y H:i'),
-                'patient_name'    => $s->patient?->person?->name,
+                'patient_name'    => $s->patient?->person?->full_name,
                 'doctor_name'     => $s->doctor?->user_name,
                 'covenant'        => $s->covenant?->name,
                 'situation'       => $s->situation->value,

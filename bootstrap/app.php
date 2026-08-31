@@ -33,6 +33,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\{Exceptions, Middleware};
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
 use Sentry\Laravel\Integration;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\{HttpException, MethodNotAllowedHttpException, NotFoundHttpException};
@@ -183,6 +184,41 @@ return Application::configure(basePath: dirname(__DIR__))
                 $message = $e->getMessage() ?: __('http-statuses.' . $e->getStatusCode(), [], null) ?? 'Error';
 
                 return redirect()->back()->with('error', $message);
+            }
+        });
+
+        // ── Páginas de erro com o visual do sistema (navegação full-page) ──
+        // Digitar URL/atualizar a página num erro HTTP mostrava o Blade cru do
+        // Laravel ("403 | PROIBIDO"). Agora renderiza a página Inertia `Error`
+        // no shell do painel (panel-app) quando a rota é /panel/*, mantendo:
+        //  - JSON/API nos handlers acima;
+        //  - navegação SPA (X-Inertia) no redirect-back com flash;
+        //  - página de debug nos 500/503 quando APP_DEBUG=true.
+        $exceptions->respond(function (HttpResponse $response, Throwable $e, Request $request) {
+            $status = $response->getStatusCode();
+
+            if (
+                ! in_array($status, [401, 403, 404, 419, 429, 500, 503], true)
+                || $request->is('api/*')
+                || $request->expectsJson()
+                || $request->hasHeader('X-Inertia')
+                || (config('app.debug') && in_array($status, [500, 503], true))
+            ) {
+                return $response;
+            }
+
+            try {
+                if ($request->is('panel/*')) {
+                    // 404 fora de rota não passa pelo HandleInertiaRequests —
+                    // força o shell do painel para manter o visual do sistema.
+                    Inertia::setRootView('panel-app');
+                }
+
+                return Inertia::render('Error', ['status' => $status])
+                    ->toResponse($request)
+                    ->setStatusCode($status);
+            } catch (Throwable) {
+                return $response; // nunca piorar um erro
             }
         });
 
