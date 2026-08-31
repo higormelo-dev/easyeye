@@ -35,7 +35,9 @@ return new class extends Migration {
         // Pula APENAS sob PHPUnit/Pest (a suíte controla o catálogo por teste).
         // NÃO usar environment('testing'): o servidor de homologação roda com
         // APP_ENV=testing e a migration ficaria como "Ran" sem fazer nada.
-        if (defined('PHPUNIT_COMPOSER_INSTALL')) {
+        // Detecção: TestCase JÁ CARREGADA (autoload=false) — verdadeiro só
+        // dentro do runner de testes, nunca num artisan migrate de servidor.
+        if (class_exists(\PHPUnit\Framework\TestCase::class, false)) {
             return;
         }
 
