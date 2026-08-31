@@ -246,7 +246,7 @@ class AnthropicProvider implements AiProviderInterface
 
     private function apiKey(): string
     {
-        $apiKey = (string) config('services.anthropic.api_key', '');
+        $apiKey = (string) trim((string) config('services.anthropic.api_key', ''));
 
         if ($apiKey === '') {
             throw new RuntimeException('Anthropic API key não configurada.');

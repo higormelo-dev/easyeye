@@ -246,7 +246,7 @@ class OpenAiProvider implements AiProviderInterface
 
     private function apiKey(): string
     {
-        $apiKey = (string) config('services.openai.api_key', '');
+        $apiKey = (string) trim((string) config('services.openai.api_key', ''));
 
         if ($apiKey === '') {
             throw new RuntimeException('OpenAI API key não configurada.');

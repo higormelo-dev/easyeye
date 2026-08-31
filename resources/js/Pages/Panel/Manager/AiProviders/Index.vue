@@ -25,8 +25,27 @@ const form = ref({
 });
 
 // Modelo escolhido por provedor ('' = usar o padrão do servidor/.env).
+// Só entra no form o que o SELECT consegue exibir: se o modelo efetivo (env)
+// não está no catálogo de preços, inicia vazio — senão o save inteiro seria
+// bloqueado por um provedor que o admin nem tocou (visto no ambiente de teste
+// com claude-sonnet-4-5 sem preço cadastrado).
+function initialModelFor(p) {
+    const opts = props.modelOptions[p.code] ?? [];
+    return opts.includes(p.model) ? p.model : '';
+}
 const modelForm = ref(Object.fromEntries(
-    props.providers.map(p => [p.code, p.model ?? ''])));
+    props.providers.map(p => [p.code, initialModelFor(p)])));
+
+// Envia apenas provedores COM select renderizado (configurado + com opções).
+function modelsPayload() {
+    const out = {};
+    for (const p of props.providers) {
+        if (p.configured && (options.value[p.code] ?? []).length) {
+            out[p.code] = modelForm.value[p.code] || '';
+        }
+    }
+    return out;
+}
 
 const providersByCode = computed(() =>
     Object.fromEntries(props.providers.map(p => [p.code, p])));
@@ -99,7 +118,7 @@ async function save() {
                 primary:     form.value.primary,
                 reviewer:    form.value.reviewer || null,
                 adjudicator: form.value.adjudicator || null,
-                models:      modelForm.value,
+                models:      modelsPayload(),
             }),
         });
         const json = await res.json();

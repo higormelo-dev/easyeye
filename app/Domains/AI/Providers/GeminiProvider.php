@@ -261,7 +261,7 @@ class GeminiProvider implements AiProviderInterface
 
     private function apiKey(): string
     {
-        $apiKey = (string) config('services.gemini.api_key', '');
+        $apiKey = (string) trim((string) config('services.gemini.api_key', ''));
 
         if ($apiKey === '') {
             throw new RuntimeException('Gemini API key não configurada.');
