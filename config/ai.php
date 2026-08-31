@@ -39,7 +39,7 @@ return [
 
         'gemini' => [
             'base_url'                => env('AI_GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com'),
-            'model'                   => env('AI_GEMINI_MODEL', 'gemini-2.0-flash'),
+            'model'                   => env('AI_GEMINI_MODEL', 'gemini-3.6-flash'),
             'timeout_seconds'         => (int) env('AI_GEMINI_TIMEOUT_SECONDS', 20),
             'connect_timeout_seconds' => (int) env('AI_GEMINI_CONNECT_TIMEOUT_SECONDS', 5),
             'retry_times'             => (int) env('AI_GEMINI_RETRY_TIMES', 1),

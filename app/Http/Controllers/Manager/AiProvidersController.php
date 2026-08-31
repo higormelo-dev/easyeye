@@ -244,7 +244,7 @@ class AiProvidersController extends Controller
                 userPrompt: 'Responda somente: ok',
                 systemPrompt: 'Você é um verificador de conectividade. Responda somente "ok".',
                 riskLevel: AiRiskLevel::Low,
-                maxOutputTokens: 16, // mínimo aceito pela OpenAI (>= 16); ok p/ Anthropic/Gemini
+                maxOutputTokens: 64, // >= 16 (piso OpenAI) e folga p/ modelos com reasoning (thoughts consomem budget)
             ));
 
             return response()->json([

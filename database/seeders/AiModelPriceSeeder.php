@@ -66,10 +66,45 @@ class AiModelPriceSeeder extends Seeder
 
             // ── Anthropic ──────────────────────────────────────────────────────
             [
+                // Topo de linha (Mythos-class).
                 'provider'                  => AiProvider::Anthropic->value,
-                'model'                     => 'claude-3-5-sonnet-20241022',
+                'model'                     => 'claude-fable-5',
+                'input_usd_per_million'     => 10.00,
+                'output_usd_per_million'    => 50.00,
+                'reasoning_usd_per_million' => null,
+                'tool_call_usd'             => null,
+            ],
+            [
+                'provider'                  => AiProvider::Anthropic->value,
+                'model'                     => 'claude-opus-5',
+                'input_usd_per_million'     => 5.00,
+                'output_usd_per_million'    => 25.00,
+                'reasoning_usd_per_million' => null,
+                'tool_call_usd'             => null,
+            ],
+            [
+                // Preco introdutorio virou definitivo (ago/2026).
+                'provider'                  => AiProvider::Anthropic->value,
+                'model'                     => 'claude-sonnet-5',
+                'input_usd_per_million'     => 2.00,
+                'output_usd_per_million'    => 10.00,
+                'reasoning_usd_per_million' => null,
+                'tool_call_usd'             => null,
+            ],
+            [
+                'provider'                  => AiProvider::Anthropic->value,
+                'model'                     => 'claude-sonnet-4-6',
                 'input_usd_per_million'     => 3.00,
                 'output_usd_per_million'    => 15.00,
+                'reasoning_usd_per_million' => null,
+                'tool_call_usd'             => null,
+            ],
+            [
+                // Mais barato — bom para papel de revisor.
+                'provider'                  => AiProvider::Anthropic->value,
+                'model'                     => 'claude-haiku-4-5',
+                'input_usd_per_million'     => 1.00,
+                'output_usd_per_million'    => 5.00,
                 'reasoning_usd_per_million' => null,
                 'tool_call_usd'             => null,
             ],
@@ -82,46 +117,50 @@ class AiModelPriceSeeder extends Seeder
                 'reasoning_usd_per_million' => null,
                 'tool_call_usd'             => null,
             ],
-            [
-                'provider'                  => AiProvider::Anthropic->value,
-                'model'                     => 'claude-3-5-haiku-20241022',
-                'input_usd_per_million'     => 0.80,
-                'output_usd_per_million'    => 4.00,
-                'reasoning_usd_per_million' => null,
-                'tool_call_usd'             => null,
-            ],
-            [
-                'provider'                  => AiProvider::Anthropic->value,
-                'model'                     => 'claude-3-opus-20240229',
-                'input_usd_per_million'     => 15.00,
-                'output_usd_per_million'    => 75.00,
-                'reasoning_usd_per_million' => null,
-                'tool_call_usd'             => null,
-            ],
 
             // ── Google Gemini ──────────────────────────────────────────────────
             [
+                // Sucessor do gemini-2.0-flash (aposentado pelo Google em 2026).
+                // Preço oficial: ai.google.dev/gemini-api/docs/pricing (standard).
+                // Thoughts/raciocínio são cobrados como saída.
                 'provider'                  => AiProvider::Gemini->value,
-                'model'                     => 'gemini-1.5-pro',
-                'input_usd_per_million'     => 1.25,
-                'output_usd_per_million'    => 5.00,
-                'reasoning_usd_per_million' => null,
+                'model'                     => 'gemini-3.6-flash',
+                'input_usd_per_million'     => 1.50,
+                'output_usd_per_million'    => 7.50,
+                'reasoning_usd_per_million' => 7.50,
                 'tool_call_usd'             => null,
             ],
             [
                 'provider'                  => AiProvider::Gemini->value,
-                'model'                     => 'gemini-1.5-flash',
-                'input_usd_per_million'     => 0.075,
-                'output_usd_per_million'    => 0.30,
-                'reasoning_usd_per_million' => null,
+                'model'                     => 'gemini-3.5-flash',
+                'input_usd_per_million'     => 1.50,
+                'output_usd_per_million'    => 9.00,
+                'reasoning_usd_per_million' => 9.00,
                 'tool_call_usd'             => null,
             ],
             [
                 'provider'                  => AiProvider::Gemini->value,
-                'model'                     => 'gemini-2.0-flash',
-                'input_usd_per_million'     => 0.10,
-                'output_usd_per_million'    => 0.40,
-                'reasoning_usd_per_million' => null,
+                'model'                     => 'gemini-3.5-flash-lite',
+                'input_usd_per_million'     => 0.30,
+                'output_usd_per_million'    => 2.50,
+                'reasoning_usd_per_million' => 2.50,
+                'tool_call_usd'             => null,
+            ],
+            [
+                'provider'                  => AiProvider::Gemini->value,
+                'model'                     => 'gemini-3.1-flash-lite',
+                'input_usd_per_million'     => 0.25,
+                'output_usd_per_million'    => 1.50,
+                'reasoning_usd_per_million' => 1.50,
+                'tool_call_usd'             => null,
+            ],
+            [
+                // Tier ate 200k tokens (prompts clinicos nunca passam disso).
+                'provider'                  => AiProvider::Gemini->value,
+                'model'                     => 'gemini-3.1-pro-preview',
+                'input_usd_per_million'     => 2.00,
+                'output_usd_per_million'    => 12.00,
+                'reasoning_usd_per_million' => 12.00,
                 'tool_call_usd'             => null,
             ],
         ];
