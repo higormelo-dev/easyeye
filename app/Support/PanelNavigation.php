@@ -324,6 +324,13 @@ class PanelNavigation
                 'match' => ['manager.partners.*'],
             ],
             [
+                'key'   => 'ai-providers',
+                'route' => 'manager.ai-providers.index',
+                'icon'  => 'ti ti-sparkles',
+                'label' => __('actions.sidemenu.ai_providers'),
+                'match' => ['manager.ai-providers.*'],
+            ],
+            [
                 'key'   => 'ai-credit-purchases',
                 'route' => 'manager.ai-credit-purchases.index',
                 'icon'  => 'ti ti-coin',

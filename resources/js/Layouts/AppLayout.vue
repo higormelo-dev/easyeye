@@ -230,9 +230,42 @@ watch(
     { immediate: true },
 );
 
+// ── Toast programático (window.showSuccessToast/showErrorToast) ──────────
+// Várias páginas com fetch (Financeiro, prontuário, manager) chamam esses
+// helpers globais para feedback SEM navegação Inertia — mas eles nunca foram
+// definidos: o "sucesso" saía silencioso ou caía no alert() nativo do
+// browser. Define-os aqui reutilizando OS MESMOS alerts do flash do layout
+// (visual idêntico ao restante do sistema, auto-dismiss 6s).
+const localSuccess = ref('');
+const localError   = ref('');
+
+function pushLocalToast(type, message) {
+    if (type === 'success') {
+        localSuccess.value = String(message ?? '');
+        clearTimeout(flashSuccessTimer);
+        flashSuccessOpen.value = true;
+        flashSuccessTimer = setTimeout(() => { flashSuccessOpen.value = false; }, 6000);
+    } else {
+        localError.value = String(message ?? '');
+        clearTimeout(flashErrorTimer);
+        flashErrorOpen.value = true;
+        flashErrorTimer = setTimeout(() => { flashErrorOpen.value = false; }, 6000);
+    }
+}
+
+const successText = computed(() => flash.value.success || localSuccess.value);
+const errorText   = computed(() => flash.value.error || localError.value);
+
+onMounted(() => {
+    window.showSuccessToast = (msg) => pushLocalToast('success', msg);
+    window.showErrorToast   = (msg) => pushLocalToast('error', msg);
+});
+
 onUnmounted(() => {
     clearTimeout(flashSuccessTimer);
     clearTimeout(flashErrorTimer);
+    delete window.showSuccessToast;
+    delete window.showErrorToast;
 });
 
 // A verificação de WhatsApp saiu do banner: virou etapa de onboarding com
@@ -505,16 +538,16 @@ onUnmounted(() => {
 
             <!-- Flash messages (Vue-controlled — auto-dismiss 6s + botão X funcional) -->
             <transition name="flash">
-                <div v-if="flashSuccessOpen && flash.success" class="alert alert-success m-3 mb-0 d-flex align-items-center gap-2" role="alert">
+                <div v-if="flashSuccessOpen && successText" class="alert alert-success m-3 mb-0 d-flex align-items-center gap-2" role="alert">
                     <i class="ti ti-circle-check fs-16"></i>
-                    <span class="flex-grow-1">{{ flash.success }}</span>
+                    <span class="flex-grow-1">{{ successText }}</span>
                     <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissSuccess"></button>
                 </div>
             </transition>
             <transition name="flash">
-                <div v-if="flashErrorOpen && flash.error" class="alert alert-danger m-3 mb-0 d-flex align-items-center gap-2" role="alert">
+                <div v-if="flashErrorOpen && errorText" class="alert alert-danger m-3 mb-0 d-flex align-items-center gap-2" role="alert">
                     <i class="ti ti-alert-circle fs-16"></i>
-                    <span class="flex-grow-1">{{ flash.error }}</span>
+                    <span class="flex-grow-1">{{ errorText }}</span>
                     <button type="button" class="btn-close" :aria-label="'Fechar'" @click="dismissError"></button>
                 </div>
             </transition>

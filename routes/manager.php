@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\Manager\{
+use App\Http\Controllers\Manager\{AiModelPricesController,
     AiCreditPurchasesController,
     AiProvidersController,
     EntitiesController,
@@ -173,6 +173,21 @@ Route::group([
     Route::patch('ai-providers', [AiProvidersController::class, 'update'])
         ->middleware('throttle:manager-destructive')
         ->name('ai-providers.update');
+    // Teste de conexão real (chamada mínima ao provedor) — throttle apertado:
+    // cada clique custa alguns centavos de API.
+    Route::post('ai-providers/test', [AiProvidersController::class, 'test'])
+        ->middleware('throttle:6,1')
+        ->name('ai-providers.test');
+
+    // ── Catálogo de modelos e preços (habilita modelos no select acima) ──
+    Route::get('ai-model-prices', [AiModelPricesController::class, 'index'])
+        ->name('ai-model-prices.index');
+    Route::post('ai-model-prices', [AiModelPricesController::class, 'store'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-model-prices.store');
+    Route::patch('ai-model-prices/{aiModelPrice}', [AiModelPricesController::class, 'update'])
+        ->middleware('throttle:manager-destructive')
+        ->name('ai-model-prices.update');
 
     // ── Gateways de Pagamento — admin only (credenciais = máxima criticidade) ──
     Route::middleware('saas.role:admin')->group(function () {

@@ -127,12 +127,13 @@ class AiRunEstimateService
 
     private function providerModel(string $provider): string
     {
-        return match ($provider) {
-            'openai'    => (string) config('ai.providers.openai.model', 'gpt-5-mini'),
-            'anthropic' => (string) config('ai.providers.anthropic.model', 'claude-sonnet-4-5'),
-            'gemini'    => (string) config('ai.providers.gemini.model', 'gemini-2.0-flash'),
-            default     => 'unknown-model',
-        };
+        // Fonte única do modelo efetivo (painel do Manager → fallback env).
+        return (string) ($this->providerSettings->model($provider) ?? match ($provider) {
+            'openai'    => 'gpt-5-mini',
+            'anthropic' => 'claude-sonnet-4-5',
+            'gemini'    => 'gemini-2.0-flash',
+            default     => 'unknown',
+        });
     }
 
     /**

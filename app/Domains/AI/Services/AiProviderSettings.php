@@ -20,6 +20,22 @@ class AiProviderSettings
     public const SETTING_KEY = 'ai.enabled_providers';
 
     /**
+     * Papéis EXPLÍCITOS definidos no painel do Manager: quem é o principal
+     * (gerador), o revisor e o árbitro (adjudicador). Tem precedência sobre a
+     * lista ordenada legada — que permanece sincronizada para retrocompat.
+     */
+    public const ROLES_SETTING_KEY = 'ai.provider_roles';
+
+    public const ROLE_KEYS = ['primary', 'reviewer', 'adjudicator'];
+
+    /**
+     * Modelos escolhidos no painel por provedor ({openai: 'gpt-4o', ...}).
+     * O TOKEN continua no .env (segredo); o MODELO é operação do dia a dia —
+     * editável pelo admin do SaaS sem deploy. Fallback: config/ai.php (env).
+     */
+    public const MODELS_SETTING_KEY = 'ai.provider_models';
+
+    /**
      * Códigos de provedores habilitados, na ordem de prioridade, já filtrados
      * para provedores conhecidos e configurados (com credencial + modelo).
      *
@@ -27,7 +43,7 @@ class AiProviderSettings
      */
     public function enabledCodes(): array
     {
-        $codes = $this->rawEnabledCodes();
+        $codes = $this->rawOrderedCodes();
 
         // Mantém só os provedores CONHECIDOS, sem duplicar, preservando a ordem.
         // Com runtime REAL, também exige credencial: um provedor habilitado que
@@ -191,17 +207,82 @@ class AiProviderSettings
     public function isConfigured(string $code): bool
     {
         return filled(config("services.{$code}.api_key"))
-            && filled(config("ai.providers.{$code}.model"));
+            && $this->model($code) !== null;
     }
 
     /**
-     * Modelo configurado para um provedor (read-only; vem de env/config).
+     * Modelo EFETIVO de um provedor: escolha do painel (system_settings) com
+     * fallback para env/config. Fonte única — providers e estimativa leem daqui.
      */
     public function model(string $code): ?string
     {
+        $fromPanel = $this->panelModels()[$code] ?? null;
+
+        if ($fromPanel !== null) {
+            return $fromPanel;
+        }
+
         $model = config("ai.providers.{$code}.model");
 
         return is_string($model) && $model !== '' ? $model : null;
+    }
+
+    /**
+     * Modelos salvos pelo painel (sem fallback), validados por provedor.
+     *
+     * @return array<string, string>
+     */
+    public function panelModels(): array
+    {
+        $raw     = SubscriptionSetting::getValue(self::MODELS_SETTING_KEY);
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($decoded as $code => $model) {
+            $code = is_string($code) ? mb_strtolower(trim($code)) : '';
+
+            if ($code === '' || AiProvider::tryFrom($code) === null) {
+                continue;
+            }
+
+            if (is_string($model) && trim($model) !== '') {
+                $out[$code] = trim($model);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Persiste os modelos do painel (parcial: só os provedores presentes;
+     * valor vazio/null remove a escolha e volta ao fallback do env).
+     *
+     * @param array<string, ?string> $models
+     */
+    public function setModels(array $models): void
+    {
+        $current = $this->panelModels();
+
+        foreach ($models as $code => $model) {
+            $code = is_string($code) ? mb_strtolower(trim($code)) : '';
+
+            if ($code === '' || AiProvider::tryFrom($code) === null) {
+                continue;
+            }
+
+            if (is_string($model) && trim($model) !== '') {
+                $current[$code] = trim($model);
+            } else {
+                unset($current[$code]);
+            }
+        }
+
+        SubscriptionSetting::setValue(self::MODELS_SETTING_KEY, json_encode($current));
     }
 
     /**
@@ -223,6 +304,101 @@ class AiProviderSettings
         }
 
         SubscriptionSetting::setValue(self::SETTING_KEY, json_encode(array_values($clean)));
+    }
+
+    /**
+     * Papéis explícitos como salvos pelo painel (sem filtro de credencial).
+     * Ausente/inválido → deriva da lista ordenada legada (índices 0/1/2).
+     *
+     * @return array{primary: ?string, reviewer: ?string, adjudicator: ?string}
+     */
+    public function roleAssignments(): array
+    {
+        $raw = SubscriptionSetting::getValue(self::ROLES_SETTING_KEY);
+
+        $decoded = is_array($raw) ? $raw : json_decode((string) $raw, true);
+
+        if (is_array($decoded)) {
+            $out  = ['primary' => null, 'reviewer' => null, 'adjudicator' => null];
+            $seen = [];
+
+            foreach (self::ROLE_KEYS as $key) {
+                $code = $decoded[$key] ?? null;
+                $code = is_string($code) ? mb_strtolower(trim($code)) : '';
+
+                if ($code === '' || isset($seen[$code]) || AiProvider::tryFrom($code) === null) {
+                    continue;
+                }
+
+                $seen[$code] = true;
+                $out[$key]   = $code;
+            }
+
+            if ($out['primary'] !== null) {
+                return $out;
+            }
+        }
+
+        // Legado: a ordem da lista habilitada define os papéis. Saneia
+        // (códigos válidos, sem duplicar) ANTES de fatiar os 3 primeiros —
+        // um código inválido no meio não pode "roubar" um papel.
+        $legacy = [];
+
+        foreach ($this->rawEnabledCodes() as $code) {
+            $code = is_string($code) ? mb_strtolower(trim($code)) : '';
+
+            if ($code !== '' && AiProvider::tryFrom($code) !== null && ! in_array($code, $legacy, true)) {
+                $legacy[] = $code;
+            }
+        }
+
+        return [
+            'primary'     => $legacy[0] ?? null,
+            'reviewer'    => $legacy[1] ?? null,
+            'adjudicator' => $legacy[2] ?? null,
+        ];
+    }
+
+    /**
+     * Persiste os papéis explícitos e sincroniza a lista legada (retrocompat).
+     * A invalidação de cache é imediata (SubscriptionSetting::setValue faz
+     * Cache::forget num store compartilhado) — a mudança vale para todos os
+     * clientes no request seguinte, sem deploy nem mexer em .env.
+     *
+     * @param array{primary: ?string, reviewer: ?string, adjudicator: ?string} $roles
+     */
+    public function setRoleAssignments(array $roles): void
+    {
+        $clean = ['primary' => null, 'reviewer' => null, 'adjudicator' => null];
+        $seen  = [];
+
+        foreach (self::ROLE_KEYS as $key) {
+            $code = $roles[$key] ?? null;
+            $code = is_string($code) ? mb_strtolower(trim($code)) : '';
+
+            if ($code === '' || isset($seen[$code]) || AiProvider::tryFrom($code) === null) {
+                continue;
+            }
+
+            $seen[$code] = true;
+            $clean[$key] = $code;
+        }
+
+        SubscriptionSetting::setValue(self::ROLES_SETTING_KEY, json_encode($clean));
+
+        // Lista legada espelha os papéis na ordem primary→reviewer→adjudicator.
+        $this->setEnabledCodes(array_values(array_filter($clean)));
+    }
+
+    /**
+     * Lista ordenada papel→provedor (primary, reviewer, adjudicator), fonte
+     * dos enabledCodes(). Papel vazio simplesmente não entra na lista.
+     *
+     * @return list<string>
+     */
+    private function rawOrderedCodes(): array
+    {
+        return array_values(array_filter($this->roleAssignments()));
     }
 
     /**

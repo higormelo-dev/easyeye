@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
+use App\Domains\AI\Services\AiProviderSettings;
 use App\Domains\AI\Support\ProviderErrorSanitizer;
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\AiProvider;
@@ -238,7 +239,9 @@ class OpenAiProvider implements AiProviderInterface
 
     private function model(): string
     {
-        return (string) config('ai.providers.openai.model', 'gpt-5-mini');
+        // Modelo efetivo: escolha do painel do Manager com fallback pro env.
+        return (string) (app(AiProviderSettings::class)->model('openai')
+            ?? config('ai.providers.openai.model', 'gpt-5-mini'));
     }
 
     private function apiKey(): string
