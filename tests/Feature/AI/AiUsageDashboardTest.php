@@ -1,7 +1,6 @@
 <?php
 
-use App\Domains\AI\Models\{AiCreditLedgerEntry, AiRun};
-use App\Domains\AI\Services\AiCreditWalletService;
+use App\Domains\AI\Models\{AiRun};
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
 use App\Models\{Entity, Plan, PlanFeature, Subscription, User};
@@ -47,86 +46,55 @@ function aiRunFor(Entity $entity, User $user, AiRunStatus $status, int $consumed
 test('dashboard responde Inertia para membro autorizado', function () {
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
     $response->assertOk();
-    $response->assertJsonPath('component', 'Panel/AI/Dashboard');
+    $response->assertJsonPath('component', 'Panel/AI/Index');
 });
 
 test('dashboard expõe plan_quota lida da feature do plano', function () {
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
-    $response->assertJsonPath('props.plan_quota', 100);
+    $response->assertJsonPath('props.analytics.plan_quota', 100);
 });
 
-test('dashboard agrega consumo mensal pelo ledger (type=consume) no período corrente', function () {
-    // Run com consumed_credits alto NÃO deve influenciar o dashboard quando não
-    // existe lançamento consume correspondente no ledger no período.
-    $run = aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 999);
+test('dashboard agrega consumo mensal por runs decididos do período (AiQuotaService)', function () {
+    // Run fora do mês corrente não entra no consumo do período.
+    $old = aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 20);
+    AiRun::query()->whereKey($old->id)->update([
+        'created_at' => now()->subMonth(),
+        'updated_at' => now()->subMonth(),
+    ]);
 
-    $wallet = app(AiCreditWalletService::class);
-
-    $wallet->reserve(
-        entityId: $this->entity->id,
-        amount: 20,
-        aiRunId: (string) $run->id,
-        idempotencyKey: 'dash-ledger-reserve-old',
-    );
-    $oldConsume = $wallet->consumeReservation(
-        entityId: $this->entity->id,
-        amount: 20,
-        aiRunId: (string) $run->id,
-        idempotencyKey: 'dash-ledger-consume-old',
-    );
-
-    // Simula consumo fora do mês corrente.
-    AiCreditLedgerEntry::query()
-        ->whereKey($oldConsume->id)
-        ->update([
-            'created_at' => now()->subMonth(),
-            'updated_at' => now()->subMonth(),
-        ]);
-
-    $wallet->reserve(
-        entityId: $this->entity->id,
-        amount: 45,
-        aiRunId: (string) $run->id,
-        idempotencyKey: 'dash-ledger-reserve-current',
-    );
-    $wallet->consumeReservation(
-        entityId: $this->entity->id,
-        amount: 45,
-        aiRunId: (string) $run->id,
-        idempotencyKey: 'dash-ledger-consume-current',
-    );
+    aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 45);
+    // Failed não conta consumo.
+    aiRunFor($this->entity, $this->admin, AiRunStatus::Failed, 30);
 
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
-    $response->assertJsonPath('props.consumed.this_month', 45);
-    $response->assertJsonPath('props.consumed.usage_percent', 45);
+    $response->assertJsonPath('props.analytics.consumed.credits', 45);
+    expect($response->json('props.analytics.consumed.usage_percent'))->toEqual(45.0);
 });
 
 test('dashboard distribui consumo por workflow', function () {
     aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 40, 'report_drafting');
+    aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 30, 'report_drafting');
     aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 10, 'exam_assistant');
 
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
-    $by_workflow = $response->json('props.by_workflow');
+    $byWorkflow = collect($response->json('props.analytics.by_workflow'))->keyBy('workflow');
 
-    expect($by_workflow)->toHaveCount(2);
-    expect($by_workflow[0]['workflow'])->toBe('report_drafting');
-    expect($by_workflow[0]['credits'])->toBe(40);
-    // JSON serializa 80.0 como 80 (sem zero decimal). Comparação loose via toEqual.
-    expect($by_workflow[0]['percent'])->toEqual(80.0);
-    expect($by_workflow[1]['workflow'])->toBe('exam_assistant');
-    expect($by_workflow[1]['percent'])->toEqual(20.0);
+    expect($byWorkflow)->toHaveCount(2);
+    expect($byWorkflow['report_drafting']['runs_count'])->toBe(2);
+    expect($byWorkflow['report_drafting']['credits_total'])->toBe(70);
+    expect($byWorkflow['exam_assistant']['credits_total'])->toBe(10);
 });
 
 test('dashboard agrega consumo por modo sem expor provedores internos', function () {
@@ -140,19 +108,17 @@ test('dashboard agrega consumo por modo sem expor provedores internos', function
 
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
-    $response->assertJsonMissingPath('props.by_provider');
+    $response->assertJsonMissingPath('props.analytics.by_provider');
 
-    $byMode = collect($response->json('props.by_mode'))->keyBy('mode');
+    $byMode = collect($response->json('props.analytics.by_mode'))->keyBy('mode');
 
-    expect($byMode[AiRunMode::Validated->value]['runs'])->toBe(1);
-    expect($byMode[AiRunMode::Validated->value]['credits'])->toBe(30);
-    expect($byMode[AiRunMode::Consensus->value]['runs'])->toBe(1);
-    expect($byMode[AiRunMode::Consensus->value]['credits'])->toBe(10);
+    expect($byMode[AiRunMode::Validated->value]['runs_count'])->toBe(1);
+    expect($byMode[AiRunMode::Consensus->value]['runs_count'])->toBe(1);
 });
 
-test('dashboard calcula approval_rate considerando só runs decididos', function () {
+test('dashboard calcula approval rate considerando só runs decididos', function () {
     aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 10);
     aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 10);
     aiRunFor($this->entity, $this->admin, AiRunStatus::Approved, 10);
@@ -162,14 +128,13 @@ test('dashboard calcula approval_rate considerando só runs decididos', function
 
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
-    $response->assertJsonPath('props.approval.approved', 3);
-    $response->assertJsonPath('props.approval.rejected', 1);
-    $response->assertJsonPath('props.approval.waiting', 1);
-    $response->assertJsonPath('props.approval.failed', 1);
-    // approval_rate = approved / (approved + rejected) = 3/4 = 75% (loose via toEqual).
-    expect($response->json('props.approval.approval_rate'))->toEqual(75.0);
+    $response->assertJsonPath('props.analytics.approval.approved', 3);
+    $response->assertJsonPath('props.analytics.approval.rejected', 1);
+    $response->assertJsonPath('props.analytics.approval.total', 4);
+    // rate = approved / (approved + rejected) = 3/4 = 75%.
+    expect($response->json('props.analytics.approval.rate'))->toEqual(75.0);
 });
 
 test('dashboard top_runs vem ordenado desc por consumed_credits', function () {
@@ -179,27 +144,27 @@ test('dashboard top_runs vem ordenado desc por consumed_credits', function () {
 
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
-    $top = $response->json('props.top_runs');
+    $top = $response->json('props.analytics.top_runs');
 
-    expect($top[0]['credits'])->toBe(50);
-    expect($top[1]['credits'])->toBe(25);
-    expect($top[2]['credits'])->toBe(5);
+    expect($top[0]['consumed_credits'])->toBe(50);
+    expect($top[1]['consumed_credits'])->toBe(25);
+    expect($top[2]['consumed_credits'])->toBe(5);
 });
 
 test('dashboard isola dados por entity (cross-tenant)', function () {
-    // Cria outra entity com runs — não devem aparecer no dashboard da entity atual.
+    // Runs de outra entity não aparecem no dashboard da entity atual.
     $other     = Entity::factory()->create(['is_client' => true, 'active' => true]);
     $otherUser = User::factory()->create();
     aiRunFor($other, $otherUser, AiRunStatus::Approved, 999);
 
     $response = $this->actingAs($this->admin)
         ->withSession(panelSession($this->adminEU))
-        ->get(route('panel.ai-runs.dashboard'), inertiaHeaders());
+        ->get(route('panel.ai-runs.index'), inertiaHeaders());
 
-    $response->assertJsonPath('props.consumed.this_month', 0);
-    expect($response->json('props.top_runs'))->toBe([]);
+    $response->assertJsonPath('props.analytics.consumed.credits', 0);
+    expect($response->json('props.analytics.top_runs'))->toBe([]);
 });
 
 test('dashboard bloqueia quando feature de IA não está habilitada no plano', function () {
@@ -221,7 +186,7 @@ test('dashboard bloqueia quando feature de IA não está habilitada no plano', f
 
     $this->actingAs($admin)
         ->withSession(panelSession($adminEU))
-        ->getJson(route('panel.ai-runs.dashboard'))
+        ->getJson(route('panel.ai-runs.index'))
         ->assertForbidden();
 });
 

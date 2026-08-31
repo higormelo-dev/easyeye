@@ -38,6 +38,16 @@ class AiModelPriceSeeder extends Seeder
                 'tool_call_usd'             => null,
             ],
             [
+                // Default de config/ai.php (AI_OPENAI_MODEL) — precisa de preço
+                // cadastrado ou a liquidação lança AiModelPriceNotFoundException.
+                'provider'                  => AiProvider::OpenAI->value,
+                'model'                     => 'gpt-5-mini',
+                'input_usd_per_million'     => 0.25,
+                'output_usd_per_million'    => 2.00,
+                'reasoning_usd_per_million' => 2.00,
+                'tool_call_usd'             => null,
+            ],
+            [
                 'provider'                  => AiProvider::OpenAI->value,
                 'model'                     => 'o1',
                 'input_usd_per_million'     => 15.00,
@@ -58,6 +68,15 @@ class AiModelPriceSeeder extends Seeder
             [
                 'provider'                  => AiProvider::Anthropic->value,
                 'model'                     => 'claude-3-5-sonnet-20241022',
+                'input_usd_per_million'     => 3.00,
+                'output_usd_per_million'    => 15.00,
+                'reasoning_usd_per_million' => null,
+                'tool_call_usd'             => null,
+            ],
+            [
+                // Default de config/ai.php (AI_ANTHROPIC_MODEL).
+                'provider'                  => AiProvider::Anthropic->value,
+                'model'                     => 'claude-sonnet-4-5',
                 'input_usd_per_million'     => 3.00,
                 'output_usd_per_million'    => 15.00,
                 'reasoning_usd_per_million' => null,

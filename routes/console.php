@@ -64,6 +64,13 @@ Schedule::command('ai:purge-feedbacks')
     ->name('ai:purge-feedbacks')
     ->withoutOverlapping();
 
+// Runs de IA presos (worker parado/job perdido) prendem créditos reservados —
+// expira e devolve a reserva (compensateFailedRun é idempotente).
+Schedule::command('ai:expire-stale-runs')
+    ->hourly()
+    ->name('ai:expire-stale-runs')
+    ->withoutOverlapping();
+
 // WhatsApp (Z-API) — confirmação de consulta: roda de hora em hora dentro do
 // horário comercial; a idempotência é do banco (1 confirmação por consulta),
 // então repetição nunca duplica mensagem. Horário restrito por respeito ao

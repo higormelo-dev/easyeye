@@ -6,7 +6,7 @@ namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Contracts\AiRunRepositoryInterface;
 use App\Domains\AI\Exceptions\AiRunCancelledException;
-use App\Domains\AI\Models\AiRun;
+use App\Domains\AI\Models\{AiCreditLedgerEntry, AiRun};
 use App\DTOs\AI\AiRequestData;
 use App\Enums\AI\{AiRiskLevel, AiRunStatus};
 use App\Models\PatientExam;
@@ -252,16 +252,55 @@ class AiRunExecutionService
             return;
         }
 
+        // A falha pode ocorrer DEPOIS da liquidação normal (consume + release
+        // da sobra já commitados — ex.: markWaitingApproval estourou). Liberar
+        // a reserva INTEIRA aqui devolveria créditos de chamadas de provider já
+        // pagas (a idempotency key desta liberação é outra, então não protege).
+        // Desconta o que o ledger deste run já resolveu.
+        $settled   = $this->settledCreditsFromLedger($run);
+        $remaining = max(0, $reservedCredits - $settled);
+
+        if ($remaining <= 0) {
+            return;
+        }
+
         try {
             $this->walletService->releaseReservation(
                 entityId: (string) $run->entity_id,
-                amount: $reservedCredits,
+                amount: $remaining,
                 aiRunId: (string) $run->id,
                 idempotencyKey: "ai-run:{$run->id}:release-on-failure",
-                metadata: ['reason' => 'workflow_failed'],
+                metadata: ['reason' => 'workflow_failed', 'settled_before_failure' => $settled],
             );
         } catch (Throwable) {
             // Evita mascarar a falha principal da execução.
         }
+    }
+
+    /**
+     * Soma o que a liquidação normal deste run já resolveu da reserva:
+     * consumo definitivo (metadata.consumed_from_reservation — a entry Consume
+     * grava amount 0) e liberação de sobra (amount da entry Release).
+     */
+    private function settledCreditsFromLedger(AiRun $run): int
+    {
+        $entries = AiCreditLedgerEntry::query()
+            ->withoutGlobalScopes()
+            ->where('entity_id', $run->entity_id)
+            ->whereIn('idempotency_key', [
+                "ai-run:{$run->id}:consume",
+                "ai-run:{$run->id}:release",
+            ])
+            ->get(['idempotency_key', 'amount', 'metadata']);
+
+        $settled = 0;
+
+        foreach ($entries as $entry) {
+            $settled += $entry->idempotency_key === "ai-run:{$run->id}:consume"
+                ? (int) data_get($entry->metadata, 'consumed_from_reservation', 0)
+                : abs((int) $entry->amount);
+        }
+
+        return $settled;
     }
 }

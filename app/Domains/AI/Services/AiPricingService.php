@@ -133,7 +133,7 @@ class AiPricingService
      */
     public function normalizeCreditsForResponse(AiProviderResponseData $response): int
     {
-        $rawCostUsd = (float) ($response->usage->rawCostUsd ?? 0.0);
+        $rawCostUsd = (float) ($this->resolveCostUsdForResponse($response) ?? 0.0);
 
         if ($rawCostUsd <= 0.0) {
             return 0;
@@ -143,6 +143,39 @@ class AiPricingService
         $usdPerCredit     = max(0.000001, (float) config('ai.pricing.usd_per_credit', 0.01));
 
         return (int) ceil(($rawCostUsd * $marginMultiplier) / $usdPerCredit);
+    }
+
+    /**
+     * Custo USD de UMA chamada: usa o valor reportado pelo provider ou cai na
+     * tabela de preços. Providers reais nunca reportam custo (rawCostUsd null),
+     * então sem este fallback ai_run_provider_calls.raw_cost_usd ficava null e
+     * o dashboard de custo/finanças da plataforma somava sempre US$ 0.
+     * Retorna null quando o modelo não tem preço cadastrado (não lança).
+     */
+    public function resolveCostUsdForResponse(AiProviderResponseData $response): ?float
+    {
+        if ($response->usage->rawCostUsd !== null) {
+            return (float) $response->usage->rawCostUsd;
+        }
+
+        try {
+            $price = $this->resolvePrice($response->provider, $response->model);
+        } catch (AiModelPriceNotFoundException) {
+            return null;
+        }
+
+        return $this->calculateCostFromPriceRow(
+            inputTokens: $response->usage->inputTokens,
+            outputTokens: $response->usage->outputTokens,
+            reasoningTokens: $response->usage->reasoningTokens,
+            toolCallsCount: $response->usage->toolCallsCount,
+            price: $price,
+        );
+    }
+
+    public function hasPriceFor(AiProvider $provider, string $model): bool
+    {
+        return $this->priceRepository->findActive($provider, $model) !== null;
     }
 
     private function resolvePrice(AiProvider $provider, string $model): AiModelPrice

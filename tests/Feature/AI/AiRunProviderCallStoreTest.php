@@ -1,12 +1,9 @@
 <?php
 
-use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Models\AiRunProviderCall;
+use App\Domains\AI\Models\{AiRun, AiRunProviderCall};
 use App\Domains\AI\Repositories\EloquentAiRunProviderCallStore;
-use App\DTOs\AI\AiProviderResponseData;
-use App\DTOs\AI\AiUsageData;
-use App\Enums\AI\AiProvider;
-use App\Enums\AI\AiProviderCallRole;
+use App\DTOs\AI\{AiProviderResponseData, AiUsageData};
+use App\Enums\AI\{AiProvider, AiProviderCallRole};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -30,7 +27,7 @@ test('store persiste call com response completa (success path)', function () {
         responseHash: hash('sha256', 'res'),
     );
 
-    (new EloquentAiRunProviderCallStore())->store(
+    app(EloquentAiRunProviderCallStore::class)->store(
         aiRunId: (string) $run->id,
         role: AiProviderCallRole::Generator,
         status: 'success',
@@ -60,7 +57,7 @@ test('store persiste call com response completa (success path)', function () {
 test('store persiste call com response=null (provider falhou antes de responder)', function () {
     $run = AiRun::factory()->create();
 
-    (new EloquentAiRunProviderCallStore())->store(
+    app(EloquentAiRunProviderCallStore::class)->store(
         aiRunId: (string) $run->id,
         role: AiProviderCallRole::Reviewer,
         status: 'failed',
@@ -82,4 +79,3 @@ test('store persiste call com response=null (provider falhou antes de responder)
     expect($call->normalized_credits)->toBeNull();
     expect($call->error_message)->toBe('Timeout na chamada ao provider Anthropic.');
 });
-

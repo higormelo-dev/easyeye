@@ -30,10 +30,13 @@ class AiProviderSettings
         $codes = $this->rawEnabledCodes();
 
         // Mantém só os provedores CONHECIDOS, sem duplicar, preservando a ordem.
-        // A validação de "configurado" (tem credencial) NÃO é aplicada aqui de
-        // propósito: ela é responsabilidade da camada administrativa ao habilitar
-        // um provedor; o runtime (e o modo fake/testes) não deve descartar
-        // provedores por falta de chave.
+        // Com runtime REAL, também exige credencial: um provedor habilitado que
+        // perdeu a chave (removida do env após a habilitação no Manager) lançava
+        // em toda chamada — call 'failed' por run, latência extra e circuit
+        // breaker abrindo por motivo de configuração, não de saúde do provedor.
+        // No modo fake/testes a lista crua é preservada (fakes não usam chave).
+        $requireKey = config('ai.provider_runtime') === 'real';
+
         $seen   = [];
         $result = [];
 
@@ -43,13 +46,29 @@ class AiProviderSettings
             if ($code === '' || isset($seen[$code]) || AiProvider::tryFrom($code) === null) {
                 continue;
             }
+
+            if ($requireKey && ! $this->isConfigured($code)) {
+                continue;
+            }
+
             $seen[$code] = true;
             $result[]    = $code;
         }
 
-        // Salvaguarda: nunca deixar o sistema sem nenhum provedor.
+        // Salvaguarda: nunca deixar o sistema sem nenhum provedor. Aplica o
+        // mesmo filtro de credencial ao fallback; se nem o fallback tem chave,
+        // devolve a lista crua (o painel continua de pé e o erro de chave
+        // aparece na execução — cenário de ambiente sem nenhuma credencial).
         if ($result === []) {
-            return $this->configFallbackOrder();
+            $fallback = $this->configFallbackOrder();
+
+            if ($requireKey) {
+                $configured = array_values(array_filter($fallback, fn (string $c) => $this->isConfigured($c)));
+
+                return $configured !== [] ? $configured : $fallback;
+            }
+
+            return $fallback;
         }
 
         return $result;

@@ -97,7 +97,9 @@ test('execution service libera reserva e marca failed quando ocorre erro', funct
         ->toThrow(RuntimeException::class, 'falha de execução');
 
     expect($run->status)->toBe(AiRunStatus::Failed);
-    expect((string) $run->error_message)->toContain('falha de execução');
+    // O médico recebe mensagem GENÉRICA — o erro interno não vaza para a UI
+    // (decisão da reformulação do assistente; o detalhe fica em log/metadata).
+    expect((string) $run->error_message)->toContain('Não foi possível concluir a análise');
 });
 
 test('execution service quando actual > reserved adiciona safety note e não consome extra', function () {

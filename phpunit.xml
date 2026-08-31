@@ -20,6 +20,10 @@
     <php>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="AI_PROVIDER_RUNTIME" value="fake"/>
+        <env name="AI_PRIMARY_PROVIDER" value="openai"/>
+        <env name="AI_REVIEWER_PROVIDER" value="anthropic"/>
+        <env name="AI_ADJUDICATOR_PROVIDER" value="gemini"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>

@@ -66,6 +66,18 @@ class AiRunEstimateService
             ];
         }
 
+        // Um único modelo sem preço cadastrado não pode colapsar a estimativa
+        // inteira para "só mínimo" — remove apenas os sem preço e estima com
+        // os demais; o catch abaixo segue cobrindo o caso de NENHUM ter preço.
+        $priced = array_values(array_filter(
+            $providerEstimates,
+            fn (array $e) => $this->pricingService->hasPriceFor($e['provider'], (string) $e['model']),
+        ));
+
+        if ($priced !== [] && count($priced) < count($providerEstimates)) {
+            $providerEstimates = $priced;
+        }
+
         try {
             return $this->pricingService->estimateCredits(
                 workflow: $workflow,
