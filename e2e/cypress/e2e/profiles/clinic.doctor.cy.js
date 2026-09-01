@@ -449,6 +449,22 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
     });
     cy.get('body').type('{esc}');
 
+    // ── Exames de imagem (módulo Eye Images dentro do prontuário) ──────────
+    // O modal de anexo não fecha com Esc — fechar pelo botão "Fechar".
+    cy.get('.modal.d-block:visible').last().within(() => {
+      cy.contains('button', 'Fechar').click();
+    });
+    cy.get('.upload-dropzone').should('not.exist');
+    cy.intercept('GET', '**/eye-images/patient-exams/**').as('eyeExams');
+    cy.contains('.pmr-doc-img-btn-label', /Exames de/).first().closest('button')
+      .click({ force: true });
+    cy.wait('@eyeExams').its('response.statusCode').should('eq', 200);
+    // CY-DOC não tem exames — estado vazio do painel.
+    cy.contains(/Nenhum exame de imagem/, { timeout: 10000 }).should('be.visible');
+    cy.get('body').type('{esc}');
+    cy.get('.modal.d-block .btn-close').first().click({ force: true });
+    cy.wait(300);
+
     // ── Assistente de IA ───────────────────────────────────────────────────
     cy.get('.ai-fab', { timeout: 10000 }).should('be.visible').click();
     cy.get('.ai-floating-assistant', { timeout: 10000 })

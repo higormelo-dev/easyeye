@@ -168,6 +168,8 @@ Route::group(
         Route::get('/eye-images', [EyeImagesController::class, 'index'])->name('eye-images.index');
         Route::get('/eye-images/search', [EyeImagesController::class, 'search'])->name('eye-images.search');
         Route::get('/eye-images/patient-urls/{patient}', [EyeImagesController::class, 'patientExamUrls'])->name('eye-images.patient-urls');
+        // Exames com metadados p/ o painel do PRONTUÁRIO (leitura logada — LGPD).
+        Route::get('/eye-images/patient-exams/{patient}', [EyeImagesController::class, 'patientExamsForRecord'])->name('eye-images.patient-exams');
         Route::get('/eye-images/image-url/{exam}', [EyeImagesController::class, 'imageUrl'])->name('eye-images.image-url');
         // Duplicata dedicada da busca de CID-10 (mesmo Cid10SearchController) sem a
         // restrição de role de `cid10.search` (admin,doctor,secretary) — o Gerenciador

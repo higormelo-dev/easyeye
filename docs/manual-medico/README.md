@@ -8,7 +8,7 @@ pacientes e conta.
 > As capturas são geradas automaticamente a partir do sistema real
 > (`e2e/cypress/e2e/docs/doctor-manual.cy.js`). Para atualizá-las após mudanças de tela:
 > `php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"` e depois
-> `cd e2e && npx cypress run --browser chrome --spec cypress/e2e/docs/doctor-manual.cy.js`;
+> `cd e2e && npx cypress run --browser chrome --config excludeSpecPattern=__none__ --spec cypress/e2e/docs/doctor-manual.cy.js`;
 > copie as imagens de `e2e/cypress/screenshots/doctor-manual.cy.js/` para
 > `docs/manual-medico/img/` e finalize com
 > `php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`.
@@ -146,6 +146,20 @@ os dados do prontuário e busca **CID-10** integrada:
 
 Todos os documentos emitidos geram **PDF** com o padrão visual da clínica e ficam
 listados no prontuário.
+
+### Exames de imagem do paciente
+
+O botão **Exames de imagem** (barra de documentações) abre os exames do módulo de
+Imagens Oftálmicas do paciente em atendimento — retinografias, OCTs e demais imagens,
+com tipo, data, olho (OD/OE/AO) e CIDs — sem sair da consulta:
+
+![Exames de imagem no prontuário](img/22-exames-imagem.png)
+
+- Clique numa miniatura à direita para ampliar; **Original** baixa o arquivo (ou o PDF
+  do laudo).
+- **Abrir módulo de imagens** leva ao visualizador completo (até 4 painéis comparativos).
+- Disponível já ao **iniciar o atendimento**, antes mesmo de salvar o prontuário.
+- Cada consulta a essas imagens é registrada na trilha de acesso (LGPD).
 
 ---
 

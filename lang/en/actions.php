@@ -417,6 +417,16 @@ return [
     ],
 
     'medical_records' => [
+        'imaging_error'          => 'Could not load the exams. Try again.',
+        'imaging_empty'          => 'No imaging exams registered for this patient.',
+        'imaging_exam'           => 'Exam',
+        'imaging_exams_short'    => 'Imaging',
+        'imaging_exams_short2'   => 'exams',
+        'imaging_loading'        => 'Loading exams…',
+        'imaging_no_preview'     => 'No preview — use the original file.',
+        'imaging_open_module'    => 'Open imaging module',
+        'imaging_original'       => 'Original',
+        'imaging_title'          => 'Patient imaging exams',
         'create_hint_after'  => 'to start editing the record.',
         'create_hint_before' => 'Fill in at least the',
         'create_hint_middle' => 'and click',

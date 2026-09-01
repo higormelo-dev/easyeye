@@ -420,6 +420,16 @@ return [
     ],
 
     'medical_records' => [
+        'imaging_error'          => 'Não foi possível carregar os exames. Tente novamente.',
+        'imaging_empty'          => 'Nenhum exame de imagem cadastrado para este paciente.',
+        'imaging_exam'           => 'Exame',
+        'imaging_exams_short'    => 'Exames de',
+        'imaging_exams_short2'   => 'imagem',
+        'imaging_loading'        => 'Carregando exames…',
+        'imaging_no_preview'     => 'Sem visualização — use o arquivo original.',
+        'imaging_open_module'    => 'Abrir módulo de imagens',
+        'imaging_original'       => 'Original',
+        'imaging_title'          => 'Exames de imagem do paciente',
         'create_hint_after'  => 'para começar a editar o prontuário.',
         'create_hint_before' => 'Preencha pelo menos a',
         'create_hint_middle' => 'e clique em',

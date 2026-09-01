@@ -8,7 +8,7 @@ relatórios.
 > As capturas são geradas automaticamente a partir do sistema real
 > (`e2e/cypress/e2e/docs/financial-manual.cy.js`). Para atualizá-las após mudanças de tela:
 > `php artisan tinker --execute="require 'e2e/scripts/seed-docs-financial.php';"` e depois
-> `cd e2e && npx cypress run --browser chrome --spec cypress/e2e/docs/financial-manual.cy.js`;
+> `cd e2e && npx cypress run --browser chrome --config excludeSpecPattern=__none__ --spec cypress/e2e/docs/financial-manual.cy.js`;
 > copie as imagens de `e2e/cypress/screenshots/financial-manual.cy.js/` para
 > `docs/manual-financeiro/img/` e finalize com
 > `php artisan tinker --execute="require 'e2e/scripts/clean-docs-financial.php';"`.

@@ -11,6 +11,7 @@ use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\FeatureKey;
 use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, Patient, PatientExam};
 use App\Services\FeatureGateService;
+use App\Traits\LogsDataAccess;
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, Collection};
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -22,6 +23,8 @@ use Inertia\{Inertia, Response as InertiaResponse};
 
 class EyeImagesController extends Controller
 {
+    use LogsDataAccess;
+
     public function __construct(
         private readonly FeatureGateService $featureGate,
         private readonly AiProviderSettings $providerSettings,
@@ -220,16 +223,16 @@ class EyeImagesController extends Controller
         // a 1ª página de laudos PDF), senão o original — compatível com o
         // front atual. `thumb_urls` (grid): miniatura com o mesmo fallback.
         // `original_urls`: sempre o arquivo original (baixar laudo PDF etc.).
-        $urls = [];
-        $thumbUrls = [];
+        $urls         = [];
+        $thumbUrls    = [];
         $originalUrls = [];
 
         foreach ($exams as $exam) {
             $original = $temporary($exam->archive);
-            $display = $temporary($exam->display_archive);
+            $display  = $temporary($exam->display_archive);
 
-            $urls[$exam->id] = $display ?? $original;
-            $thumbUrls[$exam->id] = $temporary($exam->thumb_archive) ?? $display ?? $original;
+            $urls[$exam->id]         = $display ?? $original;
+            $thumbUrls[$exam->id]    = $temporary($exam->thumb_archive) ?? $display ?? $original;
             $originalUrls[$exam->id] = $original;
         }
 
@@ -238,6 +241,52 @@ class EyeImagesController extends Controller
             'thumb_urls'    => $thumbUrls,
             'original_urls' => $originalUrls,
         ]);
+    }
+
+    /**
+     * Exames de imagem do paciente COM metadados + URLs — consumido pelo
+     * painel "Exames de imagem" do PRONTUÁRIO (o patientExamUrls acima serve
+     * o viewer do módulo e devolve só os mapas de URLs). Registra o acesso
+     * de leitura (LGPD art. 37 / CFM): quem consultou as imagens de quem.
+     */
+    public function patientExamsForRecord(Patient $patient): JsonResponse
+    {
+        $entityId = session('selected_entity_id');
+        abort_unless($patient->entity_id === $entityId, 403);
+
+        $this->logAccess($patient, patientId: (string) $patient->id);
+
+        $exams = $patient->exams()
+            ->whereNotNull('archive')
+            ->with(['examType:id,name', 'doctor.person:id,full_name'])
+            ->orderByDesc('exam_performed_at')
+            ->orderByDesc('created_at')
+            ->get();
+
+        $temporary = fn (?string $path, int $hours = 2) => $path
+            ? Storage::disk('s3')->temporaryUrl($path, now()->addHours($hours))
+            : null;
+
+        $items = $exams->map(function (PatientExam $exam) use ($temporary): array {
+            $original = $temporary($exam->archive);
+            $display  = $temporary($exam->display_archive);
+
+            return [
+                'id'           => (string) $exam->id,
+                'exam_type'    => $exam->examType?->name,
+                'performed_at' => ($exam->exam_performed_at ?? $exam->created_at)?->format('d/m/Y'),
+                'laterality'   => [1 => 'OD', 2 => 'OE'][$exam->laterality] ?? 'AO',
+                'source'       => $exam->is_external ? ($exam->external_origin ?: 'Importado') : null,
+                'diagnosis'    => collect((array) $exam->diagnosis_cids)
+                    ->pluck('code')->filter()->values()->all(),
+                'is_pdf'       => str_ends_with(mb_strtolower((string) $exam->archive), '.pdf'),
+                'thumb_url'    => $temporary($exam->thumb_archive) ?? $display ?? $original,
+                'display_url'  => $display ?? $original,
+                'original_url' => $original,
+            ];
+        })->values()->all();
+
+        return response()->json(['exams' => $items]);
     }
 
     public function imageUrl(PatientExam $exam): JsonResponse

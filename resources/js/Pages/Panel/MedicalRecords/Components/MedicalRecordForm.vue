@@ -7,6 +7,7 @@ import TinyMceEditor   from '@/Components/Panel/TinyMceEditor.vue';
 import SearchSelect    from '@/Components/Panel/SearchSelect.vue';
 import AcuitySelect    from '@/Pages/Panel/MedicalRecords/Components/AcuitySelect.vue';
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
+import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 
@@ -479,6 +480,7 @@ const showCataractModal       = ref(false);
 const showAttendanceCertModal = ref(false);
 const showMedicalCertModal    = ref(false);
 const showExamHubModal        = ref(false);
+const showImagingModal        = ref(false);
 const showTonometryModal      = ref(false);
 const showPresbyopiaObsModal  = ref(false);
 
@@ -2179,6 +2181,15 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <span class="pmr-doc-img-btn-label">{{ tt('evolution', 'Evolução') }}</span>
                 </button>
 
+                <!-- Exames de imagem do módulo Eye Images — consulta durante o
+                     atendimento; leitura por paciente, disponível já no create. -->
+                <button v-if="urls.eye_exams" type="button" class="btn pmr-doc-img-btn"
+                        :title="tt('imaging_title', 'Exames de imagem do paciente')"
+                        @click="showImagingModal = true">
+                    <i class="fas fa-x-ray" style="font-size:1.6rem;color:#7b1fa2;"></i>
+                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">{{ tt('imaging_exams_short', 'Exames de') }}<br>{{ tt('imaging_exams_short2', 'imagem') }}</span>
+                </button>
+
                 <button type="button" class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
                         :title="isEdit ? tt('documentations', 'Documentações') : tt('save_first', 'Salve primeiro')"
                         :disabled="!isEdit"
@@ -2948,6 +2959,20 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
     <PdfPreviewModal v-if="showPdfPreview" :url="pdfPreviewUrl" :title="pdfPreviewTitle" @close="closePdfPreview" />
 
     <!-- Modal de upload de anexos (drag-drop + progresso por arquivo) -->
+    <MedicalRecordImagingModal
+
+        v-if="urls.eye_exams"
+
+        :show="showImagingModal"
+
+        :fetch-url="urls.eye_exams"
+
+        :module-url="urls.eye_images_module ?? ''"
+
+        :t="t"
+
+        @close="showImagingModal = false" />
+
     <MedicalRecordFileUploadModal
         v-if="isEdit && urls.store_file"
         :show="showUploadModal"

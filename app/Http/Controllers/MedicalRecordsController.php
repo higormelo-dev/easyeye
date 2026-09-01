@@ -804,6 +804,10 @@ class MedicalRecordsController extends Controller
     private function buildFormUrls(Patient $patient, ?MedicalRecord $record, bool $isEdit): array
     {
         $urls = [
+            // Painel "Exames de imagem" do prontuário (módulo Eye Images).
+            'eye_exams'         => route('panel.eye-images.patient-exams', $patient),
+            'eye_images_module' => route('panel.eye-images.index'),
+
             'store'             => route('panel.patients.medicalrecords.store', $patient),
             'list'              => route('panel.patients.medicalrecords.index', $patient),
             'create'            => route('panel.patients.medicalrecords.create', $patient),

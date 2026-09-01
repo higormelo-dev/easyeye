@@ -9,6 +9,7 @@ if ($peOld) {
             DB::table('medical_record_files')->where('medical_record_id', $r->id)->delete();
             $r->forceDelete();
         }
+        DB::table('patient_exams')->where('patient_id', $patOld->id)->delete();
         DB::table('schedules')->where('patient_id', $patOld->id)->delete();
         $patOld->forceDelete();
     }

@@ -14,7 +14,7 @@ consulte também:
 
 > As capturas são geradas automaticamente a partir do sistema real
 > (`e2e/cypress/e2e/docs/admin-manual.cy.js`). Para atualizá-las:
-> `cd e2e && npx cypress run --browser chrome --spec cypress/e2e/docs/admin-manual.cy.js`
+> `cd e2e && npx cypress run --browser chrome --config excludeSpecPattern=__none__ --spec cypress/e2e/docs/admin-manual.cy.js`
 > e copie as imagens de `e2e/cypress/screenshots/admin-manual.cy.js/` para
 > `docs/manual-administrador/img/`. Nenhum dado é criado durante as capturas.
 
