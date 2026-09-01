@@ -167,8 +167,12 @@ class ExamRequest extends FormRequest
                     }
                 },
             ],
-            // Paridade com PatientExamRequest: equipamentos também exportam .emr
-            'archive' => 'required|file|mimes:jpg,jpeg,png,emr|max:10240',
+            // Paridade com PatientExamRequest: equipamentos também exportam .emr.
+            // bmp: topógrafos (ex.: MediWorks DEA520) exportam BMP nativo.
+            // pdf: campímetros/biômetros/aberrômetros produzem LAUDO PDF — sem
+            // pdf aqui, essas modalidades não têm o que enviar (o import manual
+            // do Gerenciador de Imagens já aceita pdf desde sempre).
+            'archive' => 'required|file|mimes:jpg,jpeg,png,bmp,pdf,emr|max:10240',
         ];
     }
 

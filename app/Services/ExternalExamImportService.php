@@ -92,7 +92,7 @@ class ExternalExamImportService
                     $path            = $this->storeArchive($file, $directory);
                     $uploadedPaths[] = $path;
 
-                    return PatientExam::create([
+                    $record = PatientExam::create([
                         'patient_id'                     => $patient->id,
                         'doctor_id'                      => $data['doctor_id'] ?? null,
                         'exam_id'                        => $data['exam_id'],
@@ -105,6 +105,12 @@ class ExternalExamImportService
                         'import_batch_id'                => $importBatchId,
                         'diagnosis_cids'                 => $diagnoses ?: null,
                     ]);
+
+                    // afterCommit: em fila, só roda se a transação do lote
+                    // confirmar — evita derivado de exame que sofreu rollback.
+                    \App\Jobs\GenerateExamDerivatives::dispatch($record->id)->afterCommit();
+
+                    return $record;
                 });
             } catch (Throwable $e) {
                 // Rollback manual dos uploads já feitos no S3 antes da transação

@@ -208,14 +208,36 @@ class EyeImagesController extends Controller
         $entityId = session('selected_entity_id');
         abort_unless($patient->entity_id === $entityId, 403);
 
-        $urls = $patient->exams()
+        $exams = $patient->exams()
             ->whereNotNull('archive')
-            ->get(['id', 'archive'])
-            ->mapWithKeys(fn ($exam) => [
-                $exam->id => Storage::disk('s3')->temporaryUrl($exam->archive, now()->addHours(2)),
-            ]);
+            ->get(['id', 'archive', 'display_archive', 'thumb_archive']);
 
-        return response()->json(['urls' => $urls]);
+        $temporary = fn (?string $path) => $path
+            ? Storage::disk('s3')->temporaryUrl($path, now()->addHours(2))
+            : null;
+
+        // `urls` (viewer): JPEG de exibição quando o derivado existe (inclusive
+        // a 1ª página de laudos PDF), senão o original — compatível com o
+        // front atual. `thumb_urls` (grid): miniatura com o mesmo fallback.
+        // `original_urls`: sempre o arquivo original (baixar laudo PDF etc.).
+        $urls = [];
+        $thumbUrls = [];
+        $originalUrls = [];
+
+        foreach ($exams as $exam) {
+            $original = $temporary($exam->archive);
+            $display = $temporary($exam->display_archive);
+
+            $urls[$exam->id] = $display ?? $original;
+            $thumbUrls[$exam->id] = $temporary($exam->thumb_archive) ?? $display ?? $original;
+            $originalUrls[$exam->id] = $original;
+        }
+
+        return response()->json([
+            'urls'          => $urls,
+            'thumb_urls'    => $thumbUrls,
+            'original_urls' => $originalUrls,
+        ]);
     }
 
     public function imageUrl(PatientExam $exam): JsonResponse

@@ -276,6 +276,9 @@ class PatientExamService
                 'archive'                        => $archivePath,
             ]);
 
+            // Arquivo substituído: regenera JPEG de exibição + miniatura.
+            \App\Jobs\GenerateExamDerivatives::dispatch($existingRecord->id);
+
             return [$existingRecord->refresh(), $oldPath];
         }
 
@@ -289,6 +292,8 @@ class PatientExamService
             'laterality'                     => $laterality,
             'archive'                        => $archivePath,
         ]);
+
+        \App\Jobs\GenerateExamDerivatives::dispatch($record->id);
 
         return [$record, null];
     }

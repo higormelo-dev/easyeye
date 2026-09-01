@@ -30,7 +30,8 @@ const props = defineProps({
 // ── Estado principal ──────────────────────────────────────────────────────
 const patients        = ref(props.patients || []);
 const selectedPatient = ref(null);
-const examUrls        = ref({});           // {examId: presignedUrl}
+const examUrls        = ref({});           // {examId: presignedUrl} — JPEG de exibição (fallback: original)
+const examThumbUrls   = ref({});           // {examId: presignedUrl} — miniatura para o grid
 const brokenUrls      = ref({});           // {examId: true}
 const urlsLoading     = ref(false);
 const loading         = ref(false);
@@ -282,6 +283,7 @@ function selectExamByLaterality(group, lat) {
 async function selectPatient(patient) {
     selectedPatient.value = patient;
     examUrls.value        = {};
+    examThumbUrls.value   = {};
     brokenUrls.value      = {};
     selectedExamIds.value = [];
     urlsLoading.value     = true;
@@ -289,9 +291,11 @@ async function selectPatient(patient) {
         const url = props.urls.patient_urls.replace('__ID__', patient.id);
         const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' } });
         const data = await res.json();
-        examUrls.value = data.urls ?? {};
+        examUrls.value      = data.urls ?? {};
+        examThumbUrls.value = data.thumb_urls ?? {};
     } catch {
-        examUrls.value = {};
+        examUrls.value      = {};
+        examThumbUrls.value = {};
     } finally {
         urlsLoading.value = false;
     }
@@ -1411,9 +1415,9 @@ const printEntity = computed(() => props.entity ?? {});
                                                     <i class="ti ti-robot me-1"></i>IA
                                                 </span>
 
-                                                <!-- Thumbnail com imagem -->
+                                                <!-- Thumbnail com imagem (miniatura gerada; fallback: exibição/original) -->
                                                 <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
-                                                     :src="examUrls[exam.id]" :alt="exam.exam_type?.name"
+                                                     :src="examThumbUrls[exam.id] ?? examUrls[exam.id]" :alt="exam.exam_type?.name"
                                                      width="100" height="76"
                                                      :style="`object-fit:cover;display:block;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid #6ea8fe' : '2px solid transparent'};transition:outline .1s;`"
                                                      @error="brokenUrls = { ...brokenUrls, [exam.id]: true }">
