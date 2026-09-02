@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Enums\ScheduleSituation;
-use App\Models\{ClinicResource, Doctor, DoctorWorkSchedule, ResourceBlock, ResourceWorkSchedule, Schedule, ScheduleBlock, ScheduleSituationLog};
+use App\Enums\{FinancialEntryStatus, ScheduleSituation};
+use App\Models\{ClinicResource, Doctor, DoctorWorkSchedule, Entity, ResourceBlock, ResourceWorkSchedule, Schedule, ScheduleBlock, ScheduleSituationLog};
 use Carbon\Carbon;
 use Illuminate\Support\Facades\{Cache, DB};
 
@@ -360,6 +360,75 @@ class ScheduleService
         }
 
         return ['updated' => $updated, 'skipped' => $skipped, 'updated_ids' => $updatedIds];
+    }
+
+    /**
+     * Transição de situação de UM agendamento — caminho único usado pelo
+     * endpoint PATCH schedules/{id}/situation e pelo fluxo do prontuário
+     * (Salvar/Finalizar/Dilatar/Exame). Grava ScheduleSituationLog, ajusta
+     * arrived_at/confirmed_at/cancellation_reason e limpa o cache da sala de
+     * espera. Situação é livremente editável (sem grafo de transições).
+     *
+     * Retorna false quando é no-op (já está na situação-alvo) — evita reset
+     * indevido de timestamps e ruído no histórico.
+     */
+    public function changeSituation(
+        Schedule $schedule,
+        ScheduleSituation $situation,
+        ?string $entityUserId,
+        ?string $notes = null,
+    ): bool {
+        if ($situation === $schedule->situation) {
+            return false;
+        }
+
+        $data = ['situation' => $situation->value];
+
+        if ($situation === ScheduleSituation::Waiting) {
+            $data['arrived_at'] = now();
+        }
+
+        if ($situation === ScheduleSituation::Confirmed) {
+            $data['confirmed_at'] = now();
+        }
+
+        if ($situation === ScheduleSituation::Cancelled && $notes) {
+            $data['cancellation_reason'] = $notes;
+        }
+
+        $fromSituation = $schedule->situation;
+
+        $schedule->update($data);
+
+        ScheduleSituationLog::create([
+            'schedule_id'    => $schedule->id,
+            'entity_user_id' => $entityUserId,
+            'from_situation' => $fromSituation->value,
+            'to_situation'   => $situation->value,
+            'notes'          => $notes,
+            'created_at'     => now(),
+        ]);
+
+        Cache::forget("waiting_room:{$schedule->entity_id}");
+
+        return true;
+    }
+
+    /**
+     * Marcar "Atendido" exige lançamento no caixa quando a clínica habilita
+     * `requires_cash_to_complete` — mesma trava do endpoint de situação,
+     * reaproveitada pelo "Finalizar consulta" do prontuário.
+     */
+    public function attendedBlockedByCash(Schedule $schedule): bool
+    {
+        if (! Entity::whereKey($schedule->entity_id)->value('requires_cash_to_complete')) {
+            return false;
+        }
+
+        return ! $schedule->financialEntries()
+            ->where('status', '!=', FinancialEntryStatus::Cancelled->value)
+            ->whereNull('deleted_at')
+            ->exists();
     }
 
     /**

@@ -395,34 +395,9 @@ class SchedulesController extends Controller
             ], 422);
         }
 
-        $data = ['situation' => $situation->value];
-
-        if ($situation === ScheduleSituation::Waiting) {
-            $data['arrived_at'] = now();
-        }
-
-        if ($situation === ScheduleSituation::Confirmed) {
-            $data['confirmed_at'] = now();
-        }
-
-        if ($situation === ScheduleSituation::Cancelled && $notes) {
-            $data['cancellation_reason'] = $notes;
-        }
-
-        $fromSituation = $schedule->situation;
-
-        $schedule->update($data);
-
-        ScheduleSituationLog::create([
-            'schedule_id'    => $schedule->id,
-            'entity_user_id' => session('selected_entity_user_id'),
-            'from_situation' => $fromSituation->value,
-            'to_situation'   => $situation->value,
-            'notes'          => $notes,
-            'created_at'     => now(),
-        ]);
-
-        Cache::forget("waiting_room:{$schedule->entity_id}");
+        // Transição centralizada no ScheduleService (log + timestamps + cache)
+        // — mesmo caminho usado pelo prontuário (Finalizar/Dilatar/Exame).
+        $this->service->changeSituation($schedule, $situation, session('selected_entity_user_id'), $notes);
 
         // ── Notificações por situação ─────────────────────────────────────────
         if ($situation === ScheduleSituation::Confirmed) {

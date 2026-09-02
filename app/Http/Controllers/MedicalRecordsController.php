@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaService};
 use App\Enums\AI\AiRunMode;
-use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey};
+use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey, ScheduleSituation};
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
     MedicalRecord, NearPointConvergence, Patient, Schedule, VisualAcuityType};
 use App\Models\ReportSettingContent;
-use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, UsageMeterService};
+use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ScheduleService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
 use Illuminate\Support\Str;
@@ -30,6 +30,7 @@ class MedicalRecordsController extends Controller
         private readonly AiCreditWalletService $aiWallet,
         private readonly AiProviderSettings $aiProviderSettings,
         private readonly AiQuotaService $aiQuotaService,
+        private readonly ScheduleService $scheduleService,
     ) {
     }
 
@@ -65,6 +66,7 @@ class MedicalRecordsController extends Controller
                 'ajax_list' => route('panel.patients.medicalrecords.ajaxlist', $patient),
                 'create'    => route('panel.patients.medicalrecords.create', $patient),
                 'patients'  => route('panel.patients.index'),
+                'schedules' => route('panel.schedules.index'),
             ],
             // Apenas médicos podem criar/editar/excluir prontuário (CFM Res. 2.227/2018).
             // A UI consome essa flag para esconder botões e o backend valida via
@@ -136,13 +138,19 @@ class MedicalRecordsController extends Controller
     {
         $validated = $request->validated();
 
+        // Intenções de fluxo não são colunas do prontuário.
+        $flowAction     = $validated['flow_action'] ?? null;
+        $postSaveAction = $validated['post_save_action'] ?? null;
+        unset($validated['flow_action'], $validated['post_save_action']);
+
         $record = $this->service->store($validated, $patient);
 
         return $this->redirectAfterSave(
             $patient,
-            $validated,
-            __('actions.medical_records.saved'),
             $record,
+            __('actions.medical_records.saved'),
+            $flowAction,
+            $postSaveAction,
         );
     }
 
@@ -304,13 +312,23 @@ class MedicalRecordsController extends Controller
         $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $validated = $request->validated();
 
+        $flowAction     = $validated['flow_action'] ?? null;
+        $postSaveAction = $validated['post_save_action'] ?? null;
+        unset($validated['flow_action'], $validated['post_save_action']);
+
         try {
             $this->service->update($medicalrecord, $validated);
         } catch (LockedMedicalRecordException) {
             return back()->with('error', __('actions.medical_records.locked'));
         }
 
-        return $this->redirectAfterSave($patient, $validated, __('actions.medical_records.updated'));
+        return $this->redirectAfterSave(
+            $patient,
+            $medicalrecord,
+            __('actions.medical_records.updated'),
+            $flowAction,
+            $postSaveAction,
+        );
     }
 
     /**
@@ -808,8 +826,10 @@ class MedicalRecordsController extends Controller
             'eye_exams'         => route('panel.eye-images.patient-exams', $patient),
             'eye_images_module' => route('panel.eye-images.index'),
 
-            'store'             => route('panel.patients.medicalrecords.store', $patient),
-            'list'              => route('panel.patients.medicalrecords.index', $patient),
+            'store' => route('panel.patients.medicalrecords.store', $patient),
+            'list'  => route('panel.patients.medicalrecords.index', $patient),
+            // Destino após Finalizar/Dilatar/Exame — o médico segue pro próximo paciente.
+            'schedules'         => route('panel.schedules.index'),
             'create'            => route('panel.patients.medicalrecords.create', $patient),
             'validation_rules'  => route('panel.medical-records.validation-rules', ['mode' => $isEdit ? 'update' : 'store']),
             'calc_presbyopia'   => route('panel.patients.medicalrecords.calculate-presbyopia', $patient),
@@ -976,6 +996,10 @@ class MedicalRecordsController extends Controller
             'observation_general'   => $r->observation_general,
             'observation_of_lenses' => $r->observation_of_lenses,
 
+            // Vínculo com a agenda (hidrata o form no edit — sem isso o
+            // update mandava '' e desvinculava o agendamento).
+            'schedule_id' => $r->schedule_id,
+
             // Diagnóstico & conduta
             'diagnosis_cids'   => $r->diagnosis_cids ?? [],
             'clinical_conduct' => $r->clinical_conduct,
@@ -1023,33 +1047,80 @@ class MedicalRecordsController extends Controller
     }
 
     /**
-     * Redireciona após save:
-     *   - Se schedule_id presente, volta à agenda.
-     *   - Se record recém-criado, redireciona para EDIT (sem ação pós-save).
-     *   - Caso contrário, listagem padrão.
+     * Redireciona após save — "Salvar" NÃO é "finalizar":
+     *
+     *   - save (padrão): volta pro EDIT do prontuário com a barra de
+     *     documentos liberada — a consulta segue aberta. Com
+     *     `post_save_action`, o edit abre a ação escolhida (?action=).
+     *   - finish / dilate / exam: aplica a transição no agendamento vinculado
+     *     (Atendido / Dilatando / Em exame) e volta pra AGENDA, onde o médico
+     *     segue pro próximo paciente. Dilatando/Em exame mantêm o prontuário
+     *     editável pra quando o paciente voltar (reabrir → Em consulta).
+     *
+     * "Finalizar" respeita a trava de caixa da clínica
+     * (requires_cash_to_complete): o prontuário fica salvo, mas o status não
+     * muda e o médico volta pro edit com o aviso.
      */
     private function redirectAfterSave(
         Patient $patient,
-        array $validated,
+        MedicalRecord $record,
         string $message,
-        ?MedicalRecord $record = null,
+        ?string $flowAction = null,
         ?string $postSaveAction = null,
     ): RedirectResponse {
-        if (! empty($validated['schedule_id'])) {
-            return redirect()
-                ->route('panel.schedules.index')
-                ->with('message', $message);
+        $editUrl = route('panel.patients.medicalrecords.edit', [$patient, $record]);
+
+        $target = match ($flowAction) {
+            'finish' => ScheduleSituation::Attended,
+            'dilate' => ScheduleSituation::Dilating,
+            'exam'   => ScheduleSituation::Exam,
+            default  => null,
+        };
+
+        if ($target && $record->schedule_id) {
+            // Escopo de tenant: um schedule_id de outra clínica nunca transita.
+            $schedule = Schedule::query()
+                ->where('entity_id', (string) session('selected_entity_id'))
+                ->find($record->schedule_id);
+
+            if ($schedule) {
+                // Aba antiga / request forjado: a recepção já encerrou o
+                // atendimento (Atendido/Faltou/Cancelado) — o prontuário é
+                // salvo, mas o status não é reaberto/rebaixado por aqui.
+                if ($schedule->situation->isTerminal()) {
+                    return redirect($editUrl)->with('error', __('actions.medical_records.flow_already_closed', [
+                        'status' => $schedule->situation->label(),
+                    ]));
+                }
+
+                if ($target === ScheduleSituation::Attended && $this->scheduleService->attendedBlockedByCash($schedule)) {
+                    // Um único aviso: o prontuário ficou salvo, a consulta segue aberta.
+                    return redirect($editUrl)->with('error', __('actions.medical_records.flow_cash_blocked'));
+                }
+
+                $this->scheduleService->changeSituation(
+                    $schedule,
+                    $target,
+                    session('selected_entity_user_id'),
+                );
+
+                return redirect()
+                    ->route('panel.schedules.index')
+                    ->with('success', __('actions.medical_records.flow_done_' . $flowAction, [
+                        'name' => $schedule->full_name ?: ($patient->person?->full_name ?? $patient->code),
+                    ]));
+            }
         }
 
-        if ($record && $record->wasRecentlyCreated) {
-            return redirect()
-                ->route('panel.patients.medicalrecords.edit', [$patient, $record])
-                ->with('message', $message);
+        $redirect = redirect($editUrl)->with('success', $message);
+
+        // Ação da barra pendente vai por flash de sessão (one-shot), nunca na
+        // URL — um link compartilhado/F5 não pode reemitir um documento.
+        if ($postSaveAction) {
+            $redirect->with('post_save_action', $postSaveAction);
         }
 
-        return redirect()
-            ->route('panel.patients.medicalrecords.index', $patient)
-            ->with('message', $message);
+        return $redirect;
     }
 
     private function assertTemplateBelongsToCurrentEntity(ReportSettingContent $content): void

@@ -301,6 +301,17 @@
     padding-right: 84px !important;
 }
 
+.pmr-bottom-bar-row {
+    /* Ícone-only + nowrap: a barra inteira cabe numa linha só mesmo com
+       todas as quick actions + o grupo Salvar/Dilatar/Exame/Finalizar.
+       overflow-x é só rede de segurança pra viewport muito estreito —
+       nunca deve disparar no fluxo normal. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap !important;
+    scrollbar-width: thin;
+}
+
 .pmr-form .pmr-bottom-bar .pmr-label {
     font-size: 1.02rem;
     margin-bottom: 0;
@@ -310,25 +321,25 @@
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    /* Largura/altura fixas para uniformidade visual da bottom-bar.
-       min-height absorve diferenças entre labels 1 e 2 linhas, garantindo
-       baseline horizontal alinhado em todos os botões. */
-    width: 72px;
-    min-height: 58px;
+    justify-content: center;
+    /* Ícone-only (rótulo é visually-hidden no template — some da tela,
+       continua acessível a leitor de tela; title dá o tooltip no hover). */
+    flex-shrink: 0;
+    width: 40px;
+    min-height: 40px;
     border: 0;
     background: transparent;
-    border-radius: .3rem;
-    padding: 4px 2px;
+    border-radius: .4rem;
+    padding: 4px;
     cursor: pointer;
     text-decoration: none;
-    transition: transform .14s ease;
-    gap: 2px;
+    transition: transform .14s ease, background-color .14s ease;
 }
 
-.pmr-doc-img-btn:hover {
-    transform: translateY(-1px);
+.pmr-doc-img-btn:hover:not(:disabled) {
+    background: rgba(15, 23, 42, .05);
 }
+
 
 /* Slot do ícone: tamanho fixo para `<img>` E `<i>` (Font Awesome) — força
    icones SVG e fonte ao mesmo footprint visual. !important sobrepõe estilos
@@ -369,18 +380,6 @@
     color: #b45309;
 }
 
-/* Modifier para labels longas em 1 linha (ex: "Documentações"). Mantém
-   altura igual aos outros botões (min-height da base) — só expande largura. */
-.pmr-doc-img-btn.pmr-doc-img-btn-wide {
-    width: 96px;
-}
-
-.pmr-doc-img-btn.pmr-doc-img-btn-wide .pmr-doc-img-btn-label {
-    max-width: 92px;
-    -webkit-line-clamp: 1;
-    min-height: calc(.58rem * 1.1);
-    white-space: nowrap !important;
-}
 
 .pmr-doc-preview,
 .pmr-doc-img-btn:disabled,
@@ -471,6 +470,71 @@
     background: #2f8444;
     color: #fff;
     transform: scale(1.03);
+}
+
+/* Andamento do atendimento (barra inferior): Salvar ≠ Finalizar.
+   Botões com rótulo visível — o médico precisa ler o que cada um faz. */
+.pmr-flow-group {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    align-items: center;
+    gap: .35rem;
+}
+
+/* Ícone-only, igual ao antigo botão único de salvar (46px, círculo) —
+   rótulo vira visually-hidden no template; cor de cada botão já distingue
+   a ação (verde=salva, roxo=etapa intermediária, azul=finaliza) e o title
+   leva o nome da ação + a explicação no hover. */
+.pmr-flow-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    font-size: 1.05rem;
+    transition: all .15s;
+}
+
+.pmr-flow-btn--save {
+    border: 1px solid #2f8444;
+    background: #3aa655;
+    color: #fff;
+}
+
+.pmr-flow-btn--save:hover {
+    background: #2f8444;
+    color: #fff;
+}
+
+.pmr-flow-btn--finish {
+    border: 1px solid #0d6efd;
+    background: #0d6efd;
+    color: #fff;
+}
+
+.pmr-flow-btn--finish:hover {
+    background: #0b5ed7;
+    color: #fff;
+}
+
+.pmr-flow-btn--stage {
+    border: 1px solid #6f42c1;
+    background: #fff;
+    color: #6f42c1;
+}
+
+.pmr-flow-btn--stage:hover {
+    background: #6f42c1;
+    color: #fff;
+}
+
+:root[data-bs-theme=dark] .pmr-flow-btn--stage {
+    background: transparent;
+    color: #b197fc;
+    border-color: #b197fc;
 }
 
 .btn-pink {

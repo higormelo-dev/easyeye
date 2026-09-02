@@ -20,18 +20,40 @@ final class AiPromptGuardrailService
     ];
 
     /**
+     * Pré-filtro GROSSEIRO (denylist) — NÃO é a defesa primária contra
+     * prompt injection. Um denylist de regex é sempre contornável por
+     * paráfrase, outro idioma ou codificação (base64, unicode, etc.). A
+     * defesa estrutural real está em dois outros pontos, que valem mesmo
+     * quando um payload passa por aqui sem casar nenhum padrão:
+     *   - AiPayloadEnricher::withSecurityPreamble() — system prompt sempre
+     *     definido pelo servidor (nunca aceita o do cliente) e reforçado com
+     *     hierarquia explícita de instrução.
+     *   - App\Domains\AI\Support\PromptComposer — contexto do prontuário vai
+     *     marcado como dado (tag <clinic_data>), nunca como instrução.
+     * Este filtro serve pra pegar as tentativas mais óbvias/preguiçosas
+     * antes mesmo de gastar uma chamada ao provedor — camada extra, barata,
+     * não a garantia.
+     *
      * @var list<string>
      */
     private const PROMPT_INJECTION_PATTERNS = [
         '/\bignore\s+(previous|above|all)\s+instructions\b/iu',
         '/\bdisregard\s+(all|any)\s+(prior|previous)\b/iu',
         '/\b(reveal|show|print)\s+(the\s+)?(system\s+)?prompt\b/iu',
-        '/\b(jailbreak|bypass|override)\b/iu',
+        '/\b(jailbreak|bypass\s+(all|your|the)|override\s+(the|your|all)\s+(instructions|rules|safety))\b/iu',
         '/^\s*(system|developer|assistant)\s*:/ium',
+        '/\bnew\s+instructions\s*:/iu',
+        '/\b(from\s+now\s+on|you\s+are\s+now)\b.{0,30}\b(you\s+are|act\s+as|no\s+longer)\b/iu',
+        '/\b(act|pretend|roleplay)\s+as\s+(if\s+you\s+(are|were)|a[n]?\s)/iu',
+        '/\bdeveloper\s+mode\b/iu',
         '/\bignore\s+(as\s+)?instru[cç][oõ]es\s+(anteriores|acima|do sistema)\b/iu',
         '/\bdesconsidere\s+(todas\s+)?(as\s+)?instru[cç][oõ]es\b/iu',
         '/\b(mostre|revele|exiba|imprima)\s+(o\s+)?prompt\s+(do\s+)?sistema\b/iu',
         '/\b(voc[eê]\s+agora\s+[ée]|finja\s+que\s+voc[eê]\s+[ée])\b/iu',
+        '/\bnovas?\s+instru[cç][oõ]es\s*:/iu',
+        '/\b(a\s+partir\s+de\s+agora|de\s+agora\s+em\s+diante)\b.{0,30}\bvoc[eê]\s+(é|[eé]s|age|deve)\b/iu',
+        '/\b(aja|comporte-se|finja)\s+como\s+(se\s+)?(voc[eê]\s+)?(fosse|um|uma)\b/iu',
+        '/\bmodo\s+desenvolvedor\b/iu',
     ];
 
     /**
@@ -41,9 +63,17 @@ final class AiPromptGuardrailService
      */
     public function sanitizePayload(array $payload): array
     {
+        // system_prompt NÃO entra no scan de injection: desde
+        // AiPayloadEnricher::withSecurityPreamble() ele é SEMPRE definido
+        // pelo servidor (nunca pelo cliente — ver comentário em
+        // applyWorkflowDefaults), então não é superfície de ataque. Escaneá-lo
+        // também é contraproducente: o próprio preâmbulo de segurança PRECISA
+        // citar termos como "jailbreak"/"ignore instructions"/"modo
+        // desenvolvedor" para instruir o modelo a resistir a eles — texto
+        // nosso, sobre o ataque, ativaria o próprio filtro (falso positivo
+        // que bloquearia 100% das chamadas).
         $searchableText = $this->flattenStrings([
             $payload['user_prompt'] ?? '',
-            $payload['system_prompt'] ?? '',
             $payload['context'] ?? [],
             $payload['attachments'] ?? [],
         ]);

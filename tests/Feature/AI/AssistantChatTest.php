@@ -78,7 +78,8 @@ describe('store assistant_chat', function () {
         expect($run->workflow)->toBe('assistant_chat')
             ->and($run->medical_record_id)->toBeNull()
             ->and($run->input_summary['expects_json'])->toBeFalse()
-            ->and($run->input_summary['system_prompt'])->toBe(__('ai.assistant_chat_system_prompt'))
+            ->and($run->input_summary['system_prompt'])->toContain(__('ai.assistant_chat_system_prompt'))
+            ->and($run->input_summary['system_prompt'])->toContain(__('ai.security_preamble'))
             ->and($run->input_summary['system_prompt'])->toContain('validad')
             ->and($run->input_summary['system_prompt'])->toContain('APOIO À DECISÃO');
     });

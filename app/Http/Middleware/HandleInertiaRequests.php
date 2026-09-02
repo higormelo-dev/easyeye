@@ -69,6 +69,8 @@ class HandleInertiaRequests extends Middleware
                 'success' => session('success'),
                 'error'   => session('error'),
                 'status'  => session('status'),
+                // Prontuário: ação da barra a abrir após o 1º save (one-shot).
+                'post_save_action' => session('post_save_action'),
             ],
 
             'auth' => fn () => $this->authProps($request),

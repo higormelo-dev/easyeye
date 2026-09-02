@@ -29,6 +29,9 @@ const props = defineProps({
     canChooseDoctor: { type: Boolean, default: false },
     isDoctor:        { type: Boolean, default: false },
     isEdit:          { type: Boolean, default: false },
+    // Fluxo Agenda ↔ Prontuário ({ id, situation, update_url } | null) — ver
+    // ScheduleFlowGuard.vue. Aqui habilita Finalizar/Dilatar/Exame na barra.
+    scheduleFlow:    { type: Object,  default: null },
     catalogs:        { type: Object,  required: true },
     urls:            { type: Object,  required: true },
     storage:         { type: Object,  default: () => ({
@@ -44,6 +47,19 @@ const props = defineProps({
 
 const r = props.medicalrecord;
 const isLocked = computed(() => Boolean(r?.is_locked));
+
+// Andamento do atendimento (Salvar ≠ Finalizar): só pra médico, com
+// agendamento vinculado, prontuário editável e situação NÃO terminal —
+// reabrir um atendimento já Atendido/Faltou/Cancelado não oferece
+// "Finalizar" de novo (espelha App\Enums\ScheduleSituation::isTerminal).
+// Salvar existe sempre.
+const TERMINAL_SITUATIONS = [7, 8, 9];
+const flowActive = computed(() => Boolean(
+    props.scheduleFlow
+    && props.isDoctor
+    && !isLocked.value
+    && !TERMINAL_SITUATIONS.includes(Number(props.scheduleFlow.situation)),
+));
 
 // Atalhos para catálogos
 const visualAcuityTypes = computed(() => props.catalogs.visual_acuity_types ?? []);
@@ -128,8 +144,15 @@ const form = useForm({
     clinical_conduct:  r?.clinical_conduct ?? '',
     follow_up_days:    r?.follow_up_days ?? '',
 
-    // Vínculo opcional com agenda
-    schedule_id: '',
+    // Vínculo opcional com agenda (edit: hidratado do registro; create:
+    // ?schedule_id= no mount)
+    schedule_id: r?.schedule_id ?? '',
+
+    // Intenções de fluxo (não persistidas — ver redirectAfterSave):
+    //   flow_action: save | finish | dilate | exam
+    //   post_save_action: ação da barra a abrir após o 1º save (create → edit)
+    flow_action:      null,
+    post_save_action: null,
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -504,6 +527,8 @@ onMounted(async () => {
     const sid = params.get('schedule_id');
     if (sid) form.schedule_id = sid;
 
+    runPostSaveAction();
+
     // Disponibiliza este prontuário como contexto OPCIONAL do Assistente
     // Virtual flutuante (AiFloatingAssistant, montado no AppLayout) — ainda
     // exige o médico ativar o toggle "Usar contexto desta tela" no widget
@@ -625,17 +650,78 @@ function validateBeforeSubmit() {
     return true;
 }
 
-function submit() {
-    if (isLocked.value) return;
-    if (!validateBeforeSubmit()) return;
+/**
+ * Salva o prontuário. `flowAction` (opcional) diz o que acontece com o
+ * paciente em seguida — save (mantém a consulta aberta, volta pro edit) |
+ * finish (Atendido) | dilate (Dilatando) | exam (Em exame); os três últimos
+ * voltam pra Agenda. Chamado pelo @submit do form (evento) ou pelos botões.
+ */
+function submit(flowAction = null) {
+    // Sem request não há onFinish: desarma a intenção da barra pra um
+    // "Salvar" posterior não emitir um documento que o médico não pediu.
+    if (isLocked.value || !validateBeforeSubmit()) {
+        form.post_save_action = null;
+        return;
+    }
+
+    form.flow_action = typeof flowAction === 'string' ? flowAction : null;
 
     const url = props.isEdit ? props.urls.update : props.urls.store;
     const method = props.isEdit ? 'put' : 'post';
     form[method](url, {
         preserveScroll: true,
         onError: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+        onFinish: () => { form.flow_action = null; form.post_save_action = null; },
     });
 }
+
+// ──────────────────────────────────────────────────────────────────────────
+// Ações da barra inferior ANTES do 1º save (create): receita/atestado/laudo
+// precisam do prontuário persistido (documentos são filhos do registro), mas
+// o médico não deve "salvar primeiro" na mão — o clique salva e o edit
+// reabre com a ação escolhida (?action=), sem passar pela Agenda.
+// ──────────────────────────────────────────────────────────────────────────
+const POST_SAVE_ACTIONS = {
+    medication:             () => openMedicationPrescription(),
+    procedures:             () => openProcedureSolicitation(),
+    pterygium:              () => issueQuickAction('pterygium-prescription', {}, { preview: true }),
+    cataract:               () => openCataractPrescription(),
+    test_eye:               () => issueQuickAction('test-eye', {}, { preview: true }),
+    retinal_mapping:        () => issueQuickAction('retinal-mapping', {}, { preview: true }),
+    attendance_certificate: () => openAttendanceCertificate(),
+    medical_certificate:    () => openMedicalCertificate(),
+    exam_hub:               () => { showExamHubModal.value = true; },
+    documentations:         () => openDocumentationsModal(),
+    upload:                 () => openUploadModal(),
+};
+
+function withRecord(actionKey) {
+    const run = POST_SAVE_ACTIONS[actionKey];
+    if (!run) return;
+
+    if (props.isEdit) {
+        run();
+        return;
+    }
+
+    form.post_save_action = actionKey;
+    submit('save');
+}
+
+// Edit reaberto após o 1º save com uma ação da barra pendente: o backend
+// devolve a chave via flash de sessão (props.flash.post_save_action) — one-shot,
+// não fica na URL (um link/F5 nunca reemite um documento).
+function runPostSaveAction() {
+    if (!props.isEdit || isLocked.value) return;
+    const key = usePage().props.flash?.post_save_action;
+    if (!key || !POST_SAVE_ACTIONS[key]) return;
+
+    nextTick(() => POST_SAVE_ACTIONS[key]());
+}
+
+// Guard de saída ("←") reaproveita o mesmo submit — Finalizar/Dilatar/Exame
+// salvam o que foi digitado antes de transitar (nunca perde texto).
+defineExpose({ submitFlow: (action) => submit(action) });
 
 // ──────────────────────────────────────────────────────────────────────────
 // Lens auto-format
@@ -1463,7 +1549,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                 {{ tt('create_hint_before', 'Preencha pelo menos a') }}
                 <strong>{{ tt('complaint', 'Queixa principal') }}</strong>
                 {{ tt('create_hint_middle', 'e clique em') }}
-                <strong>{{ tt('save', 'Salvar') }}</strong>
+                <strong>{{ tt('flow_save', 'Salvar') }}</strong>
                 {{ tt('create_hint_after', 'para começar a editar o prontuário.') }}
             </span>
         </div>
@@ -2098,7 +2184,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
         <!-- Bottom bar — quick actions + save -->
         <div class="pmr-bottom-bar px-3 py-2">
-            <div class="d-flex flex-wrap gap-1 align-items-center">
+            <div class="d-flex flex-nowrap gap-1 align-items-center pmr-bottom-bar-row">
                 <!--
                     Quick actions clínicas: exclusivas para médicos (CFM Res. 2.227/2018).
                     Admin/Secretária da clínica não emite receituários/atestados/laudos —
@@ -2107,69 +2193,69 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                 -->
                 <template v-if="isDoctor">
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Receituário de Medicamentos' : tt('save_first', 'Salve primeiro o prontuário')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="openMedicationPrescription">
+                            :title="isEdit ? 'Receituário de Medicamentos' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="withRecord('medication')">
                         <i class="fas fa-pills" style="font-size:1.6rem;color:#9c27b0;"></i>
-                        <span class="pmr-doc-img-btn-label">Medicamentos</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden">Medicamentos</span>
                     </button>
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Solicitação de Procedimentos' : tt('save_first', 'Salve primeiro')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="openProcedureSolicitation">
+                            :title="isEdit ? 'Solicitação de Procedimentos' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="withRecord('procedures')">
                         <i class="fas fa-clipboard-list" style="font-size:1.6rem;color:#3f51b5;"></i>
-                        <span class="pmr-doc-img-btn-label">Procedimentos</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden">Procedimentos</span>
                     </button>
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Receituário de Pterígio' : tt('save_first', 'Salve primeiro')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="issueQuickAction('pterygium-prescription')">
+                            :title="isEdit ? 'Receituário de Pterígio' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="isEdit ? issueQuickAction('pterygium-prescription') : withRecord('pterygium')">
                         <i class="fas fa-eye-low-vision" style="font-size:1.6rem;color:#ff5722;"></i>
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Receituário<br>Pterígio</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Receituário<br>Pterígio</span>
                     </button>
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Receituário de Catarata' : tt('save_first', 'Salve primeiro')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="openCataractPrescription">
+                            :title="isEdit ? 'Receituário de Catarata' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="withRecord('cataract')">
                         <i class="fas fa-eye" style="font-size:1.6rem;color:#00bcd4;"></i>
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Receituário<br>Catarata</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Receituário<br>Catarata</span>
                     </button>
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Teste do Olhinho' : tt('save_first', 'Salve primeiro')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="issueQuickAction('test-eye')">
+                            :title="isEdit ? 'Teste do Olhinho' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="isEdit ? issueQuickAction('test-eye') : withRecord('test_eye')">
                         <i class="fas fa-baby" style="font-size:1.6rem;color:#e91e63;"></i>
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Teste do<br>Olhinho</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Teste do<br>Olhinho</span>
                     </button>
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Mapeamento de Retina' : tt('save_first', 'Salve primeiro')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="issueQuickAction('retinal-mapping')">
+                            :title="isEdit ? 'Mapeamento de Retina' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="isEdit ? issueQuickAction('retinal-mapping') : withRecord('retinal_mapping')">
                         <i class="fas fa-bullseye" style="font-size:1.6rem;color:#673ab7;"></i>
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Mapeamento<br>de Retina</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Mapeamento<br>de Retina</span>
                     </button>
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Atestado de Comparecimento' : tt('save_first', 'Salve primeiro')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="openAttendanceCertificate">
+                            :title="isEdit ? 'Atestado de Comparecimento' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="withRecord('attendance_certificate')">
                         <i class="fas fa-user-check" style="font-size:1.6rem;color:#4caf50;"></i>
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Atestado<br>Comparecim.</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Atestado<br>Comparecim.</span>
                     </button>
                     <button type="button" class="btn pmr-doc-img-btn"
-                            :title="isEdit ? 'Atestado Médico' : tt('save_first', 'Salve primeiro')"
-                            :disabled="!isEdit || quickActionBusy || isLocked"
-                            @click="openMedicalCertificate">
+                            :title="isEdit ? 'Atestado Médico' : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                            :disabled="quickActionBusy || isLocked || form.processing"
+                            @click="withRecord('medical_certificate')">
                         <i class="fas fa-stethoscope" style="font-size:1.6rem;color:#2196f3;"></i>
-                        <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Atestado<br>Médico</span>
+                        <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Atestado<br>Médico</span>
                     </button>
                 </template>
 
                 <button v-if="isDoctor && examReports.length > 0" type="button" class="btn pmr-doc-img-btn"
-                        :title="isEdit ? tt('exam_hub_title', 'Laudos de Exame') : tt('save_first', 'Salve primeiro')"
-                        :disabled="!isEdit || isLocked"
-                        @click="showExamHubModal = true">
+                        :title="isEdit ? tt('exam_hub_title', 'Laudos de Exame') : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                        :disabled="isLocked || form.processing"
+                        @click="withRecord('exam_hub')">
                     <i class="fas fa-microscope" style="font-size:1.6rem;color:#03a9f3;"></i>
-                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
+                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">Laudos<br>de Exame</span>
                 </button>
 
                 <!-- Evolução: histórico é por paciente, então abre mesmo em modo
@@ -2178,7 +2264,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         :title="tt('evolution', 'Evolução')"
                         @click="openEvolutionModal">
                     <i class="fas fa-notes-medical" style="font-size:1.6rem;color:#009688;"></i>
-                    <span class="pmr-doc-img-btn-label">{{ tt('evolution', 'Evolução') }}</span>
+                    <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('evolution', 'Evolução') }}</span>
                 </button>
 
                 <!-- Exames de imagem do módulo Eye Images — consulta durante o
@@ -2187,32 +2273,65 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         :title="tt('imaging_title', 'Exames de imagem do paciente')"
                         @click="showImagingModal = true">
                     <i class="fas fa-x-ray" style="font-size:1.6rem;color:#7b1fa2;"></i>
-                    <span class="pmr-doc-img-btn-label" style="white-space:normal;line-height:1.1;">{{ tt('imaging_exams_short', 'Exames de') }}<br>{{ tt('imaging_exams_short2', 'imagem') }}</span>
+                    <span class="pmr-doc-img-btn-label visually-hidden" style="white-space:normal;line-height:1.1;">{{ tt('imaging_exams_short', 'Exames de') }}<br>{{ tt('imaging_exams_short2', 'imagem') }}</span>
                 </button>
 
                 <button type="button" class="btn pmr-doc-img-btn pmr-doc-img-btn-wide"
-                        :title="isEdit ? tt('documentations', 'Documentações') : tt('save_first', 'Salve primeiro')"
-                        :disabled="!isEdit"
-                        @click="openDocumentationsModal">
+                        :title="isEdit ? tt('documentations', 'Documentações') : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                        :disabled="form.processing"
+                        @click="withRecord('documentations')">
                     <i class="fas fa-folder-open" style="font-size:1.6rem;color:#0288d1;"></i>
-                    <span class="pmr-doc-img-btn-label">{{ tt('documentations', 'Documentações') }}</span>
+                    <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('documentations', 'Documentações') }}</span>
                 </button>
 
                 <!-- Anexo — abre modal com drag-drop + progresso por arquivo -->
-                <button v-if="isDoctor && isEdit"
+                <button v-if="isDoctor"
                         type="button"
                         class="btn pmr-doc-img-btn pmr-doc-annexo"
-                        :title="tt('upload_files', 'Anexar arquivos')"
-                        :disabled="isLocked"
-                        @click="openUploadModal">
+                        :title="isEdit ? tt('upload_files', 'Anexar arquivos') : tt('save_first', 'Salva o prontuário e abre esta ação em seguida')"
+                        :disabled="isLocked || form.processing"
+                        @click="withRecord('upload')">
                     <i class="fas fa-paperclip" style="font-size:1.6rem;color:#607d8b;"></i>
-                    <span class="pmr-doc-img-btn-label">Anexo</span>
+                    <span class="pmr-doc-img-btn-label visually-hidden">Anexo</span>
                 </button>
 
-                <button type="submit" class="btn pmr-save-btn ms-auto"
-                        :disabled="form.processing || isLocked" :title="tt('save', 'Salvar')">
-                    <i class="fas fa-check-circle"></i>
-                </button>
+                <!-- Andamento do atendimento — Salvar ≠ Finalizar:
+                       Salvar: grava e MANTÉM a consulta aberta (volta pro edit).
+                       Dilatar / Realizar exame: grava, status na Agenda vira
+                         Dilatando / Em exame, prontuário segue editável.
+                       Finalizar consulta: grava, Atendido, volta pra Agenda. -->
+                <div class="pmr-flow-group ms-auto" role="group" :aria-label="tt('flow_bar_label', 'Andamento do atendimento')">
+                    <button type="submit" class="btn pmr-save-btn pmr-flow-btn pmr-flow-btn--save"
+                            :disabled="form.processing || isLocked"
+                            :title="`${tt('flow_save', 'Salvar')} — ${tt('flow_save_hint', 'Salva o que já foi preenchido e mantém a consulta aberta.')}`">
+                        <i class="fas fa-save"></i>
+                        <span class="visually-hidden">{{ tt('flow_save', 'Salvar') }}</span>
+                    </button>
+
+                    <template v-if="flowActive">
+                        <button type="button" class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-dilate"
+                                :disabled="form.processing"
+                                :title="`${tt('flow_dilate', 'Dilatar')} — ${tt('flow_dilate_hint', 'Status vira \'Dilatando\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
+                                @click="submit('dilate')">
+                            <i class="fas fa-eye-dropper"></i>
+                            <span class="visually-hidden">{{ tt('flow_dilate', 'Dilatar') }}</span>
+                        </button>
+                        <button type="button" class="btn pmr-flow-btn pmr-flow-btn--stage pmr-flow-exam"
+                                :disabled="form.processing"
+                                :title="`${tt('flow_exam', 'Realizar exame')} — ${tt('flow_exam_hint', 'Status vira \'Em exame\' e o prontuário continua aberto pra quando o paciente voltar.')}`"
+                                @click="submit('exam')">
+                            <i class="fas fa-stethoscope"></i>
+                            <span class="visually-hidden">{{ tt('flow_exam', 'Realizar exame') }}</span>
+                        </button>
+                        <button type="button" class="btn pmr-flow-btn pmr-flow-btn--finish pmr-flow-finish"
+                                :disabled="form.processing"
+                                :title="`${tt('flow_finish', 'Finalizar consulta')} — ${tt('flow_finish_hint', 'Atendimento concluído — status vira \'Atendido\'.')}`"
+                                @click="submit('finish')">
+                            <i class="fas fa-check-double"></i>
+                            <span class="visually-hidden">{{ tt('flow_finish', 'Finalizar consulta') }}</span>
+                        </button>
+                    </template>
+                </div>
             </div>
         </div>
 
@@ -2598,7 +2717,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         <button type="button" class="btn btn-outline-secondary btn-sm" :disabled="prescription.length === 0 && !medicineLists" @click="clearMedicines">
                             <i class="fas fa-eraser me-1"></i>Limpar
                         </button>
-                        <div>
+                        <div class="d-flex gap-2">
                             <button type="button" class="btn btn-secondary btn-sm" @click="showMedicationModal = false">{{ tt('cancel','Cancelar') }}</button>
                             <button type="button" class="btn btn-primary btn-sm" :disabled="quickActionBusy || !medicineLists.trim()" @click="submitMedicationPrescription">
                                 <i class="fas fa-print me-1"></i>Emitir Receita
@@ -2709,7 +2828,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 @click="clearProcedureSolicitation">
                             <i class="fas fa-eraser me-1"></i>Limpar
                         </button>
-                        <div>
+                        <div class="d-flex gap-2">
                             <button type="button" class="btn btn-secondary btn-sm" @click="showProcedureModal = false">{{ tt('cancel','Cancelar') }}</button>
                             <button type="button" class="btn btn-primary btn-sm" :disabled="quickActionBusy || !procedureLists.trim()" @click="submitProcedureSolicitation">
                                 <i class="fas fa-print me-1"></i>{{ tt('procedure_emit','Emitir Solicitação') }}

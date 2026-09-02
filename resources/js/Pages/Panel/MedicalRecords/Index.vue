@@ -122,6 +122,11 @@ const isEmpty = computed(() => !loading.value && records.value.length === 0);
             >
                 <template #actions>
                     <div class="btn-group" role="group">
+                        <!-- Agenda primeiro: após o atendimento o médico segue
+                             pro próximo paciente — "Pacientes" fica como secundário. -->
+                        <Link v-if="urls.schedules" :href="urls.schedules" class="btn btn-outline-secondary btn-sm">
+                            <i class="ti ti-calendar-event me-1"></i>{{ t.schedule ?? 'Agenda' }}
+                        </Link>
                         <Link :href="urls.patients" class="btn btn-outline-secondary btn-sm">
                             <i class="ti ti-arrow-left me-1"></i>Pacientes
                         </Link>

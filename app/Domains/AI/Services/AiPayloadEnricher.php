@@ -98,6 +98,16 @@ class AiPayloadEnricher
     {
         $workflow = (string) ($payload['workflow'] ?? '');
 
+        // SEGURANÇA: system_prompt é SEMPRE decidido pelo servidor, nunca pelo
+        // cliente. StoreAiRunRequest aceita um campo `system_prompt` no
+        // payload (histórico: pensado para uso futuro/depuração) — sem este
+        // descarte, um POST direto à API (fora da UI, que nunca envia esse
+        // campo) conseguia substituir integralmente as instruções enviadas
+        // ao provedor de IA para QUALQUER workflow, incluindo os que não
+        // tinham prompt forçado abaixo (prompt injection via API). O valor
+        // definitivo é atribuído em cada branch logo em seguida.
+        unset($payload['system_prompt']);
+
         if ($workflow === 'eye_image_analysis') {
             $payload['exam_ids']      = $this->authorizeExamIds((array) ($payload['exam_ids'] ?? []), $entityId);
             $payload['system_prompt'] = __('ai.eye_image_system_prompt');
@@ -148,7 +158,30 @@ class AiPayloadEnricher
             $payload['expects_json']  = false;
         }
 
+        // Estes três workflows não tinham prompt forçado (só validados por
+        // FeatureGate) — na prática rodavam SEM system prompt algum (a UI
+        // real nunca envia `system_prompt`), e um POST direto à API podia
+        // preencher o campo livremente. Prompt clínico dedicado adicionado.
+        if (in_array($workflow, ['exam_assistant', 'report_drafting', 'consensus_review'], true)) {
+            $payload['system_prompt'] = __('ai.' . $workflow . '_system_prompt');
+        }
+
+        if (isset($payload['system_prompt'])) {
+            $payload['system_prompt'] = $this->withSecurityPreamble((string) $payload['system_prompt']);
+        }
+
         return $payload;
+    }
+
+    /**
+     * Prependa o preâmbulo de segurança (regras de precedência de
+     * instrução + como tratar o bloco <clinic_data>) a todo system prompt.
+     * Ponto ÚNICO — nenhum workflow monta o prompt final sem passar por
+     * aqui, incluindo os anteriores a esta mudança.
+     */
+    private function withSecurityPreamble(string $workflowPrompt): string
+    {
+        return __('ai.security_preamble') . $workflowPrompt;
     }
 
     /**

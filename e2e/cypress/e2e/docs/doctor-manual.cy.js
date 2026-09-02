@@ -68,8 +68,9 @@ describe('Manual do médico — capturas', () => {
     shot('06-prontuario-preenchido');
 
     cy.get('button.pmr-save-btn').first().click();
-    // Save com agendamento redireciona para a agenda.
-    cy.url({ timeout: 20000 }).should('include', '/panel/schedules');
+    // Salvar mantém a consulta aberta: volta pro edit com a barra liberada.
+    cy.url({ timeout: 20000 }).should('match', /medicalrecords\/[0-9a-f-]+\/edit/);
+    cy.get('.pmr-form', { timeout: 15000 }).should('exist');
   });
 
   it('04 prontuário: documentações (atestado, evolução, anexo)', () => {

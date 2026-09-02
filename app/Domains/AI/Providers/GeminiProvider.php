@@ -6,7 +6,7 @@ namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
 use App\Domains\AI\Services\AiProviderSettings;
-use App\Domains\AI\Support\ProviderErrorSanitizer;
+use App\Domains\AI\Support\{PromptComposer, ProviderErrorSanitizer};
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\AiProvider;
 use Illuminate\Http\Client\Response;
@@ -127,7 +127,7 @@ class GeminiProvider implements AiProviderInterface
     {
         $parts = [
             [
-                'text' => $this->composePromptWithContext($request),
+                'text' => PromptComposer::composeUserContent($request),
             ],
         ];
 
@@ -164,24 +164,6 @@ class GeminiProvider implements AiProviderInterface
         }
 
         return $parts;
-    }
-
-    private function composePromptWithContext(AiRequestData $request): string
-    {
-        $prompt = $request->userPrompt;
-
-        if ($request->expectsJson) {
-            $prompt .= "\n\nResponda em JSON válido.";
-        }
-
-        if ($request->context === []) {
-            return $prompt;
-        }
-
-        $contextJson  = json_encode($request->context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        $contextBlock = $contextJson !== false ? $contextJson : '{}';
-
-        return trim($prompt . "\n\nContexto clínico (JSON):\n" . $contextBlock);
     }
 
     /**

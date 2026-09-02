@@ -21,7 +21,7 @@ pacientes e conta.
 2. [Agenda do dia e início do atendimento](#2-agenda-do-dia-e-início-do-atendimento)
 3. [Prontuário: preenchimento e salvamento](#3-prontuário-preenchimento-e-salvamento)
 4. [Documentações do prontuário](#4-documentações-do-prontuário)
-5. [Finalização da consulta](#5-finalização-da-consulta)
+5. [Andamento e finalização da consulta](#5-andamento-e-finalização-da-consulta)
 6. [Assistente de IA](#6-assistente-de-ia)
 7. [Meus prompts de IA e consumo](#7-meus-prompts-de-ia-e-consumo)
 8. [Pacientes e imagens oftálmicas](#8-pacientes-e-imagens-oftálmicas)
@@ -83,8 +83,9 @@ O prontuário oftalmológico organiza o exame em seções OD/OE (olho direito/es
 ![Prontuário preenchido](img/06-prontuario-preenchido.png)
 
 1. Preencha as seções pertinentes à consulta.
-2. Clique em **Salvar** (botão no topo). O registro é criado e vinculado ao atendimento —
-   o sistema retorna à agenda.
+2. Clique em **Salvar** (barra inferior). O registro é criado e vinculado ao atendimento —
+   você **continua no prontuário**, com receitas, atestados e laudos liberados. A consulta
+   só termina quando você escolher **Finalizar consulta** (seção 5).
 
 > **Modos de exibição**: o prontuário pode ser usado no layout **padrão**, num layout
 > **personalizado** (você escolhe quais seções aparecem e em que coluna) ou em
@@ -103,7 +104,8 @@ Para retomar um prontuário salvo, abra o card na agenda (▶) ou vá em
 
 ## 4. Documentações do prontuário
 
-Com o prontuário **salvo**, a barra de documentações libera as ações rápidas:
+A barra de documentações fica disponível **desde o início do atendimento**. Antes do
+primeiro salvamento, clicar numa ação salva o prontuário e abre a ação em seguida:
 
 ![Barra de documentações](img/08-barra-documentacoes.png)
 
@@ -163,14 +165,34 @@ com tipo, data, olho (OD/OE/AO) e CIDs — sem sair da consulta:
 
 ---
 
-## 5. Finalização da consulta
+## 5. Andamento e finalização da consulta
 
-Ao sair do prontuário (botão ← no topo), o sistema pergunta o **desfecho** do atendimento:
+**Salvar não é finalizar.** A barra inferior do prontuário tem botões separados para
+cada momento do atendimento:
+
+- **Salvar** — grava o que já foi preenchido e **mantém a consulta aberta** (a tela
+  continua no prontuário, com receitas, atestados, laudos e solicitações liberados).
+- **Dilatar** — grava, muda o status na agenda para **Dilatando** (a recepção vê que
+  precisa dilatar) e volta para a Agenda. O prontuário continua editável; quando o
+  paciente voltar, **Iniciar atendimento** reabre o mesmo prontuário e o status volta a
+  **Em consulta**.
+- **Realizar exame** — mesma lógica, com o status **Em exame**.
+- **Finalizar consulta** — grava, marca o atendimento como **Atendido** (card verde na
+  agenda) e volta para a Agenda para o próximo paciente.
+
+Fluxo típico: `Aguardando → Em consulta → Dilatando / Em exame → Em consulta → Atendido`.
+
+> Receita, atestado, laudo, solicitação de exame e procedimentos ficam disponíveis
+> **durante** a consulta. Antes do primeiro salvamento, clicar em qualquer um desses
+> botões salva o prontuário e abre a ação escolhida em seguida.
+
+Ao sair pelo botão **←** no topo, o sistema também pergunta o **desfecho** do atendimento
+(Finalizar / Dilatar / Realizar exame / Continuar atendimento):
 
 ![Finalizar consulta](img/12-finalizar-consulta.png)
 
-- **Finalizar consulta** — marca o atendimento como **Atendido** na agenda (card verde).
-- **Continuar depois** — mantém o atendimento em andamento para retomar.
+Se a clínica exige lançamento no caixa para concluir (Configurações), **Finalizar** avisa
+e mantém a consulta aberta até o caixa ser registrado pela recepção.
 
 ---
 

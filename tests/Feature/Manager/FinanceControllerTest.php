@@ -261,7 +261,8 @@ describe('digest() e chat() — AiRun sem tocar a carteira de créditos', functi
             ->and($run->reserved_credits)->toBe(0)
             ->and($run->estimated_credits)->toBe(0)
             ->and($run->input_summary['expects_json'])->toBeTrue()
-            ->and($run->input_summary['system_prompt'])->toBe(__('ai.platform_finance_digest_system_prompt'))
+            ->and($run->input_summary['system_prompt'])->toContain(__('ai.platform_finance_digest_system_prompt'))
+            ->and($run->input_summary['system_prompt'])->toContain(__('ai.security_preamble'))
             ->and($run->input_summary['context'])->toHaveKey('resumo_financeiro');
 
         // Nenhuma entrada de ledger de crédito foi criada pra este run.

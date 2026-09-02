@@ -27,7 +27,8 @@ const props = defineProps({
     t:               { type: Object,  default: () => ({}) },
 });
 
-const flowGuard = ref(null);
+const flowGuard  = ref(null);
+const recordForm = ref(null);
 
 const viewOpen = ref(false);
 const viewRecord = ref(null);
@@ -93,6 +94,7 @@ function closeView() {
                         </div>
 
                         <MedicalRecordForm
+                            ref="recordForm"
                             :patient="patient"
                             :medicalrecord="medicalrecord"
                             :doctors="doctors"
@@ -102,6 +104,7 @@ function closeView() {
                             :is-edit="true"
                             :catalogs="catalogs"
                             :urls="urls"
+                            :schedule-flow="scheduleFlow"
                             :storage="storage"
                             :ai="ai"
                             :t="t"
@@ -120,6 +123,8 @@ function closeView() {
             :is-doctor="isDoctor"
             :locked="medicalrecord.is_locked ?? false"
             :exit-url="urls.list"
+            :finish-url="urls.schedules"
+            :submit-flow="(action) => recordForm?.submitFlow(action)"
         />
     </AppLayout>
 </template>

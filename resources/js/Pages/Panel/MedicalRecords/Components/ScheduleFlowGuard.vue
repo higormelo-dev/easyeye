@@ -26,7 +26,16 @@ const props = defineProps({
     isDoctor: { type: Boolean, default: false },
     locked:   { type: Boolean, default: false },
     exitUrl:  { type: String,  required: true },
+    // Destino após Finalizar/Dilatar/Exame — a Agenda (o médico segue pro
+    // próximo paciente). "Continuar" mantém o exitUrl (lista de prontuários).
+    finishUrl: { type: String, default: null },
+    // Quando informado, Finalizar/Dilatar/Exame passam pelo submit do
+    // MedicalRecordForm (salva o digitado + transita no backend + Agenda) em
+    // vez do PATCH direto — mesma semântica dos botões da barra inferior.
+    submitFlow: { type: Function, default: null },
 });
+
+const FLOW_KEY = { 7: 'finish', 4: 'dilate', 5: 'exam' };
 
 // Situações (espelho de App\Enums\ScheduleSituation)
 const SITUATION = { DILATING: 4, EXAM: 5, IN_PROGRESS: 6, ATTENDED: 7 };
@@ -82,6 +91,12 @@ async function choose(target) {
         return;
     }
 
+    if (typeof props.submitFlow === 'function' && FLOW_KEY[target]) {
+        open.value = false;
+        props.submitFlow(FLOW_KEY[target]);
+        return;
+    }
+
     busy.value  = true;
     error.value = '';
     try {
@@ -95,7 +110,7 @@ async function choose(target) {
 
         open.value = false;
         if (window.showSuccessToast && json.message) window.showSuccessToast(json.message);
-        router.visit(props.exitUrl);
+        router.visit(props.finishUrl ?? props.exitUrl);
     } finally {
         busy.value = false;
     }

@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Doctor;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateMedicalRecordRequest extends FormRequest
 {
@@ -54,6 +55,15 @@ class UpdateMedicalRecordRequest extends FormRequest
             }
         }
 
+        // Vínculo com a agenda é definido na criação (Iniciar atendimento) e
+        // não tem UI no edit: schedule_id vazio no payload significa "sem
+        // alteração", nunca "desvincular" — senão o 1º update apagava o
+        // vínculo (normalize() → null) e quebrava Finalizar/Dilatar/Exame.
+        if ($this->has('schedule_id') && blank($this->input('schedule_id'))) {
+            $this->request->remove('schedule_id');
+            $this->json()->remove('schedule_id');
+        }
+
         if ($payload !== []) {
             $this->merge($payload);
         }
@@ -63,8 +73,21 @@ class UpdateMedicalRecordRequest extends FormRequest
     {
         return [
             // Identificacao — doctor obrigatório (auto-preenchido se user é médico).
-            'doctor_id'   => ['required', 'uuid', 'exists:doctors,id'],
-            'schedule_id' => ['sometimes', 'nullable', 'uuid', 'exists:schedules,id'],
+            'doctor_id' => ['required', 'uuid', 'exists:doctors,id'],
+            // Vínculo com a agenda escopado por tenant: um schedule_id de outra
+            // clínica não pode ser gravado no prontuário (FK cruzada mataria o
+            // fluxo Finalizar/Dilatar/Exame e vazaria referência entre clínicas).
+            'schedule_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('schedules', 'id')
+                ->where('entity_id', (string) session('selected_entity_id'))
+                ->whereNull('deleted_at')],
+            // Fluxo do atendimento (Agenda ↔ Prontuário): o que acontece com o
+            // paciente após salvar — save (mantém aberto) | finish (Atendido) |
+            // dilate (Dilatando) | exam (Em exame). Não é persistido no registro.
+            'flow_action' => ['nullable', 'string', 'in:save,finish,dilate,exam'],
+            // Ação da barra inferior a abrir automaticamente após o 1º save
+            // (create → edit?action=): emitir receita/atestado sem "salvar
+            // primeiro" manual. Não é persistido no registro.
+            'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,exam_hub,documentations,upload'],
             // Exame fisico — selecoes
             'visual_acuity_type_id'                     => ['sometimes', 'nullable', 'uuid', 'exists:visual_acuity_types,id'],
             'near_point_convergence_id'                 => ['sometimes', 'nullable', 'uuid', 'exists:near_point_convergences,id'],

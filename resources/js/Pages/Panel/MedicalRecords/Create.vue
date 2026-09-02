@@ -27,7 +27,8 @@ defineProps({
     t:               { type: Object,  default: () => ({}) },
 });
 
-const flowGuard = ref(null);
+const flowGuard  = ref(null);
+const recordForm = ref(null);
 
 const viewOpen = ref(false);
 const viewRecord = ref(null);
@@ -79,6 +80,7 @@ function closeView() {
                 <div class="col-12 col-lg-9 col-xl-10">
                     <div class="card pmr-content-card overflow-hidden bg-white">
                         <MedicalRecordForm
+                            ref="recordForm"
                             :patient="patient"
                             :medicalrecord="null"
                             :doctors="doctors"
@@ -88,6 +90,7 @@ function closeView() {
                             :is-edit="false"
                             :catalogs="catalogs"
                             :urls="urls"
+                            :schedule-flow="scheduleFlow"
                             :storage="storage"
                             :t="t"
                         />
@@ -105,6 +108,8 @@ function closeView() {
             :is-doctor="isDoctor"
             :locked="false"
             :exit-url="urls.list"
+            :finish-url="urls.schedules"
+            :submit-flow="(action) => recordForm?.submitFlow(action)"
         />
     </AppLayout>
 </template>

@@ -66,7 +66,8 @@ describe('store record_assist', function () {
         $run = AiRun::query()->firstOrFail();
         expect($run->workflow)->toBe('record_assist')
             ->and($run->input_summary['expects_json'])->toBeTrue()
-            ->and($run->input_summary['system_prompt'])->toBe(__('ai.record_assist_system_prompt'));
+            ->and($run->input_summary['system_prompt'])->toContain(__('ai.record_assist_system_prompt'))
+            ->and($run->input_summary['system_prompt'])->toContain(__('ai.security_preamble'));
     });
 
     it('exige um prontuário em contexto', function () {

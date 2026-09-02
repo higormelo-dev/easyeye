@@ -85,9 +85,12 @@ onMounted(() => {
 
     openEdit(openId);
 
+    // Limpa ?open= sem quebrar o histórico do Inertia (replaceState(null)
+    // apagaria o snapshot da página e travaria o "voltar" do navegador):
+    // visita leve com replace, preservando estado (o modal segue aberto).
     params.delete('open');
-    const qs = params.toString();
-    window.history.replaceState(null, '', route('panel.patients.index') + (qs ? `?${qs}` : ''));
+    const clean = Object.fromEntries(params.entries());
+    router.get(route('panel.patients.index'), clean, { replace: true, preserveState: true, preserveScroll: true });
 });
 
 // ── Detail drawer ────────────────────────────────────────────────────────────

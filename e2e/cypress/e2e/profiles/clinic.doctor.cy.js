@@ -292,31 +292,29 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
     cy.expectPanelPage();
     cy.contains('CY-DOC PACIENTE', { timeout: 15000 }).should('be.visible');
 
-    // Salvar o prontuário (rascunho, sem assinar). Se o modo Texto Livre
-    // estiver ativo, documenta uma linha; nos demais modos salva o registro
-    // base — o backend só exige doctor_id.
-    cy.get('body').then(($b) => {
-      const ta = $b.find('textarea[placeholder^="Descreva livremente"]');
-      if (ta.length) {
-        cy.wrap(ta.first()).type('CY-DOC: atendimento de teste E2E — sem valor clínico.');
-      }
-    });
+    // Salvar o prontuário (rascunho, sem assinar). Queixa principal satisfaz
+    // a validação (main_complaint required_without observação) em QUALQUER
+    // modo de prontuário — é o fluxo clínico real; "Finalizar" também passa
+    // pelo submit do form, então o registro precisa ser válido.
+    cy.get('.pmr-form', { timeout: 15000 }).should('exist');
+    cy.get('.pmr-form textarea[placeholder^="Descreva a queixa"], .pmr-form textarea[placeholder^="Descreva livremente"]')
+      .filter(':visible:not(:disabled)')
+      .first().type('CY-DOC: atendimento de teste E2E — sem valor clínico.');
     cy.intercept('POST', '**/medicalrecords').as('storeRecord');
     cy.get('button.pmr-save-btn').first().click();
     cy.wait('@storeRecord', { timeout: 20000 }).then((i) => {
       expect(i.response.statusCode, `salvar prontuário: ${JSON.stringify(i.response.body).slice(0, 300)}`)
         .to.be.lessThan(400);
     });
-    // Redireciona para a edição do prontuário criado.
-    cy.url({ timeout: 20000 }).should('match', /medicalrecords\/[0-9a-f-]+/);
+    // Salvar MANTÉM a consulta aberta: redireciona pra EDIÇÃO do prontuário
+    // criado (regex estrita — "create" não pode casar).
+    cy.url({ timeout: 20000 }).should('match', /medicalrecords\/[0-9a-f]{8}-[0-9a-f-]{27}\/edit/);
 
-    // Sair pelo botão do cabeçalho → ScheduleFlowGuard pergunta o desfecho.
-    cy.get('button.btn-outline-white:has(i.fa-arrow-left)').first().click();
-    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
-    cy.contains('button', 'Finalizar consulta').click();
-
-    // O exitUrl do FlowGuard leva à lista de prontuários do paciente.
-    cy.url({ timeout: 20000 }).should('match', /patients\/[0-9a-f-]+\/medicalrecords$/);
+    // Salvar ≠ Finalizar: com o prontuário aberto, a barra inferior oferece
+    // "Finalizar consulta" direto (sem passar pelo "←"). Finalizar salva,
+    // marca Atendido e volta pra AGENDA — o médico segue pro próximo.
+    cy.get('button.pmr-flow-finish', { timeout: 10000 }).should('be.visible').click();
+    cy.url({ timeout: 20000 }).should('include', '/panel/schedules');
     cy.expectPanelPage();
 
     // Na agenda, o card do CY-DOC está "Atendido" (busca explícita de novo —
@@ -363,18 +361,11 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
     cy.get('.pmr-form input[placeholder="00"]').eq(1).clear().type('14');
 
     cy.get('button.pmr-save-btn').first().click();
-    // Comportamento REAL do app: save com schedule_id redireciona para a
-    // AGENDA (redirectAfterSave). O registro fica salvo e vinculado ao
-    // agendamento — comprovar via banco e abrir a EDIÇÃO direto (URL real),
-    // sem depender do card da agenda (que pode reabrir um "Novo Prontuário").
-    cy.url({ timeout: 20000 }).should('include', '/panel/schedules');
-    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/mr-url-cydoc.php';"`, { timeout: 40000 })
-      .its('stdout').then((out) => {
-        const m = out.match(/mr:(\S+)/);
-        expect(m, `URL de edição do prontuário salvo (stdout: ${out.slice(-200)})`).to.not.be.null;
-        cy.wrap(m[1]).as('mrUrl');
-        cy.visit(m[1]);
-      });
+    // Salvar MANTÉM a consulta aberta: o 1º save (com schedule_id) volta pro
+    // EDIT do prontuário com a barra de documentos liberada — sem passar pela
+    // Agenda. A URL de edição fica registrada pra reuso no fim do cenário.
+    cy.url({ timeout: 20000 }).should('match', /medicalrecords\/[0-9a-f-]+\/edit/);
+    cy.url().then((u) => cy.wrap(u).as('mrUrl'));
     cy.get('.pmr-form', { timeout: 15000 }).should('exist');
 
     // ── Atestado médico (quick action com payload dias) ────────────────────
@@ -405,7 +396,10 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
       expect(response.statusCode, `atestado: ${JSON.stringify(response.body).slice(0, 300)}`)
         .to.be.lessThan(400);
     });
-    cy.get('body').type('{esc}'); // fecha o preview de PDF do quick action
+    // Preview de PDF (PdfPreviewModal) não fecha de forma confiável com Esc
+    // no Cypress — o iframe do PDF rouba o foco do keydown. Fechar pelo
+    // botão explícito, mesmo padrão já usado pro modal de anexo abaixo.
+    cy.get('.modal.d-block:visible .btn-close', { timeout: 10000 }).last().click({ force: true });
     cy.get('.pmr-form', { timeout: 15000 }).should('exist');
     cy.contains(/Atestado/, { timeout: 15000 }).should('exist');
 
