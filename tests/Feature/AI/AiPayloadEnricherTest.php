@@ -160,6 +160,26 @@ it('força system_prompt server-side (antes ausente) para exam_assistant, report
     }
 });
 
+it('record_assist: field válido vira prompt single-field e é persistível; inválido vira null (prompt completo)', function () {
+    $base = [
+        'workflow'          => 'record_assist',
+        'mode'              => 'validated',
+        'risk_level'        => 'medium',
+        'medical_record_id' => $this->record->id,
+        'patient_id'        => $this->patient->id,
+        'user_prompt'       => 'Sugerir o campo.',
+    ];
+
+    $single = $this->enricher->enrich($base + ['field' => 'main_complaint'], $this->entity->id, false);
+    $bogus  = $this->enricher->enrich($base + ['field' => 'drop table patients'], $this->entity->id, false);
+
+    expect($single['field'])->toBe('main_complaint')
+        ->and($single['system_prompt'])->toContain(__('ai.record_fields.main_complaint'))
+        ->and($bogus['field'])->toBeNull()
+        ->and($bogus['system_prompt'])->toContain(__('ai.record_assist_system_prompt'))
+        ->and($bogus['system_prompt'])->not->toContain('drop table');
+});
+
 it('aplica guardrails e devolve flag _guardrails no payload', function () {
     $out = $this->enricher->enrich([
         'workflow'          => 'record_assist',

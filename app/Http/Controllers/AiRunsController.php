@@ -6,7 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Domains\AI\Exceptions\InsufficientAiCreditsException;
 use App\Domains\AI\Models\AiRun;
-use App\Domains\AI\Services\{AiAnalyticsService, AiCreditPurchaseService, AiCreditWalletService, AiFeedbackService, AiPayloadEnricher, AiPricingService, AiProviderSettings, AiQuotaService, AiRunDocumentationService, AiRunEstimateService, AiRunExecutionService};
+use App\Domains\AI\Services\{AiAnalyticsService, AiCreditPurchaseService, AiCreditWalletService, AiFeedbackService, AiPayloadEnricher, AiPricingService, AiProviderSettings, AiQuotaService, AiRunDocumentationService, AiRunEstimateService, AiRunExecutionService, AiSystemPromptResolver};
 use App\Enums\AI\{AiRiskLevel, AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, EntityGate, FeatureKey};
 use App\Enums\DataAccessPurpose;
@@ -37,6 +37,7 @@ class AiRunsController extends Controller
         private readonly AiFeedbackService $feedbackService,
         private readonly AiRunDocumentationService $documentationService,
         private readonly AiRunEstimateService $estimateService,
+        private readonly AiSystemPromptResolver $promptResolver,
     ) {
     }
 
@@ -509,8 +510,11 @@ class AiRunsController extends Controller
                     'input_summary'     => [
                         'user_prompt'   => $payload['user_prompt'],
                         'system_prompt' => $payload['system_prompt'] ?? null,
-                        'context'       => $payload['context'] ?? [],
-                        'attachments'   => $payload['attachments'] ?? [],
+                        // record_assist single-field: escalate re-deriva o
+                        // system prompt e precisa saber o campo pra manter o modo.
+                        'field'       => $payload['field'] ?? null,
+                        'context'     => $payload['context'] ?? [],
+                        'attachments' => $payload['attachments'] ?? [],
                         // Eye Image: guardamos só as referências dos exames (o
                         // base64 é reconstruído na execução, nunca persistido).
                         'exam_ids'          => array_values((array) ($payload['exam_ids'] ?? [])),
@@ -878,9 +882,17 @@ class AiRunsController extends Controller
         }
 
         // Reconstrói o payload a partir do input_summary do run original. O
-        // contexto/sistema/exam_ids já vieram enriquecidos no run anterior — não
+        // contexto/exam_ids já vieram enriquecidos no run anterior — não
         // re-enriquecemos para evitar drift (paciente/prontuário podem ter mudado).
+        //
+        // SEGURANÇA: o system_prompt NÃO é reaproveitado cru. Runs antigos de
+        // exam_assistant/report_drafting/consensus_review podiam carregar um
+        // system_prompt vindo do cliente (campo editável na UI de Imagens
+        // Oftálmicas / POST direto); e runs anteriores ao preâmbulo de
+        // segurança não o têm. AiSystemPromptResolver::harden() re-deriva
+        // quando não pode confiar e garante o preâmbulo sempre.
         $summary = is_array($aiRun->input_summary) ? $aiRun->input_summary : [];
+        $field   = isset($summary['field']) ? (string) $summary['field'] : null;
         $payload = [
             'workflow'          => (string) $aiRun->workflow,
             'mode'              => $nextMode->value,
@@ -888,7 +900,8 @@ class AiRunsController extends Controller
             'patient_id'        => $aiRun->patient_id,
             'medical_record_id' => $aiRun->medical_record_id,
             'user_prompt'       => (string) ($summary['user_prompt'] ?? ''),
-            'system_prompt'     => $summary['system_prompt'] ?? null,
+            'system_prompt'     => $this->promptResolver->harden((string) $aiRun->workflow, $summary['system_prompt'] ?? null, $field),
+            'field'             => $field,
             'context'           => (array) ($summary['context'] ?? []),
             'attachments'       => (array) ($summary['attachments'] ?? []),
             'exam_ids'          => array_values((array) ($summary['exam_ids'] ?? [])),
@@ -923,6 +936,7 @@ class AiRunsController extends Controller
                     'input_summary'     => [
                         'user_prompt'       => $payload['user_prompt'],
                         'system_prompt'     => $payload['system_prompt'],
+                        'field'             => $payload['field'],
                         'context'           => $payload['context'],
                         'attachments'       => $payload['attachments'],
                         'exam_ids'          => $payload['exam_ids'],

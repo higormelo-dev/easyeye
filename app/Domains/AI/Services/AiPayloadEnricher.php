@@ -27,20 +27,6 @@ use Illuminate\Support\Facades\Gate;
 class AiPayloadEnricher
 {
     /**
-     * Campos clínicos do prontuário que a IA pode sugerir (record_assist).
-     * Espelha as chaves do JSON em ai.record_assist_system_prompt e os v-model
-     * do MedicalRecordForm (1:1, exceto diagnosis_hypothesis → conduta/observação).
-     *
-     * @var list<string>
-     */
-    private const RECORD_FIELDS = [
-        'main_complaint', 'hda', 'medications_in_use', 'ocular_surgical_history',
-        'others_history', 'ocular_motility', 'biomicroscopy_right', 'biomicroscopy_left',
-        'fundoscopy_right', 'fundoscopy_left', 'gonioscopy_right', 'gonioscopy_left',
-        'observation_of_lenses', 'clinical_conduct', 'observation_general', 'diagnosis_hypothesis',
-    ];
-
-    /**
      * Workflows de chat livre multi-turno (têm histórico de conversa via
      * conversation_id — ver buildConversationHistory()). assistant_chat é o
      * assistente clínico do médico; platform_finance_chat é o "converse com
@@ -65,6 +51,7 @@ class AiPayloadEnricher
         private readonly AiPromptGuardrailService $promptGuardrails,
         private readonly FeatureGateService $featureGate,
         private readonly AiProviderSettings $providerSettings,
+        private readonly AiSystemPromptResolver $promptResolver,
     ) {
     }
 
@@ -104,15 +91,14 @@ class AiPayloadEnricher
         // descarte, um POST direto à API (fora da UI, que nunca envia esse
         // campo) conseguia substituir integralmente as instruções enviadas
         // ao provedor de IA para QUALQUER workflow, incluindo os que não
-        // tinham prompt forçado abaixo (prompt injection via API). O valor
-        // definitivo é atribuído em cada branch logo em seguida.
+        // tinham prompt forçado abaixo (prompt injection via API/UI). O valor
+        // definitivo é atribuído no fim deste método pelo AiSystemPromptResolver.
         unset($payload['system_prompt']);
 
         if ($workflow === 'eye_image_analysis') {
-            $payload['exam_ids']      = $this->authorizeExamIds((array) ($payload['exam_ids'] ?? []), $entityId);
-            $payload['system_prompt'] = __('ai.eye_image_system_prompt');
-            $payload['attachments']   = [];
-            $payload['_image_count']  = count($payload['exam_ids']);
+            $payload['exam_ids']     = $this->authorizeExamIds((array) ($payload['exam_ids'] ?? []), $entityId);
+            $payload['attachments']  = [];
+            $payload['_image_count'] = count($payload['exam_ids']);
         }
 
         if ($workflow === 'record_assist') {
@@ -120,13 +106,13 @@ class AiPayloadEnricher
                 abort(422, __('ai.record_assist_record_required'));
             }
 
-            // Modo por campo: quando `field` é um campo clínico suportado, usa o
-            // prompt single-field (sugere só aquele campo). Senão, análise completa.
-            $field = (string) ($payload['field'] ?? '');
-
-            $payload['system_prompt'] = $field !== '' && in_array($field, self::RECORD_FIELDS, true)
-                ? __('ai.record_assist_field_system_prompt', ['field' => __('ai.record_fields.' . $field), 'key' => $field])
-                : __('ai.record_assist_system_prompt');
+            // Modo por campo (`field` válido → prompt single-field) é decidido
+            // pelo AiSystemPromptResolver no fim deste método; aqui só
+            // normalizamos o campo pra ser persistido no input_summary
+            // (escalate precisa dele pra manter o mesmo modo).
+            $payload['field'] = $this->promptResolver->isKnownRecordField($payload['field'] ?? null)
+                ? (string) $payload['field']
+                : null;
 
             $payload['expects_json'] = true;
         }
@@ -136,8 +122,7 @@ class AiPayloadEnricher
         // sem expects_json (resposta é texto livre), e com histórico de
         // conversa multi-turno via conversation_id (ver buildConversationHistory).
         if ($workflow === 'assistant_chat') {
-            $payload['system_prompt'] = __('ai.assistant_chat_system_prompt');
-            $payload['expects_json']  = false;
+            $payload['expects_json'] = false;
         }
 
         // P&L interno do EasyEye — digest estruturado (ganhando/perdendo/
@@ -146,42 +131,25 @@ class AiPayloadEnricher
         // pronto do controller — o enricher só fixa o system prompt e o
         // formato de saída; ver Manager\FinanceController.
         if ($workflow === 'platform_finance_digest') {
-            $payload['system_prompt'] = __('ai.platform_finance_digest_system_prompt');
-            $payload['expects_json']  = true;
+            $payload['expects_json'] = true;
         }
 
         // "Converse com os dados" do P&L interno — chat livre multi-turno,
         // mesmo padrão do assistant_chat, mas contexto e prompt exclusivos
         // do financeiro da plataforma (nunca dado clínico/paciente).
         if ($workflow === 'platform_finance_chat') {
-            $payload['system_prompt'] = __('ai.platform_finance_chat_system_prompt');
-            $payload['expects_json']  = false;
+            $payload['expects_json'] = false;
         }
 
-        // Estes três workflows não tinham prompt forçado (só validados por
-        // FeatureGate) — na prática rodavam SEM system prompt algum (a UI
-        // real nunca envia `system_prompt`), e um POST direto à API podia
-        // preencher o campo livremente. Prompt clínico dedicado adicionado.
-        if (in_array($workflow, ['exam_assistant', 'report_drafting', 'consensus_review'], true)) {
-            $payload['system_prompt'] = __('ai.' . $workflow . '_system_prompt');
-        }
-
-        if (isset($payload['system_prompt'])) {
-            $payload['system_prompt'] = $this->withSecurityPreamble((string) $payload['system_prompt']);
-        }
+        // Ponto ÚNICO: prompt clínico do workflow + preâmbulo de segurança,
+        // pelo AiSystemPromptResolver (mesma fonte usada por escalate e pelo
+        // job de execução). Inclui exam_assistant/report_drafting/
+        // consensus_review, que até aqui não tinham prompt forçado — na UI
+        // da tela Imagens Oftálmicas o campo "System prompt" era editável e
+        // ia direto ao provedor.
+        $payload['system_prompt'] = $this->promptResolver->resolve($workflow, $payload['field'] ?? null);
 
         return $payload;
-    }
-
-    /**
-     * Prependa o preâmbulo de segurança (regras de precedência de
-     * instrução + como tratar o bloco <clinic_data>) a todo system prompt.
-     * Ponto ÚNICO — nenhum workflow monta o prompt final sem passar por
-     * aqui, incluindo os anteriores a esta mudança.
-     */
-    private function withSecurityPreamble(string $workflowPrompt): string
-    {
-        return __('ai.security_preamble') . $workflowPrompt;
     }
 
     /**

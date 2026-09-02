@@ -15,6 +15,8 @@ use Throwable;
 
 class AiRunExecutionService
 {
+    private readonly AiSystemPromptResolver $promptResolver;
+
     public function __construct(
         private readonly AiRunRepositoryInterface $runRepository,
         private readonly AiOrchestrator $orchestrator,
@@ -22,7 +24,12 @@ class AiRunExecutionService
         private readonly AiCreditWalletService $walletService,
         private readonly AiSafetyService $safetyService,
         private readonly EyeImageAttachmentService $eyeImageAttachments,
+        ?AiSystemPromptResolver $promptResolver = null,
     ) {
+        // Sem dependências próprias — default seguro mantém a assinatura
+        // compatível com instanciação manual (testes) e garante que o
+        // endurecimento do system prompt nunca fica "desligado".
+        $this->promptResolver = $promptResolver ?? new AiSystemPromptResolver();
     }
 
     public function execute(AiRun $run): void
@@ -206,11 +213,23 @@ class AiRunExecutionService
     {
         $summary = is_array($run->input_summary) ? $run->input_summary : [];
 
+        // SEGURANÇA — última linha de defesa: qualquer que seja o caminho
+        // que criou o run (UI, API, escalate, fila antiga), o system prompt
+        // que chega ao provedor é re-derivado/endurecido aqui
+        // (AiSystemPromptResolver::harden — nunca aceita valor cru de runs
+        // dos workflows que não tinham prompt forçado; garante o preâmbulo).
+        $workflow = (string) $run->workflow;
+        $field    = isset($summary['field']) ? (string) $summary['field'] : null;
+
         return new AiRequestData(
-            workflow: (string) $run->workflow,
+            workflow: $workflow,
             mode: $run->mode,
             userPrompt: (string) ($summary['user_prompt'] ?? 'Gerar apoio clínico estruturado para revisão médica.'),
-            systemPrompt: isset($summary['system_prompt']) ? (string) $summary['system_prompt'] : null,
+            systemPrompt: $this->promptResolver->harden(
+                $workflow,
+                isset($summary['system_prompt']) ? (string) $summary['system_prompt'] : null,
+                $field,
+            ),
             riskLevel: $run->risk_level instanceof AiRiskLevel ? $run->risk_level : AiRiskLevel::Low,
             context: (array) ($summary['context'] ?? []),
             attachments: $this->resolveAttachments($run, $summary),

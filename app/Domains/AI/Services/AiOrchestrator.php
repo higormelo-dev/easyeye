@@ -229,10 +229,16 @@ class AiOrchestrator
             return $base;
         }
 
+        // Saídas de etapas anteriores vão como DADO (<ai_draft>), nunca como
+        // instrução: são texto gerado pelo modelo a partir do prompt do
+        // usuário — um user_prompt malicioso pode induzir o generator a
+        // emitir "ignore as instruções..." e isso chegaria ao reviewer/
+        // adjudicator como prompt cru (injeção de 2ª ordem). O preâmbulo de
+        // segurança (ai.security_preamble) manda tratar <ai_draft> como dado.
         if ($role === AiProviderCallRole::Reviewer) {
             $reviewPrompt = "Revise a resposta gerada e proponha melhorias clínicas prudentes.\n\n"
                 . "Resposta inicial:\n"
-                . ($previousOutputs[0] ?? '');
+                . $this->asDraft($previousOutputs[0] ?? '');
 
             return new AiRequestData(
                 workflow: $base->workflow,
@@ -249,8 +255,8 @@ class AiOrchestrator
         }
 
         $adjudicationPrompt = "Consolide as respostas abaixo em uma versão única, segura e objetiva.\n\n";
-        $adjudicationPrompt .= "Resposta 1:\n" . ($previousOutputs[0] ?? '') . "\n\n";
-        $adjudicationPrompt .= "Resposta 2:\n" . ($previousOutputs[1] ?? '');
+        $adjudicationPrompt .= "Resposta 1:\n" . $this->asDraft($previousOutputs[0] ?? '') . "\n\n";
+        $adjudicationPrompt .= "Resposta 2:\n" . $this->asDraft($previousOutputs[1] ?? '');
 
         return new AiRequestData(
             workflow: $base->workflow,
@@ -264,6 +270,11 @@ class AiOrchestrator
             maxOutputTokens: $base->maxOutputTokens,
             metadata: array_merge($base->metadata, ['role' => $role->value]),
         );
+    }
+
+    private function asDraft(string $output): string
+    {
+        return "<ai_draft>\n" . trim($output) . "\n</ai_draft>";
     }
 
     /**

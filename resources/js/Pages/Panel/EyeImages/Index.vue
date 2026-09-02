@@ -741,7 +741,9 @@ const aiForm       = reactive({
     risk_level: 'medium',
     patient_id: '',
     user_prompt: '',
-    system_prompt: aiLabel('system_prompt_default', 'Você é um assistente de apoio clínico. Nunca emita decisão final.'),
+    // system_prompt: removido (02/09/2026) — é SEMPRE definido no servidor
+    // (AiSystemPromptResolver); o campo editável era um vetor de prompt
+    // injection pros workflows exam_assistant/consensus_review.
     max_output_tokens: 700,
 });
 
@@ -767,7 +769,7 @@ const aiHasSelection    = computed(() => aiSelectedCount.value > 0);
 const aiDefaultEyePrompt = 'Analisar as imagens oculares selecionadas e descrever os achados por estrutura e lateralidade.';
 
 watch(
-    () => [aiForm.workflow, aiForm.risk_level, aiForm.patient_id, aiForm.user_prompt, aiForm.system_prompt, aiForm.max_output_tokens],
+    () => [aiForm.workflow, aiForm.risk_level, aiForm.patient_id, aiForm.user_prompt, aiForm.max_output_tokens],
     () => { aiEstimate.value = null; },
 );
 
@@ -845,7 +847,7 @@ function aiPayload() {
     return {
         workflow: aiForm.workflow, mode: aiMode.value, risk_level: aiForm.risk_level,
         patient_id: aiForm.patient_id || null, medical_record_id: null,
-        user_prompt: aiForm.user_prompt, system_prompt: aiForm.system_prompt,
+        user_prompt: aiForm.user_prompt,
         context: { specialty: 'ophthalmology', source: 'eye_images_top_modal' },
         attachments: [],
         // Eye Image: envia as imagens selecionadas; o backend resolve o base64.
@@ -1838,11 +1840,8 @@ const printEntity = computed(() => props.entity ?? {});
                                       :placeholder="aiLabel('clinical_prompt_placeholder', 'Descreva o contexto e objetivo clínico.')"></textarea>
                         </div>
 
-                        <!-- System prompt: na análise de imagem é forçado no servidor. -->
-                        <div v-if="!isEyeImageWorkflow" class="mb-3">
-                            <label class="form-label small">{{ aiLabel('system_prompt', 'System prompt') }}</label>
-                            <textarea v-model="aiForm.system_prompt" class="form-control form-control-sm" rows="2"></textarea>
-                        </div>
+                        <!-- System prompt: sem campo — é sempre definido no servidor
+                             (AiSystemPromptResolver), pra TODO workflow. -->
 
                         <div v-if="aiEstimate" class="border rounded p-2 bg-light small">
                             <div class="d-flex justify-content-between align-items-center">
