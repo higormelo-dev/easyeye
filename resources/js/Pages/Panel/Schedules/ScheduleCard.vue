@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import ActionDropdown from '@/Components/Panel/ActionDropdown.vue';
 import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
 import ActionIconGroup from '@/Components/Panel/ActionIconGroup.vue';
+import { formatPatientCode } from '@/utils/formatPatientCode.js';
 
 const props = defineProps({
     item:            { type: Object,  required: true },
@@ -110,7 +111,7 @@ function onSituationClick(trans) {
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <strong class="fs-6" :style="{ color: item.doctor_color }">{{ item.time }}</strong>
                         <span class="fw-semibold">{{ item.name }}</span>
-                        <small v-if="item.code" class="text-muted">({{ item.code }})</small>
+                        <small v-if="item.code" class="text-muted" :title="item.code">({{ formatPatientCode(item.code) }})</small>
                     </div>
 
                     <!-- Row 2: metadata -->

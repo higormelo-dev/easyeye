@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PatientTable    from './PatientTable.vue';
@@ -75,6 +75,20 @@ function closeModal() {
     modalOpen.value     = false;
     editPatientId.value = null;
 }
+
+// Deep-link ?open=<id> — usado pela Agenda ("Cadastro do paciente") pra
+// abrir direto o cadastro do paciente clicado, sem passar pela lista geral.
+onMounted(() => {
+    const params = new URLSearchParams(window.location.search);
+    const openId = params.get('open');
+    if (!openId) return;
+
+    openEdit(openId);
+
+    params.delete('open');
+    const qs = params.toString();
+    window.history.replaceState(null, '', route('panel.patients.index') + (qs ? `?${qs}` : ''));
+});
 
 // ── Detail drawer ────────────────────────────────────────────────────────────
 const detailOpen      = ref(false);

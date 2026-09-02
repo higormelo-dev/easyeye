@@ -785,15 +785,20 @@ class SchedulesController extends Controller
             : ($s->patient_mood ? PatientMood::tryFrom((int) $s->patient_mood) : null);
 
         return [
-            'id'                  => $s->id,
-            'time'                => $s->date_time->format('H:i'),
-            'name'                => $s->full_name ?? '—',
-            'code'                => $s->patient?->code ?? null,
-            'doctor_id'           => $s->doctor_id,
-            'doctor_name'         => $s->doctor?->entityUser?->user?->name ?? '—',
-            'doctor_color'        => $s->doctor?->color ?: '#6c757d',
-            'patient_id'          => $s->patient_id,
-            'patient_url'         => $s->patient_id ? route('panel.patients.show', $s->patient_id) : null,
+            'id'           => $s->id,
+            'time'         => $s->date_time->format('H:i'),
+            'name'         => $s->full_name ?? '—',
+            'code'         => $s->patient?->code ?? null,
+            'doctor_id'    => $s->doctor_id,
+            'doctor_name'  => $s->doctor?->entityUser?->user?->name ?? '—',
+            'doctor_color' => $s->doctor?->color ?: '#6c757d',
+            'patient_id'   => $s->patient_id,
+            // aponta pro index com ?open= em vez de patients.show: show() só
+            // responde JSON (usado via fetch pelo PatientDetailDrawer) e faz
+            // redirect cego pro index em navegação de browser normal (<a href>),
+            // perdendo qual paciente era — Index.vue lê ?open= e abre o
+            // cadastro (PatientFormModal) direto no paciente certo.
+            'patient_url'         => $s->patient_id ? route('panel.patients.index', ['open' => $s->patient_id]) : null,
             'medical_records_url' => $s->patient_id ? route('panel.patients.medicalrecords.index', $s->patient_id) : null,
             // "Iniciar atendimento" (Agenda do médico) — precisa de paciente
             // vinculado; abre o prontuário DESTE agendamento (attend()).
