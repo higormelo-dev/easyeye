@@ -193,6 +193,8 @@ return [
     'drawer_section_resources' => 'Recursos',
     'drawer_section_system'    => 'Sistema',
     'drawer_label_code'        => 'Código',
+    'drawer_copy_code'         => 'Copiar código',
+    'drawer_code_copied'       => 'Código copiado!',
     'drawer_label_datetime'    => 'Data e hora',
     'drawer_label_name'        => 'Nome',
     'drawer_label_record'      => 'CRM',

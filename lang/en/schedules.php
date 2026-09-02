@@ -193,6 +193,8 @@ return [
     'drawer_section_resources' => 'Resources',
     'drawer_section_system'    => 'System',
     'drawer_label_code'        => 'Code',
+    'drawer_copy_code'         => 'Copy code',
+    'drawer_code_copied'       => 'Code copied!',
     'drawer_label_datetime'    => 'Date & time',
     'drawer_label_name'        => 'Name',
     'drawer_label_record'      => 'License #',

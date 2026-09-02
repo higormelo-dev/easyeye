@@ -31,6 +31,25 @@ watch(() => props.open, (val) => {
     if (val && props.scheduleId) loadDetail(props.scheduleId);
     if (!val) schedule.value = null;
 });
+
+// ── Copiar código (SDL/PAC/DOC) ─────────────────────────────────────────────
+// Copia só prefixo + número sem zeros à esquerda (SDL-741 em vez de
+// SDL-0000000741) — cosmético, só o que vai pro clipboard; o valor exibido
+// na tela e o gravado no banco continuam com o zero-padding original.
+const copiedField = ref(null);
+
+function shortCode(code) {
+    const m = String(code ?? '').match(/^([A-Za-z]+)-0*(\d+)$/);
+    return m ? `${m[1]}-${m[2]}` : code;
+}
+
+function copyCode(field, code) {
+    if (!code) return;
+    navigator.clipboard.writeText(shortCode(code)).then(() => {
+        copiedField.value = field;
+        setTimeout(() => { if (copiedField.value === field) copiedField.value = null; }, 2000);
+    });
+}
 </script>
 
 <template>
@@ -60,7 +79,7 @@ watch(() => props.open, (val) => {
                         {{ schedule?.patient_name ?? (t.drawer_loading ?? 'Carregando...') }}
                     </h5>
                     <div v-if="schedule" class="d-flex align-items-center gap-2 flex-wrap mt-1">
-                        <code class="text-muted small">{{ schedule.code }}</code>
+                        <code v-if="schedule.patient_code" class="text-muted small">{{ schedule.patient_code }}</code>
                         <span class="badge rounded-pill" :class="schedule.situation_badge" style="font-size:.7rem;">
                             <i class="fas me-1" :class="schedule.situation_icon"></i>{{ schedule.situation_label }}
                         </span>
@@ -83,7 +102,17 @@ watch(() => props.open, (val) => {
                 <div class="detail-table">
                     <div class="detail-row">
                         <span class="detail-label">{{ t.drawer_label_code ?? 'Código' }}</span>
-                        <span class="detail-value"><code>{{ schedule.code }}</code></span>
+                        <span class="detail-value d-flex align-items-center gap-1">
+                            <code>{{ schedule.code }}</code>
+                            <button
+                                type="button"
+                                class="btn btn-xs btn-outline-secondary"
+                                :title="t.drawer_copy_code ?? 'Copiar código'"
+                                @click="copyCode('schedule', schedule.code)"
+                            >
+                                <i :class="copiedField === 'schedule' ? 'ti ti-check text-success' : 'ti ti-copy'"></i>
+                            </button>
+                        </span>
                     </div>
                     <div class="detail-row">
                         <span class="detail-label">{{ t.drawer_label_datetime ?? 'Data e hora' }}</span>
@@ -120,7 +149,17 @@ watch(() => props.open, (val) => {
                     </div>
                     <div v-if="schedule.patient_code" class="detail-row">
                         <span class="detail-label">{{ t.drawer_label_code ?? 'Código' }}</span>
-                        <span class="detail-value"><code>{{ schedule.patient_code }}</code></span>
+                        <span class="detail-value d-flex align-items-center gap-1">
+                            <code>{{ schedule.patient_code }}</code>
+                            <button
+                                type="button"
+                                class="btn btn-xs btn-outline-secondary"
+                                :title="t.drawer_copy_code ?? 'Copiar código'"
+                                @click="copyCode('patient', schedule.patient_code)"
+                            >
+                                <i :class="copiedField === 'patient' ? 'ti ti-check text-success' : 'ti ti-copy'"></i>
+                            </button>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -144,7 +183,17 @@ watch(() => props.open, (val) => {
                     </div>
                     <div v-if="schedule.doctor_code" class="detail-row">
                         <span class="detail-label">{{ t.drawer_label_code ?? 'Código' }}</span>
-                        <span class="detail-value"><code>{{ schedule.doctor_code }}</code></span>
+                        <span class="detail-value d-flex align-items-center gap-1">
+                            <code>{{ schedule.doctor_code }}</code>
+                            <button
+                                type="button"
+                                class="btn btn-xs btn-outline-secondary"
+                                :title="t.drawer_copy_code ?? 'Copiar código'"
+                                @click="copyCode('doctor', schedule.doctor_code)"
+                            >
+                                <i :class="copiedField === 'doctor' ? 'ti ti-check text-success' : 'ti ti-copy'"></i>
+                            </button>
+                        </span>
                     </div>
                     <div v-if="schedule.doctor_record" class="detail-row">
                         <span class="detail-label">{{ t.drawer_label_record ?? 'CRM' }}</span>
