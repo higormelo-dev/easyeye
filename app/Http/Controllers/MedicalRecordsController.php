@@ -9,7 +9,7 @@ use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
     MedicalRecord, NearPointConvergence, Patient, Schedule, VisualAcuityType};
-use App\Models\ReportSettingContent;
+use App\Models\{ReportSetting, ReportSettingContent};
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ScheduleService, UsageMeterService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
@@ -1123,12 +1123,23 @@ class MedicalRecordsController extends Controller
         return $redirect;
     }
 
+    /**
+     * SEGURANÇA: ReportSetting tem EntityScope global (TenantScopeServiceProvider)
+     * — pra um content de OUTRA clínica, a relação normal `reportSetting`
+     * (sujeita ao scope) resolve pra null, não pro dono real. Confiar nisso
+     * faria "de outra clínica" passar como "sem dono" — vazando o `content`
+     * de um template privado de outro tenant pra quem soubesse/adivinhasse o
+     * UUID. `withoutEntityScope()` vê o dono verdadeiro, scope ou não.
+     */
     private function assertTemplateBelongsToCurrentEntity(ReportSettingContent $content): void
     {
         $selectedEntityId = (string) session('selected_entity_id');
-        $content->loadMissing('reportSetting');
 
-        $settingEntityId = (string) ($content->reportSetting?->entity_id ?? '');
+        $settingEntityId = (string) (ReportSetting::query()
+            ->withoutEntityScope()
+            ->whereKey($content->report_setting_id)
+            ->value('entity_id') ?? '');
+
         abort_if($settingEntityId !== '' && $settingEntityId !== $selectedEntityId, 404);
     }
 }

@@ -304,6 +304,146 @@ class ReportSettingContentSeeder extends Seeder
                         . '<p>Mácula: Brilho e reflexos regulares.</p>'
                         . '<p>Coróide: Normal.</p>',
                 ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'retinopatia-diabetica-nao-proliferativa',
+                    'label'      => 'Retinopatia Diabética Não Proliferativa',
+                    'sort_order' => 2,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Escavação, bordos e coloração dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Presença de microaneurismas e/ou hemorragias em chama de vela e puntiformes dispersos pelo pólo posterior e média periferia. Exsudatos duros presentes.</p><p>Mácula: Sem edema aparente à biomicroscopia/retinografia.</p><p>Coróide: Sem alterações.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Escavação, bordos e coloração dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Presença de microaneurismas e/ou hemorragias em chama de vela e puntiformes dispersos pelo pólo posterior e média periferia. Exsudatos duros presentes.</p><p>Mácula: Sem edema aparente à biomicroscopia/retinografia.</p><p>Coróide: Sem alterações.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Retinopatia Diabética Não Proliferativa. Recomenda-se controle glicêmico rigoroso e reavaliação periódica.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'retinopatia-diabetica-proliferativa',
+                    'label'      => 'Retinopatia Diabética Proliferativa',
+                    'sort_order' => 3,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Presença de neovasos discais (NVD) e/ou neovasos em outros locais da retina (NVE).</p><p>Vasos: Alterações vasculares extensas, com áreas de não perfusão capilar sugeridas pela isquemia retiniana.</p><p>Retina: Hemorragias extensas (em chama de vela, puntiformes e/ou pré-retinianas/vítreas), exsudatos duros e algodonosos, presença de neovascularização em quatro quadrantes.</p><p>Mácula: Edema macular associado possível.</p><p>Coróide: Sem alterações visíveis.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Presença de neovasos discais (NVD) e/ou neovasos em outros locais da retina (NVE).</p><p>Vasos: Alterações vasculares extensas, com áreas de não perfusão capilar sugeridas pela isquemia retiniana.</p><p>Retina: Hemorragias extensas (em chama de vela, puntiformes e/ou pré-retinianas/vítreas), exsudatos duros e algodonosos, presença de neovascularização em quatro quadrantes.</p><p>Mácula: Edema macular associado possível.</p><p>Coróide: Sem alterações visíveis.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Retinopatia Diabética Proliferativa Grave. Indica-se panfotocoagulação a laser, terapia antiangiogênica e controle glicêmico rigoroso, com encaminhamento urgente para avaliação de vítreo-retina.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'dmri-seca',
+                    'label'      => 'DMRI Seca (Atrófica)',
+                    'sort_order' => 4,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Periferia sem lesões degenerativas relevantes.</p><p>Mácula: Presença de drusas de médio/grande porte no pólo posterior, associadas a alterações do epitélio pigmentar da retina (áreas de atrofia geográfica quando presentes).</p><p>Coróide: Sem sinais de neovascularização.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Periferia sem lesões degenerativas relevantes.</p><p>Mácula: Presença de drusas de médio/grande porte no pólo posterior, associadas a alterações do epitélio pigmentar da retina (áreas de atrofia geográfica quando presentes).</p><p>Coróide: Sem sinais de neovascularização.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Degeneração Macular Relacionada à Idade (DMRI) forma seca/atrófica. Recomenda-se suplementação conforme protocolo AREDS2 quando indicado e acompanhamento periódico.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'dmri-umida',
+                    'label'      => 'DMRI Úmida (Exsudativa)',
+                    'sort_order' => 5,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Periferia sem lesões degenerativas relevantes.</p><p>Mácula: Membrana neovascular sub-retiniana com exsudação, hemorragia e/ou edema macular associado; drusas de fundo presentes.</p><p>Coróide: Sinais compatíveis com neovascularização de coróide.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Periferia sem lesões degenerativas relevantes.</p><p>Mácula: Membrana neovascular sub-retiniana com exsudação, hemorragia e/ou edema macular associado; drusas de fundo presentes.</p><p>Coróide: Sinais compatíveis com neovascularização de coróide.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Degeneração Macular Relacionada à Idade (DMRI) forma úmida/exsudativa/neovascular. Indica-se OCT/angio-OCT para confirmação e terapia antiangiogênica intravítrea.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'descolamento-retina',
+                    'label'      => 'Descolamento de Retina',
+                    'sort_order' => 6,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade, quando visível.</p><p>Vasos: Trajeto alterado sobre a área de retina descolada.</p><p>Retina: Área de descolamento com retina elevada, mobilidade ondulante, presença de ruptura(s)/rasgadura(s) retiniana(s) quando identificável(is).</p><p>Mácula: Envolvimento macular a avaliar (mácula on/off).</p><p>Coróide: Sem sinais de descolamento coroidal associado.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Trajeto preservado.</p><p>Retina: Colada em toda a sua extensão, sem lesões degenerativas predisponentes visíveis.</p><p>Mácula: Brilho e reflexos regulares.</p><p>Coróide: Normal.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Descolamento de Retina Regmatogênico em Olho Direito. Caso de urgência oftalmológica — encaminhar imediatamente para avaliação de retina cirúrgica.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'oclusao-veia-central-retina',
+                    'label'      => 'Oclusão de Veia Central da Retina',
+                    'sort_order' => 7,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Bordos borrados, hiperemiada.</p><p>Vasos: Veias retinianas dilatadas e tortuosas em quatro quadrantes.</p><p>Retina: Hemorragias retinianas extensas (em chama de vela) distribuídas nos quatro quadrantes, exsudatos algodonosos presentes.</p><p>Mácula: Edema macular associado.</p><p>Coróide: Sem alterações visíveis.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão, textura normal.</p><p>Mácula: Brilho e reflexos regulares.</p><p>Coróide: Normal.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Oclusão de Veia Central da Retina em Olho Direito. Recomenda-se OCT macular, avaliação de isquemia (angiografia quando indicado) e considerar terapia antiangiogênica/controle de fatores de risco sistêmicos.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'edema-macular-cistoide',
+                    'label'      => 'Edema Macular Cistoide',
+                    'sort_order' => 8,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão fora do polo posterior.</p><p>Mácula: Espessamento macular com padrão cistoide, perda dos reflexos foveais habituais.</p><p>Coróide: Sem alterações visíveis.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão, textura normal.</p><p>Mácula: Brilho e reflexos regulares.</p><p>Coróide: Normal.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Edema Macular Cistoide em Olho Direito. Sugere-se confirmação por OCT macular e investigação da causa de base (pós-cirúrgico, diabético, vascular ou inflamatório).</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'buraco-macular',
+                    'label'      => 'Buraco Macular',
+                    'sort_order' => 9,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão fora do polo posterior.</p><p>Mácula: Solução de continuidade central de espessura total sugestiva de buraco macular, com halo de descolamento perilesional.</p><p>Coróide: Sem alterações visíveis.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão, textura normal.</p><p>Mácula: Brilho e reflexos regulares.</p><p>Coróide: Normal.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Buraco Macular em Olho Direito. Indica-se confirmação por OCT (estadiamento) e avaliação para cirurgia vitreorretiniana.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'membrana-epirretiniana',
+                    'label'      => 'Membrana Epirretiniana',
+                    'sort_order' => 10,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Trajeto retificado/tortuoso por tração da membrana sobre o pólo posterior.</p><p>Retina: Colada em toda a sua extensão fora do polo posterior.</p><p>Mácula: Brilho superficial (reflexo em "celofane"), pregueamento da retina interna e distorção dos vasos maculares compatíveis com membrana epirretiniana.</p><p>Coróide: Sem alterações visíveis.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão, textura normal.</p><p>Mácula: Brilho e reflexos regulares.</p><p>Coróide: Normal.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Membrana Epirretiniana em Olho Direito. Sugere-se OCT macular para graduação e acompanhamento; cirurgia vitreorretiniana indicada conforme repercussão visual.</p>',
+                ],
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'coriorretinopatia-serosa-central',
+                    'label'      => 'Coriorretinopatia Serosa Central',
+                    'sort_order' => 11,
+                    'content'    => '<p style="text-align:right">{{LOCAL_DATA}}</p>'
+                        . '<p>&nbsp;</p>'
+                        . '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>OLHO DIREITO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão fora do polo posterior.</p><p>Mácula: Área de descolamento seroso do neuroepitélio na região macular, sem hemorragia ou exsudação lipídica associada.</p><p>Coróide: Espessamento coroidal sugestivo à biomicroscopia indireta.</p>'
+                        . '<p><strong>OLHO ESQUERDO</strong></p>'
+                        . '<p>Meios: Transparentes e normais.</p><p>Papila Óptica: Dentro dos padrões de normalidade.</p><p>Vasos: Calibre e trajeto preservados.</p><p>Retina: Colada em toda a sua extensão, textura normal.</p><p>Mácula: Brilho e reflexos regulares.</p><p>Coróide: Normal.</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> Coriorretinopatia Serosa Central em Olho Direito. Recomenda-se OCT macular para confirmação, controle de fatores de risco (estresse, uso de corticoide) e reavaliação em 4-6 semanas antes de considerar tratamento a laser.</p>',
+                ],
             ],
 
             'LAUDO DE ANGIOFLUORESCEINOGRAFIA' => [

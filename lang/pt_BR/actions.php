@@ -453,7 +453,16 @@ return [
         'back_to_schedule'    => 'Voltar para Agenda',
         'flow_cash_blocked'   => 'Prontuário salvo. Para finalizar, a recepção precisa lançar o caixa deste atendimento — a consulta continua aberta.',
         'flow_already_closed' => 'Prontuário salvo, mas o atendimento já está ":status" na Agenda — o status não foi alterado.',
-        'schedule'            => 'Agenda',
+        // Pergunta pós-Salvar (não some do prontuário sozinho): pra onde o médico quer ir agora?
+        'save_prompt_title'         => 'Prontuário salvo!',
+        'save_prompt_subtitle'      => 'O que você quer fazer agora?',
+        'save_prompt_continue'      => 'Continuar no prontuário',
+        'save_prompt_continue_hint' => 'Fica nesta tela — o atendimento segue em andamento.',
+        'save_prompt_agenda'        => 'Ir para a Agenda',
+        'save_prompt_agenda_hint'   => 'Salvo — a consulta continua em andamento, você segue pro próximo paciente.',
+        'save_prompt_list'          => 'Ver prontuários do paciente',
+        'save_prompt_list_hint'     => 'Histórico completo de atendimentos deste paciente.',
+        'schedule'                  => 'Agenda',
         // ── Cobertura i18n do prontuário (29/08/2026) ────────────────────
         'ai_insert_confirm'       => 'O campo já tem conteúdo. Anexar a sugestão da IA ao final?',
         'collapse_panel'          => 'Recolher painel',

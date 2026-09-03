@@ -54,6 +54,35 @@ return [
     'ai_no_selection'    => 'Selecione ao menos uma imagem para analisar.',
     'ai_report'          => 'Laudo da IA',
     'ai_reported_badge'  => 'Laudado (IA)',
+    'download_pdf'       => 'Baixar PDF',
+
+    // Laudo manual (Modelos) — reaproveita o catálogo de templates das
+    // Documentações do prontuário, filtrado a laudos/exames especializados.
+    'report_doctor_required'     => 'Selecione um médico responsável antes de emitir o laudo.',
+    'report_default_title'       => 'Laudo de Exame de Imagem',
+    'report_title'               => 'Novo laudo',
+    'report_new'                 => 'Novo laudo',
+    'report_templates'           => 'Modelos',
+    'report_template_blank'      => 'Em branco',
+    'report_loading_templates'   => 'Carregando modelos…',
+    'report_no_templates'        => 'Nenhum modelo disponível.',
+    'report_content_label'       => 'Conteúdo do laudo',
+    'report_title_placeholder'   => 'Título do laudo (opcional)',
+    'report_save'                => 'Salvar laudo',
+    'report_saved'               => 'Laudo salvo com sucesso.',
+    'report_save_failed'         => 'Não foi possível salvar o laudo.',
+    'report_confirm_open_record' => 'Não há prontuário do dia da consulta para este paciente. Deseja abrir um novo prontuário para registrar o laudo?',
+    'report_content_required'    => 'Escreva o conteúdo do laudo antes de salvar.',
+
+    // Comparar / Alinhar (evolução entre exames)
+    'compare_title'             => 'Comparar exames',
+    'compare_action'            => 'Comparar',
+    'compare_select_two'        => 'Selecione exatamente 2 imagens para comparar.',
+    'compare_mode_overlay'      => 'Sobrepor',
+    'compare_mode_side_by_side' => 'Lado a lado',
+    'compare_opacity'           => 'Opacidade',
+    'compare_reset'             => 'Redefinir posição',
+    'compare_hint'              => 'Arraste a imagem de cima para alinhar os pontos de referência.',
 
     // Importar exame externo
     'import' => [

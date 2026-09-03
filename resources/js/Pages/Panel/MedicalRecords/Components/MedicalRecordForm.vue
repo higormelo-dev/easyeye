@@ -664,15 +664,68 @@ function submit(flowAction = null) {
         return;
     }
 
-    form.flow_action = typeof flowAction === 'string' ? flowAction : null;
+    const normalizedFlowAction = typeof flowAction === 'string' ? flowAction : null;
+    form.flow_action = normalizedFlowAction;
+
+    // Só o clique isolado em "Salvar" (edit, sem flow_action nem ação da
+    // barra pendente) pergunta o destino — Dilatar/Exame/Finalizar já
+    // decidem sozinhos (Agenda), e o save-then-open-modal da barra de
+    // documentos (withRecord) não deve interromper o médico com um prompt.
+    const shouldPromptDestination = props.isEdit && normalizedFlowAction === null && !form.post_save_action;
 
     const url = props.isEdit ? props.urls.update : props.urls.store;
     const method = props.isEdit ? 'put' : 'post';
     form[method](url, {
         preserveScroll: true,
+        onSuccess: () => { if (shouldPromptDestination) promptSaveDestination(); },
         onError: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
         onFinish: () => { form.flow_action = null; form.post_save_action = null; },
     });
+}
+
+/**
+ * Pós-"Salvar" simples: prontuário fica salvo e ABERTO no edit (comportamento
+ * de sempre) — pergunta se o médico quer continuar aqui, ir pra Agenda ou
+ * ver a lista de prontuários do paciente. Cartões no mesmo estilo do modal
+ * de saída do ScheduleFlowGuard (ícone + rótulo + explicação), não o
+ * genérico de 3 botões cinza do SweetAlert — mais fácil de escanear rápido
+ * no meio da consulta. Fechar/Esc = continuar (padrão já é ficar na tela).
+ */
+const showSaveDestinationModal = ref(false);
+
+const saveDestinationOptions = computed(() => [
+    {
+        action: 'continue',
+        label: tt('save_prompt_continue', 'Continuar no prontuário'),
+        hint:  tt('save_prompt_continue_hint', 'Fica nesta tela — o atendimento segue em andamento.'),
+        icon:  'fas fa-notes-medical',
+        btn:   'btn-primary',
+    },
+    {
+        action: 'agenda',
+        label: tt('save_prompt_agenda', 'Ir para a Agenda'),
+        hint:  tt('save_prompt_agenda_hint', 'Salvo — a consulta continua em andamento, você segue pro próximo paciente.'),
+        icon:  'fas fa-calendar-alt',
+        btn:   'btn-outline-primary',
+    },
+    {
+        action: 'list',
+        label: tt('save_prompt_list', 'Ver prontuários do paciente'),
+        hint:  tt('save_prompt_list_hint', 'Histórico completo de atendimentos deste paciente.'),
+        icon:  'fas fa-folder-open',
+        btn:   'btn-outline-secondary',
+    },
+]);
+
+function promptSaveDestination() {
+    showSaveDestinationModal.value = true;
+}
+
+function chooseSaveDestination(action) {
+    showSaveDestinationModal.value = false;
+    if (action === 'agenda') router.visit(props.urls.schedules);
+    else if (action === 'list') router.visit(props.urls.list);
+    // 'continue' (ou Esc/fora/X): fica no prontuário — nada a fazer.
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -3101,4 +3154,43 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         @close="showUploadModal = false"
         @uploaded="onFileUploaded"
         @storage-updated="onStorageUpdated" />
+
+    <!-- Destino pós-"Salvar": mesmo padrão de cartão (ícone + rótulo + hint)
+         do modal de saída do ScheduleFlowGuard — consistência visual entre
+         os dois pontos de "e agora, pra onde?" do prontuário. -->
+    <Teleport to="body">
+        <div v-if="showSaveDestinationModal" class="modal fade show d-block" tabindex="-1"
+             style="background:rgba(0,0,0,.5);z-index:1080;"
+             @click.self="chooseSaveDestination('continue')"
+             @keydown.escape.window="chooseSaveDestination('continue')">
+            <div class="modal-dialog modal-dialog-centered pmr-save-modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header py-2">
+                        <h6 class="modal-title">
+                            <i class="fas fa-circle-check me-2 text-success"></i>{{ tt('save_prompt_title', 'Prontuário salvo!') }}
+                        </h6>
+                        <button type="button" class="btn-close" @click="chooseSaveDestination('continue')"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">{{ tt('save_prompt_subtitle', 'O que você quer fazer agora?') }}</p>
+
+                        <div class="d-grid gap-2">
+                            <button v-for="opt in saveDestinationOptions"
+                                    :key="opt.action"
+                                    type="button"
+                                    class="btn pmr-save-modal-option"
+                                    :class="opt.btn"
+                                    @click="chooseSaveDestination(opt.action)">
+                                <span class="pmr-save-modal-option__icon"><i :class="opt.icon"></i></span>
+                                <span class="pmr-save-modal-option__text">
+                                    <span class="pmr-save-modal-option__label">{{ opt.label }}</span>
+                                    <span class="pmr-save-modal-option__hint">{{ opt.hint }}</span>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>

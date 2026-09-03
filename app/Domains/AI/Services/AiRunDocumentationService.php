@@ -6,8 +6,8 @@ namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Models\AiRun;
 use App\Enums\DocumentationType;
-use App\Models\{Doctor, MedicalRecord, MedicalRecordDocumentation, PatientExam, Schedule};
-use Illuminate\Support\Carbon;
+use App\Models\{MedicalRecord, MedicalRecordDocumentation, PatientExam};
+use App\Services\ConsultationRecordResolver;
 use Mews\Purifier\Facades\Purifier;
 
 /**
@@ -15,9 +15,19 @@ use Mews\Purifier\Facades\Purifier;
  *
  * Regra do prontuário do DIA DA CONSULTA + idempotência por ai_run_id. Sem
  * mudança de comportamento: lógica movida verbatim do controller.
+ *
+ * A ancoragem "prontuário do dia" em si vive em ConsultationRecordResolver
+ * (serviço neutro, compartilhado com o laudo manual do Gerenciador de
+ * Imagens) — os métodos públicos abaixo mantêm o nome/assinatura originais
+ * (usados por AiRunsController) e delegam pra lá.
  */
 class AiRunDocumentationService
 {
+    public function __construct(
+        private readonly ConsultationRecordResolver $recordResolver = new ConsultationRecordResolver(),
+    ) {
+    }
+
     /**
      * Persiste o laudo no prontuário do DIA DA CONSULTA (agendamento). Regra:
      *  - Run já vinculado a um prontuário específico -> grava nele.
@@ -83,21 +93,9 @@ class AiRunDocumentationService
      * Prontuário da consulta: prioriza o do MESMO agendamento; na falta, qualquer
      * prontuário do paciente no mesmo DIA do agendamento.
      */
-    private function findConsultationRecord(string $entityId, string $patientId, ?string $scheduleId, string $consultationDate): ?MedicalRecord
+    public function findConsultationRecord(string $entityId, string $patientId, ?string $scheduleId, string $consultationDate): ?MedicalRecord
     {
-        $base = MedicalRecord::query()
-            ->where('entity_id', $entityId)
-            ->where('patient_id', $patientId);
-
-        if ($scheduleId) {
-            $record = (clone $base)->where('schedule_id', $scheduleId)->latest('created_at')->first();
-
-            if ($record) {
-                return $record;
-            }
-        }
-
-        return (clone $base)->whereDate('created_at', $consultationDate)->latest('created_at')->first();
+        return $this->recordResolver->findRecord($entityId, $patientId, $scheduleId, $consultationDate);
     }
 
     /**
@@ -108,19 +106,7 @@ class AiRunDocumentationService
      */
     public function consultationAnchorForRun(AiRun $aiRun): array
     {
-        $scheduleId = PatientExam::query()
-            ->whereIn('id', (array) ($aiRun->input_summary['exam_ids'] ?? []))
-            ->whereNotNull('schedule_id')
-            ->orderByDesc('created_at')
-            ->value('schedule_id');
-
-        if ($scheduleId) {
-            $dateTime = Schedule::query()->whereKey($scheduleId)->value('date_time');
-
-            return [(string) $scheduleId, $dateTime ? Carbon::parse($dateTime)->toDateString() : now()->toDateString()];
-        }
-
-        return [null, now()->toDateString()];
+        return $this->recordResolver->anchorForExamIds((array) ($aiRun->input_summary['exam_ids'] ?? []));
     }
 
     /**
@@ -176,12 +162,6 @@ class AiRunDocumentationService
      */
     public function resolveDoctorIdForCurrentUser(string $entityId): ?string
     {
-        $userId = (string) auth()->id();
-
-        return Doctor::query()
-            ->whereHas('entityUser', function ($query) use ($entityId, $userId): void {
-                $query->where('entity_id', $entityId)->where('user_id', $userId);
-            })
-            ->value('id');
+        return $this->recordResolver->resolveDoctorIdForCurrentUser($entityId);
     }
 }

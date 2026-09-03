@@ -29,12 +29,22 @@ class MedicalRecordDocumentationService
 
     /**
      * Templates ativos da entidade atual (próprios + adotados).
+     *
+     * @param list<string>|null $categorySlugs Restringe a settings destas
+     *                                         categorias (ver ReportCategory.slug) — usado pelo Gerenciador de
+     *                                         Imagens, que só quer "laudos"/"exames-especializados" na lista, não
+     *                                         receituários/atestados. Sem filtro (default), comportamento igual ao
+     *                                         original: todos os templates ativos.
      */
-    public function getActiveTemplates(string $entityId): array
+    public function getActiveTemplates(string $entityId, ?array $categorySlugs = null): array
     {
         return ReportSetting::with(['contents' => fn ($q) => $q->where('active', true)])
             ->where(fn ($q) => $q->where('entity_id', $entityId)->orWhereNull('entity_id'))
             ->where('active', true)
+            ->when(
+                $categorySlugs !== null,
+                fn ($q) => $q->whereHas('category', fn ($c) => $c->whereIn('slug', $categorySlugs)),
+            )
             // Exclui antecipadamente settings sem conteúdo ativo, para que o groupBy
             // não deixe uma cópia adotada vazia "ganhar" sobre o global que tem conteúdo.
             ->whereHas('contents', fn ($q) => $q->where('active', true))
@@ -73,6 +83,49 @@ class MedicalRecordDocumentationService
         ?MedicalRecord $medicalRecord = null,
     ): array {
         return $this->variableResolver->resolve($content, $patient, $doctor, $entity, $medicalRecord);
+    }
+
+    /**
+     * Garante que um ReportSettingContent é global OU pertence à entity ativa
+     * — content de outra clínica nunca deve ser resolvido/usado aqui (404, não
+     * 403: não confirma existência do template de outra clínica).
+     *
+     * SEGURANÇA: ReportSetting tem EntityScope global (TenantScopeServiceProvider)
+     * — pra QUALQUER outra clínica, `$content->reportSetting` (relação normal,
+     * sujeita ao scope) resolve para null, não para o dono real. Confiar nisso
+     * faria o guard tratar "de outra clínica" como "sem dono" (passa!) — vaza
+     * o `content` de um template privado de outro tenant pra quem souber/
+     * adivinhar o UUID. `withoutEntityScope()` vê o dono verdadeiro, scope ou
+     * não (mantém a checagem de soft-delete intacta).
+     */
+    public function assertTemplateBelongsToEntity(ReportSettingContent $content, string $entityId): void
+    {
+        $settingEntityId = (string) (ReportSetting::query()
+            ->withoutEntityScope()
+            ->whereKey($content->report_setting_id)
+            ->value('entity_id') ?? '');
+
+        abort_if($settingEntityId !== '' && $settingEntityId !== $entityId, 404);
+    }
+
+    /**
+     * Limpa o HTML de um template resolvido para exibição num editor livre:
+     *   - remove placeholders remanescentes ({{CONTEUDO_LIVRE}} etc.) que o
+     *     TemplateVariableResolver não resolve (preenchidos só via quick-actions);
+     *   - remove o cabeçalho de data/local já resolvido (duplicaria o que o
+     *     bloco de assinatura do PDF mostra).
+     * Mesmo tratamento usado pelo editor de Documentações do prontuário —
+     * reaproveitado aqui para manter os dois editores idênticos.
+     */
+    public function stripResolvedPlaceholders(string $html): string
+    {
+        $html = preg_replace('/\{\{[A-Z_][A-Z0-9_]*\}\}/u', '', $html) ?? $html;
+
+        // <p ... text-align:right ...>QUALQUER COISA</p>(\s*<p>&nbsp;</p>)? só
+        // no INÍCIO do conteúdo (no máximo após whitespace).
+        $pattern = '/^\s*<p\s+[^>]*text-align\s*:\s*right[^>]*>[^<]*<\/p>\s*(?:<p[^>]*>&nbsp;<\/p>)?\s*/iu';
+
+        return preg_replace($pattern, '', $html, 1) ?? $html;
     }
 
     /**

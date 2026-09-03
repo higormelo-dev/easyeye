@@ -13,8 +13,7 @@ use Database\Factories\AI\AiRunFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany, HasMany};
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, BelongsToMany, HasMany, HasOne};
 
 class AiRun extends Model
 {
@@ -88,6 +87,17 @@ class AiRun extends Model
     public function medicalRecord(): BelongsTo
     {
         return $this->belongsTo(MedicalRecord::class, 'medical_record_id');
+    }
+
+    /**
+     * Documentação gravada no prontuário quando o laudo é aprovado (ver
+     * AiRunDocumentationService::writeRunDocumentation, idempotente por
+     * ai_run_id) — usada pra montar o link de PDF do laudo de IA na tela de
+     * Imagens Oftálmicas (EyeImagesController::examAiReport).
+     */
+    public function documentation(): HasOne
+    {
+        return $this->hasOne(MedicalRecordDocumentation::class, 'ai_run_id');
     }
 
     public function requestedBy(): BelongsTo

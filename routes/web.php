@@ -10,6 +10,7 @@ use App\Http\Controllers\{
     DoctorsController,
     ExamDiagnosisController,
     ExternalExamImportController,
+    EyeImageReportController,
     EyeImagesController,
     Financial\BillingController as FinancialBillingController,
     Financial\CashClosingController,
@@ -193,6 +194,21 @@ Route::group(
         Route::put('/eye-images/exams/{exam}/diagnosis', [ExamDiagnosisController::class, 'updateDiagnosis'])
             ->middleware('entity.role:admin,doctor')
             ->name('eye-images.exams.diagnosis.update');
+
+        // Laudo manual do Gerenciador de Imagens (Modelos + editor livre) — ver
+        // EyeImageReportController. templates()/previewTemplate() são leitura
+        // (mesmo allowlist de diagnósticos acima); store() grava documentação
+        // clínica e o Gate::IssueReport (doctor-only) é checado dentro do
+        // controller, mesmo padrão do bloco de diagnóstico.
+        Route::get('/eye-images/report-templates', [EyeImageReportController::class, 'templates'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.report-templates.index');
+        Route::post('/eye-images/report-templates/preview', [EyeImageReportController::class, 'previewTemplate'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.report-templates.preview');
+        Route::post('/eye-images/reports', [EyeImageReportController::class, 'store'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.reports.store');
 
         // Importar exame externo (upload manual, sem integrador). entity.role
         // cobre admin/doctor/secretary; o Gate EntityGate::ImportExternalExam

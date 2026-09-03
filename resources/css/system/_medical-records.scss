@@ -537,6 +537,65 @@
     border-color: #b197fc;
 }
 
+/* Modal de destino pós-"Salvar" — cartões ícone+rótulo+hint, mesmo padrão
+   visual do modal de saída do ScheduleFlowGuard (.sfg-option). */
+.pmr-save-modal-dialog {
+    max-width: 480px;
+}
+
+.pmr-save-modal-option {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: .7rem .9rem;
+    text-align: start;
+    white-space: normal;
+    line-height: 1.35;
+    border-radius: .6rem;
+    transition: transform .12s, box-shadow .12s;
+}
+
+.pmr-save-modal-option:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .08);
+}
+
+.pmr-save-modal-option__icon {
+    flex-shrink: 0;
+    width: 2.1rem;
+    height: 2.1rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .2);
+    font-size: 1rem;
+}
+
+.pmr-save-modal-option.btn-outline-primary .pmr-save-modal-option__icon,
+.pmr-save-modal-option.btn-outline-secondary .pmr-save-modal-option__icon {
+    background: rgba(13, 110, 253, .1);
+}
+
+.pmr-save-modal-option__text {
+    display: block;
+    min-width: 0;
+}
+
+.pmr-save-modal-option__label {
+    display: block;
+    font-weight: 600;
+}
+
+.pmr-save-modal-option__hint {
+    display: block;
+    font-size: .8rem;
+    opacity: .8;
+    overflow-wrap: anywhere;
+}
+
 .btn-pink {
     background-color: #de6a79;
     border-color: #cc5868;

@@ -82,6 +82,10 @@ async function initEditor() {
         content_css: 'default',
         setup: (editor) => {
             editor.on('init', () => {
+                // Atribui aqui (não só depois do `await tinymce.init()` abaixo) pra
+                // fechar a janela em que um watch(modelValue) concorrente vê
+                // `editorInstance` ainda nulo e descarta a atualização de conteúdo.
+                editorInstance = editor;
                 editor.setContent(props.modelValue ?? '');
                 if (props.disabled) editor.mode.set('readonly');
             });

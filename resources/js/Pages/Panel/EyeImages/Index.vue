@@ -6,6 +6,8 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import DiagnosisManagerModal from '@/Components/Panel/DiagnosisManagerModal.vue';
 import ImportExternalExamModal from '@/Components/Panel/ImportExternalExamModal.vue';
+import EyeImageReportModal from './EyeImageReportModal.vue';
+import EyeImageCompareModal from './EyeImageCompareModal.vue';
 
 /**
  * Eye Images — porta fiel da implementação Alpine.js original.
@@ -24,6 +26,7 @@ const props = defineProps({
     total_exams: { type: Number, default: 0 },
     urls:        { type: Object, required: true },
     ai:          { type: Object, default: () => ({}) },
+    isDoctor:    { type: Boolean, default: false },
     t:           { type: Object, default: () => ({}) },
 });
 
@@ -708,6 +711,12 @@ const aiWorkflows = computed(() => Array.isArray(props.ai?.workflows) ? props.ai
 const aiLabels    = computed(() => props.ai?.labels ?? {});
 const aiLabel = (key, fallback = '') => aiLabels.value?.[key] ?? fallback;
 
+// Rótulos gerais da página (lang/eye_images.php inteiro, distinto de
+// props.ai.labels, que é só o subconjunto do painel de IA).
+function tt(key, fallback = '') {
+    return props.t?.[key] ?? fallback;
+}
+
 const aiPatients = computed(() => patients.value.map((p) => ({
     id: p.id, name: p.person?.full_name ?? p.full_name, code: p.code,
 })));
@@ -986,6 +995,48 @@ function openDiagnosisModal() {
     if (!focusedExam.value) return;
     diagnosisModalExam.value = focusedExam.value;
     diagnosisModalOpen.value = true;
+}
+
+// ── Laudo manual (Modelos) ───────────────────────────────────────────────
+const reportModalOpen = ref(false);
+
+function openReportModal() {
+    if (!selectedPatient.value) return;
+    reportModalOpen.value = true;
+}
+
+const reportPatientPayload = computed(() => selectedPatient.value ? {
+    id: selectedPatient.value.id,
+    code: selectedPatient.value.code,
+    name: selectedPatient.value.person?.full_name ?? selectedPatient.value.full_name,
+} : null);
+
+const reportUrls = computed(() => ({
+    templates: props.urls?.report_templates ?? '',
+    preview:   props.urls?.report_preview ?? '',
+    store:     props.urls?.report_store ?? '',
+}));
+
+function onReportSaved() {
+    fetchPatients(); // atualiza badge/histórico de laudos do paciente
+}
+
+// ── Comparar / Alinhar (evolução entre exames) ───────────────────────────
+const compareModalOpen = ref(false);
+
+const compareImages = computed(() => selectedExamIds.value.slice(0, 2).map((id) => {
+    const exam = selectedPatient.value?.exams?.find(e => e.id === id);
+    return {
+        id,
+        url: examUrls.value[id] ?? '',
+        label: [exam?.exam_type?.name, latLabel(exam?.laterality), formatDateTime(exam?.created_at)]
+            .filter(Boolean).join(' — '),
+    };
+}));
+
+function openCompareModal() {
+    if (selectedExamIds.value.length !== 2) return;
+    compareModalOpen.value = true;
 }
 
 // urls.exam_diagnosis_update chega como template com placeholder __ID__
@@ -1282,10 +1333,20 @@ const printEntity = computed(() => props.entity ?? {});
                                 @click="openViewerModal(selectedPatient.exams)">
                             <i class="fa fa-th me-1"></i>Visualizar todos
                         </button>
+                        <button type="button" class="btn btn-sm btn-outline-info"
+                                :disabled="selectedExamIds.length !== 2"
+                                :title="tt('compare_select_two', 'Selecione exatamente 2 imagens para comparar.')"
+                                @click="openCompareModal">
+                            <i class="ti ti-adjustments-horizontal me-1"></i>{{ tt('compare_action', 'Comparar') }}
+                        </button>
                         <div class="vr opacity-25"></div>
                         <button type="button" class="btn btn-sm btn-outline-dark"
                                 @click="openPrintModal(selectedPatient.exams, false)">
                             <i class="fa fa-print me-1"></i>Imprimir
+                        </button>
+                        <button v-if="isDoctor" type="button" class="btn btn-sm btn-outline-primary"
+                                @click="openReportModal">
+                            <i class="ti ti-file-text me-1"></i>{{ tt('report_new', 'Novo laudo') }}
                         </button>
                         <div class="flex-grow-1"></div>
                         <span v-if="selectedExamIds.length > 0" class="text-muted" style="font-size:.7rem;">
@@ -1408,13 +1469,24 @@ const printEntity = computed(() => props.entity ?? {});
                                                     </span>
                                                 </span>
 
-                                                <!-- Badge laudo IA -->
+                                                <!-- Badge laudo IA (+ atalho de PDF quando já gravado no prontuário) -->
                                                 <span v-if="exam.ai_report?.approved"
-                                                      class="position-absolute bottom-0 end-0 badge bg-info text-dark d-flex align-items-center"
-                                                      style="z-index:2;margin:3px;font-size:.5rem;cursor:pointer;"
-                                                      :title="aiLabel('eye_image_reported', 'Laudado (IA)')"
-                                                      @click.stop="openExistingReport(exam)">
-                                                    <i class="ti ti-robot me-1"></i>IA
+                                                      class="position-absolute bottom-0 end-0 d-flex align-items-center gap-1"
+                                                      style="z-index:2;margin:3px;">
+                                                    <a v-if="exam.ai_report.pdf_url"
+                                                       :href="exam.ai_report.pdf_url" target="_blank"
+                                                       class="badge bg-danger-subtle text-danger d-flex align-items-center"
+                                                       style="font-size:.5rem;"
+                                                       :title="tt('download_pdf', 'Baixar PDF')"
+                                                       @click.stop>
+                                                        <i class="ti ti-file-download"></i>
+                                                    </a>
+                                                    <span class="badge bg-info text-dark d-flex align-items-center"
+                                                          style="font-size:.5rem;cursor:pointer;"
+                                                          :title="aiLabel('eye_image_reported', 'Laudado (IA)')"
+                                                          @click.stop="openExistingReport(exam)">
+                                                        <i class="ti ti-robot me-1"></i>IA
+                                                    </span>
                                                 </span>
 
                                                 <!-- Thumbnail com imagem (miniatura gerada; fallback: exibição/original) -->
@@ -1942,6 +2014,25 @@ const printEntity = computed(() => props.entity ?? {});
             }"
             @close="showImportModal = false"
             @imported="onExternalExamImported"
+        />
+
+        <!-- Laudo manual (Modelos) -->
+        <EyeImageReportModal
+            :open="reportModalOpen"
+            :patient="reportPatientPayload"
+            :exam-ids="selectedExamIds"
+            :urls="reportUrls"
+            :t="t"
+            @close="reportModalOpen = false"
+            @saved="onReportSaved"
+        />
+
+        <!-- Comparar / Alinhar exames -->
+        <EyeImageCompareModal
+            :open="compareModalOpen"
+            :images="compareImages"
+            :t="t"
+            @close="compareModalOpen = false"
         />
     </AppLayout>
 </template>

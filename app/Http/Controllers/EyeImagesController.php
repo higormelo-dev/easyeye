@@ -8,7 +8,7 @@ use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaService};
 use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
-use App\Enums\FeatureKey;
+use App\Enums\{ClientRule, FeatureKey};
 use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, Patient, PatientExam};
 use App\Services\FeatureGateService;
 use App\Traits\LogsDataAccess;
@@ -85,10 +85,19 @@ class EyeImagesController extends Controller
             'filters'     => $filters->toArray(),
             'exam_types'  => $this->availableExamTypes($entityId),
             'equipments'  => $this->availableEquipments($entityId),
-            'urls'        => [
+            // Laudo manual e diagnóstico de exame são atos clínicos exclusivos
+            // do médico (CFM Res. 2.227/2018 — mesmo Gate IssueReport checado
+            // no EyeImageReportController). A UI usa isso pra esconder os
+            // botões; o backend valida de novo, não depende só disto.
+            'isDoctor' => session('selected_entity_user_rule') === ClientRule::Doctor->value,
+            'urls'     => [
                 'search'       => route('panel.eye-images.search'),
                 'patient_urls' => route('panel.eye-images.patient-urls', ['patient' => '__ID__']),
                 'image_url'    => route('panel.eye-images.image-url', ['exam' => '__ID__']),
+                // Laudo manual (Modelos) — ver EyeImageReportController.
+                'report_templates' => route('panel.eye-images.report-templates.index'),
+                'report_preview'   => route('panel.eye-images.report-templates.preview'),
+                'report_store'     => route('panel.eye-images.reports.store'),
                 // shape=select + placeholder __Q__: formato remoto consumido por
                 // SearchSelect.vue (filtro de Diagnóstico da barra de filtros).
                 'cid10_search' => route('panel.eye-images.cid10-search', ['shape' => 'select']) . '&q=__Q__',
@@ -371,12 +380,19 @@ class EyeImagesController extends Controller
         }
 
         $isApproved = $run->status === AiRunStatus::Approved;
+        $doc        = $run->relationLoaded('documentation') ? $run->documentation : null;
 
         return [
             'run_id'   => (string) $run->id,
             'status'   => $run->status?->value,
             'approved' => $isApproved,
             'content'  => $isApproved ? (string) $run->final_output : null,
+            // PDF formal do laudo (timbre/assinatura) — só existe quando o laudo
+            // já foi gravado no prontuário (aprovado + prontuário do dia
+            // resolvido; ver AiRunDocumentationService). Mesmo PDF do laudo manual.
+            'pdf_url' => ($doc && $doc->medical_record_id)
+                ? route('panel.patients.medicalrecords.documentations.pdf', [$exam->patient_id, $doc->medical_record_id, $doc->id])
+                : null,
         ];
     }
 
@@ -394,7 +410,9 @@ class EyeImagesController extends Controller
                         'examType',
                         'doctor.person',
                         'equipment',
-                        'aiRuns' => fn ($r) => $r->orderByDesc('ai_runs.created_at'),
+                        // .documentation: id do MedicalRecordDocumentation gravado na
+                        // aprovação — monta o link de PDF do laudo (examAiReport()).
+                        'aiRuns' => fn ($r) => $r->orderByDesc('ai_runs.created_at')->with('documentation:id,ai_run_id,medical_record_id'),
                     ])->orderByDesc('created_at');
                 },
             ])

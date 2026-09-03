@@ -450,7 +450,16 @@ return [
         'back_to_schedule'    => 'Back to Schedule',
         'flow_cash_blocked'   => 'Record saved. To finish, the front desk must register the cash entry for this visit — the visit stays open.',
         'flow_already_closed' => 'Record saved, but the visit is already ":status" on the Schedule — status was not changed.',
-        'schedule'            => 'Schedule',
+        // Post-Save prompt: where does the doctor want to go now?
+        'save_prompt_title'         => 'Record saved!',
+        'save_prompt_subtitle'      => 'What do you want to do now?',
+        'save_prompt_continue'      => 'Continue on the record',
+        'save_prompt_continue_hint' => 'Stay on this screen — the visit is still in progress.',
+        'save_prompt_agenda'        => 'Go to the Schedule',
+        'save_prompt_agenda_hint'   => 'Saved — the visit stays in progress, you move on to the next patient.',
+        'save_prompt_list'          => 'View patient records',
+        'save_prompt_list_hint'     => 'Full visit history for this patient.',
+        'schedule'                  => 'Schedule',
         // ── Cobertura i18n do prontuário (29/08/2026) ────────────────────
         'ai_insert_confirm'       => 'This field already has content. Append the AI suggestion at the end?',
         'collapse_panel'          => 'Collapse panel',
