@@ -70,6 +70,16 @@ describe('store record_assist', function () {
             ->and($run->input_summary['system_prompt'])->toContain(__('ai.security_preamble'));
     });
 
+    it('[SEGURANÇA] rejeita attachments não-vazios enviados pelo cliente (422)', function () {
+        Queue::fake();
+
+        storeRecordAssist($this, [
+            'attachments' => [['image_url' => 'https://attacker.example/injected.png']],
+        ])->assertStatus(422)->assertJsonValidationErrors(['attachments']);
+
+        expect(AiRun::query()->count())->toBe(0);
+    });
+
     it('exige um prontuário em contexto', function () {
         Queue::fake();
         storeRecordAssist($this, ['medical_record_id' => null])->assertStatus(422);

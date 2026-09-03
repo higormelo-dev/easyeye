@@ -47,7 +47,12 @@ class StoreAiRunRequest extends BaseRequest
             'user_prompt'       => ['required', 'string', 'min:12', 'max:30000'],
             'system_prompt'     => ['nullable', 'string', 'max:10000'],
             'context'           => ['nullable', 'array'],
-            'attachments'       => ['nullable', 'array'],
+            // Anexos NÃO são aceitos do cliente (max:0 = só array vazio): o único
+            // fluxo com imagem é eye_image_analysis, que resolve os anexos no
+            // servidor a partir de exam_ids na execução. Um anexo livre viraria
+            // image_url arbitrária (provedor busca a URL) ou base64 sem limite
+            // — vetor de injection visual e de custo.
+            'attachments'       => ['nullable', 'array', 'max:0'],
             'exam_ids'          => ['nullable', 'array', 'max:' . (int) config('ai.eye_image.max_images', 4)],
             'exam_ids.*'        => ['uuid'],
             'expects_json'      => ['nullable', 'boolean'],

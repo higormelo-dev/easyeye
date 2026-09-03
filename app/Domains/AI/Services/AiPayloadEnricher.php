@@ -95,6 +95,12 @@ class AiPayloadEnricher
         // definitivo é atribuído no fim deste método pelo AiSystemPromptResolver.
         unset($payload['system_prompt']);
 
+        // SEGURANÇA: anexos nunca vêm do cliente. eye_image_analysis reconstrói
+        // os seus a partir de exam_ids na execução (EyeImageAttachmentService);
+        // nenhum outro workflow tem anexo legítimo. Um array livre aqui virava
+        // `image_url` arbitrária (o provedor busca a URL) ou base64 ilimitado.
+        $payload['attachments'] = [];
+
         if ($workflow === 'eye_image_analysis') {
             $payload['exam_ids']     = $this->authorizeExamIds((array) ($payload['exam_ids'] ?? []), $entityId);
             $payload['attachments']  = [];
@@ -277,7 +283,7 @@ class AiPayloadEnricher
      */
     private function buildContext(array $payload, string $entityId): array
     {
-        $userContext = (array) ($payload['context'] ?? []);
+        $userContext = $this->sanitizeClientContext((array) ($payload['context'] ?? []));
 
         $patient = ! empty($payload['patient_id'])
             ? Patient::query()->find((string) $payload['patient_id'])
@@ -309,6 +315,28 @@ class AiPayloadEnricher
         }
 
         return $context;
+    }
+
+    /**
+     * Remove do contexto vindo do cliente as chaves que o servidor reserva:
+     * `conversation_history` (senão o cliente forja turnos "assistant" — um
+     * canal de manipulação além do user_prompt) e qualquer chave iniciada em
+     * `_` (marcadores internos, ex.: _built_by). O resto segue — vai pro
+     * provedor dentro de <clinic_data>, tratado como dado.
+     *
+     * @param array<string, mixed> $userContext
+     *
+     * @return array<string, mixed>
+     */
+    private function sanitizeClientContext(array $userContext): array
+    {
+        return array_filter(
+            $userContext,
+            static fn ($value, $key) => is_string($key)
+                && $key !== 'conversation_history'
+                && ! str_starts_with($key, '_'),
+            ARRAY_FILTER_USE_BOTH,
+        );
     }
 
     /**
