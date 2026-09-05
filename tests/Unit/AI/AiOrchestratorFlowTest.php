@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiModelPriceRepositoryInterface, AiProviderInterface, AiRunProviderCallStoreInterface};
+use App\Domains\AI\Contracts\{AiModelPriceRepositoryInterface, AiProviderInterface};
 use App\Domains\AI\Models\{AiModelPrice, AiRun};
 use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, GeminiFakeProvider, OpenAiFakeProvider};
 use App\Domains\AI\Services\{AiOrchestrator, AiPricingService, AiProviderManager, AiProviderSettings};
@@ -11,6 +11,7 @@ use App\DTOs\AI\AiUsageData;
 use App\Enums\AI\{AiProvider, AiProviderCallRole, AiRiskLevel, AiRunMode, AiRunStatus};
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Tests\Support\Fakes\{InMemoryAiCircuitBreaker, InMemoryCallStore};
 use Tests\TestCase;
 
 uses(TestCase::class)->in(__FILE__);
@@ -35,56 +36,6 @@ function buildPricingServiceForOrchestrator(): AiPricingService
     };
 
     return new AiPricingService($emptyRepo);
-}
-
-/**
- * Circuit breaker in-memory para testes do orchestrator (Unit, sem RefreshDatabase).
- * Evita dependência da tabela ai_circuit_breakers em testes que rodam fora do contexto
- * de Feature/DB. Implementa AiCircuitBreakerInterface (mesmo contract do serviço real).
- */
-class InMemoryAiCircuitBreaker implements AiCircuitBreakerInterface
-{
-    /** @var array<string, int> */
-    public array $failures = [];
-
-    /** @var array<string, bool> */
-    public array $openCircuits = [];
-
-    public function __construct(private readonly int $testThreshold = 5)
-    {
-    }
-
-    public function isOpen(AiProvider $provider, ?string $entityId = null): bool
-    {
-        return $this->openCircuits[$this->key($provider, $entityId)] ?? false;
-    }
-
-    public function recordSuccess(AiProvider $provider, ?string $entityId = null): void
-    {
-        $key = $this->key($provider, $entityId);
-        unset($this->failures[$key], $this->openCircuits[$key]);
-    }
-
-    public function recordFailure(AiProvider $provider, string $triggerType, ?string $entityId = null): void
-    {
-        $key                  = $this->key($provider, $entityId);
-        $this->failures[$key] = ($this->failures[$key] ?? 0) + 1;
-
-        if ($this->failures[$key] >= $this->testThreshold) {
-            $this->openCircuits[$key] = true;
-        }
-    }
-
-    public function reset(AiProvider $provider, ?string $entityId = null): void
-    {
-        $key = $this->key($provider, $entityId);
-        unset($this->failures[$key], $this->openCircuits[$key]);
-    }
-
-    private function key(AiProvider $provider, ?string $entityId): string
-    {
-        return $provider->value . '|' . ($entityId ?? 'global');
-    }
 }
 
 test('orchestrator executa fluxo economy com 1 provider', function () {
@@ -382,33 +333,4 @@ function buildAiRun(AiRunMode $mode): AiRun
     $run->id = (string) Str::uuid();
 
     return $run;
-}
-
-class InMemoryCallStore implements AiRunProviderCallStoreInterface
-{
-    /** @var array<int, array<string, mixed>> */
-    public array $entries = [];
-
-    public function store(
-        string $aiRunId,
-        AiProviderCallRole $role,
-        string $status,
-        ?AiProviderResponseData $response = null,
-        ?string $errorMessage = null,
-        array $metadata = [],
-        ?int $normalizedCredits = null,
-    ): void {
-        $this->entries[] = [
-            'ai_run_id' => $aiRunId,
-            'role'      => $role->value,
-            'status'    => $status,
-            // Mesma resolução do EloquentAiRunProviderCallStore real: fallback para
-            // metadata.provider quando response é null (caso de status=skipped).
-            'provider'           => $response?->provider->value ?? (string) ($metadata['provider'] ?? 'unknown'),
-            'model'              => $response?->model,
-            'error'              => $errorMessage,
-            'normalized_credits' => $normalizedCredits,
-            'metadata'           => $metadata,
-        ];
-    }
 }

@@ -33,10 +33,16 @@
       "Bash(./vendor/bin/pest tests/Feature/Auth/)",
       "Bash(./vendor/bin/pest tests/Feature/Auth/RegistrationTest.php)",
       "Bash(php -r \"echo PHP_SAPI . PHP_EOL;\")",
-      "Bash(php -r ' *)"
+      "Bash(php -r ' *)",
+      "Bash(rtk find *)",
+      "Bash(mkdir -p tests/Support/Fakes && rtk ls tests/Support/Fakes)",
+      "Bash(rtk composer *)",
+      "Bash(php -v)",
+      "Bash(rtk docker *)"
     ],
     "additionalDirectories": [
-      "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images"
+      "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images",
+      "/Users/higormelo/Sites/MyStartup/easyeye/tests/Support"
     ]
   },
   "enabledPlugins": {
