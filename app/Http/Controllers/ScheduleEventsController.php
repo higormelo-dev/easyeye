@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\ScheduleEvent;
+use Closure;
 use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ScheduleEventsController extends Controller
@@ -13,15 +15,7 @@ class ScheduleEventsController extends Controller
         $entityId = session('selected_entity_id');
 
         $request->validate([
-            'doctor_id' => [
-                'nullable',
-                'uuid',
-                Rule::exists('doctors', 'id')->where(function ($q) use ($entityId) {
-                    $q->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
-                        ->where('entity_users.entity_id', $entityId)
-                        ->whereNull('doctors.deleted_at');
-                }),
-            ],
+            'doctor_id' => ['nullable', 'uuid', $this->doctorBelongsToEntityRule()],
             'title'     => ['required', 'string', 'max:150'],
             'type'      => ['required', 'string', Rule::in(array_keys(ScheduleEvent::$types))],
             'starts_at' => ['required', 'date'],
@@ -54,7 +48,7 @@ class ScheduleEventsController extends Controller
         abort_if($scheduleEvent->entity_id !== $entityId, 403);
 
         $request->validate([
-            'doctor_id' => ['nullable', 'uuid'],
+            'doctor_id' => ['nullable', 'uuid', $this->doctorBelongsToEntityRule()],
             'title'     => ['required', 'string', 'max:150'],
             'type'      => ['required', 'string', Rule::in(array_keys(ScheduleEvent::$types))],
             'starts_at' => ['required', 'date'],
@@ -78,6 +72,30 @@ class ScheduleEventsController extends Controller
         $scheduleEvent->delete();
 
         return response()->json(['message' => 'Compromisso removido.']);
+    }
+
+    /**
+     * Achado de segurança (auditoria panel.* IDOR — doctor_id via request
+     * body): Doctor não tem entity_id direto (só via entity_user_id ->
+     * entity_users.entity_id), então 'uuid'/Rule::exists('doctors', 'id')
+     * sozinho deixa passar médico de OUTRA clínica. Mesma closure usada em
+     * ScheduleRequest::rules() — extraída aqui para compartilhar entre
+     * store() e update() e evitar drift entre os dois.
+     */
+    private function doctorBelongsToEntityRule(): Closure
+    {
+        return function ($attribute, $value, $fail) {
+            $exists = DB::table('doctors')
+                ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                ->where('doctors.id', $value)
+                ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+                ->whereNull('doctors.deleted_at')
+                ->exists();
+
+            if (! $exists) {
+                $fail(__('validation.custom.schedule.doctor_not_found'));
+            }
+        };
     }
 
     private function format(ScheduleEvent $event): array

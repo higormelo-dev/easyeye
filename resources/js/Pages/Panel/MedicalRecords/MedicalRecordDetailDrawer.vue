@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue';
 import OffcanvasPanel    from '@/Components/Panel/OffcanvasPanel.vue';
 import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
 import PdfPreviewModal   from './Components/PdfPreviewModal.vue';
+import ShareWithPatientToggle from '@/Components/Panel/ShareWithPatientToggle.vue';
 
 /**
  * Drawer de detalhes do prontuário (read-only) — abas:
@@ -330,12 +331,23 @@ function closePdfPreview() {
                                     </small>
                                 </td>
                                 <td class="text-end">
-                                    <ActionIconButton
-                                        icon="ti ti-eye"
-                                        title="Visualizar documento"
-                                        variant="default"
-                                        @click="openPdfPreview(doc)"
-                                    />
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        <ActionIconButton
+                                            icon="ti ti-eye"
+                                            title="Visualizar documento"
+                                            variant="default"
+                                            @click="openPdfPreview(doc)"
+                                        />
+                                        <ShareWithPatientToggle
+                                            shareable-type="laudo"
+                                            :shareable-id="doc.id"
+                                            :patient-id="patient.id"
+                                            :is-shared="doc.shared_with_patient"
+                                            :share-id="doc.document_share_id"
+                                            :disabled="!detail.is_signed"
+                                            @changed="loadDetail"
+                                        />
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>

@@ -63,21 +63,21 @@ class PatientExamsController extends Controller
             $search       = request()->search;
             $patientExams = $patientExams->where(function ($query) use ($search) {
                 $query->whereHas('patient', function ($q) use ($search) {
-                    $q->where('code', 'ilike', '%' . $search . '%')
+                    $q->whereLikeUnaccent('code', $search)
                         ->orWhereHas('person', function ($p) use ($search) {
-                            $p->where('full_name', 'ilike', '%' . $search . '%')
-                                ->orWhere('nickname', 'ilike', '%' . $search . '%');
+                            $p->whereLikeUnaccent('full_name', $search)
+                                ->orWhereLikeUnaccent('nickname', $search);
                         });
                 })
                     ->orWhereHas('doctor', function ($q) use ($search) {
-                        $q->where('code', 'ilike', '%' . $search . '%')
+                        $q->whereLikeUnaccent('code', $search)
                             ->orWhereHas('person', function ($p) use ($search) {
-                                $p->where('full_name', 'ilike', '%' . $search . '%')
-                                    ->orWhere('nickname', 'ilike', '%' . $search . '%');
+                                $p->whereLikeUnaccent('full_name', $search)
+                                    ->orWhereLikeUnaccent('nickname', $search);
                             });
                     })
                     ->orWhereHas('schedule', function ($q) use ($search) {
-                        $q->where('code', 'ilike', '%' . $search . '%');
+                        $q->whereLikeUnaccent('code', $search);
                     });
             });
         }

@@ -15,7 +15,7 @@ use App\Services\ScheduleService;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Support\Facades\{Cache, Gate};
+use Illuminate\Support\Facades\{Cache, DB, Gate};
 use Illuminate\Support\Str;
 use Illuminate\Validation\{Rule, ValidationException};
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -453,7 +453,23 @@ class SchedulesController extends Controller
 
         $request->validate([
             'date_time' => ['required', 'date'],
-            'doctor_id' => ['nullable', 'uuid'],
+            // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
+            // request body): Doctor não tem entity_id direto (só via
+            // entity_user_id -> entity_users.entity_id), então 'uuid' sozinho
+            // deixava reagendar com médico de OUTRA clínica. Mesmo closure já
+            // usado em ScheduleRequest::rules() para store()/update().
+            'doctor_id' => ['nullable', 'uuid', function ($attribute, $value, $fail) {
+                $exists = DB::table('doctors')
+                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                    ->where('doctors.id', $value)
+                    ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+                    ->whereNull('doctors.deleted_at')
+                    ->exists();
+
+                if (! $exists) {
+                    $fail(__('validation.custom.schedule.doctor_not_found'));
+                }
+            }],
         ]);
 
         $entityId = session()->get('selected_entity_id');
@@ -681,10 +697,9 @@ class SchedulesController extends Controller
         }
 
         if ($search) {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower) {
-                $q->whereRaw('LOWER(schedules.full_name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"]);
+            $query->where(function ($q) use ($search) {
+                $q->whereLikeUnaccent('schedules.full_name', $search)
+                    ->orWhereLikeUnaccent('people.full_name', $search);
             });
         }
 

@@ -34,6 +34,12 @@ class HandleInertiaRequests extends Middleware
             return 'portal-app';
         }
 
+        // Portal do Paciente: entry-point próprio, com <meta noindex> (LGPD) —
+        // NUNCA reaproveitar panel-app aqui (o guard é "patient", não "web").
+        if ($request->routeIs('patient-portal.*')) {
+            return 'patient-portal-app';
+        }
+
         return 'app';
     }
 
@@ -73,7 +79,14 @@ class HandleInertiaRequests extends Middleware
                 'post_save_action' => session('post_save_action'),
             ],
 
-            'auth' => fn () => $this->authProps($request),
+            // BUGFIX (revisão de segurança): authProps() lê $request->user()
+            // do guard "web" (default) INCONDICIONALMENTE. Sem este guard,
+            // se o mesmo navegador tiver uma sessão de staff aberta em outra
+            // aba, uma página do Portal do Paciente (guard "patient") também
+            // recebia o perfil de STAFF nesse prop (autodivulgação do
+            // próprio usuário, não vazamento cross-user, mas o portal nunca
+            // deveria depender do guard "web" pra nada).
+            'auth' => fn () => $request->routeIs('patient-portal.*') ? [] : $this->authProps($request),
 
             'nav' => fn () => ($request->routeIs('panel.*') || $request->routeIs('manager.*')) && $request->user()
                 ? PanelNavigation::build()

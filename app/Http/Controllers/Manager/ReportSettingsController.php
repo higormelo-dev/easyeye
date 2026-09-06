@@ -32,7 +32,7 @@ class ReportSettingsController extends Controller
         $direction  = $request->string('direction')->value() === 'desc' ? 'desc' : 'asc';
 
         $reportSettings = ReportSetting::global()
-            ->when($search, fn ($q) => $q->whereRaw('LOWER(title) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->when($search, fn ($q) => $q->whereLikeUnaccent('title', $search))
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($categoryId, fn ($q) => $q->where('report_category_id', $categoryId))
             ->with('category')
@@ -74,7 +74,7 @@ class ReportSettingsController extends Controller
         $perPage    = 12;
 
         $records = ReportSetting::global()
-            ->when($search, fn ($q) => $q->whereRaw('LOWER(title) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->when($search, fn ($q) => $q->whereLikeUnaccent('title', $search))
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($categoryId, fn ($q) => $q->where('report_category_id', $categoryId))
             ->with('category')
@@ -95,6 +95,9 @@ class ReportSettingsController extends Controller
 
     public function show(ReportSetting $reportSetting): JsonResponse
     {
+        // BUGFIX (revisao de seguranca): este controller manager só deve enxergar templates globais; sem esse check, {report_setting} resolve para qualquer clínica.
+        abort_unless($reportSetting->isGlobal(), 404);
+
         return response()->json(['data' => $this->toFormData($reportSetting)]);
     }
 
@@ -120,6 +123,9 @@ class ReportSettingsController extends Controller
 
     public function update(Request $request, ReportSetting $reportSetting): mixed
     {
+        // BUGFIX (revisao de seguranca): este controller manager só deve enxergar templates globais; sem esse check, {report_setting} resolve para qualquer clínica.
+        abort_unless($reportSetting->isGlobal(), 404);
+
         $validated = $this->validateRequest($request);
 
         $reportSetting->update($validated);
@@ -137,6 +143,9 @@ class ReportSettingsController extends Controller
 
     public function destroy(Request $request, ReportSetting $reportSetting): mixed
     {
+        // BUGFIX (revisao de seguranca): este controller manager só deve enxergar templates globais; sem esse check, {report_setting} resolve para qualquer clínica.
+        abort_unless($reportSetting->isGlobal(), 404);
+
         $request->validate([
             'reason' => ['required', 'string', 'min:20', 'max:1000'],
         ], [
@@ -169,6 +178,9 @@ class ReportSettingsController extends Controller
 
     public function preview(ReportSetting $reportSetting): View
     {
+        // BUGFIX (revisao de seguranca): este controller manager só deve enxergar templates globais; sem esse check, {report_setting} resolve para qualquer clínica.
+        abort_unless($reportSetting->isGlobal(), 404);
+
         $reportSetting->load([
             'activeContents' => fn ($q) => $q->orderBy('sort_order')->orderBy('label'),
         ]);

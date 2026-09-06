@@ -89,11 +89,11 @@ class DoctorRequest extends FormRequest
             'required_without:type_method',
             'string',
             'max:255',
-            Rule::unique('people', 'email')
-                ->ignore($this->getIgnoredPersonId(), 'id')
-                ->where(function ($query) {
-                    $query->whereNull('deleted_at');
-                }),
+            // BUGFIX (revisao de seguranca): unicidade de email deve ser validada contra "users" (tabela de
+            // login usada por DoctorService::findOrCreateUser), nao "people" -- staff sem registro em
+            // "people" (secretary/admin/financial) permitia colisao de email de login cross-tenant.
+            Rule::unique('users', 'email')
+                ->ignore($this->getIgnoredUserId(), 'id'),
         ];
         $rules['mother_name']            = ['nullable', 'string', 'min:2', 'max:255'];
         $rules['father_name']            = ['nullable', 'string', 'min:2', 'max:255'];
@@ -171,6 +171,26 @@ class DoctorRequest extends FormRequest
                 ->first();
 
             return $doctor && $doctor->person ? $doctor->person->id : null;
+        }
+
+        return null;
+    }
+
+    // BUGFIX (revisao de seguranca): resolve o "users.id" do proprio medico em edicao, para o unique de
+    // email (agora contra "users") nao rejeitar o email atual dele.
+    private function getIgnoredUserId()
+    {
+        if ($this->isMethod('PUT') || $this->isMethod('PATCH')) {
+            $doctorId = $this->route('doctor');
+
+            $doctor = Doctor::query()
+                ->with('entityUser.user')
+                ->where('doctors.id', $doctorId)
+                ->first();
+
+            return $doctor && $doctor->entityUser && $doctor->entityUser->user
+                ? $doctor->entityUser->user->id
+                : null;
         }
 
         return null;

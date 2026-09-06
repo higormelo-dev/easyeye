@@ -208,8 +208,11 @@ class AsaasGateway extends AbstractHttpGateway
     {
         $secret = $this->resolveWebhookSecret();
 
+        // BUGFIX (revisao de seguranca): sem webhook_secret configurado não é possível
+        // validar a assinatura, então falha FECHADO (rejeita) — aceitar sem verificação
+        // permitia forjar webhooks e mutar assinaturas sem autenticação.
         if ($secret === null || $secret === '') {
-            return true; // sem secret configurado: aceita em dev/sandbox
+            return false;
         }
 
         $provided = $payload->headers['asaas-access-token']

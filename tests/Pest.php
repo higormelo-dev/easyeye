@@ -1,13 +1,21 @@
 <?php
 
+use App\Enums\AI\{AiRiskLevel, AiRunMode};
+use App\Enums\{ClientRule, FeatureKey, ScheduleSituation, SubscriptionStatus};
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, EntityUserIntegrator, PatientAccount, People, Plan, PlanFeature, Schedule, Subscription, User};
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
 |--------------------------------------------------------------------------
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
@@ -35,35 +43,35 @@ expect()->extend('toBeOne', function () {
 function setupIntegrator(array $featureOverrides = []): array
 {
     $features = array_merge([
-        \App\Enums\FeatureKey::HasApiIntegrator->value => '1',
+        FeatureKey::HasApiIntegrator->value => '1',
     ], $featureOverrides);
 
-    $plan = \App\Models\Plan::factory()->create();
+    $plan = Plan::factory()->create();
 
     foreach ($features as $key => $value) {
-        \App\Models\PlanFeature::create([
+        PlanFeature::create([
             'plan_id' => $plan->id,
             'feature' => $key,
             'value'   => $value,
         ]);
     }
 
-    $entity = \App\Models\Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $entity = Entity::factory()->create(['is_client' => true, 'active' => true]);
 
-    \App\Models\Subscription::create([
+    Subscription::create([
         'entity_id' => $entity->id,
         'plan_id'   => $plan->id,
-        'status'    => \App\Enums\SubscriptionStatus::Active,
+        'status'    => SubscriptionStatus::Active,
         'starts_at' => now()->subDay(),
         'ends_at'   => now()->addMonth(),
     ]);
 
-    $integratorUser = \App\Models\EntityUserIntegrator::factory()->create([
+    $integratorUser = EntityUserIntegrator::factory()->create([
         'entity_id' => $entity->id,
         'active'    => true,
     ]);
 
-    $integrator = \App\Models\EntityIntegrator::factory()->create([
+    $integrator = EntityIntegrator::factory()->create([
         'entity_user_integrator_id' => $integratorUser->id,
         'active'                    => true,
     ]);
@@ -71,7 +79,7 @@ function setupIntegrator(array $featureOverrides = []): array
     $token = $integratorUser->createToken(
         'integrator-token',
         ['integrator_id:' . $integrator->id],
-        \Carbon\Carbon::now()->addDays(7)
+        Carbon::now()->addDays(7),
     );
 
     return [
@@ -88,13 +96,13 @@ function setupIntegrator(array $featureOverrides = []): array
  * O código é gerado automaticamente pelo booted() do model.
  */
 function createEntityUser(
-    \App\Models\Entity $entity,
-    \App\Models\User $user,
+    Entity $entity,
+    User $user,
     string $rule,
     bool $active = true,
     bool $isOwner = false,
-): \App\Models\EntityUser {
-    return \App\Models\EntityUser::create([
+): EntityUser {
+    return EntityUser::create([
         'entity_id' => $entity->id,
         'user_id'   => $user->id,
         'rule'      => $rule,
@@ -108,13 +116,13 @@ function createEntityUser(
  * Cria um Doctor vinculado a uma Entity para uso em testes de agendamento.
  * Retorna o Doctor criado.
  */
-function createDoctorForEntity(\App\Models\Entity $entity): \App\Models\Doctor
+function createDoctorForEntity(Entity $entity): Doctor
 {
-    $user   = \App\Models\User::factory()->create();
-    $people = \App\Models\People::factory()->create();
-    $eu     = createEntityUser($entity, $user, \App\Enums\ClientRule::Doctor->value);
+    $user   = User::factory()->create();
+    $people = People::factory()->create();
+    $eu     = createEntityUser($entity, $user, ClientRule::Doctor->value);
 
-    return \App\Models\Doctor::create([
+    return Doctor::create([
         'entity_user_id' => $eu->id,
         'person_id'      => $people->id,
         'active'         => true,
@@ -125,15 +133,15 @@ function createDoctorForEntity(\App\Models\Entity $entity): \App\Models\Doctor
  * Cria um Schedule vinculado a uma Entity para uso em testes.
  * Retorna ['schedule' => Schedule, 'doctor' => Doctor].
  */
-function createScheduleForEntity(\App\Models\Entity $entity, array $attrs = []): array
+function createScheduleForEntity(Entity $entity, array $attrs = []): array
 {
     $doctor   = createDoctorForEntity($entity);
-    $schedule = \App\Models\Schedule::create(array_merge([
+    $schedule = Schedule::create(array_merge([
         'entity_id' => $entity->id,
         'doctor_id' => $doctor->id,
         'full_name' => 'Paciente Teste',
         'date_time' => now(),
-        'situation' => \App\Enums\ScheduleSituation::Scheduled->value,
+        'situation' => ScheduleSituation::Scheduled->value,
         'active'    => true,
     ], $attrs));
 
@@ -160,7 +168,7 @@ function panelSession($entityUser): array
  */
 function inertiaHeaders(): array
 {
-    $middleware = app(\App\Http\Middleware\HandleInertiaRequests::class);
+    $middleware = app(HandleInertiaRequests::class);
     $version    = $middleware->version(request()) ?? '';
 
     return [
@@ -177,8 +185,8 @@ function baseRunPayload(): array
 {
     return [
         'workflow'          => 'report_drafting',
-        'mode'              => \App\Enums\AI\AiRunMode::Validated->value,
-        'risk_level'        => \App\Enums\AI\AiRiskLevel::Medium->value,
+        'mode'              => AiRunMode::Validated->value,
+        'risk_level'        => AiRiskLevel::Medium->value,
         'user_prompt'       => 'Gerar rascunho clínico com linguagem de apoio para revisão médica.',
         'system_prompt'     => 'Você é um assistente de apoio clínico.',
         'context'           => ['specialty' => 'ophthalmology'],
@@ -186,4 +194,26 @@ function baseRunPayload(): array
         'expects_json'      => false,
         'max_output_tokens' => 700,
     ];
+}
+
+/**
+ * Autentica um PatientAccount via login HTTP real (POST na rota de login do
+ * guard "patient"), em vez de TestCase::actingAs($account, 'patient').
+ *
+ * actingAs($user, $guard) chama internamente Auth::shouldUse($guard), que
+ * troca o "default guard" GLOBAL da aplicação (AuthManager) para 'patient'
+ * pelo resto do teste. Isso faz Request::user() SEM guard explícito — usado
+ * por HandleInertiaRequests::authProps(), que espera um App\Models\User do
+ * guard "web" — resolver o PatientAccount por engano e quebrar
+ * (Call to undefined method PatientAccount::entityUsers()). Em produção isso
+ * nunca acontece (nada no código do Portal do Paciente chama
+ * Auth::shouldUse()) — é um artefato específico do test helper. Login real
+ * via HTTP evita o artefato e também exercita o fluxo de verdade.
+ */
+function loginAsPatient(PatientAccount $account, string $password = 'password'): void
+{
+    test()->post(route('patient-portal.login.store'), [
+        'email'    => $account->email,
+        'password' => $password,
+    ])->assertRedirect(route('patient-portal.dashboard'));
 }

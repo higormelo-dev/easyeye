@@ -76,11 +76,18 @@ trait Signable
             'is_locked'      => true,
         ];
 
-        // saveQuietly para não disparar o guard do updating novamente
-        $this->saveQuietly($newAttributes);
-
-        // Atributos precisam ser sincronizados no model em memória
-        $this->setRawAttributes(array_merge($this->getAttributes(), $newAttributes));
+        // BUGFIX (achado durante a Fase 2 do Portal do Paciente — este
+        // método nunca tinha caller nem teste até agora): save()/saveQuietly()
+        // recebem OPÇÕES de save (ex.: ['touch' => false]), não atributos.
+        // `$this->saveQuietly($newAttributes)` não seta nada em $this — sem
+        // atributo dirty, isDirty() é false e NENHUM UPDATE chega a ir pro
+        // banco. forceFill() (campos de assinatura não são $fillable de
+        // propósito) marca os atributos como dirty ANTES do save, pra
+        // saveQuietly() realmente persistir. saveQuietly() (sem args)
+        // continua suprimindo os eventos Eloquent — evita disparar de novo o
+        // guard `updating` do próprio Signable e duplicar o audit_log
+        // genérico do Auditable (o evento 'signed' abaixo já cobre a trilha).
+        $this->forceFill($newAttributes)->saveQuietly();
 
         // Audit manual: saveQuietly bypassa todos os eventos Eloquent, incluindo
         // o hook do Auditable. A assinatura é o ato médico mais importante

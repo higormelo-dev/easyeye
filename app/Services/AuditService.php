@@ -42,16 +42,17 @@ class AuditService
         );
 
         $attributes = [
-            'entity_id'      => $this->resolveEntityId($model),
-            'user_id'        => AuditContext::userId(),
-            'auditable_type' => get_class($model),
-            'auditable_id'   => $model->getKey(),
-            'event'          => $event,
-            'old_values'     => $old !== null ? $this->filter($old, $exclude) : null,
-            'new_values'     => $new !== null ? $this->filter($new, $exclude) : null,
-            'ip_address'     => request()->ip(),
-            'user_agent'     => request()->userAgent(),
-            'created_at'     => now(),
+            'entity_id'          => $this->resolveEntityId($model),
+            'user_id'            => AuditContext::userId(),
+            'patient_account_id' => AuditContext::patientAccountId(),
+            'auditable_type'     => get_class($model),
+            'auditable_id'       => $model->getKey(),
+            'event'              => $event,
+            'old_values'         => $old !== null ? $this->filter($old, $exclude) : null,
+            'new_values'         => $new !== null ? $this->filter($new, $exclude) : null,
+            'ip_address'         => request()->ip(),
+            'user_agent'         => request()->userAgent(),
+            'created_at'         => now(),
         ];
 
         // BUG resolvido — 500 no /register: a sessão pode carregar um

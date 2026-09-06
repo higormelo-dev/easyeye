@@ -134,6 +134,25 @@ class PatientExam extends Model
         );
     }
 
+    /**
+     * URL assinada de curta duração pro Portal do Paciente — NUNCA
+     * reaproveitar archiveUrl() (TTL de 24h pensado pro staff): o link do
+     * portal pode ser reencaminhado/vazado por e-mail, e o titular não
+     * precisa de tanto tempo pra abrir uma imagem que acabou de pedir.
+     */
+    public function archiveUrlForPatientPortal(bool $forDownload = false): ?string
+    {
+        if (! $this->archive) {
+            return null;
+        }
+
+        $options = $forDownload
+            ? ['ResponseContentDisposition' => 'attachment; filename="' . basename($this->archive) . '"']
+            : [];
+
+        return Storage::disk('s3')->temporaryUrl($this->archive, now()->addMinutes(10), $options);
+    }
+
     public function isExternal(): bool
     {
         return $this->source === ExamSource::ExternalImport;

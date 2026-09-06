@@ -22,6 +22,7 @@ class DataAccessLog extends Model
     protected $fillable = [
         'entity_id',
         'user_id',
+        'patient_account_id',
         'resource_type',
         'resource_id',
         'patient_id',

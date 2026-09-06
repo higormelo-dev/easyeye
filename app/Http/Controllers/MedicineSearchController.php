@@ -33,8 +33,8 @@ class MedicineSearchController extends Controller
             })
             ->where('active', true)
             ->where(function ($q2) use ($q) {
-                $q2->where('name', 'ILIKE', "%{$q}%")
-                    ->orWhere('dosage', 'ILIKE', "%{$q}%");
+                $q2->whereLikeUnaccent('name', $q)
+                    ->orWhereLikeUnaccent('dosage', $q);
             })
             ->orderBy('name')
             ->limit(20)

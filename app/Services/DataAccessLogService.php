@@ -36,16 +36,17 @@ class DataAccessLogService
         }
 
         DataAccessLog::create([
-            'entity_id'     => session('selected_entity_id') ?? $resource->getAttribute('entity_id'),
-            'user_id'       => AuditContext::userId(),
-            'resource_type' => get_class($resource),
-            'resource_id'   => $resource->getKey(),
-            'patient_id'    => $patientId ?? $this->inferPatientId($resource),
-            'purpose'       => $purpose,
-            'justification' => $justification,
-            'ip_address'    => request()->ip(),
-            'user_agent'    => request()->userAgent(),
-            'accessed_at'   => now(),
+            'entity_id'          => session('selected_entity_id') ?? $resource->getAttribute('entity_id'),
+            'user_id'            => AuditContext::userId(),
+            'patient_account_id' => AuditContext::patientAccountId(),
+            'resource_type'      => get_class($resource),
+            'resource_id'        => $resource->getKey(),
+            'patient_id'         => $patientId ?? $this->inferPatientId($resource),
+            'purpose'            => $purpose,
+            'justification'      => $justification,
+            'ip_address'         => request()->ip(),
+            'user_agent'         => request()->userAgent(),
+            'accessed_at'        => now(),
         ]);
     }
 

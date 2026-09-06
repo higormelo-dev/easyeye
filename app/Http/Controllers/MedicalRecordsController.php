@@ -8,7 +8,7 @@ use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey, Sc
 use App\Exceptions\LockedMedicalRecordException;
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
-    MedicalRecord, NearPointConvergence, Patient, Schedule, VisualAcuityType};
+    MedicalRecord, MedicalRecordDocumentation, NearPointConvergence, Patient, PatientDocumentShare, Schedule, VisualAcuityType};
 use App\Models\{ReportSetting, ReportSettingContent};
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ScheduleService, UsageMeterService};
 use App\Traits\LogsDataAccess;
@@ -39,6 +39,11 @@ class MedicalRecordsController extends Controller
      */
     public function index(Patient $patient): InertiaResponse
     {
+        // Achado de segurança (auditoria panel.* IDOR) — ver mesmo comentário em
+        // assertMedicalRecordBelongsToPatient() logo abaixo. Aqui não há
+        // MedicalRecord ainda pra passar pelo helper, então a checagem vem direto.
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
 
         return Inertia::render('Panel/MedicalRecords/Index', [
@@ -82,6 +87,14 @@ class MedicalRecordsController extends Controller
      */
     public function ajaxList(Request $request, Patient $patient): JsonResponse
     {
+        // Achado de segurança (auditoria panel.* IDOR, rodada 2 — regressão
+        // minha: faltou nas correções anteriores). Sem isso não vazava PHI (a
+        // query de MedicalRecord abaixo já é escopada pelo EntityScope), mas
+        // servia de oráculo de existência de patient_id cross-tenant (200 em
+        // vez de 404) e sujava data_access_logs com entity_id do atacante
+        // referenciando paciente de outra clínica.
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
         // CFM Res. 2.227/2018 + LGPD Art. 37 — registra acesso à lista de prontuários do paciente
         $this->logAccess($patient, DataAccessPurpose::PatientCare);
 
@@ -120,6 +133,9 @@ class MedicalRecordsController extends Controller
      */
     public function create(Patient $patient): InertiaResponse
     {
+        // Achado de segurança (auditoria panel.* IDOR) — mesma checagem de index().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
         $patient->load(['person', 'covenant', 'skinType', 'irisType']);
         $props                  = $this->buildFormProps($patient, null);
         $props['breadcrumbs'][] = [
@@ -136,6 +152,11 @@ class MedicalRecordsController extends Controller
      */
     public function store(StoreMedicalRecordRequest $request, Patient $patient): RedirectResponse
     {
+        // Achado de segurança (auditoria panel.* IDOR) — mesma checagem de index().
+        // Sem isso, o service persistia um MedicalRecord com patient_id de outra
+        // entity misturado ao entity_id da sessão do atacante (escrita cross-tenant).
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
         $validated = $request->validated();
 
         // Intenções de fluxo não são colunas do prontuário.
@@ -182,6 +203,14 @@ class MedicalRecordsController extends Controller
             'documentations.doctor.person',
             'documentations.aiRun',
         ]);
+
+        // Portal do Paciente (Fase 2) — grant ativo por documentação, numa
+        // única query em lote (não 1 por linha da tabela).
+        $sharedDocShareIds = PatientDocumentShare::query()
+            ->where('shareable_type', MedicalRecordDocumentation::class)
+            ->whereIn('shareable_id', $medicalrecord->documentations->pluck('id'))
+            ->whereNull('revoked_at')
+            ->pluck('id', 'shareable_id');
 
         return response()->json([
             'id'                   => $medicalrecord->id,
@@ -254,6 +283,9 @@ class MedicalRecordsController extends Controller
                 'is_ai'             => $d->ai_run_id !== null,
                 'ai_workflow_label' => $d->ai_run_id && $d->aiRun ? __('ai.workflow_' . $d->aiRun->workflow) : null,
                 'pdf_url'           => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $medicalrecord, $d]),
+                // Portal do Paciente (Fase 2) — grant de leitura pro titular.
+                'shared_with_patient' => $sharedDocShareIds->has($d->id),
+                'document_share_id'   => $sharedDocShareIds->get($d->id),
             ]),
             // URLs de ação
             'edit_url'      => route('panel.patients.medicalrecords.edit', [$patient, $medicalrecord]),
@@ -1043,6 +1075,13 @@ class MedicalRecordsController extends Controller
 
     private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void
     {
+        // Achado de segurança (auditoria panel.* IDOR): $patient chega via route
+        // model binding, que roda ANTES de tenant.bind (SubstituteBindings tem
+        // prioridade fixa do Laravel) — o EntityScope global fica inerte nesse
+        // momento e $patient pode ser de QUALQUER entity. Sem esta comparação,
+        // um $patient de outra clínica (com um medicalrecord seu batendo o
+        // patient_id) passava direto. Ver mesmo padrão em PatientsController::editData().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
         abort_if($medicalrecord->patient_id !== $patient->id, 404);
     }
 

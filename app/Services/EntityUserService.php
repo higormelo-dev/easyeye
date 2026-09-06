@@ -86,15 +86,20 @@ class EntityUserService
             ->where('email', $request->email)->first();
 
         if ($existingUser) {
+            // BUGFIX (revisao de seguranca, hardening de follow-up ao achado
+            // de account takeover no DoctorService): NUNCA sobrescrever nome/
+            // senha/verificação de um User já existente encontrado por
+            // e-mail — isso permitiria a um staff que soubesse o e-mail de
+            // login de outra pessoa "roubar" a conta reescrevendo a senha via
+            // este fluxo. Hoje EntityUserRequest já valida unicidade em
+            // users.email antes de chegar aqui, então este ramo só é
+            // alcançado legitimamente (e-mail duplicado é rejeitado na
+            // validação) — isto é defesa em profundidade, não o fix
+            // primário. Restaura se soft-deleted e reaproveita a identidade
+            // como está, sem mutar credenciais.
             if ($existingUser->trashed()) {
                 $existingUser->restore();
             }
-
-            $existingUser->update([
-                'name'     => $request->name,
-                'password' => $request->password,
-            ]);
-            $existingUser->markEmailAsVerified();
 
             return $existingUser;
         }

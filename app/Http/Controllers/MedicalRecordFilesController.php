@@ -7,9 +7,13 @@ use App\Exceptions\FeatureDeniedException;
 use App\Models\{Entity, MedicalRecord, MedicalRecordFile, Patient};
 use App\Services\{FeatureGateService, UsageMeterService};
 use App\Traits\LogsDataAccess;
-use Illuminate\Http\{JsonResponse, Request, Response, StreamedResponse};
+use Illuminate\Http\{JsonResponse, Request, Response};
 use Illuminate\Support\Facades\{Gate, Storage};
 use Illuminate\Support\Str;
+// BUGFIX (revisão de segurança): Illuminate\Http\StreamedResponse não
+// existe — Laravel usa a classe do Symfony diretamente (Storage::response()
+// retorna isso). Mesma correção em PatientPortal\DocumentsController.
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MedicalRecordFilesController extends Controller
 {
@@ -85,10 +89,15 @@ class MedicalRecordFilesController extends Controller
             abort(404);
         }
 
-        return Storage::disk('private')->response($file->file_path, $file->original_name, [
-            'Content-Type'        => $file->mime_type,
-            'Content-Disposition' => 'inline; filename="' . $file->original_name . '"',
-        ]);
+        // BUGFIX (revisão de segurança): Content-Disposition NÃO pode ser
+        // montado por concatenação manual — original_name vem de
+        // getClientOriginalName() no upload (entrada do usuário) e um `"`
+        // ali corrompe/estende o header. Passar Content-Disposition dentro
+        // do array de $headers pula o makeDisposition() seguro do Laravel
+        // (FilesystemAdapter::response() só o usa se a chave NÃO existir no
+        // array recebido). Omitir aqui deixa o framework montar com escape
+        // correto — mesmo Content-Type continua auto-detectado.
+        return Storage::disk('private')->response($file->file_path, $file->original_name);
     }
 
     /**
@@ -164,6 +173,9 @@ class MedicalRecordFilesController extends Controller
 
     private function assertRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalRecord): void
     {
+        // Achado de segurança (auditoria panel.* IDOR) — ver mesmo comentário em
+        // MedicalRecordsController::assertMedicalRecordBelongsToPatient().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
         abort_if($medicalRecord->patient_id !== $patient->id, 404);
     }
 

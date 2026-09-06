@@ -3,7 +3,6 @@
 use Illuminate\Support\Str;
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Default Session Driver
@@ -130,7 +129,7 @@ return [
 
     'cookie' => env(
         'SESSION_COOKIE',
-        Str::slug(env('APP_NAME', 'laravel'), '_') . '_session'
+        Str::slug(env('APP_NAME', 'laravel'), '_') . '_session',
     ),
 
     /*
@@ -170,7 +169,17 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    // BUGFIX (revisão de segurança): sem fallback, secure ficava null e o
+    // Symfony Cookie assume `false` (envia o cookie de sessão — que carrega
+    // two_factor_verified_at, auth.password_confirmed_at, selected_entity_id
+    // e impersonating.* — mesmo em HTTP puro). Mesma regra que
+    // AppServiceProvider::boot() usa para forçar HTTPS (production+testing),
+    // mas lida via env() puro — NUNCA app()->environment() aqui: arquivos de
+    // config são require'd por LoadConfiguration ANTES de detectEnvironment()
+    // rodar, então o container ainda não tem 'env' ligado nesse momento (isso
+    // derrubava o boot inteiro da aplicação — pego pelo teste antes do commit).
+    // .env pode sempre sobrescrever via SESSION_SECURE_COOKIE se necessário.
+    'secure' => env('SESSION_SECURE_COOKIE', in_array(env('APP_ENV', 'production'), ['production', 'testing'], true)),
 
     /*
     |--------------------------------------------------------------------------
@@ -214,5 +223,4 @@ return [
     */
 
     'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
-
 ];

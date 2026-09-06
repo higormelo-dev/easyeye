@@ -36,10 +36,9 @@ class EntityUsersController extends Controller
             ->where('entity_users.entity_id', $entity->id);
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower): void {
-                $q->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
+            $query->where(function ($q) use ($search): void {
+                $q->whereLikeUnaccent('users.name', $search)
+                    ->orWhereLikeUnaccent('users.email', $search);
             });
         }
 

@@ -28,11 +28,9 @@ class Cid10Code extends Model
             str_split(self::UNACCENTS),
         )), 'UTF-8');
 
-        $desc = "LOWER(TRANSLATE(description, '" . self::ACCENTS . "', '" . self::UNACCENTS . "'))";
-
-        $query->where(function ($q) use ($lower, $desc) {
-            $q->whereRaw('LOWER(code) LIKE ?', ["%{$lower}%"])
-                ->orWhereRaw("{$desc} LIKE ?", ["%{$lower}%"]);
+        $query->where(function ($q) use ($lower) {
+            $q->whereLikeUnaccent('code', $lower)
+                ->orWhereLikeUnaccent('description', $lower);
         })->orderByRaw('CASE WHEN LOWER(code) LIKE ? THEN 0 ELSE 1 END', ["{$lower}%"])
             ->orderBy('code');
     }

@@ -224,8 +224,11 @@ class MercadoPagoGateway extends AbstractHttpGateway
     {
         $secret = $this->resolveWebhookSecret();
 
+        // BUGFIX (revisao de seguranca): sem webhook_secret configurado não é possível
+        // validar a assinatura, então falha FECHADO (rejeita) — aceitar sem verificação
+        // permitia forjar webhooks e mutar assinaturas sem autenticação.
         if ($secret === null || $secret === '') {
-            return true;
+            return false;
         }
 
         $sigHeader = $payload->headers['x-signature'] ?? $payload->headers['X-Signature'] ?? '';

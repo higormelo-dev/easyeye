@@ -90,6 +90,18 @@ class CashFlowService
         });
     }
 
+    // BUGFIX (revisao de seguranca): destroy() apagava o lançamento direto no controller,
+    // sem checar se a data pertence a um período de caixa já fechado (o create/update
+    // checam via assertDateNotClosed), permitindo corromper o snapshot do CashClose.
+    public function delete(FinancialCashEntry $entry): void
+    {
+        DB::transaction(function () use ($entry): void {
+            $this->assertDateNotClosed((string) $entry->entity_id, $entry->entry_date?->toDateString());
+
+            $entry->delete();
+        });
+    }
+
     /**
      * Garante que a data não pertence a um período de caixa fechado.
      *

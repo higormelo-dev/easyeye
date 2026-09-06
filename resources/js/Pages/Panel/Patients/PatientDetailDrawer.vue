@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue';
+import { router } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 
 const props = defineProps({
@@ -29,6 +30,32 @@ watch(() => props.open, (val) => {
     if (val && props.patientId) loadDetail(props.patientId);
     if (!val) patient.value = null;
 });
+
+// ── Portal do Paciente: convite (Fase 1 — fundação de conta/login) ───────────
+const inviting = ref(false);
+const inviteResult = ref(null); // { type: 'success'|'error', message }
+
+function invitePortal() {
+    if (!patient.value || inviting.value) return;
+
+    inviting.value = true;
+    inviteResult.value = null;
+
+    router.post(route('panel.patients.portal-invitation.store', patient.value.id), {}, {
+        preserveScroll: true,
+        preserveState: true,
+        onSuccess: (page) => {
+            const flash = page.props?.flash ?? {};
+            inviteResult.value = flash.success
+                ? { type: 'success', message: flash.success }
+                : { type: 'error', message: flash.error ?? 'Não foi possível enviar o convite.' };
+        },
+        onError: () => {
+            inviteResult.value = { type: 'error', message: 'Não foi possível enviar o convite.' };
+        },
+        onFinish: () => { inviting.value = false; },
+    });
+}
 </script>
 
 <template>
@@ -126,6 +153,32 @@ watch(() => props.open, (val) => {
                             <span v-if="patient.whatsapp" class="badge bg-success-subtle text-success border border-success ms-1 rounded-pill" style="font-size:.65rem;">WhatsApp</span>
                         </span>
                     </div>
+                </div>
+            </div>
+
+            <!-- Portal do Paciente -->
+            <div class="detail-section">
+                <div class="detail-section__title"><i class="ti ti-heart-handshake me-1"></i> Portal do Paciente</div>
+                <p class="text-muted small mb-2">
+                    Envia um convite por e-mail para o paciente criar login único de acesso
+                    ao Portal do Paciente (visão apenas das clínicas onde já foi atendido).
+                </p>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary"
+                    :disabled="!patient.email || inviting"
+                    @click="invitePortal"
+                >
+                    <i v-if="inviting" class="ti ti-loader-2 ee-spin me-1"></i>
+                    <i v-else class="ti ti-mail-forward me-1"></i>
+                    Convidar para o portal
+                </button>
+                <div v-if="!patient.email" class="form-text text-warning mt-1">
+                    <i class="ti ti-alert-triangle me-1"></i>Cadastre um e-mail para habilitar o convite.
+                </div>
+                <div v-if="inviteResult" class="small mt-2" :class="inviteResult.type === 'success' ? 'text-success' : 'text-danger'">
+                    <i :class="inviteResult.type === 'success' ? 'ti ti-circle-check' : 'ti ti-alert-circle'" class="me-1"></i>
+                    {{ inviteResult.message }}
                 </div>
             </div>
 

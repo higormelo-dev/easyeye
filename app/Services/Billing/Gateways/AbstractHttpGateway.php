@@ -198,9 +198,11 @@ abstract class AbstractHttpGateway implements PaymentGatewayInterface
     {
         $secret = $this->resolveWebhookSecret();
 
-        // Sem secret configurado: aceita qualquer webhook (ambiente de desenvolvimento)
+        // BUGFIX (revisao de seguranca): sem webhook_secret configurado não é possível
+        // validar a assinatura, então falha FECHADO (rejeita) — aceitar sem verificação
+        // permitia forjar webhooks e mutar assinaturas sem autenticação.
         if ($secret === '' || $secret === null) {
-            return true;
+            return false;
         }
 
         $provided = $payload->signature

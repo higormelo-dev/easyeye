@@ -44,8 +44,6 @@ class EntityCustomDiagnosis extends Model
      */
     public function scopeSearch($query, string $term): void
     {
-        $lower = mb_strtolower(trim($term), 'UTF-8');
-
-        $query->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"]);
+        $query->whereLikeUnaccent('name', trim($term));
     }
 }

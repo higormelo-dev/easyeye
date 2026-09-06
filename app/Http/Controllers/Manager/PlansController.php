@@ -34,8 +34,7 @@ class PlansController extends Controller
         $query = Plan::query()->select('plans.*');
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->whereRaw('LOWER(plans.name) LIKE ?', ["%{$lower}%"]);
+            $query->whereLikeUnaccent('plans.name', $search);
         }
 
         $query->orderBy("plans.{$sortBy}", $sortDir);
@@ -66,7 +65,7 @@ class PlansController extends Controller
 
         $records = Plan::when(
             $search,
-            fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']),
+            fn ($q) => $q->whereLikeUnaccent('name', $search),
         )
             ->orderBy('sort_order')
             ->paginate($perPage);

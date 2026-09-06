@@ -38,10 +38,10 @@ class PatientsController extends Controller
             $search   = request()->search;
             $patients = $patients->where(function ($query) use ($search) {
                 $query->whereHas('person', function ($q) use ($search) {
-                    $q->where('full_name', 'ilike', '%' . $search . '%');
+                    $q->whereLikeUnaccent('full_name', $search);
                 })
-                    ->orWhere('code', 'ilike', '%' . $search . '%')
-                    ->orWhere('card_number', 'ilike', '%' . $search . '%');
+                    ->orWhereLikeUnaccent('code', $search)
+                    ->orWhereLikeUnaccent('card_number', $search);
             });
         }
 

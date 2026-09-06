@@ -64,4 +64,36 @@ describe('bloqueio de lançamentos em período fechado', function () {
         postEntry($this, ['entry_date' => '2026-06-15', 'description' => 'x', 'type' => 'income', 'amount' => 50])
             ->assertOk();
     });
+
+    it('bloqueia exclusão de lançamento dentro do período fechado', function () {
+        postEntry($this, ['entry_date' => '2026-06-15', 'description' => 'x', 'type' => 'income', 'amount' => 50])
+            ->assertOk();
+
+        $entry = FinancialCashEntry::where('entity_id', $this->entity->id)->firstOrFail();
+
+        app(CashClosingService::class)->closePeriod($this->entity->id, '2026-06-01', '2026-06-30');
+
+        $this->actingAs($this->user)
+            ->withSession(panelSession($this->entityUser))
+            ->deleteJson(route('panel.financial.cash-flow.destroy', $entry))
+            ->assertStatus(422);
+
+        expect(FinancialCashEntry::withTrashed()->find($entry->id)->trashed())->toBeFalse();
+    });
+
+    it('permite exclusão de lançamento fora do período fechado', function () {
+        postEntry($this, ['entry_date' => '2026-07-15', 'description' => 'x', 'type' => 'income', 'amount' => 50])
+            ->assertOk();
+
+        $entry = FinancialCashEntry::where('entity_id', $this->entity->id)->firstOrFail();
+
+        app(CashClosingService::class)->closePeriod($this->entity->id, '2026-06-01', '2026-06-30');
+
+        $this->actingAs($this->user)
+            ->withSession(panelSession($this->entityUser))
+            ->deleteJson(route('panel.financial.cash-flow.destroy', $entry))
+            ->assertOk();
+
+        expect(FinancialCashEntry::withTrashed()->find($entry->id)->trashed())->toBeTrue();
+    });
 });

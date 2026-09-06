@@ -72,7 +72,7 @@ class ReportSettingsController extends Controller
         $perPage    = 12;
 
         $records = ReportSetting::forEntity($entityId)
-            ->when($search, fn ($q) => $q->whereRaw('LOWER(title) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->when($search, fn ($q) => $q->whereLikeUnaccent('title', $search))
             ->when($categoryId, fn ($q) => $q->where('report_category_id', $categoryId))
             ->with('category')
             ->orderBy('title')
@@ -193,6 +193,8 @@ class ReportSettingsController extends Controller
 
     public function edit(ReportSetting $reportSetting): InertiaResponse
     {
+        $this->assertOwnsReportSetting($reportSetting);
+
         $reportSetting->load('contents.variables');
         $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
@@ -249,6 +251,8 @@ class ReportSettingsController extends Controller
      */
     public function update(Request $request, ReportSetting $reportSetting): RedirectResponse
     {
+        $this->assertOwnsReportSetting($reportSetting);
+
         $validated = $this->validateRequest($request);
 
         $reportSetting->update($validated);
@@ -265,6 +269,8 @@ class ReportSettingsController extends Controller
      */
     public function destroy(ReportSetting $reportSetting): RedirectResponse
     {
+        $this->assertOwnsReportSetting($reportSetting);
+
         $reportSetting->delete();
 
         return redirect()
@@ -291,6 +297,8 @@ class ReportSettingsController extends Controller
      */
     public function reimport(ReportSetting $reportSetting): RedirectResponse
     {
+        $this->assertOwnsReportSetting($reportSetting);
+
         $this->service->reimport($reportSetting);
 
         return redirect()
@@ -347,6 +355,24 @@ class ReportSettingsController extends Controller
             ['label' => __('actions.report_settings.title'), 'url' => route('panel.setting.report-settings.index'), 'active' => false],
             ['label' => $pageTitle, 'url' => '#', 'active' => true],
         ];
+    }
+
+    /**
+     * Achado de segurança (auditoria panel.* IDOR): $reportSetting chega via
+     * route model binding, que roda ANTES de tenant.bind — EntityScope fica
+     * inerte nesse momento e o binding resolve QUALQUER template, de qualquer
+     * entity (inclusive o template GLOBAL, entity_id null). Diferente de
+     * assertCanPreviewTemplate() (que permite ver o global antes de adotar),
+     * aqui é escrita/exclusão — só o dono (entity_id da própria clínica) pode
+     * editar/excluir/reimportar seu próprio template adotado. O global nunca é
+     * editável por uma clínica individual (é gerido centralmente).
+     */
+    private function assertOwnsReportSetting(ReportSetting $reportSetting): void
+    {
+        abort_unless(
+            (string) ($reportSetting->entity_id ?? '') === (string) session('selected_entity_id'),
+            404,
+        );
     }
 
     private function assertCanPreviewTemplate(ReportSetting $reportSetting): void

@@ -237,6 +237,9 @@ class MedicalRecordQuickActionsController extends Controller
 
     private function assertMedicalRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalrecord): void
     {
+        // Achado de segurança (auditoria panel.* IDOR) — ver mesmo comentário em
+        // MedicalRecordsController::assertMedicalRecordBelongsToPatient().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
         abort_if($medicalrecord->patient_id !== $patient->id, 404);
     }
 

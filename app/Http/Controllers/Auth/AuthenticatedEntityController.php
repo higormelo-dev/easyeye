@@ -36,17 +36,24 @@ class AuthenticatedEntityController extends Controller
      */
     public function store(SelectEntityRequest $request): HttpResponse
     {
-        $entityUser = Auth::user()->entityUsers()->with('entity')->find($request->entity_user_id);
+        // Achado de segurança (auditoria manager.php — ROLE_BYPASS CRITICAL):
+        // faltava active=true aqui — permitia reselecionar um vínculo
+        // entity_users desativado (ex.: staff SaaS revogado sem soft-delete)
+        // e obter sessão administrativa plena de novo. Mesmo padrão de
+        // canAccessEntity()/getRuleInEntity() (App\Traits\HasEntityRoles).
+        $entityUser = Auth::user()->entityUsers()->with('entity')
+            ->where('active', true)
+            ->find($request->entity_user_id);
 
-        if ($entityUser) {
-            session([
-                'selected_entity_user_id'   => $entityUser->id,
-                'selected_entity_user_rule' => $entityUser->rule,
-                'selected_entity_id'        => $entityUser->entity->id,
-                'selected_entity_is_client' => $entityUser->entity->is_client,
-                'user_rule'                 => $entityUser->rule,
-            ]);
-        }
+        abort_unless($entityUser, 403, 'Este vínculo não está mais ativo.');
+
+        session([
+            'selected_entity_user_id'   => $entityUser->id,
+            'selected_entity_user_rule' => $entityUser->rule,
+            'selected_entity_id'        => $entityUser->entity->id,
+            'selected_entity_is_client' => $entityUser->entity->is_client,
+            'user_rule'                 => $entityUser->rule,
+        ]);
 
         if ($entityUser->rule === 'doctor') {
             session(['selected_entity_doctor_id' => $entityUser->doctor->id]);

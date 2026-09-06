@@ -214,6 +214,84 @@ it('bloqueia cross-tenant com 403', function () {
         ->assertStatus(403);
 });
 
+function makeTerminalChatRun($test, AiRunStatus $status, AiRunMode $mode): AiRun
+{
+    return AiRun::query()->create([
+        'entity_id'         => $test->entity->id,
+        'patient_id'        => null,
+        'medical_record_id' => null,
+        'requested_by'      => $test->doctor->id,
+        'workflow'          => 'assistant_chat',
+        'mode'              => $mode->value,
+        'risk_level'        => AiRiskLevel::Low->value,
+        'status'            => $status->value,
+        'estimated_credits' => 10,
+        'reserved_credits'  => 10,
+        'consumed_credits'  => 8,
+        'input_summary'     => [
+            'user_prompt'   => 'Dúvida sobre a agenda de amanhã.',
+            'system_prompt' => __('ai.assistant_chat_system_prompt'),
+            'context'       => [],
+            'attachments'   => [],
+            'exam_ids'      => [],
+            'expects_json'  => false,
+        ],
+        'final_output' => 'output',
+    ]);
+}
+
+it('[SEGURANÇA] bloqueia secretária de escalar run assistant_chat de outro usuário (bypass da restrição doctor-only)', function () {
+    Queue::fake();
+
+    PlanFeature::factory()->enabled(FeatureKey::HasAiChatAssistant)->for($this->plan)->create();
+
+    $secretaryUser       = User::factory()->create();
+    $secretaryEntityUser = createEntityUser($this->entity, $secretaryUser, ClientRule::Secretary->value);
+
+    $original = makeTerminalChatRun($this, AiRunStatus::Approved, AiRunMode::Economy);
+
+    $this->actingAs($secretaryUser)
+        ->withSession(panelSession($secretaryEntityUser))
+        ->postJson(route('panel.ai-runs.escalate', $original))
+        ->assertStatus(403);
+
+    expect(AiRun::query()->where('parent_run_id', $original->id)->exists())->toBeFalse();
+});
+
+it('permite médico escalar normalmente um run assistant_chat', function () {
+    Queue::fake();
+
+    PlanFeature::factory()->enabled(FeatureKey::HasAiChatAssistant)->for($this->plan)->create();
+
+    $original = makeTerminalChatRun($this, AiRunStatus::Approved, AiRunMode::Economy);
+
+    $resp = $this->actingAs($this->doctor)
+        ->withSession(panelSession($this->doctorUser))
+        ->postJson(route('panel.ai-runs.escalate', $original))
+        ->assertStatus(201);
+
+    $newRun = AiRun::query()->findOrFail($resp->json('run_id'));
+    expect((string) $newRun->parent_run_id)->toBe((string) $original->id)
+        ->and($newRun->mode)->toBe(AiRunMode::Validated);
+});
+
+it('permite secretária escalar workflow não restrito (record_assist) normalmente', function () {
+    Queue::fake();
+
+    $secretaryUser       = User::factory()->create();
+    $secretaryEntityUser = createEntityUser($this->entity, $secretaryUser, ClientRule::Secretary->value);
+
+    $original = makeTerminalRun($this, AiRunStatus::Approved, AiRunMode::Economy);
+
+    $resp = $this->actingAs($secretaryUser)
+        ->withSession(panelSession($secretaryEntityUser))
+        ->postJson(route('panel.ai-runs.escalate', $original))
+        ->assertStatus(201);
+
+    $newRun = AiRun::query()->findOrFail($resp->json('run_id'));
+    expect((string) $newRun->parent_run_id)->toBe((string) $original->id);
+});
+
 it('despacha RunAiWorkflowJob para o novo run', function () {
     Queue::fake();
     $original = makeTerminalRun($this, AiRunStatus::Approved, AiRunMode::Economy);

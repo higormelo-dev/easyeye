@@ -66,10 +66,14 @@ class AuditLogger
      */
     public function recordImpersonationEnd(array $impersonatingContext, Request $request): void
     {
+        // BUGFIX (revisao de seguranca): Auth::id() pode ainda refletir o
+        // usuário impersonado (HandleImpersonation troca o Auth::user() a
+        // cada request). O ator real é sempre o admin que iniciou a
+        // impersonação, gravado em 'original_user_id' na sessão.
         $this->insert([
             'entity_id'        => $impersonatingContext['original_entity_id'] ?? null,
             'target_entity_id' => $impersonatingContext['original_entity_id'] ?? null,
-            'user_id'          => Auth::id(),
+            'user_id'          => $impersonatingContext['original_user_id'] ?? Auth::id(),
             'target_user_id'   => $this->extractTargetUserIdFromContext($impersonatingContext),
             'auditable_type'   => 'entity_user',
             'auditable_id'     => (string) ($impersonatingContext['entity_user_id'] ?? Str::orderedUuid()),

@@ -47,9 +47,13 @@ class TwoFactorController extends Controller
      *    entre ambientes), descarta e regenera. Não propaga a exceção,
      *    senão o usuário fica preso sem conseguir abrir a tela.
      */
-    public function setup(Request $request): InertiaResponse
+    public function setup(Request $request): InertiaResponse|RedirectResponse
     {
         $user = Auth::user();
+
+        if ($guard = $this->guardAgainstResettingConfirmedTwoFactor($request, $user)) {
+            return $guard;
+        }
 
         $hasPendingSecret = $user->getRawOriginal('two_factor_secret') !== null
             && $user->getRawOriginal('two_factor_confirmed_at') === null;
@@ -89,6 +93,11 @@ class TwoFactorController extends Controller
     public function regenerateSecret(Request $request): RedirectResponse
     {
         $user = Auth::user();
+
+        if ($guard = $this->guardAgainstResettingConfirmedTwoFactor($request, $user)) {
+            return $guard;
+        }
+
         $this->service->generateSecret($user);
 
         return redirect()->route('security.two-factor.setup');
@@ -104,7 +113,28 @@ class TwoFactorController extends Controller
             'code' => ['required', 'string', 'min:6', 'max:7'],
         ]);
 
-        $user   = Auth::user();
+        $user = Auth::user();
+
+        // BUGFIX (revisao de seguranca): impede reconfirmar (e assim resetar
+        // recovery codes/confirmed_at de) uma inscrição já CONFIRMADA — tanto
+        // quando a sessão ainda não passou por /verify (fluxo correto é
+        // verificar, não reconfirmar) quanto quando JÁ passou (endpoint JSON
+        // não tem pra onde redirecionar pra confirmação de senha; nega direto).
+        if ($user->hasTwoFactorEnabled()) {
+            if (! $request->session()->has('two_factor_verified_at')) {
+                return response()->json([
+                    'message' => __('manager_hardening.two_factor_required'),
+                ], 403);
+            }
+
+            if (! $this->hasRecentPasswordConfirmation($request)) {
+                return response()->json([
+                    'message'                        => __('auth.password'),
+                    'requires_password_confirmation' => true,
+                ], 403);
+            }
+        }
+
         $result = $this->service->confirm($user, (string) $request->input('code'));
 
         if (! $result['success']) {
@@ -207,6 +237,55 @@ class TwoFactorController extends Controller
         }
 
         return route('panel.dashboard');
+    }
+
+    /**
+     * BUGFIX (revisao de seguranca): setup()/regenerateSecret() nunca podem
+     * silenciosamente regenerar (e assim apagar secret/recovery_codes/
+     * confirmed_at de) uma inscrição de 2FA JÁ CONFIRMADA. O guard anterior só
+     * cobria sessão SEM two_factor_verified_at (bloqueado no /verify) — mas
+     * qualquer sessão NORMAL de um usuário já logado (o estado mais comum)
+     * tem two_factor_verified_at setado, e caía direto no generateSecret().
+     * Um lure link/redirect pra esta URL, na aba de uma vítima já autenticada,
+     * bastava pra apagar o 2FA dela sem nenhuma confirmação.
+     *
+     * Agora: (1) sessão sem two_factor_verified_at -> manda pro /verify, nunca
+     * toca no setup; (2) sessão já verificada -> mesmo assim exige confirmação
+     * de senha RECENTE (step-up, mesmo mecanismo do password.confirm/
+     * ConfirmablePasswordController já usado no resto do app) antes de deixar
+     * regenerar. Usuário SEM 2FA (hasTwoFactorEnabled() false) nunca passa por
+     * este guard — primeiro setup continua exatamente como antes.
+     */
+    private function guardAgainstResettingConfirmedTwoFactor(Request $request, $user): ?RedirectResponse
+    {
+        if (! $user->hasTwoFactorEnabled()) {
+            return null;
+        }
+
+        if (! $request->session()->has('two_factor_verified_at')) {
+            return redirect()->route('security.two-factor.verify');
+        }
+
+        if (! $this->hasRecentPasswordConfirmation($request)) {
+            $request->session()->put('url.intended', $request->fullUrl());
+
+            return redirect()->route('password.confirm');
+        }
+
+        return null;
+    }
+
+    private function hasRecentPasswordConfirmation(Request $request): bool
+    {
+        $confirmedAt = $request->session()->get('auth.password_confirmed_at');
+
+        if ($confirmedAt === null) {
+            return false;
+        }
+
+        $timeout = (int) config('auth.password_timeout', 10800);
+
+        return (time() - (int) $confirmedAt) < $timeout;
     }
 
     private function buildSetupResponseFromExisting($user): array

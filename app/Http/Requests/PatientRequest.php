@@ -28,7 +28,12 @@ class PatientRequest extends FormRequest
             'covenant_id' => [
                 'required_without:type_method',
                 'uuid',
-                'exists:covenants,id',
+                Rule::exists('covenants', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
             ],
             'skin_id' => [
                 'nullable',

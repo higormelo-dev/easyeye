@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ClientRule;
 use App\Models\{Doctor, DoctorWorkSchedule, ScheduleBlock};
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\{DB, Storage, Vite};
@@ -163,6 +164,8 @@ class DoctorWorkScheduleController extends Controller
     {
         $doctor = $this->findDoctor($doctorId);
 
+        $this->assertCanManageDoctorSchedule($doctor);
+
         $request->validate([
             'schedule_interval'         => ['nullable', 'integer', 'min:5', 'max:120'],
             'days'                      => ['required', 'array'],
@@ -231,6 +234,8 @@ class DoctorWorkScheduleController extends Controller
     {
         $doctor = $this->findDoctor($doctorId);
 
+        $this->assertCanManageDoctorSchedule($doctor);
+
         $validated = $request->validate([
             'starts_at' => ['required', 'date'],
             'ends_at'   => ['required', 'date', 'after:starts_at'],
@@ -259,6 +264,8 @@ class DoctorWorkScheduleController extends Controller
     {
         $doctor = $this->findDoctor($doctorId);
 
+        $this->assertCanManageDoctorSchedule($doctor);
+
         $block = ScheduleBlock::where('id', $blockId)
             ->where('doctor_id', $doctor->id)
             ->firstOrFail();
@@ -266,6 +273,26 @@ class DoctorWorkScheduleController extends Controller
         $block->delete();
 
         return response()->json(['message' => __('actions.block_deleted')]);
+    }
+
+    /**
+     * BUGFIX (revisao de seguranca): rotas de sync/blocks estao no grupo
+     * entity.role:admin,doctor,secretary, entao um medico comum conseguia
+     * sobrescrever a agenda/bloqueios de outro medico da mesma clinica
+     * informando o doctor_id de um colega (descobrivel via waiting-list).
+     * Um medico so pode gerenciar a propria agenda; admin/secretary
+     * continuam podendo gerenciar a agenda de qualquer medico da entidade.
+     */
+    private function assertCanManageDoctorSchedule(Doctor $doctor): void
+    {
+        if (session('user_rule') !== ClientRule::Doctor->value) {
+            return;
+        }
+
+        abort_unless(
+            (string) $doctor->entity_user_id === (string) session('selected_entity_user_id'),
+            403,
+        );
     }
 
     /**

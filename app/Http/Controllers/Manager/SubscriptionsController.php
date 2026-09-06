@@ -42,10 +42,9 @@ class SubscriptionsController extends Controller
             ->leftJoin('plans', 'subscriptions.plan_id', '=', 'plans.id');
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower) {
-                $q->whereRaw('LOWER(entities.name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(plans.name) LIKE ?', ["%{$lower}%"]);
+            $query->where(function ($q) use ($search) {
+                $q->whereLikeUnaccent('entities.name', $search)
+                    ->orWhereLikeUnaccent('plans.name', $search);
             });
         }
 
@@ -94,9 +93,8 @@ class SubscriptionsController extends Controller
             ->join('entities', 'subscriptions.entity_id', '=', 'entities.id')
             ->leftJoin('plans', 'subscriptions.plan_id', '=', 'plans.id')
             ->when($search, fn ($q) => $q->where(function ($inner) use ($search) {
-                $lower = mb_strtolower($search, 'UTF-8');
-                $inner->whereRaw('LOWER(entities.name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(plans.name) LIKE ?', ["%{$lower}%"]);
+                $inner->whereLikeUnaccent('entities.name', $search)
+                    ->orWhereLikeUnaccent('plans.name', $search);
             }))
             ->latest('subscriptions.created_at')
             ->paginate($perPage);

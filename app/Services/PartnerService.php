@@ -107,6 +107,20 @@ class PartnerService
 
         $plan   = $subscription->plan;
         $amount = round(($plan->price * $partner->commission_rate) / 100, 2);
+        $period = now()->format('Y-m');
+
+        // BUGFIX (revisao de seguranca): SubscriptionObserver::updated() chama generateCommission()
+        // a cada transição para Active. Sem essa checagem, uma assinatura que oscila (ex.: falha de
+        // pagamento seguida de retry bem-sucedido) dentro do mesmo período de competência gera uma
+        // comissão duplicada para o parceiro. Retorna a comissão já existente em vez de duplicar.
+        $existing = PartnerCommission::query()
+            ->where('subscription_id', $subscription->id)
+            ->where('period', $period)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
 
         // Comissão gerada com vencimento em 30 dias
         $commission = PartnerCommission::create([
@@ -115,7 +129,7 @@ class PartnerService
             'subscription_id' => $subscription->id,
             'amount'          => $amount,
             'rate'            => $partner->commission_rate,
-            'period'          => now()->format('Y-m'),
+            'period'          => $period,
             'status'          => CommissionStatus::Pending,
             'due_at'          => now()->addDays(30),
         ]);

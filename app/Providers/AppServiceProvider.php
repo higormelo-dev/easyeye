@@ -10,13 +10,14 @@ use App\Domains\AI\Services\{AiCircuitBreakerService, AiProviderManager, AiProvi
 use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, MedicalRecord, Patient, Schedule, Subscription};
 use App\Observers\{ActivationObserver, SubscriptionObserver};
 use App\Services\{ActivationService, AuditService, FeatureGateService, PartnerService, ReferralService, VersionService};
+use App\Support\Database\AccentInsensitiveSearch;
 use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\{Blade, Gate, RateLimiter, URL};
-use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\{ServiceProvider, Str};
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\{PersonalAccessToken, Sanctum};
 
@@ -80,6 +81,11 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Paginator::useBootstrapFive();
+
+        // Macro whereLikeUnaccent/orWhereLikeUnaccent — busca insensível a
+        // acento (requer extensão unaccent do Postgres). Ver
+        // App\Support\Database\AccentInsensitiveSearch.
+        AccentInsensitiveSearch::register();
 
         // Carbon::isoFormat usa o locale do Carbon (independente de app()->getLocale()).
         // SetLocale middleware atualiza per-request; este boot cobre CLI/jobs/PDFs gerados
@@ -220,6 +226,27 @@ class AppServiceProvider extends ServiceProvider
             return $r->isMethodSafe()
                 ? Limit::perMinute(120)->by("int-read:{$id}")
                 : Limit::perMinute(40)->by("int-write:{$id}");
+        });
+
+        // -------------------------------------------------------------------------
+        // Portal do Paciente (Fase 1): login rate-limited por e-mail normalizado
+        // + IP, NÃO só por IP cru — um IP compartilhado (NAT, wifi de clínica)
+        // não deve travar todos os pacientes que tentam logar por trás dele, e
+        // um atacante trocando de IP não deve conseguir bypassar o limite por
+        // e-mail só variando o IP (a chave combina os dois).
+        // -------------------------------------------------------------------------
+        RateLimiter::for('patient-login', static function (Request $r) {
+            $key = Str::lower((string) $r->input('email')) . '|' . $r->ip();
+
+            return Limit::perMinute(5)->by($key);
+        });
+
+        // Evita enumeração de e-mail (quais contas existem em patient_accounts)
+        // e "email bombing" de link de reset — mesma chave email+IP do login.
+        RateLimiter::for('patient-password-email', static function (Request $r) {
+            $key = Str::lower((string) $r->input('email')) . '|' . $r->ip();
+
+            return Limit::perMinute(5)->by($key);
         });
     }
 }

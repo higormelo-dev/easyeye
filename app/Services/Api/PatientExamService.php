@@ -3,6 +3,7 @@
 namespace App\Services\Api;
 
 use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
+use App\Jobs\GenerateExamDerivatives;
 use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
@@ -14,7 +15,13 @@ use Throwable;
 
 class PatientExamService
 {
-    private const FILLABLE_FIELDS = ['patient_id', 'exam_id', 'doctor_id', 'schedule_id', 'entity_integrator_equipment_id', 'archive', 'name', 'laterality'];
+    // patient_id NUNCA deve entrar aqui: buildUpdateData() espalha este array
+    // direto no update() sem re-derivar patient_id (ao contrário de exam_id/
+    // doctor_id/schedule_id, que são recalculados logo em seguida). Incluir
+    // patient_id permitiria a um integrador reatribuir um exame para outro
+    // paciente da mesma clínica só enviando patient_id no body do update
+    // (achado de auditoria de segurança — IDOR via mass-assignment).
+    private const FILLABLE_FIELDS = ['exam_id', 'doctor_id', 'schedule_id', 'entity_integrator_equipment_id', 'archive', 'name', 'laterality'];
 
     /**
      * Create a new record with all related entities.
@@ -277,7 +284,7 @@ class PatientExamService
             ]);
 
             // Arquivo substituído: regenera JPEG de exibição + miniatura.
-            \App\Jobs\GenerateExamDerivatives::dispatch($existingRecord->id);
+            GenerateExamDerivatives::dispatch($existingRecord->id);
 
             return [$existingRecord->refresh(), $oldPath];
         }
@@ -293,7 +300,7 @@ class PatientExamService
             'archive'                        => $archivePath,
         ]);
 
-        \App\Jobs\GenerateExamDerivatives::dispatch($record->id);
+        GenerateExamDerivatives::dispatch($record->id);
 
         return [$record, null];
     }

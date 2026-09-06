@@ -111,9 +111,12 @@ class GatewaysController extends Controller
     public function storeCredential(Request $request, Gateway $gateway): JsonResponse
     {
         $request->validate([
-            'label'          => ['nullable', 'string', 'max:120'],
-            'secret'         => ['required', 'string', 'min:8'],
-            'webhook_secret' => ['nullable', 'string'],
+            'label'  => ['nullable', 'string', 'max:120'],
+            'secret' => ['required', 'string', 'min:8'],
+            // BUGFIX (revisao de seguranca): gateway com supports_webhooks=true não pode
+            // ser salvo sem webhook_secret — isso deixava validateWebhookSignature() sem
+            // segredo para validar, forçando fail-open (webhook aceito sem autenticação).
+            'webhook_secret' => $gateway->supports_webhooks ? ['required', 'string'] : ['nullable', 'string'],
             'valid_from'     => ['nullable', 'date'],
             'valid_to'       => ['nullable', 'date', 'after:valid_from'],
             'reason'         => ['required', 'string', 'min:20', 'max:1000'],

@@ -40,11 +40,10 @@ class EntityUserIntegratorsController extends Controller
             ->where('entity_id', $entityModel->id);
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower): void {
-                $q->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(email) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+            $query->where(function ($q) use ($search): void {
+                $q->whereLikeUnaccent('name', $search)
+                    ->orWhereLikeUnaccent('email', $search)
+                    ->orWhereLikeUnaccent('code', $search);
             });
         }
 

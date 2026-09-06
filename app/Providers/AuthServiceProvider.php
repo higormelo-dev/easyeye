@@ -200,6 +200,23 @@ class AuthServiceProvider extends ServiceProvider
         });
 
         /**
+         * Compartilhar/revogar um LAUDO com o paciente no Portal (admin,
+         * doctor — NUNCA secretary). Decisão de produto: secretária não
+         * decide exposição de conteúdo clínico assinado ao paciente.
+         * Exame/anexo não passam por este Gate (allowlist da rota já basta).
+         */
+        Gate::define(EntityGate::ShareLaudoWithPatient->value, function (User $user, Entity $entity): bool {
+            if (! $entity->isClient()) {
+                return false;
+            }
+
+            return $user->hasAnyRoleInEntity($entity, [
+                ClientRule::Admin,
+                ClientRule::Doctor,
+            ]);
+        });
+
+        /**
          * Gerenciar configurações da entity: dados cadastrais, convênios,
          * tipos de consulta, integrações.
          * Somente admin da entity cliente.

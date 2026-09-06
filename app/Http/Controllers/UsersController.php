@@ -45,10 +45,9 @@ class UsersController extends Controller
             ->where('entity_users.entity_id', session()->get('selected_entity_id'))
             ->whereNot('entity_users.rule', 'doctor')
             ->when($search, function ($q) use ($search) {
-                $lower = mb_strtolower($search, 'UTF-8');
-                $q->where(function ($inner) use ($lower) {
-                    $inner->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
-                        ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
+                $q->where(function ($inner) use ($search) {
+                    $inner->whereLikeUnaccent('users.name', $search)
+                        ->orWhereLikeUnaccent('users.email', $search);
                 });
             })
             ->select('entity_users.*', 'users.name', 'users.email')
@@ -112,11 +111,10 @@ class UsersController extends Controller
             ->whereNot('entity_users.rule', 'doctor');
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
             $query->where(
                 fn ($q) => $q
-                    ->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]),
+                    ->whereLikeUnaccent('users.name', $search)
+                    ->orWhereLikeUnaccent('users.email', $search),
             );
         }
 

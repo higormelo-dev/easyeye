@@ -722,6 +722,31 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
             $this->ctx['headers'],
         )->assertNotFound();
     });
+
+    // BUGFIX (revisão de segurança): buildUpdateData() espalhava patient_id do
+    // body direto no update() sem re-derivar, ao contrário de exam_id/doctor_id/
+    // schedule_id. Um integrador com token de escrita da própria clínica podia
+    // reatribuir o exame de um paciente para outro (mesmo tenant) só enviando
+    // patient_id no body. Fix: patient_id removido de FILLABLE_FIELDS + campo
+    // marcado 'prohibited' no FormRequest (defesa em profundidade).
+    it('rejects patient_id in the update body and does not reassign the exam', function () {
+        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Exame Original',
+                'patient_id'          => $otherPatient->id,
+            ],
+            $this->ctx['headers'],
+        )->assertUnprocessable()
+            ->assertJsonValidationErrors('patient_id');
+
+        expect(PatientExam::find($this->exam->id)->patient_id)->toBe($this->patient->id);
+    });
 });
 
 // ---------------------------------------------------------------------------

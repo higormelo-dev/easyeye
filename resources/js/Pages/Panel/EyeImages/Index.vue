@@ -283,6 +283,38 @@ function selectExamByLaterality(group, lat) {
 }
 
 // ── Paciente / URLs ───────────────────────────────────────────────────────
+/**
+ * Toggle "compartilhar com paciente" (Portal do Paciente, Fase 2). Usa
+ * window.axios (não Inertia router) pra não disparar reload de página nesta
+ * tela — o estado local (paciente selecionado, filtros, modal do viewer) é
+ * rico demais pra arriscar um full reload. CSRF já vem de graça via o
+ * X-XSRF-TOKEN automático do axios (bootstrap.js).
+ */
+async function toggleExamShare(exam) {
+    if (exam._sharing) return;
+    exam._sharing = true;
+
+    try {
+        if (exam.shared_with_patient) {
+            await window.axios.delete(props.urls.document_share_destroy.replace('__ID__', exam.document_share_id));
+            exam.shared_with_patient = false;
+            exam.document_share_id = null;
+        } else if (selectedPatient.value) {
+            const { data } = await window.axios.post(props.urls.document_share_store, {
+                shareable_type: 'exame',
+                shareable_id: exam.id,
+                patient_id: selectedPatient.value.id,
+            });
+            exam.shared_with_patient = true;
+            exam.document_share_id = data.id;
+        }
+    } catch (e) {
+        // Falha silenciosa na UI (badge mantém estado anterior) — erro já fica registrado no servidor.
+    } finally {
+        exam._sharing = false;
+    }
+}
+
 async function selectPatient(patient) {
     selectedPatient.value = patient;
     examUrls.value        = {};
@@ -1487,6 +1519,15 @@ const printEntity = computed(() => props.entity ?? {});
                                                           @click.stop="openExistingReport(exam)">
                                                         <i class="ti ti-robot me-1"></i>IA
                                                     </span>
+                                                </span>
+
+                                                <!-- Badge compartilhamento com paciente (Portal do Paciente, Fase 2) -->
+                                                <span class="position-absolute d-flex align-items-center justify-content-center rounded-circle"
+                                                      :class="exam.shared_with_patient ? 'bg-success text-white' : 'bg-dark border border-secondary text-white-50'"
+                                                      style="top:28px;right:3px;width:18px;height:18px;z-index:1;cursor:pointer;"
+                                                      :title="exam.shared_with_patient ? 'Compartilhado com o paciente — clique para revogar' : 'Compartilhar exame com o paciente'"
+                                                      @click.stop="toggleExamShare(exam)">
+                                                    <i :class="exam._sharing ? 'ti ti-loader-2 ee-spin' : (exam.shared_with_patient ? 'ti ti-share-off' : 'ti ti-share')" style="font-size:.5rem;"></i>
                                                 </span>
 
                                                 <!-- Thumbnail com imagem (miniatura gerada; fallback: exibição/original) -->

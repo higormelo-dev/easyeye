@@ -174,7 +174,7 @@ abstract class BaseSettingController extends Controller
                     ->where('entity_id', $entityId)
                     ->orWhereNull('entity_id'),
             )
-            ->when($search, fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->when($search, fn ($q) => $q->whereLikeUnaccent('name', $search))
             ->orderBy('name')
             ->paginate($perPage);
 
@@ -221,6 +221,7 @@ abstract class BaseSettingController extends Controller
     public function destroy(Request $request, string $id): JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
+        $this->assertOwnsRecord($record);
 
         return DB::transaction(function () use ($request, $record) {
             $message    = $this->getDeleteMessage();
@@ -238,6 +239,7 @@ abstract class BaseSettingController extends Controller
     public function restore(Request $request, string $id): JsonResponse|RedirectResponse
     {
         $record = $this->service->findByIdOrCode($id);
+        $this->assertOwnsRecord($record);
 
         return DB::transaction(function () use ($request, $record) {
             $message    = $this->getRestoreMessage();
@@ -266,7 +268,8 @@ abstract class BaseSettingController extends Controller
 
     protected function genericUpdate(FormRequest $request, string $id): JsonResponse|RedirectResponse
     {
-        $record  = $this->service->findByIdOrCode($id);
+        $record = $this->service->findByIdOrCode($id);
+        $this->assertOwnsRecord($record);
         $updated = $this->service->update($record, $request);
         $message = $this->getUpdateMessage(request());
 
@@ -313,10 +316,9 @@ abstract class BaseSettingController extends Controller
             );
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower): void {
-                $q->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+            $query->where(function ($q) use ($search): void {
+                $q->whereLikeUnaccent('name', $search)
+                    ->orWhereLikeUnaccent('code', $search);
             });
         }
 
@@ -355,6 +357,26 @@ abstract class BaseSettingController extends Controller
         $data['is_global']  = $record->entity_id === null;
 
         return $data;
+    }
+
+    /**
+     * BUGFIX (revisao de seguranca): findByIdOrCode() casa entity_id da sessão
+     * OU entity_id NULL (registro global seedado pra todas as clínicas) porque
+     * essa lookup é usada pelos paths de LEITURA (show/edit/fetchTableRows/cards),
+     * onde exibir os globais junto aos próprios é o comportamento correto. Os
+     * paths de ESCRITA (destroy/restore/genericUpdate) reaproveitavam a mesma
+     * lookup sem checagem adicional, permitindo qualquer staff com permissão
+     * settings.manage mutar/apagar um catálogo GLOBAL (entity_id null) e afetar
+     * todas as outras clínicas da plataforma. 404 (não 403) para não revelar a
+     * existência do registro global/de outro tenant.
+     */
+    protected function assertOwnsRecord(Model $record): void
+    {
+        abort_unless(
+            $record->entity_id !== null
+                && (string) $record->entity_id === (string) session('selected_entity_id'),
+            404,
+        );
     }
 
     // ── Helpers de mensagem — sobrescrever via traits ou métodos no filho ──

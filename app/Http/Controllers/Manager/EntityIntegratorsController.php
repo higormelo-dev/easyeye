@@ -46,12 +46,11 @@ class EntityIntegratorsController extends Controller
             ->where('entity_user_integrator_id', $userIntegratorModel->id);
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower): void {
-                $q->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(ip) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(mac) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+            $query->where(function ($q) use ($search): void {
+                $q->whereLikeUnaccent('name', $search)
+                    ->orWhereLikeUnaccent('ip', $search)
+                    ->orWhereLikeUnaccent('mac', $search)
+                    ->orWhereLikeUnaccent('code', $search);
             });
         }
 
@@ -97,8 +96,13 @@ class EntityIntegratorsController extends Controller
 
     public function show(string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
+        $entity              = Entity::query()->withTrashed()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()->withTrashed()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $record = $this->model->query()->withTrashed()
-            ->where('entity_user_integrator_id', $userIntegrator)
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
         // Conta tokens Sanctum ativos do EntityUserIntegrator dono, filtrados por
@@ -123,8 +127,13 @@ class EntityIntegratorsController extends Controller
 
     public function update(EntityIntegratorRequest $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $record = $this->model->query()
-            ->where('entity_user_integrator_id', $userIntegrator)
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
         $record->update($request->validated());
@@ -140,8 +149,13 @@ class EntityIntegratorsController extends Controller
      */
     public function editData(string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $record = $this->model->query()
-            ->where('entity_user_integrator_id', $userIntegrator)
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
         return response()->json(['data' => [
@@ -154,8 +168,13 @@ class EntityIntegratorsController extends Controller
 
     public function activate(Request $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $record = $this->model->query()
-            ->where('entity_user_integrator_id', $userIntegrator)
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
         $active = (bool) $request->input('active', ! $record->active);
@@ -171,8 +190,13 @@ class EntityIntegratorsController extends Controller
 
     public function restore(Request $request, string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
+        $entity              = Entity::query()->withTrashed()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()->withTrashed()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $record = $this->model->query()->withTrashed()
-            ->where('entity_user_integrator_id', $userIntegrator)
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
         $record->restore();
@@ -182,8 +206,13 @@ class EntityIntegratorsController extends Controller
 
     public function destroy(string $entityId, string $userIntegrator, string $integrator): JsonResponse
     {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $record = $this->model->query()
-            ->where('entity_user_integrator_id', $userIntegrator)
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integrator);
 
         $record->delete();

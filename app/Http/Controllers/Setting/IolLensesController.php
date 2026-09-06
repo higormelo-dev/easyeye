@@ -47,10 +47,9 @@ class IolLensesController extends Controller
         $records = EntityIolLens::query()
             ->where('entity_id', $entityId)
             ->when($search !== '', function ($query) use ($search) {
-                $lower = mb_strtolower($search, 'UTF-8');
-                $query->where(function ($q) use ($lower) {
-                    $q->whereRaw('LOWER(manufacturer) LIKE ?', ["%{$lower}%"])
-                        ->orWhereRaw('LOWER(model_name) LIKE ?', ["%{$lower}%"]);
+                $query->where(function ($q) use ($search) {
+                    $q->whereLikeUnaccent('manufacturer', $search)
+                        ->orWhereLikeUnaccent('model_name', $search);
                 });
             })
             ->when($status === 'active', fn ($query) => $query->where('active', true))

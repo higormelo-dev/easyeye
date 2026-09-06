@@ -258,6 +258,8 @@ class PartnersController extends Controller
 
     public function advanceLead(Request $request, Partner $partner, PartnerLead $lead): JsonResponse
     {
+        abort_if((string) $lead->partner_id !== (string) $partner->id, 404);
+
         $request->validate(['status' => ['required', 'string']]);
 
         $this->partnerService->advanceLead(

@@ -320,4 +320,32 @@ test('usuário inscrito sem sessão verificada não re-inscreve o 2FA nem libera
     $this->actingAs($fresh)->withSession($session)
         ->get(route('panel.dashboard'))
         ->assertRedirect(route('security.two-factor.verify'));
-})->todo();
+});
+
+test('sessao ja verificada (estado normal de qualquer login) nao reseta 2FA confirmado sem reconfirmar senha', function () {
+    [$user, $secret] = userWithConfirmedTwoFactor();
+    $rawSecretBefore = $user->getRawOriginal('two_factor_secret');
+
+    $verifiedSession = array_merge(
+        twoFactorPagesSession($user),
+        ['two_factor_verified_at' => now()->toIso8601String()],
+    );
+
+    $this->actingAs($user)->withSession($verifiedSession)
+        ->get(route('security.two-factor.setup'))
+        ->assertRedirect(route('password.confirm'));
+
+    $this->actingAs($user->fresh())->withSession($verifiedSession)
+        ->post(route('security.two-factor.setup.store'))
+        ->assertRedirect(route('password.confirm'));
+
+    $fresh = $user->fresh();
+    expect($fresh->getRawOriginal('two_factor_secret'))->toBe($rawSecretBefore);
+    expect($fresh->hasTwoFactorEnabled())->toBeTrue();
+
+    $stepUpSession = array_merge($verifiedSession, ['auth.password_confirmed_at' => time()]);
+
+    $this->actingAs($fresh)->withSession($stepUpSession)
+        ->get(route('security.two-factor.setup'))
+        ->assertOk();
+});

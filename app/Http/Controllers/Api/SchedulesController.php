@@ -50,21 +50,21 @@ class SchedulesController extends Controller
             $schedules = $schedules->where(function ($query) use ($search) {
                 $query->whereHas('patient', function ($q) use ($search) {
                     $q->whereHas('person', function ($qq) use ($search) {
-                        $qq->where('full_name', 'ilike', '%' . $search . '%')
-                            ->orWhere('nickname', 'ilike', '%' . $search . '%');
+                        $qq->whereLikeUnaccent('full_name', $search)
+                            ->orWhereLikeUnaccent('nickname', $search);
                     });
                 })
                     ->orWhereHas('doctor', function ($q) use ($search) {
                         $q->whereHas('person', function ($qq) use ($search) {
-                            $qq->where('full_name', 'ilike', '%' . $search . '%')
-                                ->orWhere('nickname', 'ilike', '%' . $search . '%');
+                            $qq->whereLikeUnaccent('full_name', $search)
+                                ->orWhereLikeUnaccent('nickname', $search);
                         });
                     })
                     ->orWhereHas('covenant', function ($q) use ($search) {
-                        $q->where('name', 'ilike', '%' . $search . '%');
+                        $q->whereLikeUnaccent('name', $search);
                     })
-                    ->orWhere('code', 'ilike', '%' . $search . '%')
-                    ->orWhere('full_name', 'ilike', '%' . $search . '%');
+                    ->orWhereLikeUnaccent('code', $search)
+                    ->orWhereLikeUnaccent('full_name', $search);
             });
         }
 

@@ -65,8 +65,7 @@ class AiCreditPurchasesController extends Controller
             ->when($filters['date_from'] ?? null, fn ($q, $v) => $q->whereDate('created_at', '>=', $v))
             ->when($filters['date_to'] ?? null, fn ($q, $v) => $q->whereDate('created_at', '<=', $v))
             ->when($filters['q'] ?? null, function ($q, $v) {
-                $like = '%' . str_replace(['%', '_'], ['\%', '\_'], $v) . '%';
-                $q->whereHas('entity', fn ($qe) => $qe->where('name', 'ilike', $like));
+                $q->whereHas('entity', fn ($qe) => $qe->whereLikeUnaccent('name', $v));
             })
             ->orderByDesc('created_at');
 

@@ -41,13 +41,12 @@ class EntityIntegratorEquipmentsController extends Controller
             ->where('integrator_id', $integratorModel->id);
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
-            $query->where(function ($q) use ($lower): void {
-                $q->whereRaw('LOWER(name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(ip) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(mac) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(serial_number) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(code) LIKE ?', ["%{$lower}%"]);
+            $query->where(function ($q) use ($search): void {
+                $q->whereLikeUnaccent('name', $search)
+                    ->orWhereLikeUnaccent('ip', $search)
+                    ->orWhereLikeUnaccent('mac', $search)
+                    ->orWhereLikeUnaccent('serial_number', $search)
+                    ->orWhereLikeUnaccent('code', $search);
             });
         }
 
@@ -76,8 +75,13 @@ class EntityIntegratorEquipmentsController extends Controller
 
     public function show(string $entityId, string $userIntegrator, string $integratorId, string $equipment): JsonResponse
     {
+        $entity              = Entity::query()->findOrFail($entityId);
+        $userIntegratorModel = EntityUserIntegrator::query()
+            ->where('entity_id', $entity->id)
+            ->findOrFail($userIntegrator);
+
         $integrator = EntityIntegrator::query()->withTrashed()
-            ->where('entity_user_integrator_id', $userIntegrator)
+            ->where('entity_user_integrator_id', $userIntegratorModel->id)
             ->findOrFail($integratorId);
 
         $record = $this->model->query()->withTrashed()

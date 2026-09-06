@@ -66,8 +66,8 @@ class IolLensModel extends Model
         $lower = mb_strtolower(trim($term), 'UTF-8');
 
         $query->where(function ($q) use ($lower) {
-            $q->whereRaw('LOWER(manufacturer) LIKE ?', ["%{$lower}%"])
-                ->orWhereRaw('LOWER(model_name) LIKE ?', ["%{$lower}%"]);
+            $q->whereLikeUnaccent('manufacturer', $lower)
+                ->orWhereLikeUnaccent('model_name', $lower);
         })->orderByRaw(
             'CASE WHEN LOWER(manufacturer) LIKE ? OR LOWER(model_name) LIKE ? THEN 0 ELSE 1 END',
             ["{$lower}%", "{$lower}%"],

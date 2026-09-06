@@ -51,9 +51,18 @@ trait HasEntityRoles
     public function getRuleInEntity(Entity $entity): ?string
     {
         if (! array_key_exists($entity->id, $this->entityRuleCache)) {
+            // Achado de segurança (auditoria manager.php — ROLE_BYPASS
+            // CRITICAL): faltava active=true aqui, diferente de
+            // canAccessEntity() (linha ~134) que já filtra por isso. Sem essa
+            // checagem, um vínculo entity_users desativado (active=false, sem
+            // soft-delete — forma comum de "revogar acesso") continuava
+            // resolvendo role normalmente em EnsureSaasRole e em todo Gate
+            // Saas*, retendo acesso admin total indefinidamente mesmo após
+            // desativação.
             $this->entityRuleCache[$entity->id] = EntityUser::query()
                 ->where('user_id', $this->id)
                 ->where('entity_id', $entity->id)
+                ->where('active', true)
                 ->whereNull('deleted_at')
                 ->value('rule');
         }
@@ -249,10 +258,14 @@ trait HasEntityRoles
      */
     public function isOwnerOfEntity(Entity $entity): bool
     {
+        // Achado de segurança (auditoria manager.php — ROLE_BYPASS CRITICAL):
+        // mesmo motivo de getRuleInEntity() acima — sem active=true, um owner
+        // desativado continuava passando por EnsureSaasRole via este check.
         return EntityUser::query()
             ->where('user_id', $this->id)
             ->where('entity_id', $entity->id)
             ->where('is_owner', true)
+            ->where('active', true)
             ->whereNull('deleted_at')
             ->exists();
     }

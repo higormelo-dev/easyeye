@@ -21,6 +21,13 @@ class PasswordResetLinkController extends Controller
     /**
      * Handle an incoming password reset link request.
      *
+     * BUGFIX (revisão de segurança — enumeração de conta, achada na área do
+     * paciente e replicada aqui do mesmo padrão): antes, e-mail inexistente
+     * devolvia "Não existe nenhum usuário com o e-mail indicado."
+     * (lang/pt_BR/passwords.php) numa mensagem de erro distinta da de
+     * sucesso — confirmava em 1 requisição se um e-mail tem conta de staff.
+     * Agora a resposta é SEMPRE a mesma, exista ou não a conta.
+     *
      * @throws ValidationException
      */
     public function store(Request $request): RedirectResponse
@@ -29,16 +36,11 @@ class PasswordResetLinkController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
-        $status = Password::sendResetLink(
-            $request->only('email'),
-        );
+        Password::sendResetLink($request->only('email'));
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        return back()->with(
+            'status',
+            'Se este e-mail estiver cadastrado, você vai receber um link de redefinição de senha.',
+        );
     }
 }

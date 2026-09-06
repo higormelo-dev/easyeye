@@ -43,12 +43,11 @@ class EntitiesController extends Controller
             ->where('code', '!=', 'ENT-0000000001');
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
             $query->where(
                 fn ($q) => $q
-                    ->whereRaw('LOWER(entities.name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(entities.code) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(entities.city) LIKE ?', ["%{$lower}%"]),
+                    ->whereLikeUnaccent('entities.name', $search)
+                    ->orWhereLikeUnaccent('entities.code', $search)
+                    ->orWhereLikeUnaccent('entities.city', $search),
             );
         }
 
@@ -77,7 +76,7 @@ class EntitiesController extends Controller
                 '(SELECT COUNT(*) FROM entity_user_integrators WHERE entity_user_integrators.entity_id = entities.id AND entity_user_integrators.deleted_at IS NULL) as entity_user_integrators_count',
             )
             ->where('code', '!=', 'ENT-0000000001')
-            ->when($search, fn ($q) => $q->whereRaw('LOWER(name) LIKE ?', ['%' . mb_strtolower($search, 'UTF-8') . '%']))
+            ->when($search, fn ($q) => $q->whereLikeUnaccent('name', $search))
             ->orderByDesc('created_at')
             ->paginate($perPage);
 

@@ -29,6 +29,10 @@ class PatientExamRequest extends FormRequest
         $entityId   = $integrator->user->entity_id;
 
         return [
+            // Defesa em profundidade: patient_id é sempre derivado do segmento
+            // de rota, nunca do body. Rejeita explicitamente em vez de apenas
+            // ignorar, para não mascarar um client tentando reatribuir o exame.
+            'patient_id'      => ['prohibited'],
             'exam_identifier' => [
                 'required',
                 function ($attribute, $value, $fail) use ($entityId) {

@@ -25,7 +25,7 @@ class IndicationSearchController extends Controller
         $results = Indication::query()
             ->where(fn ($q2) => $q2->where('entity_id', $entityId)->orWhereNull('entity_id'))
             ->where('active', true)
-            ->where('description', 'ILIKE', "%{$q}%")
+            ->whereLikeUnaccent('description', $q)
             ->orderBy('description')
             ->limit(20)
             ->get(['id', 'description']);

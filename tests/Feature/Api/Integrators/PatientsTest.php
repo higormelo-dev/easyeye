@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Patient;
+use App\Models\{Patient, People};
 
 describe('GET /api/integrators/v1/patients', function () {
     beforeEach(function () {
@@ -27,12 +27,21 @@ describe('GET /api/integrators/v1/patients', function () {
     });
 
     it('filters patients by name search', function () {
-        $person = \App\Models\People::factory()->create(['full_name' => 'João da Silva']);
+        $person = People::factory()->create(['full_name' => 'João da Silva']);
         Patient::factory()->create([
             'entity_id' => $this->ctx['entity']->id,
             'person_id' => $person->id,
         ]);
-        Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        // BUGFIX (flaky, achado ao rodar a suite completa): faker pt_BR pode
+        // sortear 'João' como nome de qualquer pessoa aleatória (é um dos
+        // nomes masculinos mais comuns no provider) — sem full_name fixo, o
+        // decoy vira um match falso-positivo com probabilidade real, dando 2
+        // resultados em vez de 1 de forma intermitente.
+        $decoy = People::factory()->create(['full_name' => 'Maria Aparecida Souza']);
+        Patient::factory()->create([
+            'entity_id' => $this->ctx['entity']->id,
+            'person_id' => $decoy->id,
+        ]);
 
         $response = $this->getJson('/api/integrators/v1/patients?search=João', $this->ctx['headers'])
             ->assertOk();
@@ -46,7 +55,7 @@ describe('GET /api/integrators/v1/patients', function () {
 
         $response = $this->getJson(
             "/api/integrators/v1/patients?search={$target->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);

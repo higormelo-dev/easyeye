@@ -31,6 +31,15 @@ class HandleImpersonation
             return $next($request);
         }
 
+        // BUGFIX (revisao de seguranca): a rota que encerra a impersonação
+        // precisa ver o admin real (Auth::user() original), não o usuário
+        // impersonado — senão o middleware 'verified' avalia o e-mail do
+        // impersonado (podendo bloquear o admin) e o audit log de
+        // 'impersonation.end' grava o ator errado.
+        if ($request->routeIs('manager.impersonate.destroy')) {
+            return $next($request);
+        }
+
         $entityUser = EntityUser::with('user')
             ->find(session('impersonating.entity_user_id'));
 

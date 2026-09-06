@@ -27,8 +27,8 @@ class ProcedureSearchController extends Controller
         $results = Procedure::query()
             ->where(fn ($q2) => $q2->where('entity_id', $entityId)->orWhereNull('entity_id'))
             ->where('active', true)
-            ->where(fn ($q2) => $q2->where('name', 'ILIKE', "%{$q}%")
-                ->orWhere('code', 'ILIKE', "%{$q}%"))
+            ->where(fn ($q2) => $q2->whereLikeUnaccent('name', $q)
+                ->orWhereLikeUnaccent('code', $q))
             ->orderBy('name')
             ->limit(20)
             ->get(['id', 'code', 'name']);

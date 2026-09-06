@@ -18,9 +18,15 @@ function makeSchedule(array $ctx, array $overrides = []): Schedule
         'active'         => true,
     ]);
 
+    // BUGFIX (achado ao rodar a suite completa pela 1a vez): sem entity_id,
+    // cai no catálogo GLOBAL de visit_types, que tem unique parcial em name
+    // (visit_types_global_name_unique, migration 2026_08_23) — colidia com o
+    // 'CONSULTA' já semeado pela própria migração. Escopado por entidade,
+    // igual ao padrão já usado em PanelCrossTenantIdorRound2Test.php.
     $visitType = VisitType::create([
-        'name'   => 'Consulta',
-        'active' => true,
+        'entity_id' => $ctx['entity']->id,
+        'name'      => 'Consulta',
+        'active'    => true,
     ]);
 
     return Schedule::create(array_merge([
@@ -67,7 +73,7 @@ describe('GET /api/integrators/v1/schedules', function () {
 
         $response = $this->getJson(
             '/api/integrators/v1/schedules?search=joao',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
@@ -79,7 +85,7 @@ describe('GET /api/integrators/v1/schedules', function () {
 
         $response = $this->getJson(
             "/api/integrators/v1/schedules?search={$schedule->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
@@ -93,7 +99,7 @@ describe('GET /api/integrators/v1/schedules', function () {
 
         $response = $this->getJson(
             "/api/integrators/v1/schedules?search={$targetSchedule->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1)
@@ -109,7 +115,7 @@ describe('GET /api/integrators/v1/schedules', function () {
             'person_id'      => $person->id,
             'active'         => true,
         ]);
-        $visitType = VisitType::create(['name' => 'Consulta', 'active' => true]);
+        $visitType = VisitType::create(['entity_id' => $this->ctx['entity']->id, 'name' => 'Consulta', 'active' => true]);
         Schedule::create([
             'entity_id'          => $this->ctx['entity']->id,
             'doctor_id'          => $doctor->id,
@@ -126,7 +132,7 @@ describe('GET /api/integrators/v1/schedules', function () {
 
         $response = $this->getJson(
             '/api/integrators/v1/schedules?search=antonio',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(1);
@@ -151,7 +157,7 @@ describe('GET /api/integrators/v1/schedules', function () {
 
         $response = $this->getJson(
             "/api/integrators/v1/schedules?date={$targetDate}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.total'))->toBe(2);
@@ -164,7 +170,7 @@ describe('GET /api/integrators/v1/schedules', function () {
 
         $response = $this->getJson(
             '/api/integrators/v1/schedules?per_page=999',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk();
 
         expect($response->json('meta.per_page'))->toBeLessThanOrEqual(100);
@@ -185,7 +191,7 @@ describe('GET /api/integrators/v1/schedules/{id}', function () {
     it('shows schedule by UUID', function () {
         $this->getJson(
             "/api/integrators/v1/schedules/{$this->schedule->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->schedule->id]);
     });
@@ -193,7 +199,7 @@ describe('GET /api/integrators/v1/schedules/{id}', function () {
     it('shows schedule by code', function () {
         $this->getJson(
             "/api/integrators/v1/schedules/{$this->schedule->code}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->schedule->id]);
     });
@@ -203,7 +209,7 @@ describe('GET /api/integrators/v1/schedules/{id}', function () {
 
         $this->getJson(
             "/api/integrators/v1/schedules/{$numericPart}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertOk()
             ->assertJsonFragment(['id' => $this->schedule->id]);
     });
@@ -211,7 +217,7 @@ describe('GET /api/integrators/v1/schedules/{id}', function () {
     it('returns 404 for non-existent schedule', function () {
         $this->getJson(
             '/api/integrators/v1/schedules/SDL-NAOEXISTE',
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 
@@ -221,7 +227,7 @@ describe('GET /api/integrators/v1/schedules/{id}', function () {
 
         $this->getJson(
             "/api/integrators/v1/schedules/{$schedule->id}",
-            $this->ctx['headers']
+            $this->ctx['headers'],
         )->assertNotFound();
     });
 

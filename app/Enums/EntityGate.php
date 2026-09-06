@@ -64,6 +64,15 @@ enum EntityGate: string
     /** Importar exame externo (upload manual) no Gerenciador de Imagens (admin, doctor, secretary). */
     case ImportExternalExam = 'entity.import-external-exam';
 
+    /**
+     * Compartilhar/revogar LAUDO (MedicalRecordDocumentation) com o paciente
+     * no Portal do Paciente (admin, doctor — NÃO secretary). Decisão de
+     * produto: secretária não decide o que do conteúdo clínico assinado é
+     * exposto ao paciente. Exame/anexo continuam no allowlist mais amplo da
+     * rota (admin, doctor, secretary) — restrição é só pro tipo laudo.
+     */
+    case ShareLaudoWithPatient = 'entity.share-laudo-with-patient';
+
     /** Gerenciar configurações da entity (admin). */
     case ManageSettings = 'entity.manage-settings';
 

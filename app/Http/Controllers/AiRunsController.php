@@ -413,8 +413,8 @@ class AiRunsController extends Controller
 
         if ($q !== '') {
             $query->where(function ($w) use ($q): void {
-                $w->where('people.full_name', 'ilike', "%{$q}%")
-                    ->orWhere('patients.code', 'ilike', "%{$q}%");
+                $w->whereLikeUnaccent('people.full_name', $q)
+                    ->orWhereLikeUnaccent('patients.code', $q);
             });
         }
 
@@ -453,7 +453,7 @@ class AiRunsController extends Controller
         }
 
         if ($q !== '') {
-            $query->where('code', 'ilike', "%{$q}%");
+            $query->whereLikeUnaccent('code', $q);
         }
 
         $rows = $query->orderByDesc('created_at')
@@ -847,6 +847,13 @@ class AiRunsController extends Controller
         $entityId = $this->selectedEntityId();
         $this->assertRunBelongsToEntity($aiRun, $entityId);
         $this->assertAiFeatureEnabled($entityId);
+
+        // BUGFIX (revisao de seguranca): escalate() criava o AiRun filho direto,
+        // sem passar por AiPayloadEnricher::enrich()/validateFeatureByWorkflow()
+        // como store() faz — permitia secretária escalar um run assistant_chat
+        // de um médico (achado via GET /panel/ai/usage) e burlar a restrição
+        // doctor-only, gerando um novo run de chat sob a própria identidade.
+        $this->enricher->validateFeatureByWorkflow((string) $aiRun->workflow, $entityId);
 
         // Estados terminais elegíveis.
         $terminal = [

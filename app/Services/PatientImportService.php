@@ -330,7 +330,7 @@ class PatientImportService
         $planLimit  = $planStatus->isUnlimited ? PHP_INT_MAX : $planStatus->limit;
 
         // Pre-carrega convênios (nome → id) para evitar N+1
-        $covenantsMap = $this->loadCovenantsMap();
+        $covenantsMap = $this->loadCovenantsMap($import->entity_id);
 
         $errors     = [];
         $imported   = 0;
@@ -666,10 +666,15 @@ class PatientImportService
 
     // ── Convênios ─────────────────────────────────────────────────────────────
 
-    /** Retorna mapa nome-em-minúsculo → UUID para lookup eficiente. */
-    private function loadCovenantsMap(): array
+    /** Retorna mapa nome-em-minúsculo → UUID para lookup eficiente, escopado à entidade. */
+    private function loadCovenantsMap(string $entityId): array
     {
-        return Covenant::pluck('id', 'name')
+        return Covenant::where(function ($query) use ($entityId) {
+            $query->where('entity_id', $entityId)
+                ->orWhere('entity_id', null);
+        })
+            ->whereNull('deleted_at')
+            ->pluck('id', 'name')
             ->mapWithKeys(fn ($id, $name) => [mb_strtolower($name, 'UTF-8') => (string) $id])
             ->toArray();
     }

@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
+use Illuminate\Database\Eloquent\Relations\{HasMany, HasOne};
 use Illuminate\Notifications\Notifiable;
 use Laracasts\Presenter\PresentableTrait;
 
@@ -203,6 +204,23 @@ class People extends Model
         'SE' => 'Sergipe',
         'TO' => 'Tocantins',
     ];
+
+    /**
+     * Cadastros de paciente desta pessoa em cada clínica (Patient.person_id).
+     * Sem escopo de entity aqui — People não usa BelongsToEntity, então isto
+     * retorna as linhas de TODAS as clínicas onde a pessoa já foi atendida.
+     * Usado pelo Portal do Paciente (Fase 1) para listar "Minhas Clínicas".
+     */
+    public function patients(): HasMany
+    {
+        return $this->hasMany(Patient::class, 'person_id');
+    }
+
+    /** Conta de acesso ao Portal do Paciente (1:1) — ver PatientAccount. */
+    public function patientAccount(): HasOne
+    {
+        return $this->hasOne(PatientAccount::class, 'person_id');
+    }
 
     /**
      * Override setAttribute to automatically uppercase specified fields.

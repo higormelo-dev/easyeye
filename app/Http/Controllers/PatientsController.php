@@ -55,12 +55,11 @@ class PatientsController extends Controller
             );
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
             $query->where(
                 fn ($q) => $q
-                    ->whereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(patients.code) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(people.cellphone) LIKE ?', ["%{$lower}%"]),
+                    ->whereLikeUnaccent('people.full_name', $search)
+                    ->orWhereLikeUnaccent('patients.code', $search)
+                    ->orWhereLikeUnaccent('people.cellphone', $search),
             );
         }
 
@@ -133,10 +132,9 @@ class PatientsController extends Controller
                     });
             })
             ->when($search, function ($q) use ($search) {
-                $lower = mb_strtolower($search, 'UTF-8');
-                $q->where(function ($inner) use ($lower) {
-                    $inner->whereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"])
-                        ->orWhereRaw('LOWER(patients.code) LIKE ?', ["%{$lower}%"]);
+                $q->where(function ($inner) use ($search) {
+                    $inner->whereLikeUnaccent('people.full_name', $search)
+                        ->orWhereLikeUnaccent('patients.code', $search);
                 });
             })
             ->select('patients.*')
@@ -285,18 +283,16 @@ class PatientsController extends Controller
             return response()->json([]);
         }
 
-        $lower = mb_strtolower($q, 'UTF-8');
-
         $patients = Patient::query()
             ->join('people', 'patients.person_id', '=', 'people.id')
             ->where('patients.entity_id', $entityId)
             ->where('patients.active', true)
-            ->where(function ($inner) use ($lower) {
-                $inner->whereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(people.cellphone) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(people.telephone) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(people.national_registry) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(patients.code) LIKE ?', ["%{$lower}%"]);
+            ->where(function ($inner) use ($q) {
+                $inner->whereLikeUnaccent('people.full_name', $q)
+                    ->orWhereLikeUnaccent('people.cellphone', $q)
+                    ->orWhereLikeUnaccent('people.telephone', $q)
+                    ->orWhereLikeUnaccent('people.national_registry', $q)
+                    ->orWhereLikeUnaccent('patients.code', $q);
             })
             ->select('patients.id', 'patients.code', 'people.full_name', 'people.cellphone', 'people.telephone')
             ->orderBy('people.full_name')
@@ -344,6 +340,18 @@ class PatientsController extends Controller
      */
     public function editData(Patient $patient): JsonResponse
     {
+        // Achado de segurança (auditoria da Fase 1 do Portal do Paciente): o
+        // route model binding de {patient} sozinho NÃO é filtrado por entidade
+        // aqui — `SubstituteBindings` roda antes de `tenant.bind` na ordem de
+        // middleware do Laravel, então o EntityScope global ainda está inerte
+        // quando {patient} é resolvido. Sem esta checagem explícita, staff de
+        // uma entidade conseguia ler PII completo (CPF, endereço, telefone) de
+        // paciente de OUTRA entidade só sabendo o UUID.
+        abort_unless(
+            (string) $patient->entity_id === (string) session('selected_entity_id'),
+            404,
+        );
+
         $patient->load('person');
         $person = $patient->person;
 

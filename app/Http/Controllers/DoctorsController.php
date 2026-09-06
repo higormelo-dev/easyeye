@@ -45,11 +45,10 @@ class DoctorsController extends Controller
             ->join('people', 'doctors.person_id', '=', 'people.id')
             ->where('entity_users.entity_id', session()->get('selected_entity_id'))
             ->when($search, function ($q) use ($search) {
-                $lower = mb_strtolower($search, 'UTF-8');
-                $q->where(function ($inner) use ($lower) {
-                    $inner->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
-                        ->orWhereRaw('LOWER(doctors.code) LIKE ?', ["%{$lower}%"])
-                        ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"]);
+                $q->where(function ($inner) use ($search) {
+                    $inner->whereLikeUnaccent('users.name', $search)
+                        ->orWhereLikeUnaccent('doctors.code', $search)
+                        ->orWhereLikeUnaccent('users.email', $search);
                 });
             })
             ->select(
@@ -119,13 +118,12 @@ class DoctorsController extends Controller
             ->where('entity_users.entity_id', $entityId);
 
         if ($search !== '') {
-            $lower = mb_strtolower($search, 'UTF-8');
             $query->where(
                 fn ($q) => $q
-                    ->whereRaw('LOWER(users.name) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(users.email) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(doctors.code) LIKE ?', ["%{$lower}%"])
-                    ->orWhereRaw('LOWER(doctors.record) LIKE ?', ["%{$lower}%"]),
+                    ->whereLikeUnaccent('users.name', $search)
+                    ->orWhereLikeUnaccent('users.email', $search)
+                    ->orWhereLikeUnaccent('doctors.code', $search)
+                    ->orWhereLikeUnaccent('doctors.record', $search),
             );
         }
 

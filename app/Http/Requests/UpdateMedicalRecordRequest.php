@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Doctor;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class UpdateMedicalRecordRequest extends FormRequest
@@ -73,7 +74,20 @@ class UpdateMedicalRecordRequest extends FormRequest
     {
         return [
             // Identificacao — doctor obrigatório (auto-preenchido se user é médico).
-            'doctor_id' => ['required', 'uuid', 'exists:doctors,id'],
+            // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
+            // request body) — ver mesmo comentário em StoreMedicalRecordRequest.
+            'doctor_id' => ['required', 'uuid', function ($attribute, $value, $fail) {
+                $exists = DB::table('doctors')
+                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                    ->where('doctors.id', $value)
+                    ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+                    ->whereNull('doctors.deleted_at')
+                    ->exists();
+
+                if (! $exists) {
+                    $fail('Médico selecionado não pertence à entidade ativa.');
+                }
+            }],
             // Vínculo com a agenda escopado por tenant: um schedule_id de outra
             // clínica não pode ser gravado no prontuário (FK cruzada mataria o
             // fluxo Finalizar/Dilatar/Exame e vazaria referência entre clínicas).
@@ -89,22 +103,150 @@ class UpdateMedicalRecordRequest extends FormRequest
             // primeiro" manual. Não é persistido no registro.
             'post_save_action' => ['nullable', 'string', 'in:medication,procedures,pterygium,cataract,test_eye,retinal_mapping,attendance_certificate,medical_certificate,exam_hub,documentations,upload'],
             // Exame fisico — selecoes
-            'visual_acuity_type_id'                     => ['sometimes', 'nullable', 'uuid', 'exists:visual_acuity_types,id'],
-            'near_point_convergence_id'                 => ['sometimes', 'nullable', 'uuid', 'exists:near_point_convergences,id'],
-            'cover_test_type_id'                        => ['sometimes', 'nullable', 'uuid', 'exists:cover_test_types,id'],
-            'color_vision_type_id'                      => ['sometimes', 'nullable', 'uuid', 'exists:color_vision_types,id'],
-            'visual_acuity_without_correction_right_id' => ['sometimes', 'nullable', 'uuid', 'exists:visual_acuity_types,id'],
-            'visual_acuity_without_correction_left_id'  => ['sometimes', 'nullable', 'uuid', 'exists:visual_acuity_types,id'],
-            'visual_acuity_with_correction_right_id'    => ['sometimes', 'nullable', 'uuid', 'exists:visual_acuity_types,id'],
-            'visual_acuity_with_correction_left_id'     => ['sometimes', 'nullable', 'uuid', 'exists:visual_acuity_types,id'],
-            'addition_type_id'                          => ['sometimes', 'nullable', 'uuid', 'exists:addition_types,id'],
-            'lens_away_id'                              => ['sometimes', 'nullable', 'uuid', 'exists:lenses,id'],
-            'lens_near_id'                              => ['sometimes', 'nullable', 'uuid', 'exists:lenses,id'],
+            // Achado de segurança (auditoria panel.* IDOR, rodada 2 — ID via
+            // request body) — ver mesmo comentário em StoreMedicalRecordRequest.
+            'visual_acuity_type_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('visual_acuity_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'near_point_convergence_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('near_point_convergences', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'cover_test_type_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('cover_test_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'color_vision_type_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('color_vision_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'visual_acuity_without_correction_right_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('visual_acuity_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'visual_acuity_without_correction_left_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('visual_acuity_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'visual_acuity_with_correction_right_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('visual_acuity_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'visual_acuity_with_correction_left_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('visual_acuity_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'addition_type_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('addition_types', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'lens_away_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('lenses', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
+            'lens_near_id' => [
+                'sometimes',
+                'nullable',
+                'uuid',
+                Rule::exists('lenses', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
             // Multi-características de lente (Multifocal + Antirreflexo...)
             'lens_away_ids'   => ['sometimes', 'nullable', 'array', 'max:10'],
-            'lens_away_ids.*' => ['uuid', 'exists:lenses,id'],
+            'lens_away_ids.*' => [
+                'uuid',
+                Rule::exists('lenses', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
             'lens_near_ids'   => ['sometimes', 'nullable', 'array', 'max:10'],
-            'lens_near_ids.*' => ['uuid', 'exists:lenses,id'],
+            'lens_near_ids.*' => [
+                'uuid',
+                Rule::exists('lenses', 'id')->where(function ($query) {
+                    return $query->where(function ($query) {
+                        $query->where('entity_id', session()->get('selected_entity_id'))
+                            ->orWhere('entity_id', null);
+                    })->whereNull('deleted_at');
+                }),
+            ],
             // Anamnese — CBO
             'main_complaint'          => ['sometimes', 'nullable', 'string', 'max:5000'],
             'hda'                     => ['sometimes', 'nullable', 'string', 'max:10000'],

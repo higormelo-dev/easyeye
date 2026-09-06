@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\{LgpdRequestStatus, LgpdRequestType};
-use App\Models\{EntityUser, LgpdRequest, Patient};
+use App\Models\{EntityUser, LgpdRequest, MedicalRecord, MedicalRecordDocumentation, MedicalRecordFile,
+    Patient, PatientConsent, PatientExam};
 use Illuminate\Database\Eloquent\Collection;
 
 class LgpdService
@@ -73,6 +74,22 @@ class LgpdService
     }
 
     /**
+     * Conclui uma solicitação SEM revisão humana — usado no self-service do
+     * Portal do Paciente (Fase 4): o titular pedindo acesso aos PRÓPRIOS
+     * dados não precisa do prazo de 15 dias do Art. 23 (esse prazo é o
+     * MÁXIMO permitido pra quando há revisão humana, não um mínimo
+     * obrigatório). `responded_by` fica null — nenhum EntityUser agiu.
+     */
+    public function completeAutomatically(LgpdRequest $request, string $response): void
+    {
+        $request->update([
+            'status'       => LgpdRequestStatus::Completed,
+            'response'     => $response,
+            'responded_at' => now(),
+        ]);
+    }
+
+    /**
      * Retorna solicitações abertas e vencidas (prazo expirado sem resposta).
      * Deve ser exibido como alerta no painel do gestor.
      *
@@ -89,31 +106,41 @@ class LgpdService
     }
 
     /**
-     * Exporta todos os dados de um paciente para atendimento de portabilidade/acesso.
+     * Exporta todos os dados de um paciente pra atendimento de acesso/portabilidade.
      * LGPD Art. 18, II (acesso) e V (portabilidade).
+     *
+     * Escopo: um Patient = uma clínica (entity_id) = um controlador de dados
+     * diferente sob a LGPD — nunca agrega dados de outras clínicas do mesmo
+     * titular aqui (isso é papel do Portal "Minhas Clínicas", que já isola
+     * por Patient). Conteúdo textual/relacional completo (inclui laudos e
+     * anamnese); binários (imagem de exame, anexo) ficam só como metadado —
+     * já acessíveis via download individual no Portal (Fase 2).
      *
      * Retorna um array estruturado com todos os dados do paciente no sistema.
      */
     public function exportPatientData(Patient $patient): array
     {
-        $patient->load([
-            'person',
-            'entity',
-            'covenant',
-        ]);
+        $patient->load(['person', 'entity', 'covenant']);
+
+        $medicalRecords = $patient->medicalRecords()
+            ->with(['doctor.person', 'documentations', 'files'])
+            ->orderByDesc('created_at')
+            ->get();
 
         return [
             'exported_at' => now()->toIso8601String(),
-            'patient'     => [
-                'code'        => $patient->code,
-                'card_number' => $patient->card_number,
-                'active'      => $patient->active,
-                'created_at'  => $patient->created_at?->toIso8601String(),
+            'clinic'      => [
+                'name'          => $patient->entity?->name,
+                'patient_code'  => $patient->code,
+                'card_number'   => $patient->card_number,
+                'covenant'      => $patient->covenant?->name,
+                'active'        => $patient->active,
+                'patient_since' => $patient->created_at?->toIso8601String(),
             ],
             'personal_data' => $patient->person ? [
                 'full_name'         => $patient->person->full_name,
                 'birth_date'        => $patient->person->birth_date?->toDateString(),
-                'gender'            => $patient->person->gender,
+                'gender'            => $patient->person->gender_label,
                 'email'             => $patient->person->email,
                 'telephone'         => $patient->person->telephone,
                 'cellphone'         => $patient->person->cellphone,
@@ -128,26 +155,57 @@ class LgpdService
                     'state'      => $patient->person->state,
                 ],
             ] : null,
-            'medical_records' => $patient->medicalRecords()
-                ->with(['doctor.person', 'schedule'])
+            'medical_records' => $medicalRecords->map(fn (MedicalRecord $r) => [
+                'code'             => $r->code,
+                'date'             => $r->created_at?->toIso8601String(),
+                'doctor'           => $r->doctor?->person?->full_name,
+                'main_complaint'   => $r->main_complaint,
+                'hda'              => $r->hda,
+                'diagnosis_cids'   => $r->diagnosis_cids ?? [],
+                'clinical_conduct' => $r->clinical_conduct,
+                'is_signed'        => $r->isSigned(),
+                'signed_at'        => $r->signed_at?->toIso8601String(),
+                'documentations'   => $r->documentations->map(fn (MedicalRecordDocumentation $d) => [
+                    'type'       => $d->getTypeLabel(),
+                    'title'      => $d->title,
+                    'content'    => $d->contentForRender(),
+                    'created_at' => $d->created_at?->toIso8601String(),
+                ])->all(),
+                'files' => $r->files->map(fn (MedicalRecordFile $f) => [
+                    'original_name' => $f->original_name,
+                    'mime_type'     => $f->mime_type,
+                    'file_size'     => $f->file_size,
+                    'created_at'    => $f->created_at?->toIso8601String(),
+                ])->all(),
+            ])->all(),
+            // Exames de imagem: metadado apenas — a imagem em si já é
+            // baixável individualmente pelo titular via Portal (Fase 2),
+            // reencodar binário em JSON não agrega portabilidade real.
+            'exams' => $patient->exams()
+                ->with('examType')
+                ->orderByDesc('exam_performed_at')
                 ->get()
-                ->map(fn ($r) => [
-                    'code'      => $r->code,
-                    'date'      => $r->created_at?->toIso8601String(),
-                    'doctor'    => $r->doctor?->person?->full_name,
-                    'is_signed' => $r->isSigned(),
-                    'signed_at' => $r->signed_at?->toIso8601String(),
-                ])
-                ->toArray(),
+                ->map(fn (PatientExam $e) => [
+                    'type'           => $e->examType?->name,
+                    'laterality'     => $e->laterality,
+                    'performed_at'   => $e->exam_performed_at?->toIso8601String(),
+                    'diagnosis_cids' => $e->diagnosis_cids ?? [],
+                ])->all(),
             'consents' => $patient->consents()
                 ->get()
-                ->map(fn ($c) => [
+                ->map(fn (PatientConsent $c) => [
                     'type'       => $c->consent_type->label(),
                     'status'     => $c->status,
                     'granted_at' => $c->granted_at?->toIso8601String(),
                     'revoked_at' => $c->revoked_at?->toIso8601String(),
                 ])
                 ->toArray(),
+            // LGPD Art. 9º, VI — transparência sobre quem tratou os dados.
+            'access_log_summary' => [
+                'total_accesses'   => $patient->accessLogs()->count(),
+                'last_accessed_at' => optional($patient->accessLogs()->latest('accessed_at')->first())
+                    ->accessed_at?->toIso8601String(),
+            ],
         ];
     }
 }

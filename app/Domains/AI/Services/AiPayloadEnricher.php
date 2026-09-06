@@ -205,7 +205,11 @@ class AiPayloadEnricher
         return $modes;
     }
 
-    private function validateFeatureByWorkflow(string $workflow, string $entityId): void
+    // BUGFIX (revisao de seguranca): visibilidade elevada para public — escalate()
+    // em AiRunsController precisa reaplicar esta mesma checagem (inclusive a
+    // restrição doctor-only do assistant_chat) sem re-enriquecer o payload
+    // inteiro do run pai (o que causaria drift de contexto/paciente).
+    public function validateFeatureByWorkflow(string $workflow, string $entityId): void
     {
         if (in_array($workflow, ['exam_assistant', 'record_assist'], true)
             && ! $this->featureGate->can($entityId, FeatureKey::HasAiExamAssistant)) {

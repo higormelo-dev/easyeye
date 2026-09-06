@@ -7,7 +7,7 @@ use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patie
 use App\Services\{MedicalRecordDocumentationService, MedicalRecordPdfService};
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request, Response};
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\{DB, Gate};
 use Mews\Purifier\Facades\Purifier;
 
 class MedicalRecordDocumentationsController extends Controller
@@ -101,10 +101,26 @@ class MedicalRecordDocumentationsController extends Controller
         $this->authorizeIssueReport();
 
         $validated = $request->validate([
-            'od'        => ['nullable', 'numeric', 'min:0', 'max:999'],
-            'oe'        => ['nullable', 'numeric', 'min:0', 'max:999'],
-            'time'      => ['required', 'string', 'max:5'],
-            'doctor_id' => ['nullable', 'uuid'],
+            'od'   => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'oe'   => ['nullable', 'numeric', 'min:0', 'max:999'],
+            'time' => ['required', 'string', 'max:5'],
+            // Achado de segurança (auditoria panel.* IDOR — ID via request body):
+            // Doctor não tem entity_id direto (só via entity_user_id ->
+            // entity_users.entity_id), então 'exists:doctors,id' sozinho
+            // aceitava médico de OUTRA clínica. Mesma closure de
+            // StoreMedicalRecordRequest::rules() para doctor_id.
+            'doctor_id' => ['nullable', 'uuid', function ($attribute, $value, $fail) {
+                $exists = DB::table('doctors')
+                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                    ->where('doctors.id', $value)
+                    ->where('entity_users.entity_id', session()->get('selected_entity_id'))
+                    ->whereNull('doctors.deleted_at')
+                    ->exists();
+
+                if (! $exists) {
+                    $fail(__('actions.medical_records.doctor_exists_validation'));
+                }
+            }],
         ]);
 
         $entityId = session('selected_entity_id');
@@ -162,6 +178,9 @@ class MedicalRecordDocumentationsController extends Controller
 
     private function assertRecordBelongsToPatient(Patient $patient, MedicalRecord $medicalRecord): void
     {
+        // Achado de segurança (auditoria panel.* IDOR) — ver mesmo comentário em
+        // MedicalRecordsController::assertMedicalRecordBelongsToPatient().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
         abort_if($medicalRecord->patient_id !== $patient->id, 404);
     }
 

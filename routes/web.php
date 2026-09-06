@@ -22,7 +22,9 @@ use App\Http\Controllers\{
     Financial\TissGuidePreValidateController,
     LocaleController,
     NoticesController,
+    PatientDocumentSharesController,
     PatientImportsController,
+    PatientPortalInvitationsController,
     PatientsController,
     ProfileController,
     ReportsController,
@@ -257,6 +259,13 @@ Route::group(
             Route::get('patients/import/{patientImport}/errors', [PatientImportsController::class, 'errors'])->name('patients.import.errors');
             Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
             Route::resource('patients', PatientsController::class);
+
+            // Portal do Paciente (Fase 1): convite disparado pelo staff. O
+            // route model binding de {patient} já resolve só dentro da entity
+            // ativa (EntityScope + tenant.bind do grupo panel.), mesma
+            // proteção que as demais rotas de patients acima.
+            Route::post('patients/{patient}/portal-invitation', [PatientPortalInvitationsController::class, 'store'])
+                ->name('patients.portal-invitation.store');
         });
 
         // ── admin + doctor + secretary: agenda, prontuários, fila de espera ──
@@ -443,6 +452,14 @@ Route::group(
             // Arquivos de prontuário
             Route::resource('patients.medicalrecords.files', MedicalRecordFilesController::class)
                 ->only(['store', 'show', 'destroy']);
+
+            // Portal do Paciente (Fase 2) — toggle "compartilhar com paciente"
+            // pra laudo/exame/anexo. Controller único pros 3 tipos (ver
+            // PatientDocumentSharesController).
+            Route::post('document-shares', [PatientDocumentSharesController::class, 'store'])
+                ->name('document-shares.store');
+            Route::delete('document-shares/{share}', [PatientDocumentSharesController::class, 'destroy'])
+                ->name('document-shares.destroy');
 
             Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');
             Route::post('schedules/bulk-update', [SchedulesController::class, 'bulkUpdate'])->name('schedules.bulk-update');
@@ -723,4 +740,6 @@ Route::prefix('docs/api')->name('docs.api.')->group(function () {
 
 require __DIR__ . '/manager.php';
 require __DIR__ . '/portal.php';
+require __DIR__ . '/patient-portal-auth.php';
+require __DIR__ . '/patient-portal.php';
 require __DIR__ . '/auth.php';

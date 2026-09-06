@@ -9,7 +9,7 @@ use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaS
 use App\DTOs\EyeImageFilters;
 use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey};
-use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, Patient, PatientExam};
+use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, Patient, PatientDocumentShare, PatientExam};
 use App\Services\FeatureGateService;
 use App\Traits\LogsDataAccess;
 use Closure;
@@ -94,6 +94,9 @@ class EyeImagesController extends Controller
                 'search'       => route('panel.eye-images.search'),
                 'patient_urls' => route('panel.eye-images.patient-urls', ['patient' => '__ID__']),
                 'image_url'    => route('panel.eye-images.image-url', ['exam' => '__ID__']),
+                // Portal do Paciente (Fase 2) — toggle "compartilhar com paciente".
+                'document_share_store'   => route('panel.document-shares.store'),
+                'document_share_destroy' => route('panel.document-shares.destroy', ['share' => '__ID__']),
                 // Laudo manual (Modelos) — ver EyeImageReportController.
                 'report_templates' => route('panel.eye-images.report-templates.index'),
                 'report_preview'   => route('panel.eye-images.report-templates.preview'),
@@ -317,6 +320,15 @@ class EyeImagesController extends Controller
 
     private function serializePatients(Collection $patients): array
     {
+        // Portal do Paciente (Fase 2) — grant ativo por exame, numa única
+        // query em lote pra toda a página (não 1 por exame).
+        $examIds            = $patients->flatMap(fn (Patient $p) => $p->exams->pluck('id'));
+        $sharedExamShareIds = PatientDocumentShare::query()
+            ->where('shareable_type', PatientExam::class)
+            ->whereIn('shareable_id', $examIds)
+            ->whereNull('revoked_at')
+            ->pluck('id', 'shareable_id');
+
         return $patients->map(fn (Patient $p) => [
             'id'        => (string) $p->id,
             'code'      => $p->code,
@@ -354,6 +366,9 @@ class EyeImagesController extends Controller
                 'external_origin'   => $e->external_origin,
                 'exam_performed_at' => optional($e->exam_performed_at)->toIso8601String(),
                 'import_batch_id'   => $e->import_batch_id,
+                // Portal do Paciente (Fase 2) — grant de leitura pro titular.
+                'shared_with_patient' => $sharedExamShareIds->has($e->id),
+                'document_share_id'   => $sharedExamShareIds->get($e->id),
             ])->all(),
         ])->all();
     }
@@ -446,10 +461,9 @@ class EyeImagesController extends Controller
         $query = Patient::query()->where('entity_id', $entityId);
 
         if ($f->search !== '') {
-            $lower = mb_strtolower($f->search, 'UTF-8');
             $query->where(fn (Builder $w) => $w
-                ->whereHas('person', fn (Builder $p) => $p->whereRaw('LOWER(people.full_name) LIKE ?', ["%{$lower}%"]))
-                ->orWhereRaw('LOWER(patients.code) LIKE ?', ["%{$lower}%"]));
+                ->whereHas('person', fn (Builder $p) => $p->whereLikeUnaccent('people.full_name', $f->search))
+                ->orWhereLikeUnaccent('patients.code', $f->search));
         }
 
         return $query;

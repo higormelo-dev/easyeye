@@ -10,6 +10,12 @@ class TonometryPdfController extends Controller
 {
     public function __invoke(Request $request, Patient $patient): Response
     {
+        // Achado de segurança (auditoria panel.* IDOR): $patient chega via route
+        // model binding, que roda antes de tenant.bind — EntityScope fica inerte
+        // nesse momento e $patient podia ser de qualquer entity. Mesmo padrão já
+        // corrigido em PatientsController::editData().
+        abort_unless((string) $patient->entity_id === (string) session('selected_entity_id'), 404);
+
         $validated = $request->validate([
             'od'        => ['nullable', 'numeric', 'min:0', 'max:999'],
             'oe'        => ['nullable', 'numeric', 'min:0', 'max:999'],
@@ -25,11 +31,13 @@ class TonometryPdfController extends Controller
             ->first();
 
         // Resolve médico:
-        //   1. doctor_id explícito do request (admin selecionou)
+        //   1. doctor_id explícito do request (admin selecionou) — escopado pela
+        //      entity ativa (achado da mesma auditoria: doctor_id explícito não
+        //      filtrava por entity, permitindo vazar nome de médico de outra clínica).
         //   2. fallback: médico vinculado ao usuário logado (perfil médico)
         // Sem médico → aborta. PDF clínico exige autoria identificada.
         $doctor = isset($validated['doctor_id'])
-            ? Doctor::with('person')->find($validated['doctor_id'])
+            ? Doctor::with('person')->where('entity_id', $entity?->id)->find($validated['doctor_id'])
             : null;
 
         if (! $doctor) {

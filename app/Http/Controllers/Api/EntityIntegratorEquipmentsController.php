@@ -40,8 +40,8 @@ class EntityIntegratorEquipmentsController extends Controller
             // só encontrava nomes salvos em maiúsculas.
             $search     = request()->search;
             $equipments = $equipments->where(function ($query) use ($search) {
-                $query->where('name', 'ilike', '%' . $search . '%')
-                    ->orWhere('code', 'ilike', '%' . $search . '%');
+                $query->whereLikeUnaccent('name', $search)
+                    ->orWhereLikeUnaccent('code', $search);
             });
         }
 

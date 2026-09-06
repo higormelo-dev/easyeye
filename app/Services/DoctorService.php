@@ -99,15 +99,14 @@ class DoctorService
             ->where('email', $request->email)->first();
 
         if ($existingUser) {
+            // BUGFIX (revisao de seguranca): nunca sobrescrever nome/senha/verificacao de um User ja
+            // existente aqui -- isso permitia takeover de conta cross-tenant reaproveitando o email de
+            // login de outro usuario (o "people.email" validado pelo DoctorRequest nao cobre staff sem
+            // registro em "people"). Um User existente e apenas reaproveitado (e restaurado se estava
+            // soft-deleted), nunca mutado.
             if ($existingUser->trashed()) {
                 $existingUser->restore();
             }
-
-            $existingUser->update([
-                'name'     => $request->nickname,
-                'password' => $request->password,
-            ]);
-            $existingUser->markEmailAsVerified();
 
             return $existingUser;
         }

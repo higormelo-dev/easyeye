@@ -7,6 +7,7 @@ namespace App\Http\Requests\Financial;
 use App\Enums\{FinancialEntryStatus, PaymentMethod};
 use App\Http\Requests\Concerns\ValidatesPaymentBreakdown;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\{Rule, Validator};
 
 /**
@@ -27,9 +28,25 @@ class ScheduleCashEntryRequest extends FormRequest
         $entityId = (string) session('selected_entity_id');
 
         return [
-            'entry_date'   => ['required', 'date'],
-            'description'  => ['required', 'string', 'max:255'],
-            'doctor_id'    => ['nullable', 'uuid'],
+            'entry_date'  => ['required', 'date'],
+            'description' => ['required', 'string', 'max:255'],
+            // Achado de segurança (auditoria panel.* IDOR — doctor_id via
+            // request body): Doctor não tem entity_id direto (só via
+            // entity_user_id -> entity_users.entity_id), então 'uuid' sozinho
+            // deixava lançar caixa com médico de OUTRA clínica. Mesma closure
+            // usada em ScheduleRequest::rules() para doctor_id.
+            'doctor_id' => ['nullable', 'uuid', function ($attribute, $value, $fail) use ($entityId) {
+                $exists = DB::table('doctors')
+                    ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                    ->where('doctors.id', $value)
+                    ->where('entity_users.entity_id', $entityId)
+                    ->whereNull('doctors.deleted_at')
+                    ->exists();
+
+                if (! $exists) {
+                    $fail(__('validation.custom.schedule.doctor_not_found'));
+                }
+            }],
             'procedure_id' => [
                 'nullable',
                 'uuid',

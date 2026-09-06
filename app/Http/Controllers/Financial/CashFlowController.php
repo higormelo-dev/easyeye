@@ -150,7 +150,11 @@ class CashFlowController extends Controller
     {
         $this->authorizeFinancial();
 
-        $entry->delete();
+        try {
+            $this->cashFlowService->delete($entry);
+        } catch (CashPeriodClosedException $e) {
+            return $this->periodClosedResponse($request, $e);
+        }
 
         // A UI exclui via fetch(DELETE) com Accept: application/json — um
         // redirect back() faria o fetch REPETIR o DELETE na URL de destino
