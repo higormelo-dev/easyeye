@@ -995,7 +995,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                     <div v-if="isCategorizedPicks && categories.length">
                         <div class="d-flex align-items-center gap-2 mb-1">
                             <label class="form-label small fw-semibold mb-0">{{ lbl('quick_picks_label', 'Sugestões rápidas') }}</label>
-                            <select v-model="activeCategory" class="form-select form-select-sm w-auto ms-auto" style="max-width:180px;">
+                            <select v-model="activeCategory" data-test="quick-picks-category-select" class="form-select form-select-sm w-auto ms-auto" style="max-width:180px;">
                                 <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
                             </select>
                         </div>

@@ -38,7 +38,20 @@
       "Bash(mkdir -p tests/Support/Fakes && rtk ls tests/Support/Fakes)",
       "Bash(rtk composer *)",
       "Bash(php -v)",
-      "Bash(rtk docker *)"
+      "Bash(rtk docker *)",
+      "Bash(npm -v)",
+      "Bash(npm ci *)",
+      "Bash(echo \"local exit=$?\")",
+      "Bash(echo \"global exit=$?\")",
+      "Bash(composer diagnose *)",
+      "Bash(composer search *)",
+      "Bash(rtk curl *)",
+      "Bash(npm view *)",
+      "Bash(npm install *)",
+      "Bash(rtk npx *)",
+      "Bash(git -C /Users/higormelo/Sites/MyStartup/easyeye config --local core.hooksPath .git/hooks)",
+      "Bash(git -C /Users/higormelo/Sites/certificate config --local --get core.hooksPath)",
+      "Bash(npx lefthook *)"
     ],
     "additionalDirectories": [
       "/home/higor/Projetos/Pessoal/MinhaEmpresa/EasyEye/public/system/images",

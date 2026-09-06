@@ -63,16 +63,18 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
         };
     });
 
-    it('formato categorizado: renderiza chips de categoria', () => {
+    it('formato categorizado: renderiza select com as categorias', () => {
         const wrapper = mountPanel({
             'Geral':    ['prompt geral 1', 'prompt geral 2'],
             'Glaucoma': ['prompt glaucoma 1'],
         });
 
-        // Chips (1 chip por categoria)
-        const buttons = wrapper.findAll('button').map(b => b.text());
-        expect(buttons).toContain('Geral');
-        expect(buttons).toContain('Glaucoma');
+        // Categorias viram <option> dentro do select compacto (layout enxuto).
+        const options = wrapper.find('[data-test="quick-picks-category-select"]')
+            .findAll('option')
+            .map(o => o.text());
+        expect(options).toContain('Geral');
+        expect(options).toContain('Glaucoma');
     });
 
     it('formato categorizado: ativa a primeira categoria por default e mostra seus prompts', () => {
@@ -93,8 +95,8 @@ describe('AiAssistantPanel — quick picks categorizados', () => {
             'Glaucoma': ['prompt glaucoma 1', 'prompt glaucoma 2'],
         });
 
-        const glaucomaBtn = wrapper.findAll('button').find(b => b.text() === 'Glaucoma');
-        await glaucomaBtn.trigger('click');
+        const categorySelect = wrapper.find('[data-test="quick-picks-category-select"]');
+        await categorySelect.setValue('Glaucoma');
         await wrapper.vm.$nextTick();
 
         const html = wrapper.html();
