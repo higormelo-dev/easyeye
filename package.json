@@ -10,7 +10,7 @@
         "test:coverage": "vitest run --coverage",
         "tinymce:install": "rm -rf public/vendor/tinymce public/vendor/tinymce-langs && mkdir -p public/vendor/tinymce public/vendor/tinymce-langs/langs7 && cp -r node_modules/tinymce/. public/vendor/tinymce/ && cp node_modules/tinymce-i18n/langs7/pt_BR.js public/vendor/tinymce-langs/langs7/",
         "postinstall": "npm run tinymce:install",
-        "prepare": "lefthook install"
+        "prepare": "lefthook install --force"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.7",
