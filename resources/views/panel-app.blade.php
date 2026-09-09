@@ -1,9 +1,20 @@
+@php
+    // Portal do Paciente reaproveita este MESMO template (guard/middleware
+    // continuam isolando o acesso — ver HandleInertiaRequests::rootView()),
+    // mas suas páginas (PatientPortalLayout) não usam o tema mini-sidebar
+    // nem os plugins jQuery legados do painel staff — pular esse peso morto
+    // aqui em vez de carregar sem necessidade.
+    $isPatientPortal = request()->routeIs('patient-portal.*');
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}"
+      @unless($isPatientPortal)
       data-layout="mini"
       data-sidebar="light"
       data-topbar="white"
-      data-color="info">
+      data-color="info"
+      @endunless
+>
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -19,10 +30,12 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('favicon-192.png') }}">
+    @unless($isPatientPortal)
     {{-- Tema salvo pelo toggle do header (AppLayout.toggleDark grava em
          localStorage). Aplicar ANTES do theme-script/CSS: sem isso o dark
          mode morre a cada full reload — o theme-script só lê o atributo
-         data-bs-theme já presente no <html> + sessionStorage próprio. --}}
+         data-bs-theme já presente no <html> + sessionStorage próprio.
+         Portal do Paciente não tem esse toggle — pula o boot inteiro. --}}
     <script>
         (function () {
             try {
@@ -44,15 +57,24 @@
     {{-- Theme config: executa antes do paint para evitar flash de tema --}}
     <script src="{{ asset('js/preclinic-theme-script.js') }}"></script>
     {{-- jQuery síncrono: vendor.js + alguns plugins Bootstrap dependem de $ global
-         disponível antes dos ES modules executarem. --}}
+         disponível antes dos ES modules executarem. Nenhuma página do Portal
+         do Paciente usa jQuery/plugins legados — pula o bundle inteiro. --}}
     <script src="{{ asset('js/jquery.min.js') }}"></script>
+    @endunless
     @routes
-    @vite(['resources/css/vendor.css', 'resources/css/system.scss', 'resources/js/vendor.js', 'resources/js/panel.js'])
+    @vite([
+        'resources/css/vendor.css',
+        'resources/css/system.scss',
+        ...($isPatientPortal ? [] : ['resources/js/vendor.js']),
+        'resources/js/panel.js',
+    ])
     @inertiaHead
 </head>
 <body>
+    @unless($isPatientPortal)
     {{-- Globals consumidos por componentes Vue (AppLayout, Patients/Index,
-         Schedules/CalendarView, LiveStatusBar, SlotPicker). --}}
+         Schedules/CalendarView, LiveStatusBar, SlotPicker) — nenhum deles
+         renderiza no Portal do Paciente. --}}
     <script>
         window.translations = {
             messages: {
@@ -86,6 +108,7 @@
         window.sessionLifetimeMs = {{ config('session.lifetime') * 60 * 1000 }};
         window.sessionLocale     = '{{ str_replace('_', '-', app()->getLocale()) }}';
     </script>
+    @endunless
 
     @inertia
 </body>
