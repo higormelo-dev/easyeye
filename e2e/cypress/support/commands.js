@@ -22,27 +22,39 @@ Cypress.Commands.add('loginAs', (key) => {
   // Guarda o último perfil logado para expectForbidden() saber a landing.
   Cypress.env('lastProfileKey', key);
 
+  // Portal do Paciente: guard/rota/model totalmente separados do staff
+  // (guard 'patient', model PatientAccount) — login fica em /portal-paciente/login,
+  // não em /login, e não tem locale switcher nem #sidebar-menu pra validar.
+  const isPatient  = profile.type === 'patient';
+  const loginUrl   = isPatient ? '/portal-paciente/login' : '/login';
+
   cy.session(
     // v2: chave versionada — invalida sessões antigas cacheadas no modo
     // interativo (podiam carregar locale EN/tema trocados manualmente).
-    ['easyeye', 'v2', profile.email],
+    // Guard no cache key: e-mail de paciente e de staff nunca colidem na
+    // prática (guards/tabelas separados), mas o prefixo deixa explícito.
+    ['easyeye', 'v2', isPatient ? 'patient' : 'staff', profile.email],
     () => {
-      cy.visit('/login');
+      cy.visit(loginUrl);
       // Sem ids/names no form (v-model): usar seletores estruturais.
       cy.get('form input[type=email]').should('be.visible').clear().type(profile.email);
       // NÃO clicar no toggle "olho" antes de digitar (viraria type=text).
       cy.get('form input[type=password]').should('be.visible').clear().type(profile.password, { log: false });
       cy.get('form button[type=submit]').should('not.be.disabled').click();
-      // Landing por URL: clínica -> /panel/dashboard, SaaS -> /panel/manager/dashboard.
+      // Landing por URL: clínica -> /panel/dashboard, SaaS -> /panel/manager/dashboard,
+      // paciente -> /meus-documentos.
       cy.url({ timeout: 20000 }).should('include', profile.landing);
-      // Locale determinístico: as asserções das specs são pt-BR; uma sessão
-      // que trocou de idioma no navegador interativo quebraria tudo.
-      cy.request('/locale/pt_BR');
+      if (!isPatient) {
+        // Locale determinístico: as asserções das specs são pt-BR; uma sessão
+        // que trocou de idioma no navegador interativo quebraria tudo.
+        // Portal do paciente não tem switcher de locale nem essa rota exposta.
+        cy.request('/locale/pt_BR');
+      }
     },
     {
       cacheAcrossSpecs: true,
       validate() {
-        // Sessão viva = landing responde 200 direto (302 = mandou pro /login).
+        // Sessão viva = landing responde 200 direto (302 = mandou pro login).
         cy.request({ url: profile.landing, followRedirect: false, failOnStatusCode: false })
           .its('status')
           .should('eq', 200);

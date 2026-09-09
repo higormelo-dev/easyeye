@@ -12,6 +12,12 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('favicon-192.png') }}">
+    {{-- BUGFIX: faltava aqui (presente em app.blade.php/panel-app.blade.php) —
+         sem @routes, window.Ziggy nunca existe e QUALQUER route() client-side
+         (ex.: Login.vue -> route('patient-portal.password.request')) lança
+         exceção síncrona no render, o Vue desmonta a árvore pra um comentário
+         vazio e a tela do Portal do Paciente fica em branco (login incluído). --}}
+    @routes
     @inertiaHead
     @vite(['resources/css/vendor.css', 'resources/css/system.scss', 'resources/js/site.js'])
 </head>

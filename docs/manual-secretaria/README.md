@@ -326,7 +326,8 @@ para alinhar) ou **Lado a lado**:
 ## 11. Portal do Paciente: convite e compartilhamento de exame
 
 O **Portal do Paciente** dá ao paciente um login próprio (fora do `/panel`) para consultar
-laudos e exames que a clínica compartilhar com ele.
+laudos e exames que a clínica compartilhar com ele. O passo a passo completo da experiência
+do paciente está no [Manual do Portal do Paciente](../manual-portal-paciente/README.md).
 
 ### Enviar convite de acesso
 

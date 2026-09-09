@@ -300,7 +300,9 @@ identificação de cada exame:
 
 O **Portal do Paciente** dá ao paciente um login próprio (fora do `/panel`) para consultar
 seus laudos e exames compartilhados. O médico participa de duas etapas: **convidar** o
-paciente para criar a conta e **compartilhar** documentos específicos com ele.
+paciente para criar a conta e **compartilhar** documentos específicos com ele. O passo a
+passo completo da experiência do paciente (login, tela de documentos, download) está no
+[Manual do Portal do Paciente](../manual-portal-paciente/README.md).
 
 ### Enviar convite de acesso ao portal
 

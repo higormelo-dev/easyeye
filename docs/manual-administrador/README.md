@@ -11,6 +11,7 @@ consulte também:
 - [Manual da Secretária](../manual-secretaria/README.md) — agenda, pacientes, fila, mural, importação
 - [Manual do Financeiro](../manual-financeiro/README.md) — caixa, fechamento, preços, TISS, glosas
 - [Manual do Médico](../manual-medico/README.md) — prontuário e assistente de IA
+- [Manual do Portal do Paciente](../manual-portal-paciente/README.md) — área externa do paciente (fora do `/panel`)
 
 > As capturas são geradas automaticamente a partir do sistema real
 > (`e2e/cypress/e2e/docs/admin-manual.cy.js`). Para atualizá-las:
@@ -341,6 +342,9 @@ ferramenta do médico — passo a passo detalhado no
 ![Comparar exames](img/30-comparar-exames.png)
 
 ### Portal do Paciente: convite de acesso
+
+> O que o paciente vê do outro lado (login, telas de documentos, download) está no
+> [Manual do Portal do Paciente](../manual-portal-paciente/README.md).
 
 Na ficha do paciente (**Pacientes → ícone de visualizar**), o administrador também pode
 convidar o paciente para o **Portal do Paciente** (mesmo fluxo do médico):

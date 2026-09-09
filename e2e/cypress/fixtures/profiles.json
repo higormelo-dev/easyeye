@@ -31,6 +31,13 @@
     "rule": "financial",
     "entity": "CLÍNICA TESTE INTEGRADOR"
   },
+  "patient": {
+    "email": "mariana.silva@easyeye-demo.test",
+    "password": "PortalPaciente@123",
+    "landing": "/meus-documentos",
+    "type": "patient",
+    "todo": "Conta seedada por e2e/scripts/seed-docs-patient.php (paciente MARIANA COSTA E SILVA, mesma pessoa do manual do médico) — rodar o seed antes de logar com este perfil."
+  },
   "saas.admin": {
     "email": "higor_ap89@icloud.com",
     "password": "Admin@2024!",
