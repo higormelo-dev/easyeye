@@ -77,7 +77,9 @@ class EyeImageReportController extends Controller
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
         $this->documentationService->assertTemplateBelongsToEntity($content, $entityId);
 
-        $examIds  = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId);
+        $examIds = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId);
+        $this->assertExamsActive($examIds);
+
         $doctorId = $this->resolveDoctorId($entityId, $examIds);
         abort_if(! $doctorId, 422, __('eye_images.report_doctor_required'));
 
@@ -122,6 +124,7 @@ class EyeImageReportController extends Controller
 
         $patient = Patient::query()->where('entity_id', $entityId)->findOrFail($validated['patient_id']);
         $examIds = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId);
+        $this->assertExamsActive($examIds);
 
         [$scheduleId, $consultationDate] = $this->recordResolver->anchorForExamIds($examIds);
         $record                          = $this->recordResolver->findRecord($entityId, (string) $patient->id, $scheduleId, $consultationDate);
@@ -206,6 +209,30 @@ class EyeImageReportController extends Controller
         abort_if(count($owned) !== count($examIds), 403);
 
         return $owned;
+    }
+
+    /**
+     * Imagem desabilitada (`active=false`, menu de contexto do Gerenciador
+     * de Imagens) nunca entra num laudo/PDF novo — 422 de regra de negócio,
+     * DE PROPÓSITO separado do 403 de posse de ownedExamIds() acima (posse
+     * de outra clínica é tentativa de acesso; imagem desabilitada é uma
+     * request válida que só viola uma regra do domínio — HTTP status
+     * diferente, semântica diferente, nunca misturar os dois).
+     *
+     * @param list<string> $examIds já validados como pertencentes ao tenant
+     */
+    private function assertExamsActive(array $examIds): void
+    {
+        if ($examIds === []) {
+            return;
+        }
+
+        $hasInactive = PatientExam::query()
+            ->whereIn('id', $examIds)
+            ->where('active', false)
+            ->exists();
+
+        abort_if($hasInactive, 422, __('eye_images.report_inactive_exam'));
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Http\Controllers\{
     DoctorsController,
     ExamDiagnosisController,
     ExternalExamImportController,
+    EyeImageExamActionsController,
     EyeImageReportController,
     EyeImagesController,
     Financial\BillingController as FinancialBillingController,
@@ -196,6 +197,30 @@ Route::group(
         Route::put('/eye-images/exams/{exam}/diagnosis', [ExamDiagnosisController::class, 'updateDiagnosis'])
             ->middleware('entity.role:admin,doctor')
             ->name('eye-images.exams.diagnosis.update');
+
+        // Ações rápidas por imagem (menu de contexto) — mesmo padrão/Gate do
+        // bloco de diagnóstico acima: entity.role no middleware + Gate
+        // EntityGate::IssueReport (doctor-only) checado dentro do controller.
+        Route::put('/eye-images/exams/{exam}/laterality', [EyeImageExamActionsController::class, 'updateLaterality'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.laterality.update');
+        Route::put('/eye-images/exams/{exam}/quality-rating', [EyeImageExamActionsController::class, 'updateQualityRating'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.quality-rating.update');
+        Route::put('/eye-images/exams/{exam}/active', [EyeImageExamActionsController::class, 'toggleActive'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.active.update');
+        // Mesclar/Dividir são em lote (N exam_ids no corpo) — nunca RESTful
+        // de um recurso só, por isso sem {exam} na URL.
+        Route::post('/eye-images/exams/merge', [EyeImageExamActionsController::class, 'mergeExams'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.merge');
+        Route::post('/eye-images/exams/split', [EyeImageExamActionsController::class, 'splitExams'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.split');
+        Route::post('/eye-images/exams/ungroup', [EyeImageExamActionsController::class, 'ungroupExams'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.exams.ungroup');
 
         // Laudo manual do Gerenciador de Imagens (Modelos + editor livre) — ver
         // EyeImageReportController. templates()/previewTemplate() são leitura

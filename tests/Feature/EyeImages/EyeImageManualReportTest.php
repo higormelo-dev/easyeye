@@ -229,6 +229,20 @@ describe('store()', function () {
         expect(MedicalRecordDocumentation::count())->toBe(0);
     });
 
+    it('[SEGURANÇA] imagem desabilitada (active=false) é rejeitada com 422, não 403', function () {
+        $this->exam->update(['active' => false]);
+
+        $response = actingAsDoctor($this)->postJson(route('panel.eye-images.reports.store'), [
+            'patient_id'          => $this->patient->id,
+            'exam_ids'            => [$this->exam->id],
+            'content'             => '<p>Tentativa com imagem desabilitada.</p>',
+            'confirm_open_record' => true,
+        ]);
+
+        $response->assertStatus(422);
+        expect(MedicalRecordDocumentation::count())->toBe(0);
+    });
+
     it('[SEGURANÇA] patient_id de outra clínica devolve 404', function () {
         $otherEntity  = Entity::factory()->create(['is_client' => true]);
         $otherPatient = Patient::factory()->create(['entity_id' => $otherEntity->id]);

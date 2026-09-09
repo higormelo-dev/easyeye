@@ -8,6 +8,8 @@ import DiagnosisManagerModal from '@/Components/Panel/DiagnosisManagerModal.vue'
 import ImportExternalExamModal from '@/Components/Panel/ImportExternalExamModal.vue';
 import EyeImageReportModal from './EyeImageReportModal.vue';
 import EyeImageCompareModal from './EyeImageCompareModal.vue';
+import EyeImageContextMenu from './EyeImageContextMenu.vue';
+import LensCalculatorModal from './LensCalculatorModal.vue';
 
 /**
  * Eye Images — porta fiel da implementação Alpine.js original.
@@ -133,12 +135,23 @@ const groupedExams = computed(() => {
     const groups = [];
     const seen = {};
     for (const exam of (selectedPatient.value?.exams ?? [])) {
-        const date    = exam.created_at?.substring(0, 10) ?? 'unknown';
+        // Prioriza exam_performed_at (data real do exame — importante em
+        // upload manual de exame antigo) sobre created_at (quando a linha
+        // foi inserida no banco); mesmo fallback que o backend já usa em
+        // EyeImagesController::patientExamsForRecord(). Sem isso, "Adicionar
+        // imagem a exame existente" de um grupo antigo cairia no grupo de
+        // HOJE (created_at do upload é sempre "agora"), não no grupo certo.
+        const date    = (exam.exam_performed_at ?? exam.created_at)?.substring(0, 10) ?? 'unknown';
         const equipId = exam.entity_integrator_equipment_id ?? '';
         const typeId  = exam.exam_id ?? '';
-        const key = `${date}|${equipId}|${typeId}`;
+        // Mesclar/Dividir exame: exam_session_id, quando presente, OVERRIDE
+        // a chave derivada (data|equipamento|tipo) — ver
+        // EyeImageExamActionsController::mergeExams()/splitExams(). Prefixo
+        // "s:" evita colisão acidental com uma chave derivada que por acaso
+        // seja um uuid igual (nunca aconteceria, mas custa nada garantir).
+        const key = exam.exam_session_id ? `s:${exam.exam_session_id}` : `${date}|${equipId}|${typeId}`;
         if (!seen[key]) {
-            seen[key] = { key, date, equipment: exam.equipment ?? null, examType: exam.exam_type ?? null, exams: [] };
+            seen[key] = { key, date, equipment: exam.equipment ?? null, examType: exam.exam_type ?? null, merged: !!exam.exam_session_id, exams: [] };
             groups.push(seen[key]);
         }
         seen[key].exams.push(exam);
@@ -336,10 +349,23 @@ async function selectPatient(patient) {
     }
 }
 
-// ── Importar exame externo ───────────────────────────────────────────────
-const showImportModal = ref(false);
+// ── Importar exame externo / Adicionar imagem a exame existente ───────────
+// Mesmo modal pras duas ações — "Adicionar imagem" (botão Upload de um
+// grupo já exibido) só chega com `group` preenchido, pré-travando tipo/
+// data/equipamento pra imagem nova cair automaticamente no mesmo grupo
+// visual (chave de agrupamento: data|equipamento|tipo — ver groupedExams).
+const showImportModal   = ref(false);
+const importPresetGroup = ref(null);
+const lensCalculatorOpen = ref(false);
 
-function openImportModal() {
+function openImportModal(group = null) {
+    importPresetGroup.value = group ? {
+        examTypeId:      group.examType?.id ?? '',
+        examTypeName:    group.examType?.name ?? '',
+        examPerformedAt: group.date,
+        equipmentId:     group.equipment?.id ?? '',
+        equipmentName:   group.equipment?.name ?? '',
+    } : null;
     showImportModal.value = true;
 }
 
@@ -1071,6 +1097,113 @@ function openCompareModal() {
     compareModalOpen.value = true;
 }
 
+// ── Menu de contexto (botão direito na miniatura) ──────────────────────────
+const contextMenuOpen = ref(false);
+const contextMenuExam = ref(null);
+const contextMenuPos  = reactive({ x: 0, y: 0 });
+
+const contextMenuUrls = computed(() => ({
+    laterality:     props.urls?.exam_laterality_update ?? '',
+    quality_rating: props.urls?.exam_quality_rating_update ?? '',
+    active:         props.urls?.exam_active_update ?? '',
+}));
+
+function openContextMenu(event, exam) {
+    contextMenuExam.value = exam;
+    contextMenuPos.x = event.clientX;
+    contextMenuPos.y = event.clientY;
+    contextMenuOpen.value = true;
+}
+
+function closeContextMenu() {
+    contextMenuOpen.value = false;
+}
+
+// "Fazer laudo manual" a partir do menu: laudo passa a ser só desta imagem
+// (troca a seleção), mesmo comportamento de clicar na miniatura + "Novo laudo".
+function onContextMenuReport() {
+    if (!contextMenuExam.value) return;
+    selectedExamIds.value = [contextMenuExam.value.id];
+    openReportModal();
+}
+
+// "Comparar" a partir do menu: garante esta imagem selecionada; só abre de
+// fato quando isso resultar em exatamente 2 (mesma trava de openCompareModal) —
+// senão o médico já vê o botão "Comparar" habilitar na barra com o contador.
+function onContextMenuCompare() {
+    if (!contextMenuExam.value) return;
+    if (!isSelected(contextMenuExam.value.id)) toggleExamSelection(contextMenuExam.value.id);
+    openCompareModal();
+}
+
+function onContextMenuShare() {
+    if (contextMenuExam.value) toggleExamShare(contextMenuExam.value);
+}
+
+function onContextMenuDownload() {
+    const exam = contextMenuExam.value;
+    if (!exam) return;
+    const url = examUrls.value[exam.id];
+    if (url) window.open(url, '_blank');
+}
+
+// ── Mesclar / Dividir exame ─────────────────────────────────────────────
+// "Mesclar": 2+ imagens selecionadas (podem estar em grupos visuais
+// diferentes) caem no mesmo grupo. "Dividir": a seleção sai do grupo atual
+// pra um grupo novo só dela. As duas mutam `exam_session_id` (nunca
+// exam_performed_at/equipamento/tipo — dado real de captura) direto nos
+// objetos já em patients.value (mesma técnica de toggleExamShare), sem
+// precisar de fetchPatients().
+const mergeBusy = ref(false);
+const splitBusy = ref(false);
+
+function applySessionIdToSelection(sessionId) {
+    const exams = selectedPatient.value?.exams ?? [];
+    for (const id of selectedExamIds.value) {
+        const exam = exams.find(e => e.id === id);
+        if (exam) exam.exam_session_id = sessionId;
+    }
+}
+
+async function mergeSelectedExams() {
+    if (selectedExamIds.value.length < 2 || mergeBusy.value) return;
+    mergeBusy.value = true;
+    try {
+        const { data } = await window.axios.post(props.urls.exams_merge, { exam_ids: selectedExamIds.value });
+        applySessionIdToSelection(data.exam_session_id);
+        if (window.showSuccessToast) window.showSuccessToast(tt('merge_success', 'Imagens mescladas no mesmo exame.'));
+    } catch (e) {
+        if (window.showErrorToast) window.showErrorToast(e?.response?.data?.message ?? 'Não foi possível mesclar.');
+    } finally {
+        mergeBusy.value = false;
+    }
+}
+
+async function splitSelectedExams() {
+    if (selectedExamIds.value.length < 1 || splitBusy.value) return;
+    splitBusy.value = true;
+    try {
+        const { data } = await window.axios.post(props.urls.exams_split, { exam_ids: selectedExamIds.value });
+        applySessionIdToSelection(data.exam_session_id);
+        if (window.showSuccessToast) window.showSuccessToast(tt('split_success', 'Imagem(ns) separada(s) num novo exame.'));
+    } catch (e) {
+        if (window.showErrorToast) window.showErrorToast(e?.response?.data?.message ?? 'Não foi possível dividir.');
+    } finally {
+        splitBusy.value = false;
+    }
+}
+
+// Badge "Mesclado ×" no cabeçalho do grupo — desfaz o override e volta ao
+// agrupamento automático (data|equipamento|tipo).
+async function undoGroupOverride(group) {
+    try {
+        await window.axios.post(props.urls.exams_ungroup, { exam_ids: group.exams.map(e => e.id) });
+        for (const exam of group.exams) exam.exam_session_id = null;
+    } catch (e) {
+        if (window.showErrorToast) window.showErrorToast(e?.response?.data?.message ?? 'Não foi possível desfazer.');
+    }
+}
+
 // urls.exam_diagnosis_update chega como template com placeholder __ID__
 // (mesmo padrão de patient_urls/image_url) — resolvido aqui com o id do
 // exame em foco no momento em que o modal abre.
@@ -1176,8 +1309,12 @@ const printEntity = computed(() => props.entity ?? {});
                         </button>
                     </div>
 
-                    <div class="col col-md d-flex justify-content-end">
-                        <button type="button" class="btn btn-primary btn-sm" @click="openImportModal">
+                    <div class="col col-md d-flex justify-content-end gap-2">
+                        <button v-if="isDoctor" type="button" class="btn btn-outline-secondary btn-sm"
+                                @click="lensCalculatorOpen = true">
+                            <i class="ti ti-calculator"></i> {{ tt('lens_calc_title', 'Calculadora de lentes') }}
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" @click="openImportModal()">
                             <i class="fa fa-plus"></i> Novo
                         </button>
                     </div>
@@ -1371,6 +1508,22 @@ const printEntity = computed(() => props.entity ?? {});
                                 @click="openCompareModal">
                             <i class="ti ti-adjustments-horizontal me-1"></i>{{ tt('compare_action', 'Comparar') }}
                         </button>
+                        <template v-if="isDoctor">
+                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                    :disabled="selectedExamIds.length < 2 || mergeBusy"
+                                    :title="tt('merge_select_two', 'Selecione 2 ou mais imagens do mesmo paciente para mesclar.')"
+                                    @click="mergeSelectedExams">
+                                <span v-if="mergeBusy" class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                                <i v-else class="ti ti-git-merge me-1"></i>{{ tt('merge_action', 'Mesclar exames') }}
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-warning"
+                                    :disabled="selectedExamIds.length < 1 || splitBusy"
+                                    :title="tt('split_select_one', 'Selecione ao menos 1 imagem do grupo para separar.')"
+                                    @click="splitSelectedExams">
+                                <span v-if="splitBusy" class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                                <i v-else class="ti ti-git-fork me-1"></i>{{ tt('split_action', 'Dividir exame') }}
+                            </button>
+                        </template>
                         <div class="vr opacity-25"></div>
                         <button type="button" class="btn btn-sm btn-outline-dark"
                                 @click="openPrintModal(selectedPatient.exams, false)">
@@ -1440,7 +1593,8 @@ const printEntity = computed(() => props.entity ?? {});
                                             <div class="vr opacity-25 mx-1"></div>
 
                                             <button type="button" class="btn btn-sm py-0 px-2 btn-outline-secondary"
-                                                    style="font-size:.6rem;" title="Upload de imagem">
+                                                    style="font-size:.6rem;" title="Adicionar imagem a este exame"
+                                                    @click.stop="openImportModal(group)">
                                                 <i class="fa fa-upload me-1"></i>Upload
                                             </button>
                                             <button type="button" class="btn btn-sm py-0 px-2 btn-outline-secondary"
@@ -1450,9 +1604,15 @@ const printEntity = computed(() => props.entity ?? {});
                                         </div>
 
                                         <!-- Subtítulo: tipo de exame -->
-                                        <div class="px-2 py-1 bg-body-secondary text-body-secondary border-bottom"
+                                        <div class="px-2 py-1 bg-body-secondary text-body-secondary border-bottom d-flex align-items-center gap-2"
                                              style="font-size:.68rem;">
-                                            {{ group.examType?.name || 'Exame' }}
+                                            <span>{{ group.examType?.name || 'Exame' }}</span>
+                                            <span v-if="group.merged" class="badge bg-warning-subtle text-warning"
+                                                  style="font-size:.6rem;cursor:pointer;"
+                                                  :title="tt('undo_merge_split', 'Mesclado/dividido manualmente — clique pra desfazer (volta ao agrupamento automático).')"
+                                                  @click.stop="undoGroupOverride(group)">
+                                                <i class="ti ti-git-merge me-1"></i>{{ tt('merged_badge', 'Mesclado') }} ×
+                                            </span>
                                         </div>
 
                                         <!-- Thumbnails -->
@@ -1460,7 +1620,8 @@ const printEntity = computed(() => props.entity ?? {});
                                             <div v-for="exam in group.exams" :key="exam.id"
                                                  class="position-relative"
                                                  style="cursor:pointer;flex-shrink:0;"
-                                                 @click="toggleExamSelection(exam.id)">
+                                                 @click="toggleExamSelection(exam.id)"
+                                                 @contextmenu.prevent="openContextMenu($event, exam)">
 
                                                 <!-- Badges topo-esquerda: diagnóstico principal + origem externa (empilhados, sem colidir) -->
                                                 <div class="position-absolute top-0 start-0 d-flex flex-column align-items-start gap-1"
@@ -1476,6 +1637,18 @@ const printEntity = computed(() => props.entity ?? {});
                                                           style="font-size:.5rem;white-space:nowrap;"
                                                           title="Exame importado (fonte externa, sem integrador)">
                                                         <i class="fa fa-file-import me-1"></i>Importado
+                                                    </span>
+                                                    <span v-if="!exam.active"
+                                                          class="badge bg-secondary"
+                                                          style="font-size:.5rem;white-space:nowrap;"
+                                                          title="Imagem desabilitada — botão direito pra reabilitar">
+                                                        <i class="fa fa-eye-slash me-1"></i>Desabilitada
+                                                    </span>
+                                                    <span v-if="exam.quality_rating"
+                                                          class="badge bg-dark border border-warning text-warning"
+                                                          style="font-size:.5rem;white-space:nowrap;"
+                                                          :title="`Qualidade avaliada: ${exam.quality_rating}/5`">
+                                                        <i class="fa fa-star me-1"></i>{{ exam.quality_rating }}/5
                                                     </span>
                                                 </div>
 
@@ -1534,7 +1707,7 @@ const printEntity = computed(() => props.entity ?? {});
                                                 <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
                                                      :src="examThumbUrls[exam.id] ?? examUrls[exam.id]" :alt="exam.exam_type?.name"
                                                      width="100" height="76"
-                                                     :style="`object-fit:cover;display:block;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid #6ea8fe' : '2px solid transparent'};transition:outline .1s;`"
+                                                     :style="`object-fit:cover;display:block;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid #6ea8fe' : '2px solid transparent'};transition:outline .1s;opacity:${exam.active ? 1 : .4};`"
                                                      @error="brokenUrls = { ...brokenUrls, [exam.id]: true }">
 
                                                 <div v-else
@@ -2041,13 +2214,15 @@ const printEntity = computed(() => props.entity ?? {});
             @updated="onDiagnosisUpdated"
         />
 
-        <!-- Importar exame externo (upload manual, sem integrador) -->
+        <!-- Importar exame externo (upload manual, sem integrador) /
+             Adicionar imagem a exame existente (mesmo modal, presetGroup) -->
         <ImportExternalExamModal
             :open="showImportModal"
             :patient="selectedPatient"
             :doctors="doctors"
             :exam-types="examTypeOptions"
             :equipments="equipmentOptions"
+            :preset-group="importPresetGroup"
             :urls="{
                 import_store: urls.import_store,
                 diagnosis_search: urls.diagnoses_search,
@@ -2075,6 +2250,25 @@ const printEntity = computed(() => props.entity ?? {});
             :t="t"
             @close="compareModalOpen = false"
         />
+
+        <!-- Menu de contexto (botão direito na miniatura) -->
+        <EyeImageContextMenu
+            :open="contextMenuOpen"
+            :exam="contextMenuExam"
+            :x="contextMenuPos.x"
+            :y="contextMenuPos.y"
+            :urls="contextMenuUrls"
+            :t="t"
+            :is-doctor="isDoctor"
+            @close="closeContextMenu"
+            @report="onContextMenuReport"
+            @compare="onContextMenuCompare"
+            @share="onContextMenuShare"
+            @download="onContextMenuDownload"
+        />
+
+        <!-- Calculadora de lentes (vértice + equivalente esférico) -->
+        <LensCalculatorModal :open="lensCalculatorOpen" :t="t" @close="lensCalculatorOpen = false" />
     </AppLayout>
 </template>
 

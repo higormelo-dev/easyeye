@@ -12,6 +12,7 @@ return [
     'feature_eye_image_unavailable' => 'Your plan does not include AI ocular image analysis.',
     'feature_chat_unavailable'      => 'Your plan does not include the virtual AI assistant.',
     'eye_image_exams_required'      => 'Select at least one image for AI analysis.',
+    'eye_image_exam_inactive'       => 'One or more selected images are disabled — enable them before analyzing with AI.',
     'record_opened'                 => 'Medical record opened and report saved.',
     'record_patient_missing'        => 'Could not identify the patient to open the medical record.',
     'record_doctor_required'        => 'Only a doctor can open a medical record to save the report.',

@@ -109,6 +109,13 @@ class EyeImagesController extends Controller
                 'diagnoses_search'      => route('panel.eye-images.diagnoses.search'),
                 'diagnoses_store'       => route('panel.eye-images.diagnoses.store'),
                 'exam_diagnosis_update' => route('panel.eye-images.exams.diagnosis.update', ['exam' => '__ID__']),
+                // Menu de contexto da miniatura — ver EyeImageExamActionsController.
+                'exam_laterality_update'     => route('panel.eye-images.exams.laterality.update', ['exam' => '__ID__']),
+                'exam_quality_rating_update' => route('panel.eye-images.exams.quality-rating.update', ['exam' => '__ID__']),
+                'exam_active_update'         => route('panel.eye-images.exams.active.update', ['exam' => '__ID__']),
+                'exams_merge'                => route('panel.eye-images.exams.merge'),
+                'exams_split'                => route('panel.eye-images.exams.split'),
+                'exams_ungroup'              => route('panel.eye-images.exams.ungroup'),
                 // Importar exame externo (upload manual, sem integrador) — ver
                 // ExternalExamImportController.
                 'import_store' => route('panel.eye-images.import.store'),
@@ -335,9 +342,13 @@ class EyeImagesController extends Controller
             'full_name' => $p->person?->full_name,
             'person'    => ['full_name' => $p->person?->full_name],
             'exams'     => $p->exams->map(fn (PatientExam $e) => [
-                'id'                             => (string) $e->id,
-                'exam_id'                        => $e->exam_id !== null ? (string) $e->exam_id : null,
-                'laterality'                     => (int) ($e->laterality ?? 0),
+                'id'             => (string) $e->id,
+                'exam_id'        => $e->exam_id !== null ? (string) $e->exam_id : null,
+                'laterality'     => (int) ($e->laterality ?? 0),
+                'quality_rating' => $e->quality_rating !== null ? (int) $e->quality_rating : null,
+                // Override do agrupamento visual (Mesclar/Dividir exame) — ver
+                // migration 2026_09_09_110000 e Index.vue::groupedExams.
+                'exam_session_id'                => $e->exam_session_id !== null ? (string) $e->exam_session_id : null,
                 'active'                         => (bool) $e->active,
                 'archive'                        => $e->archive,
                 'has_archive'                    => $e->archive !== null,

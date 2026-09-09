@@ -73,6 +73,28 @@ return [
     'report_save_failed'         => 'Could not save the report.',
     'report_confirm_open_record' => 'There is no medical record for the visit date. Open a new record to save the report?',
     'report_content_required'    => 'Write the report content before saving.',
+    'report_inactive_exam'       => 'One or more selected images are disabled — enable them before generating the report.',
+    'merge_split_same_patient'   => 'You can only merge/split images from the same patient.',
+    'merge_action'               => 'Merge exams',
+    'merge_select_two'           => 'Select 2 or more images from the same patient to merge.',
+    'merge_success'              => 'Images merged into the same exam.',
+    'split_action'               => 'Split exam',
+    'split_select_one'           => 'Select at least 1 image from the group to split off.',
+    'split_success'              => 'Image(s) split into a new exam.',
+    'merged_badge'               => 'Merged',
+    'undo_merge_split'           => 'Manually merged/split — click to undo (back to automatic grouping).',
+
+    // Lens calculator (vertex + spherical equivalent) — competitor benchmark 2026-09-09
+    'lens_calc_title'           => 'Lens calculator',
+    'lens_calc_disclaimer'      => 'Reference optics formulas (vertex distance and spherical equivalent) — always double-check the result before using it. Does not include IOL (intraocular lens) power calculation: use a dedicated, validated biometry calculator for cataract surgery.',
+    'lens_calc_vertex_title'    => 'Vertex distance conversion',
+    'lens_calc_vertex_hint'     => 'Converts spectacle prescription to the equivalent contact lens power (zero vertex).',
+    'lens_calc_vertex_distance' => 'Vertex distance (mm)',
+    'lens_calc_sphere_od'       => 'Sphere OD (D)',
+    'lens_calc_sphere_oe'       => 'Sphere OS (D)',
+    'lens_calc_result'          => 'Contact lens',
+    'lens_calc_se_title'        => 'Spherical equivalent',
+    'lens_calc_se_hint'         => 'SE = Sphere + Cylinder / 2.',
 
     // Compare / Align (progression across exams)
     'compare_title'             => 'Compare exams',
@@ -88,4 +110,22 @@ return [
     'import' => [
         'success' => 'Exam imported successfully.',
     ],
+
+    // Context menu (right-click on thumbnail) — competitor benchmark 2026-09-09
+    'context_menu_title'          => 'Quick actions',
+    'context_menu_report'         => 'Make manual report',
+    'context_menu_compare'        => 'Compare / Align',
+    'context_menu_share'          => 'Share with patient',
+    'context_menu_unshare'        => 'Revoke from Patient Portal',
+    'context_menu_download'       => 'Download image',
+    'context_menu_eye'            => 'Eye',
+    'context_menu_quality'        => 'Capture quality',
+    'context_menu_quality_hint'   => 'Click to rate — click the same star again to clear',
+    'context_menu_disable'        => 'Disable image',
+    'context_menu_enable'         => 'Enable image',
+    'context_menu_info_type'      => 'Type',
+    'context_menu_info_created'   => 'Captured at',
+    'context_menu_info_equipment' => 'Equipment',
+    'context_menu_info_doctor'    => 'Doctor',
+    'context_menu_info_origin'    => 'Origin',
 ];

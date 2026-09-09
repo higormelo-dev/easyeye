@@ -531,6 +531,63 @@ class ReportSettingContentSeeder extends Seeder
                 ],
             ],
 
+            // ── Nichos do benchmark 09/09/2026 (Ger Exames/iWayBrasil) — só
+            // esqueleto estrutural (placeholders manuais {{...}}, mesmo padrão
+            // de PAQUIMETRIA/TONOMETRIA acima), sem valor clínico específico
+            // inventado. Médico preenche/edita antes de assinar.
+            'TESTE DE ISHIHARA (VISÃO DE CORES)' => [
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'padrao',
+                    'label'      => 'Padrão',
+                    'sort_order' => 1,
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>TESTE DE ISHIHARA (VISÃO DE CORES)</strong></p>'
+                        . '<ul>'
+                        . '<li>Olho Direito: {{ISHIHARA_OD}} de 15 pranchas lidas corretamente</li>'
+                        . '<li>Olho Esquerdo: {{ISHIHARA_OE}} de 15 pranchas lidas corretamente</li>'
+                        . '</ul>'
+                        . '<p><strong>CONCLUSÃO:</strong> {{ISHIHARA_CONCLUSAO}}</p>',
+                ],
+            ],
+
+            'TESTE DE SOBRECARGA HÍDRICA' => [
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'padrao',
+                    'label'      => 'Padrão',
+                    'sort_order' => 1,
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>TESTE DE SOBRECARGA HÍDRICA</strong></p>'
+                        . '<p>Ingestão de água: {{SOBRECARGA_VOLUME}} mL</p>'
+                        . '<table><thead><tr><th></th><th>PIO basal</th><th>15 min</th><th>30 min</th><th>45 min</th><th>60 min</th></tr></thead>'
+                        . '<tbody>'
+                        . '<tr><td><strong>OD</strong></td><td>{{SOBRECARGA_OD_BASAL}}</td><td>{{SOBRECARGA_OD_15}}</td><td>{{SOBRECARGA_OD_30}}</td><td>{{SOBRECARGA_OD_45}}</td><td>{{SOBRECARGA_OD_60}}</td></tr>'
+                        . '<tr><td><strong>OE</strong></td><td>{{SOBRECARGA_OE_BASAL}}</td><td>{{SOBRECARGA_OE_15}}</td><td>{{SOBRECARGA_OE_30}}</td><td>{{SOBRECARGA_OE_45}}</td><td>{{SOBRECARGA_OE_60}}</td></tr>'
+                        . '</tbody></table>'
+                        . '<p><strong>CONCLUSÃO:</strong> {{SOBRECARGA_CONCLUSAO}}</p>',
+                ],
+            ],
+
+            'TESTE DE LENTE DE CONTATO' => [
+                [
+                    'type'       => DocumentationType::Report,
+                    'slug'       => 'padrao',
+                    'label'      => 'Padrão',
+                    'sort_order' => 1,
+                    'content'    => '{{CABECALHO_PACIENTE}}'
+                        . '<p><strong>TESTE DE LENTE DE CONTATO</strong></p>'
+                        . '<table><thead><tr><th></th><th>Marca/Modelo</th><th>Curvatura</th><th>Poder</th><th>Diâmetro</th></tr></thead>'
+                        . '<tbody>'
+                        . '<tr><td><strong>OD</strong></td><td>{{LENTE_TESTE_OD_MODELO}}</td><td>{{LENTE_TESTE_OD_CURVATURA}}</td><td>{{LENTE_TESTE_OD_PODER}}</td><td>{{LENTE_TESTE_OD_DIAMETRO}}</td></tr>'
+                        . '<tr><td><strong>OE</strong></td><td>{{LENTE_TESTE_OE_MODELO}}</td><td>{{LENTE_TESTE_OE_CURVATURA}}</td><td>{{LENTE_TESTE_OE_PODER}}</td><td>{{LENTE_TESTE_OE_DIAMETRO}}</td></tr>'
+                        . '</tbody></table>'
+                        . '<p><strong>Adaptação:</strong> centralização, movimento e conforto avaliados após período de porte.</p>'
+                        . '<p><strong>Acuidade visual com a lente:</strong> OD {{LENTE_TESTE_AV_OD}} — OE {{LENTE_TESTE_AV_OE}}</p>'
+                        . '<p><strong>CONCLUSÃO:</strong> {{LENTE_TESTE_CONCLUSAO}}</p>',
+                ],
+            ],
+
             // ── TOPOGRAFIA CORNEANA ──────────────────────────────────────────────
             'TOPOGRAFIA CORNEANA' => [
                 [

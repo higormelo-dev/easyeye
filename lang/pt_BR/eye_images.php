@@ -73,6 +73,28 @@ return [
     'report_save_failed'         => 'Não foi possível salvar o laudo.',
     'report_confirm_open_record' => 'Não há prontuário do dia da consulta para este paciente. Deseja abrir um novo prontuário para registrar o laudo?',
     'report_content_required'    => 'Escreva o conteúdo do laudo antes de salvar.',
+    'report_inactive_exam'       => 'Uma ou mais imagens selecionadas estão desabilitadas — habilite-as antes de gerar o laudo.',
+    'merge_split_same_patient'   => 'Só é possível mesclar/dividir imagens do mesmo paciente.',
+    'merge_action'               => 'Mesclar exames',
+    'merge_select_two'           => 'Selecione 2 ou mais imagens do mesmo paciente para mesclar.',
+    'merge_success'              => 'Imagens mescladas no mesmo exame.',
+    'split_action'               => 'Dividir exame',
+    'split_select_one'           => 'Selecione ao menos 1 imagem do grupo para separar.',
+    'split_success'              => 'Imagem(ns) separada(s) num novo exame.',
+    'merged_badge'               => 'Mesclado',
+    'undo_merge_split'           => 'Mesclado/dividido manualmente — clique pra desfazer (volta ao agrupamento automático).',
+
+    // Calculadora de lentes (vértice + equivalente esférico) — benchmark 09/09/2026
+    'lens_calc_title'           => 'Calculadora de lentes',
+    'lens_calc_disclaimer'      => 'Fórmulas de óptica de referência (vértice e equivalente esférico) — sempre confira o resultado antes de usar. Não inclui cálculo de LIO (lente intraocular): use uma calculadora de biometria dedicada e validada para cirurgia de catarata.',
+    'lens_calc_vertex_title'    => 'Conversão de distância ao vértice',
+    'lens_calc_vertex_hint'     => 'Converte a graduação do óculos para a potência equivalente em lente de contato (vértice zero).',
+    'lens_calc_vertex_distance' => 'Distância ao vértice (mm)',
+    'lens_calc_sphere_od'       => 'Esférico OD (D)',
+    'lens_calc_sphere_oe'       => 'Esférico OE (D)',
+    'lens_calc_result'          => 'Lente de contato',
+    'lens_calc_se_title'        => 'Equivalente esférico',
+    'lens_calc_se_hint'         => 'SE = Esférico + Cilindro / 2.',
 
     // Comparar / Alinhar (evolução entre exames)
     'compare_title'             => 'Comparar exames',
@@ -88,4 +110,22 @@ return [
     'import' => [
         'success' => 'Exame importado com sucesso.',
     ],
+
+    // Menu de contexto (botão direito na miniatura) — benchmark 09/09/2026
+    'context_menu_title'          => 'Ações rápidas',
+    'context_menu_report'         => 'Fazer laudo manual',
+    'context_menu_compare'        => 'Comparar / Alinhar',
+    'context_menu_share'          => 'Compartilhar com o paciente',
+    'context_menu_unshare'        => 'Revogar do Portal do Paciente',
+    'context_menu_download'       => 'Baixar imagem',
+    'context_menu_eye'            => 'Lateralidade',
+    'context_menu_quality'        => 'Qualidade da captura',
+    'context_menu_quality_hint'   => 'Clique pra avaliar — clique de novo na mesma estrela pra cancelar',
+    'context_menu_disable'        => 'Desabilitar imagem',
+    'context_menu_enable'         => 'Habilitar imagem',
+    'context_menu_info_type'      => 'Tipo',
+    'context_menu_info_created'   => 'Capturado em',
+    'context_menu_info_equipment' => 'Equipamento',
+    'context_menu_info_doctor'    => 'Médico',
+    'context_menu_info_origin'    => 'Origem',
 ];

@@ -21,13 +21,15 @@
  *   examTypes  – [{id, name}] — idem (props.exam_types da página)
  *   equipments – [{id, name}] — idem (props.equipments da página)
  *   urls       – { import_store, diagnosis_search, diagnosis_store }
- *
- * Emits:
- *   close    – fecha o modal (backdrop, X, cancelar)
- *   imported – exame(s) importado(s) com sucesso — o pai fecha o modal e
- *              atualiza a lista (fetchPatients), sem reload de página inteira.
- *              O toast de sucesso vem "de graça": o backend responde com um
- *              redirect + flash('success', ...) que o AppLayout já exibe.
+ *   presetGroup – { examTypeId, examTypeName, examPerformedAt, equipmentId,
+ *                equipmentName } opcional. "Adicionar imagem a exame
+ *                existente" (botão Upload de um grupo já exibido no
+ *                Gerenciador de Imagens) reaproveita este MESMO modal em vez
+ *                de duplicar upload/diagnóstico/picker de arquivos — só
+ *                pré-preenche e trava tipo/data/equipamento pra a imagem
+ *                nova cair automaticamente no mesmo grupo visual (chave de
+ *                agrupamento em Index.vue: data|equipamento|tipo). O médico
+ *                pode destravar ("Usar outro grupo") se o palpite errar.
  */
 import { ref, computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
@@ -35,13 +37,16 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import Cid10Picker from '@/Components/Panel/Cid10Picker.vue';
 
 const props = defineProps({
-    open:       { type: Boolean, required: true },
-    patient:    { type: Object,  default: null },
-    doctors:    { type: Array,   default: () => [] },
-    examTypes:  { type: Array,   default: () => [] },
-    equipments: { type: Array,   default: () => [] },
-    urls:       { type: Object,  default: () => ({}) },
+    open:        { type: Boolean, required: true },
+    patient:     { type: Object,  default: null },
+    doctors:     { type: Array,   default: () => [] },
+    examTypes:   { type: Array,   default: () => [] },
+    equipments:  { type: Array,   default: () => [] },
+    urls:        { type: Object,  default: () => ({}) },
+    presetGroup: { type: Object,  default: null },
 });
+
+const presetLocked = ref(false);
 
 const emit = defineEmits(['close', 'imported']);
 
@@ -246,13 +251,23 @@ watch(() => props.open, (isOpen) => {
     originMode.value = props.equipments?.length ? 'equipment' : 'manual';
 
     form.patient_id                     = props.patient?.id ?? '';
-    form.exam_id                        = '';
-    form.exam_performed_at              = todayIso();
     form.doctor_id                      = '';
-    form.entity_integrator_equipment_id = '';
     form.external_origin                = '';
     form.diagnoses                      = [];
     form.files                          = [];
+
+    if (props.presetGroup) {
+        form.exam_id                        = props.presetGroup.examTypeId ?? '';
+        form.exam_performed_at              = props.presetGroup.examPerformedAt ?? todayIso();
+        form.entity_integrator_equipment_id = props.presetGroup.equipmentId ?? '';
+        originMode.value  = props.presetGroup.equipmentId ? 'equipment' : 'manual';
+        presetLocked.value = true;
+    } else {
+        form.exam_id                        = '';
+        form.exam_performed_at              = todayIso();
+        form.entity_integrator_equipment_id = '';
+        presetLocked.value = false;
+    }
 
     pickedPatient.value  = null;
     patientQuery.value   = '';
@@ -264,10 +279,13 @@ watch(() => props.open, (isOpen) => {
     <OffcanvasPanel :open="open" :width="640" @close="close">
         <template #header>
             <h5 class="mb-0 fw-semibold">
-                <i class="ti ti-upload me-2 text-primary"></i>Importar exame externo
+                <i class="ti ti-upload me-2 text-primary"></i>
+                {{ presetGroup ? 'Adicionar imagem ao exame' : 'Importar exame externo' }}
             </h5>
             <p class="text-muted mt-1 mb-0" style="font-size:.8rem;">
-                Upload manual de exame realizado fora do integrador (ex.: laudo trazido pelo paciente).
+                {{ presetGroup
+                    ? 'A imagem nova entra no mesmo grupo já exibido — tipo, data e equipamento vêm preenchidos.'
+                    : 'Upload manual de exame realizado fora do integrador (ex.: laudo trazido pelo paciente).' }}
             </p>
         </template>
 
@@ -325,7 +343,19 @@ watch(() => props.open, (isOpen) => {
             <div v-if="form.errors.patient_id" class="text-danger small mt-1">{{ form.errors.patient_id }}</div>
         </div>
 
-        <div class="row g-3 mb-3">
+        <div v-if="presetGroup && presetLocked" class="alert alert-info d-flex align-items-center justify-content-between py-2 px-3 mb-3">
+            <div style="font-size:.82rem;">
+                <i class="ti ti-folder-check me-1"></i>
+                <strong>{{ presetGroup.examTypeName || 'Exame' }}</strong>
+                — {{ new Date(form.exam_performed_at + 'T00:00:00').toLocaleDateString('pt-BR') }}
+                <span v-if="presetGroup.equipmentName"> · {{ presetGroup.equipmentName }}</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-link p-0" @click="presetLocked = false">
+                Usar outro grupo
+            </button>
+        </div>
+
+        <div class="row g-3 mb-3" v-if="!(presetGroup && presetLocked)">
             <div class="col-12 col-sm-6">
                 <label class="form-label fw-semibold">Tipo de exame <span class="text-danger">*</span></label>
                 <select v-model="form.exam_id" class="form-select" :class="{ 'is-invalid': form.errors.exam_id }">
@@ -355,7 +385,7 @@ watch(() => props.open, (isOpen) => {
         </div>
 
         <!-- Origem -->
-        <div class="mb-3">
+        <div v-if="!(presetGroup && presetLocked)" class="mb-3">
             <label class="form-label fw-semibold d-block">Origem do exame</label>
             <div class="btn-group btn-group-sm mb-2" role="group">
                 <input type="radio" class="btn-check" id="import-origin-equipment" value="equipment"

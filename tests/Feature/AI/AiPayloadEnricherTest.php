@@ -95,6 +95,26 @@ it('aborta com 403 quando exam_id pertence a outra entidade', function () {
     ], $this->entity->id, false))->toThrow(HttpException::class);
 });
 
+it('aborta com 422 (não 403) quando a imagem está desabilitada', function () {
+    $exam = PatientExam::factory()->create(['patient_id' => $this->patient->id, 'active' => false]);
+
+    try {
+        $this->enricher->enrich([
+            'workflow'    => 'eye_image_analysis',
+            'mode'        => 'validated',
+            'risk_level'  => 'medium',
+            'user_prompt' => 'Avaliar a imagem ocular.',
+            'exam_ids'    => [(string) $exam->id],
+        ], $this->entity->id, false);
+
+        $this->fail('Esperava HttpException 422 para imagem desabilitada.');
+    } catch (HttpException $e) {
+        // 422 (regra de negócio) — nunca 403 (isso é posse de tenant, checado
+        // por um abort_if diferente e anterior a este, na mesma função).
+        expect($e->getStatusCode())->toBe(422);
+    }
+});
+
 it('aborta com 403 quando medical_record_id é de outra entidade', function () {
     $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
     $otherPatient = Patient::factory()->create(['entity_id' => $otherEntity->id]);

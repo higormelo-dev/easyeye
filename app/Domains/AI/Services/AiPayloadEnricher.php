@@ -411,6 +411,17 @@ class AiPayloadEnricher
 
         abort_if(count($owned) !== count($examIds), 403);
 
+        // Imagem desabilitada (menu de contexto do Gerenciador de Imagens)
+        // nunca entra numa análise de IA nova — 422 de regra de negócio, DE
+        // PROPÓSITO separado do 403 de posse acima (mesmo racional de
+        // EyeImageReportController::assertExamsActive()).
+        $hasInactive = PatientExam::query()
+            ->whereIn('id', $owned)
+            ->where('active', false)
+            ->exists();
+
+        abort_if($hasInactive, 422, __('ai.eye_image_exam_inactive'));
+
         return $owned;
     }
 }

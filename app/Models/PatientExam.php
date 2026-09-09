@@ -36,6 +36,8 @@ class PatientExam extends Model
         'archive',
         'name',
         'laterality',
+        'quality_rating',
+        'exam_session_id',
         'diagnosis_cids',
         'active',
         'source',
@@ -85,6 +87,7 @@ class PatientExam extends Model
     {
         return [
             'laterality'        => 'integer',
+            'quality_rating'    => 'integer',
             'diagnosis_cids'    => 'array',
             'source'            => ExamSource::class,
             'exam_performed_at' => 'datetime',

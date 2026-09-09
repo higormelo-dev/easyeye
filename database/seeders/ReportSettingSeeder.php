@@ -76,6 +76,12 @@ class ReportSettingSeeder extends Seeder
             ['title' => 'PENTACAM', 'category' => 'exames-especializados'],
             ['title' => 'ESTUDO COMPUTADORIZADO DA LÁGRIMA', 'category' => 'exames-especializados'],
             ['title' => 'POTENCIAL DE ACUIDADE VISUAL', 'category' => 'exames-especializados'],
+            // Nichos do benchmark 09/09/2026 — só esqueleto estrutural (mesmo
+            // padrão de placeholder manual das entradas acima), sem valor
+            // clínico específico inventado.
+            ['title' => 'TESTE DE ISHIHARA (VISÃO DE CORES)', 'category' => 'exames-especializados'],
+            ['title' => 'TESTE DE SOBRECARGA HÍDRICA', 'category' => 'exames-especializados'],
+            ['title' => 'TESTE DE LENTE DE CONTATO', 'category' => 'exames-especializados'],
             // ── Prescrições ──────────────────────────────────────────────────
             ['title' => 'PRESCRIÇÃO DE LENTES', 'category' => 'receituarios'],
             ['title' => 'PRESCRIÇÃO DE MEDICAMENTOS', 'category' => 'receituarios'],
