@@ -76,7 +76,24 @@ export default defineConfig(({ command, mode, ssrBuild }) => {
                     // no escopo do chunk. window.jQuery é garantido pelo <script> síncrono
                     // no <head>. jquery-global.js NÃO pode declarar `const jQuery` no
                     // top-level pois conflita com este var — usa window.jQuery diretamente.
-                    banner: isSsr ? '' : 'var jQuery=window.jQuery,$=window.jQuery;',
+                    //
+                    // EXCEÇÃO — chunks assíncronos (componentes carregados via
+                    // defineAsyncComponent/import() dinâmico): nunca contêm as IIFEs
+                    // legadas (essas só existem no bundle eager de vendor.js/panel.js),
+                    // então pular o banner aqui é seguro E necessário: o minificador
+                    // esbuild processa banner+código como UM programa e escolhe nomes
+                    // curtos por chunk — se o chunk assíncrono empacota uma lib pesada
+                    // com scope próprio grande (ex.: @fullcalendar/core, que embute o
+                    // Preact internamente para renderizar), o nome minificado do `$`
+                    // do banner pode colidir com uma função top-level da lib (visto em
+                    // produção: CalendarView.vue -> "SyntaxError: Identifier 'ni' has
+                    // already been declared", pois o Preact embutido do FullCalendar
+                    // definia sua própria função top-level chamada igual ao `$`
+                    // minificado). Sem o banner, o chunk não referencia bare `jQuery`/`$`
+                    // mesmo assim (é código moderno), então nada quebra.
+                    banner: isSsr
+                        ? ''
+                        : (chunk) => (chunk.isDynamicEntry ? '' : 'var jQuery=window.jQuery,$=window.jQuery;'),
                 },
             },
         },

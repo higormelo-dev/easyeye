@@ -202,7 +202,75 @@ describe('Manual do administrador — capturas', () => {
     shot('26-pacientes');
   });
 
-  it('14 conta e área do SaaS (negada)', () => {
+  it('14 imagens oftálmicas: comparar exames e laudo (exclusivo do médico)', () => {
+    // Fixture compartilhada com o manual do médico (mesma entidade demo).
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'docsdoc:');
+
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+
+    // O admin gerencia o módulo (upload, organização), mas "Novo laudo" é
+    // ato médico exclusivo — o botão nem existe no DOM para este perfil.
+    cy.contains('button', 'Novo laudo').should('not.exist');
+    cy.wait(400);
+    shot('29-imagens-sem-novo-laudo');
+
+    cy.get('.bg-dark.flex-wrap > .position-relative', { timeout: 15000 })
+      .should('have.length.at.least', 2)
+      .then(($exams) => {
+        cy.wrap($exams[0]).click();
+        cy.wrap($exams[1]).click();
+      });
+    cy.contains('button', 'Comparar').should('not.be.disabled').click();
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.wait(400);
+    shot('30-comparar-exames');
+    cy.get('body').type('{esc}');
+  });
+
+  it('15 portal do paciente: convite e compartilhamento de documentos', () => {
+    cy.visit('/panel/patients');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|nome/i.test(el.placeholder))
+      .first().type('MARIANA');
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Visualizar"]').first()
+      .click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.wait(400);
+    shot('31-ficha-paciente-convite');
+
+    cy.intercept('POST', '**/portal-invitation').as('invite');
+    cy.contains('button', 'Convidar para o portal', { timeout: 10000 })
+      .should('not.be.disabled').click();
+    cy.wait('@invite').its('response.statusCode').should('be.lessThan', 400);
+    cy.contains(/Convite enviado para/i, { timeout: 10000 }).should('be.visible');
+    cy.wait(300);
+    shot('32-convite-enviado');
+    cy.get('body').type('{esc}');
+
+    // Laudo — o admin também pode compartilhar/revogar (Gate ShareLaudoWithPatient).
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Prontuário"]').first()
+      .then(($a) => { $a[0].click(); });
+    cy.url({ timeout: 15000 }).should('include', 'medicalrecords');
+    cy.get('[title="Visualizar"], [title="Ver detalhes"]').first().click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.intercept('POST', '**/document-shares').as('shareDoc');
+    cy.get('[title="Compartilhar este documento com o paciente"]', { timeout: 10000 })
+      .first().click({ force: true });
+    cy.wait('@shareDoc').its('response.statusCode').should('be.oneOf', [200, 302, 303]);
+    cy.get('[title="Revogar acesso do paciente a este documento"]', { timeout: 10000 }).should('exist');
+    cy.wait(300);
+    shot('33-compartilhar-laudo');
+    cy.get('body').type('{esc}');
+
+    // Limpeza total do fixture compartilhada com o manual do médico.
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
+  });
+
+  it('16 conta e área do SaaS (negada)', () => {
     cy.visit('/panel/profile');
     cy.expectPanelPage();
     cy.wait(400);

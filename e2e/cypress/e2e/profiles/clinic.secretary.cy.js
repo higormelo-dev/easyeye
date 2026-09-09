@@ -752,6 +752,129 @@ describe('Perfil clinic.secretary — procedimentos completos', () => {
     cy.get('.ee-modal__dialog').should('not.exist');
   });
 
+  it('imagens: comparar dois exames e "Novo laudo" (ato médico) não existe pra secretária', () => {
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'docsdoc:');
+
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage('Imagens oftálmicas');
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+
+    cy.contains('button', 'Novo laudo').should('not.exist');
+
+    cy.get('.bg-dark.flex-wrap > .position-relative', { timeout: 15000 })
+      .should('have.length.at.least', 2)
+      .then(($exams) => {
+        cy.wrap($exams[0]).click();
+        cy.wrap($exams[1]).click();
+      });
+    cy.contains('button', 'Comparar').should('not.be.disabled').click();
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.get('body').type('{esc}');
+  });
+
+  // ════════ PORTAL DO PACIENTE ════════
+  it('portal do paciente: convidar e compartilhar EXAME (permitido); compartilhar LAUDO é negado', () => {
+    // Reaproveita a mesma fixture (schedule_id desacoplado do prontuário
+    // assinado — clicar em "Iniciar atendimento" na Agenda não reabre este
+    // registro; ver e2e/scripts/seed-docs-doctor.php).
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'docsdoc:');
+
+    // Convite — a secretária está no allowlist da rota (patients.manage,
+    // admin,financial,doctor,secretary).
+    cy.visit('/panel/patients');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|nome/i.test(el.placeholder))
+      .first().type('MARIANA');
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Visualizar"]').first()
+      .click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+
+    cy.intercept('POST', '**/portal-invitation').as('invite');
+    cy.contains('button', 'Convidar para o portal', { timeout: 10000 })
+      .should('not.be.disabled').click();
+    cy.wait('@invite').its('response.statusCode').should('be.lessThan', 400);
+    cy.contains(/Convite enviado para/i, { timeout: 10000 }).should('be.visible');
+    cy.get('body').type('{esc}');
+
+    // Exame — allowlist mais amplo (Gate só entra pro tipo laudo).
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+    cy.intercept('POST', '**/document-shares').as('shareExam');
+    cy.get('[title="Compartilhar exame com o paciente"]', { timeout: 15000 }).first()
+      .click({ force: true });
+    cy.wait('@shareExam').its('response.statusCode').should('be.lessThan', 300);
+    cy.get('[title*="Compartilhado com o paciente"]', { timeout: 10000 }).should('exist');
+
+    // Laudo — o ícone aparece (o drawer não esconde por perfil), mas o
+    // servidor nega via Gate ShareLaudoWithPatient (decisão de produto:
+    // conteúdo clínico assinado não é decisão da secretária).
+    cy.visit('/panel/patients');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|nome/i.test(el.placeholder))
+      .first().type('MARIANA');
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Prontuário"]').first()
+      .then(($a) => { $a[0].click(); });
+    cy.url({ timeout: 15000 }).should('include', 'medicalrecords');
+    cy.get('[title="Visualizar"], [title="Ver detalhes"]').first().click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.intercept('POST', '**/document-shares').as('shareDocDenied');
+    cy.get('[title="Compartilhar este documento com o paciente"]', { timeout: 10000 })
+      .first().click({ force: true });
+    // Inertia: AuthorizationException do Gate vira redirect-back (302) com
+    // flash de erro (mesmo padrão já coberto acima para o 403 de médicos).
+    cy.wait('@shareDocDenied').its('response.statusCode').should('be.oneOf', [302, 303, 403]);
+    cy.get('[title="Revogar acesso do paciente a este documento"]').should('not.exist');
+
+    // Limpeza total do fixture compartilhada com o manual do médico.
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
+  });
+
+  // ════════ AGENDA: DRAWER DE DETALHE (códigos + deep-link) ════════
+  it('agenda: drawer de detalhe — copiar código (SDL/PAC/DOC) e deep-link do cadastro do paciente', () => {
+    cy.visit('/panel/schedules');
+    cy.expectPanelPage();
+    cy.wait(800);
+
+    // cy.window().navigator.clipboard precisa de permissão de escrita no
+    // Chrome headless — stub simples evita depender disso no CI.
+    cy.window().then((win) => {
+      cy.stub(win.navigator.clipboard, 'writeText').as('clipboardWrite').resolves();
+    });
+
+    cy.get('.schedule-card', { timeout: 15000 }).first()
+      .find('[title="Visualizar"]').first().click({ force: true });
+    cy.get('.offcanvas.show, .ee-modal__dialog', { timeout: 10000 }).should('be.visible');
+
+    cy.get('[title="Copiar código"]').should('have.length', 3);
+    cy.get('[title="Copiar código"]').eq(0).click({ force: true });
+    cy.get('@clipboardWrite').should('have.been.calledOnce');
+    cy.get('[title="Copiar código"]').eq(0).find('i.ti-check').should('exist');
+    cy.get('body').type('{esc}');
+  });
+
+  it('agenda: ícone "Cadastro do paciente" leva à ficha já com o cadastro aberto (?open=)', () => {
+    cy.visit('/panel/schedules');
+    cy.expectPanelPage();
+    cy.wait(800);
+
+    cy.get('.schedule-card', { timeout: 15000 }).first()
+      .find('[title="Cadastro do paciente"]').first()
+      .invoke('attr', 'href').should('include', '/panel/patients?open=')
+      .then((href) => cy.visit(href));
+
+    // O modal de edição abre por cima da tela (backdrop cobre o menu lateral
+    // de propósito) — não usar expectPanelPage() aqui, só confirmar o modal.
+    cy.get('.ee-modal__dialog', { timeout: 15000 }).should('be.visible');
+    // O deep-link é consumido e a URL volta limpa (sem travar o histórico).
+    cy.location('search', { timeout: 10000 }).should('not.include', 'open=');
+    cy.get('.ee-modal__header .btn-close').click({ force: true });
+  });
+
   // ════════ UTILITÁRIOS AJAX (sessão autenticada) ════════
   // Endpoints AJAX que as telas consomem por trás (sem página própria):
   // autocomplete de CID-10 e de medicamentos + JSON da fila de espera.

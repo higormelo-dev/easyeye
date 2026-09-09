@@ -665,6 +665,36 @@ describe('Perfil clinic.admin — controle de acesso (usuários e perfis RBAC)',
       .and('contain.text', 'Ativo');
   });
 
+  it('usuário: e-mail de login de OUTRA clínica é rejeitado (422 — hardening account-takeover)', () => {
+    // Regressão de segurança: o e-mail é validado contra TODOS os usuários da
+    // plataforma (Rule::unique('users','email')), não só contra as pessoas
+    // desta entidade — antes disso dava pra reaproveitar o e-mail de login de
+    // um usuário de OUTRA clínica/entidade e sequestrar a conta dele.
+    // higor_ap89@icloud.com é o e-mail seedado do admin SaaS (outra entity).
+    cy.visit('/panel/accesscontrol/users');
+    cy.expectPanelPage();
+    cy.contains('button', 'Novo usuário').click();
+    cy.get('.ufm-panel', { timeout: 10000 }).should('be.visible');
+
+    cy.get('.ufm-panel input[type=text]').first().type('CY-ADM Email Duplicado');
+    cy.get('.ufm-panel input[type=email]').first().type('higor_ap89@icloud.com');
+    cy.get('.ufm-panel .multiselect').first().click();
+    cy.get('.multiselect-option:visible').contains(/Secret/i).click({ force: true });
+    cy.get('.ufm-panel input[type=password]').eq(0).type(USER_PASS).should('have.value', USER_PASS);
+    cy.get('.ufm-panel input[type=password]').eq(1).type(USER_PASS).should('have.value', USER_PASS);
+
+    cy.intercept('POST', '**/accesscontrol/users').as('storeDupUser');
+    cy.get('.ufm-footer button[type=submit]').click();
+    // Inertia: ValidationException vira redirect-back (302/303) com flash de
+    // erro pra requests não-JSON (mesmo padrão já coberto para o 403 do Gate
+    // de médicos) — o que importa é que NADA foi criado (checado abaixo).
+    cy.wait('@storeDupUser').its('response.statusCode').should('be.oneOf', [302, 303, 422]);
+    cy.get('.alert.alert-danger, .ufm-panel .is-invalid, .ufm-panel .invalid-feedback', { timeout: 6000 })
+      .should('exist');
+    cy.visit('/panel/accesscontrol/users?search=' + encodeURIComponent('Email Duplicado'));
+    cy.contains('td', 'EMAIL DUPLICADO').should('not.exist');
+  });
+
   it('usuário: desativar e reativar pelo dropdown (sem confirm)', () => {
     cy.visit('/panel/accesscontrol/users');
     cy.expectPanelPage();
@@ -1063,6 +1093,65 @@ describe('Perfil clinic.admin — clínico (médicos, mural, fila, imagens e IA)
       .and('contain.text', 'Inativo');
   });
 
+  it('médico: e-mail de login de OUTRA clínica é rejeitado (422 — hardening account-takeover)', () => {
+    // Mesma regressão de segurança do cadastro de usuários: o e-mail é
+    // validado contra TODOS os usuários da plataforma, não só contra as
+    // pessoas desta entidade. higor_ap89@icloud.com é o e-mail seedado do
+    // admin SaaS (outra entity) — nunca deve ser aceito aqui.
+    cy.visit('/panel/doctors');
+    cy.expectPanelPage();
+    cy.contains('button', 'Novo médico').click();
+    cy.get('.ee-modal__dialog', { timeout: 10000 }).should('be.visible');
+
+    const cpf = cpfValidoAdm((Date.now() % 900000) + 61);
+    cy.get('.ee-modal__dialog').contains('label', 'Nome completo')
+      .parent().find('input:visible').type('CY-ADM DR DUPLICADO');
+    cy.get('.ee-modal__dialog').contains('label', 'Apelido')
+      .parent().find('input:visible').type('CYADMDRDUP');
+    cy.get('.ee-modal__dialog').contains('label', 'CPF')
+      .parent().find('input:visible').type(cpf);
+    cy.get('.ee-modal__dialog').contains('label', 'Data de nascimento')
+      .parent().find('input:visible').type('1985-03-10');
+    cy.get('.ee-modal__dialog').contains('label', 'Gênero')
+      .parent().find('.multiselect:visible').click();
+    cy.get('.multiselect-option:visible').first().click({ force: true });
+    cy.get('.ee-modal__dialog').contains('label', 'Estado civil')
+      .parent().find('.multiselect:visible').click();
+    cy.get('.multiselect-option:visible').first().click({ force: true });
+    cy.get('.ee-modal__dialog').contains('label', 'E-mail')
+      .parent().find('input:visible').type('higor_ap89@icloud.com');
+
+    cy.get('.ee-modal__dialog .nav-tabs button').eq(2).click();
+    cy.get('.ee-modal__dialog').contains('label', 'Celular')
+      .parent().find('input:visible').type('11977776655');
+
+    cy.get('.ee-modal__dialog .nav-tabs button').eq(1).click();
+    cy.get('.ee-modal__dialog').contains('label', 'CRM')
+      .parent().find('input:visible').type(`8${ADM_STAMP.slice(-5)}`);
+    cy.get('.ee-modal__dialog').contains('label', 'Especialidade')
+      .parent().find('input:visible').type('Oftalmologia Geral');
+
+    cy.get('.ee-modal__dialog .nav-tabs button').eq(3).click();
+    cy.get('.ee-modal__dialog').contains('label', /^Senha/)
+      .parent().find('input:visible').type(`CyAdmDup@${ADM_STAMP}!`);
+    cy.get('.ee-modal__dialog').contains('label', 'Confirmar senha')
+      .parent().find('input:visible').type(`CyAdmDup@${ADM_STAMP}!`);
+
+    cy.intercept('POST', '**/panel/doctors').as('storeDupDoctor');
+    cy.get('.ee-modal__dialog button.btn-primary').last().click();
+    // Inertia: ValidationException vira redirect-back (302/303) com flash de
+    // erro pra requests não-JSON (mesmo padrão do 403 do Gate, acima).
+    cy.wait('@storeDupDoctor').its('response.statusCode').should('be.oneOf', [302, 303, 422]);
+    cy.get('.alert.alert-danger, .ee-modal__dialog', { timeout: 6000 }).should('exist');
+    cy.get('body').then(($b) => {
+      if ($b.find('.ee-modal__header .btn-close').length) {
+        cy.get('.ee-modal__header .btn-close').click({ force: true });
+      }
+    });
+    cy.visit('/panel/doctors?search=' + encodeURIComponent('DR DUPLICADO'));
+    cy.contains('td', 'DUPLICADO').should('not.exist');
+  });
+
   it('médico: ativar e desativar pelo dropdown (toggle sem confirm)', () => {
     cy.visit('/panel/doctors?search=CY-ADM');
     cy.expectPanelPage();
@@ -1222,6 +1311,93 @@ describe('Perfil clinic.admin — clínico (médicos, mural, fila, imagens e IA)
     cy.visit('/panel/dashboard');
     csrfRequest('POST', '/panel/eye-images/diagnoses', { name: 'CY-ADM DX' })
       .its('status').should('eq', 403);
+  });
+
+  it('imagens oftálmicas: comparar exames; "Novo laudo" (ato médico) não existe pro admin', () => {
+    // Fixture compartilhada com o manual do médico (mesma entidade demo).
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'docsdoc:');
+
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+
+    // Emitir laudo é ato médico (CFM Res. 2.227/2018) — o botão nem existe
+    // no DOM pro admin, mesmo ele administrando o módulo (upload/organização).
+    cy.contains('button', 'Novo laudo').should('not.exist');
+
+    cy.get('.bg-dark.flex-wrap > .position-relative', { timeout: 15000 })
+      .should('have.length.at.least', 2)
+      .then(($exams) => {
+        cy.wrap($exams[0]).click();
+        cy.wrap($exams[1]).click();
+      });
+    cy.contains('button', 'Comparar').should('not.be.disabled').click();
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.get('body').type('{esc}');
+  });
+
+  it('portal do paciente: convite e compartilhamento (admin pode laudo E exame)', () => {
+    cy.visit('/panel/patients');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|nome/i.test(el.placeholder))
+      .first().type('MARIANA');
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Visualizar"]').first()
+      .click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+
+    cy.intercept('POST', '**/portal-invitation').as('invite');
+    cy.contains('button', 'Convidar para o portal', { timeout: 10000 })
+      .should('not.be.disabled').click();
+    cy.wait('@invite').its('response.statusCode').should('be.lessThan', 400);
+    cy.contains(/Convite enviado para/i, { timeout: 10000 }).should('be.visible');
+    cy.get('body').type('{esc}');
+
+    // Laudo — Gate ShareLaudoWithPatient permite Admin + Doctor.
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Prontuário"]').first()
+      .then(($a) => { $a[0].click(); });
+    cy.url({ timeout: 15000 }).should('include', 'medicalrecords');
+    cy.get('[title="Visualizar"], [title="Ver detalhes"]').first().click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.intercept('POST', '**/document-shares').as('shareDoc');
+    cy.get('[title="Compartilhar este documento com o paciente"]', { timeout: 10000 })
+      .first().click({ force: true });
+    cy.wait('@shareDoc').its('response.statusCode').should('be.oneOf', [200, 302, 303]);
+    cy.get('[title="Revogar acesso do paciente a este documento"]', { timeout: 10000 }).should('exist');
+    cy.get('body').type('{esc}');
+
+    // Exame — a partir do Gerenciador de Imagens.
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+    cy.intercept('POST', '**/document-shares').as('shareExam');
+    cy.get('[title="Compartilhar exame com o paciente"]', { timeout: 15000 }).first()
+      .click({ force: true });
+    cy.wait('@shareExam').its('response.statusCode').should('be.lessThan', 300);
+    cy.get('[title*="Compartilhado com o paciente"]', { timeout: 10000 }).should('exist');
+
+    // Limpeza total do fixture compartilhada com o manual do médico.
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
+  });
+
+  it('agenda: drawer de detalhe traz os 3 botões de copiar código (SDL/PAC/DOC)', () => {
+    cy.visit('/panel/schedules');
+    cy.expectPanelPage();
+    cy.wait(800);
+
+    cy.window().then((win) => {
+      cy.stub(win.navigator.clipboard, 'writeText').as('clipboardWrite').resolves();
+    });
+
+    cy.get('.schedule-card', { timeout: 15000 }).first()
+      .find('[title="Visualizar"]').first().click({ force: true });
+    cy.get('.offcanvas.show, .ee-modal__dialog', { timeout: 10000 }).should('be.visible');
+    cy.get('[title="Copiar código"]').should('have.length', 3);
+    cy.get('[title="Copiar código"]').eq(0).click({ force: true });
+    cy.get('@clipboardWrite').should('have.been.calledOnce');
+    cy.get('body').type('{esc}');
   });
 
   it('consumo de IA: admin vê pacotes de crédito e filtra execuções', () => {

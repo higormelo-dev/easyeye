@@ -35,7 +35,8 @@ consulte também:
 11. [Financeiro](#11-financeiro)
 12. [Assistente de IA: consumo e créditos](#12-assistente-de-ia-consumo-e-créditos)
 13. [Operação: agenda e pacientes](#13-operação-agenda-e-pacientes)
-14. [Minha conta e limites do perfil](#14-minha-conta-e-limites-do-perfil)
+14. [Imagens oftálmicas e Portal do Paciente](#14-imagens-oftálmicas-e-portal-do-paciente)
+15. [Minha conta e limites do perfil](#15-minha-conta-e-limites-do-perfil)
 
 ---
 
@@ -92,6 +93,11 @@ números e símbolos):
 Clique em **Cadastrar médico**. O médico recém-criado nasce **Inativo** — ative-o pelo
 menu **⋮ → Ativar** da linha quando estiver pronto para atender.
 
+> **Segurança**: o e-mail do médico é validado contra **todos os usuários do sistema**,
+> não só contra os pacientes/médicos desta clínica. Isso impede reaproveitar o e-mail de
+> login de um médico/usuário de **outra clínica** para assumir a conta dele por engano
+> (ou por má-fé) — o cadastro retorna erro de validação se o e-mail já estiver em uso.
+
 ### Editar, desativar e excluir
 
 - **⋮ → Editar** — altera os dados (a aba Acesso não reaparece; senha é do próprio médico).
@@ -134,6 +140,10 @@ bloqueio o médico não recebe agendamentos.
 ![Novo usuário](img/09-usuario-novo.png)
 
 3. Clique em **Criar usuário** e repasse as credenciais com segurança.
+
+> **Segurança**: assim como no cadastro de médicos, o e-mail é validado contra todos os
+> usuários da plataforma (não só desta clínica) — evita que um e-mail de login de outra
+> entidade seja reaproveitado aqui por engano.
 
 ### Gerenciar
 
@@ -305,11 +315,58 @@ mural de recados, fila de espera e importação por planilha:
 
 ![Pacientes](img/26-pacientes.png)
 
-Passo a passo completo no [Manual da Secretária](../manual-secretaria/README.md).
+No detalhe de um agendamento (drawer), os códigos de identificação, paciente e médico têm
+um botão de **copiar** ao lado (ícone de clipe) — útil para colar em mensagens/prontuário
+sem digitar o código manualmente. Passo a passo completo, com telas, no
+[Manual da Secretária](../manual-secretaria/README.md#2-agenda-lista-calendário-e-busca).
+
+Passo a passo completo da operação no [Manual da Secretária](../manual-secretaria/README.md).
 
 ---
 
-## 14. Minha conta e limites do perfil
+## 14. Imagens oftálmicas e Portal do Paciente
+
+### Comparar exames (sem emitir laudo)
+
+O administrador acessa o Gerenciador de Imagens para organizar exames, mas **não** emite
+laudo — **Novo laudo** é ato médico exclusivo (CFM Res. 2.227/2018) e o botão nem existe
+no DOM para este perfil:
+
+![Imagens oftálmicas sem o botão Novo laudo](img/29-imagens-sem-novo-laudo.png)
+
+Selecione **2 exames** e clique em **Comparar** para sobrepor ou ver lado a lado (mesma
+ferramenta do médico — passo a passo detalhado no
+[Manual do Médico](../manual-medico/README.md#8-pacientes-e-imagens-oftálmicas)):
+
+![Comparar exames](img/30-comparar-exames.png)
+
+### Portal do Paciente: convite de acesso
+
+Na ficha do paciente (**Pacientes → ícone de visualizar**), o administrador também pode
+convidar o paciente para o **Portal do Paciente** (mesmo fluxo do médico):
+
+![Ficha do paciente com o card do Portal](img/31-ficha-paciente-convite.png)
+
+**Convidar para o portal** envia um e-mail com link de criação de login único — a visão do
+paciente no portal fica restrita às clínicas onde ele já foi atendido:
+
+![Convite enviado](img/32-convite-enviado.png)
+
+### Compartilhar laudo do prontuário com o paciente
+
+No detalhe de um prontuário **assinado**, o ícone de compartilhamento libera o laudo no
+Portal do Paciente:
+
+![Laudo compartilhado, ícone de revogar ativo](img/33-compartilhar-laudo.png)
+
+> **Quem pode compartilhar o quê**: compartilhar **laudo** (conteúdo clínico assinado) é
+> permitido a **Administrador e Médico** — a secretária não tem esse botão (decisão de
+> produto: conteúdo clínico não é decisão dela). Compartilhar **exame de imagem** (sem
+> interpretação clínica) é permitido também à secretária, no Gerenciador de Imagens.
+
+---
+
+## 15. Minha conta e limites do perfil
 
 **Avatar → Editar perfil** — dados, senha e o seu 2FA pessoal:
 

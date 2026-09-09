@@ -481,6 +481,122 @@ describe('Perfil clinic.doctor — procedimentos completos', () => {
     cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-cydoc.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
   });
 
+  it('imagens: laudo manual (Novo laudo) — exclusivo do médico, com modelo e PDF', () => {
+    // Mesmo seed dos manuais (docs/manual-medico): paciente com e-mail,
+    // prontuário assinado + 1 documentação, e 2 exames de imagem.
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'docsdoc:');
+
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+
+    // Botão só existe no DOM para o médico (v-if="isDoctor" — sem 403 client-side).
+    cy.contains('button', 'Novo laudo', { timeout: 15000 }).should('be.visible').click();
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible')
+      .and('contain.text', 'Novo laudo');
+
+    // Sem modelo cadastrado na categoria "laudos"/"exames-especializados"
+    // desta entidade de teste, digita direto no editor livre (TinyMCE).
+    cy.get('iframe.tox-edit-area__iframe', { timeout: 10000 }).should('be.visible');
+    cy.wait(700); // TinyMCE termina de montar o iframe/body (init assíncrono)
+    cy.get('iframe.tox-edit-area__iframe')
+      .its('0.contentDocument.body').should('not.be.undefined')
+      .then((body) => {
+        cy.wrap(body).click({ force: true }).type('CY-DEMO: laudo oftalmológico de teste E2E.', { force: true });
+      });
+
+    cy.intercept('POST', '**/eye-images/reports').as('storeReport');
+    cy.contains('button', 'Salvar laudo').should('not.be.disabled').click();
+    cy.wait('@storeReport', { timeout: 20000 }).its('response.statusCode')
+      .should('be.oneOf', [200, 201, 422]); // 422 só se pedir confirmação de prontuário do dia
+
+    cy.get('body').then(($b) => {
+      if ($b.text().includes('prontuário') && $b.find('.swal2-confirm:visible').length) {
+        cy.get('.swal2-confirm:visible').click();
+        cy.wait('@storeReport', { timeout: 20000 });
+      }
+    });
+
+    cy.contains('Laudo salvo com sucesso.', { timeout: 15000 }).should('be.visible');
+    cy.contains('a', 'Baixar PDF').should('have.attr', 'href');
+  });
+
+  it('imagens: comparar dois exames (sobrepor / lado a lado)', () => {
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+
+    cy.contains('button', 'Comparar').should('be.disabled');
+
+    // Seleciona os 2 exames sementeados (retinografia OD/OE).
+    cy.get('.bg-dark.flex-wrap > .position-relative', { timeout: 15000 })
+      .should('have.length.at.least', 2)
+      .then(($exams) => {
+        cy.wrap($exams[0]).click();
+        cy.wrap($exams[1]).click();
+      });
+
+    cy.contains('button', 'Comparar').should('not.be.disabled').click();
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.contains('button', /Lado a lado/i).click();
+    cy.contains('button', /Sobrepor/i).click();
+    cy.get('body').type('{esc}');
+  });
+
+  it('portal do paciente: compartilhar LAUDO e EXAME (médico pode os dois)', () => {
+    // Laudo — a partir do drawer de detalhe do prontuário assinado.
+    cy.visit('/panel/patients');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|nome/i.test(el.placeholder))
+      .first().type('MARIANA');
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Prontuário"]').first()
+      .then(($a) => { $a[0].click(); });
+    cy.url({ timeout: 15000 }).should('include', 'medicalrecords');
+
+    // Abre o detalhe do prontuário assinado (drawer com a aba Documentações).
+    cy.get('[title="Visualizar"], [title="Ver detalhes"]').first().click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.intercept('POST', '**/document-shares').as('shareDoc');
+    cy.get('[title="Compartilhar este documento com o paciente"]', { timeout: 10000 })
+      .first().click({ force: true });
+    cy.wait('@shareDoc').its('response.statusCode').should('be.oneOf', [200, 302, 303]);
+    cy.get('[title="Revogar acesso do paciente a este documento"]', { timeout: 10000 }).should('exist');
+    cy.get('body').type('{esc}');
+
+    // Exame — a partir do Gerenciador de Imagens (badge circular na thumbnail).
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+    cy.intercept('POST', '**/document-shares').as('shareExam');
+    cy.get('[title="Compartilhar exame com o paciente"]', { timeout: 15000 }).first()
+      .click({ force: true });
+    cy.wait('@shareExam').its('response.statusCode').should('be.lessThan', 300);
+    cy.get('[title*="Compartilhado com o paciente"]', { timeout: 10000 }).should('exist');
+  });
+
+  it('portal do paciente: enviar convite de acesso pela ficha do paciente', () => {
+    cy.visit('/panel/patients');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|nome/i.test(el.placeholder))
+      .first().type('MARIANA');
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Visualizar"]').first()
+      .click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+
+    cy.intercept('POST', '**/portal-invitation').as('invite');
+    cy.contains('button', 'Convidar para o portal', { timeout: 10000 })
+      .should('not.be.disabled').click();
+    cy.wait('@invite').its('response.statusCode').should('be.lessThan', 400);
+    cy.contains(/Convite enviado para/i, { timeout: 10000 }).should('be.visible');
+
+    // Limpeza total do fluxo (paciente + prontuário assinado + exames).
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
+  });
+
   it('receituário: APIs exclusivas do médico respondem (presets, medicamentos, CID-10)', () => {
     cy.visit('/panel/dashboard');
     cy.expectPanelPage();

@@ -25,8 +25,9 @@ pacientes e conta.
 6. [Assistente de IA](#6-assistente-de-ia)
 7. [Meus prompts de IA e consumo](#7-meus-prompts-de-ia-e-consumo)
 8. [Pacientes e imagens oftálmicas](#8-pacientes-e-imagens-oftálmicas)
-9. [Minha conta](#9-minha-conta)
-10. [O que o perfil de médico NÃO acessa](#10-o-que-o-perfil-de-médico-não-acessa)
+9. [Portal do Paciente: convite e compartilhamento de documentos](#9-portal-do-paciente-convite-e-compartilhamento-de-documentos)
+10. [Minha conta](#10-minha-conta)
+11. [O que o perfil de médico NÃO acessa](#11-o-que-o-perfil-de-médico-não-acessa)
 
 ---
 
@@ -247,9 +248,107 @@ diagnóstico é exclusiva do médico:
 
 ![Imagens oftálmicas](img/18-imagens-oftalmicas.png)
 
+Busque o paciente na lista à esquerda e selecione-o para ver os exames de imagem
+sementeados/importados:
+
+![Paciente selecionado no Gerenciador de Imagens](img/23-imagens-paciente-selecionado.png)
+
+### Emitir laudo manual (Novo laudo)
+
+O botão **Novo laudo** só aparece para o médico (nem chega a existir na tela para outros
+perfis — não é apenas desabilitado). Ele abre um editor de texto rico para redigir o laudo
+do exame de imagem sem depender de um atendimento em andamento:
+
+![Modal Novo laudo](img/24-novo-laudo-modal.png)
+
+1. Escolha um **modelo** cadastrado pela clínica (categoria *laudos*/*exames
+   especializados*) — o conteúdo é pré-preenchido e pode ser ajustado — ou fique em
+   **Em branco** para redigir livremente.
+2. Escreva o laudo no editor:
+
+![Laudo preenchido](img/25-novo-laudo-preenchido.png)
+
+3. Clique em **Salvar laudo**. Se o sistema pedir confirmação de vínculo com o prontuário
+   do dia, confirme. O laudo é salvo e o **PDF** fica disponível para download/impressão:
+
+![Laudo salvo com PDF](img/26-novo-laudo-sucesso-pdf.png)
+
+> Emissão de laudo de imagem é ato médico (CFM Res. 2.227/2018) — por isso o botão é
+> exclusivo do médico, mesmo quando administrador/secretária têm acesso ao módulo de
+> Imagens Oftálmicas para as demais operações (upload, organização, comparação).
+
+### Comparar exames
+
+Selecione **exatamente 2 exames** nas miniaturas do paciente — o botão **Comparar** só
+habilita com essa seleção:
+
+![Exames selecionados para comparação](img/27-comparar-exames-selecionados.png)
+
+O modal abre no modo **Sobrepor**: arraste a imagem de cima para alinhar os pontos de
+referência e ajuste a **opacidade** para enxergar a evolução entre os dois exames:
+
+![Comparar — Sobrepor](img/28-comparar-sobrepor.png)
+
+Alterne para **Lado a lado** para ver as duas imagens lado a lado, com data/hora e
+identificação de cada exame:
+
+![Comparar — Lado a lado](img/29-comparar-lado-a-lado.png)
+
 ---
 
-## 9. Minha conta
+## 9. Portal do Paciente: convite e compartilhamento de documentos
+
+O **Portal do Paciente** dá ao paciente um login próprio (fora do `/panel`) para consultar
+seus laudos e exames compartilhados. O médico participa de duas etapas: **convidar** o
+paciente para criar a conta e **compartilhar** documentos específicos com ele.
+
+### Enviar convite de acesso ao portal
+
+Abra a ficha do paciente (**Pacientes → ícone de visualizar**) e role até **Portal do
+Paciente**:
+
+![Ficha do paciente com o card do Portal](img/33-ficha-paciente-convite.png)
+
+Clique em **Convidar para o portal**. O sistema envia um e-mail com um link de criação de
+login único de acesso — a visão do paciente fica restrita às clínicas onde ele já foi
+atendido:
+
+![Convite enviado](img/34-convite-enviado.png)
+
+- O botão fica indisponível se o paciente **não tiver e-mail cadastrado** ou já tiver
+  conta ativa no portal.
+- Reenviar o convite é seguro (idempotente) — não cria uma segunda conta.
+
+### Compartilhar laudo do prontuário
+
+Abra o **detalhe do prontuário assinado** (Pacientes → Prontuário → ícone de visualizar) e
+use o ícone de compartilhamento ao lado do documento:
+
+![Drawer do prontuário com o ícone de compartilhar](img/30-compartilhar-laudo-drawer.png)
+
+Clique no ícone **Compartilhar este documento com o paciente**. Um aviso de sucesso
+confirma o envio e o ícone muda para **Revogar acesso**, indicando que o compartilhamento
+está ativo:
+
+![Laudo compartilhado, ícone de revogar ativo](img/31-compartilhar-laudo-ativo.png)
+
+> Compartilhar **laudo** (prontuário) é restrito a **Administrador e Médico** — a
+> secretária não tem esse botão. Só é possível compartilhar um prontuário **assinado**
+> (bloqueado contra edição).
+
+### Compartilhar exame de imagem
+
+No **Gerenciador de Imagens**, cada miniatura tem um selo circular de compartilhamento.
+Clique nele para liberar o exame ao paciente pelo portal — a secretária também pode
+compartilhar exames (diferente do laudo):
+
+![Exame compartilhado com o paciente](img/32-compartilhar-exame-ativo.png)
+
+Clicar novamente no mesmo selo **revoga** o acesso do paciente àquele exame.
+
+---
+
+## 10. Minha conta
 
 Avatar (canto superior direito) → **Editar perfil**: nome, e-mail, foto, senha e
 autenticação em dois fatores (recomendado):
@@ -260,7 +359,7 @@ autenticação em dois fatores (recomendado):
 
 ---
 
-## 10. O que o perfil de médico NÃO acessa
+## 11. O que o perfil de médico NÃO acessa
 
 Por desenho de segurança, estas áreas retornam **acesso negado** ao médico:
 

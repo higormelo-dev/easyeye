@@ -74,6 +74,29 @@ describe('Manual da secretária — capturas', () => {
     cy.get('body').type('{esc}');
   });
 
+  it('04b agenda: drawer de detalhe — copiar código e cadastro do paciente', () => {
+    cy.visit('/panel/schedules');
+    cy.expectPanelPage();
+    cy.wait(800);
+
+    // Chrome headless nega permissão de escrita na área de transferência —
+    // stub evita rejeição não tratada (console.error falharia o spec).
+    cy.window().then((win) => {
+      cy.stub(win.navigator.clipboard, 'writeText').resolves();
+    });
+
+    cy.get('.schedule-card', { timeout: 15000 }).first()
+      .find('[title="Visualizar"]').first().click({ force: true });
+    cy.get('.offcanvas.show, .ee-modal__dialog', { timeout: 10000 }).should('be.visible');
+    cy.wait(400);
+    shot('26-agenda-drawer-detalhe');
+
+    cy.get('[title="Copiar código"]').first().click({ force: true });
+    cy.wait(300);
+    shot('27-agenda-codigo-copiado');
+    cy.get('body').type('{esc}');
+  });
+
   it('05 mural de recados', () => {
     cy.visit('/panel/schedules');
     cy.expectPanelPage();
@@ -171,6 +194,67 @@ describe('Manual da secretária — capturas', () => {
     cy.expectPanelPage();
     cy.wait(600);
     shot('22-assistente-ia');
+  });
+
+  it('11b imagens oftálmicas: comparar exames', () => {
+    // Fixture compartilhada com o manual do médico (mesma entidade demo).
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/seed-docs-doctor.php';"`, { timeout: 40000 })
+      .its('stdout').should('include', 'docsdoc:');
+
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+    cy.wait(400);
+    shot('28-imagens-paciente-selecionado');
+
+    cy.get('.bg-dark.flex-wrap > .position-relative', { timeout: 15000 })
+      .should('have.length.at.least', 2)
+      .then(($exams) => {
+        cy.wrap($exams[0]).click();
+        cy.wrap($exams[1]).click();
+      });
+    cy.contains('button', 'Comparar').should('not.be.disabled').click();
+    cy.get('.modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.wait(400);
+    shot('29-comparar-exames');
+    cy.get('body').type('{esc}');
+  });
+
+  it('11c portal do paciente: convite e compartilhamento de exame', () => {
+    cy.visit('/panel/patients');
+    cy.expectPanelPage();
+    cy.get('input[placeholder]').filter((_, el) => /buscar|nome/i.test(el.placeholder))
+      .first().type('MARIANA');
+    cy.contains('tr', 'MARIANA', { timeout: 15000 }).find('[title="Visualizar"]').first()
+      .click({ force: true });
+    cy.get('.ee-modal__dialog, .modal.show, .modal.d-block', { timeout: 10000 }).should('be.visible');
+    cy.wait(400);
+    shot('30-ficha-paciente-convite');
+
+    cy.intercept('POST', '**/portal-invitation').as('invite');
+    cy.contains('button', 'Convidar para o portal', { timeout: 10000 })
+      .should('not.be.disabled').click();
+    cy.wait('@invite').its('response.statusCode').should('be.lessThan', 400);
+    cy.contains(/Convite enviado para/i, { timeout: 10000 }).should('be.visible');
+    cy.wait(300);
+    shot('31-convite-enviado');
+    cy.get('body').type('{esc}');
+
+    cy.visit('/panel/eye-images');
+    cy.expectPanelPage();
+    cy.get('input[placeholder="Buscar paciente..."]').type('MARIANA');
+    cy.contains('.patient-item', 'MARIANA', { timeout: 15000 }).click();
+    cy.intercept('POST', '**/document-shares').as('shareExam');
+    cy.get('[title="Compartilhar exame com o paciente"]', { timeout: 15000 }).first()
+      .click({ force: true });
+    cy.wait('@shareExam').its('response.statusCode').should('be.lessThan', 300);
+    cy.get('[title*="Compartilhado com o paciente"]', { timeout: 10000 }).should('exist');
+    cy.wait(300);
+    shot('32-compartilhar-exame-ativo');
+
+    // Limpeza total do fixture compartilhada com o manual do médico.
+    cy.exec(`cd .. && php artisan tinker --execute="require 'e2e/scripts/clean-docs-doctor.php';"`, { failOnNonZeroExit: false, timeout: 40000 });
   });
 
   it('12 conta: perfil e logout', () => {

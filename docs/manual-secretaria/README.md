@@ -23,9 +23,10 @@ importação, médicos (escala e bloqueios), imagens oftálmicas, assistente de 
 8. [Importação de pacientes por planilha](#8-importação-de-pacientes-por-planilha)
 9. [Médicos: consulta, escala e bloqueios](#9-médicos-consulta-escala-e-bloqueios)
 10. [Imagens oftálmicas](#10-imagens-oftálmicas)
-11. [Assistente de IA (consumo)](#11-assistente-de-ia-consumo)
-12. [Minha conta e saída do sistema](#12-minha-conta-e-saída-do-sistema)
-13. [O que o perfil de secretária NÃO acessa](#13-o-que-o-perfil-de-secretária-não-acessa)
+11. [Portal do Paciente: convite e compartilhamento de exame](#11-portal-do-paciente-convite-e-compartilhamento-de-exame)
+12. [Assistente de IA (consumo)](#12-assistente-de-ia-consumo)
+13. [Minha conta e saída do sistema](#13-minha-conta-e-saída-do-sistema)
+14. [O que o perfil de secretária NÃO acessa](#14-o-que-o-perfil-de-secretária-não-acessa)
 
 ---
 
@@ -129,6 +130,22 @@ Fluxo típico do dia:
 
 Os demais botões do card permitem **editar** o agendamento, **reagendar** para outro
 horário e abrir os dados do paciente.
+
+### Drawer de detalhe: códigos e cadastro do paciente
+
+O ícone **Visualizar** (olho) do card abre o detalhe completo do agendamento:
+
+![Drawer de detalhe do agendamento](img/26-agenda-drawer-detalhe.png)
+
+Os campos **Código** (do agendamento, do paciente e do médico) têm um botão de **copiar**
+ao lado — útil para colar em mensagens, planilhas ou no prontuário sem digitar manualmente.
+Um ✓ verde confirma a cópia:
+
+![Código copiado com sucesso](img/27-agenda-codigo-copiado.png)
+
+O ícone **Cadastro do paciente** (no card, fora do drawer) leva direto à ficha do paciente
+**já com o cadastro aberto para edição** — não é preciso buscar o paciente de novo na
+lista de Pacientes.
 
 ---
 
@@ -291,9 +308,54 @@ Menu **Imagens oftálmicas** — central de exames de imagem dos pacientes:
 - **Novo** importa um exame externo (arquivo trazido pelo paciente): selecione o paciente,
   o tipo de exame, a data e anexe os arquivos (JPG, PNG ou PDF).
 
+### Comparar exames
+
+Selecione o paciente e marque **2 exames** nas miniaturas — o botão **Comparar** só
+habilita com essa seleção. O modal compara em **Sobrepor** (opacidade ajustável, arraste
+para alinhar) ou **Lado a lado**:
+
+![Paciente selecionado no Gerenciador de Imagens](img/28-imagens-paciente-selecionado.png)
+
+![Comparar exames](img/29-comparar-exames.png)
+
+> **Novo laudo** (emitir laudo do exame) é ato médico exclusivo — não aparece pra
+> secretária, mesmo com acesso total ao restante do módulo.
+
 ---
 
-## 11. Assistente de IA (consumo)
+## 11. Portal do Paciente: convite e compartilhamento de exame
+
+O **Portal do Paciente** dá ao paciente um login próprio (fora do `/panel`) para consultar
+laudos e exames que a clínica compartilhar com ele.
+
+### Enviar convite de acesso
+
+Na ficha do paciente (**Pacientes → ícone de visualizar**), role até **Portal do
+Paciente** e clique em **Convidar para o portal**. O sistema envia um e-mail com um
+link de criação de login único:
+
+![Ficha do paciente com o card do Portal](img/30-ficha-paciente-convite.png)
+
+![Convite enviado](img/31-convite-enviado.png)
+
+O botão fica indisponível se o paciente não tiver e-mail cadastrado ou já tiver conta
+ativa no portal. Reenviar é seguro — não cria uma segunda conta.
+
+### Compartilhar exame de imagem
+
+No Gerenciador de Imagens, cada miniatura tem um selo circular de compartilhamento.
+Clique para liberar o exame ao paciente pelo portal; clicar de novo revoga o acesso:
+
+![Exame compartilhado com o paciente](img/32-compartilhar-exame-ativo.png)
+
+> **Laudo do prontuário** (conteúdo clínico assinado) você **não pode** compartilhar —
+> é permitido só a Administrador e Médico (decisão de produto). O ícone de
+> compartilhamento pode até aparecer no drawer do prontuário, mas a ação retorna erro;
+> use o compartilhamento de **exame**, que é liberado pra secretária.
+
+---
+
+## 12. Assistente de IA (consumo)
 
 Menu **Assistente de IA** — acompanhamento do uso de inteligência artificial da clínica:
 
@@ -305,7 +367,7 @@ a compra de créditos é do administrador.
 
 ---
 
-## 12. Minha conta e saída do sistema
+## 13. Minha conta e saída do sistema
 
 ### Meu perfil
 
@@ -327,7 +389,7 @@ Avatar → **Sair**:
 
 ---
 
-## 13. O que o perfil de secretária NÃO acessa
+## 14. O que o perfil de secretária NÃO acessa
 
 Por segurança e conformidade (LGPD/CFM), estas áreas retornam **acesso negado** para o
 perfil de secretária:
@@ -342,6 +404,8 @@ perfil de secretária:
 | Configurações da clínica (catálogos, convênios, salas) | Parametrização | Administrador |
 | Cadastro/edição/exclusão de médicos | Cria credencial de login | Administrador |
 | Criação e edição de prontuários | Ato médico | Médico |
+| Emissão de laudo de imagem (Novo laudo) | Ato médico (CFM Res. 2.227/2018) | Médico |
+| Compartilhar laudo com o paciente no Portal | Conteúdo clínico assinado | Administrador e Médico |
 | Prompts de IA e aprovação de conteúdo IA | Responsabilidade clínica | Médico |
 | Painel do SaaS (`/panel/manager`) | Administração da plataforma | Equipe EasyEye |
 
