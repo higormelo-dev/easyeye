@@ -2,7 +2,6 @@ import axios from 'axios';
 import { createSSRApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
-import { ZiggyVue } from 'ziggy-js';
 
 // BUG — ícones invisíveis no /register (e demais telas de auth servidas pelo
 // rootView 'app'): as páginas Auth/* usam <i class="ti ti-*"> (Tabler Icons),
@@ -31,15 +30,8 @@ createInertiaApp({
         resolvePageComponent(`./Pages/${name}.vue`, import.meta.glob('./Pages/**/*.vue')),
 
     setup({ el, App, props, plugin }) {
-        // BUGFIX: faltava ZiggyVue aqui (presente em panel.js) — sem ele
-        // `route()` client-side não existe (nem com @routes no Blade, que só
-        // seeda window.Ziggy; quem lê e expõe a função global é este plugin).
-        // Só o Portal do Paciente usa route() bare nas Pages/** servidas por
-        // este bundle (site.js) hoje — landing/register/portal de parceiros
-        // sempre receberam URLs já resolvidas do backend.
         createSSRApp({ render: () => h(App, props) })
             .use(plugin)
-            .use(ZiggyVue)
             .mount(el);
     },
 

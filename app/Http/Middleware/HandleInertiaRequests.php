@@ -34,10 +34,15 @@ class HandleInertiaRequests extends Middleware
             return 'portal-app';
         }
 
-        // Portal do Paciente: entry-point próprio, com <meta noindex> (LGPD) —
-        // NUNCA reaproveitar panel-app aqui (o guard é "patient", não "web").
+        // Portal do Paciente: reaproveita o MESMO template do painel staff
+        // (panel-app — bundle panel.js, @routes/ZiggyVue, <meta noindex> já
+        // presente por LGPD/CFM). O guard ainda é "patient" (nunca "web") —
+        // isso é decidido pelas rotas/middleware, não pelo rootView; o
+        // compartilhamento de props (`auth`, `nav`) já é filtrado por
+        // routeIs('patient-portal.*') em share() abaixo, então nenhum dado
+        // de staff vaza pra cá só por usar o mesmo HTML/bundle.
         if ($request->routeIs('patient-portal.*')) {
-            return 'patient-portal-app';
+            return 'panel-app';
         }
 
         return 'app';
