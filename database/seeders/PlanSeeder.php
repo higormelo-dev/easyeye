@@ -21,9 +21,9 @@ class PlanSeeder extends Seeder
                 'sort_order'    => 1,
                 'features'      => [
                     FeatureKey::MaxUsers->value            => '3',
-                    FeatureKey::MaxPatients->value         => '500',
+                    FeatureKey::MaxPatients->value         => '2000',
                     FeatureKey::MaxDoctors->value          => '1',
-                    FeatureKey::MaxStorageGB->value        => '2',
+                    FeatureKey::MaxStorageGB->value        => '10',
                     FeatureKey::HasAiExamAssistant->value  => '0',
                     FeatureKey::HasAiReportDrafting->value => '0',
                     FeatureKey::HasAiConsensus->value      => '0',
@@ -51,9 +51,9 @@ class PlanSeeder extends Seeder
                 'is_featured' => true,
                 'features'    => [
                     FeatureKey::MaxUsers->value            => '10',
-                    FeatureKey::MaxPatients->value         => '5000',
+                    FeatureKey::MaxPatients->value         => '10000',
                     FeatureKey::MaxDoctors->value          => '3',
-                    FeatureKey::MaxStorageGB->value        => '5',
+                    FeatureKey::MaxStorageGB->value        => '50',
                     FeatureKey::HasAiExamAssistant->value  => '0',
                     FeatureKey::HasAiReportDrafting->value => '1',
                     FeatureKey::HasAiConsensus->value      => '0',
@@ -75,7 +75,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxUsers->value            => '0', // ilimitado
                     FeatureKey::MaxPatients->value         => '0', // ilimitado
                     FeatureKey::MaxDoctors->value          => '10',
-                    FeatureKey::MaxStorageGB->value        => '10',
+                    FeatureKey::MaxStorageGB->value        => '200',
                     FeatureKey::HasAiExamAssistant->value  => '1',
                     FeatureKey::HasAiReportDrafting->value => '1',
                     FeatureKey::HasAiConsensus->value      => '1',
