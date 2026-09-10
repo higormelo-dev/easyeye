@@ -43,32 +43,50 @@ watch(() => props.open, (isOpen) => {
     }
 });
 
+// Mouse e touch no mesmo handler (lê touches[0] quando presente) — tablet é
+// o dispositivo real de uso em consultório, e o modo Sobrepor é o default
+// ao abrir o modal, então arraste tem que funcionar sem mouse.
+function pointFromEvent(event) {
+    if (event.touches && event.touches.length) {
+        return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    }
+    return { x: event.clientX, y: event.clientY };
+}
+
 function onDragStart(event) {
+    const p = pointFromEvent(event);
     dragging.value = true;
-    dragStart.x = event.clientX;
-    dragStart.y = event.clientY;
+    dragStart.x = p.x;
+    dragStart.y = p.y;
     dragStart.offsetX = offset.x;
     dragStart.offsetY = offset.y;
     window.addEventListener('mousemove', onDragMove);
     window.addEventListener('mouseup', onDragEnd);
+    window.addEventListener('touchmove', onDragMove, { passive: false });
+    window.addEventListener('touchend', onDragEnd);
 }
 
 function onDragMove(event) {
     if (!dragging.value) return;
-    offset.x = dragStart.offsetX + (event.clientX - dragStart.x);
-    offset.y = dragStart.offsetY + (event.clientY - dragStart.y);
+    if (event.touches && event.cancelable) event.preventDefault();
+    const p = pointFromEvent(event);
+    offset.x = dragStart.offsetX + (p.x - dragStart.x);
+    offset.y = dragStart.offsetY + (p.y - dragStart.y);
 }
 
 function onDragEnd() {
     dragging.value = false;
     window.removeEventListener('mousemove', onDragMove);
     window.removeEventListener('mouseup', onDragEnd);
+    window.removeEventListener('touchmove', onDragMove);
+    window.removeEventListener('touchend', onDragEnd);
 }
 
 const overlayStyle = computed(() => ({
     opacity: opacity.value / 100,
     transform: `translate(${offset.x}px, ${offset.y}px)`,
     cursor: dragging.value ? 'grabbing' : 'grab',
+    touchAction: 'none',
 }));
 
 function close() {
@@ -80,11 +98,12 @@ function close() {
 <template>
     <Teleport to="body">
         <div v-if="open" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.7);"
-             @click.self="close">
+             role="dialog" aria-modal="true" aria-labelledby="eyeCompareModalTitle"
+             @click.self="close" @keydown.escape.window="close">
             <div class="modal-dialog modal-xl modal-dialog-centered">
                 <div class="modal-content bg-dark text-light">
                     <div class="modal-header py-2 border-secondary">
-                        <h6 class="modal-title">
+                        <h6 id="eyeCompareModalTitle" class="modal-title">
                             <i class="ti ti-adjustments-horizontal me-2 text-info"></i>{{ tt('compare_title', 'Comparar exames') }}
                         </h6>
                         <button type="button" class="btn-close btn-close-white" @click="close"></button>
@@ -128,7 +147,7 @@ function close() {
 
                         <!-- Lado a lado -->
                         <div v-else-if="mode === 'side'" class="row g-2">
-                            <div v-for="img in images" :key="img.id" class="col-6">
+                            <div v-for="img in images" :key="img.id" class="col-12 col-sm-6">
                                 <div class="text-center small text-muted mb-1">{{ img.label }}</div>
                                 <img :src="img.url" :alt="img.label"
                                      style="width:100%;height:auto;display:block;background:#111;border-radius:4px;">
@@ -144,7 +163,8 @@ function close() {
                                  style="width:100%;height:auto;user-select:none;"
                                  draggable="false"
                                  :style="overlayStyle"
-                                 @mousedown.prevent="onDragStart">
+                                 @mousedown.prevent="onDragStart"
+                                 @touchstart.prevent="onDragStart">
                             <div class="position-absolute bottom-0 start-0 end-0 d-flex justify-content-between px-2 py-1"
                                  style="background:rgba(0,0,0,.55);font-size:.7rem;pointer-events:none;">
                                 <span>{{ images[0].label }}</span>

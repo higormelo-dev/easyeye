@@ -108,7 +108,28 @@ function setQualityRating(value) {
     });
 }
 
-function setActive(value) {
+async function confirmDisable() {
+    const message = tt('context_menu_disable_confirm',
+        'Desabilitar esta imagem bloqueia laudo, PDF e análise de IA para ela, e revoga o compartilhamento com o paciente no Portal, se houver. Deseja continuar?');
+    if (window.Swal) {
+        const result = await window.Swal.fire({
+            icon: 'warning',
+            title: tt('context_menu_disable', 'Desabilitar imagem'),
+            text: message,
+            showCancelButton: true,
+            confirmButtonText: tt('context_menu_disable_confirm_btn', 'Desabilitar'),
+            cancelButtonText: tt('cancel', 'Cancelar'),
+            confirmButtonColor: '#dc3545',
+        });
+        return result.isConfirmed;
+    }
+    return window.confirm(message);
+}
+
+// Desabilitar tem efeito real (bloqueia laudo/PDF/IA + revoga share) —
+// confirmação só nesse sentido; reabilitar é seguro/reversível, sem prévia.
+async function setActive(value) {
+    if (!value && !(await confirmDisable())) return;
     patchExam(props.urls.active, { active: value }, (data) => {
         props.exam.active = data.active;
     });
@@ -117,25 +138,26 @@ function setActive(value) {
 
 <template>
     <Teleport to="body">
-        <div v-if="open && exam" ref="menuRef" class="eic-menu" :style="style" @contextmenu.prevent>
+        <div v-if="open && exam" ref="menuRef" class="eic-menu" role="menu"
+             :aria-label="tt('context_menu_title', 'Ações rápidas')" :style="style" @contextmenu.prevent>
             <div class="eic-menu__header">
                 {{ tt('context_menu_title', 'Ações rápidas') }}
                 <span v-if="busy" class="spinner-border spinner-border-sm ms-1" style="width:.7rem;height:.7rem;"></span>
             </div>
 
-            <button v-if="isDoctor" type="button" class="eic-menu__item" @click="emit('report'); close();">
+            <button v-if="isDoctor" type="button" role="menuitem" class="eic-menu__item" @click="emit('report'); close();">
                 <i class="ti ti-file-text"></i>{{ tt('context_menu_report', 'Fazer laudo manual') }}
             </button>
-            <button type="button" class="eic-menu__item" @click="emit('compare'); close();">
+            <button type="button" role="menuitem" class="eic-menu__item" @click="emit('compare'); close();">
                 <i class="ti ti-arrows-diff"></i>{{ tt('context_menu_compare', 'Comparar / Alinhar') }}
             </button>
-            <button type="button" class="eic-menu__item" @click="emit('share'); close();">
+            <button type="button" role="menuitem" class="eic-menu__item" @click="emit('share'); close();">
                 <i :class="exam.shared_with_patient ? 'ti ti-share-off' : 'ti ti-share'"></i>
                 {{ exam.shared_with_patient
                     ? tt('context_menu_unshare', 'Revogar do Portal do Paciente')
                     : tt('context_menu_share', 'Compartilhar com o paciente') }}
             </button>
-            <button type="button" class="eic-menu__item" @click="emit('download'); close();">
+            <button type="button" role="menuitem" class="eic-menu__item" @click="emit('download'); close();">
                 <i class="ti ti-download"></i>{{ tt('context_menu_download', 'Baixar imagem') }}
             </button>
 
@@ -156,17 +178,22 @@ function setActive(value) {
 
                 <div class="eic-menu__label">{{ tt('context_menu_quality', 'Qualidade da captura') }}</div>
                 <div class="eic-menu__row px-2 pb-2 d-flex align-items-center gap-1">
-                    <i v-for="n in 5" :key="n"
-                       class="eic-star"
-                       :class="[(exam.quality_rating ?? 0) >= n ? 'fa fa-star text-warning' : 'fa fa-star-o text-muted', busy ? 'disabled' : '']"
-                       :title="tt('context_menu_quality_hint', 'Clique pra avaliar — clique de novo na mesma estrela pra cancelar')"
-                       @click="!busy && setQualityRating(n)"></i>
+                    <button v-for="n in 5" :key="n" type="button" class="eic-star-btn"
+                            :class="{ 'is-active': (exam.quality_rating ?? 0) >= n }"
+                            :disabled="busy"
+                            :aria-label="`${n}/5`"
+                            :title="tt('context_menu_quality_hint', 'Clique pra avaliar — clique de novo na mesma estrela pra cancelar')"
+                            @click="setQualityRating(n)">
+                        <i :class="(exam.quality_rating ?? 0) >= n ? 'fa fa-star' : 'fa fa-star-o'"></i>
+                    </button>
                     <span v-if="exam.quality_rating" class="text-muted small ms-1">({{ exam.quality_rating }}/5)</span>
                 </div>
 
                 <div class="eic-menu__sep"></div>
 
-                <button type="button" class="eic-menu__item" :disabled="busy" @click="setActive(!exam.active)">
+                <button type="button" role="menuitem" class="eic-menu__item"
+                        :class="{ 'text-warning': exam.active }"
+                        :disabled="busy" @click="setActive(!exam.active)">
                     <i :class="exam.active ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
                     {{ exam.active
                         ? tt('context_menu_disable', 'Desabilitar imagem')
@@ -249,12 +276,18 @@ function setActive(value) {
     margin-bottom: .15rem;
 }
 
-.eic-star {
-    cursor: pointer;
+.eic-star-btn {
+    background: none;
+    border: none;
+    padding: .2rem;
+    line-height: 1;
     font-size: .95rem;
+    color: var(--bs-secondary-color, #6c757d);
 }
 
-.eic-star.disabled {
+.eic-star-btn.is-active { color: #ffc107; }
+
+.eic-star-btn:disabled {
     cursor: default;
     opacity: .5;
 }

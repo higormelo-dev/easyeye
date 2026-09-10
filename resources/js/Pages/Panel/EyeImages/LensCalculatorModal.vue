@@ -90,11 +90,12 @@ const seResultOe = computed(() => sphericalEquivalent(se.oeSphere, se.oeCylinder
 <template>
     <Teleport to="body">
         <div v-if="open" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);"
+             role="dialog" aria-modal="true" aria-labelledby="eyeLensCalcModalTitle"
              @click.self="close" @keydown.escape.window="close">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title">
+                        <h6 id="eyeLensCalcModalTitle" class="modal-title">
                             <i class="ti ti-calculator me-2 text-primary"></i>
                             {{ tt('lens_calc_title', 'Calculadora de lentes') }}
                         </h6>

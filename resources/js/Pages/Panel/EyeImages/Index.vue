@@ -260,6 +260,20 @@ function formatDateTime(dt) {
     return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+/**
+ * Alt descritivo (tipo + lateralidade + data) pra imagem médica — reaproveitado
+ * em todas as ocorrências de <img> do módulo (miniatura, viewer, tira, modo
+ * All, impressão). Leitor de tela precisa distinguir os painéis ao comparar
+ * OD vs OE lado a lado, "Exame" fixo não ajuda nisso.
+ */
+function examAlt(exam) {
+    if (!exam) return 'Exame';
+    const type = exam.exam_type?.name || 'Exame';
+    const rawDate = (exam.exam_performed_at ?? exam.created_at);
+    const date = rawDate ? formatDateFull(String(rawDate).substring(0, 10)) : '—';
+    return `${type} — ${latLabel(exam.laterality)}` + (date !== '—' ? ` — ${date}` : '');
+}
+
 // ── Seleção ───────────────────────────────────────────────────────────────
 function isSelected(examId) {
     return selectedExamIds.value.includes(examId);
@@ -269,6 +283,35 @@ function toggleExamSelection(examId) {
     const idx = selectedExamIds.value.indexOf(examId);
     if (idx >= 0) selectedExamIds.value.splice(idx, 1);
     else selectedExamIds.value.push(examId);
+}
+
+// Toque longo na miniatura = equivalente touch do botão direito (abre o
+// menu de contexto). Sem isso, lateralidade/qualidade/habilitar-desabilitar
+// ficam inacessíveis em tablet — right-click não existe em touch.
+let longPressTimer   = null;
+let suppressNextClick = false;
+
+function onThumbTouchStart(event, exam) {
+    clearTimeout(longPressTimer);
+    suppressNextClick = false;
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    const { clientX, clientY } = touch;
+    longPressTimer = setTimeout(() => {
+        longPressTimer = null;
+        suppressNextClick = true;
+        openContextMenu({ clientX, clientY }, exam);
+    }, 550);
+}
+
+function onThumbTouchCancel() {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+}
+
+function onThumbClick(exam) {
+    if (suppressNextClick) { suppressNextClick = false; return; }
+    toggleExamSelection(exam.id);
 }
 
 function groupLatMatching(group, lat) {
@@ -303,8 +346,26 @@ function selectExamByLaterality(group, lat) {
  * rico demais pra arriscar um full reload. CSRF já vem de graça via o
  * X-XSRF-TOKEN automático do axios (bootstrap.js).
  */
+async function confirmRevokeShare() {
+    const message = tt('unshare_confirm_text', 'O paciente perde o acesso a esta imagem no Portal do Paciente.');
+    if (window.Swal) {
+        const result = await window.Swal.fire({
+            icon: 'warning',
+            title: tt('unshare_confirm_title', 'Revogar compartilhamento?'),
+            text: message,
+            showCancelButton: true,
+            confirmButtonText: tt('unshare_confirm_btn', 'Revogar'),
+            cancelButtonText: tt('cancel', 'Cancelar'),
+            confirmButtonColor: '#dc3545',
+        });
+        return result.isConfirmed;
+    }
+    return window.confirm(message);
+}
+
 async function toggleExamShare(exam) {
     if (exam._sharing) return;
+    if (exam.shared_with_patient && !(await confirmRevokeShare())) return;
     exam._sharing = true;
 
     try {
@@ -1110,8 +1171,16 @@ const contextMenuUrls = computed(() => ({
 
 function openContextMenu(event, exam) {
     contextMenuExam.value = exam;
-    contextMenuPos.x = event.clientX;
-    contextMenuPos.y = event.clientY;
+    // Ativação por teclado (Enter no botão "⋮") não garante clientX/Y em
+    // todo navegador — cai pro centro do elemento nesse caso.
+    let x = event.clientX, y = event.clientY;
+    if (!x && !y && event.currentTarget?.getBoundingClientRect) {
+        const r = event.currentTarget.getBoundingClientRect();
+        x = r.left + r.width / 2;
+        y = r.top + r.height / 2;
+    }
+    contextMenuPos.x = x;
+    contextMenuPos.y = y;
     contextMenuOpen.value = true;
 }
 
@@ -1147,6 +1216,20 @@ function onContextMenuDownload() {
     if (url) window.open(url, '_blank');
 }
 
+/**
+ * Download em lote do cabeçalho de grupo — antes um botão decorativo sem
+ * handler. v1 simples (abre cada URL presigned em nova aba, mesmo padrão de
+ * onContextMenuDownload); navegadores mais estritos (Safari) podem bloquear
+ * a partir da 2ª/3ª aba de um único clique — zip em lote pelo backend
+ * resolveria isso de vez, mas é maior escopo que esta correção.
+ */
+function downloadGroup(group) {
+    for (const exam of group.exams) {
+        const url = examUrls.value[exam.id];
+        if (url) window.open(url, '_blank');
+    }
+}
+
 // ── Mesclar / Dividir exame ─────────────────────────────────────────────
 // "Mesclar": 2+ imagens selecionadas (podem estar em grupos visuais
 // diferentes) caem no mesmo grupo. "Dividir": a seleção sai do grupo atual
@@ -1165,8 +1248,25 @@ function applySessionIdToSelection(sessionId) {
     }
 }
 
+async function confirmMerge(count) {
+    const message = tt('merge_confirm_text', `As ${count} imagens selecionadas vão passar a aparecer como um único exame.`);
+    if (window.Swal) {
+        const result = await window.Swal.fire({
+            icon: 'question',
+            title: tt('merge_confirm_title', 'Mesclar exames?'),
+            text: message,
+            showCancelButton: true,
+            confirmButtonText: tt('merge_action', 'Mesclar exames'),
+            cancelButtonText: tt('cancel', 'Cancelar'),
+        });
+        return result.isConfirmed;
+    }
+    return window.confirm(message);
+}
+
 async function mergeSelectedExams() {
     if (selectedExamIds.value.length < 2 || mergeBusy.value) return;
+    if (!(await confirmMerge(selectedExamIds.value.length))) return;
     mergeBusy.value = true;
     try {
         const { data } = await window.axios.post(props.urls.exams_merge, { exam_ids: selectedExamIds.value });
@@ -1396,7 +1496,7 @@ const printEntity = computed(() => props.entity ?? {});
         <!-- ── Layout: lateral + principal ───────────────────────────────────── -->
         <div class="row">
             <!-- Lateral: pacientes -->
-            <div class="col-xs-12 col-sm-3 col-md-3 col-lg-3">
+            <div class="col-12 col-sm-4 col-md-3">
                 <div class="card panel-info">
                     <div class="card-body p-2">
                         <h6 class="font-bold text-uppercase px-1 mb-1 mt-3">Pacientes</h6>
@@ -1458,16 +1558,16 @@ const printEntity = computed(() => props.entity ?? {});
             </div>
 
             <!-- Principal: detalhe -->
-            <div class="col-xs-12 col-sm-9 col-md-9 col-lg-9">
+            <div class="col-12 col-sm-8 col-md-9">
                 <div class="card">
-                    <h5 class="card-header d-flex align-items-center gap-2">
+                    <h5 class="card-header d-flex align-items-center gap-2 flex-wrap">
                         <span v-if="!selectedPatient">Selecione um paciente</span>
-                        <span v-else class="d-flex align-items-center gap-2 w-100">
+                        <span v-else class="d-flex align-items-center gap-2 w-100 flex-wrap">
                             <button type="button" class="btn btn-outline-secondary btn-sm"
                                     @click="selectedPatient = null; selectedExamIds = [];">
                                 <i class="fa fa-arrow-left"></i>
                             </button>
-                            <span>
+                            <span class="text-truncate" style="min-width:0;max-width:100%;">
                                 <span>{{ selectedPatient.person?.full_name ?? selectedPatient.full_name }}</span>
                                 <small class="text-muted fw-normal ms-2" style="font-size:.72rem;">
                                     {{ selectedPatient.code }}
@@ -1478,18 +1578,21 @@ const printEntity = computed(() => props.entity ?? {});
                                     class="btn btn-outline-info btn-sm" style="font-size:.72rem;"
                                     title="Diagnóstico do exame selecionado"
                                     @click="openDiagnosisModal">
-                                <i class="fa fa-stethoscope me-1"></i>Diagnóstico
+                                <i class="fa fa-stethoscope me-1"></i>
+                                <span class="d-none d-sm-inline">Diagnóstico</span>
                             </button>
                             <a :href="`/panel/patients/${selectedPatient.id}/medicalrecords`"
-                               target="_blank" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;">
-                                Prontuário <i class="fa fa-external-link ms-1"></i>
+                               target="_blank" class="btn btn-outline-primary btn-sm" style="font-size:.72rem;"
+                               title="Prontuário">
+                                <span class="d-none d-sm-inline">Prontuário</span>
+                                <i class="fa fa-external-link ms-1"></i>
                             </a>
                         </span>
                     </h5>
 
                     <!-- Barra de ações -->
                     <div v-if="selectedPatient"
-                         class="d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-body-secondary">
+                         class="ei-actions-bar d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-body-secondary">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 :disabled="selectedExamIds.length === 0"
                                 @click="openViewerModal(selectedExamsData)">
@@ -1549,14 +1652,19 @@ const printEntity = computed(() => props.entity ?? {});
                         <!-- Detalhe paciente -->
                         <div v-else class="row g-0" style="min-height:480px;">
                             <div class="col-12 border-end pe-0">
-                                <div v-if="urlsLoading" class="text-center py-3">
-                                    <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
-                                    <p class="text-muted small mt-1 mb-0">Carregando imagens...</p>
+                                <div v-if="urlsLoading" class="d-flex flex-wrap gap-2 p-2"
+                                     aria-live="polite" aria-label="Carregando imagens">
+                                    <div v-for="n in 8" :key="n" class="eyeimg-skeleton"
+                                         style="width:100px;height:76px;border-radius:4px;flex-shrink:0;"></div>
                                 </div>
 
-                                <p v-else-if="selectedPatient.exams.length === 0" class="text-muted text-center small py-4">
-                                    Nenhum exame encontrado.
-                                </p>
+                                <div v-else-if="selectedPatient.exams.length === 0" class="text-center text-muted py-5">
+                                    <i class="ti ti-photo-off" style="font-size:3rem;opacity:.3;"></i>
+                                    <p class="mt-3 mb-3">Nenhum exame encontrado para este paciente.</p>
+                                    <button type="button" class="btn btn-primary btn-sm" @click="openImportModal()">
+                                        <i class="fa fa-plus me-1"></i>Novo exame
+                                    </button>
+                                </div>
 
                                 <div v-else style="max-height:620px;overflow-y:auto;overflow-x:hidden;">
                                     <div v-for="group in groupedExams" :key="group.key" class="mb-1">
@@ -1572,33 +1680,34 @@ const printEntity = computed(() => props.entity ?? {});
                                             <div class="flex-grow-1"></div>
 
                                             <div class="btn-group btn-group-sm" role="group">
-                                                <button type="button" class="btn py-0 px-2"
+                                                <button type="button" class="btn py-1 px-2"
                                                         :class="groupLatActive(group, 'od') ? 'btn-primary' : 'btn-outline-primary'"
-                                                        style="font-size:.6rem;"
+                                                        style="font-size:.6rem;" title="Selecionar todas OD deste grupo"
                                                         @click.stop="selectExamByLaterality(group, 'od')">OD</button>
-                                                <button type="button" class="btn py-0 px-2"
+                                                <button type="button" class="btn py-1 px-2"
                                                         :class="groupLatActive(group, 'oe') ? 'btn-danger' : 'btn-outline-danger'"
-                                                        style="font-size:.6rem;"
+                                                        style="font-size:.6rem;" title="Selecionar todas OE deste grupo"
                                                         @click.stop="selectExamByLaterality(group, 'oe')">OE</button>
-                                                <button type="button" class="btn py-0 px-2"
+                                                <button type="button" class="btn py-1 px-2"
                                                         :class="groupLatActive(group, 'ao') ? 'btn-secondary' : 'btn-outline-secondary'"
-                                                        style="font-size:.6rem;"
+                                                        style="font-size:.6rem;" title="Selecionar todas ambos-olhos deste grupo"
                                                         @click.stop="selectExamByLaterality(group, 'ao')">AO</button>
-                                                <button type="button" class="btn py-0 px-2"
+                                                <button type="button" class="btn py-1 px-2"
                                                         :class="groupLatActive(group, 'all') ? 'btn-secondary' : 'btn-outline-secondary'"
-                                                        style="font-size:.6rem;"
+                                                        style="font-size:.6rem;" title="Selecionar todas as imagens deste grupo"
                                                         @click.stop="selectExamByLaterality(group, 'all')">Todos</button>
                                             </div>
 
                                             <div class="vr opacity-25 mx-1"></div>
 
-                                            <button type="button" class="btn btn-sm py-0 px-2 btn-outline-secondary"
+                                            <button type="button" class="btn btn-sm py-1 px-2 btn-outline-secondary"
                                                     style="font-size:.6rem;" title="Adicionar imagem a este exame"
                                                     @click.stop="openImportModal(group)">
                                                 <i class="fa fa-upload me-1"></i>Upload
                                             </button>
-                                            <button type="button" class="btn btn-sm py-0 px-2 btn-outline-secondary"
-                                                    style="font-size:.6rem;" title="Download das imagens">
+                                            <button type="button" class="btn btn-sm py-1 px-2 btn-outline-secondary"
+                                                    style="font-size:.6rem;" title="Baixar as imagens deste grupo"
+                                                    @click.stop="downloadGroup(group)">
                                                 <i class="fa fa-download me-1"></i>Download
                                             </button>
                                         </div>
@@ -1618,10 +1727,27 @@ const printEntity = computed(() => props.entity ?? {});
                                         <!-- Thumbnails -->
                                         <div class="d-flex flex-wrap gap-2 p-2 bg-dark">
                                             <div v-for="exam in group.exams" :key="exam.id"
-                                                 class="position-relative"
-                                                 style="cursor:pointer;flex-shrink:0;"
-                                                 @click="toggleExamSelection(exam.id)"
-                                                 @contextmenu.prevent="openContextMenu($event, exam)">
+                                                 class="position-relative eyeimg-thumb"
+                                                 tabindex="0" role="button"
+                                                 :aria-pressed="isSelected(exam.id)"
+                                                 :aria-label="examAlt(exam)"
+                                                 @click="onThumbClick(exam)"
+                                                 @keydown.enter.self.prevent="toggleExamSelection(exam.id)"
+                                                 @keydown.space.self.prevent="toggleExamSelection(exam.id)"
+                                                 @contextmenu.prevent="openContextMenu($event, exam)"
+                                                 @touchstart="onThumbTouchStart($event, exam)"
+                                                 @touchend="onThumbTouchCancel"
+                                                 @touchmove="onThumbTouchCancel"
+                                                 @touchcancel="onThumbTouchCancel">
+
+                                                <!-- Kebab: alternativa por teclado/mouse ao botão direito — some por
+                                                     padrão, aparece em :hover/:focus-within (thumbnail já é
+                                                     tabindex=0, então Tab chega aqui logo em seguida). -->
+                                                <button type="button" class="eyeimg-kebab"
+                                                        :aria-label="tt('context_menu_open', 'Mais ações desta imagem')"
+                                                        @click.stop="openContextMenu($event, exam)">
+                                                    <i class="ti ti-dots-vertical"></i>
+                                                </button>
 
                                                 <!-- Badges topo-esquerda: diagnóstico principal + origem externa (empilhados, sem colidir) -->
                                                 <div class="position-absolute top-0 start-0 d-flex flex-column align-items-start gap-1"
@@ -1645,7 +1771,7 @@ const printEntity = computed(() => props.entity ?? {});
                                                         <i class="fa fa-eye-slash me-1"></i>Desabilitada
                                                     </span>
                                                     <span v-if="exam.quality_rating"
-                                                          class="badge bg-dark border border-warning text-warning"
+                                                          class="badge bg-warning-subtle text-warning-emphasis"
                                                           style="font-size:.5rem;white-space:nowrap;"
                                                           :title="`Qualidade avaliada: ${exam.quality_rating}/5`">
                                                         <i class="fa fa-star me-1"></i>{{ exam.quality_rating }}/5
@@ -1668,9 +1794,9 @@ const printEntity = computed(() => props.entity ?? {});
                                                       style="z-index:2;margin:3px;">
                                                     <span class="rounded d-flex align-items-center justify-content-center"
                                                           :class="isSelected(exam.id) ? 'bg-primary' : 'bg-dark border border-secondary'"
-                                                          style="width:16px;height:16px;">
+                                                          style="width:20px;height:20px;">
                                                         <i v-show="isSelected(exam.id)" class="fa fa-check text-white"
-                                                           style="font-size:.5rem;"></i>
+                                                           style="font-size:.6rem;"></i>
                                                     </span>
                                                 </span>
 
@@ -1697,22 +1823,22 @@ const printEntity = computed(() => props.entity ?? {});
                                                 <!-- Badge compartilhamento com paciente (Portal do Paciente, Fase 2) -->
                                                 <span class="position-absolute d-flex align-items-center justify-content-center rounded-circle"
                                                       :class="exam.shared_with_patient ? 'bg-success text-white' : 'bg-dark border border-secondary text-white-50'"
-                                                      style="top:28px;right:3px;width:18px;height:18px;z-index:1;cursor:pointer;"
+                                                      style="top:26px;right:2px;width:22px;height:22px;z-index:1;cursor:pointer;"
                                                       :title="exam.shared_with_patient ? 'Compartilhado com o paciente — clique para revogar' : 'Compartilhar exame com o paciente'"
                                                       @click.stop="toggleExamShare(exam)">
-                                                    <i :class="exam._sharing ? 'ti ti-loader-2 ee-spin' : (exam.shared_with_patient ? 'ti ti-share-off' : 'ti ti-share')" style="font-size:.5rem;"></i>
+                                                    <i :class="exam._sharing ? 'ti ti-loader-2 ee-spin' : (exam.shared_with_patient ? 'ti ti-share-off' : 'ti ti-share')" style="font-size:.6rem;"></i>
                                                 </span>
 
                                                 <!-- Thumbnail com imagem (miniatura gerada; fallback: exibição/original) -->
                                                 <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
-                                                     :src="examThumbUrls[exam.id] ?? examUrls[exam.id]" :alt="exam.exam_type?.name"
+                                                     :src="examThumbUrls[exam.id] ?? examUrls[exam.id]" :alt="examAlt(exam)"
                                                      width="100" height="76"
-                                                     :style="`object-fit:cover;display:block;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid #6ea8fe' : '2px solid transparent'};transition:outline .1s;opacity:${exam.active ? 1 : .4};`"
+                                                     :style="`object-fit:cover;display:block;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid var(--primary)' : '2px solid transparent'};box-shadow:${isSelected(exam.id) ? '0 0 0 3px rgba(var(--primary-rgb),.35)' : 'none'};transition:outline .1s,box-shadow .1s;opacity:${exam.active ? 1 : .4};`"
                                                      @error="brokenUrls = { ...brokenUrls, [exam.id]: true }">
 
                                                 <div v-else
                                                      class="d-flex align-items-center justify-content-center rounded"
-                                                     :style="`width:100px;height:76px;background:#3a3c42;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid #6ea8fe' : '2px solid transparent'};transition:outline .1s;`">
+                                                     :style="`width:100px;height:76px;background:#3a3c42;border-radius:4px;outline:${isSelected(exam.id) ? '2px solid var(--primary)' : '2px solid transparent'};box-shadow:${isSelected(exam.id) ? '0 0 0 3px rgba(var(--primary-rgb),.35)' : 'none'};transition:outline .1s,box-shadow .1s;`">
                                                     <i class="ti ti-photo-off" style="font-size:1.4rem;color:#555;"></i>
                                                 </div>
                                             </div>
@@ -1836,7 +1962,7 @@ const printEntity = computed(() => props.entity ?? {});
                         </div>
 
                         <img v-show="viewerPanelUrls[pi - 1] && !viewerPanelLoading[pi - 1] && !viewerPanelBroken[pi - 1]"
-                             :src="viewerPanelUrls[pi - 1] ?? ''" alt="Exame"
+                             :src="viewerPanelUrls[pi - 1] ?? ''" :alt="examAlt(viewerPanelExams[pi - 1])"
                              :style="(viewerFitMode ? 'width:100%;height:auto;max-width:100%;max-height:none;flex-shrink:0;' : 'width:100%;height:84vh;object-fit:contain;') + 'display:block;user-select:none;' + (viewerPanelFlipped[pi - 1] ? 'transform:scaleY(-1);' : '')"
                              @load="setPanelLoaded(pi - 1)"
                              @error="setPanelError(pi - 1)">
@@ -1885,7 +2011,7 @@ const printEntity = computed(() => props.entity ?? {});
                                     {{ latLabel(exam.laterality) }}
                                 </span>
                                 <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
-                                     :src="examUrls[exam.id]"
+                                     :src="examUrls[exam.id]" :alt="examAlt(exam)"
                                      style="width:64px;height:64px;object-fit:cover;display:block;"
                                      @error="brokenUrls = { ...brokenUrls, [exam.id]: true }">
                                 <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center"
@@ -1928,7 +2054,7 @@ const printEntity = computed(() => props.entity ?? {});
                              @mouseenter.stop="onAllEnter(exam)"
                              @wheel="onAllWheel($event)">
                             <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
-                                 :src="examUrls[exam.id]"
+                                 :src="examUrls[exam.id]" :alt="examAlt(exam)"
                                  :style="'width:100%;height:auto;display:block;user-select:none;' + (viewerLaserMode ? 'transform:scaleY(-1);' : '')"
                                  @error="brokenUrls = { ...brokenUrls, [exam.id]: true }">
                             <div v-else class="d-flex align-items-center justify-content-center"
@@ -2032,7 +2158,7 @@ const printEntity = computed(() => props.entity ?? {});
                                 {{ exam.exam_type?.name ?? 'Exame' }} - {{ latLabel(exam.laterality) }} - {{ formatDateTime(exam.created_at) }}
                             </div>
                             <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
-                                 :src="examUrls[exam.id]"
+                                 :src="examUrls[exam.id]" :alt="examAlt(exam)"
                                  style="width:100%;height:auto;display:block;border:1px solid #ddd;"
                                  @error="brokenUrls = { ...brokenUrls, [exam.id]: true }">
                             <div v-else class="d-flex align-items-center justify-content-center"
@@ -2048,7 +2174,8 @@ const printEntity = computed(() => props.entity ?? {});
 
         <!-- ── Modal IA ────────────────────────────────────────────────────── -->
         <div v-if="aiModalOpen" class="modal d-block" tabindex="-1"
-             style="background:rgba(0,0,0,.55);" @click.self="closeAiModal">
+             style="background:rgba(0,0,0,.55);" role="dialog" aria-modal="true"
+             @click.self="closeAiModal" @keydown.escape.window="closeAiModal">
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header">
@@ -2279,6 +2406,72 @@ const printEntity = computed(() => props.entity ?? {});
 }
 .patient-item:hover { background: #f4f6fb; }
 .patient-item-active { background: #e8f0fe !important; }
+
+/* Barra de ações com muitos botões — mesmo padrão de .pmr-bottom-bar-row
+   (prontuário): nunca deve disparar em telas normais, é rede de segurança
+   pra viewport estreito (mobile/tablet) não estourar/cortar botões. */
+.ei-actions-bar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+}
+
+.eyeimg-thumb {
+    cursor: pointer;
+    flex-shrink: 0;
+    border-radius: 4px;
+}
+.eyeimg-thumb img { transition: filter .12s; }
+.eyeimg-thumb:hover img { filter: brightness(1.08); }
+.eyeimg-thumb:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* Alternativa por mouse/teclado ao botão direito — some por padrão, some
+   em :hover/:focus-within (o próprio thumbnail é tabindex=0, então Tab
+   chega no kebab logo depois, mantendo :focus-within ativo). */
+.eyeimg-kebab {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, .65);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, .4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .12s;
+    font-size: .8rem;
+}
+.eyeimg-thumb:hover .eyeimg-kebab,
+.eyeimg-thumb:focus-within .eyeimg-kebab {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.eyeimg-skeleton {
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+    background-size: 200% 100%;
+    animation: eyeimgShimmer 1.2s ease-in-out infinite;
+}
+:root[data-bs-theme=dark] .eyeimg-skeleton {
+    background: linear-gradient(90deg, #2a2c32 25%, #3a3c42 50%, #2a2c32 75%);
+    background-size: 200% 100%;
+}
+@keyframes eyeimgShimmer {
+    from { background-position: 200% 0; }
+    to   { background-position: -200% 0; }
+}
 
 @media print {
     :deep(body *) { visibility: hidden !important; }

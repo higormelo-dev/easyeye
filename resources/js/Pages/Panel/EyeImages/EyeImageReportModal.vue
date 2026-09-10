@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, watch } from 'vue';
+import { reactive, ref, watch, nextTick } from 'vue';
 import TinyMceEditor from '@/Components/Panel/TinyMceEditor.vue';
 
 /**
@@ -35,6 +35,7 @@ const previewing       = ref(false);
 const saving           = ref(false);
 const error            = ref('');
 const savedResult      = ref(null); // { pdf_url, title } após salvar
+const templateSelectRef = ref(null);
 
 // Sem campo de Título na tela — o título é sempre derivado do modelo
 // escolhido (ou fica em branco/"Em branco", e o backend aplica um título
@@ -60,6 +61,9 @@ async function fetchTemplates() {
         templates.value = data?.data ?? [];
     } catch {
         templates.value = [];
+        // Distinto de "clínica sem modelos cadastrados" — sem isso o médico
+        // via só "Nenhum modelo disponível." e achava que era o esperado.
+        error.value = tt('report_templates_load_failed', 'Não foi possível carregar os modelos. Você pode escrever o laudo do zero ou fechar e tentar novamente.');
     } finally {
         loadingTemplates.value = false;
     }
@@ -69,6 +73,7 @@ watch(() => props.open, (isOpen) => {
     if (isOpen) {
         reset();
         fetchTemplates();
+        nextTick(() => templateSelectRef.value?.focus());
     }
 });
 
@@ -156,7 +161,33 @@ async function save(confirmOpen = false) {
     }
 }
 
-function close() {
+// Conteúdo digitado e ainda não salvo não pode desaparecer num clique
+// acidental no backdrop/Esc — mesmo risco que confirmOpenRecord já cobre
+// pro caso de prontuário ausente, mas aqui é perda de digitação mesmo.
+function isDirty() {
+    if (savedResult.value) return false;
+    return !!form.content.replace(/<[^>]*>/g, '').trim();
+}
+
+async function confirmDiscard() {
+    const message = tt('report_discard_text', 'O conteúdo digitado será perdido.');
+    if (window.Swal) {
+        const result = await window.Swal.fire({
+            icon: 'warning',
+            title: tt('report_discard_title', 'Descartar laudo não salvo?'),
+            text: message,
+            showCancelButton: true,
+            confirmButtonText: tt('report_discard_confirm', 'Descartar'),
+            cancelButtonText: tt('cancel', 'Cancelar'),
+            confirmButtonColor: '#dc3545',
+        });
+        return result.isConfirmed;
+    }
+    return window.confirm(message);
+}
+
+async function close() {
+    if (isDirty() && !(await confirmDiscard())) return;
     emit('close');
 }
 </script>
@@ -164,11 +195,12 @@ function close() {
 <template>
     <Teleport to="body">
         <div v-if="open" class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,.55);"
-             @click.self="close">
+             role="dialog" aria-modal="true" aria-labelledby="eyeReportModalTitle"
+             @click.self="close" @keydown.escape.window="close">
             <div class="modal-dialog modal-lg modal-dialog-scrollable">
                 <div class="modal-content">
                     <div class="modal-header py-2">
-                        <h6 class="modal-title">
+                        <h6 id="eyeReportModalTitle" class="modal-title">
                             <i class="ti ti-file-text me-2 text-primary"></i>{{ tt('report_new', 'Novo laudo') }}
                             <span v-if="patient" class="text-muted fw-normal ms-1" style="font-size:.82rem;">
                                 — {{ patient.name }}
@@ -183,7 +215,7 @@ function close() {
                         <template v-if="!savedResult">
                             <div class="mb-3">
                                 <label class="form-label small fw-semibold">{{ tt('report_templates', 'Modelos') }}</label>
-                                <select v-model="form.report_setting_content_id"
+                                <select ref="templateSelectRef" v-model="form.report_setting_content_id"
                                         class="form-select form-select-sm"
                                         :disabled="loadingTemplates || previewing"
                                         @change="onTemplateChange">
