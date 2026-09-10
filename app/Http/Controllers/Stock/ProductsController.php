@@ -46,7 +46,8 @@ class ProductsController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->whereLikeUnaccent('name', $search)
                         ->orWhereLikeUnaccent('sku', $search)
-                        ->orWhereLikeUnaccent('code', $search);
+                        ->orWhereLikeUnaccent('code', $search)
+                        ->orWhereLikeUnaccent('barcode', $search);
                 });
             })
             ->when($status === 'active', fn ($query) => $query->where('active', true))
@@ -92,6 +93,8 @@ class ProductsController extends Controller
                 'movements_index' => route('panel.stock.movements.index'),
                 'lots_index'      => route('panel.stock.products.lots.index', ['__ID__']),
                 'lots_update'     => route('panel.stock.lots.update', ['__ID__']),
+                // GAP fechado (revisão pós-Fase 4) — importação em massa.
+                'import_index' => route('panel.stock.products.import.index'),
             ],
         ]);
     }
@@ -149,6 +152,37 @@ class ProductsController extends Controller
                 'label'        => trim($p->name . ($p->code ? " ({$p->code})" : '')),
             ])->values(),
         ]);
+    }
+
+    /**
+     * GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de estoque"):
+     * leitor de código de barras USB/Bluetooth funciona como teclado (digita
+     * os dígitos + Enter) — não precisa de driver especial, só um campo de
+     * texto que dispara esta busca por MATCH EXATO (não fuzzy — código de
+     * barras tem que resolver pra UM produto só, nunca uma lista) ao
+     * detectar o Enter. Consumido por MovementFormModal.vue.
+     */
+    public function scanBarcode(Request $request): JsonResponse
+    {
+        $barcode = $request->string('barcode')->trim()->value();
+
+        if ($barcode === '') {
+            return response()->json(['message' => __('stock.barcode_required')], 422);
+        }
+
+        $entityId = (string) session('selected_entity_id');
+
+        $product = EntityProduct::query()
+            ->where('entity_id', $entityId)
+            ->where('barcode', $barcode)
+            ->where('active', true)
+            ->first();
+
+        if (! $product) {
+            return response()->json(['message' => __('stock.barcode_not_found')], 404);
+        }
+
+        return response()->json(['data' => new EntityProductResource($product)]);
     }
 
     public function store(EntityProductRequest $request): RedirectResponse

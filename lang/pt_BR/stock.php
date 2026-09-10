@@ -12,6 +12,9 @@ return [
     'product_created' => 'Produto cadastrado.',
     'product_updated' => 'Produto atualizado.',
     'product_deleted' => 'Produto removido.',
+    // GAP fechado (revisão pós-Fase 4): código de barras.
+    'barcode_required'  => 'Informe o código de barras.',
+    'barcode_not_found' => 'Nenhum produto ativo encontrado com este código de barras.',
 
     // Movimentação
     'movement_registered'      => 'Movimentação registrada.',
@@ -41,6 +44,8 @@ return [
     'supplier_created' => 'Fornecedor cadastrado.',
     'supplier_updated' => 'Fornecedor atualizado.',
     'supplier_deleted' => 'Fornecedor removido.',
+    // GAP fechado (revisão pós-Fase 4): documento aceitava qualquer string.
+    'supplier_document_invalid' => 'Documento inválido — informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.',
 
     // Pedidos de compra (Fase 4)
     'purchase_order_created'                    => 'Pedido de compra criado.',
@@ -51,4 +56,8 @@ return [
     'purchase_order_received'                   => 'Recebimento registrado.',
     'purchase_order_received_financial_pending' => 'Recebimento registrado — lançamento financeiro pendente (verifique o fechamento de caixa).',
     'purchase_order_not_editable'               => 'Pedido :status não pode ser editado/excluído — só rascunho.',
+
+    // Contagem física (GAP fechado — revisão pós-Fase 4)
+    'count_adjustment_note' => 'Ajuste por contagem física de estoque.',
+    'count_applied'         => ':count produto(s) ajustado(s) — o resto já batia com o sistema.',
 ];

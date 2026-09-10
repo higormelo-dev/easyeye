@@ -162,6 +162,10 @@ class PanelNavigation
                     ['route' => 'panel.stock.purchase-orders.index', 'icon' => 'ti ti-shopping-cart', 'label' => __('actions.sidemenu.purchase_orders'), 'match' => ['panel.stock.purchase-orders.*']],
                     ['route' => 'panel.stock.suppliers.index', 'icon' => 'ti ti-truck-delivery', 'label' => __('actions.sidemenu.suppliers'), 'match' => ['panel.stock.suppliers.*']],
                     ['route' => 'panel.stock.reports.index', 'icon' => 'ti ti-chart-bar', 'label' => __('actions.sidemenu.stock_reports'), 'match' => ['panel.stock.reports.*']],
+                    // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo
+                    // de estoque"): contagem física em massa, ver
+                    // App\Http\Controllers\Stock\StockCountsController.
+                    ['route' => 'panel.stock.counts.index', 'icon' => 'ti ti-clipboard-check', 'label' => __('actions.sidemenu.stock_counts'), 'match' => ['panel.stock.counts.*']],
                 ],
             ];
         }

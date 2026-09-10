@@ -31,6 +31,15 @@ const activeTab = ref('inventory');
 
 function money(v) { return v === null || v === undefined ? '—' : `R$ ${Number(v).toFixed(2)}`; }
 
+// GAP fechado (revisão pós-Fase 4): Financeiro já exportava relatório,
+// Estoque não tinha nada — link puro (não fetch): resposta é
+// attachment/CSV, o navegador cuida do download sozinho.
+function exportUrl(report) {
+    const params = new URLSearchParams({ report, from: from.value, to: to.value });
+
+    return `${props.routes.export}?${params.toString()}`;
+}
+
 const ABC_BADGE = { A: 'badge-soft-success text-success', B: 'badge-soft-warning text-warning', C: 'badge-soft-secondary' };
 </script>
 
@@ -47,12 +56,17 @@ const ABC_BADGE = { A: 'badge-soft-success text-success', B: 'badge-soft-warning
                 <input v-model="to" type="date" class="form-control form-control-sm" style="max-width:160px;" @change="applyFilters">
             </div>
 
-            <ul class="nav nav-tabs mb-3">
-                <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">Posição valorizada / Curva ABC</button></li>
-                <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'turnover' }" @click="activeTab = 'turnover'">Giro de estoque</button></li>
-                <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'consumption' }" @click="activeTab = 'consumption'">Consumo por procedimento</button></li>
-                <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'purchases' }" @click="activeTab = 'purchases'">Compras por fornecedor</button></li>
-            </ul>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                <ul class="nav nav-tabs mb-0">
+                    <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'inventory' }" @click="activeTab = 'inventory'">Posição valorizada / Curva ABC</button></li>
+                    <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'turnover' }" @click="activeTab = 'turnover'">Giro de estoque</button></li>
+                    <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'consumption' }" @click="activeTab = 'consumption'">Consumo por procedimento</button></li>
+                    <li class="nav-item"><button type="button" class="nav-link" :class="{ active: activeTab === 'purchases' }" @click="activeTab = 'purchases'">Compras por fornecedor</button></li>
+                </ul>
+                <a :href="exportUrl(activeTab)" class="btn btn-outline-secondary btn-sm">
+                    <i class="ti ti-download me-1"></i>Exportar CSV
+                </a>
+            </div>
 
             <!-- Posição valorizada + Curva ABC -->
             <div v-show="activeTab === 'inventory'">

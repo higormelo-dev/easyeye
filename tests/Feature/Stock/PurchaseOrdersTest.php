@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\{ClientRule, FeatureKey, PurchaseOrderStatus, SubscriptionStatus};
 use App\Models\{Entity, EntityProduct, FinancialCashEntry, Plan, PlanFeature, PurchaseOrder, StockLot, Subscription, Supplier, User};
+use App\Services\Stock\StockService;
 
 /**
  * Ciclo de vida completo do pedido de compra via HTTP (Fase 4) —
@@ -225,4 +226,88 @@ it('[ISOLAMENTO] admin de outra clínica não consegue receber pedido alheio (bl
         ->assertJsonValidationErrors('items.0.purchase_order_item_id');
 
     expect((float) $this->product->fresh()->qty_on_hand)->toBe(0.0);
+});
+
+// ── GAP fechado (revisão pós-Fase 4): min_qty/max_qty existiam no cadastro
+// do produto desde a Fase 1 mas nunca alimentavam nada além do próprio
+// form — sugestão de quantidade de compra dá utilidade real aos 2 campos.
+
+it('[GAP] index() enriquece products com below_minimum/suggested_qty — repõe até max_qty quando configurado', function () {
+    $this->product->min_qty = 10;
+    $this->product->max_qty = 30;
+    $this->product->save();
+    app(StockService::class)->manualIn($this->product, 4, 50.00); // saldo=4, abaixo do mínimo (10)
+
+    $res = actingAsPoAdmin($this)->get(route('panel.stock.purchase-orders.index'));
+
+    $res->assertOk();
+    // 26 (int, não 26.0): json_encode() de um float "redondo" perde a casa
+    // decimal, então o payload de verdade chega como inteiro — mesma
+    // pegadinha já documentada em StockServiceTest/PurchaseOrderServiceTest.
+    $res->assertInertia(fn ($page) => $page
+        ->component('Panel/Stock/PurchaseOrders/Index')
+        ->where('products.0.below_minimum', true)
+        ->where('products.0.suggested_qty', 26)); // max_qty(30) - saldo(4)
+});
+
+it('[GAP] suggested_qty repõe só até min_qty quando max_qty não está configurado', function () {
+    $this->product->min_qty = 10;
+    $this->product->save();
+    app(StockService::class)->manualIn($this->product, 4, 50.00);
+
+    $res = actingAsPoAdmin($this)->get(route('panel.stock.purchase-orders.index'));
+
+    $res->assertOk();
+    $res->assertInertia(fn ($page) => $page
+        ->where('products.0.below_minimum', true)
+        ->where('products.0.suggested_qty', 6)); // min_qty(10) - saldo(4)
+});
+
+it('[GAP] produto sem min_qty configurado (0 — nunca configurado) não é falso-positivo — suggested_qty null', function () {
+    $res = actingAsPoAdmin($this)->get(route('panel.stock.purchase-orders.index'));
+
+    $res->assertOk();
+    $res->assertInertia(fn ($page) => $page
+        ->where('products.0.below_minimum', false)
+        ->where('products.0.suggested_qty', null));
+});
+
+// ── GAP fechado (revisão pós-Fase 4): status "Enviado" existia mas nada
+// gerava um documento de verdade pra mandar ao fornecedor — só trocava
+// status no sistema. PDF disponível em qualquer status via
+// PurchaseOrdersController::pdf() ─────────────────────────────────────────
+
+it('[GAP] admin baixa o PDF do pedido de compra (rascunho)', function () {
+    actingAsPoAdmin($this)->post(route('panel.stock.purchase-orders.store'), poPayload($this), ['Accept' => 'application/json']);
+    $po = PurchaseOrder::query()->first();
+
+    $res = actingAsPoAdmin($this)->get(route('panel.stock.purchase-orders.pdf', $po->id));
+
+    $res->assertOk();
+    $res->assertHeader('Content-Type', 'application/pdf');
+    expect(strlen($res->getContent()))->toBeGreaterThan(0);
+});
+
+it('[GAP] PDF continua disponível depois de enviado/recebido (não só rascunho)', function () {
+    actingAsPoAdmin($this)->post(route('panel.stock.purchase-orders.store'), poPayload($this), ['Accept' => 'application/json']);
+    $po = PurchaseOrder::query()->first();
+    actingAsPoAdmin($this)->post(route('panel.stock.purchase-orders.send', $po->id));
+
+    $res = actingAsPoAdmin($this)->get(route('panel.stock.purchase-orders.pdf', $po->id));
+
+    $res->assertOk();
+    $res->assertHeader('Content-Type', 'application/pdf');
+});
+
+it('[GAP][ISOLAMENTO] admin de outra clínica recebe 404 ao tentar baixar PDF de pedido alheio', function () {
+    actingAsPoAdmin($this)->post(route('panel.stock.purchase-orders.store'), poPayload($this), ['Accept' => 'application/json']);
+    $po = PurchaseOrder::query()->first();
+
+    $otherEntity     = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $otherAdmin      = User::factory()->create();
+    $otherEntityUser = createEntityUser($otherEntity, $otherAdmin, ClientRule::Admin->value);
+
+    actingAsPoAdmin($this, $otherAdmin, $otherEntityUser)
+        ->get(route('panel.stock.purchase-orders.pdf', $po->id))
+        ->assertNotFound();
 });

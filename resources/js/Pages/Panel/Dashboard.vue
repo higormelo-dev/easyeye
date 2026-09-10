@@ -9,6 +9,7 @@ import ModuleShortcuts  from './Dashboard/ModuleShortcuts.vue';
 import ScheduleToday    from './Dashboard/ScheduleToday.vue';
 import DaySummary       from './Dashboard/DaySummary.vue';
 import RecentPatients   from './Dashboard/RecentPatients.vue';
+import StockAlerts      from './Dashboard/StockAlerts.vue';
 import LiveStatusBar    from '@/Components/Panel/LiveStatusBar.vue';
 import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
 import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
@@ -21,6 +22,10 @@ const props = defineProps({
     recentPatients:  { type: Array,  default: () => [] },
     activation:      { type: Array,  default: () => [] },
     activationScore: { type: Number, default: 0 },
+    // GAP fechado (revisão pós-Fase 4 do estoque) — null quando a clínica
+    // não usa o módulo OU não tem nada crítico agora (ver
+    // PanelDashboardController::buildStockAlerts()).
+    stockAlerts:     { type: Object, default: null },
     t:               { type: Object, default: () => ({}) },
 });
 
@@ -42,9 +47,10 @@ const activationComplete = computed(() => (
 // Polling: atualiza dados clínicos a cada 30s via partial reload Inertia
 // ('activation'/'activationScore' inclusos pra o card "Configure sua
 // clínica" sumir sozinho assim que a última etapa obrigatória é concluída,
-// sem exigir reload manual da página).
+// sem exigir reload manual da página). 'stockAlerts' incluso — saldo pode
+// cair abaixo do mínimo durante o expediente (consumo em procedimento).
 const { isRefreshing, lastUpdated, refresh } = useDashboardPolling(
-    ['stats', 'scheduleToday', 'recentPatients', 'activation', 'activationScore'],
+    ['stats', 'scheduleToday', 'recentPatients', 'activation', 'activationScore', 'stockAlerts'],
     30_000,
 );
 
@@ -54,13 +60,20 @@ const breadcrumbs = [];
 // LiveStatusBar/WelcomeBanner/Activation ficam fixos (avisos/contexto, não
 // "conteúdo" reordenável). Agenda de hoje + Resumo do dia contam como UMA
 // seção — são desenhadas lado a lado de propósito, não faz sentido separar.
+// GAP fechado (revisão pós-Fase 4 do estoque): seção 'stock' só entra na
+// lista quando o Dashboard REALMENTE tem algo pra mostrar (stockAlerts !=
+// null — clínica usa o módulo E tem algo crítico agora). Construído a
+// partir de SECTION_DEFS (não array literal fixo) pra loadValidSectionOrder()
+// abaixo sempre comparar contra o tamanho REAL — clínica sem estoque nunca
+// vê "Alertas de estoque" nem na lista de reordenar.
 const SECTION_DEFS = [
     { key: 'kpis',      label: props.t.section_kpis ?? 'Indicadores' },
     { key: 'shortcuts', label: props.t.section_shortcuts ?? 'Atalhos' },
     { key: 'agenda',    label: props.t.section_agenda ?? 'Agenda de hoje' },
     { key: 'patients',  label: props.t.section_patients ?? 'Pacientes recentes' },
+    ...(props.stockAlerts ? [{ key: 'stock', label: props.t.section_stock ?? 'Alertas de estoque' }] : []),
 ];
-const DEFAULT_SECTION_ORDER = ['kpis', 'shortcuts', 'agenda', 'patients'];
+const DEFAULT_SECTION_ORDER = SECTION_DEFS.map((s) => s.key);
 
 const { getPreference, savePreference } = useUserPreferences();
 
@@ -180,6 +193,14 @@ function resetSectionOrder() {
                     v-else-if="section.key === 'patients'"
                     :patients="recentPatients"
                     :t="t"
+                />
+
+                <!-- stockAlerts pode virar null via polling (ex.: recompra
+                     resolveu o alerta durante o expediente) — guarda os
+                     dois lados, não só a existência da seção. -->
+                <StockAlerts
+                    v-else-if="section.key === 'stock' && stockAlerts"
+                    :alerts="stockAlerts"
                 />
             </template>
 

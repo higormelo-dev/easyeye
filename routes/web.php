@@ -66,7 +66,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController};
 use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
-use App\Http\Controllers\Stock\{ProcedureProductsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockMovementsController, StockReportsController, SuppliersController};
+use App\Http\Controllers\Stock\{ProcedureProductsController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Route};
@@ -792,6 +792,21 @@ Route::group(
                 // `GET products/{entityProduct}` do show casaria com
                 // "search" como se fosse um ID (ordem de rota importa).
                 Route::get('products/search', [ProductsController::class, 'search'])->name('products.search');
+                // GAP fechado (revisão pós-Fase 4) — leitor de código de
+                // barras na tela de movimentação, ver
+                // ProductsController::scanBarcode().
+                Route::get('products/scan-barcode', [ProductsController::class, 'scanBarcode'])->name('products.scan-barcode');
+                // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de
+                // estoque"): importação em massa via CSV, ver
+                // App\Http\Controllers\Stock\ProductImportsController.
+                // Registrado ANTES do resource() de propósito — mesmo
+                // motivo de products/search acima.
+                Route::prefix('products/import')->name('products.import.')->group(function () {
+                    Route::get('/', [ProductImportsController::class, 'index'])->name('index');
+                    Route::get('template', [ProductImportsController::class, 'template'])->name('template');
+                    Route::post('preview', [ProductImportsController::class, 'preview'])->name('preview');
+                    Route::post('confirm', [ProductImportsController::class, 'confirm'])->name('confirm');
+                });
 
                 Route::resource('products', ProductsController::class)
                     ->parameters(['products' => 'entityProduct'])
@@ -833,11 +848,24 @@ Route::group(
                 Route::post('purchase-orders/{purchaseOrder}/send', [PurchaseOrdersController::class, 'send'])->name('purchase-orders.send');
                 Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrdersController::class, 'cancel'])->name('purchase-orders.cancel');
                 Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrdersController::class, 'receive'])->name('purchase-orders.receive');
+                // GAP fechado (revisão pós-Fase 4): status "Enviado" existia
+                // mas nada gerava um documento de verdade pra mandar ao
+                // fornecedor — ver PurchaseOrdersController::pdf().
+                Route::get('purchase-orders/{purchaseOrder}/pdf', [PurchaseOrdersController::class, 'pdf'])->name('purchase-orders.pdf');
 
                 // GAP fechado nesta revisão — relatório previsto na Fase 4
                 // original (curva ABC/giro/custo por procedimento), deixado
                 // de fora até agora. Ver App\Services\Stock\StockReportService.
                 Route::get('reports', [StockReportsController::class, 'index'])->name('reports.index');
+                // GAP fechado (revisão pós-Fase 4) — exportação CSV, mesmo
+                // padrão de FinancialReportsController::exportCashFlowCsv().
+                Route::get('reports/export', [StockReportsController::class, 'exportCsv'])->name('reports.export');
+
+                // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de
+                // estoque"): contagem física em massa, ver
+                // App\Http\Controllers\Stock\StockCountsController.
+                Route::get('counts', [StockCountsController::class, 'index'])->name('counts.index');
+                Route::post('counts', [StockCountsController::class, 'store'])->name('counts.store');
             });
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -87,6 +87,11 @@ function money(v) {
                     <Link :href="routes.movements_index" class="btn btn-outline-secondary btn-sm me-2">
                         <i class="ti ti-transfer-in me-1"></i>Movimentação
                     </Link>
+                    <!-- GAP fechado (revisão pós-Fase 4): importação em
+                         massa via CSV — ver ProductImportsController. -->
+                    <Link :href="routes.import_index" class="btn btn-outline-secondary btn-sm me-2">
+                        <i class="ti ti-upload me-1"></i>Importar
+                    </Link>
                     <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
                         <i class="ti ti-plus me-1"></i>Novo produto
                     </button>
@@ -99,7 +104,7 @@ function money(v) {
             </div>
 
             <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-                <SearchInput v-model="search" placeholder="Buscar por nome, SKU ou código..." style="min-width: 260px;" />
+                <SearchInput v-model="search" placeholder="Buscar por nome, SKU, código ou código de barras..." style="min-width: 260px;" />
                 <select v-model="status" class="form-select form-select-sm" style="max-width: 160px;">
                     <option value="all">Todos</option>
                     <option value="active">Ativos</option>

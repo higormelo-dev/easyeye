@@ -42,6 +42,53 @@ function removeRow(index) {
     form.items.splice(index, 1);
 }
 
+// GAP fechado (revisão pós-Fase 4): `min_qty`/`max_qty` existiam no
+// cadastro do produto desde a Fase 1 mas nunca alimentavam nada — nem
+// alerta, nem sugestão de compra, só decorativos no form de produto. Aqui
+// ganham utilidade real: ao escolher um produto na linha, pré-preenche
+// custo (última média) e — se o produto está abaixo do mínimo e a
+// quantidade ainda não foi digitada — a quantidade sugerida
+// (max_qty - saldo, ou min_qty - saldo se não há máximo configurado).
+// Nunca sobrescreve valor que o usuário já digitou.
+function onProductPicked(row) {
+    const product = props.products.find((p) => p.id === row.entity_product_id);
+    if (!product) return;
+
+    if (row.unit_cost === null || row.unit_cost === '') {
+        row.unit_cost = product.cost_avg > 0 ? product.cost_avg : null;
+    }
+    if ((row.quantity_ordered === null || row.quantity_ordered === '') && product.suggested_qty) {
+        row.quantity_ordered = product.suggested_qty;
+    }
+}
+
+// Atalho: adiciona de uma vez todo produto abaixo do mínimo ainda não
+// presente no pedido, já com quantidade/custo sugeridos — cobre o caso de
+// uso mais comum de pedido de compra (repor o que está em falta) sem
+// obrigar o usuário a procurar produto por produto.
+const belowMinimumNotInOrder = computed(() => {
+    const already = new Set(form.items.map((i) => i.entity_product_id).filter(Boolean));
+
+    return props.products.filter((p) => p.below_minimum && !already.has(p.id));
+});
+
+function addBelowMinimumProducts() {
+    const rows = belowMinimumNotInOrder.value.map((p) => ({
+        entity_product_id: p.id,
+        quantity_ordered: p.suggested_qty || null,
+        unit_cost: p.cost_avg > 0 ? p.cost_avg : null,
+    }));
+
+    if (rows.length === 0) return;
+
+    // Remove a única linha vazia inicial (se ainda estiver lá) pra não
+    // deixar uma linha em branco solta no meio do pedido recém-populado.
+    form.items = [
+        ...form.items.filter((i) => i.entity_product_id),
+        ...rows,
+    ];
+}
+
 const total = computed(() => form.items.reduce((sum, row) => {
     const qty = Number(row.quantity_ordered) || 0;
     const cost = Number(row.unit_cost) || 0;
@@ -132,11 +179,16 @@ function close() {
                 </div>
             </div>
 
-            <div class="mb-2 d-flex align-items-center justify-content-between">
+            <div class="mb-2 d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <label class="form-label mb-0">Itens</label>
-                <button type="button" class="btn btn-sm btn-outline-primary" @click="addRow">
-                    <i class="ti ti-plus"></i> Adicionar item
-                </button>
+                <div class="d-flex gap-2">
+                    <button v-if="belowMinimumNotInOrder.length > 0" type="button" class="btn btn-sm btn-outline-warning" @click="addBelowMinimumProducts">
+                        <i class="ti ti-alert-triangle"></i> Adicionar {{ belowMinimumNotInOrder.length }} produto(s) abaixo do mínimo
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" @click="addRow">
+                        <i class="ti ti-plus"></i> Adicionar item
+                    </button>
+                </div>
             </div>
 
             <div v-if="form.errors.items" class="alert alert-danger py-2">{{ form.errors.items }}</div>
@@ -155,9 +207,11 @@ function close() {
                     <tbody>
                         <tr v-for="(row, index) in form.items" :key="index">
                             <td>
-                                <select v-model="row.entity_product_id" class="form-select form-select-sm">
+                                <select v-model="row.entity_product_id" class="form-select form-select-sm" @change="onProductPicked(row)">
                                     <option value="" disabled>Selecione...</option>
-                                    <option v-for="p in products" :key="p.id" :value="p.id">{{ p.name }} ({{ p.code }})</option>
+                                    <option v-for="p in products" :key="p.id" :value="p.id">
+                                        {{ p.name }} ({{ p.code }})<template v-if="p.below_minimum"> ⚠ abaixo do mínimo</template>
+                                    </option>
                                 </select>
                             </td>
                             <td><input v-model="row.quantity_ordered" type="number" step="0.001" min="0" class="form-control form-control-sm"></td>

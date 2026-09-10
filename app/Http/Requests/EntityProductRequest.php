@@ -47,6 +47,17 @@ class EntityProductRequest extends FormRequest
                     ->ignore($productId)
                     ->where(fn ($query) => $query->where('entity_id', $entityId)),
             ],
+            // GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de
+            // estoque"): código de barras (EAN/UPC ou etiqueta interna),
+            // único por clínica — ver migration 2026_09_10_090000.
+            'barcode' => [
+                'nullable',
+                'string',
+                'max:64',
+                Rule::unique('entity_products', 'barcode')
+                    ->ignore($productId)
+                    ->where(fn ($query) => $query->where('entity_id', $entityId)),
+            ],
             'name'         => ['required', 'string', 'max:255'],
             'description'  => ['nullable', 'string', 'max:2000'],
             'unit'         => ['required', Rule::enum(StockUnit::class)],

@@ -55,3 +55,55 @@ it('[REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403', 
         ->get(route('panel.stock.reports.index'), ['Accept' => 'application/json'])
         ->assertForbidden();
 });
+
+// ── GAP fechado (revisão pós-Fase 4): Financeiro já exportava relatório
+// (FinancialReportsController), Estoque não tinha exportação nenhuma ──────
+
+it('[GAP] exportCsv() da posição valorizada retorna CSV com header + linha de dado', function () {
+    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente IOL', 'code' => 'PRD-1', 'unit' => 'un', 'active' => true]);
+    app(StockService::class)->manualIn($product, 10, 50.00);
+
+    $res = $this->actingAs($this->admin)->withSession(panelSession($this->adminEntityUser))
+        ->get(route('panel.stock.reports.export'));
+
+    $res->assertOk();
+    $res->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+
+    // fputcsv() envolve em aspas qualquer campo com espaço (CSV válido,
+    // RFC 4180) — remove as aspas antes de comparar, o teste cobre
+    // CONTEÚDO, não a decisão de aspas do PHP.
+    $content = str_replace('"', '', $res->getContent());
+    expect($content)->toContain('Produto;Código;Categoria')
+        ->and($content)->toContain('Lente IOL;PRD-1');
+});
+
+it('[GAP] exportCsv() aceita report=turnover|consumption|purchases — cada um com header próprio', function () {
+    $cases = [
+        'turnover'    => 'Produto;Código;Saída no período',
+        'consumption' => 'Procedimento;Médico;Executado em',
+        'purchases'   => 'Fornecedor;Pedidos com recebimento',
+    ];
+
+    foreach ($cases as $report => $expectedHeader) {
+        $res = $this->actingAs($this->admin)->withSession(panelSession($this->adminEntityUser))
+            ->get(route('panel.stock.reports.export', ['report' => $report]));
+
+        $res->assertOk();
+        expect(str_replace('"', '', $res->getContent()))->toContain($expectedHeader);
+    }
+});
+
+it('[GAP][REGRA DE NEGÓCIO] exportCsv() sem o módulo de estoque no plano recebe 403', function () {
+    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $planNoModule   = Plan::factory()->create(['active' => true]);
+    Subscription::factory()->create([
+        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
+    ]);
+    $admin      = User::factory()->create();
+    $entityUser = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
+
+    $this->actingAs($admin)->withSession(panelSession($entityUser))
+        ->get(route('panel.stock.reports.export'), ['Accept' => 'application/json'])
+        ->assertForbidden();
+});

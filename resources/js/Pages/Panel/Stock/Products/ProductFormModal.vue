@@ -35,6 +35,7 @@ const title  = computed(() => isEdit.value ? 'Editar produto' : 'Novo produto');
 const form = useForm({
     product_category_id: null,
     sku:                  '',
+    barcode:              '',
     name:                 '',
     description:          '',
     unit:                 'un',
@@ -59,6 +60,7 @@ watch(() => props.open, (val) => {
     if (props.item) {
         form.product_category_id = props.item.product_category_id ?? null;
         form.sku                 = props.item.sku ?? '';
+        form.barcode             = props.item.barcode ?? '';
         form.name                = props.item.name ?? '';
         form.description         = props.item.description ?? '';
         form.unit                = props.item.unit ?? 'un';
@@ -195,14 +197,29 @@ async function saveLot(lot) {
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.sku }"
                         maxlength="100"
-                        placeholder="Cód. fabricante/barras"
+                        placeholder="Cód. do fabricante"
                     >
                     <div v-if="form.errors.sku" class="invalid-feedback">{{ form.errors.sku }}</div>
                 </div>
             </div>
 
             <div class="row g-3 mb-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
+                    <!-- GAP fechado (revisão pós-Fase 4): código de barras
+                         próprio — leitor USB/Bluetooth digita aqui igual um
+                         teclado, sem precisar de driver especial. -->
+                    <label class="form-label">Código de barras</label>
+                    <input
+                        v-model="form.barcode"
+                        type="text"
+                        class="form-control"
+                        :class="{ 'is-invalid': form.errors.barcode }"
+                        maxlength="64"
+                        placeholder="Escaneie ou digite o EAN/UPC"
+                    >
+                    <div v-if="form.errors.barcode" class="invalid-feedback">{{ form.errors.barcode }}</div>
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Categoria</label>
                     <select
                         v-model="form.product_category_id"
@@ -214,7 +231,7 @@ async function saveLot(lot) {
                     </select>
                     <div v-if="form.errors.product_category_id" class="invalid-feedback">{{ form.errors.product_category_id }}</div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <label class="form-label">Unidade <span class="text-danger">*</span></label>
                     <select
                         v-model="form.unit"

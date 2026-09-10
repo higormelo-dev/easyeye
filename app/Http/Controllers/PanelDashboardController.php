@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\ScheduleSituation;
-use App\Models\{Doctor, Entity, Patient, Schedule};
-use App\Services\ActivationService;
+use App\Enums\{ClientRule, FeatureKey, Permission, ScheduleSituation};
+use App\Models\{Doctor, Entity, EntityProduct, Patient, Schedule};
+use App\Services\{ActivationService, FeatureGateService};
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\{Inertia, Response};
@@ -27,8 +27,50 @@ class PanelDashboardController extends Controller
             'recentPatients'  => fn () => $this->buildRecentPatients($entityId),
             'activation'      => fn () => $this->buildActivation($entityId),
             'activationScore' => fn () => app(ActivationService::class)->getScore($entityId),
-            't'               => trans('dashboard'),
+            // GAP fechado (revisão pós-Fase 4): estoque tinha alerta próprio
+            // (Notice + StockAlertService, ver stock:check-alerts) mas
+            // nenhuma presença no Dashboard — quem não abre o mural de
+            // recados nunca via nada. null quando a clínica não usa o
+            // módulo, MESMO critério de visibilidade de
+            // App\Support\PanelNavigation (admin OU permission stock.manage,
+            // E feature has_inventory_module) — se o menu Estoque não
+            // aparece pro usuário, o card também não aparece.
+            'stockAlerts' => fn () => $this->buildStockAlerts($entityId),
+            't'           => trans('dashboard'),
         ]);
+    }
+
+    private function buildStockAlerts(string $entityId): ?array
+    {
+        $rule = session('selected_entity_user_rule');
+        $user = auth()->user();
+
+        if (! $user) {
+            return null;
+        }
+
+        $isAdmin       = $rule === ClientRule::Admin->value;
+        $entity        = Entity::find($entityId);
+        $hasPermission = $entity && $user->hasPermissionInEntity($entity, Permission::StockManage);
+        $hasFeature    = app(FeatureGateService::class)->can($entityId, FeatureKey::HasInventoryModule);
+
+        if (! $entity || ! ($isAdmin || $hasPermission) || ! $hasFeature) {
+            return null;
+        }
+
+        $belowMinimumCount = EntityProduct::where('entity_id', $entityId)->active()->belowMinimum()->count();
+        $expiringLotsCount = EntityProduct::where('entity_id', $entityId)->active()->withExpiringLots(30)->count();
+
+        if ($belowMinimumCount === 0 && $expiringLotsCount === 0) {
+            return null; // nada crítico — card nem aparece, sem "0 alertas" vazio ocupando espaço
+        }
+
+        return [
+            'below_minimum_count' => $belowMinimumCount,
+            'expiring_lots_count' => $expiringLotsCount,
+            'products_url'        => route('panel.stock.products.index', ['low_stock' => 1]),
+            'expiring_url'        => route('panel.stock.products.index', ['expiring_lots' => 1]),
+        ];
     }
 
     private function buildStats(string $entityId, string $today, array $doneValues): array

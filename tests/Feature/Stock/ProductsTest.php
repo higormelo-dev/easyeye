@@ -179,3 +179,60 @@ it('produto com mínimo REALMENTE configurado e saldo no/abaixo dele aparece com
     expect($product->fresh()->isBelowMinimum())->toBeTrue()
         ->and(EntityProduct::query()->belowMinimum()->whereKey($product->id)->exists())->toBeTrue();
 });
+
+// ── GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de estoque"):
+// código de barras pra leitor USB/Bluetooth ────────────────────────────────
+
+it('[GAP] admin cadastra produto com código de barras', function () {
+    actingAsProductAdmin($this)
+        ->post(route('panel.stock.products.store'), ['name' => 'Lente com EAN', 'unit' => 'un', 'barcode' => '7891234567890'], ['Accept' => 'application/json'])
+        ->assertRedirect(route('panel.stock.products.index'));
+
+    $product = EntityProduct::where('name', 'Lente com EAN')->firstOrFail();
+    expect($product->barcode)->toBe('7891234567890');
+});
+
+it('[GAP] código de barras duplicado NA MESMA clínica é rejeitado', function () {
+    EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'A', 'unit' => 'un', 'active' => true, 'barcode' => '111']);
+
+    actingAsProductAdmin($this)
+        ->post(route('panel.stock.products.store'), ['name' => 'B', 'unit' => 'un', 'barcode' => '111'], ['Accept' => 'application/json'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('barcode');
+});
+
+it('[GAP] o MESMO código de barras pode existir em clínicas DIFERENTES (único por entity_id, não global)', function () {
+    $otherEntity = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    EntityProduct::create(['entity_id' => $otherEntity->id, 'name' => 'Produto de outra clínica', 'unit' => 'un', 'active' => true, 'barcode' => '999']);
+
+    actingAsProductAdmin($this)
+        ->post(route('panel.stock.products.store'), ['name' => 'Produto local', 'unit' => 'un', 'barcode' => '999'], ['Accept' => 'application/json'])
+        ->assertRedirect(route('panel.stock.products.index'));
+
+    expect(EntityProduct::where('entity_id', $this->entity->id)->where('barcode', '999')->exists())->toBeTrue();
+});
+
+it('[GAP] scanBarcode() encontra o produto ativo pelo código exato', function () {
+    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente Scan', 'unit' => 'un', 'active' => true, 'barcode' => '7891234567890']);
+
+    $res = actingAsProductAdmin($this)->getJson(route('panel.stock.products.scan-barcode', ['barcode' => '7891234567890']));
+
+    $res->assertOk();
+    expect($res->json('data.id'))->toBe($product->id);
+});
+
+it('[GAP] scanBarcode() com código inexistente retorna 404 (não 200 com dado vazio)', function () {
+    actingAsProductAdmin($this)
+        ->getJson(route('panel.stock.products.scan-barcode', ['barcode' => '0000000000000']))
+        ->assertNotFound();
+});
+
+it('[GAP] scanBarcode() NÃO encontra produto INATIVO nem de OUTRA clínica', function () {
+    EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Inativo', 'unit' => 'un', 'active' => false, 'barcode' => '111']);
+
+    $otherEntity = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    EntityProduct::create(['entity_id' => $otherEntity->id, 'name' => 'De outra clínica', 'unit' => 'un', 'active' => true, 'barcode' => '222']);
+
+    actingAsProductAdmin($this)->getJson(route('panel.stock.products.scan-barcode', ['barcode' => '111']))->assertNotFound();
+    actingAsProductAdmin($this)->getJson(route('panel.stock.products.scan-barcode', ['barcode' => '222']))->assertNotFound();
+});

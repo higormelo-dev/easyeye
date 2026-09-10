@@ -135,6 +135,7 @@ function money(v) { return `R$ ${Number(v).toFixed(2)}`; }
                                 <span class="badge rounded fs-11 fw-medium" :class="STATUS_BADGE[po.status]">{{ STATUS_LABELS[po.status] }}</span>
                             </td>
                             <td class="text-end" @click.stop>
+                                <ActionIconButton icon="ti ti-file-download" title="Baixar PDF" :href="routes.pdf.replace('__ID__', po.id)" />
                                 <ActionIconButton v-if="po.status === 'draft'" icon="ti ti-send" title="Enviar ao fornecedor" @click="onSend($event, po)" />
                                 <ActionIconButton v-if="['sent', 'partially_received'].includes(po.status)" icon="ti ti-package-import" title="Receber" variant="success" @click="openReceive(po)" />
                                 <ActionIconButton v-if="!['received', 'cancelled'].includes(po.status)" icon="ti ti-x" title="Cancelar" variant="danger" @click="onCancel($event, po)" />

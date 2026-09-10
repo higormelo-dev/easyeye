@@ -8,9 +8,10 @@ use App\Enums\{FinancialEntryStatus, FinancialEntryType};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\{PurchaseOrderRequest, ReceivePurchaseOrderRequest};
 use App\Http\Resources\PurchaseOrderResource;
-use App\Models\{EntityProduct, PurchaseOrder, StockLot, Supplier};
+use App\Models\{Entity, EntityProduct, PurchaseOrder, StockLot, Supplier};
 use App\Services\Financial\CashFlowService;
 use App\Services\Stock\PurchaseOrderService;
+use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Log;
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -61,7 +62,32 @@ class PurchaseOrdersController extends Controller
             ],
             'items'     => $records,
             'suppliers' => Supplier::query()->where('entity_id', $entityId)->active()->orderBy('name')->get(['id', 'name']),
-            'products'  => EntityProduct::query()->where('entity_id', $entityId)->active()->orderBy('name')->get(['id', 'name', 'code', 'unit', 'requires_lot']),
+            // GAP fechado (revisão pós-Fase 4 — max_qty existia no cadastro
+            // do produto desde a Fase 1 mas nunca era lido em lugar nenhum
+            // do sistema, decorativo): `suggested_qty` alimenta o botão
+            // "Adicionar produtos abaixo do mínimo" do form de pedido —
+            // repõe até max_qty quando configurado, senão só até min_qty.
+            // Mesma regra de EntityProduct::isBelowMinimum() (min_qty > 0 —
+            // produto nunca configurado não é falso-positivo).
+            'products' => EntityProduct::query()
+                ->where('entity_id', $entityId)
+                ->active()
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'unit', 'requires_lot', 'qty_on_hand', 'min_qty', 'max_qty', 'cost_avg'])
+                ->map(fn (EntityProduct $p) => [
+                    'id'            => $p->id,
+                    'name'          => $p->name,
+                    'code'          => $p->code,
+                    'unit'          => $p->unit?->value,
+                    'requires_lot'  => (bool) $p->requires_lot,
+                    'qty_on_hand'   => (float) $p->qty_on_hand,
+                    'cost_avg'      => (float) $p->cost_avg,
+                    'below_minimum' => $p->isBelowMinimum(),
+                    'suggested_qty' => $p->isBelowMinimum()
+                        ? round(max((float) ($p->max_qty ?? $p->min_qty) - (float) $p->qty_on_hand, 0), 3)
+                        : null,
+                ])
+                ->values(),
             // Lotes com saldo, agrupados por produto — pré-preenche o
             // seletor de lote existente no modal de recebimento (mesmo
             // padrão de StockMovementsController::index()).
@@ -89,6 +115,7 @@ class PurchaseOrdersController extends Controller
                 'cancel'          => route('panel.stock.purchase-orders.cancel', ['__ID__']),
                 'receive'         => route('panel.stock.purchase-orders.receive', ['__ID__']),
                 'suppliers_index' => route('panel.stock.suppliers.index'),
+                'pdf'             => route('panel.stock.purchase-orders.pdf', ['__ID__']),
             ],
         ]);
     }
@@ -100,6 +127,32 @@ class PurchaseOrdersController extends Controller
         $purchaseOrder->load(['items.product', 'supplier']);
 
         return response()->json(['data' => new PurchaseOrderResource($purchaseOrder)]);
+    }
+
+    /**
+     * GAP fechado (revisão pós-Fase 4): status "Enviado" existia mas nada
+     * de fato gerava um documento pra mandar ao fornecedor — "enviar" era
+     * só uma troca de status no sistema. PDF disponível em QUALQUER status
+     * (inclusive rascunho — impressão interna de conferência antes de
+     * enviar de verdade), mesmo padrão de
+     * FinancialReportsController::cashFlowPdfResponse().
+     */
+    public function pdf(PurchaseOrder $purchaseOrder)
+    {
+        $this->assertOwnership($purchaseOrder);
+
+        $purchaseOrder->load(['items.product', 'supplier']);
+        $entity = Entity::findOrFail($purchaseOrder->entity_id);
+
+        try {
+            return SnappyPdf::loadView('pdf.stock_purchase_order', [
+                'po'          => $purchaseOrder,
+                'entity'      => $entity,
+                'generatedAt' => now(),
+            ])->setPaper('a4')->setOrientation('portrait')->download("pedido_compra_{$purchaseOrder->code}.pdf");
+        } catch (Throwable) {
+            abort(500, 'Falha ao gerar PDF. Verifique a configuração do wkhtmltopdf.');
+        }
     }
 
     public function store(PurchaseOrderRequest $request): RedirectResponse

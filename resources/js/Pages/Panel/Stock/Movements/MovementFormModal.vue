@@ -1,5 +1,5 @@
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 
@@ -20,7 +20,7 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
  */
 const props = defineProps({
     open:          { type: Boolean, required: true },
-    routes:        { type: Object,  required: true }, // { store }
+    routes:        { type: Object,  required: true }, // { store, scan_barcode }
     products:      { type: Array,   default: () => [] }, // [{ id, name, code, unit, qty_on_hand, requires_lot }]
     movementTypes: { type: Array,   default: () => [] }, // [{ value, label, direction }]
     lotsByProduct: { type: Object,  default: () => ({}) }, // { [productId]: [{ id, lot_number, expiry_date, qty_on_hand, is_expired }] }
@@ -39,6 +39,50 @@ const form = useForm({
     note:                 '',
     occurred_at:          '',
 });
+
+// GAP fechado (revisão pós-Fase 4 — "melhorar o módulo de estoque"):
+// leitor de código de barras USB/Bluetooth digita os dígitos + Enter como
+// se fosse teclado — não precisa driver especial, só este campo de texto
+// escutando @keyup.enter. Busca por MATCH EXATO no backend (nunca lista —
+// código de barras resolve pra 1 produto só); se o produto encontrado não
+// está em `products` (ex.: foi desativado entre a leitura e agora), avisa
+// em vez de selecionar um id que o <select> não reconhece.
+const barcodeInput   = ref('');
+const barcodeError   = ref('');
+const barcodeLoading = ref(false);
+
+async function onBarcodeScanned() {
+    const code = barcodeInput.value.trim();
+    if (!code) return;
+
+    barcodeError.value = '';
+    barcodeLoading.value = true;
+    try {
+        const res = await fetch(`${props.routes.scan_barcode}?barcode=${encodeURIComponent(code)}`, {
+            headers: { Accept: 'application/json' },
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            barcodeError.value = json.message ?? 'Produto não encontrado.';
+            return;
+        }
+
+        const found = props.products.find((p) => p.id === json.data.id);
+        if (!found) {
+            barcodeError.value = 'Produto encontrado, mas não está disponível pra lançamento agora (inativo?).';
+            return;
+        }
+
+        form.entity_product_id = found.id;
+        barcodeInput.value = '';
+    } catch (e) {
+        console.error('Barcode scan error:', e);
+        barcodeError.value = 'Não foi possível buscar o produto.';
+    } finally {
+        barcodeLoading.value = false;
+    }
+}
 
 // Custo unitário só faz sentido em ENTRADA (recalcula custo médio
 // ponderado — ver StockService::registerMovement()); em saída é sempre
@@ -83,6 +127,8 @@ watch(() => form.entity_product_id, () => {
 function reset() {
     form.reset();
     form.clearErrors();
+    barcodeInput.value = '';
+    barcodeError.value = '';
 }
 
 watch(() => props.open, (val) => {
@@ -111,6 +157,28 @@ function close() {
         </template>
 
         <form @submit.prevent="submit">
+            <!-- GAP fechado (revisão pós-Fase 4): leitor de código de
+                 barras — digita e aperta Enter, seleciona o produto
+                 sozinho. Opcional: quem não tem leitor usa o <select>
+                 abaixo normalmente. -->
+            <div class="mb-3">
+                <label class="form-label">Código de barras</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="ti ti-barcode"></i></span>
+                    <input
+                        v-model="barcodeInput"
+                        type="text"
+                        class="form-control"
+                        placeholder="Escaneie ou digite e aperte Enter"
+                        @keyup.enter="onBarcodeScanned"
+                    >
+                    <span v-if="barcodeLoading" class="input-group-text bg-transparent">
+                        <span class="spinner-border spinner-border-sm" style="width:.8rem;height:.8rem;"></span>
+                    </span>
+                </div>
+                <small v-if="barcodeError" class="text-danger d-block mt-1">{{ barcodeError }}</small>
+            </div>
+
             <div class="mb-3">
                 <label class="form-label">Produto <span class="text-danger">*</span></label>
                 <select

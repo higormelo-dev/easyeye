@@ -43,6 +43,7 @@ class EntityProduct extends Model
         'product_category_id',
         'code',
         'sku',
+        'barcode',
         'name',
         'description',
         'unit',

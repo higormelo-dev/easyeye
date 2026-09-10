@@ -37,12 +37,43 @@ it('admin cadastra um fornecedor', function () {
 });
 
 it('documento duplicado na mesma clínica é rejeitado', function () {
-    Supplier::create(['entity_id' => $this->entity->id, 'name' => 'A', 'document' => '111', 'active' => true]);
+    // CNPJ de formato válido nos dois (14 dígitos) — senão o teste passaria
+    // pelo motivo ERRADO (regex de formato barrando '111', não a
+    // unicidade, que é o que este teste diz cobrir).
+    Supplier::create(['entity_id' => $this->entity->id, 'name' => 'A', 'document' => '12345678000199', 'active' => true]);
 
     actingAsSupplierAdmin($this)
-        ->post(route('panel.stock.suppliers.store'), ['name' => 'B', 'document' => '111'], ['Accept' => 'application/json'])
+        ->post(route('panel.stock.suppliers.store'), ['name' => 'B', 'document' => '12345678000199'], ['Accept' => 'application/json'])
         ->assertStatus(422)
         ->assertJsonValidationErrors('document');
+});
+
+// ── GAP fechado (revisão pós-Fase 4): document aceitava qualquer string ────
+
+it('[GAP] documento com formato inválido (nem CPF nem CNPJ) é rejeitado', function () {
+    actingAsSupplierAdmin($this)
+        ->post(route('panel.stock.suppliers.store'), ['name' => 'Fornecedor B', 'document' => '111'], ['Accept' => 'application/json'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('document');
+
+    expect(Supplier::where('name', 'Fornecedor B')->exists())->toBeFalse();
+});
+
+it('[GAP] documento com pontuação (CNPJ formatado) é normalizado e aceito', function () {
+    actingAsSupplierAdmin($this)
+        ->post(route('panel.stock.suppliers.store'), ['name' => 'Fornecedor C', 'document' => '12.345.678/0001-99'], ['Accept' => 'application/json'])
+        ->assertRedirect(route('panel.stock.suppliers.index'));
+
+    $supplier = Supplier::where('name', 'Fornecedor C')->firstOrFail();
+    expect($supplier->document)->toBe('12345678000199');
+});
+
+it('[GAP] CPF (11 dígitos, fornecedor pessoa física/MEI) também é aceito', function () {
+    actingAsSupplierAdmin($this)
+        ->post(route('panel.stock.suppliers.store'), ['name' => 'Fornecedor MEI', 'document' => '12345678901'], ['Accept' => 'application/json'])
+        ->assertRedirect(route('panel.stock.suppliers.index'));
+
+    expect(Supplier::where('name', 'Fornecedor MEI')->exists())->toBeTrue();
 });
 
 it('[ISOLAMENTO] admin de outra clínica recebe 404 ao editar fornecedor alheio', function () {

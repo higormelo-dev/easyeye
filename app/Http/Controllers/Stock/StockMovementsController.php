@@ -87,6 +87,9 @@ class StockMovementsController extends Controller
                 'index'          => route('panel.stock.movements.index'),
                 'store'          => route('panel.stock.movements.store'),
                 'products_index' => route('panel.stock.products.index'),
+                // GAP fechado (revisão pós-Fase 4) — leitor de código de
+                // barras, ver ProductsController::scanBarcode().
+                'scan_barcode' => route('panel.stock.products.scan-barcode'),
             ],
         ]);
     }

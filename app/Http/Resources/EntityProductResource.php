@@ -18,6 +18,7 @@ class EntityProductResource extends JsonResource
             'id'                  => $this->id,
             'code'                => $this->code,
             'sku'                 => $this->sku,
+            'barcode'             => $this->barcode,
             'name'                => $this->name,
             'description'         => $this->description,
             'unit'                => $this->unit?->value,

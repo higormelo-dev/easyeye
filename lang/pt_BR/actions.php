@@ -256,6 +256,7 @@ return [
         'suppliers'             => 'Fornecedores',
         'purchase_orders'       => 'Pedidos de compra',
         'stock_reports'         => 'Relatórios de estoque',
+        'stock_counts'          => 'Contagem de estoque',
         'nearpointconvergences' => 'Convergências de ponto próximo',
         'medical_records'       => 'Prontuários',
         'reports'               => 'Relatórios',

@@ -82,7 +82,7 @@ function close() {
             <div class="row g-3 mb-3">
                 <div class="col-md-6">
                     <label class="form-label">CNPJ/CPF</label>
-                    <input v-model="form.document" type="text" class="form-control" :class="{ 'is-invalid': form.errors.document }" maxlength="20">
+                    <input v-model="form.document" type="text" class="form-control" :class="{ 'is-invalid': form.errors.document }" maxlength="20" placeholder="Com ou sem pontuação">
                     <div v-if="form.errors.document" class="invalid-feedback">{{ form.errors.document }}</div>
                 </div>
                 <div class="col-md-6">
