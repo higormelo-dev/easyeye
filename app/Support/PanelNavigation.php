@@ -21,6 +21,37 @@ class PanelNavigation
             return self::managerNav();
         }
 
+        // GAP fechado (revisão "relatório direto no módulo"):
+        // App\Http\Controllers\ReportsController tinha uma página-hub
+        // PRÓPRIA ("Relatórios", 2 cards — Produção e Absenteísmo)
+        // inteiramente sobre dado de AGENDA, vivendo num menu SOLTO,
+        // separado de "Agendas". Página-hub removida
+        // (ReportsController::index() + Panel/Reports/Index.vue); URL das
+        // 2 rotas migrou pra baixo de /panel/schedules (nome de rota
+        // panel.schedules.reports.*).
+        //
+        // DECISÃO FINAL (pedido explícito do usuário, revertendo uma
+        // tentativa anterior de virar submenu aqui): "Agendas" continua
+        // link DIRETO — 1 clique pro calendário, a tela mais usada do
+        // painel, sem virar dropdown. Acesso aos 2 relatórios não é mais
+        // pelo menu lateral nenhum: fica só no dropdown "Relatórios" ao
+        // lado do botão "Novo" dentro da própria tela de Agendas (ver
+        // SchedulesController::index() prop `reportsUrls` +
+        // Panel/Schedules/Index.vue) — mesmo gate (EntityGate::ViewFinancial)
+        // decide se o botão aparece, então quem não tem acesso simplesmente
+        // não vê a opção, sem precisar de lógica condicional aqui no menu.
+        $schedulesItem = [
+            'key'   => 'schedules',
+            'route' => 'panel.schedules.index',
+            'icon'  => 'ti ti-calendar',
+            'label' => __('actions.sidemenu.schedules'),
+            // Wildcard cobre panel.schedules.reports.* também (item
+            // continua "ativo" no menu enquanto o usuário está num
+            // relatório de agenda — não há mais submenu pra destacar em
+            // separado).
+            'match' => ['panel.schedules.*'],
+        ];
+
         $nav = [
             [
                 'key'   => 'dashboard',
@@ -29,13 +60,7 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.dashboard'),
                 'match' => ['panel.dashboard'],
             ],
-            [
-                'key'   => 'schedules',
-                'route' => 'panel.schedules.index',
-                'icon'  => 'ti ti-calendar',
-                'label' => __('actions.sidemenu.schedules'),
-                'match' => ['panel.schedules.*'],
-            ],
+            $schedulesItem,
             [
                 'key'   => 'patients',
                 'route' => 'panel.patients.index',
@@ -90,6 +115,57 @@ class PanelNavigation
             }
         }
 
+        // Estoque (Fase 1): produtos/materiais + movimentação. Gate duplo já
+        // acontece no middleware da rota (permission:stock.manage +
+        // feature:has_inventory_module); aqui decide VISIBILIDADE do item de
+        // menu — e precisa espelhar OS DOIS, não só a permission.
+        //
+        // BUG REAL (achado ao investigar "clico no menu e não acontece
+        // nada"): a condição aqui só checava $isAdmin/hasStockManagePermission()
+        // — igual a AI Assistant (canSeeAi() abaixo) já fazia certo pro CASO
+        // DELE, mas o Estoque tinha ficado sem o `&& hasInventoryModuleFeature()`.
+        // Resultado: pra QUALQUER clínica cujo plano não tem
+        // has_inventory_module habilitado (nenhum dos 3 planos reais tinha,
+        // na revisão desta correção), o admin via o menu inteiro (bypass de
+        // permission), clicava num filho, o middleware `feature:` da rota
+        // barrava com FeatureDeniedException, e essa exception faz
+        // `back()->withErrors(...)` — MAS nenhuma tela do painel renderiza
+        // `errors.feature_denied`/`flash.feature_denied` (confirmado: zero
+        // ocorrência em resources/js). O navegador dá a volta completa e
+        // devolve o usuário pro MESMO lugar, sem nenhuma mensagem — daí a
+        // sensação de "não acontece nada". Fix aqui deixa o menu já nascer
+        // condizente com o que a rota realmente permite; o plano do usuário
+        // também precisou ganhar a feature habilitada (dado, não código —
+        // feito via Manager > Planos).
+        //
+        // Posição ACIMA de Financeiro (pedido explícito do usuário): estoque
+        // é rotina operacional mais frequente que fluxo de caixa/faturamento
+        // pro perfil que usa este módulo — ver ordem do array $nav abaixo.
+        if (($isAdmin || self::hasStockManagePermission()) && self::hasInventoryModuleFeature()) {
+            $nav[] = [
+                'key' => 'stock',
+                // BUG REAL (achado ao investigar "sem ícone nenhum" no
+                // sidebar recolhido): `ti-boxes` NÃO EXISTE no set Tabler
+                // Icons deste projeto (confirmado em
+                // node_modules/@tabler/icons-webfont — só `ti-box`/
+                // `ti-box-multiple`, nunca a forma plural "boxes"; provável
+                // confusão com `fa-boxes` do FontAwesome, usado em outras
+                // partes do painel). `<i>` sem classe CSS válida renderiza
+                // vazio — some só no modo colapsado (ícone é a ÚNICA coisa
+                // visível ali; expandido, o texto ao lado escondia o buraco).
+                'icon'     => 'ti ti-building-warehouse',
+                'label'    => __('actions.sidemenu.stock'),
+                'match'    => ['panel.stock.*'],
+                'children' => [
+                    ['route' => 'panel.stock.products.index', 'icon' => 'ti ti-package', 'label' => __('actions.sidemenu.products'), 'match' => ['panel.stock.products.*']],
+                    ['route' => 'panel.stock.movements.index', 'icon' => 'ti ti-transfer-in', 'label' => __('actions.sidemenu.stock_movements'), 'match' => ['panel.stock.movements.*']],
+                    ['route' => 'panel.stock.purchase-orders.index', 'icon' => 'ti ti-shopping-cart', 'label' => __('actions.sidemenu.purchase_orders'), 'match' => ['panel.stock.purchase-orders.*']],
+                    ['route' => 'panel.stock.suppliers.index', 'icon' => 'ti ti-truck-delivery', 'label' => __('actions.sidemenu.suppliers'), 'match' => ['panel.stock.suppliers.*']],
+                    ['route' => 'panel.stock.reports.index', 'icon' => 'ti ti-chart-bar', 'label' => __('actions.sidemenu.stock_reports'), 'match' => ['panel.stock.reports.*']],
+                ],
+            ];
+        }
+
         if ($isFinancial) {
             $nav[] = [
                 'key'      => 'financial',
@@ -103,43 +179,6 @@ class PanelNavigation
                     ['route' => 'panel.financial.tiss.glosas.index', 'icon' => 'ti ti-gavel', 'label' => __('actions.sidemenu.tiss_glosas'), 'match' => ['panel.financial.tiss.glosas.*']],
                     ['route' => 'panel.financial.reports.cash-flow', 'icon' => 'ti ti-chart-arcs', 'label' => __('actions.sidemenu.report_cash_flow'), 'match' => ['panel.financial.reports.cash-flow*']],
                     ['route' => 'panel.financial.reports.covenants', 'icon' => 'ti ti-report-money', 'label' => __('actions.sidemenu.report_billing'), 'match' => ['panel.financial.reports.covenants*']],
-                ],
-            ];
-
-            $nav[] = [
-                'section' => __('actions.sidemenu.reports'),
-            ];
-            $nav[] = [
-                'key'   => 'reports',
-                'route' => 'panel.reports.index',
-                'icon'  => 'ti ti-chart-bar',
-                'label' => __('actions.sidemenu.reports'),
-                'match' => ['panel.reports.*'],
-            ];
-        }
-
-        // Estoque (Fase 1): produtos/materiais + movimentação. Gate duplo já
-        // acontece no middleware da rota (permission:stock.manage +
-        // feature:has_inventory_module); aqui decide VISIBILIDADE do item de
-        // menu. GAP fechado nesta revisão: além de $isAdmin, também mostra
-        // pra quem tem a permission granular `stock.manage` via Role
-        // customizada (RBAC piloto) — antes só admin via cargo fixo via a
-        // rota já deixava passar, mas o item ficava invisível no menu pra
-        // esse usuário (só descobria a tela digitando a URL). Os outros
-        // grupos ($isFinancial/Configurações) mantêm o critério antigo de
-        // propósito — não são escopo desta revisão.
-        if ($isAdmin || self::hasStockManagePermission()) {
-            $nav[] = [
-                'key'      => 'stock',
-                'icon'     => 'ti ti-boxes',
-                'label'    => __('actions.sidemenu.stock'),
-                'match'    => ['panel.stock.*'],
-                'children' => [
-                    ['route' => 'panel.stock.products.index', 'icon' => 'ti ti-package', 'label' => __('actions.sidemenu.products'), 'match' => ['panel.stock.products.*']],
-                    ['route' => 'panel.stock.movements.index', 'icon' => 'ti ti-transfer-in', 'label' => __('actions.sidemenu.stock_movements'), 'match' => ['panel.stock.movements.*']],
-                    ['route' => 'panel.stock.purchase-orders.index', 'icon' => 'ti ti-shopping-cart', 'label' => __('actions.sidemenu.purchase_orders'), 'match' => ['panel.stock.purchase-orders.*']],
-                    ['route' => 'panel.stock.suppliers.index', 'icon' => 'ti ti-truck-delivery', 'label' => __('actions.sidemenu.suppliers'), 'match' => ['panel.stock.suppliers.*']],
-                    ['route' => 'panel.stock.reports.index', 'icon' => 'ti ti-chart-bar', 'label' => __('actions.sidemenu.stock_reports'), 'match' => ['panel.stock.reports.*']],
                 ],
             ];
         }
@@ -300,6 +339,26 @@ class PanelNavigation
         }
 
         return $user->hasPermissionInEntity($entity, Permission::StockManage);
+    }
+
+    /**
+     * Espelha o middleware `feature:has_inventory_module` das rotas de
+     * estoque (routes/web.php) — mesmo padrão de canSeeAi() acima pras
+     * features de IA. Sem isso o menu aparece pra quem tem
+     * stock.manage/é admin mas o PLANO da clínica não inclui o módulo, e
+     * clicar em qualquer item bate no gate da rota e devolve o usuário pro
+     * mesmo lugar sem aviso nenhum (ver comentário no bloco de montagem do
+     * menu acima).
+     */
+    private static function hasInventoryModuleFeature(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasInventoryModule);
     }
 
     private static function managerNav(): array

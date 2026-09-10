@@ -20,8 +20,14 @@ class ComplianceController extends Controller
 
         return Inertia::render('Panel/Compliance/Index', [
             'breadcrumbs' => [
+                // GAP fechado (revisão "relatório direto no módulo"): a
+                // página-hub "Relatórios" (panel.reports.index) foi
+                // removida — ver docblock de App\Support\PanelNavigation.
+                // Compliance não pertence a nenhum módulo com relatório
+                // próprio, então o breadcrumb some direto pro Dashboard
+                // (esta página também não tem entrada no menu lateral —
+                // pré-existente, fora do escopo desta correção).
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
                 ['label' => 'Compliance & Auditoria', 'url' => '#', 'active' => true],
             ],
             'exports' => [

@@ -25,7 +25,7 @@ const form = ref({
 });
 
 function applyFilter() {
-    router.get(route('panel.reports.schedules'), form.value, { preserveState: true, preserveScroll: true });
+    router.get(route('panel.schedules.reports.production'), form.value, { preserveState: true, preserveScroll: true });
 }
 
 const hasResults = computed(() => props.summary !== null);

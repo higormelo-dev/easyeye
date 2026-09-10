@@ -42,6 +42,10 @@ const props = defineProps({
     isDoctor:         { type: Boolean, default: false },
     isStaff:          { type: Boolean, default: false },
     canRegisterCash:  { type: Boolean, default: false },
+    // Dropdown "Relatórios" ao lado de "Novo" (GAP fechado — antes página-
+    // hub solta em /panel/reports). null = sem acesso financeiro, botão
+    // nem renderiza — ver SchedulesController::index().
+    reportsUrls:      { type: Object,  default: null },
     // Painel de chamadas (TV) habilitado nesta clínica — mostra o "Chamar paciente"
     callPanelEnabled: { type: Boolean, default: false },
     t:                { type: Object,  default: () => ({}) },
@@ -404,6 +408,23 @@ const breadcrumbs = [
                 <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
                     <i class="ti ti-plus me-1"></i>{{ t.btn_new }}
                 </button>
+
+                <!-- Relatórios de Agenda (GAP fechado — antes página-hub
+                     solta em /panel/reports, agora dropdown ao lado de
+                     "Novo"; null quando sem acesso financeiro — ver
+                     SchedulesController::index()). Full-page <a> de
+                     propósito (mesmas telas cru, filtro+tabela+resumo —
+                     nenhuma delas é componente Vue desta página). -->
+                <div v-if="reportsUrls" class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                            data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="ti ti-report-analytics me-1"></i>{{ t.btn_reports }}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" :href="reportsUrls.production"><i class="ti ti-report-analytics me-2"></i>{{ t.report_production }}</a></li>
+                        <li><a class="dropdown-item" :href="reportsUrls.absenteeism"><i class="ti ti-user-x me-2"></i>{{ t.report_absenteeism }}</a></li>
+                    </ul>
+                </div>
 
             </div>
 

@@ -13,22 +13,6 @@ use Inertia\{Inertia, Response as InertiaResponse};
 
 class ReportsController extends Controller
 {
-    public function index(): InertiaResponse
-    {
-        Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
-
-        return Inertia::render('Panel/Reports/Index', [
-            'breadcrumbs' => [
-                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => true],
-            ],
-            'links' => [
-                ['title' => __('actions.reports.schedules_label'), 'icon' => 'ti-calendar', 'url' => route('panel.reports.schedules')],
-                ['title' => __('actions.reports.absenteeism_label'), 'icon' => 'ti-user-x', 'url' => route('panel.reports.absenteeism')],
-            ],
-        ]);
-    }
-
     public function schedules(Request $request): InertiaResponse
     {
         Gate::authorize(EntityGate::ViewFinancial->value, Entity::findOrFail(session('selected_entity_id')));
@@ -45,7 +29,12 @@ class ReportsController extends Controller
         $payload = [
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
+                // GAP fechado (revisão "relatório direto no módulo"): antes
+                // apontava pra panel.reports.index (página-hub "Relatórios"
+                // removida — ver docblock de App\Support\PanelNavigation).
+                // Este relatório é 100% dado de Agenda; breadcrumb agora
+                // reflete o menu real (filho de "Agendas").
+                ['label' => __('actions.sidemenu.schedules'), 'url' => route('panel.schedules.index'), 'active' => false],
                 ['label' => __('actions.reports.schedules_label'), 'url' => '#', 'active' => true],
             ],
             'doctors'    => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),
@@ -141,7 +130,7 @@ class ReportsController extends Controller
         $payload = [
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.reports'), 'url' => route('panel.reports.index'), 'active' => false],
+                ['label' => __('actions.sidemenu.schedules'), 'url' => route('panel.schedules.index'), 'active' => false],
                 ['label' => __('actions.reports.absenteeism_label'), 'url' => '#', 'active' => true],
             ],
             'doctors'   => $doctors->map(fn ($d) => ['id' => $d->id, 'name' => $d->user_name]),

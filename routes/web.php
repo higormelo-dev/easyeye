@@ -563,10 +563,20 @@ Route::group(
         // ── admin + financial: relatórios gerenciais ──────────────────────────
         // permission:financial.manage,... — mesmo padrão do bloco de pacientes
         // acima: fallback aditivo, os roles fixos mantêm o acesso que já tinham.
+        //
+        // GAP fechado (revisão "relatório direto no módulo"): página-hub
+        // "reports.index" (App\Http\Controllers\ReportsController::index(),
+        // Panel/Reports/Index.vue) removida — dado 100% de Agenda vivendo
+        // num menu solto, separado de "Agendas". Depois disso, URL/nome de
+        // rota também migraram pra baixo de `schedules.` (antes
+        // `panel.reports.schedules`/`panel.reports.absenteeism`, órfãos de
+        // `/panel/reports/*` mesmo já sendo filhos de "Agendas" no menu —
+        // pedido explícito: URL precisa refletir o dono do dado, não só o
+        // menu). Controller/métodos (ReportsController::schedules()/
+        // absenteeism()) continuam os mesmos, só o registro de rota mudou.
         Route::middleware('permission:financial.manage,admin,financial')->group(function () {
-            Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
-            Route::get('reports/schedules', [ReportsController::class, 'schedules'])->name('reports.schedules');
-            Route::get('reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('reports.absenteeism');
+            Route::get('schedules/reports/production', [ReportsController::class, 'schedules'])->name('schedules.reports.production');
+            Route::get('schedules/reports/absenteeism', [ReportsController::class, 'absenteeism'])->name('schedules.reports.absenteeism');
 
             Route::prefix('financial')->as('financial.')->group(function () {
                 // Dashboard Gerencial (BI)

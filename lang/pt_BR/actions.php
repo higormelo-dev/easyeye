@@ -246,6 +246,7 @@ return [
         'additiontypes'         => 'Tipos de adição',
         'visualacuitytypes'     => 'Tipos de acuidade visual',
         'schedules'             => 'Agendas',
+        'schedules_calendar'    => 'Calendário',
         'lenses'                => 'Lentes',
         'iol_lenses'            => 'Lentes de Catarata',
         'product_categories'    => 'Categorias de produto',

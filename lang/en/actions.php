@@ -245,6 +245,7 @@ return [
         'additiontypes'            => 'Addition Types',
         'visualacuitytypes'        => 'Visual Acuity Types',
         'schedules'                => 'Schedules',
+        'schedules_calendar'       => 'Calendar',
         'lenses'                   => 'Lenses',
         'iol_lenses'               => 'Cataract Lenses',
         'nearpointconvergences'    => 'Near Point Convergences',

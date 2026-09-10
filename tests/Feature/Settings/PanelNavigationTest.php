@@ -341,11 +341,18 @@ it('GET panel.setting.skintypes.index retorna 200 e o prop tabsGroup vem populad
 // cargo fixo enxergava o item — usuário com Role customizada acessava a
 // rota digitando a URL, mas nunca via o item no menu) ──────────────────────
 
-it('secretária SEM Role customizada não vê o menu "Estoque"; COM Role tendo stock.manage, vê', function () {
+it('secretária SEM Role customizada não vê o menu "Estoque"; COM Role tendo stock.manage E plano com o módulo, vê', function () {
     $this->seed(PermissionsSeeder::class);
 
+    // entityWithFeatures() (não $this->entity) DE PROPÓSITO: o gate do menu
+    // agora espelha os DOIS lados do middleware da rota (permission:stock.manage
+    // + feature:has_inventory_module — ver PanelNavigation::hasInventoryModuleFeature(),
+    // BUG real corrigido nesta revisão: o menu aparecia sem checar a feature
+    // do plano, então clicar num item batia no gate da rota e devolvia o
+    // usuário pro mesmo lugar sem aviso nenhum).
+    $entity              = entityWithFeatures([FeatureKey::HasInventoryModule]);
     $secretary           = User::factory()->create();
-    $secretaryEntityUser = createEntityUser($this->entity, $secretary, ClientRule::Secretary->value);
+    $secretaryEntityUser = createEntityUser($entity, $secretary, ClientRule::Secretary->value);
 
     session(panelSession($secretaryEntityUser));
     $this->actingAs($secretary);
@@ -354,7 +361,7 @@ it('secretária SEM Role customizada não vê o menu "Estoque"; COM Role tendo s
     expect(findNavItemByKey($navWithout, 'stock'))->toBeNull();
 
     $stockPermission = PermissionRecord::where('key', Permission::StockManage->value)->firstOrFail();
-    $role            = Role::query()->create(['entity_id' => $this->entity->id, 'name' => 'Gestor de Estoque']);
+    $role            = Role::query()->create(['entity_id' => $entity->id, 'name' => 'Gestor de Estoque']);
     $role->permissions()->sync([$stockPermission->id]);
     $secretaryEntityUser->roles()->sync([$role->id]);
 
@@ -367,4 +374,65 @@ it('secretária SEM Role customizada não vê o menu "Estoque"; COM Role tendo s
     $item    = findNavItemByKey($navWith, 'stock');
     expect($item)->not->toBeNull();
     assertAllRoutesResolve(collectNavRoutes([$item]));
+});
+
+it('[GAP][BUGFIX] admin COM permission mas SEM o módulo de estoque no plano NÃO vê o menu — antes aparecia e todo clique voltava pro mesmo lugar sem aviso', function () {
+    // $this->adminEntityUser/$this->entity (do beforeEach) NÃO tem
+    // Subscription nenhuma — reproduz exatamente o estado real encontrado
+    // em produção (nenhum dos 3 planos reais tinha has_inventory_module
+    // habilitado até esta correção).
+    session(panelSession($this->adminEntityUser));
+    $this->actingAs($this->adminUser);
+
+    $nav = PanelNavigation::build();
+
+    expect(findNavItemByKey($nav, 'stock'))->toBeNull();
+});
+
+it('[GAP] admin COM o módulo de estoque no plano vê o menu normalmente (bypass de permission já existia; feature agora também precisa bater)', function () {
+    $entity          = entityWithFeatures([FeatureKey::HasInventoryModule]);
+    $adminUser       = User::factory()->create();
+    $adminEntityUser = createEntityUser($entity, $adminUser, ClientRule::Admin->value);
+
+    session(panelSession($adminEntityUser));
+    $this->actingAs($adminUser);
+
+    $nav  = PanelNavigation::build();
+    $item = findNavItemByKey($nav, 'stock');
+
+    expect($item)->not->toBeNull();
+    assertAllRoutesResolve(collectNavRoutes([$item]));
+});
+
+// ── 12. GAP fechado nesta revisão: "Relatórios" deixa de ser página-hub
+// solta (nem vira submenu de "Agendas" — decisão final do usuário: menu
+// lateral continua 1 clique direto pro calendário; os 2 relatórios saem
+// inteiramente do menu, acessíveis só pelo dropdown "Relatórios" dentro da
+// própria tela de Agendas — ver SchedulesReportsButtonTest.php) ──────────
+
+it('[GAP] "Agendas" é SEMPRE link direto (nunca submenu) — admin/financeiro e secretária', function () {
+    session(panelSession($this->adminEntityUser));
+    $adminItem = findNavItemByKey(PanelNavigation::build(), 'schedules');
+
+    $secretary           = User::factory()->create();
+    $secretaryEntityUser = createEntityUser($this->entity, $secretary, ClientRule::Secretary->value);
+    session(panelSession($secretaryEntityUser));
+    $secretaryItem = findNavItemByKey(PanelNavigation::build(), 'schedules');
+
+    foreach ([$adminItem, $secretaryItem] as $item) {
+        expect($item)->not->toBeNull()
+            ->and($item['route'] ?? null)->toBe('panel.schedules.index')
+            ->and($item['children'] ?? null)->toBeNull();
+    }
+
+    // A página-hub solta ("Relatórios") não deve mais existir como item de
+    // menu — nem key 'reports', nem rota panel.reports.index (removida).
+    expect(findNavItemByKey(PanelNavigation::build(), 'reports'))->toBeNull();
+    expect(Route::has('panel.reports.index'))->toBeFalse();
+
+    // Os relatórios em si continuam existindo (rota + tela) — só saíram do
+    // menu; acesso é só pelo dropdown dentro de Agendas (ver
+    // SchedulesReportsButtonTest.php).
+    expect(Route::has('panel.schedules.reports.production'))->toBeTrue();
+    expect(Route::has('panel.schedules.reports.absenteeism'))->toBeTrue();
 });

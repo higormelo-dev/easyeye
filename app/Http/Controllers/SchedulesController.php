@@ -81,6 +81,18 @@ class SchedulesController extends Controller
                 'is_courtesy'       => $m->isCourtesy(),
             ])->values(),
             'canRegisterCash' => Gate::allows(EntityGate::ViewFinancial->value, Entity::find($entityId)),
+            // Dropdown "Relatórios" ao lado de "Novo" (GAP fechado — antes
+            // página-hub solta em /panel/reports, ver
+            // App\Http\Controllers\ReportsController). Mesmo gate de
+            // canRegisterCash acima (EntityGate::ViewFinancial) — quem não
+            // tem acesso financeiro nem vê o botão, sem depender só do
+            // middleware da rota pra esconder algo que 403aria.
+            'reportsUrls' => Gate::allows(EntityGate::ViewFinancial->value, Entity::find($entityId))
+                ? [
+                    'production'  => route('panel.schedules.reports.production'),
+                    'absenteeism' => route('panel.schedules.reports.absenteeism'),
+                ]
+                : null,
             // Lista completa e fixa — o dropdown de situação no card usa isso
             // diretamente (todas as opções sempre disponíveis, nenhuma some
             // depois de selecionada; ver ScheduleCard.vue).

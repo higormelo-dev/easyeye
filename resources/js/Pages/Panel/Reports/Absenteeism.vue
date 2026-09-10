@@ -20,7 +20,7 @@ const form = ref({
 });
 
 function applyFilter() {
-    router.get(route('panel.reports.absenteeism'), form.value, { preserveState: true, preserveScroll: true });
+    router.get(route('panel.schedules.reports.absenteeism'), form.value, { preserveState: true, preserveScroll: true });
 }
 
 const hasResults = computed(() => props.summary !== null);

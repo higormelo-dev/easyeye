@@ -8,6 +8,13 @@ return [
     'breadcrumb_home'    => 'Dashboard',
     'breadcrumb_current' => 'Agenda',
     'btn_new'            => 'Novo',
+    // Dropdown de relatórios (GAP fechado — antes página-hub solta em
+    // /panel/reports, agora botão agrupado ao lado de "Novo" — pedido do
+    // usuário). Só aparece pra quem tem acesso financeiro (mesmo gate das
+    // rotas em routes/web.php — ver SchedulesController::index()).
+    'btn_reports'        => 'Relatórios',
+    'report_production'  => 'Produção',
+    'report_absenteeism' => 'Absenteísmo',
     'search_placeholder' => 'Buscar paciente…',
     'saving'             => 'Salvando…',
     'cancel_title'       => 'Cancelar agendamento',
