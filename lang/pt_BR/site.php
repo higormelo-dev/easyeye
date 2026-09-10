@@ -249,7 +249,14 @@ return [
         'title' => 'Perguntas frequentes',
         'items' => [
             ['q' => 'Como é feita a migração dos dados da minha clínica?', 'a' => 'Oferecemos importação via CSV para pacientes e histórico. Nossa equipe de implantação auxilia na migração dos dados do sistema anterior sem interrupção do atendimento.'],
-            ['q' => 'O EasyEye funciona offline?', 'a' => 'O EasyEye é uma solução 100% em nuvem, o que garante acesso de qualquer dispositivo. Para contingência, mantemos cache local das agendas do dia.'],
+            // GAP fechado (correção de conteúdo — a resposta antiga
+            // afirmava um cache local de contingência que nunca existiu no
+            // produto; confirmado no código: nenhum service worker,
+            // localStorage ou IndexedDB guarda dado de agenda/prontuário
+            // pra uso offline, só preferência de UI (ex.: modo de
+            // visualização da agenda). Resposta corrigida pra refletir o
+            // comportamento real.
+            ['q' => 'O EasyEye funciona offline?', 'a' => 'O EasyEye é uma solução 100% em nuvem — funciona em qualquer dispositivo com navegador e internet. Não há modo offline no momento: sem conexão, não é possível acessar prontuários, agenda ou os demais dados do sistema.'],
             ['q' => 'Como funciona o suporte técnico?', 'a' => 'Oferecemos suporte por chat, e-mail e telefone conforme o plano. No plano Professional, o atendimento é prioritário com SLA de 4 horas úteis.'],
             ['q' => 'O sistema é homologado pela ANS para TISS?', 'a' => 'Sim. O EasyEye é homologado para as versões TISS 3.05 e 3.06 da ANS, com geração de XML, envio e processamento de retorno totalmente automatizados.'],
             ['q' => 'Posso integrar com outros sistemas?', 'a' => 'Disponibilizamos API REST para integração com ERPs, sistemas de imagem (laudos), laboratórios e outros sistemas clínicos. Documentação disponível para desenvolvedores.'],

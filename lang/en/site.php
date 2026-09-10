@@ -230,7 +230,13 @@ return [
         'title' => 'Frequently asked questions',
         'items' => [
             ['q' => 'How is my clinic data migrated?', 'a' => 'We offer CSV import for patients and history. Our implementation team helps migrate data from your previous system without interrupting your operations.'],
-            ['q' => 'Does EasyEye work offline?', 'a' => 'EasyEye is a 100% cloud solution, ensuring access from any device. For contingency, we maintain a local cache of the day\'s schedules.'],
+            // Content fix — the old answer claimed a contingency local
+            // cache that never existed in the product (confirmed in code:
+            // no service worker/localStorage/IndexedDB stores
+            // schedule/record data for offline use, only a UI preference
+            // such as the schedule view mode). Answer corrected to match
+            // actual behavior.
+            ['q' => 'Does EasyEye work offline?', 'a' => 'EasyEye is a 100% cloud solution — it works on any device with a browser and an internet connection. There is no offline mode at the moment: without a connection, you cannot access patient records, the schedule, or any other system data.'],
             ['q' => 'How does technical support work?', 'a' => 'We offer support via chat, email and phone depending on your plan. Professional plan customers receive priority support with a 4-business-hour SLA.'],
             ['q' => 'Is the system approved by ANS for TISS?', 'a' => 'Yes. EasyEye is approved for ANS TISS versions 3.05 and 3.06, with fully automated XML generation, submission and return processing.'],
             ['q' => 'Can I integrate with other systems?', 'a' => 'We provide a REST API for integration with ERPs, imaging systems (reports), laboratories and other clinical systems. Developer documentation available.'],
