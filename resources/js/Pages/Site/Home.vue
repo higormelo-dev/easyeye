@@ -531,8 +531,10 @@
 
                         <!-- Recursos exclusivos do Premium — bloco estático, à parte da lista
                              dinâmica de features acima (não depende de PlanFeature no banco).
-                             Optotipos/estoque ainda não existem no produto: badge "Novidade"
-                             deixa isso explícito, nunca apresentado como já incluído. -->
+                             Optotipos ainda não existe no produto: badge "Novidade" deixa isso
+                             explícito, nunca apresentado como já incluído. Estoque SAIU daqui
+                             (pedido do usuário) — módulo passou a ser incluso em TODOS os
+                             planos, listá-lo como exclusividade do Premium seria enganoso. -->
                         <div v-if="plan.slug === 'premium'" class="pricing-pro-extra">
                             <div class="pricing-pro-extra-label">{{ t.pricing.premium_exclusive_label }}</div>
                             <div v-for="item in t.differentiators.premium_callout.items" :key="item.title" class="pricing-pro-extra-item">

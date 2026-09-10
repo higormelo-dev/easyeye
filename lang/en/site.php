@@ -147,6 +147,10 @@ return [
             ['icon' => 'bi-diagram-3-fill', 'title' => 'Multi-clinic with a single view', 'text' => 'Manage multiple units with one login and consolidated reports.'],
         ],
 
+        // Stock/inventory item REMOVED here (user request): the inventory
+        // module is now included in ALL plans (Básico/Pro/Premium — see
+        // PlanFeature::HasInventoryModule), so listing it as a
+        // Premium-exclusive would be inaccurate/misleading.
         'premium_callout' => [
             'eyebrow' => 'Exclusive to the Premium plan',
             'title'   => 'Premium goes beyond the patient record',
@@ -157,12 +161,6 @@ return [
                     'badge' => 'Coming soon',
                     'title' => 'Full visual acuity testing suite',
                     'text'  => 'The main tests used in everyday ophthalmology, right inside the EasyEye ecosystem: ETDRS, Snellen, Ishihara, Landolt C, tumbling E, pediatric optotypes, contrast tests and more.',
-                ],
-                [
-                    'icon'  => 'bi-box-seam',
-                    'badge' => 'Coming soon',
-                    'title' => 'Inventory management & control',
-                    'text'  => 'Track and organize materials and supplies used in the clinic\'s operations, right inside the system.',
                 ],
             ],
             'cta' => 'Explore the Premium plan',

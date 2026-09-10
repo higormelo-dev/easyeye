@@ -161,9 +161,13 @@ return [
             ['icon' => 'bi-diagram-3-fill', 'title' => 'Multi-clínica com visão única', 'text' => 'Gerencie várias unidades com um único login e relatórios consolidados.'],
         ],
 
-        // Callout de destaque — exclusividades do Plano Premium. Optotipos e
-        // estoque ainda não existem no produto: framing deliberado como
-        // "novidade / em breve" (decisão de produto), nunca "já incluído".
+        // Callout de destaque — exclusividades do Plano Premium. Optotipos
+        // ainda não existe no produto: framing deliberado como "novidade /
+        // em breve" (decisão de produto), nunca "já incluído". Estoque
+        // SAIU daqui (pedido do usuário): módulo de estoque passou a ser
+        // incluso em TODOS os planos (ver PlanFeature::HasInventoryModule
+        // habilitado em Básico/Pro/Premium), então listá-lo como
+        // "exclusividade do Premium" ficaria incorreto/enganoso.
         'premium_callout' => [
             'eyebrow' => 'Exclusivo do Plano Premium',
             'title'   => 'O Premium vai além do prontuário',
@@ -174,12 +178,6 @@ return [
                     'badge' => 'Novidade',
                     'title' => 'Programa completo de optotipos',
                     'text'  => 'Os principais testes da rotina oftalmológica dentro do próprio ecossistema EasyEye: ETDRS, Snellen, Ishihara, C de Landolt, E direcional, optotipos infantis, testes de contraste e outros.',
-                ],
-                [
-                    'icon'  => 'bi-box-seam',
-                    'badge' => 'Novidade',
-                    'title' => 'Gerenciamento e controle de estoque',
-                    'text'  => 'Acompanhe e organize materiais e produtos utilizados na operação da clínica, direto no sistema.',
                 ],
             ],
             'cta' => 'Conhecer o Plano Premium',
