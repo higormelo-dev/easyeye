@@ -18,7 +18,10 @@ const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
     items:       { type: Object, required: true }, // paginator Laravel (through())
     filters:     { type: Object, default: () => ({}) },
-    routes:      { type: Object, required: true },  // { index, store, search, show, update, destroy }
+    routes:      { type: Object, required: true },  // { index, store, search, show, update, destroy, products_search }
+    // Vínculo opcional com estoque (GAP-FILL pós-Fase 4) — ver docblock de
+    // App\Models\EntityIolLens. Só true quando a clínica tem o módulo.
+    hasInventoryModule: { type: Boolean, default: false },
 });
 
 const page = usePage();
@@ -159,6 +162,9 @@ function statusLabel(active) {
                             <p class="small mb-0 fw-medium">
                                 Valor: {{ lens.price_formatted ?? 'Não informado' }}
                             </p>
+                            <p v-if="lens.stock" class="text-muted small mb-0 mt-1">
+                                <i class="ti ti-package me-1"></i>Estoque: {{ lens.stock.qty_on_hand }} {{ lens.stock.unit_label }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -170,6 +176,7 @@ function statusLabel(active) {
                 :open="formOpen"
                 :item="editItem"
                 :routes="routes"
+                :has-inventory-module="hasInventoryModule"
                 @close="formOpen = false"
                 @saved="onSaved"
             />

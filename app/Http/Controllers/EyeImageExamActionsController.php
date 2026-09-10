@@ -115,7 +115,7 @@ class EyeImageExamActionsController extends Controller
     public function mergeExams(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'exam_ids'   => ['required', 'array', 'min:2'],
+            'exam_ids'   => ['required', 'array', 'min:2', 'max:50'],
             'exam_ids.*' => ['uuid'],
         ]);
 
@@ -138,7 +138,7 @@ class EyeImageExamActionsController extends Controller
     public function splitExams(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'exam_ids'   => ['required', 'array', 'min:1'],
+            'exam_ids'   => ['required', 'array', 'min:1', 'max:50'],
             'exam_ids.*' => ['uuid'],
         ]);
 
@@ -159,7 +159,7 @@ class EyeImageExamActionsController extends Controller
     public function ungroupExams(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'exam_ids'   => ['required', 'array', 'min:1'],
+            'exam_ids'   => ['required', 'array', 'min:1', 'max:50'],
             'exam_ids.*' => ['uuid'],
         ]);
 

@@ -402,6 +402,15 @@ class AiPayloadEnricher
             abort(422, __('ai.eye_image_exams_required'));
         }
 
+        // Defesa em profundidade: StoreAiRunRequest já trava exam_ids em
+        // config('ai.eye_image.max_images', 4) antes de chegar aqui, mas
+        // este método é chamado por qualquer caller de enrich() — nunca
+        // confiar só na validação de um FormRequest específico pra um
+        // whereIn() que toca dado de paciente (mesmo racional do max:50
+        // aplicado em EyeImageExamActionsController/EyeImageReportController
+        // na revisão de segurança 09/09/2026).
+        abort_if(count($examIds) > 50, 422);
+
         $owned = PatientExam::query()
             ->whereIn('patient_exams.id', $examIds)
             ->whereHas('patient', fn ($q) => $q->where('entity_id', $entityId))

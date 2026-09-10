@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Setting;
 
+use App\Enums\FeatureKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EntityIolLensRequest;
 use App\Http\Resources\EntityIolLensResource;
 use App\Models\EntityIolLens;
-use App\Services\IolLensCatalogService;
+use App\Services\{FeatureGateService, IolLensCatalogService};
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\{DB, Storage};
 use Inertia\{Inertia, Response as InertiaResponse};
@@ -35,6 +36,7 @@ class IolLensesController extends Controller
 {
     public function __construct(
         private readonly IolLensCatalogService $catalogService,
+        private readonly FeatureGateService $featureGate,
     ) {
     }
 
@@ -46,6 +48,11 @@ class IolLensesController extends Controller
 
         $records = EntityIolLens::query()
             ->where('entity_id', $entityId)
+            // Eager load OBRIGATÓRIO (GAP-FILL pós-Fase 4 — vínculo opcional
+            // com estoque): sem isso, EntityIolLensResource::whenLoaded()
+            // simplesmente omite a chave 'stock' — funciona, mas silencioso;
+            // COM isso, sem N+1 (1 query extra pra página inteira).
+            ->with('entityProduct:id,name,code,unit,qty_on_hand')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->whereLikeUnaccent('manufacturer', $search)
@@ -79,16 +86,23 @@ class IolLensesController extends Controller
                 'search' => $search,
                 'status' => $status,
             ],
-            'routes' => [
+            // Vínculo opcional com estoque (GAP-FILL pós-Fase 4): o form só
+            // mostra o picker de produto quando a clínica TEM o módulo —
+            // sem isso o picker existiria mas nunca encontraria nada (rota
+            // de busca vive atrás do mesmo permission:stock.manage +
+            // feature:has_inventory_module do resto do módulo).
+            'hasInventoryModule' => $this->featureGate->status($entityId, FeatureKey::HasInventoryModule)->allowed,
+            'routes'             => [
                 'index'  => route('panel.setting.iollenses.index'),
                 'store'  => route('panel.setting.iollenses.store'),
                 'search' => route('panel.setting.iollenses.search'),
                 // Vue substitui {id} no client (evita gerar 1 rota por linha
                 // na hidratação) — mesma convenção de BaseSettingController::
                 // index() / AccessControl\RolesController::index().
-                'show'    => route('panel.setting.iollenses.show', ['__ID__']),
-                'update'  => route('panel.setting.iollenses.update', ['__ID__']),
-                'destroy' => route('panel.setting.iollenses.destroy', ['__ID__']),
+                'show'            => route('panel.setting.iollenses.show', ['__ID__']),
+                'update'          => route('panel.setting.iollenses.update', ['__ID__']),
+                'destroy'         => route('panel.setting.iollenses.destroy', ['__ID__']),
+                'products_search' => route('panel.stock.products.search'),
             ],
         ]);
     }
@@ -102,7 +116,7 @@ class IolLensesController extends Controller
     {
         $this->assertOwnership($entityIolLens);
 
-        return response()->json(['data' => new EntityIolLensResource($entityIolLens)]);
+        return response()->json(['data' => new EntityIolLensResource($entityIolLens->load('entityProduct:id,name,code,unit,qty_on_hand'))]);
     }
 
     public function store(EntityIolLensRequest $request): RedirectResponse

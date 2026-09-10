@@ -69,8 +69,11 @@ class EyeImageReportController extends Controller
         $validated = $request->validate([
             'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
             'patient_id'                => ['required', 'uuid', 'exists:patients,id'],
-            'exam_ids'                  => ['nullable', 'array'],
-            'exam_ids.*'                => ['uuid'],
+            // max:50 — nenhuma sessão de exame real chega perto disso; sem
+            // limite, doctor autenticado podia mandar array gigante e forçar
+            // um whereIn() caro (achado na revisão de segurança 09/09/2026).
+            'exam_ids'   => ['nullable', 'array', 'max:50'],
+            'exam_ids.*' => ['uuid'],
         ]);
 
         $patient = Patient::query()->where('entity_id', $entityId)->findOrFail($validated['patient_id']);
@@ -113,8 +116,11 @@ class EyeImageReportController extends Controller
         $this->authorizeIssueReport($entityId);
 
         $validated = $request->validate([
-            'patient_id'                => ['required', 'uuid', 'exists:patients,id'],
-            'exam_ids'                  => ['nullable', 'array'],
+            'patient_id' => ['required', 'uuid', 'exists:patients,id'],
+            // max:50 — nenhuma sessão de exame real chega perto disso; sem
+            // limite, doctor autenticado podia mandar array gigante e forçar
+            // um whereIn() caro (achado na revisão de segurança 09/09/2026).
+            'exam_ids'                  => ['nullable', 'array', 'max:50'],
             'exam_ids.*'                => ['uuid'],
             'report_setting_content_id' => ['nullable', 'uuid', 'exists:report_setting_contents,id'],
             'title'                     => ['nullable', 'string', 'max:255'],

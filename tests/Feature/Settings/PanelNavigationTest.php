@@ -1,8 +1,11 @@
 <?php
 
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
+use App\Enums\Permission;
 use App\Models\{Entity, Plan, PlanFeature, Subscription, User};
+use App\Models\{PermissionRecord, Role};
 use App\Support\PanelNavigation;
+use Database\Seeders\PermissionsSeeder;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -331,4 +334,37 @@ it('GET panel.setting.skintypes.index retorna 200 e o prop tabsGroup vem populad
     $activeTabs = collect($tabsGroup)->where('active', true);
     expect($activeTabs)->toHaveCount(1);
     expect($activeTabs->first()['url'])->toBe(route('panel.setting.skintypes.index'));
+});
+
+// ── 11. GAP fechado nesta revisão: visibilidade do menu "Estoque" pra Role
+// customizada com a permission granular stock.manage (antes só $isAdmin via
+// cargo fixo enxergava o item — usuário com Role customizada acessava a
+// rota digitando a URL, mas nunca via o item no menu) ──────────────────────
+
+it('secretária SEM Role customizada não vê o menu "Estoque"; COM Role tendo stock.manage, vê', function () {
+    $this->seed(PermissionsSeeder::class);
+
+    $secretary           = User::factory()->create();
+    $secretaryEntityUser = createEntityUser($this->entity, $secretary, ClientRule::Secretary->value);
+
+    session(panelSession($secretaryEntityUser));
+    $this->actingAs($secretary);
+
+    $navWithout = PanelNavigation::build();
+    expect(findNavItemByKey($navWithout, 'stock'))->toBeNull();
+
+    $stockPermission = PermissionRecord::where('key', Permission::StockManage->value)->firstOrFail();
+    $role            = Role::query()->create(['entity_id' => $this->entity->id, 'name' => 'Gestor de Estoque']);
+    $role->permissions()->sync([$stockPermission->id]);
+    $secretaryEntityUser->roles()->sync([$role->id]);
+
+    // hasPermissionInEntity() cacheia por instância de User (ver
+    // App\Traits\HasEntityRoles) — busca um User fresco pra simular uma
+    // nova requisição real, mesmo padrão de RolesTest.php.
+    $this->actingAs(User::find($secretary->id));
+
+    $navWith = PanelNavigation::build();
+    $item    = findNavItemByKey($navWith, 'stock');
+    expect($item)->not->toBeNull();
+    assertAllRoutesResolve(collectNavRoutes([$item]));
 });

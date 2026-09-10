@@ -88,3 +88,10 @@ Schedule::command('whatsapp:send-surveys')
     ->between('9:00', '20:00')
     ->name('whatsapp:send-surveys')
     ->withoutOverlapping();
+
+// Estoque (GAP fechado): estoque baixo / lote vencendo — cedo de manhã pra
+// já aparecer no mural quando a equipe abrir o painel.
+Schedule::command('stock:check-alerts')
+    ->dailyAt('06:30')
+    ->name('stock:check-alerts')
+    ->withoutOverlapping();

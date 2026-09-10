@@ -40,6 +40,19 @@ class EntityIolLensResource extends JsonResource
             'image_url'         => $this->image_url,
             'active'            => (bool) $this->active,
             'created_at'        => $this->created_at?->format('d/m/Y H:i'),
+            // Vínculo opcional com estoque (GAP-FILL pós-Fase 4 — ver
+            // docblock de App\Models\EntityIolLens). `entityProduct` precisa
+            // vir eager-loaded (ver IolLensesController::index()/show()) —
+            // sem isso o `whenLoaded` abaixo simplesmente omite a chave
+            // 'stock', nunca dispara N+1 por conta própria.
+            'entity_product_id' => $this->entity_product_id,
+            'stock'             => $this->whenLoaded('entityProduct', fn () => $this->entityProduct === null ? null : [
+                'id'          => $this->entityProduct->id,
+                'name'        => $this->entityProduct->name,
+                'code'        => $this->entityProduct->code,
+                'unit_label'  => $this->entityProduct->unit?->label(),
+                'qty_on_hand' => (float) $this->entityProduct->qty_on_hand,
+            ]),
         ];
     }
 

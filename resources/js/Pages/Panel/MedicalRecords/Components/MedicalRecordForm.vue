@@ -8,6 +8,7 @@ import SearchSelect    from '@/Components/Panel/SearchSelect.vue';
 import AcuitySelect    from '@/Pages/Panel/MedicalRecords/Components/AcuitySelect.vue';
 import MedicalRecordFileUploadModal from './MedicalRecordFileUploadModal.vue';
 import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
+import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
 
@@ -353,6 +354,10 @@ const evolutions         = ref([]);
 const evolutionsLoaded   = ref(false);
 const evolutionText      = ref('');
 const evolutionBusy      = ref(false);
+
+// Procedimento estruturado (Fase 3 gap-fill) — estado interno inteiro vive
+// em MedicalRecordProceduresModal.vue, aqui só o toggle de visibilidade.
+const showProceduresModal = ref(false);
 
 async function openEvolutionModal() {
     showEvolutionModal.value = true;
@@ -2320,6 +2325,17 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                     <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('evolution', 'Evolução') }}</span>
                 </button>
 
+                <!-- Procedimento estruturado (Fase 3 — estoque ↔ prontuário):
+                     histórico é por PACIENTE, então abre mesmo em modo
+                     create (leitura); solicitar/executar/cancelar exigem
+                     prontuário salvo + médico (trava dentro do modal). -->
+                <button type="button" class="btn pmr-doc-img-btn"
+                        :title="tt('procedures', 'Procedimentos')"
+                        @click="showProceduresModal = true">
+                    <i class="fas fa-syringe" style="font-size:1.6rem;color:#7e57c2;"></i>
+                    <span class="pmr-doc-img-btn-label visually-hidden">{{ tt('procedures', 'Procedimentos') }}</span>
+                </button>
+
                 <!-- Exames de imagem do módulo Eye Images — consulta durante o
                      atendimento; leitura por paciente, disponível já no create. -->
                 <button v-if="urls.eye_exams" type="button" class="btn pmr-doc-img-btn"
@@ -3144,6 +3160,14 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         :t="t"
 
         @close="showImagingModal = false" />
+
+    <MedicalRecordProceduresModal
+        :show="showProceduresModal"
+        :urls="urls"
+        :is-doctor="isDoctor"
+        :is-locked="isLocked"
+        :t="t"
+        @close="showProceduresModal = false" />
 
     <MedicalRecordFileUploadModal
         v-if="isEdit && urls.store_file"

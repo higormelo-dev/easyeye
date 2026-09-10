@@ -3,6 +3,7 @@
 use App\Domains\AI\Services\AiPayloadEnricher;
 use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
 use App\Models\{Doctor, Entity, MedicalRecord, Patient, PatientExam, People, Plan, PlanFeature, Subscription, User};
+use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
@@ -92,6 +93,19 @@ it('aborta com 403 quando exam_id pertence a outra entidade', function () {
         'risk_level'  => 'medium',
         'user_prompt' => 'Avaliar a imagem ocular.',
         'exam_ids'    => [(string) $otherExam->id],
+    ], $this->entity->id, false))->toThrow(HttpException::class);
+});
+
+it('[SEGURANÇA] rejeita mais de 50 exam_ids direto no enrich() — defesa em profundidade além do FormRequest', function () {
+    // Chama enrich() direto (bypassa StoreAiRunRequest de propósito) pra
+    // provar que o método se protege sozinho, não só confiando no
+    // max:config('ai.eye_image.max_images') do FormRequest.
+    expect(fn () => $this->enricher->enrich([
+        'workflow'    => 'eye_image_analysis',
+        'mode'        => 'validated',
+        'risk_level'  => 'medium',
+        'user_prompt' => 'Avaliar as imagens oculares.',
+        'exam_ids'    => array_fill(0, 51, (string) Str::uuid()),
     ], $this->entity->id, false))->toThrow(HttpException::class);
 });
 

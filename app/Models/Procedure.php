@@ -6,7 +6,7 @@ use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 class Procedure extends Model
 {
@@ -37,5 +37,11 @@ class Procedure extends Model
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class);
+    }
+
+    /** BOM de estoque (Fase 3) — ver App\Models\ProcedureProduct. */
+    public function productBom(): HasMany
+    {
+        return $this->hasMany(ProcedureProduct::class);
     }
 }

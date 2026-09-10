@@ -37,6 +37,17 @@ class EntityIolLensRequest extends FormRequest
                 'uuid',
                 Rule::exists('iol_lens_models', 'id')->withoutTrashed(),
             ],
+            // Vínculo opcional com o catálogo de estoque (GAP-FILL pós-Fase
+            // 4 — ver docblock de App\Models\EntityIolLens). AQUI SIM escopa
+            // por entity_id: entity_products é dado DA CLÍNICA (diferente de
+            // iol_lens_models acima, que é catálogo global sem escopo).
+            'entity_product_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('entity_products', 'id')
+                    ->where('entity_id', session('selected_entity_id'))
+                    ->whereNull('deleted_at'),
+            ],
             'manufacturer' => ['required', 'string', 'max:255'],
             'model_name'   => ['required', 'string', 'max:255'],
             'category'     => ['nullable', 'string', 'max:100'],

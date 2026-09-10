@@ -30,6 +30,7 @@ enum Permission: string
     case ExamsImport     = 'exams.import';
     case PatientsManage  = 'patients.manage';
     case FinancialManage = 'financial.manage';
+    case StockManage     = 'stock.manage';
 
     /**
      * Human-readable label (pt-BR).
@@ -44,6 +45,7 @@ enum Permission: string
             self::ExamsImport     => 'Importar exames',
             self::PatientsManage  => 'Gerenciar pacientes e médicos',
             self::FinancialManage => 'Gerenciar financeiro e faturamento',
+            self::StockManage     => 'Gerenciar estoque',
         };
     }
 
@@ -57,6 +59,7 @@ enum Permission: string
             self::UsersManage, self::RolesManage => 'Usuários',
             self::FinancialView, self::FinancialManage => 'Financeiro',
             self::ExamsImport, self::PatientsManage => 'Pacientes',
+            self::StockManage => 'Estoque',
         };
     }
 

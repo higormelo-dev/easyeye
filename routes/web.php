@@ -39,6 +39,7 @@ use App\Http\Controllers\{
     MedicalRecordDocumentationsController,
     MedicalRecordEvolutionsController,
     MedicalRecordFilesController,
+    MedicalRecordProceduresController,
     MedicalRecordQuickActionsController,
     MedicalRecordsController,
     SiteController,
@@ -57,6 +58,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     IrisTypesController,
     LensesController,
     NearPointConvergencesController,
+    ProductCategoriesController,
     ResourcesController,
     SkinTypesController,
     SurgeryTypesController,
@@ -64,6 +66,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController};
 use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
+use App\Http\Controllers\Stock\{ProcedureProductsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockMovementsController, StockReportsController, SuppliersController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Route};
@@ -397,6 +400,34 @@ Route::group(
                 'patients/{patient}/medicalrecords/{medicalrecord}/evolutions',
                 [MedicalRecordEvolutionsController::class, 'store'],
             )->name('patients.medicalrecords.evolutions.store');
+
+            // Procedimento ESTRUTURADO (Fase 3 — estoque ↔ prontuário):
+            // solicitado→executado/cancelado, com consumo de material
+            // opcional na execução. Mesmo padrão de evoluções acima: leitura
+            // aqui, escrita restrita a médico DENTRO do controller (Gate
+            // IssueReport). `bom` fica fora de `permission:stock.manage` de
+            // propósito — ver docblock de MedicalRecordProceduresController.
+            Route::get(
+                'patients/{patient}/medicalrecord-procedures',
+                [MedicalRecordProceduresController::class, 'index'],
+            )->name('patients.medicalrecord-procedures.index');
+            Route::post(
+                'patients/{patient}/medicalrecords/{medicalrecord}/medicalrecord-procedures',
+                [MedicalRecordProceduresController::class, 'store'],
+            )->name('patients.medicalrecords.medicalrecord-procedures.store');
+            Route::post(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/mark-done',
+                [MedicalRecordProceduresController::class, 'markDone'],
+            )->name('patients.medicalrecord-procedures.mark-done');
+            Route::post(
+                'patients/{patient}/medicalrecord-procedures/{medicalRecordProcedure}/cancel',
+                [MedicalRecordProceduresController::class, 'cancel'],
+            )->name('patients.medicalrecord-procedures.cancel');
+            Route::get(
+                'procedures/{procedure}/bom',
+                [MedicalRecordProceduresController::class, 'bom'],
+            )->name('procedures.bom');
+
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/exam-template/{exam}',
                 [MedicalRecordQuickActionsController::class, 'examTemplate'],
@@ -723,8 +754,81 @@ Route::group(
                 Route::resource('iollenses', IolLensesController::class)
                     ->parameters(['iollenses' => 'entityIolLens'])
                     ->except(['create', 'edit']);
+
+                // Categorias de produto/estoque — catálogo simples name/active,
+                // mesmo grupo RBAC piloto dos demais catálogos administrativos.
+                Route::get('product-categories/cards', [ProductCategoriesController::class, 'cards'])->name('product-categories.cards');
+                Route::resource('product-categories', ProductCategoriesController::class)
+                    ->parameters(['product-categories' => 'productcategory']);
+                Route::get('product-categories/{productcategory}/restore', [ProductCategoriesController::class, 'restore'])->name('product-categories.restore');
             });
         });
+
+        // ── Módulo de estoque (Fase 1: catálogo de produtos + movimentação
+        // manual) ─────────────────────────────────────────────────────────
+        // Dupla trava: `permission:stock.manage` (RBAC — admin sempre passa,
+        // Role customizada precisa da permission) + `feature:has_inventory_module`
+        // (plano — feature paga, ver App\Enums\FeatureKey). Produtos/
+        // movimentação NÃO entram no grupo `setting.` acima: não são um
+        // catálogo de configuração, são dado operacional (saldo/ledger) —
+        // mesma separação que Financeiro já usa fora de `setting.`.
+        Route::middleware(['permission:stock.manage', 'feature:has_inventory_module'])
+            ->prefix('stock')
+            ->name('stock.')
+            ->group(function () {
+                // Autocomplete (GAP-FILL pós-Fase 4) — consumido pelo vínculo
+                // opcional Lente IOL ↔ Produto (ver EntityIolLensRequest).
+                // Registrado ANTES do resource() abaixo: senão o
+                // `GET products/{entityProduct}` do show casaria com
+                // "search" como se fosse um ID (ordem de rota importa).
+                Route::get('products/search', [ProductsController::class, 'search'])->name('products.search');
+
+                Route::resource('products', ProductsController::class)
+                    ->parameters(['products' => 'entityProduct'])
+                    ->except(['create', 'edit']);
+
+                // Lotes/validade (Fase 2) — JSON puro, chamado via
+                // window.axios de dentro do modal de produto (ver doc de
+                // ProductLotsController). Sem create/destroy: lote nasce de
+                // uma entrada de movimentação (findOrCreateLot), não de
+                // cadastro solto; sem destroy nesta fase (não remove lote
+                // com histórico de movimentação).
+                Route::get('products/{entityProduct}/lots', [ProductLotsController::class, 'index'])->name('products.lots.index');
+                Route::put('lots/{stockLot}', [ProductLotsController::class, 'update'])->name('lots.update');
+
+                Route::resource('movements', StockMovementsController::class)
+                    ->only(['index', 'store']);
+
+                // BOM por procedimento (Fase 3) — gestão admin da lista
+                // padrão de consumo. Leitura CLÍNICA (durante o atendimento,
+                // pra pré-preencher a confirmação de consumo) é uma rota
+                // SEPARADA fora deste grupo — ver
+                // MedicalRecordProceduresController::bom() e o comentário no
+                // bloco de rotas do prontuário.
+                Route::get('procedures/{procedure}/bom', [ProcedureProductsController::class, 'index'])->name('procedures.bom.index');
+                Route::post('procedures/{procedure}/bom', [ProcedureProductsController::class, 'store'])->name('procedures.bom.store');
+                Route::delete('procedure-products/{procedureProduct}', [ProcedureProductsController::class, 'destroy'])->name('procedure-products.destroy');
+
+                // ── Fase 4: fornecedores + pedidos de compra ────────────────
+                Route::resource('suppliers', SuppliersController::class)
+                    ->except(['create', 'edit']);
+
+                Route::resource('purchase-orders', PurchaseOrdersController::class)
+                    ->parameters(['purchase-orders' => 'purchaseOrder'])
+                    ->except(['create', 'edit']);
+                // Ações de transição de estado — sempre POST (efeito
+                // colateral real: send/cancel mudam status; receive baixa
+                // estoque + tenta lançamento financeiro), nunca PUT/PATCH de
+                // recurso (não é "editar o pedido", é um ATO sobre ele).
+                Route::post('purchase-orders/{purchaseOrder}/send', [PurchaseOrdersController::class, 'send'])->name('purchase-orders.send');
+                Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrdersController::class, 'cancel'])->name('purchase-orders.cancel');
+                Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrdersController::class, 'receive'])->name('purchase-orders.receive');
+
+                // GAP fechado nesta revisão — relatório previsto na Fase 4
+                // original (curva ABC/giro/custo por procedimento), deixado
+                // de fora até agora. Ver App\Services\Stock\StockReportService.
+                Route::get('reports', [StockReportsController::class, 'index'])->name('reports.index');
+            });
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

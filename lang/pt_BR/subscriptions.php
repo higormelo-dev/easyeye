@@ -45,6 +45,7 @@ return [
         'has_ai_eye_image_analysis' => 'Análise de imagem ocular com IA',
         'has_ai_chat_assistant'     => 'Assistente virtual de IA (chat flutuante)',
         'has_api_integrator'        => 'Integração com equipamentos oftalmológicos',
+        'has_inventory_module'      => 'Módulo de estoque',
         'ai_monthly_credits'        => 'Créditos mensais de IA',
         'api_monthly_exam_sends'    => 'Envios via integrador (mensal)',
         'plan_upgrade_required'     => 'Seu plano não inclui integração com equipamentos. Faça upgrade para continuar.',

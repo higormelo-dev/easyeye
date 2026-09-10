@@ -881,6 +881,13 @@ class MedicalRecordsController extends Controller
             // Histórico de evoluções é por PACIENTE (atravessa prontuários) —
             // disponível também no create, antes de salvar o prontuário atual.
             'evolutions_index' => route('panel.patients.evolutions.index', $patient),
+            // Procedimento ESTRUTURADO (Fase 3 — estoque ↔ prontuário): mesmo
+            // desenho de evolutions_index (histórico por PACIENTE, disponível
+            // antes de salvar). `procedure_bom_template` não depende do
+            // prontuário — é lookup de sugestão de consumo por procedimento
+            // do CATÁLOGO, disponível assim que o médico escolhe um.
+            'medicalrecordprocedures_index' => route('panel.patients.medicalrecord-procedures.index', $patient),
+            'procedure_bom_template'        => route('panel.procedures.bom', '__PROCEDURE_ID__'),
         ];
 
         if ($isEdit && $record) {
@@ -899,6 +906,18 @@ class MedicalRecordsController extends Controller
             $urls['evolutions_store'] = route(
                 'panel.patients.medicalrecords.evolutions.store',
                 [$patient, $record],
+            );
+            $urls['medicalrecordprocedures_store'] = route(
+                'panel.patients.medicalrecords.medicalrecord-procedures.store',
+                [$patient, $record],
+            );
+            $urls['medicalrecordprocedure_mark_done_template'] = route(
+                'panel.patients.medicalrecord-procedures.mark-done',
+                [$patient, '__PROCEDURE_ID__'],
+            );
+            $urls['medicalrecordprocedure_cancel_template'] = route(
+                'panel.patients.medicalrecord-procedures.cancel',
+                [$patient, '__PROCEDURE_ID__'],
             );
             $urls['exam_template_template'] = route(
                 'panel.patients.medicalrecords.exam-template',

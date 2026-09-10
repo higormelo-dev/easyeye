@@ -1,0 +1,181 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
+use App\Http\Resources\EntityProductResource;
+use App\Models\{Entity, EntityProduct, Plan, PlanFeature, ProductCategory, Subscription, User};
+use App\Services\Stock\StockService;
+
+/**
+ * Catálogo de produtos/materiais de estoque — App\Http\Controllers\Stock\
+ * ProductsController.
+ *
+ * Rota com dupla trava: `permission:stock.manage` (RBAC, admin bypass) +
+ * `feature:has_inventory_module` (plano). Diferente dos catálogos em
+ * `setting.`, aqui a clínica PRECISA ter a feature habilitada no plano —
+ * testado explicitamente abaixo (feature ausente = 403 antes mesmo de
+ * checar permission).
+ */
+beforeEach(function () {
+    $this->entity = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $this->plan   = Plan::factory()->create(['active' => true]);
+
+    PlanFeature::factory()->enabled(FeatureKey::HasInventoryModule)->for($this->plan)->create();
+
+    Subscription::factory()->create([
+        'entity_id' => $this->entity->id,
+        'plan_id'   => $this->plan->id,
+        'status'    => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(),
+        'ends_at'   => now()->addMonth(),
+    ]);
+
+    $this->admin           = User::factory()->create();
+    $this->adminEntityUser = createEntityUser($this->entity, $this->admin, ClientRule::Admin->value);
+
+    $this->category = ProductCategory::create(['entity_id' => $this->entity->id, 'name' => 'Colírios', 'active' => true]);
+});
+
+function actingAsProductAdmin($test, ?User $admin = null, $entityUser = null)
+{
+    return $test->actingAs($admin ?? $test->admin)
+        ->withSession(panelSession($entityUser ?? $test->adminEntityUser));
+}
+
+function productPayload($test, array $overrides = []): array
+{
+    return array_merge([
+        'product_category_id' => $test->category->id,
+        'name'                => 'Colírio Diclofenaco 0,1%',
+        'unit'                => 'un',
+        'sale_price'          => 25.90,
+        'min_qty'             => 5,
+        'active'              => true,
+    ], $overrides);
+}
+
+it('clínica SEM o módulo de estoque no plano recebe 403 ao acessar produtos', function () {
+    $entityWithoutFeature = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $planWithoutFeature   = Plan::factory()->create(['active' => true]);
+
+    Subscription::factory()->create([
+        'entity_id' => $entityWithoutFeature->id,
+        'plan_id'   => $planWithoutFeature->id,
+        'status'    => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(),
+        'ends_at'   => now()->addMonth(),
+    ]);
+
+    $admin      = User::factory()->create();
+    $entityUser = createEntityUser($entityWithoutFeature, $admin, ClientRule::Admin->value);
+
+    // Accept:application/json — FeatureDeniedException::render() só devolve
+    // 403 JSON nesse caso; sem ele (navegação web normal) faz back()-with-
+    // errors (302), mesmo padrão de FeatureDeniedException::render() e do
+    // teste equivalente em AssistantChatTest.
+    actingAsProductAdmin($this, $admin, $entityUser)
+        ->get(route('panel.stock.products.index'), ['Accept' => 'application/json'])
+        ->assertForbidden();
+});
+
+it('admin com feature habilitada cria um produto', function () {
+    // ProductsController (custom, mesmo padrão de IolLensesController) SEMPRE
+    // redireciona no sucesso — diferente de BaseSettingController, que
+    // devolve JSON quando Accept:application/json. `Accept` aqui só importa
+    // pra validação (422 vira JSON de qualquer forma).
+    $res = actingAsProductAdmin($this)
+        ->post(route('panel.stock.products.store'), productPayload($this), ['Accept' => 'application/json']);
+
+    $res->assertRedirect(route('panel.stock.products.index'));
+
+    $product = EntityProduct::query()->where('entity_id', $this->entity->id)->first();
+    expect($product)->not->toBeNull()
+        ->and($product->name)->toBe('Colírio Diclofenaco 0,1%')
+        ->and($product->code)->toStartWith('PRD-')
+        ->and((float) $product->qty_on_hand)->toBe(0.0)
+        ->and((float) $product->cost_avg)->toBe(0.0);
+});
+
+it('não aceita qty_on_hand/cost_avg via mass-assignment no cadastro (saldo só muda por StockService)', function () {
+    actingAsProductAdmin($this)
+        ->post(route('panel.stock.products.store'), productPayload($this, [
+            'qty_on_hand' => 999,
+            'cost_avg'    => 500,
+        ]), ['Accept' => 'application/json'])
+        ->assertRedirect(route('panel.stock.products.index'));
+
+    $product = EntityProduct::query()->where('entity_id', $this->entity->id)->first();
+    expect((float) $product->qty_on_hand)->toBe(0.0)
+        ->and((float) $product->cost_avg)->toBe(0.0);
+});
+
+it('sku duplicado na mesma clínica é rejeitado', function () {
+    EntityProduct::create(array_merge(productPayload($this), ['entity_id' => $this->entity->id, 'sku' => 'ABC-123']));
+
+    actingAsProductAdmin($this)
+        ->post(route('panel.stock.products.store'), productPayload($this, ['sku' => 'ABC-123', 'name' => 'Outro produto']), ['Accept' => 'application/json'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('sku');
+});
+
+it('[ISOLAMENTO] admin de outra clínica recebe 404 ao tentar editar produto alheio', function () {
+    $product = EntityProduct::create(array_merge(productPayload($this), ['entity_id' => $this->entity->id]));
+
+    $otherEntity = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $otherPlan   = Plan::factory()->create(['active' => true]);
+    PlanFeature::factory()->enabled(FeatureKey::HasInventoryModule)->for($otherPlan)->create();
+    Subscription::factory()->create([
+        'entity_id' => $otherEntity->id,
+        'plan_id'   => $otherPlan->id,
+        'status'    => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(),
+        'ends_at'   => now()->addMonth(),
+    ]);
+    $otherAdmin      = User::factory()->create();
+    $otherEntityUser = createEntityUser($otherEntity, $otherAdmin, ClientRule::Admin->value);
+
+    // product_category_id: null — a categoria de $this->entity não existe
+    // pra $otherEntity (EntityProductRequest::rules() já barraria isso com
+    // 422 antes de chegar no controller); aqui o alvo é especificamente o
+    // assertOwnership() do controller, não a validação de categoria.
+    actingAsProductAdmin($this, $otherAdmin, $otherEntityUser)
+        ->put(route('panel.stock.products.update', $product->id), productPayload($this, ['name' => 'Hackeado', 'product_category_id' => null]), ['Accept' => 'application/json'])
+        ->assertStatus(404);
+
+    expect($product->fresh()->name)->toBe('Colírio Diclofenaco 0,1%');
+});
+
+it('admin desativa (soft delete) um produto', function () {
+    $product = EntityProduct::create(array_merge(productPayload($this), ['entity_id' => $this->entity->id]));
+
+    actingAsProductAdmin($this)
+        ->delete(route('panel.stock.products.destroy', $product->id), [], ['Accept' => 'application/json'])
+        ->assertRedirect(route('panel.stock.products.index'));
+
+    expect($product->fresh()->trashed())->toBeTrue();
+});
+
+// ── BUGFIX (achado na revisão de gaps): min_qty=0 (default de todo produto
+// recém-cadastrado) não é "abaixo do mínimo" — é "sem mínimo configurado" ──
+
+it('[BUGFIX] produto recém-cadastrado (min_qty=0, saldo=0) NÃO aparece como abaixo do mínimo', function () {
+    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Produto novo', 'unit' => 'un', 'active' => true]); // min_qty=0 (default)
+
+    expect($product->isBelowMinimum())->toBeFalse()
+        ->and(EntityProduct::query()->belowMinimum()->whereKey($product->id)->exists())->toBeFalse()
+        // Mesma serialização usada pela listagem (EntityProductResource) —
+        // checa direto no Resource em vez de parsear a resposta Inertia da
+        // rota index() (que não é JSON puro), mesmo padrão do resto desta suíte.
+        ->and((new EntityProductResource($product))->resolve()['below_minimum'])->toBeFalse();
+});
+
+it('produto com mínimo REALMENTE configurado e saldo no/abaixo dele aparece como abaixo do mínimo', function () {
+    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Colírio', 'unit' => 'un', 'min_qty' => 5, 'active' => true]);
+    // qty_on_hand não é fillable (ver doc do model) — seed via StockService,
+    // mesmo caminho real de qualquer entrada de estoque.
+    app(StockService::class)->manualIn($product, 5, 10.00);
+
+    expect($product->fresh()->isBelowMinimum())->toBeTrue()
+        ->and(EntityProduct::query()->belowMinimum()->whereKey($product->id)->exists())->toBeTrue();
+});

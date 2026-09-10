@@ -26,6 +26,10 @@ enum FeatureKey: string
     // parte (chat de apoio geral, não workflow de laudo/prontuário estruturado).
     case HasAiChatAssistant = 'has_ai_chat_assistant';
     case HasApiIntegrator   = 'has_api_integrator';
+    // Módulo de gestão de estoque (produtos/materiais/OPM, movimentação,
+    // compras). Feature paga independente — clínica sem o módulo continua
+    // operando normalmente (estoque é opcional, não trava agenda/prontuário).
+    case HasInventoryModule = 'has_inventory_module';
 
     // Limites mensais de créditos IA (integer, 0 = ilimitado)
     case AiMonthlyCredits = 'ai_monthly_credits';
@@ -46,6 +50,7 @@ enum FeatureKey: string
             self::HasAiEyeImageAnalysis => __('subscriptions.features.has_ai_eye_image_analysis'),
             self::HasAiChatAssistant    => __('subscriptions.features.has_ai_chat_assistant'),
             self::HasApiIntegrator      => __('subscriptions.features.has_api_integrator'),
+            self::HasInventoryModule    => __('subscriptions.features.has_inventory_module'),
             self::AiMonthlyCredits      => __('subscriptions.features.ai_monthly_credits'),
             self::ApiMonthlyExamSends   => __('subscriptions.features.api_monthly_exam_sends'),
         };
@@ -61,6 +66,7 @@ enum FeatureKey: string
             self::HasAiEyeImageAnalysis,
             self::HasAiChatAssistant,
             self::HasApiIntegrator,
+            self::HasInventoryModule,
         ]);
     }
 

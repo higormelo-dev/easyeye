@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Server Side Rendering
@@ -20,7 +19,6 @@ return [
     */
 
     'ssr' => [
-
         'enabled' => (bool) env('INERTIA_SSR_ENABLED', true),
 
         'runtime' => env('INERTIA_SSR_RUNTIME', 'node'),
@@ -48,7 +46,6 @@ return [
         */
 
         'throw_on_error' => (bool) env('INERTIA_SSR_THROW_ON_ERROR', false),
-
     ],
 
     /*
@@ -66,26 +63,31 @@ return [
     */
 
     'pages' => [
-
         'ensure_pages_exist' => false,
 
         'paths' => [
-
-            resource_path('js/pages'),
-
+            // BUGFIX (achado na revisão de gaps): era 'js/pages' (minúsculo)
+            // — o diretório real é resources/js/Pages (P maiúsculo, ver
+            // convenção em todo o projeto). Em filesystem case-sensitive
+            // (Linux, produção/CI) isso faz `assertInertia(...)
+            // ->component(...)` falhar SEMPRE com "component file does not
+            // exist", mesmo pra página que existe — só nunca apareceu
+            // porque nenhum teste do projeto até agora chamava
+            // `->component()` dentro de assertInertia() (só `->has(...)`,
+            // que não bate nesse código). Não afeta produção: o
+            // `ensure_pages_exist` de topo (runtime real) já é `false`; só
+            // o de `testing` abaixo é `true`.
+            resource_path('js/Pages'),
         ],
 
         'extensions' => [
-
             'js',
             'jsx',
             'svelte',
             'ts',
             'tsx',
             'vue',
-
         ],
-
     ],
 
     /*
@@ -103,9 +105,7 @@ return [
     */
 
     'testing' => [
-
         'ensure_pages_exist' => true,
-
     ],
 
     /*
@@ -134,9 +134,6 @@ return [
     */
 
     'history' => [
-
         'encrypt' => (bool) env('INERTIA_ENCRYPT_HISTORY', false),
-
     ],
-
 ];

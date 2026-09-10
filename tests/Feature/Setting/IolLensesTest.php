@@ -1,7 +1,8 @@
 <?php
 
-use App\Enums\ClientRule;
-use App\Models\{Entity, EntityIolLens, IolLensModel, User};
+use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
+use App\Models\{Entity, EntityIolLens, EntityProduct, IolLensModel, Plan, PlanFeature, Subscription, User};
+use App\Services\Stock\StockService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -46,6 +47,25 @@ function actingAsIolLensAdmin($test, ?User $admin = null, $entityUser = null)
 {
     return $test->actingAs($admin ?? $test->admin)
         ->withSession(panelSession($entityUser ?? $test->adminEntityUser));
+}
+
+/**
+ * Habilita o módulo de estoque (feature paga) pra uma entity — necessário
+ * só nos testes do vínculo opcional Lente IOL ↔ Produto (GAP-FILL pós-Fase
+ * 4): sem isso `hasInventoryModule` fica false e `panel.stock.products.search`
+ * 403a (mesmo par de trava permission:stock.manage + feature:has_inventory_module
+ * de todo o resto do módulo — ver StockReportsTest::beforeEach() pro mesmo
+ * setup). Os demais testes deste arquivo NÃO chamam isso de propósito: o
+ * CRUD de lente em si nunca dependeu do módulo de estoque.
+ */
+function enableInventoryModuleFor(Entity $entity): void
+{
+    $plan = Plan::factory()->create(['active' => true]);
+    PlanFeature::factory()->enabled(FeatureKey::HasInventoryModule)->for($plan)->create();
+    Subscription::factory()->create([
+        'entity_id' => $entity->id, 'plan_id' => $plan->id, 'status' => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
+    ]);
 }
 
 function iolLensPayload(array $overrides = []): array
@@ -330,4 +350,126 @@ it('excluir uma lente faz soft delete (deleted_at preenchido, some da consulta p
     // `{resource}/{id}/restore`). Item 10 do pedido original pede um teste
     // de restore "se o endpoint existir" — não existe, então esse teste foi
     // deliberadamente omitido.
+});
+
+// ── Vínculo opcional com estoque (GAP-FILL pós-Fase 4) ─────────────────────
+// entity_product_id + App\Models\EntityProduct — ver docblock de
+// App\Models\EntityIolLens sobre a decisão (aditivo, sem migração).
+
+it('[GAP] cria lente já vinculada a um produto do estoque DA MESMA clínica — persistido + refletido no resource', function () {
+    enableInventoryModuleFor($this->entity);
+    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente IOL física', 'unit' => 'un', 'active' => true]);
+    app(StockService::class)->manualIn($product, 3, 500.00);
+
+    $res = storeIolLens($this, ['entity_product_id' => $product->id]);
+    $res->assertRedirect(route('panel.setting.iollenses.index'));
+
+    $lens = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
+    expect($lens->entity_product_id)->toBe($product->id);
+
+    $show = actingAsIolLensAdmin($this)->getJson(route('panel.setting.iollenses.show', $lens->id));
+    $show->assertOk();
+    // (float) explícito: json_encode() de 3.0 vira `3` sem casa decimal —
+    // json_decode() volta int, quebrando toBe(3.0) por tipo estrito (mesma
+    // pegadinha já documentada em StockServiceTest/PurchaseOrderServiceTest).
+    expect($show->json('data.entity_product_id'))->toBe($product->id)
+        ->and($show->json('data.stock.name'))->toBe('Lente IOL física')
+        ->and((float) $show->json('data.stock.qty_on_hand'))->toBe(3.0);
+});
+
+it('[GAP][SEGURANÇA] vincular a um entity_product_id de OUTRA clínica retorna 422 — isolamento multi-tenant', function () {
+    enableInventoryModuleFor($this->entity);
+    $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $otherProduct = EntityProduct::create(['entity_id' => $otherEntity->id, 'name' => 'Produto de outra clínica', 'unit' => 'un', 'active' => true]);
+
+    $res = storeIolLens($this, ['entity_product_id' => $otherProduct->id]);
+
+    $res->assertStatus(422);
+    $res->assertJsonValidationErrors('entity_product_id');
+    expect(EntityIolLens::count())->toBe(0);
+});
+
+it('[GAP] lente sem vínculo (entity_product_id omitido) continua funcionando normalmente — stock ausente no resource', function () {
+    $res = storeIolLens($this);
+    $res->assertRedirect(route('panel.setting.iollenses.index'));
+
+    $lens = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
+    expect($lens->entity_product_id)->toBeNull();
+
+    $show = actingAsIolLensAdmin($this)->getJson(route('panel.setting.iollenses.show', $lens->id));
+    $show->assertOk();
+    expect($show->json('data.entity_product_id'))->toBeNull()
+        ->and($show->json('data.stock'))->toBeNull();
+});
+
+it('[GAP] editar lente pra REMOVER um vínculo existente funciona (entity_product_id vira null)', function () {
+    enableInventoryModuleFor($this->entity);
+    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente vinculada', 'unit' => 'un', 'active' => true]);
+
+    storeIolLens($this, ['entity_product_id' => $product->id])->assertRedirect(route('panel.setting.iollenses.index'));
+    $lens = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
+    expect($lens->entity_product_id)->toBe($product->id);
+
+    updateIolLens($this, $lens->id, ['entity_product_id' => null])->assertRedirect(route('panel.setting.iollenses.index'));
+
+    $lens->refresh();
+    expect($lens->entity_product_id)->toBeNull();
+});
+
+// Dois `it()` separados (não 2 asserts num só) DE PROPÓSITO: FeatureGateService
+// é singleton com cache de assinatura POR PROCESSO ($subscriptionCache, ver
+// docblock da classe) — chamar index() 2x na MESMA function de teste leria a
+// assinatura da PRIMEIRA chamada (cacheada), mesmo após criar uma nova
+// Subscription no meio. Cada `it()` do Pest tem seu próprio boot/container,
+// então cada um vê o estado real e isolado.
+it('[GAP] index() expõe hasInventoryModule=false quando a clínica NÃO tem o módulo de estoque no plano', function () {
+    $res = actingAsIolLensAdmin($this)->get(route('panel.setting.iollenses.index'));
+    $res->assertOk();
+    $res->assertInertia(fn ($page) => $page->where('hasInventoryModule', false));
+});
+
+it('[GAP] index() expõe hasInventoryModule=true quando a clínica TEM o módulo de estoque no plano', function () {
+    enableInventoryModuleFor($this->entity);
+
+    $res = actingAsIolLensAdmin($this)->get(route('panel.setting.iollenses.index'));
+    $res->assertOk();
+    $res->assertInertia(fn ($page) => $page->where('hasInventoryModule', true));
+});
+
+it('[GAP] ProductsController::search() — menos de 2 caracteres retorna vazio', function () {
+    enableInventoryModuleFor($this->entity);
+    EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente X', 'unit' => 'un', 'active' => true]);
+
+    $res = actingAsIolLensAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'l']));
+
+    $res->assertOk();
+    expect($res->json('data'))->toBe([]);
+});
+
+it('[GAP] ProductsController::search() — retorna só produtos ATIVOS da MESMA clínica, campo product_name (não name) pra não colidir com o label do SearchSelect', function () {
+    enableInventoryModuleFor($this->entity);
+    $match        = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente Multifocal', 'code' => 'PRD-1', 'unit' => 'un', 'active' => true]);
+    $inactive     = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente Inativa', 'unit' => 'un', 'active' => false]);
+    $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $otherProduct = EntityProduct::create(['entity_id' => $otherEntity->id, 'name' => 'Lente Multifocal outra clínica', 'unit' => 'un', 'active' => true]);
+
+    $res = actingAsIolLensAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'multifocal']));
+
+    $res->assertOk();
+    $ids = collect($res->json('data'))->pluck('id');
+
+    expect($ids)->toHaveCount(1)
+        ->and($ids->first())->toBe($match->id)
+        ->and($ids)->not->toContain($inactive->id)
+        ->and($ids)->not->toContain($otherProduct->id)
+        ->and($res->json('data.0.product_name'))->toBe('Lente Multifocal')
+        ->and($res->json('data.0.label'))->toBe('Lente Multifocal (PRD-1)');
+});
+
+it('[GAP][REGRA DE NEGÓCIO] ProductsController::search() sem o módulo de estoque no plano retorna 403', function () {
+    // SEM enableInventoryModuleFor() — feature:has_inventory_module barra
+    // antes mesmo de chegar no controller.
+    $res = actingAsIolLensAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'lente']));
+
+    $res->assertForbidden();
 });

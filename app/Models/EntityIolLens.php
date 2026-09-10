@@ -17,6 +17,15 @@ use Illuminate\Support\Facades\Storage;
  *
  * Para o catálogo GLOBAL de referência (sem escopo, compartilhado entre
  * clínicas), ver IolLensModel.
+ *
+ * `entity_product_id` (nullable — GAP-FILL pós-Fase 4 do módulo de estoque):
+ * vínculo OPCIONAL e ADITIVO com App\Models\EntityProduct, decisão explícita
+ * do usuário em vez de unificar os dois catálogos (risco de migração numa
+ * feature em produção). Sem vínculo, este model funciona exatamente como
+ * antes — price/diopter continuam sendo dado PRÓPRIO da lente (cotação),
+ * nunca escritos a partir do saldo de estoque. Com vínculo, a clínica pode
+ * ADICIONALMENTE rastrear saldo/lote/custo físico da mesma lente via
+ * StockService, sem duplicar cadastro.
  */
 class EntityIolLens extends Model
 {
@@ -36,6 +45,7 @@ class EntityIolLens extends Model
     protected $fillable = [
         'entity_id',
         'iol_lens_model_id',
+        'entity_product_id',
         'manufacturer',
         'model_name',
         'category',
@@ -79,6 +89,15 @@ class EntityIolLens extends Model
     public function lensModel(): BelongsTo
     {
         return $this->belongsTo(IolLensModel::class, 'iol_lens_model_id');
+    }
+
+    /**
+     * Vínculo opcional com o catálogo de estoque (ver docblock da classe).
+     * Nullable — a maioria dos itens não tem vínculo nenhum.
+     */
+    public function entityProduct(): BelongsTo
+    {
+        return $this->belongsTo(EntityProduct::class, 'entity_product_id');
     }
 
     /**

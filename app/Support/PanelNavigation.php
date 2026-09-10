@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Enums\{ClientRule, FeatureKey, SaasRule};
+use App\Enums\{ClientRule, FeatureKey, Permission, SaasRule};
 use App\Models\Entity;
 use App\Services\FeatureGateService;
 
@@ -118,6 +118,32 @@ class PanelNavigation
             ];
         }
 
+        // Estoque (Fase 1): produtos/materiais + movimentação. Gate duplo já
+        // acontece no middleware da rota (permission:stock.manage +
+        // feature:has_inventory_module); aqui decide VISIBILIDADE do item de
+        // menu. GAP fechado nesta revisão: além de $isAdmin, também mostra
+        // pra quem tem a permission granular `stock.manage` via Role
+        // customizada (RBAC piloto) — antes só admin via cargo fixo via a
+        // rota já deixava passar, mas o item ficava invisível no menu pra
+        // esse usuário (só descobria a tela digitando a URL). Os outros
+        // grupos ($isFinancial/Configurações) mantêm o critério antigo de
+        // propósito — não são escopo desta revisão.
+        if ($isAdmin || self::hasStockManagePermission()) {
+            $nav[] = [
+                'key'      => 'stock',
+                'icon'     => 'ti ti-boxes',
+                'label'    => __('actions.sidemenu.stock'),
+                'match'    => ['panel.stock.*'],
+                'children' => [
+                    ['route' => 'panel.stock.products.index', 'icon' => 'ti ti-package', 'label' => __('actions.sidemenu.products'), 'match' => ['panel.stock.products.*']],
+                    ['route' => 'panel.stock.movements.index', 'icon' => 'ti ti-transfer-in', 'label' => __('actions.sidemenu.stock_movements'), 'match' => ['panel.stock.movements.*']],
+                    ['route' => 'panel.stock.purchase-orders.index', 'icon' => 'ti ti-shopping-cart', 'label' => __('actions.sidemenu.purchase_orders'), 'match' => ['panel.stock.purchase-orders.*']],
+                    ['route' => 'panel.stock.suppliers.index', 'icon' => 'ti ti-truck-delivery', 'label' => __('actions.sidemenu.suppliers'), 'match' => ['panel.stock.suppliers.*']],
+                    ['route' => 'panel.stock.reports.index', 'icon' => 'ti ti-chart-bar', 'label' => __('actions.sidemenu.stock_reports'), 'match' => ['panel.stock.reports.*']],
+                ],
+            ];
+        }
+
         if ($isAdmin) {
             // ── Configurações reorganizadas em 5 categorias (era 1 grupo
             // flat com 12+ itens soltos + "Controle de acesso" à parte).
@@ -141,6 +167,7 @@ class PanelNavigation
                 ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
                 ['route' => 'panel.setting.surgerytypes.index', 'label' => __('actions.sidemenu.surgerytypes'), 'match' => ['panel.setting.surgerytypes.*']],
                 ['route' => 'panel.setting.iollenses.index', 'label' => __('actions.sidemenu.iol_lenses'), 'match' => ['panel.setting.iollenses.*']],
+                ['route' => 'panel.setting.product-categories.index', 'label' => __('actions.sidemenu.product_categories'), 'match' => ['panel.setting.product-categories.*']],
             ];
 
             // Usuários e permissões: identidade + RBAC granular (roles).
@@ -248,6 +275,31 @@ class PanelNavigation
 
         return $featureGate->can((string) $entityId, FeatureKey::HasAiExamAssistant)
             || $featureGate->can((string) $entityId, FeatureKey::HasAiReportDrafting);
+    }
+
+    /**
+     * True pra admin (bypass interno de hasPermissionInEntity()) OU usuário
+     * com Role customizada portando a permission granular `stock.manage`.
+     * `auth()->user()` (não passado como parâmetro) porque build() é
+     * chamado sem argumentos por HandleInertiaRequests — mesmo padrão de
+     * canSeeAi() acima resolvendo tudo a partir de session()/helpers globais.
+     */
+    private static function hasStockManagePermission(): bool
+    {
+        $entityId = session('selected_entity_id');
+        $user     = auth()->user();
+
+        if (! $entityId || ! $user) {
+            return false;
+        }
+
+        $entity = Entity::find($entityId);
+
+        if (! $entity) {
+            return false;
+        }
+
+        return $user->hasPermissionInEntity($entity, Permission::StockManage);
     }
 
     private static function managerNav(): array

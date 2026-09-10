@@ -229,6 +229,12 @@ describe('mergeExams()', function () {
         ])->assertStatus(422);
     });
 
+    it('[SEGURANÇA] rejeita array com mais de 50 imagens (422) — evita whereIn() caro', function () {
+        actingAsDoctorEic($this)->postJson(route('panel.eye-images.exams.merge'), [
+            'exam_ids' => array_fill(0, 51, (string) Str::uuid()),
+        ])->assertStatus(422);
+    });
+
     it('[SEGURANÇA] nunca mescla exames de pacientes diferentes, mesma clínica', function () {
         actingAsDoctorEic($this)->postJson(route('panel.eye-images.exams.merge'), [
             'exam_ids' => [$this->exam->id, $this->examOtherPatient->id],
