@@ -2448,15 +2448,19 @@ const printEntity = computed(() => props.entity ?? {});
     align-items: center;
     justify-content: center;
     z-index: 3;
-    opacity: 0;
-    pointer-events: none;
+    /* Affordance permanente e discreta em vez de só-hover: em touch o
+       1º toque na miniatura já seleciona o exame (onThumbClick), então
+       :hover/:focus-within nunca dispara de forma confiável antes do
+       usuário tocar de novo — pointer-events:none por padrão deixava
+       o kebab morto no primeiro toque em vários navegadores móveis. */
+    opacity: .55;
+    pointer-events: auto;
     transition: opacity .12s;
     font-size: .8rem;
 }
 .eyeimg-thumb:hover .eyeimg-kebab,
 .eyeimg-thumb:focus-within .eyeimg-kebab {
     opacity: 1;
-    pointer-events: auto;
 }
 
 .eyeimg-skeleton {
