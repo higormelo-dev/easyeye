@@ -24,13 +24,14 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxPatients->value         => '2000',
                     FeatureKey::MaxDoctors->value          => '1',
                     FeatureKey::MaxStorageGB->value        => '10',
-                    FeatureKey::HasAiExamAssistant->value  => '0',
-                    FeatureKey::HasAiReportDrafting->value => '0',
-                    FeatureKey::HasAiConsensus->value      => '0',
-                    FeatureKey::HasAiChatAssistant->value  => '0',
-                    FeatureKey::HasApiIntegrator->value    => '0',
-                    FeatureKey::AiMonthlyCredits->value    => '0',
-                    FeatureKey::ApiMonthlyExamSends->value => '0',
+                    FeatureKey::HasAiExamAssistant->value    => '0',
+                    FeatureKey::HasAiReportDrafting->value   => '0',
+                    FeatureKey::HasAiConsensus->value        => '0',
+                    FeatureKey::HasAiEyeImageAnalysis->value => '0',
+                    FeatureKey::HasAiChatAssistant->value    => '0',
+                    FeatureKey::HasApiIntegrator->value      => '0',
+                    FeatureKey::AiMonthlyCredits->value      => '0',
+                    FeatureKey::ApiMonthlyExamSends->value   => '0',
                 ],
             ],
             [
@@ -54,13 +55,14 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxPatients->value         => '10000',
                     FeatureKey::MaxDoctors->value          => '3',
                     FeatureKey::MaxStorageGB->value        => '50',
-                    FeatureKey::HasAiExamAssistant->value  => '0',
-                    FeatureKey::HasAiReportDrafting->value => '1',
-                    FeatureKey::HasAiConsensus->value      => '0',
-                    FeatureKey::HasAiChatAssistant->value  => '1',
-                    FeatureKey::HasApiIntegrator->value    => '0',
-                    FeatureKey::AiMonthlyCredits->value    => '30',  // degustação — excedente R$ 2,50/crédito
-                    FeatureKey::ApiMonthlyExamSends->value => '0',
+                    FeatureKey::HasAiExamAssistant->value    => '0',
+                    FeatureKey::HasAiReportDrafting->value   => '1',
+                    FeatureKey::HasAiConsensus->value        => '0',
+                    FeatureKey::HasAiEyeImageAnalysis->value => '0',
+                    FeatureKey::HasAiChatAssistant->value    => '1',
+                    FeatureKey::HasApiIntegrator->value      => '0',
+                    FeatureKey::AiMonthlyCredits->value      => '30',  // degustação — excedente R$ 2,50/crédito
+                    FeatureKey::ApiMonthlyExamSends->value   => '0',
                 ],
             ],
             [
@@ -76,13 +78,14 @@ class PlanSeeder extends Seeder
                     FeatureKey::MaxPatients->value         => '0', // ilimitado
                     FeatureKey::MaxDoctors->value          => '10',
                     FeatureKey::MaxStorageGB->value        => '200',
-                    FeatureKey::HasAiExamAssistant->value  => '1',
-                    FeatureKey::HasAiReportDrafting->value => '1',
-                    FeatureKey::HasAiConsensus->value      => '1',
-                    FeatureKey::HasAiChatAssistant->value  => '1',
-                    FeatureKey::HasApiIntegrator->value    => '1',
-                    FeatureKey::AiMonthlyCredits->value    => '80',  // franquia — excedente R$ 2,00/crédito
-                    FeatureKey::ApiMonthlyExamSends->value => '0',   // ilimitado → cap interno 1000
+                    FeatureKey::HasAiExamAssistant->value    => '1',
+                    FeatureKey::HasAiReportDrafting->value   => '1',
+                    FeatureKey::HasAiConsensus->value        => '1',
+                    FeatureKey::HasAiEyeImageAnalysis->value => '1',
+                    FeatureKey::HasAiChatAssistant->value    => '1',
+                    FeatureKey::HasApiIntegrator->value      => '1',
+                    FeatureKey::AiMonthlyCredits->value      => '80',  // franquia — excedente R$ 2,00/crédito
+                    FeatureKey::ApiMonthlyExamSends->value   => '0',   // ilimitado → cap interno 1000
                 ],
             ],
         ];
