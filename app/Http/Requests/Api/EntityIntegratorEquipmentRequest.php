@@ -28,15 +28,20 @@ class EntityIntegratorEquipmentRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Só o nome é obrigatório: o integrador opera por pasta monitorada e
+        // IP/MAC/serial nunca participam do pipeline — são metadados de
+        // inventário. Muitos aparelhos reais (ex.: Topcon TRC-50DX com DSLR
+        // acoplada) nem têm rede própria. Quando informados, formato e
+        // unicidade continuam valendo.
         return [
             'name' => ['required', 'string', 'max:255', $this->uniqueRule('name')],
-            'ip'   => ['required', 'ip', $this->uniqueRule('ip')],
+            'ip'   => ['nullable', 'ip', $this->uniqueRule('ip')],
             'mac'  => [
-                'required',
+                'nullable',
                 'regex:/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/',
                 $this->uniqueRule('mac'),
             ],
-            'serial_number' => ['required', 'string', 'max:100', $this->uniqueRule('serial_number')],
+            'serial_number' => ['nullable', 'string', 'max:100', $this->uniqueRule('serial_number')],
         ];
     }
 

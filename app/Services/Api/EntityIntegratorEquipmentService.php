@@ -85,14 +85,31 @@ class EntityIntegratorEquipmentService
             'active' => $request->boolean('active'),
         ];
 
-        $existingRecord = EntityIntegratorEquipment::withTrashed()
-            ->where('integrator_id', $integrator->id)
-            ->where(function ($query) use ($request) {
-                $query->where('ip', $request->input('ip'))
-                    ->orWhere('mac', mb_strtoupper($request->mac, 'UTF-8'))
-                    ->orWhere('serial_number', mb_strtoupper($request->serial_number, 'UTF-8'));
-            })
-            ->first();
+        // Identidade de hardware só existe nos campos INFORMADOS: ip/mac/
+        // serial agora são opcionais (o integrador opera por pasta; muitos
+        // aparelhos nem têm rede). Comparar um campo ausente seria ou um
+        // erro de tipo (macaddr do Postgres rejeita '') ou um falso match
+        // (ip IS NULL casaria com qualquer outro equipamento sem ip).
+        $hardwareIdentity = array_filter([
+            'ip'            => $request->input('ip'),
+            'mac'           => $request->filled('mac')
+                ? mb_strtoupper($request->input('mac'), 'UTF-8')
+                : null,
+            'serial_number' => $request->filled('serial_number')
+                ? mb_strtoupper($request->input('serial_number'), 'UTF-8')
+                : null,
+        ]);
+
+        $existingRecord = $hardwareIdentity === []
+            ? null
+            : EntityIntegratorEquipment::withTrashed()
+                ->where('integrator_id', $integrator->id)
+                ->where(function ($query) use ($hardwareIdentity) {
+                    foreach ($hardwareIdentity as $column => $value) {
+                        $query->orWhere($column, $value);
+                    }
+                })
+                ->first();
 
         if ($existingRecord) {
             $existingRecord->trashed() && $existingRecord->restore();
