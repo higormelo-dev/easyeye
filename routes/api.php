@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
     ExamTypesController,
     ExamsController,
+    IntegratorUpdatesController,
     PatientExamsController,
     PatientsController,
     SchedulesController};
@@ -31,6 +32,8 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
             Route::apiResource('examtypes', ExamTypesController::class)->only(['index', 'show']);
             Route::apiResource('schedules', SchedulesController::class)->only('index', 'show');
             Route::apiResource('exams', ExamsController::class)->only('store');
+            // Auto-atualização do desktop: manifesto do último build publicado
+            Route::get('updates', [IntegratorUpdatesController::class, 'index'])->name('updates.index');
 
             // Route::get('profile', static function (Request $request) {
             //     return response()->json($request->user());
