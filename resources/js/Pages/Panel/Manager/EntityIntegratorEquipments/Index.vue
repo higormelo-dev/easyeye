@@ -68,6 +68,12 @@ function closeDetail() { detailOpen.value = false; }
             >
                 <template #actions>
                     <Link
+                        :href="route('manager.entities.user-integrators.integrators.queue-health', [entity.id, userIntegrator.id, integrator.id])"
+                        class="btn btn-outline-primary btn-sm"
+                    >
+                        <i class="ti ti-list-details me-1"></i>Ver fila
+                    </Link>
+                    <Link
                         :href="route('manager.entities.user-integrators.integrators.index', [entity.id, userIntegrator.id])"
                         class="btn btn-outline-secondary btn-sm"
                     >

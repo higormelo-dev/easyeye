@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
     ExamTypesController,
     ExamsController,
+    IntegratorQueueHealthController,
     IntegratorUpdatesController,
     PatientExamsController,
     PatientsController,
@@ -34,6 +35,9 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
             Route::apiResource('exams', ExamsController::class)->only('store');
             // Auto-atualização do desktop: manifesto do último build publicado
             Route::get('updates', [IntegratorUpdatesController::class, 'index'])->name('updates.index');
+            // Retrato do estado atual da fila local (pendentes/falhas/
+            // bloqueados/enviados) — upsert periódico, nunca histórico.
+            Route::put('queue-health', [IntegratorQueueHealthController::class, 'store'])->name('queue-health.store');
 
             // Route::get('profile', static function (Request $request) {
             //     return response()->json($request->user());

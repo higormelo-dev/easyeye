@@ -1,10 +1,12 @@
 <?php
 
-use App\Http\Controllers\Manager\{AiModelPricesController,
+use App\Http\Controllers\Manager\{
     AiCreditPurchasesController,
+    AiModelPricesController,
     AiProvidersController,
     EntitiesController,
     EntityIntegratorEquipmentsController,
+    EntityIntegratorQueueHealthController,
     EntityIntegratorsController,
     EntityUserIntegratorsController,
     EntityUsersController,
@@ -91,6 +93,12 @@ Route::group([
 
         // ── Equipamentos ───────────────────────────────────────────────────────
         Route::resource('entities.user-integrators.integrators.equipments', EntityIntegratorEquipmentsController::class)->only('index', 'show');
+
+        // ── Fila local do integrador ("o que tá acontecendo agora") ───────────
+        Route::get(
+            'entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/queue-health',
+            [EntityIntegratorQueueHealthController::class, 'index'],
+        )->name('entities.user-integrators.integrators.queue-health');
 
         // ── Atualizações do Integrador (auto-update dos desktops) ─────────────
         // Publicar um binário distribui para TODAS as clínicas — admin only e
