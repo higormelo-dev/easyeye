@@ -69,10 +69,40 @@ describe('GET /api/integrators/v1/updates', function () {
             ->assertJsonPath('data.version', '0.2.0');
     });
 
+    // Desempate por id (UUIDv7, ordenado no tempo) quando dois builds têm o
+    // MESMO created_at — cenário plausível de duas publicações no mesmo
+    // segundo. orderByDesc('created_at')->orderByDesc('id') deve escolher o
+    // publicado por último mesmo com created_at idêntico.
+    it('breaks a created_at tie by id (most recently inserted wins)', function () {
+        $now = now();
+
+        makeUpdate(['version' => '0.3.0', 'created_at' => $now]);
+        $winner = makeUpdate(['version' => '0.4.0', 'created_at' => $now]);
+
+        $this->getJson('/api/integrators/v1/updates?platform=windows&arch=x86', $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('data.version', '0.4.0')
+            ->assertJsonPath('data.sha256', $winner->sha256);
+    });
+
     it('validates platform and arch as required', function () {
         $this->getJson('/api/integrators/v1/updates', $this->ctx['headers'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['platform', 'arch']);
+    });
+
+    it('returns 422 when platform exceeds max length', function () {
+        $this->getJson(
+            '/api/integrators/v1/updates?platform=' . str_repeat('w', 17) . '&arch=x86',
+            $this->ctx['headers'],
+        )->assertUnprocessable()->assertJsonValidationErrors('platform');
+    });
+
+    it('returns 422 when arch exceeds max length', function () {
+        $this->getJson(
+            '/api/integrators/v1/updates?platform=windows&arch=' . str_repeat('a', 17),
+            $this->ctx['headers'],
+        )->assertUnprocessable()->assertJsonValidationErrors('arch');
     });
 
     it('returns 401 without authentication', function () {

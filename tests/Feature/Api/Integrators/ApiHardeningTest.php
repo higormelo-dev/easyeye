@@ -4,7 +4,7 @@ use App\Enums\{DataAccessPurpose, FeatureKey};
 use App\Models\{DataAccessLog, ExamType, Patient, PatientExam};
 use App\Services\FeatureGateService;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\{Cache, Storage};
 use Laravel\Sanctum\PersonalAccessToken;
 
 /**
@@ -82,6 +82,25 @@ describe('rate limiting integrators-api', function () {
         }
 
         $this->getJson('/api/integrators/v1/examtypes', $ctx['headers'])
+            ->assertStatus(429)
+            ->assertHeader('Retry-After');
+    });
+
+    // Bucket de escrita (40/min) — usa POST /equipments (sem upload/S3) em vez
+    // de exame para manter o teste rápido; cada nome é único para não
+    // esbarrar na checagem de unicidade de name.
+    it('retorna 429 com Retry-After ao estourar o teto de escrita', function () {
+        $ctx = setupIntegrator();
+
+        foreach (range(1, 40) as $i) {
+            $this->postJson('/api/integrators/v1/equipments', [
+                'name' => "Equipamento Rate {$i}",
+            ], $ctx['headers'])->assertCreated();
+        }
+
+        $this->postJson('/api/integrators/v1/equipments', [
+            'name' => 'Equipamento Rate 41',
+        ], $ctx['headers'])
             ->assertStatus(429)
             ->assertHeader('Retry-After');
     });
@@ -166,6 +185,18 @@ describe('escopo de token', function () {
         expect($accessToken->abilities)->toContain('api:read')
             ->and($accessToken->abilities)->toContain('api:write');
     });
+
+    // Só é possível construir este token manualmente (createToken direto) —
+    // o endpoint de signin nunca emite write-only (abilitiesFor() só tem os
+    // ramos 'read' e default=read+write) — mas EnsureTokenScope precisa
+    // barrar leitura mesmo assim se algum dia esse token existir.
+    it('token write-only (sem api:read) é barrado (403) ao ler', function () {
+        $ctx     = setupIntegrator();
+        $headers = scopedHeaders($ctx, ['api:write']);
+
+        $this->getJson('/api/integrators/v1/patients', $headers)
+            ->assertForbidden();
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -212,6 +243,80 @@ describe('idempotência', function () {
             examPayload($ctx, 'NoIdem'),
             $ctx['headers'],
         )->assertCreated()->assertHeaderMissing('Idempotency-Replayed');
+    });
+
+    it('a mesma Idempotency-Key não colide entre integradores diferentes', function () {
+        $ctxA = writeCtx();
+        $ctxB = writeCtx();
+        $key  = ['Idempotency-Key' => 'shared-key-across-tenants'];
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$ctxA['patient']->id}/exams",
+            examPayload($ctxA, 'Exame Tenant A'),
+            $ctxA['headers'] + $key,
+        )->assertCreated()->assertHeaderMissing('Idempotency-Replayed');
+
+        // O guard 'sanctum' memoriza o usuário resolvido na 1ª chamada
+        // (RequestGuard::user() só chama o resolver uma vez por instância) —
+        // sem isso, esta 2ª chamada autenticada como um integrador DIFERENTE,
+        // dentro do MESMO teste, reusaria a identidade da 1ª. Isso é um
+        // artefato do harness de teste (uma request real de produção sempre
+        // resolve o guard do zero); forgetGuards() força a re-resolução.
+        auth()->forgetGuards();
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$ctxB['patient']->id}/exams",
+            examPayload($ctxB, 'Exame Tenant B'),
+            $ctxB['headers'] + $key,
+        )->assertCreated()->assertHeaderMissing('Idempotency-Replayed');
+
+        expect(PatientExam::where('name', 'Exame Tenant A')->count())->toBe(1)
+            ->and(PatientExam::where('name', 'Exame Tenant B')->count())->toBe(1);
+    });
+
+    it('não memoriza resposta de erro: reenviar a mesma chave com payload válido executa normalmente', function () {
+        $ctx = writeCtx();
+        $key = ['Idempotency-Key' => 'retry-after-error-0001'];
+        $url = "/api/integrators/v1/patients/{$ctx['patient']->id}/exams";
+
+        // 1ª tentativa: payload inválido (sem archive) → 422, NÃO memorizado.
+        $this->postJson($url, [
+            'exam_identifier'     => $ctx['examType']->code,
+            'schedule_identifier' => $ctx['schedule']->code,
+            'name'                => 'Exame Retry Apos Erro',
+        ], $ctx['headers'] + $key)->assertUnprocessable();
+
+        // 2ª tentativa, mesma chave, payload válido → deve executar de verdade
+        // (não pode vir de um replay de uma resposta de erro que não existe).
+        $this->postJson($url, examPayload($ctx, 'Exame Retry Apos Erro'), $ctx['headers'] + $key)
+            ->assertCreated()
+            ->assertHeaderMissing('Idempotency-Replayed');
+
+        expect(PatientExam::where('name', 'Exame Retry Apos Erro')->count())->toBe(1);
+    });
+
+    it('retorna 409 quando outra requisição com a mesma Idempotency-Key já está em andamento', function () {
+        $ctx  = writeCtx();
+        $key  = 'concurrent-key-0001';
+        $path = "api/integrators/v1/patients/{$ctx['patient']->id}/exams";
+
+        // Simula a 1ª requisição já ter adquirido o lock (ver ApiIdempotency::handle):
+        // uma 2ª chegando enquanto o lock está preso deve receber 409.
+        $cacheKey = 'idem:' . hash('sha256', $ctx['integrator']->id . '|POST|' . $path . '|' . $key);
+        $lock     = Cache::lock($cacheKey . ':lock', 30);
+        expect($lock->get())->toBeTrue();
+
+        try {
+            $this->postJson(
+                '/' . $path,
+                examPayload($ctx, 'Exame Concorrente'),
+                $ctx['headers'] + ['Idempotency-Key' => $key],
+            )->assertStatus(409);
+
+            expect(PatientExam::where('name', 'Exame Concorrente')->exists())->toBeFalse();
+        } finally {
+            $lock->release();
+        }
     });
 });
 

@@ -78,4 +78,26 @@ class EntityIntegratorEquipmentRequest extends FormRequest
             ->whereNull('deleted_at')
             ->where('integrator_id', request()->attributes->get('integrator')->id);
     }
+
+    /**
+     * Uppercasa name/mac/serial_number ANTES da validação.
+     *
+     * O model (EntityIntegratorEquipment::UPPERCASE_FIELDS) uppercasa esses
+     * mesmos campos ao salvar. Sem normalizar aqui também, uniqueRule()
+     * comparava o valor BRUTO do request contra a coluna já uppercased no
+     * banco — o caso comum (cliente reenvia o mesmo texto que digitou, sem
+     * estar em caixa alta) escapava da checagem de unicidade mesmo colidindo
+     * com um registro existente após a normalização do model, permitindo
+     * duplicata funcional de name/serial_number (achado ao escrever os
+     * testes desta rota; mac não é afetado pois a coluna é macaddr nativo do
+     * Postgres, que já compara endereços independente de caixa).
+     */
+    protected function prepareForValidation(): void
+    {
+        foreach (['name', 'mac', 'serial_number'] as $field) {
+            if ($this->filled($field)) {
+                $this->merge([$field => mb_strtoupper((string) $this->input($field), 'UTF-8')]);
+            }
+        }
+    }
 }

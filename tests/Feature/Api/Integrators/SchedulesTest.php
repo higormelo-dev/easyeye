@@ -91,6 +91,34 @@ describe('GET /api/integrators/v1/schedules', function () {
         expect($response->json('meta.total'))->toBe(1);
     });
 
+    it('searches schedules by bare numeric code (without the SDL- prefix)', function () {
+        $schedule    = makeSchedule($this->ctx);
+        $numericPart = (int) substr($schedule->code, 4); // remove 'SDL-'
+        makeSchedule($this->ctx);
+
+        $response = $this->getJson(
+            "/api/integrators/v1/schedules?search={$numericPart}",
+            $this->ctx['headers'],
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1)
+            ->and($response->json('data.0.id'))->toBe($schedule->id);
+    });
+
+    it('searches schedules by shorthand lower-case code (sdl-N without zero-padding)', function () {
+        $schedule    = makeSchedule($this->ctx);
+        $numericPart = (int) substr($schedule->code, 4); // remove 'SDL-'
+        makeSchedule($this->ctx);
+
+        $response = $this->getJson(
+            '/api/integrators/v1/schedules?search=' . mb_strtolower("sdl-{$numericPart}"),
+            $this->ctx['headers'],
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1)
+            ->and($response->json('data.0.id'))->toBe($schedule->id);
+    });
+
     it('searches schedules by code even when schedule date is not today', function () {
         $targetSchedule = makeSchedule($this->ctx, [
             'date_time' => now()->subDays(14),

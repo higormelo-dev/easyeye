@@ -95,6 +95,22 @@ describe('POST /api/integrators/signin', function () {
             'code'     => mb_strtolower($this->integrator->code),
         ])->assertOk();
     });
+
+    it('returns 422 when email, password and code are all missing', function () {
+        $this->postJson('/api/integrators/signin', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['email', 'password', 'code']);
+    });
+
+    it('returns 422 when scope is not read or write', function () {
+        $this->postJson('/api/integrators/signin', [
+            'email'    => $this->integratorUser->email,
+            'password' => 'Senha@123',
+            'code'     => $this->integrator->code,
+            'scope'    => 'admin',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('scope');
+    });
 });
 
 // ── check-token ───────────────────────────────────────────────────────────────
@@ -111,7 +127,7 @@ describe('POST /api/integrators/check-token', function () {
         $token = $this->integratorUser->createToken(
             'integrator-token',
             ['integrator_id:' . $this->integrator->id],
-            Carbon::now()->addDays(7)
+            Carbon::now()->addDays(7),
         );
 
         $this->postJson('/api/integrators/check-token', [
@@ -137,7 +153,7 @@ describe('POST /api/integrators/check-token', function () {
         $token = $this->integratorUser->createToken(
             'integrator-token',
             ['integrator_id:' . $this->integrator->id],
-            Carbon::now()->subDay()  // já expirado
+            Carbon::now()->subDay(),  // já expirado
         );
 
         $this->postJson('/api/integrators/check-token', [
@@ -152,7 +168,7 @@ describe('POST /api/integrators/check-token', function () {
         $token = $this->integratorUser->createToken(
             'integrator-token',
             ['integrator_id:' . $this->integrator->id],
-            Carbon::now()->addDays(7)
+            Carbon::now()->addDays(7),
         );
 
         $this->postJson('/api/integrators/check-token', [
@@ -167,8 +183,38 @@ describe('POST /api/integrators/check-token', function () {
         $token = $this->integratorUser->createToken(
             'integrator-token',
             ['integrator_id:' . $this->integrator->id],
-            Carbon::now()->addDays(7)
+            Carbon::now()->addDays(7),
         );
+
+        $this->postJson('/api/integrators/check-token', [
+            'token' => $token->plainTextToken,
+        ])->assertUnauthorized()
+            ->assertJsonFragment(['valid' => false]);
+    });
+
+    it('returns 401 for a token whose abilities do not include integrator_id', function () {
+        $token = $this->integratorUser->createToken(
+            'integrator-token',
+            ['some:other-ability'],
+            Carbon::now()->addDays(7),
+        );
+
+        $this->postJson('/api/integrators/check-token', [
+            'token' => $token->plainTextToken,
+        ])->assertUnauthorized()
+            ->assertJsonFragment(['valid' => false]);
+
+        [$id] = explode('|', $token->plainTextToken);
+        expect(PersonalAccessToken::find($id))->toBeNull();
+    });
+
+    it('returns 401 when the integrator record no longer exists', function () {
+        $token = $this->integratorUser->createToken(
+            'integrator-token',
+            ['integrator_id:' . $this->integrator->id],
+            Carbon::now()->addDays(7),
+        );
+        $this->integrator->forceDelete();
 
         $this->postJson('/api/integrators/check-token', [
             'token' => $token->plainTextToken,
@@ -184,7 +230,7 @@ describe('POST /api/integrators/check-token', function () {
         $token = $this->integratorUser->createToken(
             'integrator-token',
             ['integrator_id:' . $this->integrator->id],
-            $expiresAt
+            $expiresAt,
         );
 
         $this->postJson('/api/integrators/check-token', [

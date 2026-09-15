@@ -80,10 +80,18 @@ class EntityIntegratorEquipmentService
     private function findOrCreate(EntityIntegratorEquipmentRequest $request): EntityIntegratorEquipment
     {
         $integrator = request()->attributes->get('integrator');
-        $recordData = [
-            ...$request->only(self::FILLABLE_FIELDS),
-            'active' => $request->boolean('active'),
-        ];
+        $recordData = $request->only(self::FILLABLE_FIELDS);
+
+        // Só sobrescreve 'active' quando o request o envia explicitamente —
+        // mesmo guard usado por update() (if ($request->has('active'))).
+        // EntityIntegratorEquipmentRequest não inclui 'active' no seu
+        // contrato; sem este guard, $request->boolean('active') resolvia
+        // para false por ausência, e um recadastro (POST) do mesmo
+        // equipamento após exclusão lógica reativava o registro (restore)
+        // mas o marcava active=false sem o cliente nunca ter pedido isso.
+        if ($request->has('active')) {
+            $recordData['active'] = $request->boolean('active');
+        }
 
         // Identidade de hardware só existe nos campos INFORMADOS: ip/mac/
         // serial agora são opcionais (o integrador opera por pasta; muitos
@@ -91,8 +99,8 @@ class EntityIntegratorEquipmentService
         // erro de tipo (macaddr do Postgres rejeita '') ou um falso match
         // (ip IS NULL casaria com qualquer outro equipamento sem ip).
         $hardwareIdentity = array_filter([
-            'ip'            => $request->input('ip'),
-            'mac'           => $request->filled('mac')
+            'ip'  => $request->input('ip'),
+            'mac' => $request->filled('mac')
                 ? mb_strtoupper($request->input('mac'), 'UTF-8')
                 : null,
             'serial_number' => $request->filled('serial_number')
@@ -112,7 +120,16 @@ class EntityIntegratorEquipmentService
                 ->first();
 
         if ($existingRecord) {
-            $existingRecord->trashed() && $existingRecord->restore();
+            $wasTrashed = $existingRecord->trashed();
+            $wasTrashed && $existingRecord->restore();
+
+            // Restaurar um equipamento excluído equivale, do ponto de vista
+            // do integrador, a recriá-lo: volta ativo por padrão, a menos
+            // que o cliente tenha pedido o contrário explicitamente.
+            if ($wasTrashed && ! $request->has('active')) {
+                $recordData['active'] = true;
+            }
+
             $existingRecord->update($recordData);
 
             return $existingRecord->refresh();

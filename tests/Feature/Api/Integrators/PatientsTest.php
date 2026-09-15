@@ -127,4 +127,9 @@ describe('GET /api/integrators/v1/patients/{id}', function () {
         $this->getJson('/api/integrators/v1/patients/PAC-NAOEXISTE', $this->ctx['headers'])
             ->assertNotFound();
     });
+
+    it('returns 401 without authentication', function () {
+        $this->getJson("/api/integrators/v1/patients/{$this->patient->id}")
+            ->assertUnauthorized();
+    });
 });

@@ -747,6 +747,75 @@ describe('POST /api/integrators/v1/patients/{patient}/exams/{exam} (update)', fu
 
         expect(PatientExam::find($this->exam->id)->patient_id)->toBe($this->patient->id);
     });
+
+    // Partial update: campos ausentes do body não podem ser nulados.
+    // PatientExamService::buildUpdateData() usa array_filter(!== null), então
+    // uma chave ausente/nula simplesmente não entra no update().
+    it('preserves laterality when the update payload omits it', function () {
+        $this->exam->update(['laterality' => 1]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Exame Original',
+            ],
+            $this->ctx['headers'],
+        )->assertOk();
+
+        expect(PatientExam::find($this->exam->id)->laterality)->toBe(1);
+    });
+
+    it('preserves entity_integrator_equipment_id when the update payload omits equipment_identifier', function () {
+        $equipment = EntityIntegratorEquipment::factory()->create([
+            'integrator_id' => $this->ctx['integrator']->id,
+        ]);
+        $this->exam->update(['entity_integrator_equipment_id' => $equipment->id]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Exame Original',
+            ],
+            $this->ctx['headers'],
+        )->assertOk();
+
+        expect(PatientExam::find($this->exam->id)->entity_integrator_equipment_id)->toBe($equipment->id);
+    });
+
+    it('returns 404 when the exam belongs to another patient in the same entity', function () {
+        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherExam    = PatientExam::factory()->create(['patient_id' => $otherPatient->id]);
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$otherExam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => $this->schedule->code,
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Tentativa De Reatribuir',
+            ],
+            $this->ctx['headers'],
+        )->assertNotFound();
+    });
+
+    it('returns 422 when schedule_identifier looks like a UUID but is malformed', function () {
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$this->exam->id}",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => '12345678-1234-ZZZZ-ZZZZ-ZZZZZZZZZZZZ',
+                'archive'             => UploadedFile::fake()->image('updated.jpg'),
+                'name'                => 'Exame Original',
+            ],
+            $this->ctx['headers'],
+        )->assertUnprocessable()->assertJsonValidationErrors('schedule_identifier');
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -829,6 +898,19 @@ describe('DELETE /api/integrators/v1/patients/{patient}/exams/{exam}', function 
             [],
             $this->ctx['headers'],
         )->assertNotFound();
+    });
+
+    it('returns 404 when the exam belongs to another patient in the same entity', function () {
+        $otherPatient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $otherExam    = PatientExam::factory()->create(['patient_id' => $otherPatient->id]);
+
+        $this->deleteJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams/{$otherExam->id}",
+            [],
+            $this->ctx['headers'],
+        )->assertNotFound();
+
+        expect(PatientExam::find($otherExam->id))->not->toBeNull();
     });
 
     it('returns 401 without authentication', function () {
