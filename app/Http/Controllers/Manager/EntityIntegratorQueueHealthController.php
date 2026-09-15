@@ -5,23 +5,31 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Manager;
 
 use App\Http\Controllers\Controller;
-use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator, IntegratorQueueHealth};
+use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory};
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
- * "O que tá acontecendo agora" na fila local do integrador (Manager SaaS) —
- * dono do SaaS/suporte conferem pendentes/falhas/bloqueados/enviados de uma
- * clínica ANTES de precisar acessar a máquina remotamente.
+ * "O que tá acontecendo agora" (+ tendência recente) na fila local do
+ * integrador (Manager SaaS) — dono do SaaS/suporte conferem pendentes/
+ * falhas/bloqueados/enviados de uma clínica ANTES de precisar acessar a
+ * máquina remotamente.
  *
  * Read-only, e não é "ao vivo": é o último retrato que o próprio integrador
  * sincronizou (ver docs no repositório do integrator, módulo de sync de
  * queue-health) — a tela sempre mostra "sincronizado há Xmin" pra deixar
  * claro que não é uma consulta em tempo real à máquina da clínica.
  *
+ * `history` mostra só os últimos `HISTORY_LIMIT` pontos (não os 7 dias
+ * inteiros retidos no banco — ver migration de
+ * `integrator_queue_health_history`): a tela é "o que aconteceu
+ * recentemente", não um gráfico de uma semana inteira.
+ *
  * Rotas: /panel/manager/entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/queue-health
  */
 class EntityIntegratorQueueHealthController extends Controller
 {
+    private const HISTORY_LIMIT = 50;
+
     public function index(string $entityId, string $userIntegrator, string $integrator): InertiaResponse
     {
         $entity              = Entity::query()->findOrFail($entityId);
@@ -36,6 +44,12 @@ class EntityIntegratorQueueHealthController extends Controller
         $health = IntegratorQueueHealth::query()
             ->where('integrator_id', $integratorModel->id)
             ->first();
+
+        $history = IntegratorQueueHealthHistory::query()
+            ->where('integrator_id', $integratorModel->id)
+            ->orderByDesc('synced_at')
+            ->limit(self::HISTORY_LIMIT)
+            ->get();
 
         return Inertia::render('Panel/Manager/EntityIntegratorQueueHealth/Index', [
             'entity' => [
@@ -61,6 +75,13 @@ class EntityIntegratorQueueHealthController extends Controller
                 'problems'            => $health->problems,
                 'synced_at'           => $health->synced_at->toIso8601String(),
             ],
+            'history' => $history->map(fn (IntegratorQueueHealthHistory $point) => [
+                'pending_count'       => $point->pending_count,
+                'failed_count'        => $point->failed_count,
+                'blocked_count'       => $point->blocked_count,
+                'sent_last_24h_count' => $point->sent_last_24h_count,
+                'synced_at'           => $point->synced_at->toIso8601String(),
+            ]),
         ]);
     }
 }

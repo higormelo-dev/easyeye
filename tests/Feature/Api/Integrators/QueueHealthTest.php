@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\IntegratorQueueHealth;
+use App\Models\{IntegratorQueueHealth, IntegratorQueueHealthHistory};
 
 describe('PUT /api/integrators/v1/queue-health', function () {
     beforeEach(function () {
@@ -41,6 +41,37 @@ describe('PUT /api/integrators/v1/queue-health', function () {
             ->and($row->blocked_count)->toBe(2)
             ->and($row->problems)->toHaveCount(1)
             ->and($row->problems[0]['schedule_identifier'])->toBe('SDL-0000000722');
+    });
+
+    it('also records a history point on every sync (unlike the snapshot, which upserts)', function () {
+        $this->putJson('/api/integrators/v1/queue-health', validQueueHealthPayload(), $this->ctx['headers'])
+            ->assertNoContent();
+        $this->putJson(
+            '/api/integrators/v1/queue-health',
+            validQueueHealthPayload(['pending_count' => 9]),
+            $this->ctx['headers'],
+        )->assertNoContent();
+
+        // Snapshot table: still exactly 1 row (upsert).
+        expect(IntegratorQueueHealth::where('integrator_id', $this->ctx['integrator']->id)->count())->toBe(1);
+
+        // History table: 1 row PER sync — this is the "log" the user asked for.
+        $history = IntegratorQueueHealthHistory::where('integrator_id', $this->ctx['integrator']->id)
+            ->orderBy('id')
+            ->get();
+        expect($history)->toHaveCount(2)
+            ->and($history[0]->pending_count)->toBe(3)
+            ->and($history[1]->pending_count)->toBe(9);
+    });
+
+    it('never writes a history point for another integrator', function () {
+        $other = setupIntegrator();
+        $this->putJson('/api/integrators/v1/queue-health', validQueueHealthPayload(), $this->ctx['headers'])
+            ->assertNoContent();
+
+        expect(IntegratorQueueHealthHistory::count())->toBe(1)
+            ->and(IntegratorQueueHealthHistory::where('integrator_id', $other['integrator']->id)->exists())
+            ->toBeFalse();
     });
 
     it('upserts in place instead of accumulating a new row per sync', function () {

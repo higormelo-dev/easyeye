@@ -15,6 +15,10 @@ const props = defineProps({
     userIntegrator: { type: Object, required: true },
     integrator:     { type: Object, required: true },
     health:         { type: Object, default: null },
+    // Últimos pontos do log de tendência (integrator_queue_health_history,
+    // retido 7 dias no banco — aqui só os mais recentes, ver
+    // HISTORY_LIMIT no controller). Mais recente primeiro.
+    history:        { type: Array, default: () => [] },
 });
 
 const breadcrumbs = [
@@ -199,6 +203,45 @@ function statusLabel(status) {
                                         <span v-if="item.api_status" class="text-muted">(HTTP {{ item.api_status }})</span>
                                     </td>
                                     <td class="text-muted small">{{ new Date(item.updated_at).toLocaleString() }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Log de tendência (pedido original: "como log a fila do
+                     integrador") — os contadores ao longo do tempo, não só
+                     "agora". Retido 7 dias no banco; aqui só os últimos
+                     pontos (ver HISTORY_LIMIT no controller). -->
+                <div v-if="history.length > 0" class="card mt-3">
+                    <div class="card-header fw-medium">
+                        Tendência recente
+                        <span class="text-muted fw-normal small">
+                            (últimos {{ history.length }} pontos — histórico completo retido 7 dias)
+                        </span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-nowrap table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Sincronizado</th>
+                                    <th class="text-end">Pendentes</th>
+                                    <th class="text-end">Falhas</th>
+                                    <th class="text-end">Bloqueados</th>
+                                    <th class="text-end">Enviados (24h)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(point, index) in history" :key="index">
+                                    <td class="text-muted small">{{ new Date(point.synced_at).toLocaleString() }}</td>
+                                    <td class="text-end">{{ point.pending_count }}</td>
+                                    <td class="text-end" :class="{ 'text-warning fw-medium': point.failed_count > 0 }">
+                                        {{ point.failed_count }}
+                                    </td>
+                                    <td class="text-end" :class="{ 'text-danger fw-medium': point.blocked_count > 0 }">
+                                        {{ point.blocked_count }}
+                                    </td>
+                                    <td class="text-end text-success">{{ point.sent_last_24h_count }}</td>
                                 </tr>
                             </tbody>
                         </table>

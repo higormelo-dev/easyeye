@@ -95,3 +95,12 @@ Schedule::command('stock:check-alerts')
     ->dailyAt('06:30')
     ->name('stock:check-alerts')
     ->withoutOverlapping();
+
+// Log de tendência da fila do integrador: retenção de 7 dias (pedido do
+// usuário). Diário, não semanal como ai:purge-feedbacks — uma janela curta
+// de 7 dias precisa de expurgo diário pra não derivar até 13-14 dias de
+// acúmulo entre execuções.
+Schedule::command('queue-health:prune-history')
+    ->dailyAt('03:30')
+    ->name('queue-health:prune-history')
+    ->withoutOverlapping();

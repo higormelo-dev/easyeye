@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator, IntegratorQueueHealth, User};
+use App\Models\{Entity, EntityIntegrator, EntityUserIntegrator, IntegratorQueueHealth, IntegratorQueueHealthHistory, User};
 
 beforeEach(function () {
     $this->saas  = Entity::factory()->create(['is_client' => false, 'active' => true]);
@@ -57,6 +57,85 @@ it('renders the last synced snapshot for the integrator', function () {
             ->where('health.pending_count', 4)
             ->where('health.blocked_count', 2)
             ->where('health.problems.0.schedule_identifier', 'SDL-0000000722'));
+});
+
+it('returns the recent history trend, most recent first', function () {
+    [$entity, $userIntegrator, $integrator] = makeClientChain();
+
+    IntegratorQueueHealthHistory::create([
+        'integrator_id' => $integrator->id,
+        'pending_count' => 1, 'failed_count' => 0, 'blocked_count' => 0, 'sent_last_24h_count' => 10,
+        'synced_at'     => now()->subMinutes(10),
+    ]);
+    IntegratorQueueHealthHistory::create([
+        'integrator_id' => $integrator->id,
+        'pending_count' => 5, 'failed_count' => 1, 'blocked_count' => 2, 'sent_last_24h_count' => 12,
+        'synced_at'     => now()->subMinutes(5),
+    ]);
+
+    $url = route('manager.entities.user-integrators.integrators.queue-health', [
+        $entity->id, $userIntegrator->id, $integrator->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->withSession(queueHealthAdminSession($this->saas))
+        ->get($url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Panel/Manager/EntityIntegratorQueueHealth/Index')
+            ->where('history.0.pending_count', 5)
+            ->where('history.1.pending_count', 1));
+});
+
+it('never mixes another integrator\'s history into this one\'s trend', function () {
+    [$entity, $userIntegrator, $integrator] = makeClientChain();
+    [, , $otherIntegrator]                  = makeClientChain();
+
+    IntegratorQueueHealthHistory::create([
+        'integrator_id' => $otherIntegrator->id,
+        'pending_count' => 999, 'failed_count' => 0, 'blocked_count' => 0, 'sent_last_24h_count' => 0,
+        'synced_at'     => now(),
+    ]);
+
+    $url = route('manager.entities.user-integrators.integrators.queue-health', [
+        $entity->id, $userIntegrator->id, $integrator->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->withSession(queueHealthAdminSession($this->saas))
+        ->get($url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Panel/Manager/EntityIntegratorQueueHealth/Index')
+            ->where('history', []));
+});
+
+it('caps the returned trend at the most recent 50 points', function () {
+    [$entity, $userIntegrator, $integrator] = makeClientChain();
+
+    for ($i = 0; $i < 55; $i++) {
+        IntegratorQueueHealthHistory::create([
+            'integrator_id' => $integrator->id,
+            'pending_count' => $i, 'failed_count' => 0, 'blocked_count' => 0, 'sent_last_24h_count' => 0,
+            'synced_at'     => now()->subMinutes(55 - $i),
+        ]);
+    }
+
+    $url = route('manager.entities.user-integrators.integrators.queue-health', [
+        $entity->id, $userIntegrator->id, $integrator->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->withSession(queueHealthAdminSession($this->saas))
+        ->get($url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('Panel/Manager/EntityIntegratorQueueHealth/Index')
+            ->has('history', 50)
+            // synced_at is `now()->subMinutes(55 - $i)` — bigger $i is more
+            // recent, and the controller orders desc, so the top of the
+            // capped list is $i=54 (pending_count 54), never the oldest.
+            ->where('history.0.pending_count', 54));
 });
 
 it('returns a null health payload when the integrator never synced', function () {
