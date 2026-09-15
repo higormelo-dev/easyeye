@@ -11,6 +11,7 @@ use App\Http\Controllers\Manager\{AiModelPricesController,
     FinanceController,
     GatewaysController,
     ImpersonateController,
+    IntegratorUpdatesController,
     ManagerDashboardController,
     PartnersController,
     PlansController,
@@ -90,6 +91,17 @@ Route::group([
 
         // ── Equipamentos ───────────────────────────────────────────────────────
         Route::resource('entities.user-integrators.integrators.equipments', EntityIntegratorEquipmentsController::class)->only('index', 'show');
+
+        // ── Atualizações do Integrador (auto-update dos desktops) ─────────────
+        // Publicar um binário distribui para TODAS as clínicas — admin only e
+        // rate-limited como as demais ações de alto impacto.
+        Route::get('integrator-updates', [IntegratorUpdatesController::class, 'index'])->name('integrator-updates.index');
+        Route::post('integrator-updates', [IntegratorUpdatesController::class, 'store'])
+            ->middleware('throttle:manager-destructive')
+            ->name('integrator-updates.store');
+        Route::patch('integrator-updates/{integratorUpdate}', [IntegratorUpdatesController::class, 'update'])
+            ->middleware('throttle:manager-destructive')
+            ->name('integrator-updates.update');
     });
 
     // ── Usuários das empresas + Impersonação — admin ou support ───────────────

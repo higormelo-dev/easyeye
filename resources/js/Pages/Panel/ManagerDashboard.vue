@@ -58,6 +58,9 @@ const breadcrumbs = [];
                         <a :href="route('manager.ai-providers.index')" class="btn btn-sm btn-banner">
                             <i class="ti ti-robot me-1"></i>{{ t.btn_ai_providers ?? 'Provedores de IA' }}
                         </a>
+                        <a :href="route('manager.integrator-updates.index')" class="btn btn-sm btn-banner">
+                            <i class="ti ti-cloud-up me-1"></i>{{ t.btn_integrator_updates ?? 'Atualizações do Integrador' }}
+                        </a>
                     </div>
                 </div>
             </div>

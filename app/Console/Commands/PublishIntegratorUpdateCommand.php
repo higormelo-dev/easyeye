@@ -2,10 +2,9 @@
 
 namespace App\Console\Commands;
 
-use App\Models\IntegratorUpdate;
+use App\Services\IntegratorUpdatePublisher;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
 
 /**
  * Publica um build do EasyEye Integrator para auto-atualização.
@@ -28,7 +27,7 @@ class PublishIntegratorUpdateCommand extends Command
 
     protected $description = 'Publica um instalador do integrador no S3 e registra o manifesto de auto-atualização';
 
-    public function handle(): int
+    public function handle(IntegratorUpdatePublisher $publisher): int
     {
         $file      = (string) $this->argument('file');
         $version   = (string) $this->option('release-version');
@@ -48,37 +47,24 @@ class PublishIntegratorUpdateCommand extends Command
                 return self::FAILURE;
             }
         }
-        // O cliente rejeita downloads sem assinatura válida (fail closed) —
-        // publicar sem assinatura só criaria uma atualização impossível de
-        // instalar. base64 com 64 bytes decodificados = assinatura ed25519.
-        $decoded = base64_decode($signature, true);
-        if ($decoded === false || strlen($decoded) !== 64) {
-            $this->error('--signature deve ser uma assinatura ed25519 em base64 (64 bytes).');
+
+        try {
+            $update = $publisher->publish(
+                localPath: $file,
+                fileName: basename($file),
+                version: $version,
+                platform: $platform,
+                arch: $arch,
+                signature: $signature,
+                keepPrevious: (bool) $this->option('keep-previous'),
+            );
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage());
 
             return self::FAILURE;
         }
 
-        $sha256 = hash_file('sha256', $file);
-        $path   = sprintf('integrator-updates/%s/%s', $version, basename($file));
-
-        $this->info("Enviando para s3://{$path} …");
-        Storage::disk('s3')->put($path, fopen($file, 'rb'));
-
-        DB::transaction(function () use ($version, $platform, $arch, $path, $sha256, $signature) {
-            if (! $this->option('keep-previous')) {
-                IntegratorUpdate::query()
-                    ->where('platform', $platform)
-                    ->where('arch', $arch)
-                    ->update(['active' => false]);
-            }
-
-            IntegratorUpdate::updateOrCreate(
-                ['platform' => $platform, 'arch' => $arch, 'version' => $version],
-                ['archive' => $path, 'sha256' => $sha256, 'signature' => $signature, 'active' => true],
-            );
-        });
-
-        $this->info("Publicado: {$platform}/{$arch} {$version} (sha256 {$sha256})");
+        $this->info("Publicado: {$platform}/{$arch} {$version} (sha256 {$update->sha256})");
 
         return self::SUCCESS;
     }
