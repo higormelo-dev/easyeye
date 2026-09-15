@@ -3,13 +3,20 @@ import { mount, flushPromises } from '@vue/test-utils';
 import ScheduleDetailDrawer from '@/Pages/Panel/Schedules/ScheduleDetailDrawer.vue';
 
 /**
- * Botão de copiar "só o número" (schedule.code / schedule.patient_code) —
- * adicionado ao lado do copiar-código existente para colar direto em campos
- * de ID puramente numéricos do software nativo de aparelhos (ex.: OCULUS
- * Patient Data Management), sem o operador precisar apagar prefixo/traço
- * na mão a cada exame. Ver ScheduleDetailDrawer.vue — integrador não
- * participa dessa etapa em nenhum momento; é só clínica ↔ EasyEye ↔
- * programa do aparelho.
+ * Botão de copiar "só o número" do CÓDIGO DO PACIENTE — para colar direto em
+ * campos de ID puramente numéricos do software nativo de aparelhos (ex.:
+ * OCULUS Patient Data Management), sem o operador precisar apagar
+ * prefixo/traço na mão a cada exame. Ver ScheduleDetailDrawer.vue —
+ * integrador não participa dessa etapa em nenhum momento; é só clínica ↔
+ * EasyEye ↔ programa do aparelho.
+ *
+ * Deliberadamente SEM equivalente no código do AGENDAMENTO: esse campo de ID
+ * do aparelho é a chave de busca na base de dados local dele, e só o código
+ * do paciente é estável entre visitas. Um botão de "só número" ali
+ * incentivaria colar o código errado — o aparelho nunca encontraria o
+ * cadastro de uma visita anterior (código de agendamento novo a cada
+ * consulta) e o operador criaria um paciente duplicado na base local a
+ * cada retorno. Ver o teste de guarda no fim do arquivo.
  */
 describe('ScheduleDetailDrawer — copiar código', () => {
     beforeEach(() => {
@@ -62,21 +69,30 @@ describe('ScheduleDetailDrawer — copiar código', () => {
         mockSchedule();
         const wrapper = await mountOpenDrawer();
 
-        const codeButtons = wrapper.findAll('.detail-row button');
-        await codeButtons[0].trigger('click');
+        const scheduleRow = wrapper
+            .findAll('.detail-row')
+            .find((row) => row.text().includes('SDL-0000000741'));
+        await scheduleRow.find('button').trigger('click');
 
         expect(navigator.clipboard.writeText).toHaveBeenCalledWith('SDL-741');
     });
 
-    it('copia só os dígitos do código do agendamento, sem prefixo/zeros à esquerda', async () => {
+    /**
+     * Guarda de regressão: o código do agendamento NUNCA deve ganhar um
+     * botão de "copiar só número" — ele muda a cada consulta, e colar esse
+     * número no campo de ID do software do aparelho faria o operador criar
+     * um paciente duplicado na base local a cada retorno (ver comentário no
+     * topo do arquivo e em numericCode() no componente).
+     */
+    it('não oferece copiar-só-número no código do agendamento', async () => {
         mockSchedule();
         const wrapper = await mountOpenDrawer();
 
-        const codeButtons = wrapper.findAll('.detail-row button');
-        // segundo botão da linha "Código" do agendamento = copiar numérico
-        await codeButtons[1].trigger('click');
+        const scheduleRow = wrapper
+            .findAll('.detail-row')
+            .find((row) => row.text().includes('SDL-0000000741'));
 
-        expect(navigator.clipboard.writeText).toHaveBeenCalledWith('741');
+        expect(scheduleRow.findAll('button')).toHaveLength(1);
     });
 
     it('copia só os dígitos do código do paciente', async () => {

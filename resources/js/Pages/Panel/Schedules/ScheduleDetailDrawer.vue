@@ -50,6 +50,14 @@ function shortCode(code) {
 // cada exame. Copiar já só o número elimina essa edição manual sem o
 // integrador participar em nenhum momento — a colagem continua sendo feita
 // pelo operador, direto do EasyEye pro programa do aparelho.
+//
+// USAR SÓ COM schedule.patient_code, NUNCA com schedule.code: o campo de ID
+// do aparelho é a chave de busca na base de dados LOCAL dele. O código do
+// paciente é estável (mesma pessoa, toda visita); o código do agendamento
+// muda a cada consulta. Colar o código do agendamento faria a busca por ID
+// nunca encontrar o cadastro de visitas anteriores — o operador criaria um
+// paciente duplicado no aparelho a cada retorno, fragmentando o histórico de
+// exames dessa pessoa entre vários cadastros locais diferentes.
 function numericCode(code) {
     const m = String(code ?? '').match(/^([A-Za-z]+)-0*(\d+)$/);
     return m ? m[2] : String(code ?? '').replace(/\D/g, '');
@@ -132,15 +140,16 @@ function copyNumericCode(field, code) {
                             >
                                 <i :class="copiedField === 'schedule' ? 'ti ti-check text-success' : 'ti ti-copy'"></i>
                             </button>
-                            <button
-                                type="button"
-                                class="btn btn-xs btn-outline-secondary"
-                                :title="t.drawer_copy_code_numeric ?? 'Copiar só o número (para o campo de ID do programa do aparelho)'"
-                                @click="copyNumericCode('schedule-num', schedule.code)"
-                            >
-                                <i v-if="copiedField === 'schedule-num'" class="ti ti-check text-success"></i>
-                                <span v-else class="small">#</span>
-                            </button>
+                            <!--
+                                Sem botão de "copiar só número" aqui DE PROPÓSITO. O código
+                                do agendamento é novo a cada consulta — colar esse número no
+                                campo de busca de ID do software do aparelho (ex.: OCULUS
+                                Patient Data Management) nunca bate com o cadastro de visitas
+                                anteriores, e o operador acaba criando um paciente duplicado
+                                na base LOCAL do aparelho a cada retorno. O identificador
+                                estável pra essa finalidade é o do PACIENTE (abaixo), nunca o
+                                do agendamento. Ver ScheduleDetailDrawer.test.js.
+                            -->
                         </span>
                     </div>
                     <div class="detail-row">
@@ -191,7 +200,7 @@ function copyNumericCode(field, code) {
                             <button
                                 type="button"
                                 class="btn btn-xs btn-outline-secondary"
-                                :title="t.drawer_copy_code_numeric ?? 'Copiar só o número (para o campo de ID do programa do aparelho)'"
+                                :title="t.drawer_copy_patient_id_numeric ?? 'Copiar ID do paciente (só números) para o programa do aparelho'"
                                 @click="copyNumericCode('patient-num', schedule.patient_code)"
                             >
                                 <i v-if="copiedField === 'patient-num'" class="ti ti-check text-success"></i>
