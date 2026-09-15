@@ -43,9 +43,29 @@ function shortCode(code) {
     return m ? `${m[1]}-${m[2]}` : code;
 }
 
+// Só os dígitos, sem o prefixo de letra nem zeros à esquerda (PAC-0000000123
+// → "123"). O software nativo de vários aparelhos (ex.: OCULUS Patient Data
+// Management) busca paciente por um campo "ID Number" numérico puro — colar
+// "PAC-123" ali falha ou exige o operador apagar o prefixo/traço na mão a
+// cada exame. Copiar já só o número elimina essa edição manual sem o
+// integrador participar em nenhum momento — a colagem continua sendo feita
+// pelo operador, direto do EasyEye pro programa do aparelho.
+function numericCode(code) {
+    const m = String(code ?? '').match(/^([A-Za-z]+)-0*(\d+)$/);
+    return m ? m[2] : String(code ?? '').replace(/\D/g, '');
+}
+
 function copyCode(field, code) {
     if (!code) return;
     navigator.clipboard.writeText(shortCode(code)).then(() => {
+        copiedField.value = field;
+        setTimeout(() => { if (copiedField.value === field) copiedField.value = null; }, 2000);
+    });
+}
+
+function copyNumericCode(field, code) {
+    if (!code) return;
+    navigator.clipboard.writeText(numericCode(code)).then(() => {
         copiedField.value = field;
         setTimeout(() => { if (copiedField.value === field) copiedField.value = null; }, 2000);
     });
@@ -112,6 +132,15 @@ function copyCode(field, code) {
                             >
                                 <i :class="copiedField === 'schedule' ? 'ti ti-check text-success' : 'ti ti-copy'"></i>
                             </button>
+                            <button
+                                type="button"
+                                class="btn btn-xs btn-outline-secondary"
+                                :title="t.drawer_copy_code_numeric ?? 'Copiar só o número (para o campo de ID do programa do aparelho)'"
+                                @click="copyNumericCode('schedule-num', schedule.code)"
+                            >
+                                <i v-if="copiedField === 'schedule-num'" class="ti ti-check text-success"></i>
+                                <span v-else class="small">#</span>
+                            </button>
                         </span>
                     </div>
                     <div class="detail-row">
@@ -158,6 +187,15 @@ function copyCode(field, code) {
                                 @click="copyCode('patient', schedule.patient_code)"
                             >
                                 <i :class="copiedField === 'patient' ? 'ti ti-check text-success' : 'ti ti-copy'"></i>
+                            </button>
+                            <button
+                                type="button"
+                                class="btn btn-xs btn-outline-secondary"
+                                :title="t.drawer_copy_code_numeric ?? 'Copiar só o número (para o campo de ID do programa do aparelho)'"
+                                @click="copyNumericCode('patient-num', schedule.patient_code)"
+                            >
+                                <i v-if="copiedField === 'patient-num'" class="ti ti-check text-success"></i>
+                                <span v-else class="small">#</span>
                             </button>
                         </span>
                     </div>
