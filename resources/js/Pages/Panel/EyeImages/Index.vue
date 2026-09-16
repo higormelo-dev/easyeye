@@ -1738,7 +1738,7 @@ const printEntity = computed(() => props.entity ?? {});
                                         </div>
 
                                         <!-- Thumbnails -->
-                                        <div class="d-flex flex-wrap gap-2 p-2 bg-dark">
+                                        <div class="d-flex flex-wrap gap-2 p-2 eyeimg-canvas-dark">
                                             <div v-for="exam in group.exams" :key="exam.id"
                                                  class="position-relative eyeimg-thumb"
                                                  tabindex="0" role="button"
@@ -1806,7 +1806,7 @@ const printEntity = computed(() => props.entity ?? {});
                                                 <span class="position-absolute bottom-0 start-0 d-flex align-items-center justify-content-center"
                                                       style="z-index:2;margin:3px;">
                                                     <span class="rounded d-flex align-items-center justify-content-center"
-                                                          :class="isSelected(exam.id) ? 'bg-primary' : 'bg-dark border border-secondary'"
+                                                          :class="isSelected(exam.id) ? 'bg-primary' : 'eyeimg-canvas-dark border border-secondary'"
                                                           style="width:20px;height:20px;">
                                                         <i v-show="isSelected(exam.id)" class="fa fa-check text-white"
                                                            style="font-size:.6rem;"></i>
@@ -1835,7 +1835,7 @@ const printEntity = computed(() => props.entity ?? {});
 
                                                 <!-- Badge compartilhamento com paciente (Portal do Paciente, Fase 2) -->
                                                 <span class="position-absolute d-flex align-items-center justify-content-center rounded-circle"
-                                                      :class="exam.shared_with_patient ? 'bg-success text-white' : 'bg-dark border border-secondary text-white-50'"
+                                                      :class="exam.shared_with_patient ? 'bg-success text-white' : 'eyeimg-canvas-dark border border-secondary text-white-50'"
                                                       style="top:26px;right:2px;width:22px;height:22px;z-index:1;cursor:pointer;"
                                                       :title="exam.shared_with_patient ? 'Compartilhado com o paciente — clique para revogar' : 'Compartilhar exame com o paciente'"
                                                       @click.stop="toggleExamShare(exam)">
@@ -2426,6 +2426,15 @@ const printEntity = computed(() => props.entity ?? {});
 .ei-gallery-panel {
     box-shadow: 0 4px 18px rgba(0, 0, 0, .28);
     border-color: #2b3646;
+}
+
+/* NÃO usar a utility bg-dark do Bootstrap aqui: o template Preclinic
+   inverte --dark pra #E3E3E3 (cinza claro) em data-bs-theme="dark" —
+   proposital pra chip/badge continuar legível em geral, mas exatamente
+   o oposto do que um canvas de revisão de imagem precisa (sempre
+   escuro, sem depender de token de tema nenhum). Cor literal. */
+.eyeimg-canvas-dark {
+    background-color: #0a0a0a;
 }
 
 /* Barra de ações com muitos botões — mesmo padrão de .pmr-bottom-bar-row
