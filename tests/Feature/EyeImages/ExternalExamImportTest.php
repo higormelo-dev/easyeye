@@ -71,6 +71,29 @@ it('médico importa exame externo com 1 arquivo — PatientExam criado com sourc
     Storage::disk('s3')->assertExists($exam->archive);
 });
 
+it('laterality (OD/OE) enviado no import é persistido no PatientExam; omitido fica null (AO)', function () {
+    $resOd = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, ['laterality' => 1]));
+    $resOd->assertRedirect(route('panel.eye-images.index'));
+    $examOd = PatientExam::where('patient_id', $this->patient->id)->latest('created_at')->first();
+    expect($examOd->laterality)->toBe(1);
+
+    $resOe = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, ['laterality' => 2]));
+    $resOe->assertRedirect(route('panel.eye-images.index'));
+    $examOe = PatientExam::where('patient_id', $this->patient->id)->latest('created_at')->first();
+    expect($examOe->laterality)->toBe(2);
+
+    $resNone = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this));
+    $resNone->assertRedirect(route('panel.eye-images.index'));
+    $examNone = PatientExam::where('patient_id', $this->patient->id)->latest('created_at')->first();
+    expect($examNone->laterality)->toBeNull();
+});
+
+it('laterality com valor fora de 0/1/2 retorna 422', function () {
+    $res = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, ['laterality' => 3]));
+
+    $res->assertStatus(422)->assertJsonValidationErrors('laterality');
+});
+
 it('secretary também consegue importar exame externo — gate admin/doctor/secretary, diferente do gate de diagnóstico (doctor-only)', function () {
     $res = importExternalExam($this, $this->secretary, $this->secretaryEntityUser, basePayload($this));
 
@@ -159,6 +182,17 @@ it('campos obrigatórios ausentes (patient_id, exam_id, exam_performed_at, files
 it('arquivo com mimetype não permitido (.exe) retorna 422', function () {
     $res = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, [
         'files' => [UploadedFile::fake()->create('malware.exe', 10, 'application/x-msdownload')],
+    ]));
+
+    $res->assertStatus(422);
+    $res->assertJsonValidationErrors('files.0');
+
+    expect(PatientExam::count())->toBe(0);
+});
+
+it('arquivo maior que 10MB retorna 422', function () {
+    $res = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, [
+        'files' => [UploadedFile::fake()->create('exame.jpg', 10241, 'image/jpeg')],
     ]));
 
     $res->assertStatus(422);

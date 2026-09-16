@@ -65,6 +65,7 @@ const form = useForm({
     doctor_id: '',
     entity_integrator_equipment_id: '',
     external_origin: '',
+    laterality: null,
     diagnoses: [],
     files: [],
 });
@@ -210,7 +211,7 @@ function validateClientSide() {
 // Erros que não têm campo próprio no template (ex.: "diagnoses", "diagnoses.0").
 const knownFields = [
     'patient_id', 'exam_id', 'exam_performed_at', 'doctor_id',
-    'entity_integrator_equipment_id', 'external_origin',
+    'entity_integrator_equipment_id', 'external_origin', 'laterality',
 ];
 const genericErrors = computed(() => Object.entries(form.errors ?? {})
     .filter(([key]) => !knownFields.includes(key) && key !== 'files' && !key.startsWith('files.'))
@@ -253,6 +254,7 @@ watch(() => props.open, (isOpen) => {
     form.patient_id                     = props.patient?.id ?? '';
     form.doctor_id                      = '';
     form.external_origin                = '';
+    form.laterality                     = null;
     form.diagnoses                      = [];
     form.files                          = [];
 
@@ -376,6 +378,21 @@ watch(() => props.open, (isOpen) => {
         </div>
 
         <div class="mb-3">
+            <label class="form-label fw-semibold d-block">Olho</label>
+            <div class="btn-group btn-group-sm" role="group" :class="{ 'is-invalid': form.errors.laterality }">
+                <input type="radio" class="btn-check" id="import-laterality-od" value="1" v-model="form.laterality">
+                <label class="btn btn-outline-primary" for="import-laterality-od">OD</label>
+
+                <input type="radio" class="btn-check" id="import-laterality-oe" value="2" v-model="form.laterality">
+                <label class="btn btn-outline-danger" for="import-laterality-oe">OE</label>
+
+                <input type="radio" class="btn-check" id="import-laterality-ao" :value="null" v-model="form.laterality">
+                <label class="btn btn-outline-secondary" for="import-laterality-ao">AO</label>
+            </div>
+            <div v-if="form.errors.laterality" class="invalid-feedback d-block">{{ form.errors.laterality }}</div>
+        </div>
+
+        <div class="mb-3">
             <label class="form-label fw-semibold">Médico</label>
             <select v-model="form.doctor_id" class="form-select" :class="{ 'is-invalid': form.errors.doctor_id }">
                 <option value="">Não informado</option>
@@ -438,7 +455,7 @@ watch(() => props.open, (isOpen) => {
             <input type="file" class="form-control" :class="{ 'is-invalid': form.errors.files }"
                    multiple accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                    @change="onFilesChange">
-            <div class="form-text">Até 10 arquivos, JPG/PNG/PDF, até 20 MB cada.</div>
+            <div class="form-text">Até 10 arquivos, JPG/PNG/PDF, até 10 MB cada.</div>
             <div v-if="form.errors.files" class="invalid-feedback d-block">{{ form.errors.files }}</div>
 
             <ul v-if="fileItems.length" class="list-group mt-2">

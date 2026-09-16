@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ExamSource;
+use App\Jobs\GenerateExamDerivatives;
 use App\Models\{Patient, PatientExam};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\{Collection, Str};
@@ -97,6 +98,7 @@ class ExternalExamImportService
                         'doctor_id'                      => $data['doctor_id'] ?? null,
                         'exam_id'                        => $data['exam_id'],
                         'entity_integrator_equipment_id' => $data['entity_integrator_equipment_id'] ?? null,
+                        'laterality'                     => $data['laterality'] ?? null,
                         'archive'                        => $path,
                         'active'                         => true,
                         'source'                         => ExamSource::ExternalImport,
@@ -108,7 +110,7 @@ class ExternalExamImportService
 
                     // afterCommit: em fila, só roda se a transação do lote
                     // confirmar — evita derivado de exame que sofreu rollback.
-                    \App\Jobs\GenerateExamDerivatives::dispatch($record->id)->afterCommit();
+                    GenerateExamDerivatives::dispatch($record->id)->afterCommit();
 
                     return $record;
                 });

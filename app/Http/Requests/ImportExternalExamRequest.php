@@ -53,6 +53,11 @@ class ImportExternalExamRequest extends FormRequest
                 ),
             ],
             'exam_performed_at' => ['required', 'date', 'before_or_equal:today'],
+            // Lateralidade: 1=OD, 2=OE, null/ausente=AO — mesmo shape/regra de
+            // Api\ExamRequest e Api\PatientExamRequest (não há enum dedicado,
+            // é convenção de inteiro replicada nos 3 pontos de entrada de
+            // PatientExam::laterality).
+            'laterality' => ['nullable', 'integer', 'in:0,1,2'],
             // doctor_id referencia a tabela `doctors` (PatientExam::doctor()),
             // não `users` — escopado via doctors.entity_user_id -> entity_users.entity_id.
             'doctor_id' => [
@@ -88,7 +93,7 @@ class ImportExternalExamRequest extends FormRequest
             ],
             'external_origin' => ['nullable', 'string', 'max:255'],
             'files'           => ['required', 'array', 'min:1', 'max:10'],
-            'files.*'         => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:20480'],
+            'files.*'         => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
             // Mesmo shape/regra de UpdateExamDiagnosisRequest — mantém consistência
             // entre "Diagnóstico do exame" e "Importar exame externo".
             'diagnoses'        => ['nullable', 'array', 'max:20'],
