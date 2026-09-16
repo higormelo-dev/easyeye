@@ -1777,7 +1777,7 @@ const printEntity = computed(() => props.entity ?? {});
                                                           style="font-size:.5rem;white-space:nowrap;"
                                                           :title="isDoctor
                                                               ? 'Imagem desabilitada — botão direito pra reabilitar'
-                                                              : 'Imagem desabilitada — só médico pode reabilitar'">
+                                                              : 'Imagem desabilitada'">
                                                         <i class="fa fa-eye-slash me-1"></i>Desabilitada
                                                     </span>
                                                     <span v-if="exam.quality_rating"
