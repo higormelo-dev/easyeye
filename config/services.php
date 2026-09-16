@@ -1,7 +1,6 @@
 <?php
 
 return [
-
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -48,4 +47,17 @@ return [
         'api_key' => env('GEMINI_API_KEY'),
     ],
 
+    'integrator_updates' => [
+        // Chave pública ed25519 (hex, 32 bytes) que assina os builds do
+        // EasyEye Integrator — mesmo valor de UPDATE_PUBLIC_KEY_HEX em
+        // integrator/src/updater/mod.rs (repositório separado). É seguro
+        // manter aqui como default: é a metade PÚBLICA do par, só serve pra
+        // VERIFICAR assinatura, nunca pra assinar. A privada correspondente
+        // nunca passa pelo SaaS (fica só na máquina do operador de release —
+        // ver integrator/scripts/sign-update.sh).
+        'public_key' => env(
+            'INTEGRATOR_UPDATE_PUBLIC_KEY',
+            'c62b4de90f8cacd4bf0f4d408a2dec22f80c181f19e0f64156124a00aedbe2b9',
+        ),
+    ],
 ];

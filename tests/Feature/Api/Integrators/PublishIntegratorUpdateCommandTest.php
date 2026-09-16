@@ -5,13 +5,49 @@ use App\Services\IntegratorUpdatePublisher;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * Assinatura ed25519 "válida" do ponto de vista do publisher: base64 de
- * exatamente 64 bytes. O servidor só valida o FORMATO (o cliente desktop é
- * quem verifica a assinatura de verdade contra a chave pública embutida).
+ * Keypair de teste — isolado da chave de produção (services.integrator_
+ * updates.public_key aponta pra ela nos beforeEach abaixo). Assinar de
+ * verdade com a privada correspondente, em vez de uma string dummy, é o que
+ * torna estes testes uma checagem real da verificação criptográfica
+ * (sodium_crypto_sign_verify_detached), não só do formato.
  */
-function validUpdateSignature(): string
+function testUpdateKeypair(): array
 {
-    return base64_encode(str_repeat("\x01", 64));
+    static $keypair = null;
+
+    if ($keypair === null) {
+        $kp      = sodium_crypto_sign_keypair();
+        $keypair = [
+            'secret' => sodium_crypto_sign_secretkey($kp),
+            'public' => sodium_crypto_sign_publickey($kp),
+        ];
+    }
+
+    return $keypair;
+}
+
+/**
+ * Assina os BYTES CRUS do digest SHA-256 de $localPath com a privada de
+ * teste — mesma convenção do scripts/sign-update.sh do repositório do
+ * integrator (openssl pkeyutl -sign -rawin sobre o digest binário, não a
+ * string hex nem o arquivo inteiro).
+ */
+function signInstaller(string $localPath): string
+{
+    $digest    = hex2bin(hash_file('sha256', $localPath));
+    $signature = sodium_crypto_sign_detached($digest, testUpdateKeypair()['secret']);
+
+    return base64_encode($signature);
+}
+
+/**
+ * Assinatura com formato válido (base64 de 64 bytes) mas sem significado
+ * criptográfico — só para popular registros via forceCreate() nos testes
+ * abaixo que não passam pelo publisher (então nunca são reverificados).
+ */
+function formatOnlySignature(): string
+{
+    return base64_encode(str_repeat('a', 64));
 }
 
 /**
@@ -33,6 +69,7 @@ function fakeInstallerPath(string $contents = 'conteudo-fake-do-instalador'): st
 describe('artisan integrator:publish-update', function () {
     beforeEach(function () {
         Storage::fake('s3');
+        config(['services.integrator_updates.public_key' => bin2hex(testUpdateKeypair()['public'])]);
     });
 
     it('publishes a new build and registers the manifest', function () {
@@ -43,7 +80,7 @@ describe('artisan integrator:publish-update', function () {
             '--release-version' => '1.0.0',
             '--platform'        => 'windows',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file),
         ])->assertExitCode(0);
 
         $update = IntegratorUpdate::where('version', '1.0.0')
@@ -53,8 +90,7 @@ describe('artisan integrator:publish-update', function () {
 
         expect($update)->not->toBeNull()
             ->and($update->active)->toBeTrue()
-            ->and($update->sha256)->toBe(hash_file('sha256', $file))
-            ->and($update->signature)->toBe(validUpdateSignature());
+            ->and($update->sha256)->toBe(hash_file('sha256', $file));
 
         Storage::disk('s3')->assertExists($update->archive);
 
@@ -68,7 +104,7 @@ describe('artisan integrator:publish-update', function () {
             'file'              => $file,
             '--release-version' => '1.0.0',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file),
         ])->assertExitCode(0);
 
         expect(IntegratorUpdate::where('version', '1.0.0')->first()->platform)->toBe('windows');
@@ -81,7 +117,7 @@ describe('artisan integrator:publish-update', function () {
             'file'              => '/tmp/caminho-que-nao-existe-' . uniqid() . '.msi',
             '--release-version' => '1.0.0',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => formatOnlySignature(),
         ])->assertExitCode(1);
 
         expect(IntegratorUpdate::count())->toBe(0);
@@ -93,7 +129,7 @@ describe('artisan integrator:publish-update', function () {
         $this->artisan('integrator:publish-update', [
             'file'        => $file,
             '--arch'      => 'x86_64',
-            '--signature' => validUpdateSignature(),
+            '--signature' => signInstaller($file),
         ])->assertExitCode(1);
 
         expect(IntegratorUpdate::count())->toBe(0);
@@ -107,7 +143,7 @@ describe('artisan integrator:publish-update', function () {
         $this->artisan('integrator:publish-update', [
             'file'              => $file,
             '--release-version' => '1.0.0',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file),
         ])->assertExitCode(1);
 
         expect(IntegratorUpdate::count())->toBe(0);
@@ -144,6 +180,24 @@ describe('artisan integrator:publish-update', function () {
         @unlink($file);
     });
 
+    it('fails with a non-zero exit code when the signature has valid format but does not match the file', function () {
+        $file       = fakeInstallerPath();
+        $otherFile  = fakeInstallerPath('conteudo-completamente-diferente');
+        $mismatched = signInstaller($otherFile);
+
+        $this->artisan('integrator:publish-update', [
+            'file'              => $file,
+            '--release-version' => '1.0.0',
+            '--arch'            => 'x86_64',
+            '--signature'       => $mismatched,
+        ])->assertExitCode(1);
+
+        expect(IntegratorUpdate::count())->toBe(0);
+
+        @unlink($file);
+        @unlink($otherFile);
+    });
+
     it('deactivates previous builds of the same platform/arch by default', function () {
         $previous = IntegratorUpdate::forceCreate([
             'version'   => '1.0.0',
@@ -151,7 +205,7 @@ describe('artisan integrator:publish-update', function () {
             'arch'      => 'x86_64',
             'archive'   => 'integrator-updates/1.0.0/old.msi',
             'sha256'    => str_repeat('ab', 32),
-            'signature' => validUpdateSignature(),
+            'signature' => formatOnlySignature(),
             'active'    => true,
         ]);
         $file = fakeInstallerPath();
@@ -161,7 +215,7 @@ describe('artisan integrator:publish-update', function () {
             '--release-version' => '1.1.0',
             '--platform'        => 'windows',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file),
         ])->assertExitCode(0);
 
         expect($previous->fresh()->active)->toBeFalse()
@@ -177,7 +231,7 @@ describe('artisan integrator:publish-update', function () {
             'arch'      => 'x86_64',
             'archive'   => 'integrator-updates/1.0.0/old.msi',
             'sha256'    => str_repeat('ab', 32),
-            'signature' => validUpdateSignature(),
+            'signature' => formatOnlySignature(),
             'active'    => true,
         ]);
         $file = fakeInstallerPath();
@@ -187,7 +241,7 @@ describe('artisan integrator:publish-update', function () {
             '--release-version' => '1.1.0',
             '--platform'        => 'windows',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file),
             '--keep-previous'   => true,
         ])->assertExitCode(0);
 
@@ -203,7 +257,7 @@ describe('artisan integrator:publish-update', function () {
             'arch'      => 'x86_64',
             'archive'   => 'integrator-updates/1.0.0/old-linux',
             'sha256'    => str_repeat('cd', 32),
-            'signature' => validUpdateSignature(),
+            'signature' => formatOnlySignature(),
             'active'    => true,
         ]);
         $file = fakeInstallerPath();
@@ -213,7 +267,7 @@ describe('artisan integrator:publish-update', function () {
             '--release-version' => '1.1.0',
             '--platform'        => 'windows',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file),
         ])->assertExitCode(0);
 
         expect($other->fresh()->active)->toBeTrue();
@@ -229,7 +283,7 @@ describe('artisan integrator:publish-update', function () {
             '--release-version' => '1.0.0',
             '--platform'        => 'windows',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file1),
         ])->assertExitCode(0);
         @unlink($file1);
 
@@ -240,7 +294,7 @@ describe('artisan integrator:publish-update', function () {
             '--release-version' => '1.0.0',
             '--platform'        => 'windows',
             '--arch'            => 'x86_64',
-            '--signature'       => validUpdateSignature(),
+            '--signature'       => signInstaller($file2),
         ])->assertExitCode(0);
 
         expect(IntegratorUpdate::where('version', '1.0.0')
@@ -257,11 +311,13 @@ describe('artisan integrator:publish-update', function () {
 
 // ---------------------------------------------------------------------------
 // IntegratorUpdatePublisher (chamado tanto pelo Command quanto pela página
-// do Manager) — testado diretamente para os ramos de validação de assinatura.
+// do Manager) — testado diretamente para os ramos de validação de
+// assinatura: formato E verificação criptográfica de verdade.
 // ---------------------------------------------------------------------------
 describe('IntegratorUpdatePublisher', function () {
     beforeEach(function () {
         Storage::fake('s3');
+        config(['services.integrator_updates.public_key' => bin2hex(testUpdateKeypair()['public'])]);
     });
 
     it('throws InvalidArgumentException when the signature is not valid base64', function () {
@@ -294,6 +350,76 @@ describe('IntegratorUpdatePublisher', function () {
         ))->toThrow(InvalidArgumentException::class);
 
         expect(IntegratorUpdate::count())->toBe(0);
+
+        @unlink($file);
+    });
+
+    it('throws InvalidArgumentException when the signature has valid format but was produced for a different file', function () {
+        $file      = fakeInstallerPath('conteudo-real');
+        $otherFile = fakeInstallerPath('conteudo-de-outro-arquivo');
+
+        expect(fn () => app(IntegratorUpdatePublisher::class)->publish(
+            localPath: $file,
+            fileName: basename($file),
+            version: '1.0.0',
+            platform: 'windows',
+            arch: 'x86_64',
+            signature: signInstaller($otherFile), // assina o digest ERRADO de propósito
+        ))->toThrow(InvalidArgumentException::class);
+
+        expect(IntegratorUpdate::count())->toBe(0);
+
+        @unlink($file);
+        @unlink($otherFile);
+    });
+
+    it('throws InvalidArgumentException when the configured public key is the all-zero placeholder', function () {
+        config(['services.integrator_updates.public_key' => str_repeat('0', 64)]);
+        $file = fakeInstallerPath();
+
+        expect(fn () => app(IntegratorUpdatePublisher::class)->publish(
+            localPath: $file,
+            fileName: basename($file),
+            version: '1.0.0',
+            platform: 'windows',
+            arch: 'x86_64',
+            signature: signInstaller($file),
+        ))->toThrow(InvalidArgumentException::class);
+
+        expect(IntegratorUpdate::count())->toBe(0);
+
+        @unlink($file);
+    });
+
+    /**
+     * Vetor de conhecido-bom (known-answer) copiado LITERALMENTE do teste
+     * `accepts_a_signature_produced_by_the_signing_script` em
+     * integrator/src/updater/mod.rs — mesmo arquivo (bytes exatos), mesma
+     * assinatura real (gerada com scripts/sign-update.sh e a chave privada
+     * de produção), mesma chave pública embutida no binário Rust
+     * (UPDATE_PUBLIC_KEY_HEX). Prova que sodium_crypto_sign_verify_detached
+     * (aqui) e ed25519_dalek::VerifyingKey::verify_strict (lá) concordam
+     * byte a byte pra essa tripla real — não é só "minha implementação
+     * aceita o que ela mesma assinou", é interoperabilidade cruzada
+     * comprovada com o cliente de verdade.
+     */
+    it('accepts a real signature produced by the integrator repo signing script against the real embedded public key', function () {
+        config(['services.integrator_updates.public_key' => 'c62b4de90f8cacd4bf0f4d408a2dec22f80c181f19e0f64156124a00aedbe2b9']);
+
+        $file = fakeInstallerPath("dummy msi payload\n");
+        expect(hash_file('sha256', $file))
+            ->toBe('61ed817144fba1fdd7e3a4e68811cbd0558a7d75c02cfe47a342fea081b3e218');
+
+        $update = app(IntegratorUpdatePublisher::class)->publish(
+            localPath: $file,
+            fileName: basename($file),
+            version: '9.9.9',
+            platform: 'windows',
+            arch: 'x86_64',
+            signature: 'Yt7GwAggyQNqUnT1b4hZkDBKmO0BtHOm4uuuO2UKXhI1oj4ciZCbwtDN3QIVVblEmJVf/bxnLVM8wW3HNDqGCg==',
+        );
+
+        expect($update->version)->toBe('9.9.9');
 
         @unlink($file);
     });
