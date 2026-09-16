@@ -30,6 +30,10 @@ const props = defineProps({
     // cada escolha aparece como chip removível individualmente — usado nas
     // características de lente do prontuário (Multifocal + Antirreflexo...).
     multiple:        { type: Boolean, default: false },
+    // Barra de filtro (busca .input-group-sm + selects lado a lado): sem
+    // isso o select sai no tamanho "regular" da lib (~47px) enquanto o
+    // input de busca ao lado é "sm" (~31px), destoando de altura.
+    sm:              { type: Boolean, default: false },
 });
 
 // `option-selected` — Onda IOL Lenses: emite o OBJETO completo da opção
@@ -132,7 +136,7 @@ function onSearchChange(q) {
     <Multiselect
         v-model="value"
         class="search-select"
-        :class="{ 'is-invalid': invalid }"
+        :class="{ 'is-invalid': invalid, 'search-select--sm': sm }"
         :style="listHeight ? { '--ms-max-height': listHeight } : {}"
         :options="effectiveOptions"
         :value-prop="valueKey"
@@ -175,6 +179,26 @@ function onSearchChange(q) {
        lado a lado. Zera a centralização; quem quiser centralizar usa
        margin no wrapper de fora. */
     margin: 0;
+}
+
+/* Variante compacta (prop `sm`) — mesma altura/fonte do .input-group-sm
+   do Bootstrap (SearchInput), pra ficar no padrão quando usado lado a
+   lado com a busca numa barra de filtro (ex.: report-settings). */
+.search-select--sm.multiselect {
+    --ms-py: .25rem;
+    --ms-px: .5rem;
+    --ms-font-size: 14px;
+    --ms-line-height: 1.5;
+    --ms-option-font-size: 14px;
+    /* height (não só min-height): o wrapper interno do @vueform soma ~2px
+       e deixava o controle em 33px vs 31px do input-group-sm ao lado
+       (mesmo ajuste já usado em _medical-records.scss .pmr-screen). */
+    height: 31px;
+    min-height: 31px;
+}
+.search-select--sm.multiselect .multiselect-wrapper {
+    min-height: 0;
+    height: 100%;
 }
 
 .search-select.multiselect.is-active {

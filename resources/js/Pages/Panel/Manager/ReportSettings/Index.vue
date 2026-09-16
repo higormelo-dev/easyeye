@@ -178,7 +178,7 @@ const breadcrumbs = [
             </PageHeader>
 
             <!-- ── Search + Filters ────────────────────────────────────────── -->
-            <div class="d-flex flex-wrap gap-2 mb-3">
+            <div class="d-flex flex-wrap align-items-start gap-2 mb-3">
                 <SearchInput
                     v-model="search"
                     :placeholder="t.search_placeholder"
@@ -191,6 +191,7 @@ const breadcrumbs = [
                     :value-key="'value'"
                     :label-key="'label'"
                     :placeholder="t.all_statuses"
+                    sm
                     style="width:200px;"
                 />
 
@@ -198,6 +199,7 @@ const breadcrumbs = [
                     v-model="categoryFilter"
                     :options="categories"
                     :placeholder="t.all_categories"
+                    sm
                     style="width:250px;"
                 />
             </div>
