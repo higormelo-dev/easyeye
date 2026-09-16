@@ -57,22 +57,21 @@ async function setDefault() {
 <template>
     <div
         class="card h-100"
-        :class="{ 'opacity-75': !gateway.active }"
-        :style="gateway.is_default ? 'border:2px solid #fdd835 !important;' : ''"
+        :class="{ 'opacity-75': !gateway.active, 'gw-gold-border': gateway.is_default }"
     >
         <!-- ── Card Header ─────────────────────────────────────────────────── -->
         <div
             class="card-header d-flex align-items-center justify-content-between py-2 px-3"
-            :style="gateway.is_default ? 'background:var(--warning-transparent);' : ''"
+            :class="{ 'gw-default-header': gateway.is_default }"
         >
             <!-- Name + badges -->
             <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
-                <i v-if="gateway.is_default" class="ti ti-star flex-shrink-0" style="color:#f9a825;"></i>
+                <i v-if="gateway.is_default" class="ti ti-star flex-shrink-0 gw-gold-icon"></i>
                 <span class="fw-bold text-truncate">{{ gateway.name }}</span>
                 <span class="badge badge-soft-secondary text-uppercase flex-shrink-0" style="font-size:.7rem;letter-spacing:.04em;">
                     {{ gateway.code }}
                 </span>
-                <span v-if="gateway.is_default" class="badge flex-shrink-0" style="background:#fdd835;color:#5d4037;font-size:.7rem;">
+                <span v-if="gateway.is_default" class="badge flex-shrink-0 gw-gold-badge" style="font-size:.7rem;">
                     {{ t.default_badge }}
                 </span>
             </div>
@@ -200,9 +199,8 @@ async function setDefault() {
             <template v-else>
                 <button
                     type="button"
-                    class="btn btn-sm w-100 btn-outline-secondary"
+                    class="btn btn-sm w-100 btn-outline-secondary gw-gold-outline-btn"
                     disabled
-                    style="border-color:#fdd835;color:#f9a825;"
                 >
                     <i class="ti ti-star me-1"></i>{{ t.btn_current_default }}
                 </button>
@@ -210,3 +208,38 @@ async function setDefault() {
         </div>
     </div>
 </template>
+
+<style scoped>
+.gw-gold-border {
+    border: 2px solid #fdd835 !important;
+}
+.gw-default-header {
+    background: var(--warning-transparent);
+}
+.gw-gold-icon {
+    color: #f9a825;
+}
+.gw-gold-badge {
+    background: #fdd835;
+    color: #5d4037;
+}
+.gw-gold-outline-btn {
+    border-color: #fdd835;
+    color: #f9a825;
+}
+
+:root[data-bs-theme=dark] .gw-gold-border {
+    border-color: #a3821f !important;
+}
+:root[data-bs-theme=dark] .gw-gold-icon {
+    color: #d1a936;
+}
+:root[data-bs-theme=dark] .gw-gold-badge {
+    background: #a3821f;
+    color: #fff6df;
+}
+:root[data-bs-theme=dark] .gw-gold-outline-btn {
+    border-color: #a3821f;
+    color: #d1a936;
+}
+</style>

@@ -76,10 +76,10 @@ function isDefault(g) {
                             >
                                 <div class="flex-grow-1">
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <i v-if="isDefault(g)" class="ti ti-star" style="color:#f9a825;"></i>
+                                        <i v-if="isDefault(g)" class="ti ti-star gw-gold-icon"></i>
                                         <span class="fw-semibold small">{{ g.name }}</span>
                                         <span class="badge badge-soft-secondary text-uppercase" style="font-size:.68rem;">{{ g.code }}</span>
-                                        <span v-if="isDefault(g)" class="badge" style="background:#fdd835;color:#5d4037;font-size:.68rem;">
+                                        <span v-if="isDefault(g)" class="badge gw-gold-badge" style="font-size:.68rem;">
                                             {{ t.modal_default_current }}
                                         </span>
                                     </div>
@@ -96,8 +96,8 @@ function isDefault(g) {
                                 <div class="flex-shrink-0">
                                     <button
                                         v-if="isDefault(g)"
-                                        class="btn btn-sm"
-                                        style="background:#fdd835;color:#5d4037;border:none;"
+                                        class="btn btn-sm gw-gold-badge"
+                                        style="border:none;"
                                         disabled
                                     >
                                         <i class="ti ti-check me-1"></i>{{ t.default_badge }}
@@ -129,3 +129,21 @@ function isDefault(g) {
         </div>
     </Teleport>
 </template>
+
+<style scoped>
+.gw-gold-icon {
+    color: #f9a825;
+}
+.gw-gold-badge {
+    background: #fdd835;
+    color: #5d4037;
+}
+
+:root[data-bs-theme=dark] .gw-gold-icon {
+    color: #d1a936;
+}
+:root[data-bs-theme=dark] .gw-gold-badge {
+    background: #a3821f;
+    color: #fff6df;
+}
+</style>

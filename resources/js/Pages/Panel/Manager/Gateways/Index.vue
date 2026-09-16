@@ -52,20 +52,16 @@ const defaultOpen = ref(false);
             <!-- ── Default gateway banner ──────────────────────────────────────── -->
             <div
                 v-if="defaultGateway"
-                class="alert d-flex align-items-center gap-3 py-3 mb-4"
-                style="background:var(--warning-transparent);border:1.5px solid var(--warning);border-radius:10px;"
+                class="alert gw-default-banner d-flex align-items-center gap-3 py-3 mb-4"
             >
-                <div
-                    class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle"
-                    style="width:42px;height:42px;background:#fdd835;"
-                >
-                    <i class="ti ti-star fs-20" style="color:#5d4037;"></i>
+                <div class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle gw-gold-circle" style="width:42px;height:42px;">
+                    <i class="ti ti-star fs-20 gw-gold-circle-icon"></i>
                 </div>
                 <div class="flex-grow-1">
                     <div class="fw-bold mb-0" style="color:var(--heading-color);">{{ t.default_banner_title }}</div>
                     <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                         <span class="fw-semibold" style="color:var(--heading-color);">{{ defaultGateway.name }}</span>
-                        <span class="badge text-uppercase" style="background:#fdd835;color:#5d4037;font-size:.7rem;">{{ defaultGateway.code }}</span>
+                        <span class="badge text-uppercase gw-gold-badge" style="font-size:.7rem;">{{ defaultGateway.code }}</span>
                         <span class="text-muted small">{{ t.default_banner_subtitle }}</span>
                     </div>
                 </div>
@@ -203,3 +199,35 @@ const defaultOpen = ref(false);
         />
     </AppLayout>
 </template>
+
+<style scoped>
+.gw-default-banner {
+    background: var(--warning-transparent);
+    border: 1.5px solid var(--warning);
+    border-radius: 10px;
+}
+.gw-gold-circle {
+    background: #fdd835;
+}
+.gw-gold-circle-icon {
+    color: #5d4037;
+}
+.gw-gold-badge {
+    background: #fdd835;
+    color: #5d4037;
+}
+
+:root[data-bs-theme=dark] .gw-default-banner {
+    border-color: #d1a936;
+}
+:root[data-bs-theme=dark] .gw-gold-circle {
+    background: #a3821f;
+}
+:root[data-bs-theme=dark] .gw-gold-circle-icon {
+    color: #fff6df;
+}
+:root[data-bs-theme=dark] .gw-gold-badge {
+    background: #a3821f;
+    color: #fff6df;
+}
+</style>
