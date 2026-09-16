@@ -13,6 +13,55 @@
 
 // ── Estilos customizados do painel (migrado de app.css) ───────────────────────
 
+// ── Dark mode: inputs/selects legíveis em QUALQUER formulário do sistema ──────
+// O template Preclinic não dá contraste bom pro form-control/form-select em
+// dark mode fora do que já foi resolvido só pro prontuário (.pmr-form, ver
+// system/medical-records). Generalizado aqui pra toda tela — mesma paleta do
+// .pmr-form dark, pra manter os dois pontos de entrada de dado consistentes.
+:root[data-bs-theme=dark] .form-control,
+:root[data-bs-theme=dark] .form-select {
+    background-color: #121a26;
+    border-color: #384559;
+    color: #dbe4ef;
+}
+
+:root[data-bs-theme=dark] .form-control::placeholder {
+    color: #8695a8;
+}
+
+:root[data-bs-theme=dark] .form-control:focus,
+:root[data-bs-theme=dark] .form-select:focus {
+    background-color: #121a26;
+    border-color: var(--primary);
+    color: #dbe4ef;
+}
+
+// Bootstrap reduz opacity nos campos desabilitados — em dark mode isso
+// deixa o texto quase invisível (contraste já baixo, opacity reduzida por
+// cima). Cor própria em vez de opacity resolve sem esconder o conteúdo.
+:root[data-bs-theme=dark] .form-control:disabled,
+:root[data-bs-theme=dark] .form-select:disabled {
+    background-color: #18212f;
+    border-color: #2b3646;
+    color: #6b7a8f;
+    opacity: 1;
+}
+
+:root[data-bs-theme=dark] .input-group-text {
+    background-color: #18212f;
+    border-color: #384559;
+    color: #b9c7d8;
+}
+
+// A lista de opções do <select> nativo usa renderização do próprio SO por
+// padrão — sem isso, ela aparece com esquema de cor claro do sistema
+// mesmo com o form-select estilizado escuro por fora (Chrome/Firefox
+// respeitam; Safari tem suporte parcial).
+:root[data-bs-theme=dark] .form-select option {
+    background-color: #121a26;
+    color: #dbe4ef;
+}
+
 .table-nowrap td,
 .table-nowrap th {
     white-space: nowrap;

@@ -179,4 +179,47 @@ function onSearchChange(q) {
     --ms-border-color: #dc3545;
     --ms-ring-color: rgba(220, 53, 69, .25);
 }
+
+/*
+ * Dark mode: a lib (@vueform/multiselect/themes/default.css) só expõe cor
+ * de fundo/borda via --ms-*; a caixa e o dropdown de opções sem essas vars
+ * setadas ficam com o fallback #fff da própria lib (fixo, não reage a
+ * data-bs-theme) enquanto o texto herda a cor clara do body em dark mode —
+ * texto claro sobre fundo branco fixo, quase ilegível. A lib também não
+ * expõe var nenhuma pro texto do valor selecionado nem da opção "normal"
+ * (só pointed/selected/disabled têm --ms-option-color-*) — por isso o
+ * `color` explícito abaixo, herdado via cascata normal do CSS pro texto.
+ * Mesma paleta já usada nos inputs (.pmr-form dark, _medical-records.scss)
+ * — consistência entre os dois pontos de entrada de dado do sistema.
+ */
+:root[data-bs-theme=dark] .search-select.multiselect {
+    --ms-bg: #121a26;
+    --ms-bg-disabled: #18212f;
+    --ms-border-color: #384559;
+    --ms-border-color-active: var(--primary);
+    --ms-dropdown-bg: #121a26;
+    --ms-dropdown-border-color: #384559;
+    --ms-placeholder-color: #8695a8;
+    --ms-caret-color: #8695a8;
+    --ms-clear-color: #8695a8;
+    --ms-clear-color-hover: #dbe4ef;
+    --ms-empty-color: #8695a8;
+    --ms-option-bg-pointed: #1c2735;
+    --ms-option-color-pointed: #dbe4ef;
+    --ms-option-bg-selected: var(--primary);
+    --ms-option-color-selected: #fff;
+    --ms-option-bg-selected-pointed: var(--primary-hover, var(--primary));
+    --ms-option-color-selected-pointed: #fff;
+    --ms-option-bg-disabled: #18212f;
+    --ms-option-color-disabled: #55627a;
+    --ms-group-label-bg: #18212f;
+    --ms-group-label-color: #b9c7d8;
+    --ms-group-label-bg-pointed: #1c2735;
+    --ms-group-label-color-pointed: #dbe4ef;
+    color: #dbe4ef;
+}
+
+:root[data-bs-theme=dark] .search-select.multiselect.is-active {
+    --ms-border-color: var(--primary);
+}
 </style>

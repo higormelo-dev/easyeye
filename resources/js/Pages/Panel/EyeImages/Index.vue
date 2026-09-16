@@ -1559,7 +1559,20 @@ const printEntity = computed(() => props.entity ?? {});
 
             <!-- Principal: detalhe -->
             <div class="col-12 col-sm-8 col-md-9">
-                <div class="card">
+                <!--
+                    data-bs-theme="dark" fixo (não segue o tema do sistema):
+                    é o painel de revisão de imagem — cara de gerenciador
+                    dedicado (PACS/Lightroom/DaVinci), igual o concorrente
+                    benchmarcado. Bootstrap 5.3 resolve TODO bg-body-*/
+                    btn-outline-*/badge-subtle etc. dentro daqui pra variante
+                    dark automaticamente, sem recolorir nada manualmente — e
+                    corrige de brinde um mismatch que já existia em light
+                    mode (badge sutil claro sobre a faixa de miniaturas, que
+                    sempre foi escura). Ter isso fixo, em vez de trocar junto
+                    com o tema do app, é o que resolve o "contraste mudando
+                    muito" — o painel nunca muda, só o resto da tela.
+                -->
+                <div class="card ei-gallery-panel" data-bs-theme="dark">
                     <h5 class="card-header d-flex align-items-center gap-2 flex-wrap">
                         <span v-if="!selectedPatient">Selecione um paciente</span>
                         <span v-else class="d-flex align-items-center gap-2 w-100 flex-wrap">
@@ -2407,6 +2420,14 @@ const printEntity = computed(() => props.entity ?? {});
 .patient-item:hover { background: #f4f6fb; }
 .patient-item-active { background: #e8f0fe !important; }
 
+/* Painel sempre dark (ver comentário no template) — sombra mais pronunciada
+   que o .card padrão pra "descolar" visualmente do resto da tela clara,
+   em vez de ficar plano feito uma ilha desalinhada. */
+.ei-gallery-panel {
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .28);
+    border-color: #2b3646;
+}
+
 /* Barra de ações com muitos botões — mesmo padrão de .pmr-bottom-bar-row
    (prontuário): nunca deve disparar em telas normais, é rede de segurança
    pra viewport estreito (mobile/tablet) não estourar/cortar botões. */
@@ -2463,14 +2484,12 @@ const printEntity = computed(() => props.entity ?? {});
     opacity: 1;
 }
 
+/* .ei-gallery-panel é sempre dark (data-bs-theme="dark" fixo) — sem
+   variante clara aqui, o skeleton só existe dentro do painel. */
 .eyeimg-skeleton {
-    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-    background-size: 200% 100%;
-    animation: eyeimgShimmer 1.2s ease-in-out infinite;
-}
-:root[data-bs-theme=dark] .eyeimg-skeleton {
     background: linear-gradient(90deg, #2a2c32 25%, #3a3c42 50%, #2a2c32 75%);
     background-size: 200% 100%;
+    animation: eyeimgShimmer 1.2s ease-in-out infinite;
 }
 @keyframes eyeimgShimmer {
     from { background-position: 200% 0; }
