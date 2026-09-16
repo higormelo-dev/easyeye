@@ -19,8 +19,14 @@ class ApiCheckPlanAccess
     {
         $integrator = $request->attributes->get('integrator');
 
+        // Fail-closed: este middleware só faz sentido depois de
+        // auth_with_integrator (que define 'integrator'). Nas rotas atuais a
+        // ordem já garante isso, mas passar direto (fail-open) na ausência do
+        // atributo deixaria qualquer reordenação futura de middleware pular
+        // silenciosamente o gate de plano/assinatura — mesma categoria de
+        // risco corrigida em ApiAuthenticateWithIntegrator.
         if (! $integrator) {
-            return $next($request);
+            return response()->json(['message' => __('http-statuses.401')], Response::HTTP_UNAUTHORIZED);
         }
 
         $entityId = $integrator->user->entity_id;

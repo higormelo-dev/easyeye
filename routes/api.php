@@ -17,7 +17,14 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
     Route::post('signin', [EntityIntegratorsController::class, 'store'])->name('auth')->middleware('throttle:10,1');
     Route::post('check-token', [EntityIntegratorsController::class, 'checkToken'])->name('checktoken')->middleware('throttle:30,1');
     Route::group(['middleware' => ['token.precheck', 'auth:sanctum', 'auth_with_integrator', 'token.expiration', 'api.plan']], static function () {
-        Route::delete('signout', [EntityIntegratorsController::class, 'destroy'])->name('signout')->withoutMiddleware('api.plan');
+        // throttle:integrators-api aqui só por consistência com o resto do
+        // grupo autenticado (signout já roda depois de auth_with_integrator,
+        // então o limiter tem 'integrator' pra chavear por device, igual v1) —
+        // sem isso era o único endpoint autenticado sem nenhum rate limit.
+        Route::delete('signout', [EntityIntegratorsController::class, 'destroy'])
+            ->name('signout')
+            ->withoutMiddleware('api.plan')
+            ->middleware('throttle:integrators-api');
         Route::group([
             'prefix'     => 'v1',
             'as'         => 'v1.',

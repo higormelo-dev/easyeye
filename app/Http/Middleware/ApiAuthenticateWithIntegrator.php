@@ -33,6 +33,22 @@ class ApiAuthenticateWithIntegrator
             ->with(['user', 'user.entity'])
             ->find($integratorId);
 
+        // Defesa em profundidade: reafirma a cada request que o integrador da
+        // ability pertence mesmo ao usuário autenticado pelo token. Essa
+        // amarração só é garantida hoje no momento da EMISSÃO do token
+        // (EntityIntegratorsController::store() filtra por
+        // entity_user_integrator_id === $user->id antes de gravar a ability
+        // integrator_id:<uuid>) — nenhuma leitura subsequente reafirmava a
+        // invariante. Sem esta checagem, um integrator_id de outro tenant
+        // acabar numa ability (bug futuro de emissão/renovação de token,
+        // reordenação de middleware, etc.) seria aceito sem checagem: todo
+        // controller/service da API do integrador confia cegamente em
+        // request()->attributes->get('integrator')->user->entity_id para
+        // escopar patients/exams/equipments — seria IDOR cross-tenant total.
+        if ($integrator && $integrator->entity_user_integrator_id !== $user->id) {
+            $integrator = null;
+        }
+
         $blockReason = $integrator ? $integrator->accessBlockReason() : 'auth.integrator_inactive';
 
         if ($blockReason !== null) {

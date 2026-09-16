@@ -200,6 +200,44 @@ describe('escopo de token', function () {
 });
 
 // ---------------------------------------------------------------------------
+// Amarração token ↔ integrador (ApiAuthenticateWithIntegrator)
+//
+// A ability `integrator_id:<uuid>` só é gravada corretamente no momento do
+// signin (EntityIntegratorsController::store() filtra por
+// entity_user_integrator_id === usuário autenticado). Nenhuma leitura
+// subsequente reafirmava essa amarração — só era possível construir o
+// cenário abaixo manualmente (createToken direto, como os demais testes de
+// "token legado"/"write-only" desta suíte), nunca via signin normal. Ainda
+// assim, o middleware precisa recusar: sem essa checagem, um integrator_id
+// de outro tenant numa ability seria aceito sem checagem, e todo controller
+// da API confia cegamente em request()->attributes->get('integrator') para
+// escopar patients/exams/equipments — IDOR cross-tenant total.
+// ---------------------------------------------------------------------------
+describe('amarração token ↔ integrador', function () {
+    it('barra token cujo integrator_id na ability pertence a outro usuário/tenant', function () {
+        $victim   = setupIntegrator();
+        $attacker = setupIntegrator();
+
+        $forgedToken = $attacker['integratorUser']->createToken(
+            'integrator-token',
+            ['integrator_id:' . $victim['integrator']->id],
+            now()->addDays(7),
+        );
+
+        $this->getJson('/api/integrators/v1/patients', [
+            'Authorization' => 'Bearer ' . $forgedToken->plainTextToken,
+        ])->assertUnauthorized();
+    });
+
+    it('permite normalmente quando integrator_id pertence ao próprio usuário do token', function () {
+        $ctx = setupIntegrator();
+
+        $this->getJson('/api/integrators/v1/patients', $ctx['headers'])
+            ->assertOk();
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Idempotência no upload
 // ---------------------------------------------------------------------------
 describe('idempotência', function () {
