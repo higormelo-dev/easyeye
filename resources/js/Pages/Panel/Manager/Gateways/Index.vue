@@ -53,18 +53,18 @@ const defaultOpen = ref(false);
             <div
                 v-if="defaultGateway"
                 class="alert d-flex align-items-center gap-3 py-3 mb-4"
-                style="background:linear-gradient(135deg,#fff8e1 0%,#fffde7 100%);border:1.5px solid #fdd835;border-radius:10px;"
+                style="background:var(--warning-transparent);border:1.5px solid var(--warning);border-radius:10px;"
             >
                 <div
                     class="flex-shrink-0 d-flex align-items-center justify-content-center rounded-circle"
                     style="width:42px;height:42px;background:#fdd835;"
                 >
-                    <i class="ti ti-star text-dark fs-20"></i>
+                    <i class="ti ti-star fs-20" style="color:#5d4037;"></i>
                 </div>
                 <div class="flex-grow-1">
-                    <div class="fw-bold mb-0" style="color:#5d4037;">{{ t.default_banner_title }}</div>
+                    <div class="fw-bold mb-0" style="color:var(--heading-color);">{{ t.default_banner_title }}</div>
                     <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                        <span class="fw-semibold" style="color:#333;">{{ defaultGateway.name }}</span>
+                        <span class="fw-semibold" style="color:var(--heading-color);">{{ defaultGateway.name }}</span>
                         <span class="badge text-uppercase" style="background:#fdd835;color:#5d4037;font-size:.7rem;">{{ defaultGateway.code }}</span>
                         <span class="text-muted small">{{ t.default_banner_subtitle }}</span>
                     </div>

@@ -63,7 +63,7 @@ async function setDefault() {
         <!-- ── Card Header ─────────────────────────────────────────────────── -->
         <div
             class="card-header d-flex align-items-center justify-content-between py-2 px-3"
-            :style="gateway.is_default ? 'background:linear-gradient(135deg,#fff8e1,#fffde7);' : ''"
+            :style="gateway.is_default ? 'background:var(--warning-transparent);' : ''"
         >
             <!-- Name + badges -->
             <div class="d-flex align-items-center gap-2 flex-wrap min-w-0">
