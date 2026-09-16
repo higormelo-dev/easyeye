@@ -40,16 +40,16 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  * vazio é enviado (evita SuspiciousOperationException do Symfony ao tentar
  * `strtoupper('')` como verbo HTTP). `forceFormData: true` sempre, pra
  * upload de imagem funcionar em ambos os fluxos.
+ *
+ * Toda lente É um produto de estoque real agora (1:1 obrigatório — ver
+ * docblock de App\Models\EntityIolLens/App\Services\IolLensStockBridgeService)
+ * — o vínculo deixou de ser um picker manual opcional (antigo GAP-FILL
+ * pós-Fase 4), é automático no backend. Nenhum campo deste form mudou.
  */
 const props = defineProps({
     open:   { type: Boolean, required: true },
     item:   { type: Object,  default: null }, // null = criar; objeto = editar
-    routes: { type: Object,  required: true }, // { store, update (__ID__), search, products_search }
-    // Vínculo opcional com estoque (GAP-FILL pós-Fase 4 — ver docblock de
-    // App\Models\EntityIolLens). Só true quando a clínica tem o módulo —
-    // sem isso o picker de produto nem aparece (buscaria em rota que
-    // sempre 403aria pra quem não tem stock.manage/feature habilitada).
-    hasInventoryModule: { type: Boolean, default: false },
+    routes: { type: Object,  required: true }, // { store, update (__ID__), search }
 });
 
 const emit = defineEmits(['close', 'saved']);
@@ -64,7 +64,6 @@ const form = useForm({
     model_name:         '',
     category:           '',
     iol_lens_model_id:  null,
-    entity_product_id:  null,
     diopter_min:        null,
     diopter_max:        null,
     price:              null,
@@ -114,46 +113,6 @@ function onCatalogOptionSelected(option) {
     catalogImageUrl.value  = option.image_url ?? null;
 }
 
-// ── Vínculo opcional com estoque (GAP-FILL pós-Fase 4) ───────────────────
-// Mesmo princípio do picker de catálogo global acima: o `SearchSelect`
-// remoto não tem endpoint pra "buscar 1 EntityProduct por id" e re-hidratar
-// o label — então o picker abre VAZIO mesmo em edição de item já vinculado.
-// Diferente do catálogo global (onde manufacturer/model_name já mostram o
-// snapshot local), aqui não existe campo de texto equivalente, então
-// `linkedProductLabel` mostra uma linha de confirmação separada com o que
-// está vinculado HOJE — sempre reflete `form.entity_product_id`, nunca só o
-// estado inicial, pra continuar correta se o usuário trocar/remover o
-// vínculo no meio da edição.
-const productPickerValue = ref(null);
-const linkedProductSnapshot = ref(null); // { name, code, qty_on_hand, unit_label } | null
-
-const productsSearchUrl = computed(() => `${props.routes.products_search}?q=__Q__`);
-
-function onProductOptionSelected(option) {
-    if (!option) {
-        form.entity_product_id = null;
-        linkedProductSnapshot.value = null;
-        return;
-    }
-
-    form.entity_product_id = option.id ?? null;
-    // `product_name` (não `name`/`label`) — ver comentário em
-    // ProductsController::search() sobre por que o campo semântico tem
-    // esse nome (evita colisão com a normalização de label do SearchSelect).
-    linkedProductSnapshot.value = {
-        name: option.product_name ?? option.label,
-        code: option.code ?? null,
-        qty_on_hand: option.qty_on_hand ?? null,
-        unit_label: option.unit_label ?? '',
-    };
-}
-
-function unlinkProduct() {
-    form.entity_product_id = null;
-    linkedProductSnapshot.value = null;
-    productPickerValue.value = null;
-}
-
 // ── Reset / hidratação ao abrir ───────────────────────────────────────────
 function reset() {
     form.reset();
@@ -161,8 +120,6 @@ function reset() {
     catalogPickerValue.value = null;
     catalogImageUrl.value    = null;
     localImagePreview.value  = null;
-    productPickerValue.value = null;
-    linkedProductSnapshot.value = null;
     clearImageSelection();
 }
 
@@ -179,11 +136,7 @@ watch(() => props.open, (val) => {
         form.diopter_max       = props.item.diopter_max ?? null;
         form.price             = props.item.price ?? null;
         form.active            = props.item.active ?? true;
-        form.entity_product_id = props.item.entity_product_id ?? null;
         existingImageUrl.value = props.item.image_url ?? null;
-        linkedProductSnapshot.value = props.item.stock
-            ? { name: props.item.stock.name, code: props.item.stock.code, qty_on_hand: props.item.stock.qty_on_hand, unit_label: props.item.stock.unit_label }
-            : null;
     } else {
         existingImageUrl.value = null;
     }
@@ -317,30 +270,6 @@ function close() {
                     placeholder="0,00"
                 >
                 <div v-if="form.errors.price" class="invalid-feedback">{{ form.errors.price }}</div>
-            </div>
-
-            <!-- Vínculo opcional com estoque (GAP-FILL pós-Fase 4) -->
-            <div v-if="hasInventoryModule" class="mb-3">
-                <label class="form-label">Vincular ao estoque (opcional)</label>
-                <div v-if="linkedProductSnapshot" class="alert alert-light border py-2 px-2 small d-flex align-items-center gap-2 mb-2">
-                    <i class="ti ti-package text-primary"></i>
-                    <span class="flex-grow-1">
-                        <strong>{{ linkedProductSnapshot.name }}</strong>
-                        <template v-if="linkedProductSnapshot.code"> ({{ linkedProductSnapshot.code }})</template>
-                        <template v-if="linkedProductSnapshot.qty_on_hand !== null"> — saldo atual: {{ linkedProductSnapshot.qty_on_hand }} {{ linkedProductSnapshot.unit_label }}</template>
-                    </span>
-                    <button type="button" class="btn btn-link btn-sm text-danger p-0" @click="unlinkProduct">Remover vínculo</button>
-                </div>
-                <SearchSelect
-                    v-model="productPickerValue"
-                    :remote-search-url="productsSearchUrl"
-                    :remote-min-chars="2"
-                    :placeholder="linkedProductSnapshot ? 'Trocar produto vinculado...' : 'Buscar produto do estoque...'"
-                    @option-selected="onProductOptionSelected"
-                />
-                <small class="text-muted d-block mt-1">
-                    Associa esta lente a um produto já cadastrado no módulo de Estoque — permite rastrear saldo/lote/custo físico dela, sem duplicar cadastro. Totalmente opcional.
-                </small>
             </div>
 
             <!-- Imagem -->

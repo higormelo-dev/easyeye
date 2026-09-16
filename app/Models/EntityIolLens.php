@@ -3,29 +3,32 @@
 namespace App\Models;
 
 use App\Traits\{Auditable, HasAuditColumns};
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, SoftDeletes};
-use Illuminate\Support\Facades\Storage;
 
 /**
- * Inventário de lentes intraoculares (IOL/catarata) POR CLÍNICA — escopado
- * por entity_id. manufacturer/model_name/category são snapshot local (cópia
- * estável, não depende de join com iol_lens_models pra exibir/buscar), mesmo
- * quando vinculado ao catálogo global via lensModel().
+ * Metadado CLÍNICO/ÓPTICO de uma lente intraocular (IOL/catarata) POR
+ * CLÍNICA — escopado por entity_id. Fabricante, nome/modelo, preço, foto e
+ * status ativo NÃO vivem mais aqui: migraram pro produto de estoque
+ * vinculado (App\Models\EntityProduct, ver entityProduct()) — este model
+ * guarda só o que é exclusivamente clínico/óptico e não faz sentido em
+ * nenhum outro tipo de produto: `category` (tipo ÓPTICO da lente —
+ * monofocal/multifocal/tórica/EDF; NÃO confundir com
+ * EntityProduct::product_category_id, que é a categoria AMPLA de estoque
+ * "Lentes IOL") e a faixa de dioptria.
+ *
+ * `entity_product_id` é 1:1 OBRIGATÓRIO (NOT NULL + UNIQUE desde a migration
+ * que aperta o schema) — toda lente É um produto de estoque real, criado/
+ * atualizado sempre junto via App\Services\IolLensStockBridgeService.
+ * Histórico: até a migration de aperto de schema, esse vínculo era
+ * OPCIONAL (GAP-FILL pós-Fase 4 do módulo de estoque) e os campos acima
+ * eram snapshot local duplicado — ver
+ * database/migrations/2026_09_09_210000_add_entity_product_id_to_entity_iol_lenses_table.php
+ * pro contexto da decisão original de não unificar, revertida neste plano.
  *
  * Para o catálogo GLOBAL de referência (sem escopo, compartilhado entre
  * clínicas), ver IolLensModel.
- *
- * `entity_product_id` (nullable — GAP-FILL pós-Fase 4 do módulo de estoque):
- * vínculo OPCIONAL e ADITIVO com App\Models\EntityProduct, decisão explícita
- * do usuário em vez de unificar os dois catálogos (risco de migração numa
- * feature em produção). Sem vínculo, este model funciona exatamente como
- * antes — price/diopter continuam sendo dado PRÓPRIO da lente (cotação),
- * nunca escritos a partir do saldo de estoque. Com vínculo, a clínica pode
- * ADICIONALMENTE rastrear saldo/lote/custo físico da mesma lente via
- * StockService, sem duplicar cadastro.
  */
 class EntityIolLens extends Model
 {
@@ -46,20 +49,10 @@ class EntityIolLens extends Model
         'entity_id',
         'iol_lens_model_id',
         'entity_product_id',
-        'manufacturer',
-        'model_name',
         'category',
         'diopter_min',
         'diopter_max',
-        'price',
-        'image_path',
-        'active',
     ];
-
-    /**
-     * @var string[]
-     */
-    protected $appends = ['image_url'];
 
     /**
      * Get the attributes that should be cast.
@@ -71,8 +64,6 @@ class EntityIolLens extends Model
         return [
             'diopter_min' => 'decimal:2',
             'diopter_max' => 'decimal:2',
-            'price'       => 'decimal:2',
-            'active'      => 'boolean',
         ];
     }
 
@@ -92,30 +83,18 @@ class EntityIolLens extends Model
     }
 
     /**
-     * Vínculo opcional com o catálogo de estoque (ver docblock da classe).
-     * Nullable — a maioria dos itens não tem vínculo nenhum.
+     * Produto de estoque desta lente — fabricante, nome, preço, foto, saldo
+     * e status ativo vivem todos aqui agora. 1:1 obrigatório, sempre
+     * presente (ver docblock da classe).
      */
     public function entityProduct(): BelongsTo
     {
         return $this->belongsTo(EntityProduct::class, 'entity_product_id');
     }
 
-    /**
-     * Foto própria da clínica (se houver); senão, cai pra foto do modelo do
-     * catálogo global vinculado (se houver). Acessar lensModel sem eager
-     * load em listagens gera N+1 — usar with('lensModel') quando aplicável.
-     */
-    public function imageUrl(): Attribute
-    {
-        return new Attribute(
-            get: fn () => $this->image_path
-                ? Storage::disk('public')->url($this->image_path)
-                : $this->lensModel?->image_url,
-        );
-    }
-
+    /** Delega pro status ativo do produto de estoque vinculado. */
     public function scopeActive($query)
     {
-        return $query->where('active', true);
+        return $query->whereHas('entityProduct', fn ($q) => $q->where('active', true));
     }
 }

@@ -8,10 +8,12 @@ use App\Concerns\HasEntityCode;
 use App\Enums\StockUnit;
 use App\Models\Concerns\BelongsToEntity;
 use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany, HasOne};
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Item de estoque DA CLÍNICA (produto/material/insumo/OPM) — escopado por
@@ -45,15 +47,22 @@ class EntityProduct extends Model
         'sku',
         'barcode',
         'name',
+        'manufacturer',
         'description',
         'unit',
         'is_opm',
         'requires_lot',
         'sale_price',
+        'image_path',
         'min_qty',
         'max_qty',
         'active',
     ];
+
+    /**
+     * @var string[]
+     */
+    protected $appends = ['image_url'];
 
     protected function casts(): array
     {
@@ -91,18 +100,35 @@ class EntityProduct extends Model
     }
 
     /**
-     * Itens do inventário de lentes IOL vinculados a este produto (vínculo
-     * opcional/aditivo — ver docblock de App\Models\EntityIolLens). Normal
-     * um produto não ter nenhum lens vinculado.
+     * Metadado clínico/óptico de lente IOL vinculado a este produto — 1:1
+     * OBRIGATÓRIO só quando o produto nasceu do cadastro de lentes
+     * (App\Services\IolLensStockBridgeService); a maioria dos produtos de
+     * estoque não tem lente nenhuma vinculada. Ver docblock de
+     * App\Models\EntityIolLens.
      */
-    public function iolLenses(): HasMany
+    public function iolLens(): HasOne
     {
-        return $this->hasMany(EntityIolLens::class);
+        return $this->hasOne(EntityIolLens::class);
     }
 
     public function scopeActive($query)
     {
         return $query->where('active', true);
+    }
+
+    /**
+     * Foto do produto, se cadastrada. Sem fallback (diferente do antigo
+     * EntityIolLens::imageUrl(), que caía pro catálogo global de lentes —
+     * esse fallback é responsabilidade de quem consome o produto pelo lado
+     * de lentes, não do produto genérico).
+     */
+    public function imageUrl(): Attribute
+    {
+        return new Attribute(
+            get: fn () => $this->image_path
+                ? Storage::disk('public')->url($this->image_path)
+                : null,
+        );
     }
 
     /**

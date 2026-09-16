@@ -9,15 +9,17 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\{Rule, Validator};
 
 /**
- * Validação de create/update de um item de inventário de lente IOL
- * (catarata) DA CLÍNICA — App\Models\EntityIolLens.
+ * Validação de create/update de uma lente IOL (catarata) DA CLÍNICA —
+ * App\Models\EntityIolLens. Os campos aqui alimentam o par
+ * EntityIolLens + EntityProduct via App\Services\IolLensStockBridgeService
+ * (1:1 obrigatório — ver docblock do model); `entity_product_id` NÃO é mais
+ * input do usuário (era vínculo opcional/manual antes da migração pro
+ * estoque, agora é sempre criado/gerenciado pelo bridge service).
  *
  * `iol_lens_model_id` aponta pro catálogo GLOBAL (App\Models\IolLensModel,
  * sem escopo por entity_id) — só valida existência (e que não esteja soft-
  * deletado), nunca escopa por clínica. manufacturer/model_name continuam
- * obrigatórios mesmo quando o model_id é informado: são snapshot local
- * (colunas NOT NULL em entity_iol_lenses — ver doc do model), nunca lidos
- * via join com o catálogo global.
+ * obrigatórios mesmo quando o model_id é informado.
  */
 class EntityIolLensRequest extends FormRequest
 {
@@ -36,17 +38,6 @@ class EntityIolLensRequest extends FormRequest
                 'nullable',
                 'uuid',
                 Rule::exists('iol_lens_models', 'id')->withoutTrashed(),
-            ],
-            // Vínculo opcional com o catálogo de estoque (GAP-FILL pós-Fase
-            // 4 — ver docblock de App\Models\EntityIolLens). AQUI SIM escopa
-            // por entity_id: entity_products é dado DA CLÍNICA (diferente de
-            // iol_lens_models acima, que é catálogo global sem escopo).
-            'entity_product_id' => [
-                'nullable',
-                'uuid',
-                Rule::exists('entity_products', 'id')
-                    ->where('entity_id', session('selected_entity_id'))
-                    ->whereNull('deleted_at'),
             ],
             'manufacturer' => ['required', 'string', 'max:255'],
             'model_name'   => ['required', 'string', 'max:255'],

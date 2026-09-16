@@ -1,8 +1,7 @@
 <?php
 
-use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
-use App\Models\{Entity, EntityIolLens, EntityProduct, IolLensModel, Plan, PlanFeature, Subscription, User};
-use App\Services\Stock\StockService;
+use App\Enums\ClientRule;
+use App\Models\{Entity, EntityIolLens, EntityProduct, IolLensModel, ProductCategory, User};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -10,10 +9,18 @@ use Illuminate\Support\Facades\Storage;
  * CRUD do inventário de lentes IOL (catarata) DA CLÍNICA —
  * App\Http\Controllers\Setting\IolLensesController.
  *
- * Isolamento: entity_iol_lenses é dado DA CLÍNICA (escopado por entity_id);
- * iol_lens_models é catálogo GLOBAL sem escopo, compartilhado entre todas as
- * clínicas — ver docblocks de EntityIolLens/IolLensModel/
- * IolLensCatalogService::findOrCreateModel().
+ * Toda lente É um produto de estoque real agora (1:1 obrigatório via
+ * App\Services\IolLensStockBridgeService — ver docblock de
+ * App\Models\EntityIolLens). Fabricante/nome/preço/foto/status vivem no
+ * EntityProduct vinculado; a lente em si guarda só o que é clínico/óptico
+ * (category = tipo óptico, diopter_min/max). Disponível pra TODAS as
+ * clínicas independente do módulo pago de estoque — a rota fica fora do
+ * gate `feature:has_inventory_module` de propósito (ver routes/web.php).
+ *
+ * Isolamento: entity_iol_lenses/entity_products são dado DA CLÍNICA
+ * (escopados por entity_id); iol_lens_models é catálogo GLOBAL sem escopo,
+ * compartilhado entre todas as clínicas — ver docblocks de
+ * EntityIolLens/IolLensModel/IolLensCatalogService::findOrCreateModel().
  *
  * Rota protegida por `permission:settings.manage`
  * (App\Http\Middleware\EnsureEntityPermission) — ClientRule::Admin faz
@@ -24,15 +31,21 @@ use Illuminate\Support\Facades\Storage;
  *
  * `iollenses` NÃO expõe rota de restore (confirmado via `php artisan
  * route:list`, diferente de covenants/skintypes/lenses/etc. no mesmo bloco
- * de routes/web.php) — por isso não há teste de restore aqui (item 10 do
- * pedido original cobre só o soft delete).
+ * de routes/web.php) — por isso não há teste de restore aqui.
  *
  * Setup/estilo espelha tests/Feature/EyeImages/ExternalExamImportTest.php
  * (Storage::fake, UploadedFile::fake(), helpers createEntityUser/
  * panelSession de tests/Pest.php). Disco usado por
  * IolLensCatalogService::storeImage() é `public` (foto de produto não é
- * dado sensível de paciente — ver docblock do service), diferente do disco
- * `s3` fake usado pelos testes de exame.
+ * dado sensível de paciente — ver docblock do service).
+ *
+ * Os testes do antigo vínculo MANUAL opcional lente↔produto (GAP-FILL
+ * pós-Fase 4, incluindo cobertura de ProductsController::search()) foram
+ * REMOVIDOS daqui — o vínculo deixou de existir como conceito (agora é
+ * sempre automático). A cobertura de search() em si (endpoint genérico do
+ * módulo de estoque, usado por outros pickers como
+ * ProcedureProductsController) foi relocada pra
+ * tests/Feature/Stock/ProductsTest.php.
  */
 beforeEach(function () {
     Storage::fake('public');
@@ -47,25 +60,6 @@ function actingAsIolLensAdmin($test, ?User $admin = null, $entityUser = null)
 {
     return $test->actingAs($admin ?? $test->admin)
         ->withSession(panelSession($entityUser ?? $test->adminEntityUser));
-}
-
-/**
- * Habilita o módulo de estoque (feature paga) pra uma entity — necessário
- * só nos testes do vínculo opcional Lente IOL ↔ Produto (GAP-FILL pós-Fase
- * 4): sem isso `hasInventoryModule` fica false e `panel.stock.products.search`
- * 403a (mesmo par de trava permission:stock.manage + feature:has_inventory_module
- * de todo o resto do módulo — ver StockReportsTest::beforeEach() pro mesmo
- * setup). Os demais testes deste arquivo NÃO chamam isso de propósito: o
- * CRUD de lente em si nunca dependeu do módulo de estoque.
- */
-function enableInventoryModuleFor(Entity $entity): void
-{
-    $plan = Plan::factory()->create(['active' => true]);
-    PlanFeature::factory()->enabled(FeatureKey::HasInventoryModule)->for($plan)->create();
-    Subscription::factory()->create([
-        'entity_id' => $entity->id, 'plan_id' => $plan->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
 }
 
 function iolLensPayload(array $overrides = []): array
@@ -98,7 +92,7 @@ function updateIolLens($test, string $id, array $overrides = [], ?User $admin = 
         ->put(route('panel.setting.iollenses.update', $id), iolLensPayload($overrides), ['Accept' => 'application/json']);
 }
 
-it('admin cria uma lente com todos os campos + imagem — EntityIolLens criado, image_url presente, arquivo no disco fake', function () {
+it('admin cria uma lente com todos os campos + imagem — EntityIolLens + EntityProduct vinculado criados, image_url presente, arquivo no disco fake', function () {
     $res = storeIolLens($this, [
         'category'    => 'multifocal',
         'diopter_min' => 15.5,
@@ -110,20 +104,47 @@ it('admin cria uma lente com todos os campos + imagem — EntityIolLens criado, 
 
     $res->assertRedirect(route('panel.setting.iollenses.index'));
 
-    $lens = EntityIolLens::where('entity_id', $this->entity->id)->first();
+    $lens = EntityIolLens::where('entity_id', $this->entity->id)->with('entityProduct')->first();
 
     expect($lens)->not->toBeNull();
-    expect($lens->manufacturer)->toBe('Alcon');
-    expect($lens->model_name)->toBe('AcrySof IQ');
+    expect($lens->entity_product_id)->not->toBeNull();
+
+    $product = $lens->entityProduct;
+    expect($product)->not->toBeNull();
+    expect($product->entity_id)->toBe($this->entity->id);
+    expect($product->manufacturer)->toBe('Alcon');
+    expect($product->name)->toBe('AcrySof IQ');
     expect($lens->category)->toBe('multifocal');
     expect((float) $lens->diopter_min)->toBe(15.5);
     expect((float) $lens->diopter_max)->toBe(28.0);
-    expect((float) $lens->price)->toBe(3200.9);
-    expect($lens->active)->toBeFalse();
-    expect($lens->image_path)->not->toBeNull();
-    expect($lens->image_url)->not->toBeNull();
+    expect((float) $product->sale_price)->toBe(3200.9);
+    expect($product->active)->toBeFalse();
+    expect($product->is_opm)->toBeTrue();
+    expect($product->image_path)->not->toBeNull();
+    expect($product->image_url)->not->toBeNull();
+    expect((float) $product->qty_on_hand)->toBe(0.0);
 
-    Storage::disk('public')->assertExists($lens->image_path);
+    Storage::disk('public')->assertExists($product->image_path);
+});
+
+it('cria a categoria de estoque "Lentes IOL" automaticamente na primeira lente da clínica, e REAPROVEITA na segunda (não duplica)', function () {
+    expect(ProductCategory::where('entity_id', $this->entity->id)->count())->toBe(0);
+
+    storeIolLens($this, ['model_name' => 'Lente A'])->assertRedirect(route('panel.setting.iollenses.index'));
+
+    expect(ProductCategory::where('entity_id', $this->entity->id)->count())->toBe(1);
+    $category = ProductCategory::where('entity_id', $this->entity->id)->firstOrFail();
+    expect($category->name)->toBe('Lentes IOL');
+
+    storeIolLens($this, ['model_name' => 'Lente B'])->assertRedirect(route('panel.setting.iollenses.index'));
+
+    expect(ProductCategory::where('entity_id', $this->entity->id)->count())->toBe(1);
+
+    $lensA = EntityIolLens::whereHas('entityProduct', fn ($q) => $q->where('name', 'Lente A'))->firstOrFail();
+    $lensB = EntityIolLens::whereHas('entityProduct', fn ($q) => $q->where('name', 'Lente B'))->firstOrFail();
+
+    expect($lensA->entityProduct->product_category_id)->toBe($category->id);
+    expect($lensB->entityProduct->product_category_id)->toBe($category->id);
 });
 
 it('cria lente com fabricante/modelo inexistente no catálogo global — findOrCreateModel registra um novo IolLensModel e a inventory aponta pra ele', function () {
@@ -173,7 +194,7 @@ it('cria lente escolhendo um iol_lens_model_id já existente (autocomplete) — 
     expect($lens->iol_lens_model_id)->toBe($existing->id);
 });
 
-it('duas clínicas cadastrando fabricante+modelo idênticos deduplicam no catálogo global (normalized_key) mas mantêm inventário próprio', function () {
+it('duas clínicas cadastrando fabricante+modelo idênticos deduplicam no catálogo global (normalized_key) mas mantêm inventário/produto/categoria próprios', function () {
     $entityB      = Entity::factory()->create(['is_client' => true, 'active' => true]);
     $adminB       = User::factory()->create();
     $adminBEntity = createEntityUser($entityB, $adminB, ClientRule::Admin->value);
@@ -200,18 +221,20 @@ it('duas clínicas cadastrando fabricante+modelo idênticos deduplicam no catál
     $normalizedKey = mb_strtolower("{$manufacturer}|{$modelName}", 'UTF-8');
     expect(IolLensModel::where('normalized_key', $normalizedKey)->count())->toBe(1);
 
-    $lensA = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
-    $lensB = EntityIolLens::where('entity_id', $entityB->id)->firstOrFail();
+    $lensA = EntityIolLens::where('entity_id', $this->entity->id)->with('entityProduct')->firstOrFail();
+    $lensB = EntityIolLens::where('entity_id', $entityB->id)->with('entityProduct')->firstOrFail();
 
     // Mesmo model global reaproveitado pelas duas clínicas...
     expect($lensA->iol_lens_model_id)->toBe($lensB->iol_lens_model_id);
     expect($lensA->id)->not->toBe($lensB->id);
 
-    // ...mas cada uma com sua própria linha de inventário (dioptria/valor diferentes).
+    // ...mas cada uma com seu próprio produto/categoria de estoque.
+    expect($lensA->entity_product_id)->not->toBe($lensB->entity_product_id);
+    expect($lensA->entityProduct->product_category_id)->not->toBe($lensB->entityProduct->product_category_id);
     expect((float) $lensA->diopter_min)->toBe(6.0);
     expect((float) $lensB->diopter_min)->toBe(8.0);
-    expect((float) $lensA->price)->toBe(1800.0);
-    expect((float) $lensB->price)->toBe(2100.0);
+    expect((float) $lensA->entityProduct->sale_price)->toBe(1800.0);
+    expect((float) $lensB->entityProduct->sale_price)->toBe(2100.0);
 });
 
 it('isolamento multi-tenant: lente da Entity A não aparece na listagem da Entity B; show/update/destroy por id direto retornam 404', function () {
@@ -250,6 +273,7 @@ it('diopter_max menor que diopter_min retorna 422', function () {
     $res->assertJsonValidationErrors('diopter_max');
 
     expect(EntityIolLens::count())->toBe(0);
+    expect(EntityProduct::count())->toBe(0);
 });
 
 it('upload de imagem com mimetype real não permitido (arquivo disfarçado de .jpg) retorna 422', function () {
@@ -311,12 +335,12 @@ it('search() com termo válido (>=2 chars) retorna lentes do catálogo global, o
     expect($ids)->not->toContain($unrelated->id);
 });
 
-it('editar uma lente SEM enviar nova imagem mantém a imagem antiga (arquivo não é apagado do disco)', function () {
+it('editar uma lente SEM enviar nova imagem mantém a imagem antiga no produto (arquivo não é apagado do disco)', function () {
     storeIolLens($this, ['image' => UploadedFile::fake()->image('lens-original.jpg')])
         ->assertRedirect(route('panel.setting.iollenses.index'));
 
-    $lens         = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
-    $originalPath = $lens->image_path;
+    $lens         = EntityIolLens::where('entity_id', $this->entity->id)->with('entityProduct')->firstOrFail();
+    $originalPath = $lens->entityProduct->image_path;
 
     expect($originalPath)->not->toBeNull();
     Storage::disk('public')->assertExists($originalPath);
@@ -325,151 +349,76 @@ it('editar uma lente SEM enviar nova imagem mantém a imagem antiga (arquivo nã
         ->assertRedirect(route('panel.setting.iollenses.index'));
 
     $lens->refresh();
-    expect($lens->image_path)->toBe($originalPath);
-    expect((float) $lens->price)->toBe(9999.99);
+    expect($lens->entityProduct->image_path)->toBe($originalPath);
+    expect((float) $lens->entityProduct->sale_price)->toBe(9999.99);
     Storage::disk('public')->assertExists($originalPath);
 });
 
-it('excluir uma lente faz soft delete (deleted_at preenchido, some da consulta padrão, mas continua recuperável via withTrashed)', function () {
+it('editar uma lente troca a imagem e apaga a antiga do disco', function () {
+    storeIolLens($this, ['image' => UploadedFile::fake()->image('lens-original.jpg')])
+        ->assertRedirect(route('panel.setting.iollenses.index'));
+
+    $lens         = EntityIolLens::where('entity_id', $this->entity->id)->with('entityProduct')->firstOrFail();
+    $originalPath = $lens->entityProduct->image_path;
+
+    updateIolLens($this, $lens->id, ['image' => UploadedFile::fake()->image('lens-new.jpg')])
+        ->assertRedirect(route('panel.setting.iollenses.index'));
+
+    $lens->refresh();
+    $newPath = $lens->entityProduct->image_path;
+
+    expect($newPath)->not->toBe($originalPath);
+    Storage::disk('public')->assertExists($newPath);
+    Storage::disk('public')->assertMissing($originalPath);
+});
+
+it('excluir uma lente faz soft delete DELA E do produto de estoque vinculado (deleted_at preenchido, some da consulta padrão, recuperável via withTrashed)', function () {
     storeIolLens($this)->assertRedirect(route('panel.setting.iollenses.index'));
-    $lens = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
+    $lens      = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
+    $productId = $lens->entity_product_id;
 
     $res = actingAsIolLensAdmin($this)->delete(route('panel.setting.iollenses.destroy', $lens->id));
 
     $res->assertRedirect(route('panel.setting.iollenses.index'));
 
     expect(EntityIolLens::find($lens->id))->toBeNull();
+    expect(EntityProduct::find($productId))->toBeNull();
 
-    $trashed = EntityIolLens::withTrashed()->find($lens->id);
-    expect($trashed)->not->toBeNull();
-    expect($trashed->trashed())->toBeTrue();
+    $trashedLens = EntityIolLens::withTrashed()->find($lens->id);
+    expect($trashedLens)->not->toBeNull();
+    expect($trashedLens->trashed())->toBeTrue();
+
+    $trashedProduct = EntityProduct::withTrashed()->find($productId);
+    expect($trashedProduct)->not->toBeNull();
+    expect($trashedProduct->trashed())->toBeTrue();
 
     // NOTA: `iollenses` não expõe rota de restore (confirmado via
     // `php artisan route:list` — diferente de covenants/skintypes/lenses/
     // etc. registrados no mesmo bloco de routes/web.php, que têm
-    // `{resource}/{id}/restore`). Item 10 do pedido original pede um teste
-    // de restore "se o endpoint existir" — não existe, então esse teste foi
-    // deliberadamente omitido.
+    // `{resource}/{id}/restore`).
 });
 
-// ── Vínculo opcional com estoque (GAP-FILL pós-Fase 4) ─────────────────────
-// entity_product_id + App\Models\EntityProduct — ver docblock de
-// App\Models\EntityIolLens sobre a decisão (aditivo, sem migração).
-
-it('[GAP] cria lente já vinculada a um produto do estoque DA MESMA clínica — persistido + refletido no resource', function () {
-    enableInventoryModuleFor($this->entity);
-    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente IOL física', 'unit' => 'un', 'active' => true]);
-    app(StockService::class)->manualIn($product, 3, 500.00);
-
-    $res = storeIolLens($this, ['entity_product_id' => $product->id]);
-    $res->assertRedirect(route('panel.setting.iollenses.index'));
+it('resource de listagem/show expõe manufacturer/model_name/price/image_url/active vindos do produto vinculado — mesmo formato de chaves de antes da migração pro estoque (zero mudança pro frontend)', function () {
+    storeIolLens($this, [
+        'manufacturer' => 'Alcon',
+        'model_name'   => 'AcrySof IQ',
+        'price'        => 1234.56,
+    ])->assertRedirect(route('panel.setting.iollenses.index'));
 
     $lens = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
-    expect($lens->entity_product_id)->toBe($product->id);
 
     $show = actingAsIolLensAdmin($this)->getJson(route('panel.setting.iollenses.show', $lens->id));
     $show->assertOk();
-    // (float) explícito: json_encode() de 3.0 vira `3` sem casa decimal —
-    // json_decode() volta int, quebrando toBe(3.0) por tipo estrito (mesma
-    // pegadinha já documentada em StockServiceTest/PurchaseOrderServiceTest).
-    expect($show->json('data.entity_product_id'))->toBe($product->id)
-        ->and($show->json('data.stock.name'))->toBe('Lente IOL física')
-        ->and((float) $show->json('data.stock.qty_on_hand'))->toBe(3.0);
-});
 
-it('[GAP][SEGURANÇA] vincular a um entity_product_id de OUTRA clínica retorna 422 — isolamento multi-tenant', function () {
-    enableInventoryModuleFor($this->entity);
-    $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $otherProduct = EntityProduct::create(['entity_id' => $otherEntity->id, 'name' => 'Produto de outra clínica', 'unit' => 'un', 'active' => true]);
+    expect($show->json('data.manufacturer'))->toBe('Alcon')
+        ->and($show->json('data.model_name'))->toBe('AcrySof IQ')
+        ->and((float) $show->json('data.price'))->toBe(1234.56)
+        ->and($show->json('data.active'))->toBeTrue()
+        ->and($show->json('data.stock.qty_on_hand'))->not->toBeNull();
 
-    $res = storeIolLens($this, ['entity_product_id' => $otherProduct->id]);
-
-    $res->assertStatus(422);
-    $res->assertJsonValidationErrors('entity_product_id');
-    expect(EntityIolLens::count())->toBe(0);
-});
-
-it('[GAP] lente sem vínculo (entity_product_id omitido) continua funcionando normalmente — stock ausente no resource', function () {
-    $res = storeIolLens($this);
-    $res->assertRedirect(route('panel.setting.iollenses.index'));
-
-    $lens = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
-    expect($lens->entity_product_id)->toBeNull();
-
-    $show = actingAsIolLensAdmin($this)->getJson(route('panel.setting.iollenses.show', $lens->id));
-    $show->assertOk();
-    expect($show->json('data.entity_product_id'))->toBeNull()
-        ->and($show->json('data.stock'))->toBeNull();
-});
-
-it('[GAP] editar lente pra REMOVER um vínculo existente funciona (entity_product_id vira null)', function () {
-    enableInventoryModuleFor($this->entity);
-    $product = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente vinculada', 'unit' => 'un', 'active' => true]);
-
-    storeIolLens($this, ['entity_product_id' => $product->id])->assertRedirect(route('panel.setting.iollenses.index'));
-    $lens = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
-    expect($lens->entity_product_id)->toBe($product->id);
-
-    updateIolLens($this, $lens->id, ['entity_product_id' => null])->assertRedirect(route('panel.setting.iollenses.index'));
-
-    $lens->refresh();
-    expect($lens->entity_product_id)->toBeNull();
-});
-
-// Dois `it()` separados (não 2 asserts num só) DE PROPÓSITO: FeatureGateService
-// é singleton com cache de assinatura POR PROCESSO ($subscriptionCache, ver
-// docblock da classe) — chamar index() 2x na MESMA function de teste leria a
-// assinatura da PRIMEIRA chamada (cacheada), mesmo após criar uma nova
-// Subscription no meio. Cada `it()` do Pest tem seu próprio boot/container,
-// então cada um vê o estado real e isolado.
-it('[GAP] index() expõe hasInventoryModule=false quando a clínica NÃO tem o módulo de estoque no plano', function () {
-    $res = actingAsIolLensAdmin($this)->get(route('panel.setting.iollenses.index'));
-    $res->assertOk();
-    $res->assertInertia(fn ($page) => $page->where('hasInventoryModule', false));
-});
-
-it('[GAP] index() expõe hasInventoryModule=true quando a clínica TEM o módulo de estoque no plano', function () {
-    enableInventoryModuleFor($this->entity);
-
-    $res = actingAsIolLensAdmin($this)->get(route('panel.setting.iollenses.index'));
-    $res->assertOk();
-    $res->assertInertia(fn ($page) => $page->where('hasInventoryModule', true));
-});
-
-it('[GAP] ProductsController::search() — menos de 2 caracteres retorna vazio', function () {
-    enableInventoryModuleFor($this->entity);
-    EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente X', 'unit' => 'un', 'active' => true]);
-
-    $res = actingAsIolLensAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'l']));
-
-    $res->assertOk();
-    expect($res->json('data'))->toBe([]);
-});
-
-it('[GAP] ProductsController::search() — retorna só produtos ATIVOS da MESMA clínica, campo product_name (não name) pra não colidir com o label do SearchSelect', function () {
-    enableInventoryModuleFor($this->entity);
-    $match        = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente Multifocal', 'code' => 'PRD-1', 'unit' => 'un', 'active' => true]);
-    $inactive     = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente Inativa', 'unit' => 'un', 'active' => false]);
-    $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $otherProduct = EntityProduct::create(['entity_id' => $otherEntity->id, 'name' => 'Lente Multifocal outra clínica', 'unit' => 'un', 'active' => true]);
-
-    $res = actingAsIolLensAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'multifocal']));
-
-    $res->assertOk();
-    $ids = collect($res->json('data'))->pluck('id');
-
-    expect($ids)->toHaveCount(1)
-        ->and($ids->first())->toBe($match->id)
-        ->and($ids)->not->toContain($inactive->id)
-        ->and($ids)->not->toContain($otherProduct->id)
-        ->and($res->json('data.0.product_name'))->toBe('Lente Multifocal')
-        ->and($res->json('data.0.label'))->toBe('Lente Multifocal (PRD-1)');
-});
-
-it('[GAP][REGRA DE NEGÓCIO] ProductsController::search() sem o módulo de estoque no plano retorna 403', function () {
-    // SEM enableInventoryModuleFor() — feature:has_inventory_module barra
-    // antes mesmo de chegar no controller.
-    $res = actingAsIolLensAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'lente']));
-
-    $res->assertForbidden();
+    $index = actingAsIolLensAdmin($this)->get(route('panel.setting.iollenses.index'));
+    $index->assertOk();
+    $index->assertInertia(fn ($page) => $page
+        ->where('items.data.0.manufacturer', 'Alcon')
+        ->where('items.data.0.model_name', 'AcrySof IQ'));
 });

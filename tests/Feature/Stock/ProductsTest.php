@@ -236,3 +236,94 @@ it('[GAP] scanBarcode() NÃO encontra produto INATIVO nem de OUTRA clínica', fu
     actingAsProductAdmin($this)->getJson(route('panel.stock.products.scan-barcode', ['barcode' => '111']))->assertNotFound();
     actingAsProductAdmin($this)->getJson(route('panel.stock.products.scan-barcode', ['barcode' => '222']))->assertNotFound();
 });
+
+// ── search() — autocomplete remoto usado por outros pickers do sistema
+// (ex.: IolLensFormModal antes da migração de lentes pro estoque; hoje
+// também usado por ProcedureProductsController pra montar a BOM de
+// procedimento) — relocado de IolLensesTest.php quando o vínculo lente↔
+// produto deixou de ser manual/opcional.
+
+it('[GAP] search() — menos de 2 caracteres retorna vazio', function () {
+    EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente X', 'unit' => 'un', 'active' => true]);
+
+    $res = actingAsProductAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'l']));
+
+    $res->assertOk();
+    expect($res->json('data'))->toBe([]);
+});
+
+it('[GAP] search() — retorna só produtos ATIVOS da MESMA clínica, campo product_name (não name) pra não colidir com o label do SearchSelect', function () {
+    $match        = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente Multifocal', 'code' => 'PRD-1', 'unit' => 'un', 'active' => true]);
+    $inactive     = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Lente Inativa', 'unit' => 'un', 'active' => false]);
+    $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $otherProduct = EntityProduct::create(['entity_id' => $otherEntity->id, 'name' => 'Lente Multifocal outra clínica', 'unit' => 'un', 'active' => true]);
+
+    $res = actingAsProductAdmin($this)->getJson(route('panel.stock.products.search', ['q' => 'multifocal']));
+
+    $res->assertOk();
+    $ids = collect($res->json('data'))->pluck('id');
+
+    expect($ids)->toHaveCount(1)
+        ->and($ids->first())->toBe($match->id)
+        ->and($ids)->not->toContain($inactive->id)
+        ->and($ids)->not->toContain($otherProduct->id)
+        ->and($res->json('data.0.product_name'))->toBe('Lente Multifocal')
+        ->and($res->json('data.0.label'))->toBe('Lente Multifocal (PRD-1)');
+});
+
+it('[GAP][REGRA DE NEGÓCIO] search() sem o módulo de estoque no plano retorna 403', function () {
+    $entityWithoutFeature = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $planWithoutFeature   = Plan::factory()->create(['active' => true]);
+
+    Subscription::factory()->create([
+        'entity_id' => $entityWithoutFeature->id,
+        'plan_id'   => $planWithoutFeature->id,
+        'status'    => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(),
+        'ends_at'   => now()->addMonth(),
+    ]);
+
+    $adminWithoutFeature      = User::factory()->create();
+    $entityUserWithoutFeature = createEntityUser($entityWithoutFeature, $adminWithoutFeature, ClientRule::Admin->value);
+
+    $res = actingAsProductAdmin($this, $adminWithoutFeature, $entityUserWithoutFeature)
+        ->getJson(route('panel.stock.products.search', ['q' => 'lente']));
+
+    $res->assertForbidden();
+});
+
+// ── App\Concerns\HasEntityCode — pré-requisito (fase 0) da migração de
+// lentes IOL pro estoque. Um teste de RACE real exigiria dois processos/
+// conexões concorrentes de verdade — fora do escopo de um teste de feature
+// (mesmo critério já documentado em tests/Unit/Stock/StockServiceTest.php).
+// Em vez disso, simula o efeito de uma corrida: insere via SQL cru
+// (contornando o trait) exatamente o código que HasEntityCode COMPUTARIA a
+// seguir, forçando uma colisão real de verdade no INSERT do model logo
+// depois — exercita o catch+retry de App\Concerns\HasEntityCode::save() de
+// ponta a ponta.
+
+it('[GAP] HasEntityCode retry: colisão real de code (simulando corrida) não derruba o create — model tenta de novo e persiste com código diferente', function () {
+    $first = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Produto 1', 'unit' => 'un', 'active' => true]);
+    expect($first->code)->toBe('PRD-0000000001');
+
+    // Insere direto no banco (sem passar pelo trait) o código que o
+    // PRÓXIMO create() naturalmente computaria — simula outro processo
+    // vencendo a corrida um instante antes.
+    \DB::table('entity_products')->insert([
+        'id'          => (string) \Illuminate\Support\Str::uuid(),
+        'entity_id'   => $this->entity->id,
+        'code'        => 'PRD-0000000002',
+        'name'        => 'Produto colidente',
+        'unit'        => 'un',
+        'active'      => true,
+        'created_at'  => now(),
+        'updated_at'  => now(),
+    ]);
+
+    $second = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Produto 2', 'unit' => 'un', 'active' => true]);
+
+    // Sem o retry, isso quebraria com QueryException (unique violation) —
+    // com o retry, o model recalcula e usa PRD-0000000003.
+    expect($second->code)->toBe('PRD-0000000003');
+    expect(EntityProduct::where('entity_id', $this->entity->id)->count())->toBe(3);
+});

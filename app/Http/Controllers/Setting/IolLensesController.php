@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Setting;
 
-use App\Enums\FeatureKey;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EntityIolLensRequest;
 use App\Http\Resources\EntityIolLensResource;
 use App\Models\EntityIolLens;
-use App\Services\{FeatureGateService, IolLensCatalogService};
+use App\Services\{IolLensCatalogService, IolLensStockBridgeService};
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Support\Facades\{DB, Storage};
+use Illuminate\Support\Facades\Storage;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
  * CRUD do inventário de lentes IOL (catarata) DA CLÍNICA —
- * App\Models\EntityIolLens.
+ * App\Models\EntityIolLens. Toda lente É um produto de estoque real (1:1
+ * obrigatório com App\Models\EntityProduct) — criação/atualização/exclusão
+ * do par delega pra App\Services\IolLensStockBridgeService; este controller
+ * só resolve HTTP/upload/autocomplete do catálogo global.
  *
  * NÃO estende BaseSettingController: aquele controller genérico foi
  * desenhado pra catálogos simples (name/code/active) e serializa via
@@ -31,12 +33,19 @@ use Inertia\{Inertia, Response as InertiaResponse};
  * clínicas) — toda query aqui filtra por entity_id da sessão, sem exceção;
  * update/destroy/show também re-checam posse no model resolvido pelo route
  * model binding (nunca confiar só no binding pra isolamento entre clínicas).
+ *
+ * Disponível pra TODAS as clínicas independente do módulo pago de estoque
+ * (`feature:has_inventory_module`) — rota fica fora daquele gate de
+ * propósito (ver routes/web.php). O EntityProduct por trás de cada lente é
+ * criado de qualquer forma, mesmo pra quem nunca usou a tela de Estoque;
+ * só não vê saldo/movimentação/lote (isso continua exigindo o módulo pago
+ * pra fazer sentido, mas não bloqueia o cadastro da lente em si).
  */
 class IolLensesController extends Controller
 {
     public function __construct(
         private readonly IolLensCatalogService $catalogService,
-        private readonly FeatureGateService $featureGate,
+        private readonly IolLensStockBridgeService $bridge,
     ) {
     }
 
@@ -46,23 +55,25 @@ class IolLensesController extends Controller
         $search   = $request->string('search')->trim()->value();
         $status   = $request->string('status', 'all')->value(); // active|inactive|all
 
+        // JOIN (não whereHas) pra poder ORDENAR por manufacturer/name do
+        // produto vinculado — Eloquent não ordena por coluna de relação sem
+        // join explícito. `select('entity_iol_lenses.*')` evita ambiguidade
+        // de colunas homônimas (id/created_at/etc.) entre as duas tabelas.
         $records = EntityIolLens::query()
-            ->where('entity_id', $entityId)
-            // Eager load OBRIGATÓRIO (GAP-FILL pós-Fase 4 — vínculo opcional
-            // com estoque): sem isso, EntityIolLensResource::whenLoaded()
-            // simplesmente omite a chave 'stock' — funciona, mas silencioso;
-            // COM isso, sem N+1 (1 query extra pra página inteira).
-            ->with('entityProduct:id,name,code,unit,qty_on_hand')
+            ->join('entity_products', 'entity_products.id', '=', 'entity_iol_lenses.entity_product_id')
+            ->where('entity_iol_lenses.entity_id', $entityId)
+            ->with('entityProduct:id,name,manufacturer,code,unit,qty_on_hand,sale_price,image_path,active')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->whereLikeUnaccent('manufacturer', $search)
-                        ->orWhereLikeUnaccent('model_name', $search);
+                    $q->whereLikeUnaccent('entity_products.manufacturer', $search)
+                        ->orWhereLikeUnaccent('entity_products.name', $search);
                 });
             })
-            ->when($status === 'active', fn ($query) => $query->where('active', true))
-            ->when($status === 'inactive', fn ($query) => $query->where('active', false))
-            ->orderBy('manufacturer')
-            ->orderBy('model_name')
+            ->when($status === 'active', fn ($query) => $query->where('entity_products.active', true))
+            ->when($status === 'inactive', fn ($query) => $query->where('entity_products.active', false))
+            ->orderBy('entity_products.manufacturer')
+            ->orderBy('entity_products.name')
+            ->select('entity_iol_lenses.*')
             ->paginate(12)
             ->withQueryString()
             // `->through()` preserva o paginator (current_page/last_page/
@@ -86,23 +97,16 @@ class IolLensesController extends Controller
                 'search' => $search,
                 'status' => $status,
             ],
-            // Vínculo opcional com estoque (GAP-FILL pós-Fase 4): o form só
-            // mostra o picker de produto quando a clínica TEM o módulo —
-            // sem isso o picker existiria mas nunca encontraria nada (rota
-            // de busca vive atrás do mesmo permission:stock.manage +
-            // feature:has_inventory_module do resto do módulo).
-            'hasInventoryModule' => $this->featureGate->status($entityId, FeatureKey::HasInventoryModule)->allowed,
-            'routes'             => [
+            'routes' => [
                 'index'  => route('panel.setting.iollenses.index'),
                 'store'  => route('panel.setting.iollenses.store'),
                 'search' => route('panel.setting.iollenses.search'),
                 // Vue substitui {id} no client (evita gerar 1 rota por linha
                 // na hidratação) — mesma convenção de BaseSettingController::
                 // index() / AccessControl\RolesController::index().
-                'show'            => route('panel.setting.iollenses.show', ['__ID__']),
-                'update'          => route('panel.setting.iollenses.update', ['__ID__']),
-                'destroy'         => route('panel.setting.iollenses.destroy', ['__ID__']),
-                'products_search' => route('panel.stock.products.search'),
+                'show'    => route('panel.setting.iollenses.show', ['__ID__']),
+                'update'  => route('panel.setting.iollenses.update', ['__ID__']),
+                'destroy' => route('panel.setting.iollenses.destroy', ['__ID__']),
             ],
         ]);
     }
@@ -116,48 +120,44 @@ class IolLensesController extends Controller
     {
         $this->assertOwnership($entityIolLens);
 
-        return response()->json(['data' => new EntityIolLensResource($entityIolLens->load('entityProduct:id,name,code,unit,qty_on_hand'))]);
+        return response()->json(['data' => new EntityIolLensResource($entityIolLens->load('entityProduct:id,name,manufacturer,code,unit,qty_on_hand,sale_price,image_path,active'))]);
     }
 
     public function store(EntityIolLensRequest $request): RedirectResponse
     {
         $entityId = (string) session('selected_entity_id');
+        $data     = $request->safe()->except(['image']);
 
-        DB::transaction(function () use ($request, $entityId) {
-            $data              = $request->safe()->except(['image']);
-            $data['entity_id'] = $entityId;
+        if ($request->hasFile('image')) {
+            $data['image_path'] = $this->catalogService->storeImage(
+                $request->file('image'),
+                "iol-lenses/{$entityId}",
+            );
+        }
 
-            if ($request->hasFile('image')) {
-                $data['image_path'] = $this->catalogService->storeImage(
-                    $request->file('image'),
-                    "iol-lenses/{$entityId}",
-                );
-            }
+        // DECISÃO: findOrCreateModel() só roda quando o usuário está
+        // cadastrando um modelo que NÃO veio do autocomplete
+        // (iol_lens_model_id vazio) — se ele já escolheu um model_id
+        // existente no picker, o catálogo global já tem esse modelo,
+        // não há nada a registrar. Isso alimenta o catálogo global
+        // organicamente (sem duplicar, graças ao normalized_key único
+        // em IolLensCatalogService::findOrCreateModel()) só quando é
+        // genuinamente informação nova: da próxima vez que qualquer
+        // clínica digitar o mesmo fabricante+modelo, o autocomplete já
+        // encontra. O novo item de inventário também é vinculado
+        // (iol_lens_model_id) ao registro global recém-criado/reaproveitado.
+        if (blank($data['iol_lens_model_id'] ?? null)) {
+            $model = $this->catalogService->findOrCreateModel(
+                $data['manufacturer'],
+                $data['model_name'],
+                $data['category'] ?? null,
+                $entityId,
+            );
 
-            // DECISÃO: findOrCreateModel() só roda quando o usuário está
-            // cadastrando um modelo que NÃO veio do autocomplete
-            // (iol_lens_model_id vazio) — se ele já escolheu um model_id
-            // existente no picker, o catálogo global já tem esse modelo,
-            // não há nada a registrar. Isso alimenta o catálogo global
-            // organicamente (sem duplicar, graças ao normalized_key único
-            // em IolLensCatalogService::findOrCreateModel()) só quando é
-            // genuinamente informação nova: da próxima vez que qualquer
-            // clínica digitar o mesmo fabricante+modelo, o autocomplete já
-            // encontra. O novo item de inventário também é vinculado
-            // (iol_lens_model_id) ao registro global recém-criado/reaproveitado.
-            if (blank($data['iol_lens_model_id'] ?? null)) {
-                $model = $this->catalogService->findOrCreateModel(
-                    $data['manufacturer'],
-                    $data['model_name'],
-                    $data['category'] ?? null,
-                    $entityId,
-                );
+            $data['iol_lens_model_id'] = $model->id;
+        }
 
-                $data['iol_lens_model_id'] = $model->id;
-            }
-
-            EntityIolLens::create($data);
-        });
+        $this->bridge->create($entityId, $data);
 
         return redirect()
             ->route('panel.setting.iollenses.index')
@@ -170,32 +170,29 @@ class IolLensesController extends Controller
 
         // DECISÃO: findOrCreateModel() NÃO roda aqui (só em store()). Editar
         // um item de inventário existente é frequentemente ajuste de texto
-        // local (snapshot) que pode divergir intencionalmente do catálogo
-        // global — replicar a lógica de auto-registro no update poluiria o
-        // catálogo global a cada edição de detalhe específico da clínica.
-        DB::transaction(function () use ($request, $entityIolLens) {
-            $data = $request->safe()->except(['image']);
+        // local que pode divergir intencionalmente do catálogo global —
+        // replicar a lógica de auto-registro no update poluiria o catálogo
+        // global a cada edição de detalhe específico da clínica.
+        $data = $request->safe()->except(['image']);
 
-            if ($request->hasFile('image')) {
-                $oldPath = $entityIolLens->image_path;
+        if ($request->hasFile('image')) {
+            $oldPath = $entityIolLens->entityProduct->image_path;
 
-                // Salva a NOVA imagem primeiro; só troca `image_path` (e só
-                // apaga a antiga do disco) se o storeImage() não lançar —
-                // nunca fica sem imagem numa falha de upload no meio do
-                // caminho.
-                $newPath = $this->catalogService->storeImage(
-                    $request->file('image'),
-                    "iol-lenses/{$entityIolLens->entity_id}",
-                );
-                $data['image_path'] = $newPath;
+            // Salva a NOVA imagem primeiro; só troca `image_path` (e só
+            // apaga a antiga do disco) se o storeImage() não lançar — nunca
+            // fica sem imagem numa falha de upload no meio do caminho.
+            $newPath = $this->catalogService->storeImage(
+                $request->file('image'),
+                "iol-lenses/{$entityIolLens->entity_id}",
+            );
+            $data['image_path'] = $newPath;
 
-                if ($oldPath !== null && $oldPath !== $newPath) {
-                    Storage::disk('public')->delete($oldPath);
-                }
+            if ($oldPath !== null && $oldPath !== $newPath) {
+                Storage::disk('public')->delete($oldPath);
             }
+        }
 
-            $entityIolLens->update($data);
-        });
+        $this->bridge->update($entityIolLens, $data);
 
         return redirect()
             ->route('panel.setting.iollenses.index')
@@ -206,7 +203,7 @@ class IolLensesController extends Controller
     {
         $this->assertOwnership($entityIolLens);
 
-        $entityIolLens->delete();
+        $this->bridge->delete($entityIolLens);
 
         return redirect()
             ->route('panel.setting.iollenses.index')
