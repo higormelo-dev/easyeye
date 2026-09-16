@@ -1560,16 +1560,12 @@ const printEntity = computed(() => props.entity ?? {});
             <!-- Principal: detalhe -->
             <div class="col-12 col-sm-8 col-md-9">
                 <!--
-                    Cabeçalho/toolbar/header de grupo seguem o tema da
-                    página normalmente (bg-body-*, igual o resto do painel)
-                    — só o CANVAS de imagem (faixa de miniaturas) é sempre
-                    escuro, com data-bs-theme="dark" escopado só nele (ver
-                    mais abaixo), pra imagem clínica nunca perder contraste
-                    contra um fundo branco e os badges em cima da miniatura
-                    (diagnóstico/qualidade/etc.) renderizarem na variante
-                    certa do Bootstrap. Já foi tentado deixar o painel
-                    inteiro sempre escuro — quebrava o modo claro (o
-                    cabeçalho/toolbar ficavam pretos sem motivo).
+                    Tudo aqui segue o tema da página normalmente (bg-body-*,
+                    igual o resto do sistema) — nada forçado. Já foi tentado
+                    deixar o painel inteiro (ou só a faixa de miniaturas)
+                    sempre escura, tipo canvas de PACS — quebrava o modo
+                    claro (ficava com tonalidade preta destoando do resto
+                    da tela em vez de acompanhar o cinza claro do tema).
                 -->
                 <div class="card ei-gallery-panel">
                     <h5 class="card-header d-flex align-items-center gap-2 flex-wrap">
@@ -1737,12 +1733,7 @@ const printEntity = computed(() => props.entity ?? {});
                                         </div>
 
                                         <!-- Thumbnails -->
-                                        <!-- data-bs-theme="dark" só aqui: o canvas da imagem é sempre
-                                             escuro (fundo neutro pra imagem clínica + badges em cima
-                                             renderizando a variante dark do Bootstrap), independente
-                                             do tema da página — mas o cabeçalho/toolbar acima seguem
-                                             o tema normal. -->
-                                        <div class="d-flex flex-wrap gap-2 p-2 eyeimg-canvas-dark" data-bs-theme="dark">
+                                        <div class="d-flex flex-wrap gap-2 p-2 bg-body-tertiary">
                                             <div v-for="exam in group.exams" :key="exam.id"
                                                  class="position-relative eyeimg-thumb"
                                                  tabindex="0" role="button"
@@ -1812,7 +1803,7 @@ const printEntity = computed(() => props.entity ?? {});
                                                 <span class="position-absolute bottom-0 start-0 d-flex align-items-center justify-content-center"
                                                       style="z-index:2;margin:3px;">
                                                     <span class="rounded d-flex align-items-center justify-content-center"
-                                                          :class="isSelected(exam.id) ? 'bg-primary' : 'eyeimg-canvas-dark border border-secondary'"
+                                                          :class="isSelected(exam.id) ? 'bg-primary' : 'bg-secondary'"
                                                           style="width:20px;height:20px;">
                                                         <i v-show="isSelected(exam.id)" class="fa fa-check text-white"
                                                            style="font-size:.6rem;"></i>
@@ -1841,7 +1832,7 @@ const printEntity = computed(() => props.entity ?? {});
 
                                                 <!-- Badge compartilhamento com paciente (Portal do Paciente, Fase 2) -->
                                                 <span class="position-absolute d-flex align-items-center justify-content-center rounded-circle"
-                                                      :class="exam.shared_with_patient ? 'bg-success text-white' : 'eyeimg-canvas-dark border border-secondary text-white-50'"
+                                                      :class="exam.shared_with_patient ? 'bg-success text-white' : 'bg-secondary text-white-50'"
                                                       style="top:26px;right:2px;width:22px;height:22px;z-index:1;cursor:pointer;"
                                                       :title="exam.shared_with_patient ? 'Compartilhado com o paciente — clique para revogar' : 'Compartilhar exame com o paciente'"
                                                       @click.stop="toggleExamShare(exam)">
@@ -2432,15 +2423,6 @@ const printEntity = computed(() => props.entity ?? {});
     box-shadow: 0 4px 18px rgba(0, 0, 0, .28);
 }
 
-/* NÃO usar a utility bg-dark do Bootstrap aqui: o template Preclinic
-   inverte --dark pra #E3E3E3 (cinza claro) em data-bs-theme="dark" —
-   proposital pra chip/badge continuar legível em geral, mas exatamente
-   o oposto do que um canvas de revisão de imagem precisa (sempre
-   escuro, sem depender de token de tema nenhum). Cor literal. */
-.eyeimg-canvas-dark {
-    background-color: #0a0a0a;
-}
-
 /* Barra de ações com muitos botões — mesmo padrão de .pmr-bottom-bar-row
    (prontuário): nunca deve disparar em telas normais, é rede de segurança
    pra viewport estreito (mobile/tablet) não estourar/cortar botões. */
@@ -2497,12 +2479,14 @@ const printEntity = computed(() => props.entity ?? {});
     opacity: 1;
 }
 
-/* .ei-gallery-panel é sempre dark (data-bs-theme="dark" fixo) — sem
-   variante clara aqui, o skeleton só existe dentro do painel. */
 .eyeimg-skeleton {
-    background: linear-gradient(90deg, #2a2c32 25%, #3a3c42 50%, #2a2c32 75%);
+    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
     background-size: 200% 100%;
     animation: eyeimgShimmer 1.2s ease-in-out infinite;
+}
+:root[data-bs-theme=dark] .eyeimg-skeleton {
+    background: linear-gradient(90deg, #2a2c32 25%, #3a3c42 50%, #2a2c32 75%);
+    background-size: 200% 100%;
 }
 @keyframes eyeimgShimmer {
     from { background-position: 200% 0; }
