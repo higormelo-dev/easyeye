@@ -158,6 +158,22 @@ class PanelNavigation
                 'match'    => ['panel.stock.*'],
                 'children' => [
                     ['route' => 'panel.stock.products.index', 'icon' => 'ti ti-package', 'label' => __('actions.sidemenu.products'), 'match' => ['panel.stock.products.*']],
+                    // Categorias de produto — MOVIDO de Configurações >
+                    // Atendimento (era `panel.setting.product-categories.*`,
+                    // sempre visível). Sem consumidor fora de Estoque (ver
+                    // docblock de ProductCategoriesController), então herda o
+                    // gate do grupo sem custo real pra quem não usa o módulo.
+                    ['route' => 'panel.stock.product-categories.index', 'icon' => 'ti ti-category', 'label' => __('actions.sidemenu.product_categories'), 'match' => ['panel.stock.product-categories.*']],
+                    // Lentes de Catarata (IOL) — MOVIDO de Configurações >
+                    // Atendimento (era `panel.setting.iollenses.*`, sempre
+                    // visível). Cada lente É um EntityProduct real (ver
+                    // App\Services\IolLensStockBridgeService), então cabe
+                    // como catálogo especializado dentro do próprio Estoque;
+                    // herda o gate do grupo (permission:stock.manage +
+                    // feature:has_inventory_module) — decisão do usuário de
+                    // tornar o cadastro de lente parte do módulo pago (ver
+                    // doc "Plano de Migração IOL → Estoque").
+                    ['route' => 'panel.stock.iollenses.index', 'icon' => 'ti ti-eyeglass', 'label' => __('actions.sidemenu.iol_lenses'), 'match' => ['panel.stock.iollenses.*']],
                     ['route' => 'panel.stock.movements.index', 'icon' => 'ti ti-transfer-in', 'label' => __('actions.sidemenu.stock_movements'), 'match' => ['panel.stock.movements.*']],
                     ['route' => 'panel.stock.purchase-orders.index', 'icon' => 'ti ti-shopping-cart', 'label' => __('actions.sidemenu.purchase_orders'), 'match' => ['panel.stock.purchase-orders.*']],
                     ['route' => 'panel.stock.suppliers.index', 'icon' => 'ti ti-truck-delivery', 'label' => __('actions.sidemenu.suppliers'), 'match' => ['panel.stock.suppliers.*']],

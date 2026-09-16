@@ -54,11 +54,9 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     ColorVisionTypesController,
     CovenantsController,
     CoverTestTypesController,
-    IolLensesController,
     IrisTypesController,
     LensesController,
     NearPointConvergencesController,
-    ProductCategoriesController,
     ResourcesController,
     SkinTypesController,
     SurgeryTypesController,
@@ -66,7 +64,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController};
 use App\Http\Controllers\Setting\{ReportSettingsController, SecurityController};
-use App\Http\Controllers\Stock\{ProcedureProductsController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
+use App\Http\Controllers\Stock\{IolLensesController, ProcedureProductsController, ProductCategoriesController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Auth, Route};
@@ -746,33 +744,19 @@ Route::group(
                 Route::post('report-settings/{report_setting}/adopt', [ReportSettingsController::class, 'adopt'])->name('report-settings.adopt');
                 Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');
                 Route::resource('report-settings', ReportSettingsController::class);
-
-                // Inventário de lentes IOL (catarata) da clínica — dado DA
-                // CLÍNICA (entity_id obrigatório), diferente do catálogo
-                // GLOBAL de modelos (iol_lens_models, sem escopo). `search`
-                // fica ANTES do resource pra não colidir com `iollenses/{id}`.
-                // `show` é mantido (fora do `except`) pro modal de detalhe/
-                // edição abrir via JSON ao clicar num card — ver decisão em
-                // IolLensesController::show(). `create`/`edit` ficam de fora:
-                // é SPA/modal (Inertia), não há tela dedicada server-rendered.
-                Route::get('iollenses/search', [IolLensesController::class, 'search'])->name('iollenses.search');
-                // parameters(): binding implícito casa pelo NOME do parâmetro
-                // da rota com o do método do controller — sem isso, o
-                // wildcard viraria `{iollense}` (singular automático) mas os
-                // métodos tipam `EntityIolLens $entityIolLens`, e o model
-                // nunca seria resolvido. Mesmo ajuste já usado em ai-prompts.
-                Route::resource('iollenses', IolLensesController::class)
-                    ->parameters(['iollenses' => 'entityIolLens'])
-                    ->except(['create', 'edit']);
-
-                // Categorias de produto/estoque — catálogo simples name/active,
-                // mesmo grupo RBAC piloto dos demais catálogos administrativos.
-                Route::get('product-categories/cards', [ProductCategoriesController::class, 'cards'])->name('product-categories.cards');
-                Route::resource('product-categories', ProductCategoriesController::class)
-                    ->parameters(['product-categories' => 'productcategory']);
-                Route::get('product-categories/{productcategory}/restore', [ProductCategoriesController::class, 'restore'])->name('product-categories.restore');
             });
         });
+
+        // Redirect 301: cadastro de lente IOL e categorias de produto
+        // mudaram de local (eram `panel.setting.iollenses.*` e
+        // `panel.setting.product-categories.*`, agora `panel.stock.*` —
+        // ver bloco "Módulo de estoque" abaixo) — evita quebrar link salvo/
+        // compartilhado de quem já usava a tela antiga. Só a página de
+        // listagem (GET, o que de fato se salva/compartilha); a rota antiga
+        // deixa de existir pros demais verbos (store/update/destroy/search),
+        // que não fazem sentido "redirecionar".
+        Route::permanentRedirect('setting/iollenses', '/panel/stock/iollenses');
+        Route::permanentRedirect('setting/product-categories', '/panel/stock/product-categories');
 
         // ── Módulo de estoque (Fase 1: catálogo de produtos + movimentação
         // manual) ─────────────────────────────────────────────────────────
@@ -811,6 +795,45 @@ Route::group(
                 Route::resource('products', ProductsController::class)
                     ->parameters(['products' => 'entityProduct'])
                     ->except(['create', 'edit']);
+
+                // Inventário de lentes IOL (catarata) da clínica — dado DA
+                // CLÍNICA (entity_id obrigatório), diferente do catálogo
+                // GLOBAL de modelos (iol_lens_models, sem escopo). Movido
+                // pra dentro do módulo de Estoque (era `setting.iollenses.*`,
+                // fora do gate `feature:has_inventory_module` de propósito —
+                // ver histórico no docblock de IolLensesController) —
+                // DECISÃO revertida a pedido do usuário: cadastro de lente
+                // agora É parte do módulo pago de Estoque, sujeito ao mesmo
+                // gate duplo do grupo (permission:stock.manage +
+                // feature:has_inventory_module) que o resto daqui. Redirect
+                // 301 da URL antiga logo abaixo do grupo evita quebrar link
+                // salvo/compartilhado de quem já usava a tela.
+                //
+                // `search` fica ANTES do resource pra não colidir com
+                // `iollenses/{id}`. `show` é mantido (fora do `except`) pro
+                // modal de detalhe/edição abrir via JSON ao clicar num card —
+                // ver decisão em IolLensesController::show(). `create`/`edit`
+                // ficam de fora: é SPA/modal (Inertia), não há tela dedicada
+                // server-rendered.
+                Route::get('iollenses/search', [IolLensesController::class, 'search'])->name('iollenses.search');
+                // parameters(): binding implícito casa pelo NOME do parâmetro
+                // da rota com o do método do controller — sem isso, o
+                // wildcard viraria `{iollense}` (singular automático) mas os
+                // métodos tipam `EntityIolLens $entityIolLens`, e o model
+                // nunca seria resolvido. Mesmo ajuste já usado em ai-prompts.
+                Route::resource('iollenses', IolLensesController::class)
+                    ->parameters(['iollenses' => 'entityIolLens'])
+                    ->except(['create', 'edit']);
+
+                // Categorias de produto/estoque — catálogo simples
+                // name/active (BaseSettingController genérico). MOVIDO de
+                // Configurações > Atendimento (era `panel.setting.
+                // product-categories.*`, fora do gate) — sem consumidor
+                // fora de Estoque (ver docblock de ProductCategoriesController).
+                Route::get('product-categories/cards', [ProductCategoriesController::class, 'cards'])->name('product-categories.cards');
+                Route::resource('product-categories', ProductCategoriesController::class)
+                    ->parameters(['product-categories' => 'productcategory']);
+                Route::get('product-categories/{productcategory}/restore', [ProductCategoriesController::class, 'restore'])->name('product-categories.restore');
 
                 // Lotes/validade (Fase 2) — JSON puro, chamado via
                 // window.axios de dentro do modal de produto (ver doc de

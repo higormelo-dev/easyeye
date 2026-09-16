@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
  * Único ponto de escrita do par EntityProduct + EntityIolLens — toda lente
  * IOL da clínica É um produto de estoque real (1:1 obrigatório, ver
  * docblock de App\Models\EntityIolLens). Reunido aqui em vez de espalhado
- * em App\Http\Controllers\Setting\IolLensesController pra ser reaproveitado
+ * em App\Http\Controllers\Stock\IolLensesController pra ser reaproveitado
  * também pelo comando de backfill (App\Console\Commands\
  * MigrateIolLensesToStock) sem duplicar a lógica de categoria/produto.
  *
@@ -59,10 +59,10 @@ class IolLensStockBridgeService
                 // badge/checkbox visual, não está cablado em faturamento
                 // TISS — ver TissGuideItem.php) — revisar quando o
                 // faturamento OPM/TISS for implementado de verdade.
-                'is_opm'       => true,
-                'sale_price'   => $data['price'] ?? null,
-                'image_path'   => $data['image_path'] ?? null,
-                'active'       => $data['active'] ?? true,
+                'is_opm'     => true,
+                'sale_price' => $data['price'] ?? null,
+                'image_path' => $data['image_path'] ?? null,
+                'active'     => $data['active'] ?? true,
             ]);
 
             return EntityIolLens::create([

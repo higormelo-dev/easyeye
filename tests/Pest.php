@@ -163,6 +163,27 @@ function panelSession($entityUser): array
 }
 
 /**
+ * Provisiona plano com a feature `has_inventory_module` habilitada +
+ * assinatura ativa pra uma entity — usado por qualquer teste que precise de
+ * uma clínica com acesso ao módulo de Estoque (Products, IolLenses,
+ * ProductCategories, StockCounts, StockReports, ...), já que essas rotas
+ * vivem atrás do gate `feature:has_inventory_module` (ver routes/web.php).
+ * Compartilhado aqui (não duplicado por arquivo de teste) porque Pest carrega
+ * todos os arquivos de tests/Feature no mesmo processo — duas funções
+ * globais com o MESMO nome em arquivos diferentes quebram a suite inteira
+ * com "Cannot redeclare function" assim que os dois são carregados juntos.
+ */
+function giveInventoryModuleAccess(Entity $entity): void
+{
+    $plan = Plan::factory()->create(['active' => true]);
+    PlanFeature::factory()->enabled(FeatureKey::HasInventoryModule)->for($plan)->create();
+    Subscription::factory()->create([
+        'entity_id' => $entity->id, 'plan_id' => $plan->id, 'status' => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
+    ]);
+}
+
+/**
  * Headers de uma request Inertia. Inclui X-Inertia-Version computado pelo middleware
  * para evitar 409 (version mismatch) em testes que disparam GET com X-Inertia.
  */

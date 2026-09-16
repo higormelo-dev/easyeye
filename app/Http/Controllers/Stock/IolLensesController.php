@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers\Setting;
+namespace App\Http\Controllers\Stock;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EntityIolLensRequest;
@@ -34,12 +34,15 @@ use Inertia\{Inertia, Response as InertiaResponse};
  * update/destroy/show também re-checam posse no model resolvido pelo route
  * model binding (nunca confiar só no binding pra isolamento entre clínicas).
  *
- * Disponível pra TODAS as clínicas independente do módulo pago de estoque
- * (`feature:has_inventory_module`) — rota fica fora daquele gate de
- * propósito (ver routes/web.php). O EntityProduct por trás de cada lente é
- * criado de qualquer forma, mesmo pra quem nunca usou a tela de Estoque;
- * só não vê saldo/movimentação/lote (isso continua exigindo o módulo pago
- * pra fazer sentido, mas não bloqueia o cadastro da lente em si).
+ * MOVIDO pro namespace/menu/rotas de Estoque (era App\Http\Controllers\
+ * Setting\IolLensesController, `panel.setting.iollenses.*`, fora do gate
+ * `feature:has_inventory_module` de propósito) — decisão revertida a pedido
+ * do usuário: cadastro de lente IOL agora É parte do módulo pago de
+ * Estoque, sujeito ao mesmo gate duplo do resto do módulo
+ * (`permission:stock.manage` + `feature:has_inventory_module`, ver
+ * routes/web.php). Clínica sem o módulo contratado perde acesso ao cadastro
+ * de lente — ver plano de migração (doc "Plano de Migração IOL → Estoque")
+ * pra contexto completo dessa mudança e o redirect 301 da URL antiga.
  */
 class IolLensesController extends Controller
 {
@@ -86,10 +89,10 @@ class IolLensesController extends Controller
             // perdendo a paginação no Vue.
             ->through(fn (EntityIolLens $record) => (new EntityIolLensResource($record))->resolve());
 
-        return Inertia::render('Panel/Settings/IolLenses/Index', [
+        return Inertia::render('Panel/Stock/IolLenses/Index', [
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
-                ['label' => __('actions.sidemenu.settings'), 'url' => '#', 'active' => false],
+                ['label' => __('actions.sidemenu.stock'), 'url' => '#', 'active' => false],
                 ['label' => __('actions.sidemenu.iol_lenses'), 'url' => '#', 'active' => true],
             ],
             'items'   => $records,
@@ -98,15 +101,15 @@ class IolLensesController extends Controller
                 'status' => $status,
             ],
             'routes' => [
-                'index'  => route('panel.setting.iollenses.index'),
-                'store'  => route('panel.setting.iollenses.store'),
-                'search' => route('panel.setting.iollenses.search'),
+                'index'  => route('panel.stock.iollenses.index'),
+                'store'  => route('panel.stock.iollenses.store'),
+                'search' => route('panel.stock.iollenses.search'),
                 // Vue substitui {id} no client (evita gerar 1 rota por linha
                 // na hidratação) — mesma convenção de BaseSettingController::
                 // index() / AccessControl\RolesController::index().
-                'show'    => route('panel.setting.iollenses.show', ['__ID__']),
-                'update'  => route('panel.setting.iollenses.update', ['__ID__']),
-                'destroy' => route('panel.setting.iollenses.destroy', ['__ID__']),
+                'show'    => route('panel.stock.iollenses.show', ['__ID__']),
+                'update'  => route('panel.stock.iollenses.update', ['__ID__']),
+                'destroy' => route('panel.stock.iollenses.destroy', ['__ID__']),
             ],
         ]);
     }
@@ -160,7 +163,7 @@ class IolLensesController extends Controller
         $this->bridge->create($entityId, $data);
 
         return redirect()
-            ->route('panel.setting.iollenses.index')
+            ->route('panel.stock.iollenses.index')
             ->with('message', __('catalog_setting.created'));
     }
 
@@ -195,7 +198,7 @@ class IolLensesController extends Controller
         $this->bridge->update($entityIolLens, $data);
 
         return redirect()
-            ->route('panel.setting.iollenses.index')
+            ->route('panel.stock.iollenses.index')
             ->with('message', __('catalog_setting.updated'));
     }
 
@@ -206,7 +209,7 @@ class IolLensesController extends Controller
         $this->bridge->delete($entityIolLens);
 
         return redirect()
-            ->route('panel.setting.iollenses.index')
+            ->route('panel.stock.iollenses.index')
             ->with('message', __('catalog_setting.deleted'));
     }
 
