@@ -209,30 +209,45 @@ class PanelNavigation
             // "Usuários" e "Segurança" saem do antigo grupo solto e entram
             // nas categorias semanticamente corretas abaixo.
 
-            // Clínica: recursos físicos da clínica (salas/equipamentos) e
-            // segurança/2FA. Gateways próprios da clínica: REMOVIDO — a
-            // funcionalidade não existe mais para clínicas.
+            // Clínica: recursos físicos da clínica (salas/equipamentos) +
+            // painel de chamadas (MOVIDO de Atendimento — pedido do usuário:
+            // painel de chamadas é infra física exibida em telão/recepção da
+            // clínica, cabe melhor junto de Unidades/salas). Gateways
+            // próprios da clínica: REMOVIDO — a funcionalidade não existe
+            // mais para clínicas. Segurança/2FA MOVIDO pra Usuários e
+            // permissões (era item fixo aqui) — 2FA é configuração de
+            // conta/identidade, não de recurso físico da clínica.
             $clinicalChildren = [
                 // Rota/controller continuam "resources" — só o label do menu
                 // muda para "Unidades / salas" (ClinicResource não é renomeado).
                 ['route' => 'panel.setting.resources.index', 'label' => __('actions.sidemenu.clinic_resources'), 'match' => ['panel.setting.resources.*']],
-                ['route' => 'panel.setting.security.index', 'label' => __('manager_hardening.entity_2fa_section'), 'match' => ['panel.setting.security.*']],
+                ['route' => 'panel.setting.call-panel.index', 'label' => __('schedules.call_panel_title'), 'match' => ['panel.setting.call-panel.*']],
             ];
 
             // Atendimento: catálogos ligados ao fluxo de agendamento/atendimento.
             $attendanceChildren = [
-                ['route' => 'panel.setting.call-panel.index', 'label' => __('schedules.call_panel_title'), 'match' => ['panel.setting.call-panel.*']],
                 ['route' => 'panel.setting.covenants.index', 'label' => __('actions.sidemenu.covenants'), 'match' => ['panel.setting.covenants.*']],
                 ['route' => 'panel.setting.visittypes.index', 'label' => __('actions.sidemenu.visittypes'), 'match' => ['panel.setting.visittypes.*']],
-                ['route' => 'panel.setting.surgerytypes.index', 'label' => __('actions.sidemenu.surgerytypes'), 'match' => ['panel.setting.surgerytypes.*']],
-                ['route' => 'panel.setting.iollenses.index', 'label' => __('actions.sidemenu.iol_lenses'), 'match' => ['panel.setting.iollenses.*']],
-                ['route' => 'panel.setting.product-categories.index', 'label' => __('actions.sidemenu.product_categories'), 'match' => ['panel.setting.product-categories.*']],
+                // 'Tipos de cirurgia' MOVIDO pra virar 9ª aba dentro de
+                // "Parâmetros oftalmológicos" (era item solto aqui) — pedido
+                // do usuário; ver $ophthalmologyMatch/$ophthalmologyChildren
+                // abaixo e o $tabsGroup replicado nos 9 controllers do grupo
+                // (SurgeryTypesController incluso).
+                // 'Lentes de Catarata' e 'Categorias de produto' MOVIDOS pro
+                // menu Estoque (eram itens fixos aqui, sempre visíveis
+                // independente de plano) — agora vivem dentro do bloco
+                // `stock` abaixo, atrás do mesmo gate (permission:stock.manage
+                // + feature:has_inventory_module). Decisão do usuário:
+                // cadastro de lente/categoria vira parte do módulo pago — ver
+                // doc "Plano de Migração IOL → Estoque".
             ];
 
-            // Usuários e permissões: identidade + RBAC granular (roles).
+            // Usuários e permissões: identidade + RBAC granular (roles) +
+            // segurança/2FA (MOVIDO de Clínica — ver comentário acima).
             $usersChildren = [
                 ['route' => 'panel.accesscontrol.users.index', 'label' => __('actions.users'), 'match' => ['panel.accesscontrol.users.*']],
                 ['route' => 'panel.accesscontrol.roles.index', 'label' => __('actions.sidemenu.roles'), 'match' => ['panel.accesscontrol.roles.*']],
+                ['route' => 'panel.setting.security.index', 'label' => __('manager_hardening.entity_2fa_section'), 'match' => ['panel.setting.security.*']],
             ];
 
             // Documentos: modelos de documentação clínica (receituários,
@@ -241,10 +256,12 @@ class PanelNavigation
                 ['route' => 'panel.setting.report-settings.index', 'label' => __('actions.report_settings.title'), 'match' => ['panel.setting.report-settings.*']],
             ];
 
-            // Oftalmologia: os 8 sub-catálogos clínicos viram ABAS dentro de
+            // Oftalmologia: os 9 sub-catálogos clínicos viram ABAS dentro de
             // uma única página ("Parâmetros oftalmológicos"), não itens soltos
             // no menu (ver BaseSettingController::$tabsGroup). O match cobre
-            // as 8 rotas para o item de menu ficar "ativo" em qualquer aba.
+            // as 9 rotas para o item de menu ficar "ativo" em qualquer aba.
+            // 'Tipos de cirurgia' (surgerytypes) é a 9ª — MOVIDO de
+            // Atendimento (pedido do usuário).
             $ophthalmologyMatch = [
                 'panel.setting.skintypes.*',
                 'panel.setting.iristypes.*',
@@ -254,6 +271,7 @@ class PanelNavigation
                 'panel.setting.nearpointconvergences.*',
                 'panel.setting.covertesttypes.*',
                 'panel.setting.lenses.*',
+                'panel.setting.surgerytypes.*',
             ];
             $ophthalmologyChildren = [
                 ['route' => 'panel.setting.skintypes.index', 'label' => __('actions.sidemenu.ophthalmology_parameters'), 'match' => $ophthalmologyMatch],

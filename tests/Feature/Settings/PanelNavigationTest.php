@@ -25,10 +25,11 @@ use Illuminate\Support\Facades\Route;
  *     children) existe de fato no route list — o teste mais importante,
  *     pega qualquer nome de rota digitado errado.
  *  4. Labels de "covertesttypes" e "colorvisiontypes" não ficam duplicados.
- *  5. Os 8 sub-catálogos oftalmológicos não viram itens soltos no menu.
+ *  5. Os 9 sub-catálogos oftalmológicos não viram itens soltos no menu
+ *     (9º = "Tipos de cirurgia", MOVIDO de Atendimento — pedido do usuário).
  *  6. "visittypes" usa o label "Tipos de atendimento" (não mais "Tipos de visita").
  *  7. Request HTTP real: página do catálogo responde 200 e o prop Inertia
- *     `tabsGroup` vem populado com as 8 entradas.
+ *     `tabsGroup` vem populado com as 9 entradas.
  */
 
 /**
@@ -246,9 +247,9 @@ it('labels de "Tipos de teste de cobertura" e "Tipos de visão cromática" não 
     expect($coverTestEntry['label'])->not->toBe($colorVisionEntry['label']);
 });
 
-// ── 5. Os 8 sub-catálogos não aparecem soltos em Oftalmologia ──────────────
+// ── 5. Os 9 sub-catálogos não aparecem soltos em Oftalmologia ──────────────
 
-it('os 8 sub-catálogos oftalmológicos não têm entrada própria nos children de Oftalmologia', function () {
+it('os 9 sub-catálogos oftalmológicos não têm entrada própria nos children de Oftalmologia', function () {
     session(panelSession($this->adminEntityUser));
 
     $nav           = PanelNavigation::build();
@@ -256,14 +257,14 @@ it('os 8 sub-catálogos oftalmológicos não têm entrada própria nos children 
 
     expect($ophthalmology)->not->toBeNull();
 
-    // Só existe 1 item ("Parâmetros oftalmológicos") nos children — os 8
+    // Só existe 1 item ("Parâmetros oftalmológicos") nos children — os 9
     // sub-catálogos viraram abas dentro dele (BaseSettingController::$tabsGroup),
     // não itens soltos no nível de children de Oftalmologia.
     expect($ophthalmology['children'])->toHaveCount(1);
     expect($ophthalmology['children'][0]['label'])->toBe('Parâmetros oftalmológicos');
 
     // As rotas diretas (campo 'route') dentro de children de Oftalmologia
-    // não incluem os 8 sub-catálogos como entradas independentes — só a
+    // não incluem os 9 sub-catálogos como entradas independentes — só a
     // única rota-âncora do item "Parâmetros oftalmológicos".
     $directChildRoutes = collectNavRoutes($ophthalmology['children']);
     expect($directChildRoutes)->toHaveCount(1);
@@ -277,9 +278,10 @@ it('os 8 sub-catálogos oftalmológicos não têm entrada própria nos children 
         'panel.setting.nearpointconvergences.index',
         'panel.setting.covertesttypes.index',
         'panel.setting.lenses.index',
+        'panel.setting.surgerytypes.index',
     ];
 
-    // No máximo 1 dos 8 pode ser a rota-âncora do item único; os outros 7
+    // No máximo 1 dos 9 pode ser a rota-âncora do item único; os outros 8
     // definitivamente não podem aparecer como 'route' de um child separado.
     $matchedSubCatalogRoutes = array_intersect($directChildRoutes, $subCatalogRoutes);
     expect(count($matchedSubCatalogRoutes))->toBeLessThanOrEqual(1);
@@ -302,9 +304,10 @@ it('rota visittypes usa o label "Tipos de atendimento" (não mais "Tipos de visi
     expect($visitTypesItem['label'])->not->toBe('Tipos de visita');
 });
 
-// ── 7. Requisição HTTP real: 200 + tabsGroup com as 8 entradas ─────────────
+// ── 7. Requisição HTTP real: 200 + tabsGroup com as 9 entradas ─────────────
+// (9ª = Tipos de cirurgia, MOVIDO de Atendimento — pedido do usuário)
 
-it('GET panel.setting.skintypes.index retorna 200 e o prop tabsGroup vem populado com as 8 entradas', function () {
+it('GET panel.setting.skintypes.index retorna 200 e o prop tabsGroup vem populado com as 9 entradas', function () {
     $response = $this->actingAs($this->adminUser)
         ->withSession(panelSession($this->adminEntityUser))
         ->get(route('panel.setting.skintypes.index'));
@@ -318,11 +321,11 @@ it('GET panel.setting.skintypes.index retorna 200 e o prop tabsGroup vem populad
     // renderizam normalmente em produção (lá `ensure_pages_exist` é false).
     // Ver relato no report final do agente de testes — não é bug do
     // PanelNavigation, está fora do escopo desta tarefa.
-    $response->assertInertia(fn ($page) => $page->has('tabsGroup', 8));
+    $response->assertInertia(fn ($page) => $page->has('tabsGroup', 9));
 
     $tabsGroup = $response->inertiaProps('tabsGroup');
 
-    expect($tabsGroup)->toHaveCount(8);
+    expect($tabsGroup)->toHaveCount(9);
 
     foreach ($tabsGroup as $tab) {
         expect($tab)->toHaveKeys(['url', 'label', 'active']);

@@ -29,6 +29,7 @@ class ColorVisionTypesController extends BaseSettingController
             ['route' => 'panel.setting.nearpointconvergences.index', 'label' => __('actions.sidemenu.nearpointconvergences')],
             ['route' => 'panel.setting.covertesttypes.index', 'label' => __('actions.sidemenu.covertesttypes')],
             ['route' => 'panel.setting.lenses.index', 'label' => __('actions.sidemenu.lenses')],
+            ['route' => 'panel.setting.surgerytypes.index', 'label' => __('actions.sidemenu.surgerytypes')],
         ];
     }
 
