@@ -1560,20 +1560,28 @@ const printEntity = computed(() => props.entity ?? {});
             <!-- Principal: detalhe -->
             <div class="col-12 col-sm-8 col-md-9">
                 <!--
-                    data-bs-theme="dark" fixo (não segue o tema do sistema):
-                    é o painel de revisão de imagem — cara de gerenciador
-                    dedicado (PACS/Lightroom/DaVinci), igual o concorrente
-                    benchmarcado. Bootstrap 5.3 resolve TODO bg-body-*/
-                    btn-outline-*/badge-subtle etc. dentro daqui pra variante
-                    dark automaticamente, sem recolorir nada manualmente — e
-                    corrige de brinde um mismatch que já existia em light
-                    mode (badge sutil claro sobre a faixa de miniaturas, que
-                    sempre foi escura). Ter isso fixo, em vez de trocar junto
-                    com o tema do app, é o que resolve o "contraste mudando
-                    muito" — o painel nunca muda, só o resto da tela.
+                    data-bs-theme="dark" fixo no cabeçalho/toolbar/corpo
+                    (não no .card em si): é o painel de revisão de imagem —
+                    cara de gerenciador dedicado (PACS/Lightroom/DaVinci),
+                    igual o concorrente benchmarcado. Bootstrap 5.3 resolve
+                    TODO bg-body-*/btn-outline-*/badge-subtle etc. dentro
+                    daqui pra variante dark automaticamente, sem recolorir
+                    nada manualmente — e corrige de brinde um mismatch que já
+                    existia em light mode (badge sutil claro sobre a faixa de
+                    miniaturas, que sempre foi escura). Ter isso fixo, em vez
+                    de trocar junto com o tema do app, é o que resolve o
+                    "contraste mudando muito" — o painel nunca muda, só o
+                    resto da tela.
+
+                    O atributo fica no cabeçalho/toolbar/corpo, NÃO no .card:
+                    a MOLDURA do card (borda/sombra) precisa seguir o tema da
+                    página, igual o card de filtros/sidebar ao lado — só o
+                    CONTEÚDO é sempre escuro. Botar no .card direto fazia a
+                    borda ficar escura fixa mesmo em modo claro, destoando
+                    dos cards vizinhos.
                 -->
-                <div class="card ei-gallery-panel" data-bs-theme="dark">
-                    <h5 class="card-header d-flex align-items-center gap-2 flex-wrap">
+                <div class="card ei-gallery-panel">
+                    <h5 class="card-header d-flex align-items-center gap-2 flex-wrap" data-bs-theme="dark">
                         <span v-if="!selectedPatient">Selecione um paciente</span>
                         <span v-else class="d-flex align-items-center gap-2 w-100 flex-wrap">
                             <button type="button" class="btn btn-outline-secondary btn-sm"
@@ -1605,7 +1613,8 @@ const printEntity = computed(() => props.entity ?? {});
 
                     <!-- Barra de ações -->
                     <div v-if="selectedPatient"
-                         class="ei-actions-bar d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-body-secondary">
+                         class="ei-actions-bar d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-body-secondary"
+                         data-bs-theme="dark">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 :disabled="selectedExamIds.length === 0"
                                 @click="openViewerModal(selectedExamsData)">
@@ -1655,7 +1664,7 @@ const printEntity = computed(() => props.entity ?? {});
                         </span>
                     </div>
 
-                    <div class="card-body">
+                    <div class="card-body" data-bs-theme="dark">
                         <!-- Placeholder -->
                         <div v-if="!selectedPatient" class="text-center py-5 text-muted">
                             <i class="ti ti-eye" style="font-size:3rem;opacity:.3;"></i>
@@ -2424,10 +2433,24 @@ const printEntity = computed(() => props.entity ?? {});
 
 /* Painel sempre dark (ver comentário no template) — sombra mais pronunciada
    que o .card padrão pra "descolar" visualmente do resto da tela clara,
-   em vez de ficar plano feito uma ilha desalinhada. */
+   em vez de ficar plano feito uma ilha desalinhada. SEM sobrescrever
+   border-color: a moldura precisa seguir o tema da PÁGINA (igual o
+   card de filtros/sidebar ao lado), não o tema forçado do conteúdo —
+   senão vira uma borda quase-preta destoando do resto em modo claro.
+   Só o conteúdo do painel é sempre escuro, a moldura é normal. */
 .ei-gallery-panel {
     box-shadow: 0 4px 18px rgba(0, 0, 0, .28);
-    border-color: #2b3646;
+}
+
+/* data-bs-theme="dark" agora fica no cabeçalho/toolbar/corpo (não no
+   .card), então cada um precisa pintar o PRÓPRIO fundo — senão o branco
+   do .card (modo claro) vaza no padding/gutter entre eles. var(--bs-
+   body-bg) resolve pra dark aqui porque o atributo já está no próprio
+   elemento. */
+.ei-gallery-panel > .card-header,
+.ei-gallery-panel > .ei-actions-bar,
+.ei-gallery-panel > .card-body {
+    background-color: var(--bs-body-bg);
 }
 
 /* NÃO usar a utility bg-dark do Bootstrap aqui: o template Preclinic
