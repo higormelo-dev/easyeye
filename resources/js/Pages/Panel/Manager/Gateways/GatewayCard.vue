@@ -242,4 +242,28 @@ async function setDefault() {
     border-color: #a3821f;
     color: #d1a936;
 }
+
+/* Modo dark: botões outline e toggle usam a mesma cor viva do modo
+   claro (--primary/--success), o que soa "gritante" repetido em 6
+   cards. Aqui só no dark mode, tons mais discretos/profundos. */
+:root[data-bs-theme=dark] .btn-outline-primary {
+    --bs-btn-color: #6ea0dd;
+    --bs-btn-border-color: #6ea0dd;
+    --bs-btn-hover-bg: #6ea0dd;
+    --bs-btn-hover-border-color: #6ea0dd;
+    color: #6ea0dd;
+    border-color: #6ea0dd;
+}
+:root[data-bs-theme=dark] .btn-outline-success {
+    --bs-btn-color: #5fa77e;
+    --bs-btn-border-color: #5fa77e;
+    --bs-btn-hover-bg: #5fa77e;
+    --bs-btn-hover-border-color: #5fa77e;
+    color: #5fa77e;
+    border-color: #5fa77e;
+}
+:root[data-bs-theme=dark] .form-check-input:checked {
+    background-color: #4a7dc2;
+    border-color: #4a7dc2;
+}
 </style>
