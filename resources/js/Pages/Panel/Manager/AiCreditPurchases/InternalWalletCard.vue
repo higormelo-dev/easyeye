@@ -196,4 +196,9 @@ function fmtDate(iso) {
 .provider-mini-tile {
     background: #f8fafc;
 }
+
+:root[data-bs-theme=dark] .balance-tile {
+    background: #18212f;
+    border-color: #384559;
+}
 </style>

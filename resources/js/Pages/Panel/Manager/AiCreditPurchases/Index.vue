@@ -839,4 +839,8 @@ function providerIcon(provider) {
 }
 .summary-card--providers { border-left: 3px solid var(--bs-primary); }
 .summary-card--clients   { border-left: 3px solid var(--bs-success); }
+
+:root[data-bs-theme=dark] .summary-card {
+    border-color: #384559;
+}
 </style>

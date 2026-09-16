@@ -385,4 +385,29 @@ function fmtDateOnly(iso) {
 .margin-strip--success { background: rgba(25, 135, 84, 0.04);  border-color: rgba(25, 135, 84, 0.2); }
 .margin-strip--warning { background: rgba(255, 193, 7, 0.05);  border-color: rgba(255, 193, 7, 0.25); }
 .margin-strip--danger  { background: rgba(220, 53, 69, 0.05);  border-color: rgba(220, 53, 69, 0.25); }
+
+:root[data-bs-theme=dark] .provider-costs-card {
+    border-color: #384559;
+}
+:root[data-bs-theme=dark] .cost-tile {
+    background: #18212f;
+}
+:root[data-bs-theme=dark] .provider-cost-tile {
+    background: #18212f;
+    border-color: #384559;
+}
+:root[data-bs-theme=dark] .provider-cost-tile:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+:root[data-bs-theme=dark] .estimated-balance {
+    border-color: #384559;
+    background: #18212f;
+}
+:root[data-bs-theme=dark] .estimated-balance--secondary {
+    background: #18212f;
+    border-color: #384559;
+}
+:root[data-bs-theme=dark] .margin-strip {
+    border-color: #384559;
+}
 </style>
