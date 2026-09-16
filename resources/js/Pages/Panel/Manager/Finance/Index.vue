@@ -617,4 +617,38 @@ async function sendChat() {
 .pf-chat-msg { max-width: 85%; padding: .5rem .7rem; border-radius: .5rem; font-size: .84rem; }
 .pf-chat-msg--user { align-self: flex-end; background: #7c3aed; color: #fff; }
 .pf-chat-msg--assistant { align-self: flex-start; background: #fff; border: 1px solid #e2e8f0; }
+
+/* ── Dark mode ────────────────────────────────────────────────────────────
+   Página inteira é CSS custom (pf-*) com cor fixa, zero reação a tema —
+   mesma paleta já usada em .pmr-form/inputs globais/SearchSelect (ver
+   _medical-records.scss, system.scss, SearchSelect.vue) pra manter os
+   painéis do sistema consistentes entre si: #121a26 fundo de card,
+   #18212f fundo "recuado" (ícone/track/mensagem), #384559 borda,
+   #dbe4ef texto principal, #8695a8 texto secundário. Cores semânticas
+   (verde/vermelho/laranja/roxo/ciano de KPI, delta, categoria de laudo
+   IA) ficam como estão — já têm contraste bom em fundo escuro também. */
+:root[data-bs-theme=dark] .pf-custom-period { background: #121a26; border-color: #384559; }
+
+:root[data-bs-theme=dark] .pf-stat-card { background: #121a26; border-color: #384559; }
+:root[data-bs-theme=dark] .pf-stat-icon { background: #18212f; color: #8695a8; }
+:root[data-bs-theme=dark] .pf-stat-value { color: #dbe4ef; }
+:root[data-bs-theme=dark] .pf-stat-label { color: #8695a8; }
+:root[data-bs-theme=dark] .pf-delta--neutral { color: #8695a8; }
+
+:root[data-bs-theme=dark] .pf-mini-stat { background: #121a26; border-color: #384559; }
+:root[data-bs-theme=dark] .pf-mini-value { color: #dbe4ef; }
+:root[data-bs-theme=dark] .pf-mini-label { color: #8695a8; }
+
+:root[data-bs-theme=dark] .pf-card { background: #121a26; border-color: #384559; }
+:root[data-bs-theme=dark] .pf-card-header { border-color: #384559; color: #dbe4ef; }
+
+:root[data-bs-theme=dark] .pf-bar-track { background: #18212f; }
+
+:root[data-bs-theme=dark] .pf-digest-section { border-color: #384559; }
+:root[data-bs-theme=dark] .pf-digest-item-title { color: #dbe4ef; }
+:root[data-bs-theme=dark] .pf-digest-item-detail { color: #9fb0c7; }
+:root[data-bs-theme=dark] .pf-digest-item-evidence { color: #c4b5fd; background: rgba(124, 58, 237, .18); }
+
+:root[data-bs-theme=dark] .pf-chat-messages { background: #0d1219; }
+:root[data-bs-theme=dark] .pf-chat-msg--assistant { background: #18212f; border-color: #384559; color: #dbe4ef; }
 </style>
