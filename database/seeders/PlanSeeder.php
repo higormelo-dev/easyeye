@@ -20,10 +20,10 @@ class PlanSeeder extends Seeder
                 'active'        => true,
                 'sort_order'    => 1,
                 'features'      => [
-                    FeatureKey::MaxUsers->value            => '3',
-                    FeatureKey::MaxPatients->value         => '2000',
-                    FeatureKey::MaxDoctors->value          => '1',
-                    FeatureKey::MaxStorageGB->value        => '10',
+                    FeatureKey::MaxUsers->value              => '3',
+                    FeatureKey::MaxPatients->value           => '2000',
+                    FeatureKey::MaxDoctors->value            => '1',
+                    FeatureKey::MaxStorageGB->value          => '10',
                     FeatureKey::HasAiExamAssistant->value    => '0',
                     FeatureKey::HasAiReportDrafting->value   => '0',
                     FeatureKey::HasAiConsensus->value        => '0',
@@ -32,6 +32,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasApiIntegrator->value      => '0',
                     FeatureKey::AiMonthlyCredits->value      => '0',
                     FeatureKey::ApiMonthlyExamSends->value   => '0',
+                    FeatureKey::HasInventoryModule->value    => '0',
                 ],
             ],
             [
@@ -51,10 +52,10 @@ class PlanSeeder extends Seeder
                 // site.differentiators.premium_callout.
                 'is_featured' => true,
                 'features'    => [
-                    FeatureKey::MaxUsers->value            => '10',
-                    FeatureKey::MaxPatients->value         => '10000',
-                    FeatureKey::MaxDoctors->value          => '3',
-                    FeatureKey::MaxStorageGB->value        => '50',
+                    FeatureKey::MaxUsers->value              => '10',
+                    FeatureKey::MaxPatients->value           => '10000',
+                    FeatureKey::MaxDoctors->value            => '3',
+                    FeatureKey::MaxStorageGB->value          => '50',
                     FeatureKey::HasAiExamAssistant->value    => '0',
                     FeatureKey::HasAiReportDrafting->value   => '1',
                     FeatureKey::HasAiConsensus->value        => '0',
@@ -63,6 +64,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasApiIntegrator->value      => '0',
                     FeatureKey::AiMonthlyCredits->value      => '30',  // degustação — excedente R$ 2,50/crédito
                     FeatureKey::ApiMonthlyExamSends->value   => '0',
+                    FeatureKey::HasInventoryModule->value    => '1',
                 ],
             ],
             [
@@ -74,10 +76,10 @@ class PlanSeeder extends Seeder
                 'active'        => true,
                 'sort_order'    => 3,
                 'features'      => [
-                    FeatureKey::MaxUsers->value            => '0', // ilimitado
-                    FeatureKey::MaxPatients->value         => '0', // ilimitado
-                    FeatureKey::MaxDoctors->value          => '10',
-                    FeatureKey::MaxStorageGB->value        => '200',
+                    FeatureKey::MaxUsers->value              => '0', // ilimitado
+                    FeatureKey::MaxPatients->value           => '0', // ilimitado
+                    FeatureKey::MaxDoctors->value            => '10',
+                    FeatureKey::MaxStorageGB->value          => '200',
                     FeatureKey::HasAiExamAssistant->value    => '1',
                     FeatureKey::HasAiReportDrafting->value   => '1',
                     FeatureKey::HasAiConsensus->value        => '1',
@@ -86,6 +88,7 @@ class PlanSeeder extends Seeder
                     FeatureKey::HasApiIntegrator->value      => '1',
                     FeatureKey::AiMonthlyCredits->value      => '80',  // franquia — excedente R$ 2,00/crédito
                     FeatureKey::ApiMonthlyExamSends->value   => '0',   // ilimitado → cap interno 1000
+                    FeatureKey::HasInventoryModule->value    => '1',
                 ],
             ],
         ];
