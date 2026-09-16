@@ -1780,7 +1780,9 @@ const printEntity = computed(() => props.entity ?? {});
                                                     <span v-if="!exam.active"
                                                           class="badge bg-secondary"
                                                           style="font-size:.5rem;white-space:nowrap;"
-                                                          title="Imagem desabilitada — botão direito pra reabilitar">
+                                                          :title="isDoctor
+                                                              ? 'Imagem desabilitada — botão direito pra reabilitar'
+                                                              : 'Imagem desabilitada — só médico pode reabilitar'">
                                                         <i class="fa fa-eye-slash me-1"></i>Desabilitada
                                                     </span>
                                                     <span v-if="exam.quality_rating"
