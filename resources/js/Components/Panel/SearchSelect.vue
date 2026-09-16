@@ -168,6 +168,13 @@ function onSearchChange(q) {
     --ms-dropdown-border-color: var(--bs-border-color, #dee2e6);
     --ms-dropdown-radius: .375rem;
     min-height: calc(1.5em + .75rem + 2px);
+    /* A lib (default.css) seta margin:0 auto no .multiselect base — pensado
+       pra centralizar um form isolado, mas dentro de um flex row com
+       max-width (barras de filtro) sobra espaço "fantasma" dos dois lados
+       de cada select, abrindo vãos enormes entre eles em vez de ficarem
+       lado a lado. Zera a centralização; quem quiser centralizar usa
+       margin no wrapper de fora. */
+    margin: 0;
 }
 
 .search-select.multiselect.is-active {

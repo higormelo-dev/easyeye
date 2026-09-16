@@ -191,14 +191,14 @@ const breadcrumbs = [
                     :value-key="'value'"
                     :label-key="'label'"
                     :placeholder="t.all_statuses"
-                    style="max-width:180px;"
+                    style="width:200px;"
                 />
 
                 <SearchSelect
                     v-model="categoryFilter"
                     :options="categories"
                     :placeholder="t.all_categories"
-                    style="max-width:200px;"
+                    style="width:250px;"
                 />
             </div>
 
