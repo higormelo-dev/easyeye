@@ -53,18 +53,25 @@ beforeEach(function () {
     ]);
 });
 
-function actingAsDoctor($test)
+// Nomes com sufixo Account (em vez de actingAsDoctor/actingAsSecretary
+// genéricos) para não colidir com os helpers globais de mesmo nome já
+// declarados em tests/Feature/EyeImages/EyeImageManualReportTest.php — Pest
+// carrega todos os arquivos de tests/Feature no mesmo processo, e duas
+// funções globais com o MESMO nome em arquivos diferentes quebram a suite
+// inteira com "Cannot redeclare function" assim que os dois são carregados
+// juntos (achado ao rodar a suite completa em vez de arquivos isolados).
+function actingAsDoctorAccount($test)
 {
     return $test->actingAs($test->doctorUserAccount)->withSession(panelSession($test->doctorEntityUser));
 }
 
-function actingAsSecretary($test)
+function actingAsSecretaryAccount($test)
 {
     return $test->actingAs($test->secretaryUserAccount)->withSession(panelSession($test->secretaryEntityUser));
 }
 
 it('médico solicita procedimento — status nasce requested', function () {
-    $res = actingAsDoctor($this)->postJson(
+    $res = actingAsDoctorAccount($this)->postJson(
         route('panel.patients.medicalrecords.medicalrecord-procedures.store', [$this->patient->id, $this->record->id]),
         ['procedure_id' => $this->catalogProcedure->id, 'eye' => 'right', 'solicitation_type' => 'rotina'],
     );
@@ -75,7 +82,7 @@ it('médico solicita procedimento — status nasce requested', function () {
 });
 
 it('[ACL] secretária NÃO consegue solicitar procedimento (403 — IssueReport é doctor estrito)', function () {
-    actingAsSecretary($this)->postJson(
+    actingAsSecretaryAccount($this)->postJson(
         route('panel.patients.medicalrecords.medicalrecord-procedures.store', [$this->patient->id, $this->record->id]),
         ['procedure_id' => $this->catalogProcedure->id],
     )->assertForbidden();
@@ -92,7 +99,7 @@ it('médico marca executado + confirma consumo de material — baixa estoque de 
         'procedure_id' => $this->catalogProcedure->id, 'doctor_id' => $this->doctor->id,
     ]);
 
-    $res = actingAsDoctor($this)->postJson(
+    $res = actingAsDoctorAccount($this)->postJson(
         route('panel.patients.medicalrecord-procedures.mark-done', [$this->patient->id, $mrProcedure->id]),
         ['items' => [['entity_product_id' => $product->id, 'quantity' => 1]]],
     );
@@ -164,7 +171,7 @@ it('médico cancela solicitação', function () {
         'procedure_id' => $this->catalogProcedure->id, 'doctor_id' => $this->doctor->id,
     ]);
 
-    actingAsDoctor($this)->postJson(
+    actingAsDoctorAccount($this)->postJson(
         route('panel.patients.medicalrecord-procedures.cancel', [$this->patient->id, $mrProcedure->id]),
         ['notes' => 'Paciente desistiu'],
     )->assertOk();
@@ -195,7 +202,7 @@ it('bom() retorna a lista de materiais padrão do procedimento', function () {
         'entity_id' => $this->entity->id, 'procedure_id' => $this->catalogProcedure->id, 'entity_product_id' => $product->id, 'quantity' => 1,
     ]);
 
-    $res = actingAsDoctor($this)->getJson(route('panel.procedures.bom', $this->catalogProcedure->id));
+    $res = actingAsDoctorAccount($this)->getJson(route('panel.procedures.bom', $this->catalogProcedure->id));
 
     $res->assertOk();
     expect($res->json('data'))->toHaveCount(1)
@@ -214,7 +221,7 @@ it('[GAP] bom() inclui lotes disponíveis pra item requires_lot=true — doctor 
     // Doctor NÃO tem permission stock.manage — se bom() dependesse de
     // ProductLotsController (atrás de stock.manage) isso 403aria; aqui deve
     // vir OK porque bom() é doctor-acessível de propósito.
-    $res = actingAsDoctor($this)->getJson(route('panel.procedures.bom', $this->catalogProcedure->id));
+    $res = actingAsDoctorAccount($this)->getJson(route('panel.procedures.bom', $this->catalogProcedure->id));
 
     $res->assertOk();
     expect($res->json('data.0.requires_lot'))->toBeTrue()
@@ -225,7 +232,7 @@ it('[GAP] bom() inclui lotes disponíveis pra item requires_lot=true — doctor 
 it('médico solicita um procedimento GLOBAL (entity_id null — catálogo compartilhado)', function () {
     $globalProcedure = Procedure::query()->create(['entity_id' => null, 'code' => 'GLOBAL-1', 'name' => 'Consulta padrão', 'active' => true]);
 
-    $res = actingAsDoctor($this)->postJson(
+    $res = actingAsDoctorAccount($this)->postJson(
         route('panel.patients.medicalrecords.medicalrecord-procedures.store', [$this->patient->id, $this->record->id]),
         ['procedure_id' => $globalProcedure->id],
     );
@@ -242,7 +249,7 @@ it('bom() de procedimento global NÃO retorna a BOM cadastrada por outra clínic
         'entity_id' => $otherEntity->id, 'procedure_id' => $globalProcedure->id, 'entity_product_id' => $otherProduct->id, 'quantity' => 1,
     ]);
 
-    $res = actingAsDoctor($this)->getJson(route('panel.procedures.bom', $globalProcedure->id));
+    $res = actingAsDoctorAccount($this)->getJson(route('panel.procedures.bom', $globalProcedure->id));
 
     $res->assertOk();
     expect($res->json('data'))->toBe([]);
