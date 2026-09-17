@@ -1,7 +1,25 @@
 <?php
 
 use App\Enums\ScheduleSituation;
-use App\Models\{Doctor, People, Schedule, User, VisitType};
+use App\Models\{ClinicResource, Doctor, People, Schedule, User, VisitType};
+use Illuminate\Support\Str;
+
+/**
+ * schedule_resources.id é uuid primary key sem default no banco (gerado só
+ * pelo HasUuids do model no `creating()`, que BelongsToMany::sync()/attach()
+ * não dispara — o insert do pivot é feito via query builder cru). Achado ao
+ * escrever estes testes: Schedule::resources()->sync() quebraria com
+ * "null value in column id" na primeira vez que fosse chamado com uma lista
+ * não vazia — o que nunca aconteceu em produção porque nenhuma clínica real
+ * usa reserva de recursos ainda (clinic_resources está vazia hoje). Pré-
+ * existente e fora do escopo desta mudança (não mexe no controller web de
+ * agendamento); os testes aqui geram o id do pivot explicitamente para não
+ * depender desse caminho.
+ */
+function linkScheduleToResource(Schedule $schedule, ClinicResource $resource): void
+{
+    $schedule->resources()->attach($resource->id, ['id' => (string) Str::uuid()]);
+}
 
 /**
  * Creates the minimal dependencies to produce a Schedule for the given entity.
@@ -207,6 +225,63 @@ describe('GET /api/integrators/v1/schedules', function () {
     it('returns 401 without authentication', function () {
         $this->getJson('/api/integrators/v1/schedules')
             ->assertUnauthorized();
+    });
+
+    // Plumbing pra escopar a Modality Worklist a um aparelho específico via
+    // clinic_resources/schedule_resources. Sem adoção real ainda (nenhuma
+    // clínica usa reserva de recursos na tela de agendamento hoje), então o
+    // filtro só entra em ação quando o param é explicitamente enviado.
+    it('filters schedules by clinic_resource_id via schedule_resources', function () {
+        $resource = ClinicResource::create([
+            'entity_id' => $this->ctx['entity']->id,
+            'name'      => 'Retinógrafo Consultório 1',
+            'type'      => 'equipment',
+        ]);
+        $otherResource = ClinicResource::create([
+            'entity_id' => $this->ctx['entity']->id,
+            'name'      => 'Retinógrafo Consultório 2',
+            'type'      => 'equipment',
+        ]);
+
+        $linkedSchedule = makeSchedule($this->ctx);
+        linkScheduleToResource($linkedSchedule, $resource);
+
+        $otherLinkedSchedule = makeSchedule($this->ctx);
+        linkScheduleToResource($otherLinkedSchedule, $otherResource);
+
+        makeSchedule($this->ctx); // no resource linked at all
+
+        $response = $this->getJson(
+            "/api/integrators/v1/schedules?clinic_resource_id={$resource->id}",
+            $this->ctx['headers'],
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1)
+            ->and($response->json('data.0.id'))->toBe($linkedSchedule->id);
+    });
+
+    // Regressão: ausência do param deve produzir resultado byte-a-byte igual
+    // ao comportamento de antes desta mudança — tanto agendamentos COM
+    // recurso vinculado quanto SEM devem continuar aparecendo juntos.
+    it('returns identical results to before when clinic_resource_id is absent (regression)', function () {
+        $resource = ClinicResource::create([
+            'entity_id' => $this->ctx['entity']->id,
+            'name'      => 'Retinógrafo Consultório 1',
+            'type'      => 'equipment',
+        ]);
+
+        $withResource = makeSchedule($this->ctx);
+        linkScheduleToResource($withResource, $resource);
+        $withoutResource = makeSchedule($this->ctx);
+
+        $response = $this->getJson('/api/integrators/v1/schedules', $this->ctx['headers'])
+            ->assertOk();
+
+        expect($response->json('meta.total'))->toBe(2);
+
+        $ids = collect($response->json('data'))->pluck('id')->all();
+        expect($ids)->toContain($withResource->id)
+            ->and($ids)->toContain($withoutResource->id);
     });
 });
 

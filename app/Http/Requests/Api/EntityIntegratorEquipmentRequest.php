@@ -42,6 +42,20 @@ class EntityIntegratorEquipmentRequest extends FormRequest
                 $this->uniqueRule('mac'),
             ],
             'serial_number' => ['nullable', 'string', 'max:100', $this->uniqueRule('serial_number')],
+            // Vínculo opcional com um recurso de agenda do tipo 'equipment'.
+            // Escopado por entity_id do integrador autenticado: sem esse
+            // where(), um integrador da clínica A poderia linkar um
+            // clinic_resource da clínica B só adivinhando/enumerando o UUID —
+            // vazamento de dado cross-tenant. type='equipment' também é
+            // obrigatório: recursos do tipo 'room' não fazem sentido aqui.
+            'clinic_resource_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('clinic_resources', 'id')->where(function ($query) {
+                    $query->where('entity_id', request()->attributes->get('integrator')->user->entity_id)
+                        ->where('type', 'equipment');
+                }),
+            ],
         ];
     }
 

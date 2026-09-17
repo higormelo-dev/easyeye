@@ -1,6 +1,7 @@
 <?php
 
-use App\Http\Controllers\Api\{EntityIntegratorEquipmentsController,
+use App\Http\Controllers\Api\{ClinicResourcesController,
+    EntityIntegratorEquipmentsController,
     EntityIntegratorsController,
     ExamTypesController,
     ExamsController,
@@ -32,6 +33,10 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
         ], function () {
             Route::apiResource('equipments', EntityIntegratorEquipmentsController::class)
                 ->except(['create', 'edit']);
+            // Recursos de agenda (type=equipment) disponíveis para vincular a
+            // um equipamento do integrador — só leitura, escopado à entity_id
+            // do integrador autenticado (ver ClinicResourcesController).
+            Route::apiResource('clinic-resources', ClinicResourcesController::class)->only('index');
             Route::apiResource('patients', PatientsController::class)->only('index', 'show');
             Route::apiResource('patients.exams', PatientExamsController::class)
                 ->except(['create', 'edit']);

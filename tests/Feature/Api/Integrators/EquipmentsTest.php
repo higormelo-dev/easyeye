@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\EntityIntegratorEquipment;
+use App\Models\{ClinicResource, EntityIntegratorEquipment};
 
 describe('GET /api/integrators/v1/equipments', function () {
     beforeEach(function () {
@@ -498,5 +498,113 @@ describe('DELETE /api/integrators/v1/equipments/{id}', function () {
     it('returns 401 without authentication', function () {
         $this->deleteJson("/api/integrators/v1/equipments/{$this->equipment->id}")
             ->assertUnauthorized();
+    });
+});
+
+// Vínculo opcional equipment <-> clinic_resource (plumbing pra escopar a
+// Modality Worklist a um aparelho específico). A checagem de tenant aqui é a
+// parte crítica: sem o where('entity_id', ...) em
+// EntityIntegratorEquipmentRequest::rules(), um integrador da clínica A
+// poderia linkar um clinic_resource da clínica B só adivinhando o UUID.
+describe('POST|PUT /api/integrators/v1/equipments — clinic_resource_id', function () {
+    beforeEach(function () {
+        $this->ctx = setupIntegrator();
+    });
+
+    it('accepts and persists a valid same-tenant clinic_resource_id on create', function () {
+        $resource = ClinicResource::create([
+            'entity_id' => $this->ctx['entity']->id,
+            'name'      => 'Retinógrafo Sala 1',
+            'type'      => 'equipment',
+        ]);
+
+        $response = $this->postJson('/api/integrators/v1/equipments', [
+            'name'               => 'Equipamento Vinculado',
+            'clinic_resource_id' => $resource->id,
+        ], $this->ctx['headers'])->assertCreated();
+
+        expect($response->json('data.attributes.clinic_resource_id'))->toBe($resource->id);
+
+        $equipment = EntityIntegratorEquipment::where('integrator_id', $this->ctx['integrator']->id)->first();
+        expect($equipment->clinic_resource_id)->toBe($resource->id);
+    });
+
+    it('accepts and persists a valid same-tenant clinic_resource_id on update', function () {
+        $resource = ClinicResource::create([
+            'entity_id' => $this->ctx['entity']->id,
+            'name'      => 'Tonômetro Sala 2',
+            'type'      => 'equipment',
+        ]);
+        $equipment = EntityIntegratorEquipment::factory()->create([
+            'integrator_id' => $this->ctx['integrator']->id,
+        ]);
+
+        $response = $this->putJson("/api/integrators/v1/equipments/{$equipment->id}", [
+            'name'               => $equipment->name,
+            'clinic_resource_id' => $resource->id,
+        ], $this->ctx['headers'])->assertOk();
+
+        expect($response->json('data.attributes.clinic_resource_id'))->toBe($resource->id)
+            ->and($equipment->fresh()->clinic_resource_id)->toBe($resource->id);
+    });
+
+    it('rejects a clinic_resource_id belonging to a different tenant (cross-tenant IDOR)', function () {
+        $otherCtx      = setupIntegrator();
+        $otherResource = ClinicResource::create([
+            'entity_id' => $otherCtx['entity']->id,
+            'name'      => 'Recurso De Outra Clínica',
+            'type'      => 'equipment',
+        ]);
+
+        $response = $this->postJson('/api/integrators/v1/equipments', [
+            'name'               => 'Tentativa Cross-Tenant',
+            'clinic_resource_id' => $otherResource->id,
+        ], $this->ctx['headers'])->assertUnprocessable();
+
+        $response->assertJsonValidationErrors('clinic_resource_id');
+
+        expect(EntityIntegratorEquipment::where('integrator_id', $this->ctx['integrator']->id)->count())->toBe(0);
+    });
+
+    it('rejects a clinic_resource_id belonging to a different tenant on update', function () {
+        $otherCtx      = setupIntegrator();
+        $otherResource = ClinicResource::create([
+            'entity_id' => $otherCtx['entity']->id,
+            'name'      => 'Recurso De Outra Clínica (Update)',
+            'type'      => 'equipment',
+        ]);
+        $equipment = EntityIntegratorEquipment::factory()->create([
+            'integrator_id' => $this->ctx['integrator']->id,
+        ]);
+
+        $this->putJson("/api/integrators/v1/equipments/{$equipment->id}", [
+            'name'               => $equipment->name,
+            'clinic_resource_id' => $otherResource->id,
+        ], $this->ctx['headers'])->assertUnprocessable()
+            ->assertJsonValidationErrors('clinic_resource_id');
+
+        expect($equipment->fresh()->clinic_resource_id)->toBeNull();
+    });
+
+    it('rejects a clinic_resource_id whose type is room instead of equipment', function () {
+        $room = ClinicResource::create([
+            'entity_id' => $this->ctx['entity']->id,
+            'name'      => 'Sala De Exame 1',
+            'type'      => 'room',
+        ]);
+
+        $this->postJson('/api/integrators/v1/equipments', [
+            'name'               => 'Tentativa De Vincular Sala',
+            'clinic_resource_id' => $room->id,
+        ], $this->ctx['headers'])->assertUnprocessable()
+            ->assertJsonValidationErrors('clinic_resource_id');
+    });
+
+    it('accepts equipment creation without clinic_resource_id (default no-op)', function () {
+        $response = $this->postJson('/api/integrators/v1/equipments', [
+            'name' => 'Equipamento Sem Vínculo',
+        ], $this->ctx['headers'])->assertCreated();
+
+        expect($response->json('data.attributes.clinic_resource_id'))->toBeNull();
     });
 });

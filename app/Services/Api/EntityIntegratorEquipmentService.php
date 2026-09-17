@@ -10,7 +10,7 @@ use Throwable;
 
 class EntityIntegratorEquipmentService
 {
-    private const FILLABLE_FIELDS = ['name', 'ip', 'mac', 'serial_number'];
+    private const FILLABLE_FIELDS = ['name', 'ip', 'mac', 'serial_number', 'clinic_resource_id'];
 
     /**
      * Create a new record with all related entities.

@@ -32,6 +32,18 @@ class SchedulesController extends Controller
             ->with(['doctor', 'patient', 'covenant', 'visitType'])
             ->where('entity_id', $integrator->user->entity_id);
 
+        // Escopo opcional a um recurso de agenda específico (ex.: o
+        // equipamento que está consultando via Modality Worklist), via
+        // schedule_resources. Ausente = comportamento idêntico ao de antes
+        // desta mudança (agenda inteira do dia da entidade).
+        if (request()->filled('clinic_resource_id')) {
+            $clinicResourceId = request()->string('clinic_resource_id')->value();
+            $schedules        = $schedules->whereHas(
+                'resources',
+                fn ($q) => $q->where('clinic_resources.id', $clinicResourceId),
+            );
+        }
+
         $identifierSearch = $this->resolveIdentifierSearch($search);
 
         if (request()->has('date')) {

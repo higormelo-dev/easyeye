@@ -33,6 +33,7 @@ class EntityIntegratorEquipment extends Model
         'mac',
         'serial_number',
         'active',
+        'clinic_resource_id',
     ];
 
     /**
@@ -111,5 +112,15 @@ class EntityIntegratorEquipment extends Model
     public function patientExams(): HasMany
     {
         return $this->hasMany(PatientExam::class, 'entity_integrator_equipment_id');
+    }
+
+    /**
+     * Recurso de agenda (`clinic_resources.type = 'equipment'`) vinculado a
+     * este equipamento — opcional, usado para escopar a Modality Worklist a
+     * só os agendamentos reservados para este aparelho.
+     */
+    public function clinicResource(): BelongsTo
+    {
+        return $this->belongsTo(ClinicResource::class);
     }
 }
