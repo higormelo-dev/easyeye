@@ -172,14 +172,20 @@ return [
     // BUGFIX (revisão de segurança): sem fallback, secure ficava null e o
     // Symfony Cookie assume `false` (envia o cookie de sessão — que carrega
     // two_factor_verified_at, auth.password_confirmed_at, selected_entity_id
-    // e impersonating.* — mesmo em HTTP puro). Mesma regra que
-    // AppServiceProvider::boot() usa para forçar HTTPS (production+testing),
-    // mas lida via env() puro — NUNCA app()->environment() aqui: arquivos de
-    // config são require'd por LoadConfiguration ANTES de detectEnvironment()
-    // rodar, então o container ainda não tem 'env' ligado nesse momento (isso
+    // e impersonating.* — mesmo em HTTP puro).
+    //
+    // BUGFIX 2 (achado real, localhost pedindo SSL sem precisar): a v1 deste
+    // fix usava nome de ambiente (production/testing) como proxy pra "é
+    // HTTPS?", igual o AppServiceProvider::boot() fazia — mas isso quebra
+    // qualquer setup local com APP_ENV=testing sem TLS (docker nginx local só
+    // com `listen 80`). A fonte de verdade correta é o scheme que APP_URL já
+    // declara — AppServiceProvider::boot() foi corrigido pra usar a mesma
+    // regra. env() puro aqui (nunca app()->environment()): arquivos de config
+    // são require'd por LoadConfiguration ANTES de detectEnvironment() rodar,
+    // então o container ainda não tem 'env' ligado nesse momento (isso
     // derrubava o boot inteiro da aplicação — pego pelo teste antes do commit).
     // .env pode sempre sobrescrever via SESSION_SECURE_COOKIE se necessário.
-    'secure' => env('SESSION_SECURE_COOKIE', in_array(env('APP_ENV', 'production'), ['production', 'testing'], true)),
+    'secure' => env('SESSION_SECURE_COOKIE', str_starts_with((string) env('APP_URL', ''), 'https://')),
 
     /*
     |--------------------------------------------------------------------------

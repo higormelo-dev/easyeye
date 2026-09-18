@@ -10,9 +10,9 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "ext-calendar": "*",
         "bacon/bacon-qr-code": "^3.1",
         "barryvdh/laravel-snappy": "^1.0",
-        "ext-calendar": "*",
         "fakerphp/faker": "^1.23",
         "h4cc/wkhtmltoimage-amd64": "^0.12.4",
         "h4cc/wkhtmltopdf-amd64": "^0.12.4",
@@ -24,6 +24,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
         "league/flysystem-aws-s3-v3": "^3.30",
+        "maatwebsite/excel": "^3.1",
         "mews/purifier": "^3.4",
         "pragmarx/google2fa-laravel": "^3.0",
         "predis/predis": "^3.2",

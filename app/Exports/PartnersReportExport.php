@@ -98,7 +98,7 @@ final class PartnersSummarySheet implements FromCollection, WithHeadings, WithTi
         return collect([
             ['Período', $period],
             ['Filtro de status (aba Comissões)', $this->status ?: 'todos'],
-            ['Total de parceiros ativos', Partner::where('active', true)->count()],
+            ['Total de parceiros ativos', Partner::where('status', 'active')->count()],
             ['Total de parceiros (todos)', Partner::count()],
             ['Total de leads no período', $leadsQuery->count()],
             ['Total de comissões no período', $commissionsQuery->count()],
@@ -170,7 +170,7 @@ final class PartnersListSheet implements FromCollection, WithHeadings, WithTitle
                 $p->name,
                 $p->email,
                 $p->type?->label() ?? '—',
-                $p->active ? 'Sim' : 'Não',
+                $p->isActive() ? 'Sim' : 'Não',
                 $p->commission_rate !== null ? number_format((float) $p->commission_rate, 2, ',', '.') : '—',
                 (int) ($p->leads_count ?? 0),
                 (int) ($p->commissions_count ?? 0),
