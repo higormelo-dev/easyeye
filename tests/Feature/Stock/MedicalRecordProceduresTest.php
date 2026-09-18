@@ -110,13 +110,7 @@ it('médico marca executado + confirma consumo de material — baixa estoque de 
 });
 
 it('[REGRA DE NEGÓCIO] consumo com módulo de estoque desabilitado no plano é rejeitado (403)', function () {
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]); // sem PlanFeature has_inventory_module
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-
+    $entityNoModule   = entityWithoutInventoryModule(); // sem PlanFeature has_inventory_module
     $doctorAccount    = User::factory()->create();
     $doctorEntityUser = createEntityUser($entityNoModule, $doctorAccount, ClientRule::Doctor->value);
     $doctor           = Doctor::query()->create(['entity_user_id' => $doctorEntityUser->id, 'person_id' => People::factory()->create()->id, 'active' => true]);

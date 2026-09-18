@@ -85,14 +85,9 @@ it('[GAP] confirm() rejeita payload com linha sem nome/unidade (422 — validaç
 });
 
 it('[REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403 em toda rota de importação', function () {
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]);
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-    $admin      = User::factory()->create();
-    $entityUser = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
+    $entityNoModule = entityWithoutInventoryModule();
+    $admin          = User::factory()->create();
+    $entityUser     = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
 
     $this->actingAs($admin)->withSession(panelSession($entityUser))
         ->get(route('panel.stock.products.import.index'), ['Accept' => 'application/json'])

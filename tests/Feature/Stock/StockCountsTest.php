@@ -120,14 +120,9 @@ it('[GAP][SEGURANÇA] produto de OUTRA clínica no payload retorna 422 — nunca
 });
 
 it('[REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403', function () {
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]);
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-    $admin      = User::factory()->create();
-    $entityUser = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
+    $entityNoModule = entityWithoutInventoryModule();
+    $admin          = User::factory()->create();
+    $entityUser     = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
 
     $this->actingAs($admin)->withSession(panelSession($entityUser))
         ->get(route('panel.stock.counts.index'), ['Accept' => 'application/json'])

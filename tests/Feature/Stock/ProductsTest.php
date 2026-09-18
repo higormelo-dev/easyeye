@@ -6,6 +6,7 @@ use App\Enums\{ClientRule, FeatureKey, SubscriptionStatus};
 use App\Http\Resources\EntityProductResource;
 use App\Models\{Entity, EntityProduct, Plan, PlanFeature, ProductCategory, Subscription, User};
 use App\Services\Stock\StockService;
+use Illuminate\Support\Str;
 
 /**
  * Catálogo de produtos/materiais de estoque — App\Http\Controllers\Stock\
@@ -56,19 +57,9 @@ function productPayload($test, array $overrides = []): array
 }
 
 it('clínica SEM o módulo de estoque no plano recebe 403 ao acessar produtos', function () {
-    $entityWithoutFeature = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planWithoutFeature   = Plan::factory()->create(['active' => true]);
-
-    Subscription::factory()->create([
-        'entity_id' => $entityWithoutFeature->id,
-        'plan_id'   => $planWithoutFeature->id,
-        'status'    => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(),
-        'ends_at'   => now()->addMonth(),
-    ]);
-
-    $admin      = User::factory()->create();
-    $entityUser = createEntityUser($entityWithoutFeature, $admin, ClientRule::Admin->value);
+    $entityWithoutFeature = entityWithoutInventoryModule();
+    $admin                = User::factory()->create();
+    $entityUser           = createEntityUser($entityWithoutFeature, $admin, ClientRule::Admin->value);
 
     // Accept:application/json — FeatureDeniedException::render() só devolve
     // 403 JSON nesse caso; sem ele (navegação web normal) faz back()-with-
@@ -272,17 +263,7 @@ it('[GAP] search() — retorna só produtos ATIVOS da MESMA clínica, campo prod
 });
 
 it('[GAP][REGRA DE NEGÓCIO] search() sem o módulo de estoque no plano retorna 403', function () {
-    $entityWithoutFeature = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planWithoutFeature   = Plan::factory()->create(['active' => true]);
-
-    Subscription::factory()->create([
-        'entity_id' => $entityWithoutFeature->id,
-        'plan_id'   => $planWithoutFeature->id,
-        'status'    => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(),
-        'ends_at'   => now()->addMonth(),
-    ]);
-
+    $entityWithoutFeature     = entityWithoutInventoryModule();
     $adminWithoutFeature      = User::factory()->create();
     $entityUserWithoutFeature = createEntityUser($entityWithoutFeature, $adminWithoutFeature, ClientRule::Admin->value);
 
@@ -309,15 +290,15 @@ it('[GAP] HasEntityCode retry: colisão real de code (simulando corrida) não de
     // Insere direto no banco (sem passar pelo trait) o código que o
     // PRÓXIMO create() naturalmente computaria — simula outro processo
     // vencendo a corrida um instante antes.
-    \DB::table('entity_products')->insert([
-        'id'          => (string) \Illuminate\Support\Str::uuid(),
-        'entity_id'   => $this->entity->id,
-        'code'        => 'PRD-0000000002',
-        'name'        => 'Produto colidente',
-        'unit'        => 'un',
-        'active'      => true,
-        'created_at'  => now(),
-        'updated_at'  => now(),
+    DB::table('entity_products')->insert([
+        'id'         => (string) Str::uuid(),
+        'entity_id'  => $this->entity->id,
+        'code'       => 'PRD-0000000002',
+        'name'       => 'Produto colidente',
+        'unit'       => 'un',
+        'active'     => true,
+        'created_at' => now(),
+        'updated_at' => now(),
     ]);
 
     $second = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Produto 2', 'unit' => 'un', 'active' => true]);

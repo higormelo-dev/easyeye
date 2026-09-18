@@ -122,40 +122,43 @@ class AclTest extends TestCase
             ->assertOk();
     }
 
-    // ── /panel/reports (admin, financial) ────────────────────────────────
+    // ── /panel/schedules/reports/production (admin, financial) ────────────
+    // GAP fechado (revisão "relatório direto no módulo"): página-hub
+    // "/panel/reports" foi removida (ver docblock em routes/web.php);
+    // relatório de agenda migrou pra `schedules.reports.production`.
 
     public function test_doctor_nao_pode_acessar_reports(): void
     {
         $this->actingAsRole(ClientRule::Doctor->value)
-            ->get('/panel/reports')
+            ->get('/panel/schedules/reports/production')
             ->assertForbidden();
     }
 
     public function test_secretary_nao_pode_acessar_reports(): void
     {
         $this->actingAsRole(ClientRule::Secretary->value)
-            ->get('/panel/reports')
+            ->get('/panel/schedules/reports/production')
             ->assertForbidden();
     }
 
     public function test_user_nao_pode_acessar_reports(): void
     {
         $this->actingAsRole(ClientRule::User->value)
-            ->get('/panel/reports')
+            ->get('/panel/schedules/reports/production')
             ->assertForbidden();
     }
 
     public function test_financial_pode_acessar_reports(): void
     {
         $this->actingAsRole(ClientRule::Financial->value)
-            ->get('/panel/reports')
+            ->get('/panel/schedules/reports/production')
             ->assertOk();
     }
 
     public function test_admin_pode_acessar_reports(): void
     {
         $this->actingAsRole(ClientRule::Admin->value)
-            ->get('/panel/reports')
+            ->get('/panel/schedules/reports/production')
             ->assertOk();
     }
 

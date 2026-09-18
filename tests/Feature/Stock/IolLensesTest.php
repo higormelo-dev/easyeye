@@ -1,7 +1,7 @@
 <?php
 
-use App\Enums\{ClientRule, SubscriptionStatus};
-use App\Models\{Entity, EntityIolLens, EntityProduct, IolLensModel, Plan, ProductCategory, Subscription, User};
+use App\Enums\ClientRule;
+use App\Models\{Entity, EntityIolLens, EntityProduct, IolLensModel, ProductCategory, User};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -205,7 +205,7 @@ it('cria lente escolhendo um iol_lens_model_id já existente (autocomplete) — 
 });
 
 it('duas clínicas cadastrando fabricante+modelo idênticos deduplicam no catálogo global (normalized_key) mas mantêm inventário/produto/categoria próprios', function () {
-    $entityB      = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $entityB = Entity::factory()->create(['is_client' => true, 'active' => true]);
     giveInventoryModuleAccess($entityB);
     $adminB       = User::factory()->create();
     $adminBEntity = createEntityUser($entityB, $adminB, ClientRule::Admin->value);
@@ -252,7 +252,7 @@ it('isolamento multi-tenant: lente da Entity A não aparece na listagem da Entit
     storeIolLens($this)->assertRedirect(route('panel.stock.iollenses.index'));
     $lensA = EntityIolLens::where('entity_id', $this->entity->id)->firstOrFail();
 
-    $entityB      = Entity::factory()->create(['is_client' => true, 'active' => true]);
+    $entityB = Entity::factory()->create(['is_client' => true, 'active' => true]);
     giveInventoryModuleAccess($entityB);
     $adminB       = User::factory()->create();
     $adminBEntity = createEntityUser($entityB, $adminB, ClientRule::Admin->value);
@@ -443,14 +443,9 @@ it('[REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403 ao
     // mudança de decisão desta migração: cadastro de lente deixou de ser
     // universal (ver docblock do arquivo) e passou a exigir o módulo pago,
     // igual ao resto de Estoque.
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]);
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-    $admin      = User::factory()->create();
-    $entityUser = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
+    $entityNoModule = entityWithoutInventoryModule();
+    $admin          = User::factory()->create();
+    $entityUser     = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
 
     actingAsIolLensAdmin($this, $admin, $entityUser)
         ->get(route('panel.stock.iollenses.index'), ['Accept' => 'application/json'])

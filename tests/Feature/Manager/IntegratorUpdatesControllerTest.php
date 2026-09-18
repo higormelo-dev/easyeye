@@ -3,8 +3,7 @@
 use App\Enums\SaasRule;
 use App\Http\Controllers\Manager\IntegratorUpdatesController;
 use App\Models\{Entity, IntegratorUpdate, User};
-use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
+use Illuminate\Http\{Request, UploadedFile};
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -25,6 +24,7 @@ function storeUpdate(array $payload, ?UploadedFile $file = null)
     session(['selected_entity_id' => test()->saas->id]);
 
     $request = Request::create('/panel/manager/integrator-updates', 'POST', $payload);
+
     if ($file !== null) {
         $request->files->set('file', $file);
     }
@@ -36,19 +36,32 @@ function storeUpdate(array $payload, ?UploadedFile $file = null)
 }
 
 it('publishes an installer and deactivates previous builds of the same target', function () {
+    // IntegratorUpdatePublisher::verifySignature() faz verificação criptográfica
+    // real (ed25519) contra services.integrator_updates.public_key — a antiga
+    // validSignature() (64 bytes fixos) só satisfazia o check de formato e não
+    // verifica mais. Aqui geramos um par de chaves efêmero, apontamos a config
+    // pra chave pública dele, e assinamos de verdade o SHA-256 do arquivo
+    // enviado — mesma convenção de scripts/sign-update.sh (mensagem = bytes
+    // crus do digest, não a string hex).
+    $keyPair = sodium_crypto_sign_keypair();
+    config(['services.integrator_updates.public_key' => bin2hex(sodium_crypto_sign_publickey($keyPair))]);
+    $secretKey = sodium_crypto_sign_secretkey($keyPair);
+
     IntegratorUpdate::forceCreate([
-        'version'  => '0.1.0', 'platform' => 'windows', 'arch' => 'x86',
-        'archive'  => 'integrator-updates/0.1.0/old.msi',
-        'sha256'   => str_repeat('cd', 32), 'signature' => validSignature(), 'active' => true,
+        'version' => '0.1.0', 'platform' => 'windows', 'arch' => 'x86',
+        'archive' => 'integrator-updates/0.1.0/old.msi',
+        'sha256'  => str_repeat('cd', 32), 'signature' => validSignature(), 'active' => true,
     ]);
 
-    $file = UploadedFile::fake()->create('EasyEye-Integrator-0.2.0-x86.msi', 512);
+    $file      = UploadedFile::fake()->create('EasyEye-Integrator-0.2.0-x86.msi', 512);
+    $digest    = hash_file('sha256', $file->getRealPath(), true);
+    $signature = base64_encode(sodium_crypto_sign_detached($digest, $secretKey));
 
     storeUpdate([
         'version'   => '0.2.0',
         'platform'  => 'windows',
         'arch'      => 'x86',
-        'signature' => validSignature(),
+        'signature' => $signature,
     ], $file);
 
     $published = IntegratorUpdate::where('version', '0.2.0')->first();
@@ -89,9 +102,9 @@ it('rejects a non-installer file extension', function () {
 
 it('toggles a build active flag without deleting history', function () {
     $update = IntegratorUpdate::forceCreate([
-        'version'  => '0.2.0', 'platform' => 'windows', 'arch' => 'x86',
-        'archive'  => 'integrator-updates/0.2.0/x.msi',
-        'sha256'   => str_repeat('ab', 32), 'signature' => validSignature(), 'active' => true,
+        'version' => '0.2.0', 'platform' => 'windows', 'arch' => 'x86',
+        'archive' => 'integrator-updates/0.2.0/x.msi',
+        'sha256'  => str_repeat('ab', 32), 'signature' => validSignature(), 'active' => true,
     ]);
 
     test()->actingAs(test()->user);

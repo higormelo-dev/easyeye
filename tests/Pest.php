@@ -184,6 +184,36 @@ function giveInventoryModuleAccess(Entity $entity): void
 }
 
 /**
+ * Cria uma Entity com assinatura ativa num plano SEM o módulo de estoque —
+ * usada pelos testes de feature-gate que esperam 403 (Products, IolLenses,
+ * ProductCategories, ProductImports, StockCounts, StockReports, dashboard).
+ *
+ * skipAutoTrial é obrigatório aqui: Entity::factory()->create() dispara
+ * EntityObserver::created(), que inicia um trial automático (geralmente no
+ * plano de menor tier, com todas as features "de entrada" habilitadas). Sem
+ * suprimir esse trial, a entity fica com DUAS subscriptions "accessible"
+ * simultâneas — o trial automático e a assinatura sem o módulo criada aqui —
+ * e FeatureGateService::getSubscription() faz ->first() sem ORDER BY, então
+ * o teste vira nao-determinístico (às vezes pega o trial, que libera o
+ * módulo). Em produção esse cenário não existe: SubscriptionService::activate()
+ * sempre cancela a assinatura corrente antes de criar outra.
+ */
+function entityWithoutInventoryModule(): Entity
+{
+    $entity                = Entity::factory()->make(['is_client' => true, 'active' => true]);
+    $entity->skipAutoTrial = true;
+    $entity->save();
+
+    $plan = Plan::factory()->create(['active' => true]);
+    Subscription::factory()->create([
+        'entity_id' => $entity->id, 'plan_id' => $plan->id, 'status' => SubscriptionStatus::Active,
+        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
+    ]);
+
+    return $entity;
+}
+
+/**
  * Headers de uma request Inertia. Inclui X-Inertia-Version computado pelo middleware
  * para evitar 409 (version mismatch) em testes que disparam GET com X-Inertia.
  */

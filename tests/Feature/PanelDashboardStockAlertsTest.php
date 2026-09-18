@@ -52,13 +52,8 @@ it('[GAP] clínica sem nada crítico no estoque recebe stockAlerts null (sem car
 });
 
 it('[GAP] clínica sem o módulo de estoque no plano recebe stockAlerts null mesmo com produto abaixo do mínimo', function () {
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]);
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-    $product = EntityProduct::create(['entity_id' => $entityNoModule->id, 'name' => 'Lente IOL', 'unit' => 'un', 'active' => true, 'min_qty' => 10]);
+    $entityNoModule = entityWithoutInventoryModule();
+    $product        = EntityProduct::create(['entity_id' => $entityNoModule->id, 'name' => 'Lente IOL', 'unit' => 'un', 'active' => true, 'min_qty' => 10]);
     app(StockService::class)->manualIn($product, 4, 50.00);
 
     $admin      = User::factory()->create();

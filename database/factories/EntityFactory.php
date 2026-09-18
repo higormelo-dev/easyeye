@@ -20,8 +20,11 @@ class EntityFactory extends Factory
         $name = $this->faker->company();
 
         return [
-            'name'                   => $name,
-            'subdomain'              => Str::slug($name),
+            'name' => $name,
+            // Sufixo aleatório evita colisão em entities_subdomain_unique: o
+            // pool de nomes fake()->company() é limitado e se repete em
+            // suítes grandes, enquanto Str::slug($name) sozinho não é único.
+            'subdomain'              => Str::slug($name) . '-' . Str::lower(Str::random(8)),
             'zipcode'                => str(fake()->postcode())->replaceMatches('/\D/', ''),
             'address'                => fake()->streetName(),
             'number'                 => fake()->buildingNumber(),

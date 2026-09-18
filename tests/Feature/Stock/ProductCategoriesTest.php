@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Enums\{ClientRule, SubscriptionStatus};
-use App\Models\{Entity, Plan, ProductCategory, Subscription, User};
+use App\Enums\ClientRule;
+use App\Models\{Entity, ProductCategory, User};
 
 /**
  * Catálogo de categorias de produto/estoque — App\Http\Controllers\Stock\
@@ -106,14 +106,9 @@ it('[REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403 ao
     // tests/Feature/Stock/IolLensesTest.php. Cobre a mudança de decisão desta
     // migração: cadastro de categoria deixou de ser universal (ver docblock
     // do arquivo) e passou a exigir o módulo pago, igual ao resto de Estoque.
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]);
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-    $admin      = User::factory()->create();
-    $entityUser = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
+    $entityNoModule = entityWithoutInventoryModule();
+    $admin          = User::factory()->create();
+    $entityUser     = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
 
     actingAsCategoryAdmin($this, $admin, $entityUser)
         ->get(route('panel.stock.product-categories.index'), ['Accept' => 'application/json'])

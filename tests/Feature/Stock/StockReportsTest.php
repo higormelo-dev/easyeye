@@ -42,14 +42,9 @@ it('admin acessa os relatórios de estoque com os 4 blocos de dado', function ()
 });
 
 it('[REGRA DE NEGÓCIO] clínica sem o módulo de estoque no plano recebe 403', function () {
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]);
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-    $admin      = User::factory()->create();
-    $entityUser = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
+    $entityNoModule = entityWithoutInventoryModule();
+    $admin          = User::factory()->create();
+    $entityUser     = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
 
     $this->actingAs($admin)->withSession(panelSession($entityUser))
         ->get(route('panel.stock.reports.index'), ['Accept' => 'application/json'])
@@ -94,14 +89,9 @@ it('[GAP] exportCsv() aceita report=turnover|consumption|purchases — cada um c
 });
 
 it('[GAP][REGRA DE NEGÓCIO] exportCsv() sem o módulo de estoque no plano recebe 403', function () {
-    $entityNoModule = Entity::factory()->create(['is_client' => true, 'active' => true]);
-    $planNoModule   = Plan::factory()->create(['active' => true]);
-    Subscription::factory()->create([
-        'entity_id' => $entityNoModule->id, 'plan_id' => $planNoModule->id, 'status' => SubscriptionStatus::Active,
-        'starts_at' => now()->subDay(), 'ends_at' => now()->addMonth(),
-    ]);
-    $admin      = User::factory()->create();
-    $entityUser = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
+    $entityNoModule = entityWithoutInventoryModule();
+    $admin          = User::factory()->create();
+    $entityUser     = createEntityUser($entityNoModule, $admin, ClientRule::Admin->value);
 
     $this->actingAs($admin)->withSession(panelSession($entityUser))
         ->get(route('panel.stock.reports.export'), ['Accept' => 'application/json'])

@@ -72,19 +72,31 @@ it('médico importa exame externo com 1 arquivo — PatientExam criado com sourc
 });
 
 it('laterality (OD/OE) enviado no import é persistido no PatientExam; omitido fica null (AO)', function () {
+    // PatientExam usa HasUuids (id não-sequencial) e os 3 imports abaixo podem
+    // cair no mesmo `created_at` (precisão de timestamp do banco/CI) — usar
+    // latest('created_at')->first() sem desempate é não-determinístico e pode
+    // reencontrar um exame de uma chamada anterior. Rastrear os IDs já vistos
+    // garante que cada asserção olha exatamente o registro recém-criado.
+    $seenIds = [];
+
     $resOd = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, ['laterality' => 1]));
     $resOd->assertRedirect(route('panel.eye-images.index'));
-    $examOd = PatientExam::where('patient_id', $this->patient->id)->latest('created_at')->first();
+    $examOd = PatientExam::where('patient_id', $this->patient->id)->whereNotIn('id', $seenIds)->first();
+    expect($examOd)->not->toBeNull();
     expect($examOd->laterality)->toBe(1);
+    $seenIds[] = $examOd->id;
 
     $resOe = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this, ['laterality' => 2]));
     $resOe->assertRedirect(route('panel.eye-images.index'));
-    $examOe = PatientExam::where('patient_id', $this->patient->id)->latest('created_at')->first();
+    $examOe = PatientExam::where('patient_id', $this->patient->id)->whereNotIn('id', $seenIds)->first();
+    expect($examOe)->not->toBeNull();
     expect($examOe->laterality)->toBe(2);
+    $seenIds[] = $examOe->id;
 
     $resNone = importExternalExam($this, $this->doctor, $this->doctorEntityUser, basePayload($this));
     $resNone->assertRedirect(route('panel.eye-images.index'));
-    $examNone = PatientExam::where('patient_id', $this->patient->id)->latest('created_at')->first();
+    $examNone = PatientExam::where('patient_id', $this->patient->id)->whereNotIn('id', $seenIds)->first();
+    expect($examNone)->not->toBeNull();
     expect($examNone->laterality)->toBeNull();
 });
 
