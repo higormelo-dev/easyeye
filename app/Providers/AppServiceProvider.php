@@ -75,7 +75,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (app()->environment(['production', 'testing'])) {
+        // BUGFIX: forçar HTTPS por NOME de ambiente (production/testing) quebra
+        // qualquer setup local que rode APP_ENV=testing sem TLS (ex.: docker
+        // nginx local só com `listen 80`, sem certificado) — toda URL absoluta
+        // gerada (redirect()->route(), etc) vira https:// e o browser tenta
+        // handshake TLS num servidor que só fala HTTP puro (ERR_CONNECTION_
+        // CLOSED). A fonte de verdade correta é o scheme que APP_URL já
+        // declara, não o nome do ambiente.
+        if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
             URL::forceRootUrl(config('app.url'));
         }
