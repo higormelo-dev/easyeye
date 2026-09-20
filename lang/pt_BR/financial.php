@@ -143,6 +143,24 @@ return [
         'col_description'    => 'Descrição',
         'col_status'         => 'Status',
         'no_entries'         => 'Nenhum lançamento encontrado.',
+
+        // Tela viva (CRUD) de fluxo de caixa — distinta do relatório acima
+        'new_entry'        => 'Novo lançamento',
+        'income_period'    => 'Receitas (período)',
+        'expense_period'   => 'Despesas (período)',
+        'pending'          => 'A receber',
+        'filter_from'      => 'De',
+        'filter_to'        => 'Até',
+        'status_pending'   => 'Pendente',
+        'status_paid'      => 'Pago',
+        'status_cancelled' => 'Cancelado',
+        'col_covenant'     => 'Convênio',
+        'col_actions'      => 'Ações',
+
+        // Relatório (Reports/CashFlow.vue)
+        'export_csv'   => 'Exportar CSV',
+        'filter_apply' => 'Filtrar',
+        'col_total'    => 'Total',
     ],
 
     // Billing (TISS)
@@ -236,11 +254,13 @@ return [
         'particular_batch_badge' => 'Particular',
 
         // Flash messages
-        'individual_created' => 'Guia individual criada com sucesso.',
-        'batch_created'      => 'Lote :code criado com sucesso.',
-        'batch_submitted'    => 'Lote :code enviado para faturamento.',
-        'claim_paid'         => 'Guia :code marcada como paga.',
-        'claim_denied'       => 'Guia :code marcada como glosada.',
+        'individual_created'         => 'Guia individual criada com sucesso.',
+        'batch_created'              => 'Lote :code criado com sucesso.',
+        'batch_submitted'            => 'Lote :code enviado para faturamento.',
+        'claim_paid'                 => 'Guia :code marcada como paga.',
+        'claim_denied'               => 'Guia :code marcada como glosada.',
+        'paid_amount_exceeds_claim'  => 'O valor pago não pode ser maior que o valor da guia.',
+        'glosa_amount_exceeds_claim' => 'O valor glosado não pode ser maior que o valor da guia.',
 
         // Importar retorno TISS
         'import_return_title'        => 'Importar retorno TISS',
@@ -278,6 +298,14 @@ return [
         'col_status'     => 'Status',
         'col_paid'       => 'Pago',
         'no_guides'      => 'Nenhuma guia encontrada.',
+
+        // Filtro/KPIs (Reports/Covenants.vue)
+        'export_csv'       => 'Exportar CSV',
+        'filter_from'      => 'De',
+        'filter_to'        => 'Até',
+        'filter_apply'     => 'Filtrar',
+        'kpi_total_billed' => 'Total faturado',
+        'kpi_total_paid'   => 'Total pago',
     ],
 
     // Tabela de preço por procedimento × convênio

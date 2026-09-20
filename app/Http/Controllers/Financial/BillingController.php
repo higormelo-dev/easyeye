@@ -8,13 +8,14 @@ use App\Domains\Tiss\Models\{TissGlosaReason, TissTussCode};
 use App\Domains\Tiss\Services\TissWorkflowService;
 use App\Enums\{BillingBatchStatus, BillingClaimStatus, EntityGate, ScheduleSituation};
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Financial\{BillingBatchRequest, BillingIndividualRequest};
+use App\Http\Requests\Financial\{BillingBatchRequest, BillingIndividualRequest, MarkClaimDeniedRequest, MarkClaimPaidRequest};
 use App\Models\{BillingBatch, BillingClaim, Covenant, Entity, Schedule};
 use App\Services\Financial\BillingService;
 use BackedEnum;
 use Illuminate\Http\{RedirectResponse, Request};
-use Illuminate\Support\Facades\{DB, Gate, Storage};
+use Illuminate\Support\Facades\{DB, Gate, Log, Storage};
 use Inertia\{Inertia, Response as InertiaResponse};
+use RuntimeException;
 use Throwable;
 
 class BillingController extends Controller
@@ -228,33 +229,20 @@ class BillingController extends Controller
         );
     }
 
-    public function markClaimPaid(Request $request, BillingClaim $claim): RedirectResponse
+    public function markClaimPaid(MarkClaimPaidRequest $request, BillingClaim $claim): RedirectResponse
     {
         $this->authorizeFinancial();
 
-        $validated = $request->validate([
-            'paid_amount'    => ['nullable', 'numeric', 'min:0'],
-            'paid_at'        => ['nullable', 'date'],
-            'payment_method' => ['nullable', 'string', 'max:40'],
-            'notes'          => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $this->billingService->markClaimPaid($claim, $validated);
+        $this->billingService->markClaimPaid($claim, $request->validated());
 
         return back()->with('success', __('financial.billing.claim_paid', ['code' => $claim->code]));
     }
 
-    public function markClaimDenied(Request $request, BillingClaim $claim): RedirectResponse
+    public function markClaimDenied(MarkClaimDeniedRequest $request, BillingClaim $claim): RedirectResponse
     {
         $this->authorizeFinancial();
 
-        $validated = $request->validate([
-            'glosa_amount' => ['nullable', 'numeric', 'min:0'],
-            'glosa_code'   => ['nullable', 'string', 'max:30'],
-            'notes'        => ['nullable', 'string', 'max:1000'],
-        ]);
-
-        $this->billingService->markClaimDenied($claim, $validated);
+        $this->billingService->markClaimDenied($claim, $request->validated());
 
         return back()->with('success', __('financial.billing.claim_denied', ['code' => $claim->code]));
     }
@@ -289,7 +277,23 @@ class BillingController extends Controller
                 processSynchronously: true,
             );
         } catch (Throwable $e) {
-            report($e);
+            // Log local mantém detalhe completo (mesmo perímetro da aplicação).
+            // Não repassa a exceção original pro Sentry: mensagem/stack do parser
+            // de XML de retorno TISS pode conter dado de paciente (cartão, nome)
+            // vindo do arquivo importado por terceiro (a operadora).
+            Log::error('Falha ao importar retorno TISS.', [
+                'entity_id'   => (string) $entity->id,
+                'covenant_id' => (string) $covenant->id,
+                'exception'   => $e->getMessage(),
+                'trace'       => $e->getTraceAsString(),
+            ]);
+
+            report(new RuntimeException(sprintf(
+                'Falha ao importar retorno TISS (entity=%s, covenant=%s, exceção=%s).',
+                $entity->id,
+                $covenant->id,
+                $e::class,
+            )));
 
             return back()->with('error', __('financial.billing.import_return_failed'));
         }

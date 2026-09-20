@@ -212,6 +212,19 @@ class AppServiceProvider extends ServiceProvider
         );
 
         // -------------------------------------------------------------------------
+        // Painel financeiro da clínica: mutações (faturar, marcar paga/negada,
+        // fechar caixa, importar retorno TISS) e as exportações pesadas
+        // (XML/CSV com drill-down) não tinham nenhum teto — sessão comprometida
+        // conseguia automatizar parsing de XML/geração de relatório sem barreira.
+        // -------------------------------------------------------------------------
+        RateLimiter::for(
+            'financial-write',
+            static fn (Request $r) => Limit::perMinute(30)->by(
+                'financial:' . ($r->user()?->id ?? $r->ip()),
+            ),
+        );
+
+        // -------------------------------------------------------------------------
         // API de integradores (cliente desktop Rust): teto por INTEGRADOR, não por
         // IP — várias clínicas podem sair pelo mesmo IP corporativo/NAT, e um token
         // vazado deve ser contido sozinho sem afetar os demais.

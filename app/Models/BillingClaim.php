@@ -80,13 +80,16 @@ class BillingClaim extends Model
 
     public function resolveRouteBinding($value, $field = null): ?self
     {
-        $query = static::where($field ?? $this->getRouteKeyName(), $value);
+        // Sessão sem entity_id (ex.: vínculo desativado em sessão já aberta) não
+        // pode virar "sem filtro" — isso resolveria qualquer registro do sistema
+        // pelo ID, quebrando isolamento entre clínicas.
+        $entityId = session('selected_entity_id');
 
-        if ($entityId = session('selected_entity_id')) {
-            $query->where('entity_id', $entityId);
-        }
+        abort_unless($entityId, 403);
 
-        return $query->firstOrFail();
+        return static::where($field ?? $this->getRouteKeyName(), $value)
+            ->where('entity_id', $entityId)
+            ->firstOrFail();
     }
 
     public function entity(): BelongsTo

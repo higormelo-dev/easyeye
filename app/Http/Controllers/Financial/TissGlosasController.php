@@ -7,8 +7,11 @@ namespace App\Http\Controllers\Financial;
 use App\Domains\Tiss\Actions\{OpenGlosaAppealAction, ResolveGlosaAppealAction, SubmitGlosaAppealAction};
 use App\Domains\Tiss\Enums\{TissAppealStatus, TissGlosaStatus};
 use App\Domains\Tiss\Models\{TissGlosa, TissGlosaAppeal};
+use App\Enums\EntityGate;
 use App\Http\Controllers\Controller;
+use App\Models\Entity;
 use Illuminate\Http\{RedirectResponse, Request};
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -23,7 +26,7 @@ class TissGlosasController extends Controller
 
     public function index(Request $request): InertiaResponse
     {
-        $entityId = session('selected_entity_id');
+        $entityId = $this->authorizeFinancial()->id;
 
         $from = $request->date('from', 'Y-m-d') ?? now()->startOfMonth();
         $to   = $request->date('to', 'Y-m-d') ?? now()->endOfMonth();
@@ -118,6 +121,8 @@ class TissGlosasController extends Controller
 
     public function appeal(Request $request, TissGlosa $glosa): RedirectResponse
     {
+        $this->authorizeFinancial();
+
         abort_if((string) $glosa->entity_id !== session('selected_entity_id'), 403);
         abort_if(! $glosa->status->isActionable(), 409, __('financial.glosas.cannot_appeal'));
 
@@ -139,6 +144,8 @@ class TissGlosasController extends Controller
 
     public function submitAppeal(Request $request, TissGlosaAppeal $appeal): RedirectResponse
     {
+        $this->authorizeFinancial();
+
         abort_if((string) $appeal->entity_id !== session('selected_entity_id'), 403);
         abort_if(! $appeal->status->canBeSubmitted(), 409, __('financial.glosas.cannot_submit_appeal'));
 
@@ -151,6 +158,8 @@ class TissGlosasController extends Controller
 
     public function resolveAppeal(Request $request, TissGlosaAppeal $appeal): RedirectResponse
     {
+        $this->authorizeFinancial();
+
         abort_if((string) $appeal->entity_id !== session('selected_entity_id'), 403);
         abort_if(! $appeal->status->canBeResolved(), 409, __('financial.glosas.cannot_resolve_appeal'));
 
@@ -165,5 +174,13 @@ class TissGlosasController extends Controller
         return redirect()
             ->route('panel.financial.tiss.glosas.index')
             ->with('success', __('financial.glosas.appeal_resolved', ['number' => $appeal->appeal_number]));
+    }
+
+    private function authorizeFinancial(): Entity
+    {
+        $entity = Entity::query()->findOrFail(session('selected_entity_id'));
+        Gate::authorize(EntityGate::ViewFinancial->value, $entity);
+
+        return $entity;
     }
 }

@@ -143,6 +143,24 @@ return [
         'col_description'    => 'Description',
         'col_status'         => 'Status',
         'no_entries'         => 'No entries found.',
+
+        // Live (CRUD) cash flow screen — distinct from the report above
+        'new_entry'        => 'New entry',
+        'income_period'    => 'Income (period)',
+        'expense_period'   => 'Expenses (period)',
+        'pending'          => 'Pending',
+        'filter_from'      => 'From',
+        'filter_to'        => 'To',
+        'status_pending'   => 'Pending',
+        'status_paid'      => 'Paid',
+        'status_cancelled' => 'Cancelled',
+        'col_covenant'     => 'Covenant',
+        'col_actions'      => 'Actions',
+
+        // Report (Reports/CashFlow.vue)
+        'export_csv'   => 'Export CSV',
+        'filter_apply' => 'Filter',
+        'col_total'    => 'Total',
     ],
 
     // Billing (TISS)
@@ -236,11 +254,13 @@ return [
         'particular_batch_badge' => 'Private',
 
         // Flash messages
-        'individual_created' => 'Individual claim created successfully.',
-        'batch_created'      => 'Batch :code created successfully.',
-        'batch_submitted'    => 'Batch :code submitted for billing.',
-        'claim_paid'         => 'Claim :code marked as paid.',
-        'claim_denied'       => 'Claim :code marked as denied.',
+        'individual_created'         => 'Individual claim created successfully.',
+        'batch_created'              => 'Batch :code created successfully.',
+        'batch_submitted'            => 'Batch :code submitted for billing.',
+        'claim_paid'                 => 'Claim :code marked as paid.',
+        'claim_denied'               => 'Claim :code marked as denied.',
+        'paid_amount_exceeds_claim'  => 'The paid amount cannot exceed the claim amount.',
+        'glosa_amount_exceeds_claim' => 'The denied amount cannot exceed the claim amount.',
 
         // Import TISS return
         'import_return_title'        => 'Import TISS return',
@@ -278,6 +298,14 @@ return [
         'col_status'     => 'Status',
         'col_paid'       => 'Paid',
         'no_guides'      => 'No claims found.',
+
+        // Filter/KPIs (Reports/Covenants.vue)
+        'export_csv'       => 'Export CSV',
+        'filter_from'      => 'From',
+        'filter_to'        => 'To',
+        'filter_apply'     => 'Filter',
+        'kpi_total_billed' => 'Total billed',
+        'kpi_total_paid'   => 'Total paid',
     ],
 
     // Procedure × covenant price table
