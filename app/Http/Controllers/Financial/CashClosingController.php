@@ -34,8 +34,9 @@ class CashClosingController extends Controller
         $closes = CashClose::query()
             ->where('entity_id', $entityId)
             ->orderByDesc('period_end')
-            ->get()
-            ->map(fn (CashClose $c) => [
+            ->paginate(30)
+            ->withQueryString()
+            ->through(fn (CashClose $c) => [
                 'id'            => $c->id,
                 'period_start'  => $c->period_start?->format('Y-m-d'),
                 'period_end'    => $c->period_end?->format('Y-m-d'),

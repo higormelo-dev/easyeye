@@ -74,12 +74,12 @@ const statusBadge = (s) => {
 </script>
 
 <template>
-    <AppLayout title="Fluxo de Caixa" :breadcrumbs="breadcrumbs">
+    <AppLayout :title="t.cashflow?.breadcrumb ?? 'Fluxo de Caixa'" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader title="Fluxo de Caixa">
+            <PageHeader :title="t.cashflow?.breadcrumb ?? 'Fluxo de Caixa'">
                 <template #actions>
                     <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i>Novo lançamento
+                        <i class="ti ti-plus me-1"></i>{{ t.cashflow?.new_entry ?? 'Novo lançamento' }}
                     </button>
                 </template>
             </PageHeader>
@@ -89,7 +89,7 @@ const statusBadge = (s) => {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm border-start border-success border-3 h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Receitas (período)</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.income_period ?? 'Receitas (período)' }}</small>
                             <div class="fw-bold fs-5 text-success">{{ brl(summary.income) }}</div>
                         </div>
                     </div>
@@ -97,7 +97,7 @@ const statusBadge = (s) => {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm border-start border-danger border-3 h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Despesas (período)</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.expense_period ?? 'Despesas (período)' }}</small>
                             <div class="fw-bold fs-5 text-danger">{{ brl(summary.expense) }}</div>
                         </div>
                     </div>
@@ -105,7 +105,7 @@ const statusBadge = (s) => {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm border-start border-info border-3 h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Saldo</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.col_balance ?? 'Saldo' }}</small>
                             <div class="fw-bold fs-5" :class="(summary.balance ?? 0) >= 0 ? 'text-success' : 'text-danger'">
                                 {{ brl(summary.balance) }}
                             </div>
@@ -115,7 +115,7 @@ const statusBadge = (s) => {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm border-start border-warning border-3 h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">A receber</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.pending ?? 'A receber' }}</small>
                             <div class="fw-bold fs-5 text-warning">{{ brl(summary.pending) }}</div>
                         </div>
                     </div>
@@ -127,39 +127,39 @@ const statusBadge = (s) => {
                 <div class="card-body py-3">
                     <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
                         <div class="col-md-2">
-                            <label class="form-label small mb-1">De</label>
+                            <label class="form-label small mb-1">{{ t.cashflow?.filter_from ?? 'De' }}</label>
                             <input v-model="form.from" type="date" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label small mb-1">Até</label>
+                            <label class="form-label small mb-1">{{ t.cashflow?.filter_to ?? 'Até' }}</label>
                             <input v-model="form.to" type="date" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label small mb-1">Tipo</label>
+                            <label class="form-label small mb-1">{{ t.cashflow?.col_type ?? 'Tipo' }}</label>
                             <SearchSelect
                                 v-model="form.type"
-                                :options="[{ value: 'income', label: 'Receita' }, { value: 'expense', label: 'Despesa' }]"
+                                :options="[{ value: 'income', label: t.cashflow?.type_income ?? 'Receita' }, { value: 'expense', label: t.cashflow?.type_expense ?? 'Despesa' }]"
                                 :value-key="'value'"
                                 :label-key="'label'"
-                                :placeholder="'Todos'"
+                                :placeholder="t.billing?.all ?? 'Todos'"
                             />
                         </div>
                         <div class="col-md-2">
-                            <label class="form-label small mb-1">Status</label>
+                            <label class="form-label small mb-1">{{ t.cashflow?.col_status ?? 'Status' }}</label>
                             <SearchSelect
                                 v-model="form.status"
-                                :options="[{ value: 'pending', label: 'Pendente' }, { value: 'paid', label: 'Pago' }, { value: 'cancelled', label: 'Cancelado' }]"
+                                :options="[{ value: 'pending', label: t.cashflow?.status_pending ?? 'Pendente' }, { value: 'paid', label: t.cashflow?.status_paid ?? 'Pago' }, { value: 'cancelled', label: t.cashflow?.status_cancelled ?? 'Cancelado' }]"
                                 :value-key="'value'"
                                 :label-key="'label'"
-                                :placeholder="'Todos'"
+                                :placeholder="t.billing?.all ?? 'Todos'"
                             />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label small mb-1">Categoria</label>
+                            <label class="form-label small mb-1">{{ t.cashflow?.col_category ?? 'Categoria' }}</label>
                             <SearchSelect
                                 v-model="form.category_id"
                                 :options="categories"
-                                :placeholder="'Todas'"
+                                :placeholder="t.billing?.all ?? 'Todas'"
                             />
                         </div>
                         <div class="col-md-1 d-flex gap-1">
@@ -180,14 +180,14 @@ const statusBadge = (s) => {
                     <table class="table table-nowrap table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Data</th>
-                                <th>Descrição</th>
-                                <th>Categoria</th>
-                                <th>Convênio</th>
-                                <th class="text-center">Tipo</th>
-                                <th class="text-center">Status</th>
-                                <th class="text-end">Valor</th>
-                                <th class="text-end">Ações</th>
+                                <th>{{ t.cashflow?.col_date ?? 'Data' }}</th>
+                                <th>{{ t.cashflow?.col_description ?? 'Descrição' }}</th>
+                                <th>{{ t.cashflow?.col_category ?? 'Categoria' }}</th>
+                                <th>{{ t.cashflow?.col_covenant ?? 'Convênio' }}</th>
+                                <th class="text-center">{{ t.cashflow?.col_type ?? 'Tipo' }}</th>
+                                <th class="text-center">{{ t.cashflow?.col_status ?? 'Status' }}</th>
+                                <th class="text-end">{{ t.cashflow?.col_value ?? 'Valor' }}</th>
+                                <th class="text-end">{{ t.cashflow?.col_actions ?? 'Ações' }}</th>
                             </tr>
                         </thead>
                         <tbody>

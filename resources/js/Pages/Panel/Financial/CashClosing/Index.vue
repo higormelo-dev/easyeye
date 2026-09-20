@@ -1,12 +1,13 @@
 <script setup>
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout  from '@/Layouts/AppLayout.vue';
-import PageHeader from '@/Components/Panel/PageHeader.vue';
+import AppLayout       from '@/Layouts/AppLayout.vue';
+import PageHeader      from '@/Components/Panel/PageHeader.vue';
+import TablePagination from '@/Components/Panel/TablePagination.vue';
 
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
-    closes:      { type: Array,  default: () => [] },
+    closes:      { type: Object, required: true },
     preview:     { type: Object, default: () => ({}) },
     filters:     { type: Object, default: () => ({}) },
     t:           { type: Object, default: () => ({}) },
@@ -120,10 +121,10 @@ function reopen(id) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr v-if="!closes.length">
+                                        <tr v-if="closes.data.length === 0">
                                             <td colspan="4" class="text-center text-muted py-3">{{ t.cc_empty ?? 'Nenhum período fechado.' }}</td>
                                         </tr>
-                                        <tr v-for="c in closes" :key="c.id">
+                                        <tr v-for="c in closes.data" :key="c.id">
                                             <td>{{ c.period_start }} — {{ c.period_end }}</td>
                                             <td class="text-end">{{ brl(c.balance) }}</td>
                                             <td class="small text-muted">{{ c.closed_at }}</td>
@@ -136,6 +137,7 @@ function reopen(id) {
                                     </tbody>
                                 </table>
                             </div>
+                            <TablePagination :data="closes" class="p-3" />
                         </div>
                     </div>
                 </div>

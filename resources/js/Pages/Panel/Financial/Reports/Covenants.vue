@@ -25,12 +25,12 @@ function applyFilter() {
 </script>
 
 <template>
-    <AppLayout title="Relatório por Convênio" :breadcrumbs="breadcrumbs">
+    <AppLayout :title="t.covenants?.title ?? 'Relatório por Convênio'" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader title="Relatório de Faturamento por Convênio">
+            <PageHeader :title="t.covenants?.title ?? 'Relatório de Faturamento por Convênio'">
                 <template #actions>
                     <a :href="`${export_url}?from=${filters.from}&to=${filters.to}`" class="btn btn-outline-secondary btn-sm">
-                        <i class="ti ti-download me-1"></i>Exportar CSV
+                        <i class="ti ti-download me-1"></i>{{ t.covenants?.export_csv ?? 'Exportar CSV' }}
                     </a>
                 </template>
             </PageHeader>
@@ -40,16 +40,16 @@ function applyFilter() {
                 <div class="card-body py-3">
                     <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
                         <div class="col-md-3">
-                            <label class="form-label small mb-1">De</label>
+                            <label class="form-label small mb-1">{{ t.covenants?.filter_from ?? 'De' }}</label>
                             <input v-model="from" type="date" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label small mb-1">Até</label>
+                            <label class="form-label small mb-1">{{ t.covenants?.filter_to ?? 'Até' }}</label>
                             <input v-model="to" type="date" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-3">
                             <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="ti ti-filter me-1"></i>Filtrar
+                                <i class="ti ti-filter me-1"></i>{{ t.covenants?.filter_apply ?? 'Filtrar' }}
                             </button>
                         </div>
                     </form>
@@ -61,7 +61,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Guias</small>
+                            <small class="text-muted d-block">{{ t.covenants?.col_guides ?? 'Guias' }}</small>
                             <div class="fw-bold fs-5">{{ summary.total_claims ?? 0 }}</div>
                         </div>
                     </div>
@@ -69,7 +69,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Total faturado</small>
+                            <small class="text-muted d-block">{{ t.covenants?.kpi_total_billed ?? 'Total faturado' }}</small>
                             <div class="fw-bold fs-5 text-primary">{{ brl(summary.total_amount) }}</div>
                         </div>
                     </div>
@@ -77,7 +77,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Total pago</small>
+                            <small class="text-muted d-block">{{ t.covenants?.kpi_total_paid ?? 'Total pago' }}</small>
                             <div class="fw-bold fs-5 text-success">{{ brl(summary.total_paid) }}</div>
                         </div>
                     </div>
@@ -85,7 +85,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Glosado</small>
+                            <small class="text-muted d-block">{{ t.covenants?.col_glosa ?? 'Glosado' }}</small>
                             <div class="fw-bold fs-5 text-danger">{{ brl(summary.total_denied) }}</div>
                         </div>
                     </div>
@@ -95,22 +95,22 @@ function applyFilter() {
             <!-- Por convênio -->
             <div class="card">
                 <div class="card-header bg-transparent">
-                    <h6 class="mb-0 fw-semibold"><i class="ti ti-medical-cross me-1 text-primary"></i>Por convênio</h6>
+                    <h6 class="mb-0 fw-semibold"><i class="ti ti-medical-cross me-1 text-primary"></i>{{ t.covenants?.by_covenant ?? 'Por convênio' }}</h6>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-nowrap table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Convênio</th>
-                                <th class="text-center">Guias</th>
-                                <th class="text-end">Faturado</th>
-                                <th class="text-end">Pago</th>
-                                <th class="text-end">Glosado</th>
+                                <th>{{ t.covenants?.col_covenant ?? 'Convênio' }}</th>
+                                <th class="text-center">{{ t.covenants?.col_guides ?? 'Guias' }}</th>
+                                <th class="text-end">{{ t.covenants?.col_billed ?? 'Faturado' }}</th>
+                                <th class="text-end">{{ t.covenants?.col_paid ?? 'Pago' }}</th>
+                                <th class="text-end">{{ t.covenants?.col_glosa ?? 'Glosado' }}</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-if="byCovenant.length === 0">
-                                <td colspan="5" class="text-center text-muted py-5">Sem dados no período.</td>
+                                <td colspan="5" class="text-center text-muted py-5">{{ t.covenants?.no_data ?? 'Sem dados no período.' }}</td>
                             </tr>
                             <tr v-for="(row, i) in byCovenant" :key="i">
                                 <td class="fw-medium">{{ row.covenant }}</td>
