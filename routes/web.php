@@ -610,6 +610,11 @@ Route::group(
                 // Conciliação de glosas
                 Route::get('tiss/glosas', [TissGlosasController::class, 'index'])->name('tiss.glosas.index');
                 Route::post('tiss/glosas/{glosa}/appeal', [TissGlosasController::class, 'appeal'])->name('tiss.glosas.appeal');
+                Route::post('tiss/glosas/appeals/{appeal}/submit', [TissGlosasController::class, 'submitAppeal'])->name('tiss.glosas.appeals.submit');
+                Route::post('tiss/glosas/appeals/{appeal}/resolve', [TissGlosasController::class, 'resolveAppeal'])->name('tiss.glosas.appeals.resolve');
+
+                // Importação manual de retorno TISS (demonstrativo de glosa)
+                Route::post('billing/import-return', [FinancialBillingController::class, 'importReturn'])->name('billing.import-return');
 
                 // Relatórios financeiros (exportação com drill-down)
                 Route::get('reports/cash-flow', [FinancialReportsController::class, 'cashFlow'])->name('reports.cash-flow');
