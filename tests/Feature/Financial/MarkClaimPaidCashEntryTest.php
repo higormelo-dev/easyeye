@@ -3,6 +3,7 @@
 use App\Enums\{BillingClaimStatus, CashEntryNature, PaymentMethod};
 use App\Models\{BillingClaim, Covenant, Entity, FinancialCashEntry};
 use App\Services\Financial\BillingService;
+use Illuminate\Database\QueryException;
 
 beforeEach(function () {
     $this->entity   = Entity::factory()->create(['is_client' => true, 'active' => true]);
@@ -45,5 +46,31 @@ describe('BillingService::markClaimPaid -> lançamento de caixa', function () {
         $this->service->markClaimPaid($claim->fresh());
 
         expect(FinancialCashEntry::query()->where('billing_claim_id', $claim->id)->count())->toBe(1);
+    });
+
+    it('índice único parcial barra 2 entradas de receita pra mesma guia mesmo pulando o service', function () {
+        $claim = makeClaim($this);
+
+        FinancialCashEntry::query()->create([
+            'entity_id'        => $this->entity->id,
+            'billing_claim_id' => $claim->id,
+            'entry_date'       => now()->toDateString(),
+            'description'      => 'Recebimento 1',
+            'type'             => 'income',
+            'status'           => 'paid',
+            'amount'           => 250.00,
+            'active'           => true,
+        ]);
+
+        expect(fn () => FinancialCashEntry::query()->create([
+            'entity_id'        => $this->entity->id,
+            'billing_claim_id' => $claim->id,
+            'entry_date'       => now()->toDateString(),
+            'description'      => 'Recebimento 2 (duplicado)',
+            'type'             => 'income',
+            'status'           => 'paid',
+            'amount'           => 250.00,
+            'active'           => true,
+        ]))->toThrow(QueryException::class);
     });
 });
