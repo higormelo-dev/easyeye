@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasEntityCode;
+use App\Domains\Tiss\Models\TissBatch;
 use App\Enums\BillingBatchStatus;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -39,6 +40,7 @@ class BillingBatch extends Model
         'total_amount',
         'xml_path',
         'notes',
+        'tiss_batch_id',
     ];
 
     protected function casts(): array
@@ -83,5 +85,10 @@ class BillingBatch extends Model
     public function claims(): HasMany
     {
         return $this->hasMany(BillingClaim::class, 'batch_id');
+    }
+
+    public function tissBatch(): BelongsTo
+    {
+        return $this->belongsTo(TissBatch::class, 'tiss_batch_id');
     }
 }

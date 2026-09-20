@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace App\Services\Financial;
 
+use App\Domains\Tiss\Actions\ResolveTissOperatorForCovenantAction;
+use App\Domains\Tiss\Enums\TissGlosaStatus;
+use App\Domains\Tiss\Models\{TissEntityOperatorContract, TissGlosa, TissGlosaReason, TissGuide};
+use App\Domains\Tiss\Services\TissWorkflowService;
 use App\Enums\{BillingBatchStatus, BillingClaimStatus, CashEntryNature, FinancialEntryStatus, FinancialEntryType, PaymentMethod, ScheduleSituation};
 use App\Models\{BillingBatch, BillingClaim, Covenant, FinancialCashEntry, FinancialCategory, Schedule};
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use RuntimeException;
 
 class BillingService
 {
     public function __construct(
         private readonly TissXmlService $tissXmlService,
         private readonly ProcedurePriceService $procedurePrices,
+        private readonly ResolveTissOperatorForCovenantAction $resolveOperator,
+        private readonly TissWorkflowService $tissWorkflow,
     ) {
     }
 
@@ -49,7 +57,7 @@ class BillingService
             $quantity  = (int) ($data['quantity'] ?? 1);
             $unitPrice = $this->resolveUnitPrice($data, $schedule->covenant_id, $entityId);
 
-            return BillingClaim::query()->create([
+            $claimData = [
                 'entity_id'             => $entityId,
                 'schedule_id'           => $schedule->id,
                 'patient_id'            => $schedule->patient_id,
@@ -64,9 +72,60 @@ class BillingService
                 'tuss_code'             => $data['tuss_code'] ?? null,
                 'procedure_description' => $data['procedure_description'] ?? null,
                 'authorization_code'    => $data['authorization_code'] ?? null,
+                'clinical_indication'   => $data['clinical_indication'] ?? null,
                 'notes'                 => $data['notes'] ?? null,
-            ]);
+            ];
+
+            $claim = BillingClaim::query()->create($claimData);
+
+            // Convênios sem registro ANS (ex.: "Particular") são cobrança direta ao
+            // beneficiário e não seguem o protocolo TISS — nesse caso o claim fica
+            // sem guia TISS vinculada, exatamente como antes da consolidação.
+            if ($schedule->covenant && $this->resolveOperator->isEligible($schedule->covenant)) {
+                $contract = $this->resolveOperator->__invoke($schedule->covenant, $entityId);
+                $guide    = $this->createTissGuideForSchedule($schedule, $claimData, $entityId, $contract, $data['eye_side'] ?? null);
+
+                $claim->update(['tiss_guide_id' => $guide->id]);
+            }
+
+            return $claim->fresh();
         });
+    }
+
+    /**
+     * Cria a guia TISS (Domains\Tiss) correspondente a um agendamento faturado.
+     * A guia nasce em rascunho e só é anexada a um lote (com pré-validação) em createBatch().
+     *
+     * @param array<string, mixed> $claimData
+     */
+    private function createTissGuideForSchedule(
+        Schedule $schedule,
+        array $claimData,
+        string $entityId,
+        TissEntityOperatorContract $contract,
+        ?string $eyeSide = null,
+    ): TissGuide {
+        return $this->tissWorkflow->createGuide([
+            'entity_id'               => $entityId,
+            'operator_id'             => $contract->operator_id,
+            'contract_id'             => $contract->id,
+            'patient_id'              => $schedule->patient_id,
+            'doctor_id'               => $schedule->doctor_id,
+            'schedule_id'             => $schedule->id,
+            'guide_type'              => 'consultation',
+            'attendance_date'         => $schedule->date_time->toDateString(),
+            'beneficiary_card_number' => $schedule->patient?->card_number ?? null,
+            'beneficiary_name'        => $schedule->patient?->person?->name ?? null,
+            'clinical_indication'     => $claimData['clinical_indication'] ?? null,
+            'items'                   => [[
+                'tuss_code'            => $claimData['tuss_code'] ?: '10101012',
+                'description'          => $claimData['procedure_description'] ?: 'CONSULTA OFTALMOLOGICA',
+                'quantity'             => $claimData['quantity'],
+                'unit_amount'          => $claimData['unit_price'],
+                'authorization_number' => $claimData['authorization_code'] ?? null,
+                'metadata'             => filled($eyeSide) ? ['eye_side' => $eyeSide] : null,
+            ]],
+        ]);
     }
 
     public function createBatch(array $data): BillingBatch
@@ -112,32 +171,78 @@ class BillingService
             $quantity  = (int) ($data['quantity'] ?? 1);
             $unitPrice = $this->resolveUnitPrice($data, $covenant->id, $entityId);
 
-            $claimsPayload = $schedules->map(fn (Schedule $schedule) => [
-                'entity_id'             => $entityId,
-                'batch_id'              => $batch->id,
-                'schedule_id'           => $schedule->id,
-                'patient_id'            => $schedule->patient_id,
-                'doctor_id'             => $schedule->doctor_id,
-                'covenant_id'           => $schedule->covenant_id,
-                'status'                => $data['status'] ?? BillingClaimStatus::Draft->value,
-                'attendance_date'       => $schedule->date_time->toDateString(),
-                'due_date'              => $data['due_date'] ?? null,
-                'amount'                => $quantity * $unitPrice,
-                'quantity'              => $quantity,
-                'unit_price'            => $unitPrice,
-                'tuss_code'             => $data['tuss_code'] ?? null,
-                'procedure_description' => $data['procedure_description'] ?? null,
-                'authorization_code'    => $data['authorization_code'] ?? null,
-                'notes'                 => $data['notes'] ?? null,
-            ])->all();
+            // Convênios sem registro ANS (ex.: "Particular") são cobrança direta ao
+            // beneficiário e não seguem o protocolo TISS — o lote inteiro fica fora
+            // do domínio Domains\Tiss, exatamente como antes da consolidação.
+            $tissEligible = $this->resolveOperator->isEligible($covenant);
+            $contract     = null;
+            $tissBatch    = null;
 
-            foreach ($claimsPayload as $claimData) {
-                BillingClaim::query()->create($claimData);
+            if ($tissEligible) {
+                $contract  = $this->resolveOperator->__invoke($covenant, $entityId);
+                $tissBatch = $this->tissWorkflow->createBatch([
+                    'entity_id'       => $entityId,
+                    'operator_id'     => $contract->operator_id,
+                    'contract_id'     => $contract->id,
+                    'reference_month' => now()->format('Y-m'),
+                ]);
+
+                $batch->update(['tiss_batch_id' => $tissBatch->id]);
             }
 
+            $attachedCount = 0;
+            $pendingCount  = 0;
+
+            foreach ($schedules as $schedule) {
+                $claimData = [
+                    'entity_id'             => $entityId,
+                    'batch_id'              => $batch->id,
+                    'schedule_id'           => $schedule->id,
+                    'patient_id'            => $schedule->patient_id,
+                    'doctor_id'             => $schedule->doctor_id,
+                    'covenant_id'           => $schedule->covenant_id,
+                    'status'                => $data['status'] ?? BillingClaimStatus::Draft->value,
+                    'attendance_date'       => $schedule->date_time->toDateString(),
+                    'due_date'              => $data['due_date'] ?? null,
+                    'amount'                => $quantity * $unitPrice,
+                    'quantity'              => $quantity,
+                    'unit_price'            => $unitPrice,
+                    'tuss_code'             => $data['tuss_code'] ?? null,
+                    'procedure_description' => $data['procedure_description'] ?? null,
+                    'authorization_code'    => $data['authorization_code'] ?? null,
+                    'clinical_indication'   => $data['clinical_indication'] ?? null,
+                    'notes'                 => $data['notes'] ?? null,
+                ];
+
+                $claim = BillingClaim::query()->create($claimData);
+
+                if ($tissEligible) {
+                    $guide = $this->createTissGuideForSchedule($schedule, $claimData, $entityId, $contract);
+                    $claim->update(['tiss_guide_id' => $guide->id]);
+
+                    try {
+                        $this->tissWorkflow->attachGuideToBatch($tissBatch, $guide);
+                        $attachedCount++;
+                    } catch (InvalidArgumentException) {
+                        // Guia fica com pendência registrada em tiss_guides.errors (ver PreValidateTissGuideService)
+                        // e permanece fora do lote até ser corrigida — não derruba a criação do lote inteiro.
+                        $pendingCount++;
+                    }
+                } else {
+                    $attachedCount++;
+                }
+            }
+
+            $totalAmount = $tissEligible
+                ? (float) $tissBatch->refresh()->total_amount
+                : $attachedCount * $quantity * $unitPrice;
+
             $batch->update([
-                'total_claims' => count($claimsPayload),
-                'total_amount' => count($claimsPayload) * ($quantity * $unitPrice),
+                'total_claims' => $attachedCount + $pendingCount,
+                'total_amount' => $totalAmount,
+                'notes'        => $pendingCount > 0
+                    ? trim(($data['notes'] ?? '') . sprintf(' [%d guia(s) com pendência não incluída(s) no lote — revise em /panel/financial/billing]', $pendingCount))
+                    : ($data['notes'] ?? null),
             ]);
 
             return $batch->fresh();
@@ -146,15 +251,19 @@ class BillingService
 
     public function submitBatch(BillingBatch $batch): BillingBatch
     {
+        $claimsCount = $batch->claims()->count();
+
+        if ($claimsCount === 0) {
+            throw ValidationException::withMessages([
+                'batch' => 'Este lote não possui guias para envio.',
+            ]);
+        }
+
+        if ($batch->tiss_batch_id) {
+            $this->submitViaTissWorkflow($batch);
+        }
+
         return DB::transaction(function () use ($batch): BillingBatch {
-            $claimsCount = $batch->claims()->count();
-
-            if ($claimsCount === 0) {
-                throw ValidationException::withMessages([
-                    'batch' => 'Este lote não possui guias para envio.',
-                ]);
-            }
-
             $batch->update([
                 'status'       => BillingBatchStatus::Submitted->value,
                 'submitted_at' => now(),
@@ -166,6 +275,40 @@ class BillingService
 
             return $batch->fresh();
         });
+    }
+
+    private function submitViaTissWorkflow(BillingBatch $batch): void
+    {
+        $tissBatch = $batch->tissBatch;
+
+        if (! $tissBatch) {
+            return;
+        }
+
+        if ((int) $tissBatch->guides_count === 0) {
+            throw ValidationException::withMessages([
+                'batch' => 'Este lote não possui guias sem pendência crítica — corrija as guias pendentes antes de enviar.',
+            ]);
+        }
+
+        try {
+            if ($tissBatch->status->value === 'open') {
+                $this->tissWorkflow->closeBatch($tissBatch);
+            }
+
+            $this->tissWorkflow->generateXmlNow($tissBatch);
+            $this->tissWorkflow->sendBatchNow($tissBatch->fresh());
+        } catch (InvalidArgumentException|RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'batch' => 'Falha no envio TISS: ' . $exception->getMessage(),
+            ]);
+        }
+
+        $tissBatch->refresh()->loadMissing('xmlDocument');
+
+        $batch->update([
+            'xml_path' => $tissBatch->xmlDocument?->file_path,
+        ]);
     }
 
     public function markClaimPaid(BillingClaim $claim, array $data = []): BillingClaim
@@ -214,11 +357,43 @@ class BillingService
     public function markClaimDenied(BillingClaim $claim, array $data = []): BillingClaim
     {
         return DB::transaction(function () use ($claim, $data): BillingClaim {
+            $glosaAmount = (float) ($data['glosa_amount'] ?? $claim->amount);
+
             $claim->update([
                 'status'       => BillingClaimStatus::Denied->value,
-                'glosa_amount' => (float) ($data['glosa_amount'] ?? $claim->amount),
+                'glosa_amount' => $glosaAmount,
                 'notes'        => $data['notes'] ?? $claim->notes,
             ]);
+
+            if ($claim->tiss_guide_id) {
+                $guide     = $claim->tissGuide;
+                $glosaCode = (string) ($data['glosa_code'] ?? 'GLS-MANUAL');
+
+                // Tabela 38 (ANS) dá o termo oficial quando o código bate; senão
+                // cai pro texto livre da clínica — mantém o fluxo funcionando
+                // pra códigos fora da tabela (ex.: convênios com tabela própria).
+                $officialReason = TissGlosaReason::query()
+                    ->where('code', $glosaCode)
+                    ->where('active', true)
+                    ->value('description');
+
+                TissGlosa::query()->updateOrCreate(
+                    [
+                        'entity_id'  => $claim->entity_id,
+                        'guide_id'   => $claim->tiss_guide_id,
+                        'glosa_code' => $glosaCode,
+                    ],
+                    [
+                        'operator_id'       => $guide?->operator_id,
+                        'status'            => TissGlosaStatus::Open->value,
+                        'glosa_description' => $officialReason ?? $data['notes'] ?? 'Glosa lançada manualmente pela clínica.',
+                        'amount'            => $glosaAmount,
+                        'identified_at'     => now()->toDateString(),
+                        'deadline'          => now()->addDays((int) config('tiss.glosa_appeal_deadline_days', 30))->toDateString(),
+                        'metadata'          => ['source' => 'billing_claim_manual', 'billing_claim_id' => (string) $claim->id],
+                    ],
+                );
+            }
 
             return $claim->fresh();
         });
@@ -227,7 +402,13 @@ class BillingService
     public function generateBatchXml(BillingBatch $batch): BillingBatch
     {
         return DB::transaction(function () use ($batch): BillingBatch {
-            $xmlPath = $this->tissXmlService->generate($batch);
+            if ($batch->tiss_batch_id && $batch->tissBatch) {
+                $this->tissWorkflow->generateXmlNow($batch->tissBatch);
+                $xmlPath = $batch->tissBatch->fresh()->loadMissing('xmlDocument')->xmlDocument?->file_path;
+            } else {
+                // Lote legado (criado antes da consolidação com Domains\Tiss).
+                $xmlPath = $this->tissXmlService->generate($batch);
+            }
 
             $batch->update([
                 'xml_path'  => $xmlPath,

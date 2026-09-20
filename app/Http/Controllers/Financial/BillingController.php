@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Financial;
 
-use App\Enums\{BillingClaimStatus, EntityGate, ScheduleSituation};
+use App\Domains\Tiss\Models\{TissGlosaReason, TissTussCode};
+use App\Domains\Tiss\Services\TissWorkflowService;
+use App\Enums\{BillingBatchStatus, BillingClaimStatus, EntityGate, ScheduleSituation};
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\{BillingBatchRequest, BillingIndividualRequest};
 use App\Models\{BillingBatch, BillingClaim, Covenant, Entity, Schedule};
@@ -13,6 +15,7 @@ use BackedEnum;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\{DB, Gate, Storage};
 use Inertia\{Inertia, Response as InertiaResponse};
+use Throwable;
 
 class BillingController extends Controller
 {
@@ -56,7 +59,7 @@ class BillingController extends Controller
             ->get();
 
         $claims = BillingClaim::query()
-            ->with(['batch', 'patient.person', 'doctor', 'covenant', 'schedule'])
+            ->with(['batch', 'patient.person', 'doctor', 'covenant', 'schedule', 'tissGuide'])
             ->where('entity_id', $entityId)
             ->when($request->filled('claim_status'), fn ($q) => $q->where('status', $request->input('claim_status')))
             ->whereNull('deleted_at')
@@ -115,16 +118,23 @@ class BillingController extends Controller
                 'visit_type'    => $s->visitType?->name,
             ]),
             'claims' => $claims->map(fn ($c) => [
-                'id'              => $c->id,
-                'created_at'      => $c->created_at?->format('d/m/Y H:i'),
-                'patient_name'    => $c->patient?->person?->name,
-                'doctor_name'     => $c->doctor?->name,
-                'covenant_name'   => $c->covenant?->name,
-                'batch_id'        => $c->batch_id,
-                'status'          => $c->status instanceof BackedEnum ? $c->status->value : $c->status,
-                'amount'          => (float) ($c->amount ?? 0),
-                'mark_paid_url'   => route('panel.financial.billing.claims.markPaid', $c->id),
-                'mark_denied_url' => route('panel.financial.billing.claims.markDenied', $c->id),
+                'id'                => $c->id,
+                'created_at'        => $c->created_at?->format('d/m/Y H:i'),
+                'patient_name'      => $c->patient?->person?->name,
+                'doctor_name'       => $c->doctor?->name,
+                'covenant_name'     => $c->covenant?->name,
+                'batch_id'          => $c->batch_id,
+                'status'            => $c->status instanceof BackedEnum ? $c->status->value : $c->status,
+                'status_label'      => $c->status instanceof BillingClaimStatus ? $c->status->label() : (string) $c->status,
+                'status_badge'      => $c->status instanceof BillingClaimStatus ? $c->status->badgeClass() : 'bg-secondary',
+                'amount'            => (float) ($c->amount ?? 0),
+                'guide_number'      => $c->tissGuide?->guide_number_provider,
+                'has_pending_guide' => (bool) $c->tissGuide && filled($c->tissGuide->errors),
+                'pre_validate_url'  => $c->tiss_guide_id
+                    ? route('panel.financial.tiss.guides.pre-validate', $c->tiss_guide_id)
+                    : null,
+                'mark_paid_url'   => route('panel.financial.billing.claims.paid', $c->id),
+                'mark_denied_url' => route('panel.financial.billing.claims.denied', $c->id),
             ]),
             'batches' => $batches->map(fn ($b) => [
                 'id'            => $b->id,
@@ -132,16 +142,47 @@ class BillingController extends Controller
                 'covenant_name' => $b->covenant?->name,
                 'claims_count'  => (int) $b->claims_count,
                 'status'        => $b->status instanceof BackedEnum ? $b->status->value : $b->status,
+                'status_label'  => $b->status instanceof BillingBatchStatus ? $b->status->label() : (string) $b->status,
+                'status_badge'  => $b->status instanceof BillingBatchStatus ? $b->status->badgeClass() : 'bg-secondary',
+                'is_tiss'       => (bool) $b->tiss_batch_id,
+                'notes'         => $b->notes,
                 'submit_url'    => route('panel.financial.billing.batches.submit', $b->id),
                 'xml_url'       => route('panel.financial.billing.batches.xml', $b->id),
             ]),
-            'covenants'           => $covenants->map(fn ($c) => ['id' => $c->id, 'name' => $c->name]),
+            'covenants' => $covenants->map(fn ($c) => [
+                'id'                => $c->id,
+                'name'              => $c->name,
+                'has_ans_registry'  => filled($c->ans_registry),
+                'has_tiss_operator' => filled($c->tiss_operator_id),
+                'tiss_operator_id'  => $c->tiss_operator_id,
+            ]),
             'filters'             => ['from' => $from, 'to' => $to],
             'tissVersionOptions'  => $tissVersionOptions,
             'tissLayoutOptions'   => $tissLayoutOptions,
             'selectedTissVersion' => $selectedTissVersion,
             'selectedTissLayout'  => $selectedTissLayout,
-            't'                   => trans('financial'),
+            'storeIndividualUrl'  => route('panel.financial.billing.individual.store'),
+            'storeBatchUrl'       => route('panel.financial.billing.batch.store'),
+            'importReturnUrl'     => route('panel.financial.billing.import-return'),
+            'glosaReasons'        => TissGlosaReason::query()
+                ->where('active', true)
+                ->orderBy('code')
+                ->get(['code', 'description'])
+                ->map(fn (TissGlosaReason $r) => [
+                    'code'        => $r->code,
+                    'description' => $r->description,
+                    'label'       => "{$r->code} — {$r->description}",
+                ]),
+            'tussCodes' => TissTussCode::query()
+                ->where('active', true)
+                ->orderBy('description')
+                ->get(['code', 'description'])
+                ->map(fn (TissTussCode $c) => [
+                    'code'        => $c->code,
+                    'description' => $c->description,
+                    'label'       => "{$c->code} — {$c->description}",
+                ]),
+            't' => trans('financial'),
         ]);
     }
 
@@ -151,7 +192,7 @@ class BillingController extends Controller
 
         $this->billingService->createIndividual($request->validated());
 
-        return back()->with('message', __('financial.billing.individual_created'));
+        return back()->with('success', __('financial.billing.individual_created'));
     }
 
     public function storeBatch(BillingBatchRequest $request): RedirectResponse
@@ -160,7 +201,7 @@ class BillingController extends Controller
 
         $batch = $this->billingService->createBatch($request->validated());
 
-        return back()->with('message', __('financial.billing.batch_created', ['code' => $batch->code]));
+        return back()->with('success', __('financial.billing.batch_created', ['code' => $batch->code]));
     }
 
     public function submitBatch(BillingBatch $batch): RedirectResponse
@@ -169,7 +210,7 @@ class BillingController extends Controller
 
         $batch = $this->billingService->submitBatch($batch);
 
-        return back()->with('message', __('financial.billing.batch_submitted', ['code' => $batch->code]));
+        return back()->with('success', __('financial.billing.batch_submitted', ['code' => $batch->code]));
     }
 
     public function exportBatchXml(BillingBatch $batch)
@@ -200,7 +241,7 @@ class BillingController extends Controller
 
         $this->billingService->markClaimPaid($claim, $validated);
 
-        return back()->with('message', __('financial.billing.claim_paid', ['code' => $claim->code]));
+        return back()->with('success', __('financial.billing.claim_paid', ['code' => $claim->code]));
     }
 
     public function markClaimDenied(Request $request, BillingClaim $claim): RedirectResponse
@@ -209,12 +250,58 @@ class BillingController extends Controller
 
         $validated = $request->validate([
             'glosa_amount' => ['nullable', 'numeric', 'min:0'],
+            'glosa_code'   => ['nullable', 'string', 'max:30'],
             'notes'        => ['nullable', 'string', 'max:1000'],
         ]);
 
         $this->billingService->markClaimDenied($claim, $validated);
 
-        return back()->with('message', __('financial.billing.claim_denied', ['code' => $claim->code]));
+        return back()->with('success', __('financial.billing.claim_denied', ['code' => $claim->code]));
+    }
+
+    public function importReturn(Request $request): RedirectResponse
+    {
+        $entity = $this->authorizeFinancial();
+
+        $validated = $request->validate([
+            'covenant_id' => ['required', 'uuid'],
+            'xml_file'    => ['required', 'file', 'extensions:xml', 'max:10240'],
+        ]);
+
+        $covenant = Covenant::query()
+            ->where('id', $validated['covenant_id'])
+            ->where(function ($q) use ($entity): void {
+                $q->where('entity_id', (string) $entity->id)->orWhereNull('entity_id');
+            })
+            ->firstOrFail();
+
+        if (blank($covenant->tiss_operator_id)) {
+            return back()->with('error', __('financial.billing.import_return_no_operator'));
+        }
+
+        $xmlContent = file_get_contents($validated['xml_file']->getRealPath());
+
+        try {
+            $return = app(TissWorkflowService::class)->receiveResponse(
+                entityId: (string) $entity->id,
+                operatorId: (string) $covenant->tiss_operator_id,
+                xmlContent: (string) $xmlContent,
+                processSynchronously: true,
+            );
+        } catch (Throwable $e) {
+            report($e);
+
+            return back()->with('error', __('financial.billing.import_return_failed'));
+        }
+
+        $glosaCount = (int) ($return->summary['glosa_count'] ?? 0);
+
+        return back()->with(
+            'success',
+            $glosaCount > 0
+                ? __('financial.billing.import_return_success', ['count' => $glosaCount])
+                : __('financial.billing.import_return_empty'),
+        );
     }
 
     private function authorizeFinancial(): Entity

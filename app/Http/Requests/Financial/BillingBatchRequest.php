@@ -48,6 +48,7 @@ class BillingBatchRequest extends FormRequest
             'tuss_code'             => ['nullable', 'string', 'max:32'],
             'procedure_description' => ['nullable', 'string', 'max:255'],
             'authorization_code'    => ['nullable', 'string', 'max:64'],
+            'clinical_indication'   => ['nullable', 'string', 'max:500'],
             'notes'                 => ['nullable', 'string', 'max:2000'],
         ];
     }

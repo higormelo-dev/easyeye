@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasEntityCode;
+use App\Domains\Tiss\Models\TissGuide;
 use App\Enums\BillingClaimStatus;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -46,6 +47,7 @@ class BillingClaim extends Model
         'quantity',
         'unit_price',
         'notes',
+        'tiss_guide_id',
     ];
 
     protected static function booted(): void
@@ -120,5 +122,10 @@ class BillingClaim extends Model
     public function cashEntries(): HasMany
     {
         return $this->hasMany(FinancialCashEntry::class, 'billing_claim_id');
+    }
+
+    public function tissGuide(): BelongsTo
+    {
+        return $this->belongsTo(TissGuide::class, 'tiss_guide_id');
     }
 }
