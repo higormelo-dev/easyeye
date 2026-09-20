@@ -43,6 +43,7 @@ class Entity extends Model
         'state',
         'country',
         'national_registration',
+        'cnes',
         'state_registration',
         'municipal_registration',
         'telephone',
@@ -86,7 +87,6 @@ class Entity extends Model
      * @var list<string>
      */
     protected array $numericOnlyFields = [
-        'national_registration',
         'telephone',
         'cellphone',
     ];
@@ -305,6 +305,14 @@ class Entity extends Model
             $value = $this->onlyNumbers($value);
         }
 
+        // CNPJ pode ser alfanumérico desde a IN RFB 2.229/2024 — não pode
+        // levar o mesmo tratamento só-dígitos de telephone/cellphone, senão
+        // um CNPJ novo perde as letras e vira um número inválido junto à
+        // Receita/ANS. Mantém dígitos e letras, maiúsculas, sem pontuação.
+        if ($key === 'national_registration' && is_string($value)) {
+            $value = $this->onlyAlphanumericUppercase($value);
+        }
+
         return parent::setAttribute($key, $value);
     }
 
@@ -314,5 +322,13 @@ class Entity extends Model
     private function onlyNumbers(string $value): string
     {
         return preg_replace('/\D/', '', $value);
+    }
+
+    /**
+     * Uppercase, digits and letters only — sem pontuação/espaço.
+     */
+    private function onlyAlphanumericUppercase(string $value): string
+    {
+        return mb_strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $value) ?: '', 'UTF-8');
     }
 }

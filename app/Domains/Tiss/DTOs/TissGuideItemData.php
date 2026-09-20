@@ -17,6 +17,7 @@ final readonly class TissGuideItemData
         public float $totalAmount,
         public ?string $executionDate = null,
         public ?string $authorizationNumber = null,
+        public ?string $eyeSide = null,
     ) {
     }
 
@@ -31,6 +32,7 @@ final readonly class TissGuideItemData
             totalAmount: (float) $item->total_amount,
             executionDate: $item->execution_date?->format('Y-m-d'),
             authorizationNumber: $item->authorization_number,
+            eyeSide: $item->metadata['eye_side'] ?? null,
         );
     }
 }

@@ -82,6 +82,7 @@ class DoctorRequest extends FormRequest
                     })->whereNull('deleted_at');
                 }),
         ];
+        $rules['cbo_code']       = ['nullable', 'string', 'max:10'];
         $rules['birth_date']     = ['nullable', 'date'];
         $rules['gender']         = ['nullable', 'integer'];
         $rules['marital_status'] = ['nullable', 'integer'];

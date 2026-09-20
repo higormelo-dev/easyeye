@@ -23,6 +23,7 @@ class DoctorResource extends JsonResource
                 'code'             => $this->code,
                 'record'           => $this->record,
                 'record_specialty' => $this->record_specialty,
+                'cbo_code'         => $this->cbo_code,
                 'color'            => $this->color,
                 'observation'      => $this->observation,
                 'partner'          => (bool) $this->partner,

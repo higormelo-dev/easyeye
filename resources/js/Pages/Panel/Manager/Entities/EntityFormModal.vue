@@ -20,7 +20,7 @@ const activeTab = ref('dados');
 
 const form = useForm({
     name: '', subdomain: '', email: '', telephone: '', cellphone: '',
-    national_registration: '', state_registration: '', municipal_registration: '', website: '',
+    national_registration: '', cnes: '', state_registration: '', municipal_registration: '', website: '',
     zipcode: '', address: '', number: '', complement: '', district: '',
     city: '', state: '', country: 'Brasil',
     schedule_interval: 15, active: true,
@@ -136,7 +136,7 @@ async function lookupCep() {
 }
 
 const tabErrors = computed(() => ({
-    dados:    ['name','subdomain','email','telephone','cellphone','national_registration','state_registration','municipal_registration','website'].some(k => k in form.errors),
+    dados:    ['name','subdomain','email','telephone','cellphone','national_registration','cnes','state_registration','municipal_registration','website'].some(k => k in form.errors),
     endereco: ['zipcode','address','number','complement','district','city','state','country'].some(k => k in form.errors),
     config:   ['schedule_interval','active'].some(k => k in form.errors),
 }));
@@ -240,6 +240,13 @@ const statusOptions = computed(() => [
                     <div class="col-4">
                         <label class="form-label">{{ t.field_municipal_registration }}</label>
                         <input v-model="form.municipal_registration" type="text" maxlength="30" class="form-control">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">{{ t.field_cnes }}</label>
+                        <input v-model="form.cnes" type="text" maxlength="7" class="form-control"
+                               :class="{ 'is-invalid': form.errors.cnes }">
+                        <div v-if="form.errors.cnes" class="invalid-feedback">{{ form.errors.cnes }}</div>
+                        <small class="text-muted">{{ t.field_cnes_hint }}</small>
                     </div>
                     <div class="col-12">
                         <label class="form-label">{{ t.field_website }}</label>

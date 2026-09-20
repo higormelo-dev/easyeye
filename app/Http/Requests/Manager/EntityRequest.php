@@ -26,6 +26,7 @@ class EntityRequest extends FormRequest
             'telephone'              => ['nullable', 'string', 'max:20'],
             'cellphone'              => ['nullable', 'string', 'max:20'],
             'national_registration'  => ['nullable', 'string', 'max:20'],
+            'cnes'                   => ['nullable', 'string', 'max:7'],
             'state_registration'     => ['nullable', 'string', 'max:30'],
             'municipal_registration' => ['nullable', 'string', 'max:30'],
             'website'                => ['nullable', 'url', 'max:150'],

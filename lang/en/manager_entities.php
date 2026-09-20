@@ -72,6 +72,8 @@ return [
     'field_telephone'              => 'Telephone',
     'field_cellphone'              => 'Mobile',
     'field_national_registration'  => 'Tax Number (CNPJ / CPF)',
+    'field_cnes'                   => 'CNES',
+    'field_cnes_hint'              => 'National Registry of Health Facilities — required by the TISS XML.',
     'field_state_registration'     => 'State Registration',
     'field_municipal_registration' => 'Municipal Registration',
     'field_website'                => 'Website',
