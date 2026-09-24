@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\{ClinicResourcesController,
     EntityIntegratorsController,
     ExamTypesController,
     ExamsController,
+    IntegratorCommandsController,
     IntegratorQueueHealthController,
     IntegratorUpdatesController,
     PatientExamsController,
@@ -50,6 +51,12 @@ Route::group(['prefix' => 'integrators', 'as' => 'integrators.'], function () {
             // Retrato do estado atual da fila local (pendentes/falhas/
             // bloqueados/enviados) — upsert periódico, nunca histórico.
             Route::put('queue-health', [IntegratorQueueHealthController::class, 'store'])->name('queue-health.store');
+            // Canal de comando do backend pro desktop — único fluxo em que o
+            // SaaS pede pro cliente fazer algo (ver
+            // Manager\EntityIntegratorCommandsController pro lado que
+            // enfileira). Poll + ack, nunca push de verdade.
+            Route::apiResource('commands', IntegratorCommandsController::class)->only('index');
+            Route::post('commands/{command}/ack', [IntegratorCommandsController::class, 'ack'])->name('commands.ack');
 
             // Route::get('profile', static function (Request $request) {
             //     return response()->json($request->user());

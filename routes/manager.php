@@ -5,6 +5,7 @@ use App\Http\Controllers\Manager\{
     AiModelPricesController,
     AiProvidersController,
     EntitiesController,
+    EntityIntegratorCommandsController,
     EntityIntegratorEquipmentsController,
     EntityIntegratorQueueHealthController,
     EntityIntegratorsController,
@@ -99,6 +100,14 @@ Route::group([
             'entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/queue-health',
             [EntityIntegratorQueueHealthController::class, 'index'],
         )->name('entities.user-integrators.integrators.queue-health');
+
+        // ── Comando remoto pro desktop (resync/diagnóstico) ────────────────────
+        // Infra mínima (JSON, sem tela própria ainda) — enfileira, o
+        // integrador busca no próximo poll (ver Api\IntegratorCommandsController).
+        Route::post(
+            'entities/{entity}/user-integrators/{userIntegrator}/integrators/{integrator}/commands',
+            [EntityIntegratorCommandsController::class, 'store'],
+        )->name('entities.user-integrators.integrators.commands.store');
 
         // ── Atualizações do Integrador (auto-update dos desktops) ─────────────
         // Publicar um binário distribui para TODAS as clínicas — admin only e

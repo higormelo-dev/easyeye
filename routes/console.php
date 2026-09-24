@@ -104,3 +104,13 @@ Schedule::command('queue-health:prune-history')
     ->dailyAt('03:30')
     ->name('queue-health:prune-history')
     ->withoutOverlapping();
+
+// Canal de comando do backend pro desktop: retenção de 30 dias, só de
+// linhas terminais (completed/failed) — ver o doc comment de
+// PruneIntegratorCommandsCommand pra por que `pending` nunca é apagado.
+// Janela de 30 dias é folgada o bastante pra rodar semanalmente, ao
+// contrário do log de 7 dias acima.
+Schedule::command('integrator-commands:prune')
+    ->weeklyOn(1, '03:45')
+    ->name('integrator-commands:prune')
+    ->withoutOverlapping();
