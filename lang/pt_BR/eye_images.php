@@ -67,6 +67,21 @@ return [
     'report_loading_templates'   => 'Carregando modelos…',
     'report_no_templates'        => 'Nenhum modelo disponível.',
     'report_content_label'       => 'Conteúdo do laudo',
+    'report_insert_image'        => 'Inserir imagem',
+    'report_phrases'             => 'Frases rápidas',
+    'report_phrases_empty'       => 'Nenhuma frase salva ainda.',
+    'report_phrases_save'        => 'Salvar seleção como frase',
+    'report_phrases_save_hint'   => 'Selecione um trecho do texto acima antes de salvar como frase.',
+    'report_phrases_label_title' => 'Rótulo da frase',
+    'report_phrases_saved'       => 'Frase salva.',
+    'report_phrases_deleted'     => 'Frase removida.',
+    'phrase_limit_reached'       => 'Limite de frases rápidas atingido.',
+
+    // Extração de texto do PDF nativo do equipamento — benchmark 18/09/2026.
+    'pdf_no_text_found'          => 'Não foi possível extrair texto de nenhum PDF selecionado.',
+    'pdf_extract_text'           => 'Extrair texto do PDF',
+    'pdf_extracting'             => 'Extraindo texto do PDF…',
+    'pdf_extract_failed'         => 'Não foi possível extrair o texto do PDF.',
     'report_title_placeholder'   => 'Título do laudo (opcional)',
     'report_save'                => 'Salvar laudo',
     'report_saved'               => 'Laudo salvo com sucesso.',
@@ -74,6 +89,16 @@ return [
     'report_confirm_open_record' => 'Não há prontuário do dia da consulta para este paciente. Deseja abrir um novo prontuário para registrar o laudo?',
     'report_content_required'    => 'Escreva o conteúdo do laudo antes de salvar.',
     'report_inactive_exam'       => 'Uma ou mais imagens selecionadas estão desabilitadas — habilite-as antes de gerar o laudo.',
+
+    // Laudo em lote: seleção cobrindo 2+ tipos de exame vira 1 laudo por
+    // grupo (ex.: Pentacam + Retinografia no mesmo dia), em sequência.
+    'report_queue_confirm_title' => 'Laudar exames separadamente?',
+    'report_queue_confirm_text'  => 'Vai ser criado um laudo separado para cada um dos exames selecionados:',
+    'report_queue_confirm_ok'    => 'Começar',
+    'report_queue_label'         => 'Laudo',
+    'report_queue_of'            => 'de',
+    'report_queue_next'          => 'Próximo laudo',
+    'report_queue_previous'      => 'Laudos já gerados nesta sessão:',
     'merge_split_same_patient'   => 'Só é possível mesclar/dividir imagens do mesmo paciente.',
     'merge_action'               => 'Mesclar exames',
     'merge_select_two'           => 'Selecione 2 ou mais imagens do mesmo paciente para mesclar.',
@@ -95,6 +120,17 @@ return [
     'lens_calc_result'          => 'Lente de contato',
     'lens_calc_se_title'        => 'Equivalente esférico',
     'lens_calc_se_hint'         => 'SE = Esférico + Cilindro / 2.',
+
+    // Agrupar por Equipamento (padrão) / Agrupar por Exame — benchmark 18/09/2026
+    'group_by_equipment' => 'Agrupar por Equipamento',
+    'group_by_exam'      => 'Agrupar por Exame',
+
+    // Montage (colagem de imagens) — benchmark 18/09/2026.
+    'montage_action'      => 'Montage',
+    'montage_select_two'  => 'Selecione 2 ou mais imagens para montar a colagem.',
+    'montage_unavailable' => 'Recurso indisponível neste ambiente (extensão Imagick não instalada no servidor).',
+    'montage_no_images'   => 'Nenhuma das imagens selecionadas pôde ser lida para montar a colagem.',
+    'montage_failed'      => 'Não foi possível gerar a colagem.',
 
     // Comparar / Alinhar (evolução entre exames)
     'compare_title'             => 'Comparar exames',

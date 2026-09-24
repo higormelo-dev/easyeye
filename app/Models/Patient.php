@@ -38,6 +38,7 @@ class Patient extends Model
         'code',
         'card_number',
         'active',
+        'priority_rating',
     ];
 
     /**
@@ -75,9 +76,10 @@ class Patient extends Model
     protected function casts(): array
     {
         return [
-            'created_at' => 'datetime',
-            'updated_at' => 'datetime',
-            'deleted_at' => 'datetime',
+            'created_at'      => 'datetime',
+            'updated_at'      => 'datetime',
+            'deleted_at'      => 'datetime',
+            'priority_rating' => 'integer',
         ];
     }
 

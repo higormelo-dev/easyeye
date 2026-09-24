@@ -29,6 +29,7 @@
         "pragmarx/google2fa-laravel": "^3.0",
         "predis/predis": "^3.2",
         "sentry/sentry-laravel": "^4.24",
+        "smalot/pdfparser": "^2.12",
         "spatie/laravel-html": "^3.12",
         "tightenco/ziggy": "^2.6"
     },

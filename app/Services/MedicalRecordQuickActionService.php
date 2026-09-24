@@ -54,6 +54,7 @@ class MedicalRecordQuickActionService
             $content,
             $html,
             $title ?: null,
+            (string) $doctor->id,
         );
     }
 

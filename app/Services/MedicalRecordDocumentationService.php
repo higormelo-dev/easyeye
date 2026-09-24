@@ -131,18 +131,26 @@ class MedicalRecordDocumentationService
     /**
      * Cria uma documentação clínica com conteúdo final (variáveis já substituídas).
      */
+    /**
+     * @param string $doctorId médico que está de fato emitindo ESTE documento
+     *                         agora — nunca $record->doctor_id: o prontuário
+     *                         pode ter sido aberto por outro médico da mesma
+     *                         clínica (cobertura/plantão), e Gate::IssueReport
+     *                         autoriza por role, não por posse do prontuário.
+     */
     public function store(
         MedicalRecord $record,
         ReportSettingContent $content,
         string $resolvedContent,
-        ?string $title = null,
+        ?string $title,
+        string $doctorId,
     ): MedicalRecordDocumentation {
         $setting = $content->reportSetting;
 
         return MedicalRecordDocumentation::create([
             'medical_record_id'         => $record->id,
             'patient_id'                => $record->patient_id,
-            'doctor_id'                 => $record->doctor_id,
+            'doctor_id'                 => $doctorId,
             'report_setting_id'         => $content->report_setting_id,
             'report_setting_content_id' => $content->id,
             'template_version'          => $setting?->version,

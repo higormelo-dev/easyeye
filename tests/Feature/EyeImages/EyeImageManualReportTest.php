@@ -24,6 +24,9 @@ beforeEach(function () {
     $this->secretaryUser       = User::factory()->create();
     $this->secretaryEntityUser = createEntityUser($this->entity, $this->secretaryUser, ClientRule::Secretary->value);
 
+    $this->adminUser       = User::factory()->create();
+    $this->adminEntityUser = createEntityUser($this->entity, $this->adminUser, ClientRule::Admin->value);
+
     $this->patient = Patient::factory()->create(['entity_id' => $this->entity->id]);
 
     ['schedule' => $this->schedule] = createScheduleForEntity($this->entity, [
@@ -67,6 +70,11 @@ function actingAsDoctor($test)
 function actingAsSecretary($test)
 {
     return $test->actingAs($test->secretaryUser)->withSession(panelSession($test->secretaryEntityUser));
+}
+
+function actingAsAdmin($test)
+{
+    return $test->actingAs($test->adminUser)->withSession(panelSession($test->adminEntityUser));
 }
 
 describe('templates()', function () {
@@ -120,6 +128,18 @@ describe('previewTemplate()', function () {
             'patient_id'                => $this->patient->id,
         ])->assertNotFound();
     });
+
+    it('[SEGURANÇA] admin não pré-visualiza laudo (Gate IssueReport é doctor-only — CFM Res. 2.227/2018)', function () {
+        // Middleware da rota é entity.role:admin,doctor (admin passa); o Gate
+        // dentro do controller é quem precisa barrar — sem ele, admin lia o
+        // conteúdo clínico resolvido (paciente/médico/prontuário) mesmo sem
+        // poder assinar nada, via este endpoint de "preview".
+        actingAsAdmin($this)->postJson(route('panel.eye-images.report-templates.preview'), [
+            'report_setting_content_id' => $this->content->id,
+            'patient_id'                => $this->patient->id,
+            'exam_ids'                  => [$this->exam->id],
+        ])->assertForbidden();
+    });
 });
 
 describe('store()', function () {
@@ -156,6 +176,39 @@ describe('store()', function () {
             ->and($doc->content)->toContain('Achados normais')
             ->and($doc->report_setting_content_id)->toBe($this->content->id)
             ->and($response->json('pdf_url'))->toContain((string) $doc->id);
+    });
+
+    it('atribui o laudo ao médico que está de fato assinando, não ao dono original do prontuário', function () {
+        // Prontuário do dia já existe sob OUTRO médico (cobertura/plantão —
+        // Gate::IssueReport autoriza por role em toda a clínica, não por
+        // posse do prontuário). O laudo tem que nascer com o autor real.
+        $coveringDoctorUser       = User::factory()->create();
+        $coveringDoctorEntityUser = createEntityUser($this->entity, $coveringDoctorUser, ClientRule::Doctor->value);
+        $coveringDoctor           = Doctor::query()->create([
+            'entity_user_id' => $coveringDoctorEntityUser->id,
+            'person_id'      => People::factory()->create()->id,
+            'active'         => true,
+        ]);
+
+        $existing = MedicalRecord::create([
+            'entity_id'   => $this->entity->id,
+            'patient_id'  => $this->patient->id,
+            'doctor_id'   => $this->doctor->id,
+            'schedule_id' => $this->schedule->id,
+        ]);
+
+        $response = $this->actingAs($coveringDoctorUser)
+            ->withSession(panelSession($coveringDoctorEntityUser))
+            ->postJson(route('panel.eye-images.reports.store'), [
+                'patient_id' => $this->patient->id,
+                'exam_ids'   => [$this->exam->id],
+                'content'    => '<p>Laudo emitido pelo médico de cobertura.</p>',
+            ]);
+
+        $response->assertCreated();
+        $doc = MedicalRecordDocumentation::query()->where('medical_record_id', $existing->id)->firstOrFail();
+        expect($doc->doctor_id)->toBe((string) $coveringDoctor->id)
+            ->and($doc->doctor_id)->not->toBe((string) $this->doctor->id);
     });
 
     it('reaproveita o prontuário do MESMO agendamento em vez de criar outro', function () {

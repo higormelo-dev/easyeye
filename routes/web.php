@@ -6,11 +6,13 @@ use App\Http\Controllers\{
     AiRunPromptsController,
     AiRunsController,
     ComplianceController,
+    DoctorReportPhrasesController,
     DoctorWorkScheduleController,
     DoctorsController,
     ExamDiagnosisController,
     ExternalExamImportController,
     EyeImageExamActionsController,
+    EyeImageMontageController,
     EyeImageReportController,
     EyeImagesController,
     Financial\BillingController as FinancialBillingController,
@@ -223,6 +225,13 @@ Route::group(
             ->middleware('entity.role:admin,doctor')
             ->name('eye-images.exams.ungroup');
 
+        // Montage (benchmark 18/09/2026) — EyeImageMontageController. NÃO é
+        // ato clínico (conveniência de exportação/impressão), por isso
+        // secretary também tem acesso, diferente do bloco de laudo abaixo.
+        Route::post('/eye-images/montage', [EyeImageMontageController::class, 'store'])
+            ->middleware('entity.role:admin,doctor,secretary')
+            ->name('eye-images.montage.store');
+
         // Laudo manual do Gerenciador de Imagens (Modelos + editor livre) — ver
         // EyeImageReportController. templates()/previewTemplate() são leitura
         // (mesmo allowlist de diagnósticos acima); store() grava documentação
@@ -237,6 +246,27 @@ Route::group(
         Route::post('/eye-images/reports', [EyeImageReportController::class, 'store'])
             ->middleware('entity.role:admin,doctor')
             ->name('eye-images.reports.store');
+        Route::post('/eye-images/reports/extract-pdf-text', [EyeImageReportController::class, 'extractPdfText'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.reports.extract-pdf-text');
+
+        // Frases rápidas do médico pro laudo (benchmark 18/09/2026 —
+        // DoctorReportPhrasesController) — sempre escopado ao PRÓPRIO
+        // médico logado (controller resolve doctor_id do usuário, nunca do
+        // payload); admin passa no middleware mas leva 403 do controller
+        // (mesmo padrão de AiDoctorPromptsController).
+        Route::get('/eye-images/report-phrases', [DoctorReportPhrasesController::class, 'index'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.report-phrases.index');
+        Route::post('/eye-images/report-phrases', [DoctorReportPhrasesController::class, 'store'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.report-phrases.store');
+        Route::put('/eye-images/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'update'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.report-phrases.update');
+        Route::delete('/eye-images/report-phrases/{phrase}', [DoctorReportPhrasesController::class, 'destroy'])
+            ->middleware('entity.role:admin,doctor')
+            ->name('eye-images.report-phrases.destroy');
 
         // Importar exame externo (upload manual, sem integrador). entity.role
         // cobre admin/doctor/secretary; o Gate EntityGate::ImportExternalExam
@@ -284,6 +314,11 @@ Route::group(
             Route::get('patients/import/{patientImport}/status', [PatientImportsController::class, 'status'])->name('patients.import.status');
             Route::get('patients/import/{patientImport}/errors', [PatientImportsController::class, 'errors'])->name('patients.import.errors');
             Route::get('patients/{patient}/edit-data', [PatientsController::class, 'editData'])->name('patients.editData');
+            // Estrela de prioridade/triagem (benchmark 18/09/2026) — mesmo
+            // grupo de permissão de patients.manage; tenant checado no
+            // controller (route model binding de {patient} sozinho não é
+            // filtrado por entidade — ver comentário em editData() acima).
+            Route::put('patients/{patient}/priority', [PatientsController::class, 'updatePriority'])->name('patients.priority.update');
             Route::resource('patients', PatientsController::class);
 
             // Portal do Paciente (Fase 1): convite disparado pelo staff. O

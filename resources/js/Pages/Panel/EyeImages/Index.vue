@@ -40,6 +40,7 @@ const examThumbUrls   = ref({});           // {examId: presignedUrl} — miniatu
 const brokenUrls      = ref({});           // {examId: true}
 const urlsLoading     = ref(false);
 const loading         = ref(false);
+const priorityPopoverId = ref(null); // patient.id com o popover de estrela aberto
 const loadingMore     = ref(false);
 
 // Paginação server-side (substitui o limit(200) fixo do backend) — ver
@@ -128,6 +129,32 @@ function statusLabel(exam) {
     return map[deriveStatus(exam)] ?? '—';
 }
 
+/**
+ * Chave de agrupamento visual de um exame: data|equipamento|tipo, ou
+ * exam_session_id quando mesclado (Mesclar/Dividir exame — ver
+ * EyeImageExamActionsController::mergeExams()/splitExams()). Prefixo "s:"
+ * evita colisão acidental com uma chave derivada que por acaso seja um uuid
+ * igual (nunca aconteceria, mas custa nada garantir).
+ *
+ * ÚNICA fonte da verdade — usada tanto por groupedExams (o que a galeria
+ * MOSTRA) quanto por selectedExamGroups (o que o laudo em lote TRATA como
+ * um grupo). Nunca duplicar esta lógica: as duas precisam concordar sobre
+ * "o que é um grupo", senão o laudo em lote pode juntar ou separar exames
+ * de forma diferente do que a tela exibe.
+ */
+function examGroupKey(exam) {
+    // Prioriza exam_performed_at (data real do exame — importante em
+    // upload manual de exame antigo) sobre created_at (quando a linha foi
+    // inserida no banco); mesmo fallback que o backend já usa em
+    // EyeImagesController::patientExamsForRecord(). Sem isso, "Adicionar
+    // imagem a exame existente" de um grupo antigo cairia no grupo de HOJE
+    // (created_at do upload é sempre "agora"), não no grupo certo.
+    const date    = (exam.exam_performed_at ?? exam.created_at)?.substring(0, 10) ?? 'unknown';
+    const equipId = exam.entity_integrator_equipment_id ?? '';
+    const typeId  = exam.exam_id ?? '';
+    return { key: exam.exam_session_id ? `s:${exam.exam_session_id}` : `${date}|${equipId}|${typeId}`, date };
+}
+
 // Filtros (busca, olho, tipo, equipamento, diagnóstico, médico, status) agora
 // rodam no backend (EyeImagesController) — patients/selectedPatient.exams já
 // chegam filtrados do servidor, sem filtragem client-side redundante.
@@ -135,21 +162,7 @@ const groupedExams = computed(() => {
     const groups = [];
     const seen = {};
     for (const exam of (selectedPatient.value?.exams ?? [])) {
-        // Prioriza exam_performed_at (data real do exame — importante em
-        // upload manual de exame antigo) sobre created_at (quando a linha
-        // foi inserida no banco); mesmo fallback que o backend já usa em
-        // EyeImagesController::patientExamsForRecord(). Sem isso, "Adicionar
-        // imagem a exame existente" de um grupo antigo cairia no grupo de
-        // HOJE (created_at do upload é sempre "agora"), não no grupo certo.
-        const date    = (exam.exam_performed_at ?? exam.created_at)?.substring(0, 10) ?? 'unknown';
-        const equipId = exam.entity_integrator_equipment_id ?? '';
-        const typeId  = exam.exam_id ?? '';
-        // Mesclar/Dividir exame: exam_session_id, quando presente, OVERRIDE
-        // a chave derivada (data|equipamento|tipo) — ver
-        // EyeImageExamActionsController::mergeExams()/splitExams(). Prefixo
-        // "s:" evita colisão acidental com uma chave derivada que por acaso
-        // seja um uuid igual (nunca aconteceria, mas custa nada garantir).
-        const key = exam.exam_session_id ? `s:${exam.exam_session_id}` : `${date}|${equipId}|${typeId}`;
+        const { key, date } = examGroupKey(exam);
         if (!seen[key]) {
             seen[key] = { key, date, equipment: exam.equipment ?? null, examType: exam.exam_type ?? null, merged: !!exam.exam_session_id, exams: [] };
             groups.push(seen[key]);
@@ -159,9 +172,59 @@ const groupedExams = computed(() => {
     return groups.sort((a, b) => b.date.localeCompare(a.date));
 });
 
+// Agrupar por Equipamento (por nome do equipamento) vs Agrupar por Exame
+// (por tipo de exame, cruzando datas/equipamentos) — mesma dupla de modos do
+// concorrente ("Group by Equipment"/"Group by Exam"). Reordena os MESMOS
+// grupos de groupedExams (nunca recalcula a chave); o cabeçalho de seção
+// extra é só um divisor visual entre equipamentos/tipos de exame consecutivos
+// diferentes, sem duplicar o bloco de grupo (thumbnails, seleção por olho,
+// upload etc.).
+const groupMode = ref('equipment'); // 'equipment' | 'exam'
+
+const displayedGroups = computed(() => {
+    if (groupMode.value === 'exam') {
+        return [...groupedExams.value].sort((a, b) => {
+            const an = a.examType?.name || 'Exame';
+            const bn = b.examType?.name || 'Exame';
+            return an.localeCompare(bn) || b.date.localeCompare(a.date);
+        });
+    }
+    return [...groupedExams.value].sort((a, b) => {
+        const an = a.equipment?.name || 'Sem equipamento';
+        const bn = b.equipment?.name || 'Sem equipamento';
+        return an.localeCompare(bn) || b.date.localeCompare(a.date);
+    });
+});
+
+function groupSectionLabel(group) {
+    if (!group) return null;
+    if (groupMode.value === 'exam') return group.examType?.name || 'Exame';
+    return group.equipment?.name || 'Sem equipamento';
+}
+
 const selectedExamsData = computed(() => {
     if (!selectedPatient.value) return [];
     return selectedPatient.value.exams.filter(e => selectedExamIds.value.includes(e.id));
+});
+
+/**
+ * Agrupa a seleção atual pela MESMA chave de groupedExams — usado por
+ * openReportModal() pra decidir entre 1 laudo só (seleção cabe num grupo) ou
+ * um laudo por grupo em sequência (seleção cobre 2+ tipos de exame, ex.:
+ * Pentacam + Retinografia do mesmo dia — ver vídeo de referência do ticket).
+ */
+const selectedExamGroups = computed(() => {
+    const groups = [];
+    const seen = {};
+    for (const exam of selectedExamsData.value) {
+        const { key } = examGroupKey(exam);
+        if (!seen[key]) {
+            seen[key] = { key, label: exam.exam_type?.name || 'Exame', examIds: [] };
+            groups.push(seen[key]);
+        }
+        seen[key].examIds.push(exam.id);
+    }
+    return groups;
 });
 
 // Exame "em foco" pro botão Diagnóstico — reaproveita o mesmo estado usado
@@ -410,6 +473,25 @@ async function selectPatient(patient) {
     }
 }
 
+// Clicar na mesma estrela já marcada cancela a prioridade (toggle) — mesma
+// semântica de setQualityRating() em EyeImageContextMenu.vue. Otimista: o
+// popover já reflete o novo valor antes da resposta; sem rollback explícito
+// em erro porque é campo de triagem (baixo risco), mas erro real vai pro
+// toast — falha nunca fica silenciosa.
+async function setPatientPriority(patient, value) {
+    const next = patient.priority_rating === value ? 0 : value;
+    try {
+        const { data } = await window.axios.put(props.urls.patient_priority_update.replace('__ID__', patient.id), {
+            priority_rating: next,
+        });
+        patient.priority_rating = data.priority_rating;
+    } catch (e) {
+        if (window.showErrorToast) window.showErrorToast(e?.response?.data?.message ?? 'Não foi possível definir a prioridade.');
+    } finally {
+        priorityPopoverId.value = null;
+    }
+}
+
 // ── Importar exame externo / Adicionar imagem a exame existente ───────────
 // Mesmo modal pras duas ações — "Adicionar imagem" (botão Upload de um
 // grupo já exibido) só chega com `group` preenchido, pré-travando tipo/
@@ -516,7 +598,7 @@ watch(
 );
 
 // ── Viewer ────────────────────────────────────────────────────────────────
-function openViewerModal(exams, startIndex = 0) {
+function openViewerModal(exams, startIndex = 0, initialPanelCount = 1) {
     if (!exams || exams.length === 0) return;
     viewerExams.value        = exams;
     viewerPanelExams.value   = [null, null, null, null];
@@ -531,9 +613,14 @@ function openViewerModal(exams, startIndex = 0) {
     viewerFitMode.value      = false;
     viewerLensActive.value   = false;
     viewerLensVisible.value  = false;
-    viewerPanelCount.value   = 1;
+    const panelCount = Math.max(1, Math.min(initialPanelCount, exams.length, 4));
+    viewerPanelCount.value   = panelCount;
     showViewerModal.value    = true;
-    setPanelExam(0, exams[startIndex]);
+    if (panelCount > 1) {
+        for (let i = 0; i < panelCount; i++) setPanelExam(i, exams[i]);
+    } else {
+        setPanelExam(0, exams[startIndex] ?? exams[0]);
+    }
 }
 
 function viewerGoTo(idx) {
@@ -604,6 +691,7 @@ function setPanelError(pi) {
 }
 
 function setViewerPanelCount(n) {
+    n = Math.min(n, viewerExams.value.length || 1);
     viewerPanelCount.value = n;
     viewerSplitMode.value  = false;
     for (let i = 0; i < n; i++) {
@@ -673,6 +761,7 @@ function allGridExams() {
 }
 
 function panelStripExams(pi) {
+    if (!viewerSplitMode.value) return viewerExams.value;
     const exam = viewerPanelExams.value[pi];
     if (!exam) return viewerExams.value;
     const lat = exam.laterality;
@@ -804,6 +893,44 @@ function printReport() {
     window.print();
 }
 
+// Montage (benchmark 18/09/2026) — gerado no backend com Imagick (decisão
+// explícita: evita risco de CORS de compor num <canvas> contra o bucket S3-
+// compatível externo). Reaproveita printCols como número de colunas — o
+// médico já escolheu essa preferência ao usar Imprimir, sem exigir mais uma
+// tela só pra repetir a mesma escolha.
+const montageBusy = ref(false);
+
+async function downloadMontage() {
+    if (selectedExamIds.value.length < 2 || montageBusy.value || !props.urls.montage) return;
+    montageBusy.value = true;
+    try {
+        const res = await window.axios.post(props.urls.montage, {
+            exam_ids: selectedExamIds.value,
+            columns: printCols.value,
+        }, { responseType: 'blob' });
+
+        const url = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'montage.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        // Erro vem como Blob (responseType) mesmo em falha — precisa ler
+        // como texto/JSON antes de extrair a mensagem.
+        let message = 'Não foi possível gerar a colagem.';
+        try {
+            const text = await e?.response?.data?.text?.();
+            message = JSON.parse(text)?.message ?? message;
+        } catch { /* mantém a mensagem default */ }
+        if (window.showErrorToast) window.showErrorToast(message);
+    } finally {
+        montageBusy.value = false;
+    }
+}
+
 // ── Keyboard nav ──────────────────────────────────────────────────────────
 function onKeyDown(e) {
     if (!showViewerModal.value) return;
@@ -815,13 +942,27 @@ function onPrintKey(e) {
     if (showPrintModal.value && e.key === 'Escape') showPrintModal.value = false;
 }
 
+// Fecha o popover de prioridade ao clicar fora do controle (ícone + popover
+// — ambos dentro de .priority-star-control). Fase de bubble (não capture):
+// o próprio botão/popover primeiro processa o clique (abre/fecha/escolhe
+// nota), só DEPOIS o clique sobe até aqui — com capture, este handler
+// rodaria ANTES do botão e a corrida desfazia o toggle (fechava e o botão
+// reabria em seguida, ou vice-versa).
+function onDocumentClickClosePriorityPopover(event) {
+    if (priorityPopoverId.value && !event.target.closest('.priority-star-control')) {
+        priorityPopoverId.value = null;
+    }
+}
+
 onMounted(() => {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keydown', onPrintKey);
+    document.addEventListener('click', onDocumentClickClosePriorityPopover);
 });
 onBeforeUnmount(() => {
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keydown', onPrintKey);
+    document.removeEventListener('click', onDocumentClickClosePriorityPopover);
 });
 
 // ── IA modal (mantido do código anterior) ─────────────────────────────────
@@ -1118,11 +1259,85 @@ function openDiagnosisModal() {
 
 // ── Laudo manual (Modelos) ───────────────────────────────────────────────
 const reportModalOpen = ref(false);
+// Desacoplado de selectedExamIds: no laudo em lote cada passo da fila troca
+// isto pro grupo da vez, sem mexer na seleção real do médico na galeria.
+const reportExamIds = ref([]);
 
-function openReportModal() {
+// Laudo em lote: seleção cobrindo 2+ grupos de exame vira 1
+// MedicalRecordDocumentation por grupo, em sequência, reaproveitando o
+// MESMO endpoint/modal de sempre (chamado uma vez por grupo) — nunca um
+// laudo só com o conteúdo de tipos de exame diferentes misturado.
+const reportQueue        = ref([]); // grupos restantes (ver selectedExamGroups)
+const reportQueueIndex   = ref(0);
+const reportQueueResults = ref([]); // [{ label, title, pdf_url }] já salvos nesta sessão
+
+const reportQueueActive = computed(() => reportQueue.value.length > 1);
+
+const reportQueueProgress = computed(() => reportQueueActive.value ? {
+    current: reportQueueIndex.value + 1,
+    total:   reportQueue.value.length,
+    label:   reportQueue.value[reportQueueIndex.value]?.label ?? '',
+} : null);
+
+const reportNextLabel = computed(() => {
+    if (!reportQueueActive.value) return null;
+    const next = reportQueue.value[reportQueueIndex.value + 1];
+    return next ? `${tt('report_queue_next', 'Próximo laudo')}: ${next.label}` : null;
+});
+
+async function confirmMultiGroupReport(groups) {
+    const intro = tt('report_queue_confirm_text', 'Vai ser criado um laudo separado para cada um dos exames selecionados:');
+    if (window.Swal) {
+        // html (não text): SweetAlert2 renderiza `text` como textContent puro
+        // — \n vira espaço, a lista de grupos saía tudo numa linha só. Nomes
+        // de exame vêm de cadastro configurável pela clínica (ExamType), não
+        // são literal fixo — escapar antes de injetar como HTML.
+        const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const list = groups.map((g) => `• ${escape(g.label)}`).join('<br>');
+        const result = await window.Swal.fire({
+            icon: 'question',
+            title: tt('report_queue_confirm_title', 'Laudar exames separadamente?'),
+            html: `${escape(intro)}<br><br>${list}`,
+            showCancelButton: true,
+            confirmButtonText: tt('report_queue_confirm_ok', 'Começar'),
+            cancelButtonText: tt('cancel', 'Cancelar'),
+        });
+        return result.isConfirmed;
+    }
+    const message = intro + '\n\n' + groups.map((g) => `• ${g.label}`).join('\n');
+    return window.confirm(message);
+}
+
+async function openReportModal() {
     if (!selectedPatient.value) return;
+
+    const groups = selectedExamGroups.value;
+    if (groups.length > 1) {
+        if (!(await confirmMultiGroupReport(groups))) return;
+        reportQueue.value        = groups;
+        reportQueueIndex.value   = 0;
+        reportQueueResults.value = [];
+        reportExamIds.value      = groups[0].examIds;
+    } else {
+        reportQueue.value   = [];
+        reportExamIds.value = selectedExamIds.value;
+    }
+
     reportModalOpen.value = true;
 }
+
+// Imagens do passo ATUAL da fila (ou da seleção, fora do laudo em lote) —
+// pro botão "Inserir imagem do exame" no editor (item 2 do benchmark
+// 18/09/2026). Mesmo padrão de label de compareImages; URLs já resolvidas
+// pelo pai (examUrls), sem round-trip novo ao abrir o modal.
+const reportExamImages = computed(() => reportExamIds.value.map((id) => {
+    const exam = selectedPatient.value?.exams?.find(e => e.id === id);
+    return {
+        id,
+        url: examUrls.value[id] ?? '',
+        label: [exam?.exam_type?.name, latLabel(exam?.laterality)].filter(Boolean).join(' — ') || 'Imagem',
+    };
+}).filter(img => img.url));
 
 const reportPatientPayload = computed(() => selectedPatient.value ? {
     id: selectedPatient.value.id,
@@ -1134,10 +1349,68 @@ const reportUrls = computed(() => ({
     templates: props.urls?.report_templates ?? '',
     preview:   props.urls?.report_preview ?? '',
     store:     props.urls?.report_store ?? '',
+    extractPdfText: props.urls?.report_extract_pdf_text ?? '',
+    // Frases rápidas do médico (benchmark 18/09/2026) — ver
+    // DoctorReportPhrasesController.
+    phrasesIndex:   props.urls?.report_phrases_index ?? '',
+    phrasesStore:   props.urls?.report_phrases_store ?? '',
+    phrasesUpdate:  props.urls?.report_phrases_update ?? '', // template __ID__
+    phrasesDestroy: props.urls?.report_phrases_destroy ?? '', // template __ID__
 }));
 
-function onReportSaved() {
-    fetchPatients(); // atualiza badge/histórico de laudos do paciente
+// Guarda só o resultado do passo atual — vira entrada de reportQueueResults
+// quando o médico avança (onReportNext), nunca antes: a tela de sucesso do
+// passo atual já mostra esse PDF sozinha (savedResult, no modal), então
+// queueSummary só deve listar os passos ANTERIORES, senão duplicaria.
+const reportLastSaved = ref(null);
+// Refetch só dispara ao FECHAR o modal (onReportModalClosed), nunca entre
+// passos da fila: fetchPatients() sempre busca a página 1 (Index.vue:493-523)
+// e reselectPatientAfterFetch() zera selectedPatient quando ele não está
+// nessa página — um médico que abriu o paciente via "carregar mais"
+// (página 2+) perderia a seleção NO MEIO da fila, quebrando os passos
+// restantes silenciosamente. Um refresh só, no final, é seguro e evita isso.
+const reportAnySaved = ref(false);
+
+function onReportSaved(data) {
+    reportAnySaved.value = true;
+    if (reportQueueActive.value) reportLastSaved.value = data;
+}
+
+// Botão "Próximo laudo" na tela de sucesso: fecha e reabre o modal pro
+// próximo grupo da fila — reaproveita o reset() interno dele (watch(open)
+// já limpa formulário/erro e busca os modelos de novo pro grupo seguinte).
+function onReportNext() {
+    if (reportLastSaved.value) {
+        reportQueueResults.value.push({
+            label:   reportQueue.value[reportQueueIndex.value]?.label ?? '',
+            title:   reportLastSaved.value.title,
+            pdf_url: reportLastSaved.value.pdf_url,
+        });
+        reportLastSaved.value = null;
+    }
+
+    reportModalOpen.value = false;
+    reportQueueIndex.value += 1;
+    nextTick(() => {
+        reportExamIds.value   = reportQueue.value[reportQueueIndex.value].examIds;
+        reportModalOpen.value = true;
+    });
+}
+
+// Fechar (X, backdrop, Esc ou "Fechar" no último passo) sempre limpa o
+// estado da fila — parar no meio não desfaz os laudos já salvos, só não
+// oferece os grupos restantes; o médico pode retomá-los individualmente
+// pelo menu de contexto de cada exame.
+function onReportModalClosed() {
+    reportModalOpen.value    = false;
+    reportQueue.value        = [];
+    reportQueueIndex.value   = 0;
+    reportQueueResults.value = [];
+    reportLastSaved.value    = null;
+    if (reportAnySaved.value) {
+        reportAnySaved.value = false;
+        fetchPatients(); // atualiza badge/histórico de laudos do paciente
+    }
 }
 
 // ── Comparar / Alinhar (evolução entre exames) ───────────────────────────
@@ -1536,6 +1809,31 @@ const printEntity = computed(() => props.entity ?? {});
                                     </div>
                                 </div>
 
+                                <!-- Estrela de prioridade/triagem (benchmark 18/09/2026) —
+                                     sempre visível (cinza vazia se sem prioridade); clique
+                                     abre um popover de 1-5 estrelas. Não seleciona o
+                                     paciente (@click.stop). -->
+                                <span class="position-relative flex-shrink-0 priority-star-control">
+                                    <button type="button" class="btn btn-sm p-0 border-0 bg-transparent"
+                                            :title="patient.priority_rating ? `Prioridade: ${patient.priority_rating}/5` : 'Definir prioridade'"
+                                            @click.stop="priorityPopoverId = (priorityPopoverId === patient.id ? null : patient.id)">
+                                        <i :class="patient.priority_rating ? 'fa fa-star text-warning' : 'fa fa-star-o text-muted'"
+                                           style="font-size:.8rem;"></i>
+                                    </button>
+                                    <div v-if="priorityPopoverId === patient.id"
+                                         class="position-absolute end-0 mt-1 bg-body border rounded shadow-sm d-flex align-items-center gap-1 px-2 py-1"
+                                         style="z-index:20;white-space:nowrap;"
+                                         @click.stop>
+                                        <button v-for="n in 5" :key="n" type="button"
+                                                class="btn btn-sm p-0 border-0 bg-transparent"
+                                                :title="`${n}/5`"
+                                                @click="setPatientPriority(patient, n)">
+                                            <i :class="(patient.priority_rating ?? 0) >= n ? 'fa fa-star text-warning' : 'fa fa-star-o text-muted'"
+                                               style="font-size:.9rem;"></i>
+                                        </button>
+                                    </div>
+                                </span>
+
                                 <span class="badge bg-primary rounded-pill flex-shrink-0" style="font-size:.6rem;">
                                     {{ patient.exams.length }}
                                 </span>
@@ -1603,7 +1901,7 @@ const printEntity = computed(() => props.entity ?? {});
                          class="ei-actions-bar d-flex align-items-center gap-2 px-3 py-2 border-bottom bg-body-secondary">
                         <button type="button" class="btn btn-sm btn-outline-primary"
                                 :disabled="selectedExamIds.length === 0"
-                                @click="openViewerModal(selectedExamsData)">
+                                @click="openViewerModal(selectedExamsData, 0, selectedExamIds.length)">
                             <i class="fa fa-images me-1"></i>Visualizar selecionados
                             <span class="badge bg-primary ms-1" v-if="selectedExamIds.length > 0">
                                 {{ selectedExamIds.length }}
@@ -1640,6 +1938,13 @@ const printEntity = computed(() => props.entity ?? {});
                                 @click="openPrintModal(selectedPatient.exams, false)">
                             <i class="fa fa-print me-1"></i>Imprimir
                         </button>
+                        <button type="button" class="btn btn-sm btn-outline-dark"
+                                :disabled="selectedExamIds.length < 2 || montageBusy"
+                                :title="tt('montage_select_two', 'Selecione 2 ou mais imagens para montar a colagem.')"
+                                @click="downloadMontage">
+                            <span v-if="montageBusy" class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem;"></span>
+                            <i v-else class="ti ti-layout-grid me-1"></i>{{ tt('montage_action', 'Montage') }}
+                        </button>
                         <button v-if="isDoctor" type="button" class="btn btn-sm btn-outline-primary"
                                 @click="openReportModal">
                             <i class="ti ti-file-text me-1"></i>{{ tt('report_new', 'Novo laudo') }}
@@ -1675,7 +1980,28 @@ const printEntity = computed(() => props.entity ?? {});
                                 </div>
 
                                 <div v-else style="max-height:620px;overflow-y:auto;overflow-x:hidden;">
-                                    <div v-for="group in groupedExams" :key="group.key" class="mb-1">
+                                    <div class="d-flex justify-content-end px-2 pt-2 pb-1">
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Modo de agrupamento">
+                                            <button type="button" class="btn py-1 px-2"
+                                                    :class="groupMode === 'equipment' ? 'btn-secondary' : 'btn-outline-secondary'"
+                                                    style="font-size:.68rem;" @click="groupMode = 'equipment'">
+                                                {{ tt('group_by_equipment', 'Agrupar por Equipamento') }}
+                                            </button>
+                                            <button type="button" class="btn py-1 px-2"
+                                                    :class="groupMode === 'exam' ? 'btn-secondary' : 'btn-outline-secondary'"
+                                                    style="font-size:.68rem;" @click="groupMode = 'exam'">
+                                                {{ tt('group_by_exam', 'Agrupar por Exame') }}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <template v-for="(group, idx) in displayedGroups" :key="group.key">
+                                        <div v-if="groupSectionLabel(group) && groupSectionLabel(group) !== groupSectionLabel(displayedGroups[idx - 1])"
+                                             class="px-2 py-2 fw-bold text-uppercase border-bottom mt-2 bg-body-tertiary"
+                                             style="font-size:.72rem;">
+                                            {{ groupSectionLabel(group) }}
+                                        </div>
+                                    <div class="mb-1">
                                         <!-- Header do grupo -->
                                         <div class="px-2 py-1 d-flex align-items-center gap-1 flex-wrap bg-body-tertiary text-body border-bottom fw-semibold"
                                              style="font-size:.7rem;row-gap:3px;">
@@ -1854,6 +2180,7 @@ const printEntity = computed(() => props.entity ?? {});
                                             </div>
                                         </div>
                                     </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>
@@ -1875,6 +2202,7 @@ const printEntity = computed(() => props.entity ?? {});
                     <button v-for="n in [1,2,3,4]" :key="n" type="button" class="btn fw-semibold"
                             :class="viewerPanelCount === n ? 'btn-primary' : 'btn-outline-secondary'"
                             style="min-width:26px;font-size:.72rem;"
+                            :disabled="n > viewerExams.length"
                             @click="setViewerPanelCount(n)">{{ n }}</button>
                 </div>
 
@@ -2373,11 +2701,16 @@ const printEntity = computed(() => props.entity ?? {});
         <EyeImageReportModal
             :open="reportModalOpen"
             :patient="reportPatientPayload"
-            :exam-ids="selectedExamIds"
+            :exam-ids="reportExamIds"
             :urls="reportUrls"
             :t="t"
-            @close="reportModalOpen = false"
+            :queue-progress="reportQueueProgress"
+            :queue-summary="reportQueueResults"
+            :next-label="reportNextLabel"
+            :exam-images="reportExamImages"
+            @close="onReportModalClosed"
             @saved="onReportSaved"
+            @next="onReportNext"
         />
 
         <!-- Comparar / Alinhar exames -->

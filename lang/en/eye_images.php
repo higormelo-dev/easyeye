@@ -67,6 +67,21 @@ return [
     'report_loading_templates'   => 'Loading templates…',
     'report_no_templates'        => 'No templates available.',
     'report_content_label'       => 'Report content',
+    'report_insert_image'        => 'Insert image',
+    'report_phrases'             => 'Quick phrases',
+    'report_phrases_empty'       => 'No saved phrases yet.',
+    'report_phrases_save'        => 'Save selection as phrase',
+    'report_phrases_save_hint'   => 'Select a piece of the text above before saving it as a phrase.',
+    'report_phrases_label_title' => 'Phrase label',
+    'report_phrases_saved'       => 'Phrase saved.',
+    'report_phrases_deleted'     => 'Phrase removed.',
+    'phrase_limit_reached'       => 'Quick phrase limit reached.',
+
+    // Native equipment PDF text extraction — 09/18/2026 benchmark.
+    'pdf_no_text_found'          => 'Could not extract text from any selected PDF.',
+    'pdf_extract_text'           => 'Extract text from PDF',
+    'pdf_extracting'             => 'Extracting text from PDF…',
+    'pdf_extract_failed'         => 'Could not extract text from the PDF.',
     'report_title_placeholder'   => 'Report title (optional)',
     'report_save'                => 'Save report',
     'report_saved'               => 'Report saved successfully.',
@@ -74,6 +89,16 @@ return [
     'report_confirm_open_record' => 'There is no medical record for the visit date. Open a new record to save the report?',
     'report_content_required'    => 'Write the report content before saving.',
     'report_inactive_exam'       => 'One or more selected images are disabled — enable them before generating the report.',
+
+    // Batch reporting: a selection spanning 2+ exam types becomes 1 report
+    // per group (e.g. Pentacam + Retinography on the same day), in sequence.
+    'report_queue_confirm_title' => 'Report exams separately?',
+    'report_queue_confirm_text'  => 'A separate report will be created for each of the selected exams:',
+    'report_queue_confirm_ok'    => 'Start',
+    'report_queue_label'         => 'Report',
+    'report_queue_of'            => 'of',
+    'report_queue_next'          => 'Next report',
+    'report_queue_previous'      => 'Reports already generated this session:',
     'merge_split_same_patient'   => 'You can only merge/split images from the same patient.',
     'merge_action'               => 'Merge exams',
     'merge_select_two'           => 'Select 2 or more images from the same patient to merge.',
@@ -95,6 +120,17 @@ return [
     'lens_calc_result'          => 'Contact lens',
     'lens_calc_se_title'        => 'Spherical equivalent',
     'lens_calc_se_hint'         => 'SE = Sphere + Cylinder / 2.',
+
+    // Group by Equipment (default) / Group by Exam — 09/18/2026 benchmark
+    'group_by_equipment' => 'Group by Equipment',
+    'group_by_exam'      => 'Group by Exam',
+
+    // Montage (image collage) — 09/18/2026 benchmark.
+    'montage_action'      => 'Montage',
+    'montage_select_two'  => 'Select 2 or more images to build the montage.',
+    'montage_unavailable' => 'Feature unavailable in this environment (Imagick extension not installed on the server).',
+    'montage_no_images'   => 'None of the selected images could be read to build the montage.',
+    'montage_failed'      => 'Could not build the montage.',
 
     // Compare / Align (progression across exams)
     'compare_title'             => 'Compare exams',

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\{DataAccessPurpose, DocumentationType, EntityGate};
+use App\Http\Controllers\Concerns\AuthorizesEyeImageExams;
 use App\Models\{Doctor, Entity, MedicalRecord, MedicalRecordDocumentation, Patient, PatientExam, ReportSettingContent};
 use App\Services\{ConsultationRecordResolver, MedicalRecordDocumentationService};
+use App\Services\EyeImages\PdfTextExtractionService;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, Request};
 use Illuminate\Support\Facades\Gate;
@@ -27,6 +29,7 @@ use Mews\Purifier\Facades\Purifier;
  */
 class EyeImageReportController extends Controller
 {
+    use AuthorizesEyeImageExams;
     use LogsDataAccess;
 
     /**
@@ -40,6 +43,7 @@ class EyeImageReportController extends Controller
     public function __construct(
         private readonly MedicalRecordDocumentationService $documentationService,
         private readonly ConsultationRecordResolver $recordResolver,
+        private readonly PdfTextExtractionService $pdfTextExtraction,
     ) {
     }
 
@@ -65,7 +69,9 @@ class EyeImageReportController extends Controller
      */
     public function previewTemplate(Request $request): JsonResponse
     {
-        $entityId  = (string) session('selected_entity_id');
+        $entityId = (string) session('selected_entity_id');
+        $this->authorizeIssueReport($entityId);
+
         $validated = $request->validate([
             'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
             'patient_id'                => ['required', 'uuid', 'exists:patients,id'],
@@ -105,6 +111,34 @@ class EyeImageReportController extends Controller
     }
 
     /**
+     * Extrai o texto puro do PDF nativo do equipamento (Pentacam etc.) pro
+     * editor — benchmark 18/09/2026 ("Extraindo texto do PDF..." no vídeo
+     * de referência do ticket). Mesmo Gate/tenant/active dos outros
+     * endpoints de laudo: o texto extraído alimenta diretamente um
+     * documento clínico, então é ato de laudo, não leitura genérica.
+     */
+    public function extractPdfText(Request $request): JsonResponse
+    {
+        $entityId = (string) session('selected_entity_id');
+        $this->authorizeIssueReport($entityId);
+
+        $validated = $request->validate([
+            'exam_ids'   => ['required', 'array', 'min:1', 'max:50'],
+            'exam_ids.*' => ['uuid'],
+        ]);
+
+        $examIds = $this->ownedExamIds($validated['exam_ids'], $entityId);
+        $this->assertExamsActive($examIds);
+
+        $exams = PatientExam::query()->whereIn('id', $examIds)->get();
+        $texts = $this->pdfTextExtraction->extractMany($exams->all());
+
+        abort_if($texts === [], 422, __('eye_images.pdf_no_text_found'));
+
+        return response()->json(['text' => implode("\n\n---\n\n", $texts)]);
+    }
+
+    /**
      * Salva o laudo manual. Sem prontuário do dia da consulta, devolve 422 +
      * `requires_record_confirmation` (mesmo contrato do laudo de IA) — o
      * front pergunta e reenvia com `confirm_open_record=true` pra abrir e
@@ -132,6 +166,14 @@ class EyeImageReportController extends Controller
         $examIds = $this->ownedExamIds($validated['exam_ids'] ?? [], $entityId);
         $this->assertExamsActive($examIds);
 
+        // Resolvido uma vez só e reaproveitado tanto pra abrir o prontuário
+        // (quando faltar) quanto pra autoria da documentação abaixo — nunca
+        // $record->doctor_id: o prontuário pode já existir sob OUTRO médico
+        // da mesma clínica (cobertura/plantão), e Gate::IssueReport autoriza
+        // por role, não por posse do prontuário.
+        $doctorId = $this->resolveDoctorId($entityId, $examIds);
+        abort_if(! $doctorId, 422, __('eye_images.report_doctor_required'));
+
         [$scheduleId, $consultationDate] = $this->recordResolver->anchorForExamIds($examIds);
         $record                          = $this->recordResolver->findRecord($entityId, (string) $patient->id, $scheduleId, $consultationDate);
 
@@ -142,9 +184,6 @@ class EyeImageReportController extends Controller
                     'consultation_date'            => $consultationDate,
                 ], 422);
             }
-
-            $doctorId = $this->resolveDoctorId($entityId, $examIds);
-            abort_if(! $doctorId, 422, __('eye_images.report_doctor_required'));
 
             // Abrir prontuário é ato médico (mesma regra de AiRunsController::openRecordForRun).
             $record = MedicalRecord::query()->create(array_filter([
@@ -168,13 +207,14 @@ class EyeImageReportController extends Controller
                 $reportContent,
                 $sanitized,
                 $validated['title'] ?? null,
+                (string) $doctorId,
             );
         } else {
             // Laudo em branco (sem modelo) — mesmo default de título do laudo de IA.
             $documentation = MedicalRecordDocumentation::create([
                 'medical_record_id' => $record->id,
                 'patient_id'        => $record->patient_id,
-                'doctor_id'         => $record->doctor_id,
+                'doctor_id'         => $doctorId,
                 'type'              => DocumentationType::Report->value,
                 'title'             => $validated['title'] ?? __('eye_images.report_default_title'),
                 'content'           => $sanitized,
@@ -188,33 +228,6 @@ class EyeImageReportController extends Controller
             'created_at'        => $documentation->created_at?->format('d/m/Y H:i'),
             'pdf_url'           => route('panel.patients.medicalrecords.documentations.pdf', [$patient, $record, $documentation]),
         ], 201);
-    }
-
-    /**
-     * @param array<int, mixed> $examIds
-     *
-     * @return list<string>
-     */
-    private function ownedExamIds(array $examIds, string $entityId): array
-    {
-        $examIds = array_values(array_unique(array_filter(array_map('strval', $examIds))));
-
-        if ($examIds === []) {
-            return [];
-        }
-
-        $owned = PatientExam::query()
-            ->whereIn('patient_exams.id', $examIds)
-            ->whereHas('patient', fn ($q) => $q->where('entity_id', $entityId))
-            ->pluck('patient_exams.id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        // Nunca falha silenciosamente com um exam_id de outra clínica: 403
-        // explícito (mesmo padrão de AiPayloadEnricher::authorizeExamIds).
-        abort_if(count($owned) !== count($examIds), 403);
-
-        return $owned;
     }
 
     /**

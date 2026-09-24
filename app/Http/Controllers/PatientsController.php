@@ -391,6 +391,32 @@ class PatientsController extends Controller
     }
 
     /**
+     * Estrela de prioridade/triagem do paciente (0-5; 0/null = sem
+     * prioridade) — benchmark contra concorrente (Ger Exames/iWayBrasil):
+     * sinaliza urgência na fila de atendimento. Diferente de
+     * patient_exams.quality_rating (nota de qualidade da CAPTURA de uma
+     * imagem específica, doctor-only via Gate::IssueReport) — aqui é
+     * triagem operacional, não ato clínico, por isso admin/doctor/secretary
+     * (mesmo grupo de permissão de patients.manage) em vez de IssueReport.
+     */
+    public function updatePriority(Request $request, Patient $patient): JsonResponse
+    {
+        abort_unless(
+            (string) $patient->entity_id === (string) session('selected_entity_id'),
+            404,
+        );
+
+        $validated = $request->validate([
+            'priority_rating' => ['nullable', 'integer', 'min:0', 'max:5'],
+        ]);
+
+        $rating = $validated['priority_rating'] ?? null;
+        $patient->update(['priority_rating' => $rating === 0 ? null : $rating]);
+
+        return response()->json(['id' => (string) $patient->id, 'priority_rating' => $patient->priority_rating]);
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     // BUG-FIX (achado pelo E2E Cypress): o tipo de retorno não incluía

@@ -158,6 +158,46 @@ watch(() => props.disabled, (d) => {
     if (!editorInstance) return;
     editorInstance.mode.set(d ? 'readonly' : 'design');
 });
+
+/**
+ * Insere HTML na posição do cursor (ou no final, se o editor nunca teve
+ * foco) — usado por quem monta este componente pra oferecer atalhos de
+ * inserção (ex.: imagem do exame, frase rápida do médico) sem duplicar a
+ * lógica de sincronização de conteúdo já existente aqui.
+ */
+function insertContent(html) {
+    if (usingFallback) {
+        const el = textareaRef.value;
+        if (!el) return;
+        const start = el.selectionStart ?? el.value.length;
+        const end   = el.selectionEnd ?? el.value.length;
+        el.value = el.value.slice(0, start) + html + el.value.slice(end);
+        el.focus();
+        el.selectionStart = el.selectionEnd = start + html.length;
+        emit('update:modelValue', el.value);
+        return;
+    }
+    if (!editorInstance) return;
+    editorInstance.focus();
+    editorInstance.insertContent(html);
+    emit('update:modelValue', editorInstance.getContent());
+}
+
+/**
+ * HTML atualmente selecionado (drag/duplo-clique no editor) — usado por
+ * "Salvar seleção como frase rápida". Vazio se não houver seleção ou no
+ * modo fallback (textarea nativa não expõe HTML de seleção, só texto puro).
+ */
+function getSelectionHtml() {
+    if (usingFallback) {
+        const el = textareaRef.value;
+        if (!el) return '';
+        return el.value.slice(el.selectionStart ?? 0, el.selectionEnd ?? 0);
+    }
+    return editorInstance?.selection.getContent() ?? '';
+}
+
+defineExpose({ insertContent, getSelectionHtml });
 </script>
 
 <template>

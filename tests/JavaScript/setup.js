@@ -39,6 +39,15 @@ window.tinymce = {
             _content: '',
             getContent: () => editor._content,
             setContent: (v) => { editor._content = v ?? ''; },
+            // insertContent/focus/selection: usados por
+            // TinyMceEditor::insertContent()/getSelectionHtml() (botões
+            // "Inserir imagem"/"Frases rápidas" do Gerenciador de Imagens,
+            // benchmark 18/09/2026) — sem eles aqui, chamar insertContent()
+            // num teste montado por cima do stub quebra com "is not a
+            // function" bem antes de qualquer asserção rodar.
+            insertContent: (html) => { editor._content += html; },
+            focus: () => {},
+            selection: { getContent: () => '' },
             mode: { set: () => {} },
             remove: () => {},
             on: () => {},

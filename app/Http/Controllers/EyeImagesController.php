@@ -98,9 +98,16 @@ class EyeImagesController extends Controller
                 'document_share_store'   => route('panel.document-shares.store'),
                 'document_share_destroy' => route('panel.document-shares.destroy', ['share' => '__ID__']),
                 // Laudo manual (Modelos) — ver EyeImageReportController.
-                'report_templates' => route('panel.eye-images.report-templates.index'),
-                'report_preview'   => route('panel.eye-images.report-templates.preview'),
-                'report_store'     => route('panel.eye-images.reports.store'),
+                'report_templates'        => route('panel.eye-images.report-templates.index'),
+                'report_preview'          => route('panel.eye-images.report-templates.preview'),
+                'report_store'            => route('panel.eye-images.reports.store'),
+                'report_extract_pdf_text' => route('panel.eye-images.reports.extract-pdf-text'),
+                // Frases rápidas do médico (benchmark 18/09/2026) — ver
+                // DoctorReportPhrasesController.
+                'report_phrases_index'   => route('panel.eye-images.report-phrases.index'),
+                'report_phrases_store'   => route('panel.eye-images.report-phrases.store'),
+                'report_phrases_update'  => route('panel.eye-images.report-phrases.update', ['phrase' => '__ID__']),
+                'report_phrases_destroy' => route('panel.eye-images.report-phrases.destroy', ['phrase' => '__ID__']),
                 // shape=select + placeholder __Q__: formato remoto consumido por
                 // SearchSelect.vue (filtro de Diagnóstico da barra de filtros).
                 'cid10_search' => route('panel.eye-images.cid10-search', ['shape' => 'select']) . '&q=__Q__',
@@ -113,9 +120,14 @@ class EyeImagesController extends Controller
                 'exam_laterality_update'     => route('panel.eye-images.exams.laterality.update', ['exam' => '__ID__']),
                 'exam_quality_rating_update' => route('panel.eye-images.exams.quality-rating.update', ['exam' => '__ID__']),
                 'exam_active_update'         => route('panel.eye-images.exams.active.update', ['exam' => '__ID__']),
-                'exams_merge'                => route('panel.eye-images.exams.merge'),
-                'exams_split'                => route('panel.eye-images.exams.split'),
-                'exams_ungroup'              => route('panel.eye-images.exams.ungroup'),
+                // Estrela de prioridade/triagem do PACIENTE (benchmark 18/09/2026) —
+                // PatientsController::updatePriority, não é ação de exame.
+                'patient_priority_update' => route('panel.patients.priority.update', ['patient' => '__ID__']),
+                // Montage (benchmark 18/09/2026) — ver EyeImageMontageController.
+                'montage'       => route('panel.eye-images.montage.store'),
+                'exams_merge'   => route('panel.eye-images.exams.merge'),
+                'exams_split'   => route('panel.eye-images.exams.split'),
+                'exams_ungroup' => route('panel.eye-images.exams.ungroup'),
                 // Importar exame externo (upload manual, sem integrador) — ver
                 // ExternalExamImportController.
                 'import_store' => route('panel.eye-images.import.store'),
@@ -227,8 +239,8 @@ class EyeImagesController extends Controller
 
     public function patientExamUrls(Patient $patient): JsonResponse
     {
-        $entityId = session('selected_entity_id');
-        abort_unless($patient->entity_id === $entityId, 403);
+        $entityId = (string) session('selected_entity_id');
+        abort_unless($entityId !== '' && (string) $patient->entity_id === $entityId, 403);
 
         $exams = $patient->exams()
             ->whereNotNull('archive')
@@ -270,8 +282,8 @@ class EyeImagesController extends Controller
      */
     public function patientExamsForRecord(Patient $patient): JsonResponse
     {
-        $entityId = session('selected_entity_id');
-        abort_unless($patient->entity_id === $entityId, 403);
+        $entityId = (string) session('selected_entity_id');
+        abort_unless($entityId !== '' && (string) $patient->entity_id === $entityId, 403);
 
         $this->logAccess($patient, patientId: (string) $patient->id);
 
@@ -337,11 +349,12 @@ class EyeImagesController extends Controller
             ->pluck('id', 'shareable_id');
 
         return $patients->map(fn (Patient $p) => [
-            'id'        => (string) $p->id,
-            'code'      => $p->code,
-            'full_name' => $p->person?->full_name,
-            'person'    => ['full_name' => $p->person?->full_name],
-            'exams'     => $p->exams->map(fn (PatientExam $e) => [
+            'id'              => (string) $p->id,
+            'code'            => $p->code,
+            'full_name'       => $p->person?->full_name,
+            'person'          => ['full_name' => $p->person?->full_name],
+            'priority_rating' => $p->priority_rating,
+            'exams'           => $p->exams->map(fn (PatientExam $e) => [
                 'id'             => (string) $e->id,
                 'exam_id'        => $e->exam_id !== null ? (string) $e->exam_id : null,
                 'laterality'     => (int) ($e->laterality ?? 0),
