@@ -24,6 +24,7 @@ class PatientResource extends JsonResource
                 'skin_id'     => $this->skin_id,
                 'iris_id'     => $this->iris_id,
                 'code'        => $this->code,
+                'full_name'   => $this->person?->full_name,
                 'card_number' => $this->card_number,
                 'active'      => (bool) $this->active,
                 'created_at'  => $this->created_at,

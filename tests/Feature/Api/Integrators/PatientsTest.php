@@ -74,6 +74,22 @@ describe('GET /api/integrators/v1/patients', function () {
         expect($response->json('meta.total'))->toBe(1);
     });
 
+    it('exposes the person full_name in patient attributes', function () {
+        // O integrador desktop usa full_name como segundo fator na
+        // identificação por OCR (cruza nome lido com o paciente casado por código).
+        $person = People::factory()->create(['full_name' => 'Carlos Eduardo Pereira']);
+        Patient::factory()->create([
+            'entity_id' => $this->ctx['entity']->id,
+            'person_id' => $person->id,
+        ]);
+
+        // People normaliza full_name para maiúsculas ($uppercaseFields):
+        // compara com o valor persistido, não com o literal.
+        $this->getJson('/api/integrators/v1/patients', $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('data.0.attributes.full_name', $person->fresh()->full_name);
+    });
+
     it('caps per_page at the plan limit', function () {
         Patient::factory(10)->create(['entity_id' => $this->ctx['entity']->id]);
 
@@ -105,6 +121,18 @@ describe('GET /api/integrators/v1/patients/{id}', function () {
         $this->getJson("/api/integrators/v1/patients/{$this->patient->code}", $this->ctx['headers'])
             ->assertOk()
             ->assertJsonFragment(['id' => $this->patient->id]);
+    });
+
+    it('exposes the person full_name when showing patient by code', function () {
+        $person  = People::factory()->create(['full_name' => 'Ana Beatriz Lima']);
+        $patient = Patient::factory()->create([
+            'entity_id' => $this->ctx['entity']->id,
+            'person_id' => $person->id,
+        ]);
+
+        $this->getJson("/api/integrators/v1/patients/{$patient->code}", $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('data.attributes.full_name', $person->fresh()->full_name);
     });
 
     it('shows patient by integer number', function () {
