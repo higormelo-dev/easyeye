@@ -41,6 +41,10 @@ class DoctorService
                 $data['record_specialty'] = $request->record_specialty;
             }
 
+            if ($request->has('cbo_code')) {
+                $data['cbo_code'] = $request->cbo_code;
+            }
+
             if ($request->has('color')) {
                 $data['color'] = $request->color;
             }
@@ -194,6 +198,7 @@ class DoctorService
             'person_id'        => $person->id,
             'record'           => $request->record,
             'record_specialty' => $request->record_specialty,
+            'cbo_code'         => $request->cbo_code,
             'color'            => $request->color,
             'partner'          => $request->partner,
             'observation'      => $request->observation,

@@ -39,6 +39,11 @@ class CashFlowService
     public function createForSchedule(Schedule $schedule, array $data): FinancialCashEntry
     {
         return DB::transaction(function () use ($schedule, $data): FinancialCashEntry {
+            // Trava o agendamento: 2 requests simultâneos (chegada registrada 2x)
+            // não podem passar ambos no exists() abaixo antes de qualquer um
+            // commitar o lançamento.
+            $schedule = Schedule::query()->whereKey($schedule->id)->lockForUpdate()->firstOrFail();
+
             $exists = $schedule->financialEntries()
                 ->where('status', '!=', FinancialEntryStatus::Cancelled->value)
                 ->whereNull('deleted_at')
@@ -135,14 +140,14 @@ class CashFlowService
             ->whereNull('deleted_at')
             ->where('status', '!=', 'cancelled');
 
-        $income  = (float) (clone $base)->where('type', 'income')->sum('amount');
-        $expense = (float) (clone $base)->where('type', 'expense')->sum('amount');
-        $pending = (float) (clone $base)->where('type', 'income')->where('status', 'pending')->sum('amount');
+        $income  = round((float) (clone $base)->where('type', 'income')->sum('amount'), 2);
+        $expense = round((float) (clone $base)->where('type', 'expense')->sum('amount'), 2);
+        $pending = round((float) (clone $base)->where('type', 'income')->where('status', 'pending')->sum('amount'), 2);
 
         return [
             'income'  => $income,
             'expense' => $expense,
-            'balance' => $income - $expense,
+            'balance' => round($income - $expense, 2),
             'pending' => $pending,
         ];
     }

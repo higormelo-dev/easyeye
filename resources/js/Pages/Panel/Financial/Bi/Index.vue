@@ -101,26 +101,28 @@ const kpis = computed(() => [
                     <div v-if="trend.length === 0" class="text-center text-muted py-4">
                         {{ t.bi?.no_trend_data ?? 'Sem dados suficientes.' }}
                     </div>
-                    <table v-else class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>{{ t.bi?.month ?? 'Mês' }}</th>
-                                <th class="text-end">{{ t.bi?.revenue ?? 'Receita' }}</th>
-                                <th class="text-end">{{ t.bi?.expenses ?? 'Despesa' }}</th>
-                                <th class="text-end">{{ t.bi?.balance ?? 'Saldo' }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(row, idx) in trend" :key="idx">
-                                <td class="fw-medium">{{ row.month }}</td>
-                                <td class="text-end text-success">{{ brl(row.revenue) }}</td>
-                                <td class="text-end text-danger">{{ brl(row.expenses) }}</td>
-                                <td class="text-end fw-semibold" :class="(row.balance ?? 0) >= 0 ? 'text-success' : 'text-danger'">
-                                    {{ brl(row.balance) }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <div v-else class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>{{ t.bi?.month ?? 'Mês' }}</th>
+                                    <th class="text-end">{{ t.bi?.revenue ?? 'Receita' }}</th>
+                                    <th class="text-end">{{ t.bi?.expenses ?? 'Despesa' }}</th>
+                                    <th class="text-end">{{ t.bi?.balance ?? 'Saldo' }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(row, idx) in trend" :key="idx">
+                                    <td class="fw-medium">{{ row.month }}</td>
+                                    <td class="text-end text-success">{{ brl(row.revenue) }}</td>
+                                    <td class="text-end text-danger">{{ brl(row.expenses) }}</td>
+                                    <td class="text-end fw-semibold" :class="(row.balance ?? 0) >= 0 ? 'text-success' : 'text-danger'">
+                                        {{ brl(row.balance) }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

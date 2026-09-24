@@ -72,6 +72,8 @@ return [
     'field_telephone'              => 'Telefone',
     'field_cellphone'              => 'Celular',
     'field_national_registration'  => 'CNPJ / CPF',
+    'field_cnes'                   => 'CNES',
+    'field_cnes_hint'              => 'Cadastro Nacional de Estabelecimentos de Saúde — exigido pelo XML TISS.',
     'field_state_registration'     => 'Insc. Estadual',
     'field_municipal_registration' => 'Insc. Municipal',
     'field_website'                => 'Site',

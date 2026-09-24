@@ -33,6 +33,7 @@ class TissGlosaAppeal extends Model
         'accepted_amount',
         'submitted_at',
         'resolved_at',
+        'deadline',
         'result_notes',
         'metadata',
     ];
@@ -45,6 +46,7 @@ class TissGlosaAppeal extends Model
             'accepted_amount'  => 'decimal:2',
             'submitted_at'     => 'datetime',
             'resolved_at'      => 'datetime',
+            'deadline'         => 'date',
             'metadata'         => 'array',
             'created_at'       => 'datetime',
             'updated_at'       => 'datetime',

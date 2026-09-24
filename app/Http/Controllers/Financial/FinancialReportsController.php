@@ -223,12 +223,28 @@ class FinancialReportsController extends Controller
         return $entity;
     }
 
+    /**
+     * OWASP CSV/Formula Injection: célula de texto começando com =, +, -, @,
+     * tab ou CR vira fórmula executável ao abrir no Excel — nome de paciente,
+     * observação e nome de convênio/categoria são texto livre, superfície de
+     * ataque real aqui. Prefixa com aspas simples pra neutralizar sem alterar
+     * o valor visível na planilha.
+     */
+    private function sanitizeCellValue(mixed $cell): mixed
+    {
+        if (! is_string($cell) || $cell === '') {
+            return $cell;
+        }
+
+        return preg_match('/^[=+\-@\t\r]/', $cell) === 1 ? "'" . $cell : $cell;
+    }
+
     private function csvResponse(array $rows, string $filename)
     {
         $stream = fopen('php://temp', 'r+');
 
         foreach ($rows as $row) {
-            fputcsv($stream, $row, ';');
+            fputcsv($stream, array_map($this->sanitizeCellValue(...), $row), ';');
         }
 
         rewind($stream);
@@ -339,7 +355,7 @@ class FinancialReportsController extends Controller
                 $type      = $isNumeric ? 'Number' : 'String';
                 $value     = $isNumeric
                     ? (string) $cell
-                    : htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
+                    : htmlspecialchars((string) $this->sanitizeCellValue($cell), ENT_QUOTES | ENT_XML1, 'UTF-8');
 
                 $xml[] = sprintf(
                     '<Cell><Data ss:Type="%s">%s</Data></Cell>',
@@ -410,7 +426,7 @@ class FinancialReportsController extends Controller
                     continue;
                 }
 
-                $value   = htmlspecialchars((string) $cell, ENT_QUOTES | ENT_XML1, 'UTF-8');
+                $value   = htmlspecialchars((string) $this->sanitizeCellValue($cell), ENT_QUOTES | ENT_XML1, 'UTF-8');
                 $lines[] = sprintf('<c r="%s" t="inlineStr"><is><t>%s</t></is></c>', $cellRef, $value);
             }
 

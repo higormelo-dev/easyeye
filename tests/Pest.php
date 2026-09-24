@@ -1,9 +1,10 @@
 <?php
 
+use App\Domains\Tiss\Models\TissVersion;
 use App\Enums\AI\{AiRiskLevel, AiRunMode};
 use App\Enums\{ClientRule, FeatureKey, ScheduleSituation, SubscriptionStatus};
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Models\{Doctor, Entity, EntityIntegrator, EntityUser, EntityUserIntegrator, PatientAccount, People, Plan, PlanFeature, Schedule, Subscription, User};
+use App\Models\{Covenant, Doctor, Entity, EntityIntegrator, EntityUser, EntityUserIntegrator, Patient, PatientAccount, People, Plan, PlanFeature, Schedule, Subscription, User};
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -267,4 +268,98 @@ function loginAsPatient(PatientAccount $account, string $password = 'password'):
         'email'    => $account->email,
         'password' => $password,
     ])->assertRedirect(route('patient-portal.dashboard'));
+}
+
+/**
+ * Garante uma versão TISS ativa (código 202603 / layout 04.03.00) para os
+ * testes de faturamento — sem isso ResolveTissVersionService lança
+ * RuntimeException, já que RefreshDatabase não roda o TissReferenceSeeder.
+ */
+function seedActiveTissVersion(): void
+{
+    TissVersion::query()->firstOrCreate(
+        ['code' => '202603'],
+        ['layout_version' => '04.03.00', 'effective_from' => '2026-03-01', 'active' => true],
+    );
+}
+
+/**
+ * Agendamento atendido, com convênio real (ans_registry preenchido) e
+ * paciente com carteirinha — pronto para faturar via BillingService com
+ * pré-validação TISS passando (falta só o CID por guia, que cada teste
+ * define conforme o cenário).
+ */
+function createBillableSchedule(Entity $entity, array $overrides = []): Schedule
+{
+    $doctor   = createDoctorForEntity($entity);
+    $covenant = Covenant::factory()->create([
+        'entity_id'    => $entity->id,
+        'active'       => true,
+        'table'        => true,
+        'ans_registry' => '326305',
+    ]);
+    $patient = Patient::factory()->create([
+        'entity_id'   => $entity->id,
+        'covenant_id' => $covenant->id,
+        'card_number' => '1234567890',
+    ]);
+
+    return Schedule::create(array_merge([
+        'entity_id'   => $entity->id,
+        'doctor_id'   => $doctor->id,
+        'patient_id'  => $patient->id,
+        'covenant_id' => $covenant->id,
+        'full_name'   => $patient->person->name ?? 'Paciente Teste',
+        'date_time'   => now()->subHour(),
+        'situation'   => ScheduleSituation::Attended->value,
+        'active'      => true,
+    ], $overrides));
+}
+
+/**
+ * Agendamento atendido de convênio "particular" (sem ans_registry) — usado
+ * pelos testes que garantem que faturamento sem operadora TISS real
+ * continua funcionando fora do domínio Domains\Tiss.
+ */
+function createParticularSchedule(Entity $entity): Schedule
+{
+    $doctor   = createDoctorForEntity($entity);
+    $covenant = Covenant::factory()->create([
+        'entity_id'    => $entity->id,
+        'active'       => true,
+        'table'        => false,
+        'name'         => 'PARTICULAR',
+        'ans_registry' => null,
+    ]);
+    $patient = Patient::factory()->create([
+        'entity_id'   => $entity->id,
+        'covenant_id' => $covenant->id,
+    ]);
+
+    return Schedule::create([
+        'entity_id'   => $entity->id,
+        'doctor_id'   => $doctor->id,
+        'patient_id'  => $patient->id,
+        'covenant_id' => $covenant->id,
+        'full_name'   => $patient->person->name ?? 'Paciente Particular',
+        'date_time'   => now()->subHour(),
+        'situation'   => ScheduleSituation::Attended->value,
+        'active'      => true,
+    ]);
+}
+
+/**
+ * Sessão de painel + login real + versão TISS ativa — ponto de entrada padrão
+ * para testes HTTP do módulo de faturamento (BillingController/TissGlosasController).
+ */
+function actingAsFinancialEntityUser(Entity $entity): EntityUser
+{
+    seedActiveTissVersion();
+
+    $user       = User::factory()->create();
+    $entityUser = createEntityUser($entity, $user, ClientRule::Admin->value, isOwner: true);
+
+    test()->withSession(panelSession($entityUser))->actingAs($user);
+
+    return $entityUser;
 }

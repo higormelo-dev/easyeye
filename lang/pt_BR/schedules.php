@@ -243,7 +243,7 @@ return [
     'cash_client'                => 'Fornecedor / Cliente',
     'cash_doctor'                => 'Médico',
     'cash_procedure'             => 'Procedimento',
-    'cash_service'               => 'Serviço',
+    'cash_covenant'              => 'Convênio',
     'cash_amount'                => 'Valor (R$)',
     'cash_option'                => 'Opção',
     'cash_installments'          => 'Parcela',

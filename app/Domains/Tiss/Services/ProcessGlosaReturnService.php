@@ -7,7 +7,7 @@ namespace App\Domains\Tiss\Services;
 use App\Domains\Tiss\Enums\TissGlosaStatus;
 use App\Domains\Tiss\Models\{TissGlosa, TissGuide, TissGuideItem, TissReturn};
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{DB, Log};
 
 class ProcessGlosaReturnService
 {
@@ -47,6 +47,24 @@ class ProcessGlosaReturnService
 
                 $amount = (float) ($glosaData['amount'] ?? 0);
 
+                // Sem guia identificada (lote com >1 guia e sem guide_number_provider casando),
+                // guide_id/guide_item_id ficam null pra todas as glosas não resolvidas do mesmo
+                // retorno — sem discriminador, um updateOrCreate com o mesmo glosa_code sobrescreve
+                // silenciosamente o registro anterior. O hash do payload bruto desambigua.
+                $rawHash = $guide === null
+                    ? hash('sha256', json_encode($glosaData, JSON_THROW_ON_ERROR))
+                    : null;
+
+                if ($guide === null) {
+                    Log::warning('Glosa recebida sem guia identificada no lote — revisão manual recomendada.', [
+                        'entity_id'   => (string) $return->entity_id,
+                        'return_id'   => (string) $return->id,
+                        'protocol_id' => (string) $return->protocol_id,
+                        'glosa_code'  => (string) ($glosaData['code'] ?? 'GLS-SEM-CODIGO'),
+                        'raw_hash'    => $rawHash,
+                    ]);
+                }
+
                 $glosa = TissGlosa::query()->updateOrCreate(
                     [
                         'entity_id'     => $return->entity_id,
@@ -55,6 +73,7 @@ class ProcessGlosaReturnService
                         'guide_id'      => $guide?->id,
                         'guide_item_id' => $guideItem?->id,
                         'glosa_code'    => (string) ($glosaData['code'] ?? 'GLS-SEM-CODIGO'),
+                        'raw_hash'      => $rawHash,
                     ],
                     [
                         'operator_id'       => $return->operator_id,
@@ -62,6 +81,7 @@ class ProcessGlosaReturnService
                         'glosa_description' => (string) ($glosaData['description'] ?? ''),
                         'amount'            => $amount,
                         'identified_at'     => now()->toDateString(),
+                        'deadline'          => now()->addDays((int) config('tiss.glosa_appeal_deadline_days', 30))->toDateString(),
                         'metadata'          => [
                             'guide_number_provider' => $glosaData['guide_number_provider'] ?? null,
                             'procedure_code'        => $glosaData['procedure_code'] ?? null,

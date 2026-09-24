@@ -28,6 +28,7 @@ class Doctor extends Model
         'code',
         'record',
         'record_specialty',
+        'cbo_code',
         'color',
         'partner',
         'active',

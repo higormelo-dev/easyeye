@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasEntityCode;
+use App\Domains\Tiss\Models\TissGuide;
 use App\Enums\BillingClaimStatus;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -46,6 +47,7 @@ class BillingClaim extends Model
         'quantity',
         'unit_price',
         'notes',
+        'tiss_guide_id',
     ];
 
     protected static function booted(): void
@@ -78,13 +80,16 @@ class BillingClaim extends Model
 
     public function resolveRouteBinding($value, $field = null): ?self
     {
-        $query = static::where($field ?? $this->getRouteKeyName(), $value);
+        // Sessão sem entity_id (ex.: vínculo desativado em sessão já aberta) não
+        // pode virar "sem filtro" — isso resolveria qualquer registro do sistema
+        // pelo ID, quebrando isolamento entre clínicas.
+        $entityId = session('selected_entity_id');
 
-        if ($entityId = session('selected_entity_id')) {
-            $query->where('entity_id', $entityId);
-        }
+        abort_unless($entityId, 403);
 
-        return $query->firstOrFail();
+        return static::where($field ?? $this->getRouteKeyName(), $value)
+            ->where('entity_id', $entityId)
+            ->firstOrFail();
     }
 
     public function entity(): BelongsTo
@@ -120,5 +125,10 @@ class BillingClaim extends Model
     public function cashEntries(): HasMany
     {
         return $this->hasMany(FinancialCashEntry::class, 'billing_claim_id');
+    }
+
+    public function tissGuide(): BelongsTo
+    {
+        return $this->belongsTo(TissGuide::class, 'tiss_guide_id');
     }
 }

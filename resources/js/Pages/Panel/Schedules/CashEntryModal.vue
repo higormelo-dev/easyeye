@@ -4,7 +4,7 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 // Modal de entrada no caixa disparado pela chegada do paciente.
 // Espelha o formulário CashierBook do smart_oftal: Fornecedor/Cliente,
-// Médico, Procedimento, Serviço (convênio), Valor, Opção de pagamento (5),
+// Médico, Procedimento, Convênio, Valor, Opção de pagamento (5),
 // Parcela e breakdown crédito/débito/dinheiro nas opções combinadas.
 const props = defineProps({
     open:            { type: Boolean, required: true },
@@ -210,9 +210,9 @@ function firstError(f) { return errors.value[f]?.[0] ?? ''; }
                             <div v-if="hasError('procedure_id')" class="invalid-feedback d-block">{{ firstError('procedure_id') }}</div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">{{ t.cash_service ?? 'Serviço' }}</label>
+                            <label class="form-label">{{ t.cash_covenant ?? 'Convênio' }}</label>
                             <SearchSelect v-model="form.covenant_id" :options="covenants"
-                                          :placeholder="t.cash_service ?? 'Serviço'" :invalid="hasError('covenant_id')" />
+                                          :placeholder="t.cash_covenant ?? 'Convênio'" :invalid="hasError('covenant_id')" />
                             <div v-if="hasError('covenant_id')" class="invalid-feedback d-block">{{ firstError('covenant_id') }}</div>
                         </div>
                         <div class="col-md-4">

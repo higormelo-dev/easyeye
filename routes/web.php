@@ -617,40 +617,56 @@ Route::group(
 
                 // Fluxo de caixa
                 Route::get('cash-flow', [CashFlowController::class, 'index'])->name('cash-flow.index');
-                Route::post('cash-flow', [CashFlowController::class, 'store'])->name('cash-flow.store');
-                Route::match(['PUT', 'PATCH'], 'cash-flow/{entry}', [CashFlowController::class, 'update'])->name('cash-flow.update');
-                Route::delete('cash-flow/{entry}', [CashFlowController::class, 'destroy'])->name('cash-flow.destroy');
 
-                // Tabela de preço por procedimento × convênio
-                Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
-                Route::post('procedure-prices', [ProcedurePricesController::class, 'store'])->name('procedure-prices.store');
+                // Preço/período de procedimento, faturamento, fechamento de caixa,
+                // recurso de glosa, exportação e importação de retorno: throttle
+                // financial-write (30/min/usuário) — sem teto, sessão comprometida
+                // automatizava parsing de XML ou geração de relatório sem barreira.
+                Route::middleware('throttle:financial-write')->group(function () {
+                    Route::post('cash-flow', [CashFlowController::class, 'store'])->name('cash-flow.store');
+                    Route::match(['PUT', 'PATCH'], 'cash-flow/{entry}', [CashFlowController::class, 'update'])->name('cash-flow.update');
+                    Route::delete('cash-flow/{entry}', [CashFlowController::class, 'destroy'])->name('cash-flow.destroy');
 
-                // Fechamento de caixa (lock por período)
-                Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
-                Route::post('cash-closing', [CashClosingController::class, 'store'])->name('cash-closing.store');
-                Route::delete('cash-closing/{cashClose}', [CashClosingController::class, 'destroy'])->name('cash-closing.destroy');
+                    // Tabela de preço por procedimento × convênio
+                    Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
+                    Route::post('procedure-prices', [ProcedurePricesController::class, 'store'])->name('procedure-prices.store');
 
-                // Faturamento TISS (individual e lote)
-                Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
-                Route::post('billing/individual', [FinancialBillingController::class, 'storeIndividual'])->name('billing.individual.store');
-                Route::post('billing/batch', [FinancialBillingController::class, 'storeBatch'])->name('billing.batch.store');
-                Route::post('billing/batches/{batch}/submit', [FinancialBillingController::class, 'submitBatch'])->name('billing.batches.submit');
-                Route::get('billing/batches/{batch}/xml', [FinancialBillingController::class, 'exportBatchXml'])->name('billing.batches.xml');
-                Route::post('billing/claims/{claim}/paid', [FinancialBillingController::class, 'markClaimPaid'])->name('billing.claims.paid');
-                Route::post('billing/claims/{claim}/denied', [FinancialBillingController::class, 'markClaimDenied'])->name('billing.claims.denied');
+                    // Fechamento de caixa (lock por período)
+                    Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
+                    Route::post('cash-closing', [CashClosingController::class, 'store'])->name('cash-closing.store');
+                    Route::delete('cash-closing/{cashClose}', [CashClosingController::class, 'destroy'])->name('cash-closing.destroy');
+
+                    // Faturamento TISS (individual e lote)
+                    Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
+                    Route::post('billing/individual', [FinancialBillingController::class, 'storeIndividual'])->name('billing.individual.store');
+                    Route::post('billing/batch', [FinancialBillingController::class, 'storeBatch'])->name('billing.batch.store');
+                    Route::post('billing/batches/{batch}/submit', [FinancialBillingController::class, 'submitBatch'])->name('billing.batches.submit');
+                    Route::get('billing/batches/{batch}/xml', [FinancialBillingController::class, 'exportBatchXml'])->name('billing.batches.xml');
+                    Route::post('billing/claims/{claim}/paid', [FinancialBillingController::class, 'markClaimPaid'])->name('billing.claims.paid');
+                    Route::post('billing/claims/{claim}/denied', [FinancialBillingController::class, 'markClaimDenied'])->name('billing.claims.denied');
+
+                    // Conciliação de glosas
+                    Route::post('tiss/glosas/{glosa}/appeal', [TissGlosasController::class, 'appeal'])->name('tiss.glosas.appeal');
+                    Route::post('tiss/glosas/appeals/{appeal}/submit', [TissGlosasController::class, 'submitAppeal'])->name('tiss.glosas.appeals.submit');
+                    Route::post('tiss/glosas/appeals/{appeal}/resolve', [TissGlosasController::class, 'resolveAppeal'])->name('tiss.glosas.appeals.resolve');
+
+                    // Importação manual de retorno TISS (demonstrativo de glosa)
+                    Route::post('billing/import-return', [FinancialBillingController::class, 'importReturn'])->name('billing.import-return');
+
+                    // Relatórios financeiros (exportação com drill-down)
+                    Route::get('reports/cash-flow/export', [FinancialReportsController::class, 'exportCashFlowCsv'])->name('reports.cash-flow.export');
+                    Route::get('reports/covenants/export', [FinancialReportsController::class, 'exportCovenantsCsv'])->name('reports.covenants.export');
+                });
 
                 // Pré-validação TISS (motor anti-glosa)
                 Route::get('tiss/guides/{guide}/pre-validate', TissGuidePreValidateController::class)->name('tiss.guides.pre-validate');
 
                 // Conciliação de glosas
                 Route::get('tiss/glosas', [TissGlosasController::class, 'index'])->name('tiss.glosas.index');
-                Route::post('tiss/glosas/{glosa}/appeal', [TissGlosasController::class, 'appeal'])->name('tiss.glosas.appeal');
 
-                // Relatórios financeiros (exportação com drill-down)
+                // Relatórios financeiros
                 Route::get('reports/cash-flow', [FinancialReportsController::class, 'cashFlow'])->name('reports.cash-flow');
                 Route::get('reports/covenants', [FinancialReportsController::class, 'covenants'])->name('reports.covenants');
-                Route::get('reports/cash-flow/export', [FinancialReportsController::class, 'exportCashFlowCsv'])->name('reports.cash-flow.export');
-                Route::get('reports/covenants/export', [FinancialReportsController::class, 'exportCovenantsCsv'])->name('reports.covenants.export');
             });
         });
 

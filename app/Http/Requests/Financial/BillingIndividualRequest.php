@@ -40,7 +40,13 @@ class BillingIndividualRequest extends FormRequest
             'tuss_code'             => ['nullable', 'string', 'max:32'],
             'procedure_description' => ['nullable', 'string', 'max:255'],
             'authorization_code'    => ['nullable', 'string', 'max:64'],
-            'notes'                 => ['nullable', 'string', 'max:2000'],
+            // Lateralidade não é campo estruturado no XSD TISS (nenhuma
+            // especialidade tem — nem ortopedia pra "joelho"). Guardamos pra
+            // uso interno e anexamos na descrição do procedimento no XML,
+            // único canal que o padrão realmente oferece pra isso.
+            'eye_side'            => ['nullable', Rule::in(['OD', 'OE', 'AO'])],
+            'clinical_indication' => ['nullable', 'string', 'max:500'],
+            'notes'               => ['nullable', 'string', 'max:2000'],
         ];
     }
 
@@ -56,7 +62,7 @@ class BillingIndividualRequest extends FormRequest
             $merge['status'] = BillingClaimStatus::Draft->value;
         }
 
-        foreach (['status', 'tuss_code', 'authorization_code'] as $field) {
+        foreach (['status', 'tuss_code', 'authorization_code', 'eye_side'] as $field) {
             if ($this->has($field) && is_string($this->input($field))) {
                 $merge[$field] = mb_strtoupper(trim($this->input($field)));
             }

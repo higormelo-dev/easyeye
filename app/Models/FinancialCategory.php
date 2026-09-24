@@ -46,13 +46,18 @@ class FinancialCategory extends Model
 
     public function resolveRouteBinding($value, $field = null): ?self
     {
-        $query = static::where($field ?? $this->getRouteKeyName(), $value);
+        // Sessão sem entity_id (ex.: vínculo desativado em sessão já aberta) não
+        // pode virar "sem filtro" — isso resolveria qualquer registro do sistema
+        // pelo ID, quebrando isolamento entre clínicas. Categoria global
+        // (entity_id null) continua acessível normalmente quando há entidade
+        // ativa na sessão.
+        $entityId = session('selected_entity_id');
 
-        if ($entityId = session('selected_entity_id')) {
-            $query->where(fn (Builder $q) => $q->where('entity_id', $entityId)->orWhereNull('entity_id'));
-        }
+        abort_unless($entityId, 403);
 
-        return $query->firstOrFail();
+        return static::where($field ?? $this->getRouteKeyName(), $value)
+            ->where(fn (Builder $q) => $q->where('entity_id', $entityId)->orWhereNull('entity_id'))
+            ->firstOrFail();
     }
 
     public function entity(): BelongsTo

@@ -27,12 +27,12 @@ function applyFilter() {
 </script>
 
 <template>
-    <AppLayout title="Relatório Fluxo de Caixa" :breadcrumbs="breadcrumbs">
+    <AppLayout :title="t.cashflow?.title ?? 'Relatório de Fluxo de Caixa'" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader title="Relatório de Fluxo de Caixa">
+            <PageHeader :title="t.cashflow?.title ?? 'Relatório de Fluxo de Caixa'">
                 <template #actions>
                     <a :href="`${export_url}?from=${filters.from}&to=${filters.to}`" class="btn btn-outline-secondary btn-sm">
-                        <i class="ti ti-download me-1"></i>Exportar CSV
+                        <i class="ti ti-download me-1"></i>{{ t.cashflow?.export_csv ?? 'Exportar CSV' }}
                     </a>
                 </template>
             </PageHeader>
@@ -42,16 +42,16 @@ function applyFilter() {
                 <div class="card-body py-3">
                     <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
                         <div class="col-md-3">
-                            <label class="form-label small mb-1">De</label>
+                            <label class="form-label small mb-1">{{ t.cashflow?.filter_from ?? 'De' }}</label>
                             <input v-model="from" type="date" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label small mb-1">Até</label>
+                            <label class="form-label small mb-1">{{ t.cashflow?.filter_to ?? 'Até' }}</label>
                             <input v-model="to" type="date" class="form-control form-control-sm">
                         </div>
                         <div class="col-md-3">
                             <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="ti ti-filter me-1"></i>Filtrar
+                                <i class="ti ti-filter me-1"></i>{{ t.cashflow?.filter_apply ?? 'Filtrar' }}
                             </button>
                         </div>
                     </form>
@@ -63,7 +63,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Receitas</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.col_income ?? 'Receitas' }}</small>
                             <div class="fw-bold fs-5 text-success">{{ brl(summary.revenue) }}</div>
                         </div>
                     </div>
@@ -71,7 +71,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Despesas</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.col_expense ?? 'Despesas' }}</small>
                             <div class="fw-bold fs-5 text-danger">{{ brl(summary.expenses) }}</div>
                         </div>
                     </div>
@@ -79,7 +79,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">Saldo</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.col_balance ?? 'Saldo' }}</small>
                             <div class="fw-bold fs-5" :class="(summary.balance ?? 0) >= 0 ? 'text-success' : 'text-danger'">
                                 {{ brl(summary.balance) }}
                             </div>
@@ -89,7 +89,7 @@ function applyFilter() {
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body py-3">
-                            <small class="text-muted d-block">A receber</small>
+                            <small class="text-muted d-block">{{ t.cashflow?.pending ?? 'A receber' }}</small>
                             <div class="fw-bold fs-5 text-warning">{{ brl(summary.pending) }}</div>
                         </div>
                     </div>
@@ -101,15 +101,15 @@ function applyFilter() {
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header bg-transparent">
-                            <h6 class="mb-0 fw-semibold"><i class="ti ti-tag me-1 text-primary"></i>Por categoria</h6>
+                            <h6 class="mb-0 fw-semibold"><i class="ti ti-tag me-1 text-primary"></i>{{ t.cashflow?.category_breakdown ?? 'Por categoria' }}</h6>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Categoria</th>
-                                        <th>Tipo</th>
-                                        <th class="text-end">Total</th>
+                                        <th>{{ t.cashflow?.col_category ?? 'Categoria' }}</th>
+                                        <th>{{ t.cashflow?.col_type ?? 'Tipo' }}</th>
+                                        <th class="text-end">{{ t.cashflow?.col_total ?? 'Total' }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -117,7 +117,7 @@ function applyFilter() {
                                         <td class="fw-medium">{{ row.category }}</td>
                                         <td>
                                             <span :class="row.type === 'income' ? 'text-success' : 'text-danger'">
-                                                {{ row.type === 'income' ? 'Receita' : 'Despesa' }}
+                                                {{ row.type === 'income' ? (t.cashflow?.type_income ?? 'Receita') : (t.cashflow?.type_expense ?? 'Despesa') }}
                                             </span>
                                         </td>
                                         <td class="text-end">{{ brl(row.total) }}</td>
@@ -132,15 +132,15 @@ function applyFilter() {
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header bg-transparent">
-                            <h6 class="mb-0 fw-semibold"><i class="ti ti-calendar me-1 text-primary"></i>Por dia</h6>
+                            <h6 class="mb-0 fw-semibold"><i class="ti ti-calendar me-1 text-primary"></i>{{ t.cashflow?.daily_evolution ?? 'Por dia' }}</h6>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-sm table-hover mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Dia</th>
-                                        <th class="text-end">Receita</th>
-                                        <th class="text-end">Despesa</th>
+                                        <th>{{ t.cashflow?.col_day ?? 'Dia' }}</th>
+                                        <th class="text-end">{{ t.cashflow?.type_income ?? 'Receita' }}</th>
+                                        <th class="text-end">{{ t.cashflow?.type_expense ?? 'Despesa' }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -159,23 +159,23 @@ function applyFilter() {
             <!-- Lançamentos -->
             <div class="card">
                 <div class="card-header bg-transparent">
-                    <h6 class="mb-0 fw-semibold"><i class="ti ti-list me-1 text-primary"></i>Lançamentos</h6>
+                    <h6 class="mb-0 fw-semibold"><i class="ti ti-list me-1 text-primary"></i>{{ t.cashflow?.entry_detail ?? 'Lançamentos' }}</h6>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-nowrap table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Data</th>
-                                <th>Descrição</th>
-                                <th>Categoria</th>
-                                <th>Convênio</th>
-                                <th class="text-center">Tipo</th>
-                                <th class="text-end">Valor</th>
+                                <th>{{ t.cashflow?.col_date ?? 'Data' }}</th>
+                                <th>{{ t.cashflow?.col_description ?? 'Descrição' }}</th>
+                                <th>{{ t.cashflow?.col_category ?? 'Categoria' }}</th>
+                                <th>{{ t.cashflow?.col_covenant ?? 'Convênio' }}</th>
+                                <th class="text-center">{{ t.cashflow?.col_type ?? 'Tipo' }}</th>
+                                <th class="text-end">{{ t.cashflow?.col_value ?? 'Valor' }}</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-if="entries.length === 0">
-                                <td colspan="6" class="text-center text-muted py-5">Nenhum lançamento.</td>
+                                <td colspan="6" class="text-center text-muted py-5">{{ t.cashflow?.no_entries ?? 'Nenhum lançamento.' }}</td>
                             </tr>
                             <tr v-for="(e, i) in entries" :key="i">
                                 <td class="text-muted small">{{ e.entry_date }}</td>

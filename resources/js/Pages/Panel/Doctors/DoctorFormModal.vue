@@ -32,6 +32,7 @@ const form = useForm({
     // Médico
     record:           '',
     record_specialty: '',
+    cbo_code:         '',
     color:            '#3699ff',
     observation:      '',
     partner:          false,
@@ -115,7 +116,7 @@ const stateOptions = computed(() =>
 
 const tabErrors = computed(() => ({
     personal: ['name','nickname','national_registry','birth_date','gender','marital_status','email','mother_name','father_name'].some(k => k in form.errors),
-    doctor:   ['record','record_specialty','color','observation'].some(k => k in form.errors),
+    doctor:   ['record','record_specialty','cbo_code','color','observation'].some(k => k in form.errors),
     contact:  ['telephone','cellphone','whatsapp','zipcode','address','number','complement','district','city','state'].some(k => k in form.errors),
     auth:     ['password','password_confirmation'].some(k => k in form.errors),
 }));
@@ -270,6 +271,17 @@ const tabErrors = computed(() => ({
                                class="form-control"
                                :class="{ 'is-invalid': form.errors.record_specialty }">
                         <div v-if="form.errors.record_specialty" class="invalid-feedback">{{ form.errors.record_specialty }}</div>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">CBO</label>
+                        <input v-model="form.cbo_code"
+                               type="text"
+                               maxlength="10"
+                               placeholder="225265"
+                               class="form-control"
+                               :class="{ 'is-invalid': form.errors.cbo_code }">
+                        <div v-if="form.errors.cbo_code" class="invalid-feedback">{{ form.errors.cbo_code }}</div>
+                        <small class="text-muted">Classificação Brasileira de Ocupações — 225265 = Médico oftalmologista. Exigido pelo XML TISS.</small>
                     </div>
                 </div>
 

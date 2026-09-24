@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Concerns\HasEntityCode;
+use App\Domains\Tiss\Models\TissBatch;
 use App\Enums\BillingBatchStatus;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -39,6 +40,7 @@ class BillingBatch extends Model
         'total_amount',
         'xml_path',
         'notes',
+        'tiss_batch_id',
     ];
 
     protected function casts(): array
@@ -61,13 +63,16 @@ class BillingBatch extends Model
 
     public function resolveRouteBinding($value, $field = null): ?self
     {
-        $query = static::where($field ?? $this->getRouteKeyName(), $value);
+        // Sessão sem entity_id (ex.: vínculo desativado em sessão já aberta) não
+        // pode virar "sem filtro" — isso resolveria qualquer registro do sistema
+        // pelo ID, quebrando isolamento entre clínicas.
+        $entityId = session('selected_entity_id');
 
-        if ($entityId = session('selected_entity_id')) {
-            $query->where('entity_id', $entityId);
-        }
+        abort_unless($entityId, 403);
 
-        return $query->firstOrFail();
+        return static::where($field ?? $this->getRouteKeyName(), $value)
+            ->where('entity_id', $entityId)
+            ->firstOrFail();
     }
 
     public function entity(): BelongsTo
@@ -83,5 +88,10 @@ class BillingBatch extends Model
     public function claims(): HasMany
     {
         return $this->hasMany(BillingClaim::class, 'batch_id');
+    }
+
+    public function tissBatch(): BelongsTo
+    {
+        return $this->belongsTo(TissBatch::class, 'tiss_batch_id');
     }
 }

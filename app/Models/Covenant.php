@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Concerns\{HasEntityCode, HasUppercaseFields};
+use App\Domains\Tiss\Models\TissOperator;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,7 +23,7 @@ class Covenant extends Model
 
     protected string $codePrefixGlobal = 'CVP';
 
-    protected $fillable = ['entity_id', 'code', 'name', 'color', 'table', 'active'];
+    protected $fillable = ['entity_id', 'code', 'name', 'color', 'table', 'active', 'tiss_operator_id'];
 
     protected array $uppercaseFields = ['name', 'color'];
 
@@ -34,5 +35,10 @@ class Covenant extends Model
     public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class, 'entity_id', 'id');
+    }
+
+    public function tissOperator(): BelongsTo
+    {
+        return $this->belongsTo(TissOperator::class, 'tiss_operator_id');
     }
 }
