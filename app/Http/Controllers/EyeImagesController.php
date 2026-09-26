@@ -389,6 +389,7 @@ class EyeImagesController extends Controller
                 'is_external'       => $e->isExternal(),
                 'external_origin'   => $e->external_origin,
                 'exam_performed_at' => optional($e->exam_performed_at)->toIso8601String(),
+                'observation'       => $e->observation,
                 'import_batch_id'   => $e->import_batch_id,
                 // Portal do Paciente (Fase 2) — grant de leitura pro titular.
                 'shared_with_patient' => $sharedExamShareIds->has($e->id),

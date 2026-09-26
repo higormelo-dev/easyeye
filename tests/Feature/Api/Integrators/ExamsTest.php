@@ -501,3 +501,132 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
             ->assertJsonValidationErrors(['patient_identifier', 'schedule_identifier']);
     });
 });
+
+// ---------------------------------------------------------------------------
+// POST /api/integrators/v1/exams — data/hora real do exame e observação
+// lidas pelo integrador do arquivo do equipamento (ex.: .EMR do Keratograph:
+// "Exam Date"/"Exam Time" e "Display").
+// ---------------------------------------------------------------------------
+describe('POST /api/integrators/v1/exams — exam_performed_at / observation', function () {
+    beforeEach(function () {
+        Storage::fake('s3');
+
+        $this->ctx      = setupIntegrator();
+        $this->examType = ExamType::factory()->create(['entity_id' => null]);
+        $this->patient  = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+    });
+
+    it('stores exam_performed_at and observation sent by the integrator', function () {
+        $this->postJson('/api/integrators/v1/exams', [
+            'exam_identifier'    => $this->examType->code,
+            'patient_identifier' => $this->patient->id,
+            'archive'            => UploadedFile::fake()->image('exam.jpg'),
+            'name'               => 'Keratograph Topo',
+            'exam_performed_at'  => '2026-02-12T09:32:25-03:00',
+            'observation'        => 'Display: Topo 4-Maps',
+        ], $this->ctx['headers'])
+            ->assertCreated()
+            ->assertJsonPath('data.attributes.observation', 'Display: Topo 4-Maps');
+
+        $exam = PatientExam::where('name', 'Keratograph Topo')->first();
+        expect($exam->exam_performed_at->equalTo(Carbon\Carbon::parse('2026-02-12T12:32:25Z')))->toBeTrue()
+            ->and($exam->observation)->toBe('Display: Topo 4-Maps');
+    });
+
+    it('accepts a date-only exam_performed_at', function () {
+        $this->postJson('/api/integrators/v1/exams', [
+            'exam_identifier'    => $this->examType->code,
+            'patient_identifier' => $this->patient->id,
+            'archive'            => UploadedFile::fake()->image('exam.jpg'),
+            'name'               => 'Somente Data',
+            'exam_performed_at'  => '2026-03-01',
+        ], $this->ctx['headers'])->assertCreated();
+
+        expect(PatientExam::where('name', 'Somente Data')->first()->exam_performed_at->toDateString())
+            ->toBe('2026-03-01');
+    });
+
+    it('keeps both fields null when the integrator does not send them', function () {
+        $this->postJson('/api/integrators/v1/exams', [
+            'exam_identifier'    => $this->examType->code,
+            'patient_identifier' => $this->patient->id,
+            'archive'            => UploadedFile::fake()->image('exam.jpg'),
+            'name'               => 'Sem Detalhes',
+        ], $this->ctx['headers'])->assertCreated();
+
+        $exam = PatientExam::where('name', 'Sem Detalhes')->first();
+        expect($exam->exam_performed_at)->toBeNull()
+            ->and($exam->observation)->toBeNull();
+    });
+
+    it('links to the schedule of the EXAM day, not of the upload day', function () {
+        $examDay   = now()->subDays(3)->setTime(9, 30);
+        $pastSched = createScheduleForEntity($this->ctx['entity'], [
+            'patient_id' => $this->patient->id,
+            'date_time'  => $examDay->copy()->setTime(9, 0),
+        ]);
+        createScheduleForEntity($this->ctx['entity'], ['patient_id' => $this->patient->id]); // hoje
+
+        $this->postJson('/api/integrators/v1/exams', [
+            'exam_identifier'    => $this->examType->code,
+            'patient_identifier' => $this->patient->id,
+            'archive'            => UploadedFile::fake()->image('exam.jpg'),
+            'name'               => 'Backlog Offline',
+            'exam_performed_at'  => $examDay->toIso8601String(),
+        ], $this->ctx['headers'])->assertCreated();
+
+        $exam = PatientExam::where('name', 'Backlog Offline')->first();
+        expect($exam->schedule_id)->toBe($pastSched['schedule']->id)
+            ->and($exam->doctor_id)->toBe($pastSched['doctor']->id);
+    });
+
+    it('rejects an invalid, far-future or pre-2000 exam_performed_at', function (string $value) {
+        $this->postJson('/api/integrators/v1/exams', [
+            'exam_identifier'    => $this->examType->code,
+            'patient_identifier' => $this->patient->id,
+            'archive'            => UploadedFile::fake()->image('exam.jpg'),
+            'name'               => 'Data Invalida',
+            'exam_performed_at'  => $value,
+        ], $this->ctx['headers'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('exam_performed_at');
+    })->with([
+        'lixo'   => ['nao-e-data'],
+        'futuro' => [fn () => now()->addDays(10)->toIso8601String()],
+        'antigo' => ['1999-12-31'],
+    ]);
+
+    it('rejects an observation longer than 1000 chars', function () {
+        $this->postJson('/api/integrators/v1/exams', [
+            'exam_identifier'    => $this->examType->code,
+            'patient_identifier' => $this->patient->id,
+            'archive'            => UploadedFile::fake()->image('exam.jpg'),
+            'name'               => 'Obs Longa',
+            'observation'        => str_repeat('x', 1001),
+        ], $this->ctx['headers'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('observation');
+    });
+
+    it('re-upload without the fields keeps the values already captured', function () {
+        $payload = [
+            'exam_identifier'    => $this->examType->code,
+            'patient_identifier' => $this->patient->id,
+            'name'               => 'Reenvio',
+        ];
+
+        $this->postJson('/api/integrators/v1/exams', $payload + [
+            'archive'           => UploadedFile::fake()->image('a.jpg'),
+            'exam_performed_at' => '2026-02-12T09:32:25-03:00',
+            'observation'       => 'Display: Topo 4-Maps',
+        ], $this->ctx['headers'])->assertCreated();
+
+        $this->postJson('/api/integrators/v1/exams', $payload + [
+            'archive' => UploadedFile::fake()->image('b.jpg'),
+        ], $this->ctx['headers']);
+
+        $exam = PatientExam::where('name', 'Reenvio')->first();
+        expect($exam->observation)->toBe('Display: Topo 4-Maps')
+            ->and($exam->exam_performed_at)->not->toBeNull();
+    });
+});

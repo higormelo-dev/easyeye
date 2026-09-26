@@ -8,8 +8,8 @@ use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExa
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\{Carbon, Str};
 use Illuminate\Support\Facades\{DB, Storage};
-use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -62,6 +62,11 @@ class PatientExamService
         $entityId   = $integrator->user->entity_id;
         $schedule   = $this->scheduleFindByIdOrCode($request->schedule_identifier);
 
+        // Data real da captura (do arquivo do equipamento), no fuso da clínica.
+        $examPerformedAt = $request->filled('exam_performed_at')
+            ? Carbon::parse($request->exam_performed_at)->setTimezone(config('app.timezone'))
+            : null;
+
         if ($schedule) {
             // Fluxo original: schedule_identifier informado
             $patientId  = $schedule->patient_id;
@@ -74,10 +79,13 @@ class PatientExamService
 
             $patientId = $patient->id;
 
-            // Tenta vincular ao agendamento mais recente do dia para esse paciente
+            // Tenta vincular ao agendamento mais recente do DIA DO EXAME para
+            // esse paciente — não do dia do envio: um exame de ontem enviado
+            // hoje (integrador offline, backlog) não pode cair no agendamento
+            // de hoje. Sem data do equipamento, mantém o comportamento antigo.
             $todaySchedule = Schedule::where('entity_id', $entityId)
                 ->where('patient_id', $patientId)
-                ->whereDate('date_time', now()->toDateString())
+                ->whereDate('date_time', ($examPerformedAt ?? now())->toDateString())
                 ->whereNull('deleted_at')
                 ->orderByDesc('date_time')
                 ->first();
@@ -99,6 +107,8 @@ class PatientExamService
                 name: $request->name,
                 archivePath: $archivePath,
                 laterality: $request->laterality !== null ? (int) $request->laterality : null,
+                examPerformedAt: $examPerformedAt,
+                observation: $request->filled('observation') ? $request->observation : null,
             ),
         );
     }
@@ -256,6 +266,8 @@ class PatientExamService
         ?string $name,
         string $archivePath,
         ?int $laterality = null,
+        ?Carbon $examPerformedAt = null,
+        ?string $observation = null,
     ): array {
         // Escopo do upsert: o registro existente DEVE pertencer ao mesmo paciente.
         // Sem o filtro por patient_id, um exame de outro paciente com o mesmo
@@ -281,6 +293,9 @@ class PatientExamService
                 'name'                           => $name,
                 'laterality'                     => $laterality,
                 'archive'                        => $archivePath,
+                // Reenvio sem esses campos não apaga o que já foi capturado.
+                'exam_performed_at' => $examPerformedAt ?? $existingRecord->exam_performed_at,
+                'observation'       => $observation ?? $existingRecord->observation,
             ]);
 
             // Arquivo substituído: regenera JPEG de exibição + miniatura.
@@ -298,6 +313,8 @@ class PatientExamService
             'name'                           => $name,
             'laterality'                     => $laterality,
             'archive'                        => $archivePath,
+            'exam_performed_at'              => $examPerformedAt,
+            'observation'                    => $observation,
         ]);
 
         GenerateExamDerivatives::dispatch($record->id);

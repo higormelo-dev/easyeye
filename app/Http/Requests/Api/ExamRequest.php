@@ -114,7 +114,19 @@ class ExamRequest extends FormRequest
                     }
                 },
             ],
-            'laterality'           => ['nullable', 'integer', 'in:0,1,2'],
+            'laterality' => ['nullable', 'integer', 'in:0,1,2'],
+            // Data/hora real da captura, lida pelo integrador do arquivo do
+            // equipamento (ex.: "Exam Date"/"Exam Time" do .EMR). ISO-8601 com
+            // offset, ou só a data. Limites contra relógio do PC do aparelho
+            // desregulado: 1 dia de folga no futuro, nada antes de 2000.
+            'exam_performed_at' => [
+                'nullable',
+                'date',
+                'after_or_equal:2000-01-01',
+                'before_or_equal:' . now()->addDay()->toIso8601String(),
+            ],
+            // Descrição do exame vinda do equipamento (ex.: "Display: Topo 4-Maps").
+            'observation'          => ['nullable', 'string', 'max:1000'],
             'equipment_identifier' => [
                 'nullable',
                 function ($attribute, $value, $fail) use ($integrator) {

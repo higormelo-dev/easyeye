@@ -43,6 +43,7 @@ class PatientExam extends Model
         'source',
         'external_origin',
         'exam_performed_at',
+        'observation',
         'import_batch_id',
     ];
 

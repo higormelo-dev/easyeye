@@ -2065,6 +2065,7 @@ const printEntity = computed(() => props.entity ?? {});
                                                  tabindex="0" role="button"
                                                  :aria-pressed="isSelected(exam.id)"
                                                  :aria-label="examAlt(exam)"
+                                                 :title="exam.observation || null"
                                                  @click="onThumbClick(exam)"
                                                  @keydown.enter.self.prevent="toggleExamSelection(exam.id)"
                                                  @keydown.space.self.prevent="toggleExamSelection(exam.id)"
@@ -2493,7 +2494,8 @@ const printEntity = computed(() => props.entity ?? {});
                         <div v-for="exam in printExams" :key="exam.id" style="break-inside:avoid;">
                             <div class="text-center mb-1"
                                  style="font-size:.65rem;color:#333;font-weight:600;">
-                                {{ exam.exam_type?.name ?? 'Exame' }} - {{ latLabel(exam.laterality) }} - {{ formatDateTime(exam.created_at) }}
+                                {{ exam.exam_type?.name ?? 'Exame' }} - {{ latLabel(exam.laterality) }} - {{ formatDateTime(exam.exam_performed_at ?? exam.created_at) }}
+                                <div v-if="exam.observation" style="font-weight:400;white-space:pre-line;">{{ exam.observation }}</div>
                             </div>
                             <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
                                  :src="examUrls[exam.id]" :alt="examAlt(exam)"
