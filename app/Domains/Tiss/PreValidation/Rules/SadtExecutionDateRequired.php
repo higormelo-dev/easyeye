@@ -26,17 +26,17 @@ final class SadtExecutionDateRequired implements TissGuideValidationRule
         }
 
         $operatorName = $guide->relationLoaded('operator')
-            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? 'a operadora')
-            : 'a operadora';
+            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? __('tiss_prevalidation.operator_fallback'))
+            : __('tiss_prevalidation.operator_fallback');
 
         return [
             new TissGuideValidationIssue(
                 severity: TissValidationSeverity::Error,
                 code: 'SADT_EXECUTION_DATE_REQUIRED',
                 field: 'execution_date',
-                message: 'Data de execução é obrigatória para guias SP-SADT.',
-                suggestion: 'Informe a data em que os procedimentos foram realizados.',
-                operatorHint: "Atenção: {$operatorName} exige a data de execução em guias SP-SADT.",
+                message: __('tiss_prevalidation.SADT_EXECUTION_DATE_REQUIRED.message'),
+                suggestion: __('tiss_prevalidation.SADT_EXECUTION_DATE_REQUIRED.suggestion'),
+                operatorHint: __('tiss_prevalidation.SADT_EXECUTION_DATE_REQUIRED.operator_hint', ['operator' => $operatorName]),
             ),
         ];
     }

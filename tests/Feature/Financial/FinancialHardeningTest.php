@@ -1,8 +1,8 @@
 <?php
 
 use App\Enums\{BillingClaimStatus, ClientRule};
-use App\Http\Controllers\Financial\FinancialReportsController;
 use App\Models\{BillingClaim, Covenant, Entity, User};
+use App\Support\Export\SpreadsheetWriter;
 
 beforeEach(function () {
     $this->entity   = Entity::factory()->create(['is_client' => true, 'active' => true]);
@@ -20,14 +20,14 @@ it('nega acesso a médico (role sem permissão financeira) nas rotas de glosa', 
 });
 
 it('sanitiza fórmula em célula de export CSV pra não executar no Excel', function () {
-    $controller = app(FinancialReportsController::class);
-    $method     = new ReflectionMethod($controller, 'sanitizeCellValue');
-    $method->setAccessible(true);
+    // A geração das planilhas saiu do FinancialReportsController para o
+    // SpreadsheetWriter (mesma regra; arquivos idênticos — ReportsSpreadsheetWriterTest).
+    $writer = app(SpreadsheetWriter::class);
 
-    expect($method->invoke($controller, '=CMD(calc)'))->toBe("'=CMD(calc)")
-        ->and($method->invoke($controller, '+1+1'))->toBe("'+1+1")
-        ->and($method->invoke($controller, 'PACIENTE NORMAL'))->toBe('PACIENTE NORMAL')
-        ->and($method->invoke($controller, 150.5))->toBe(150.5);
+    expect($writer->sanitizeCell('=CMD(calc)'))->toBe("'=CMD(calc)")
+        ->and($writer->sanitizeCell('+1+1'))->toBe("'+1+1")
+        ->and($writer->sanitizeCell('PACIENTE NORMAL'))->toBe('PACIENTE NORMAL')
+        ->and($writer->sanitizeCell(150.5))->toBe(150.5);
 });
 
 it('rejeita marcar guia como paga com valor maior que o valor da guia', function () {

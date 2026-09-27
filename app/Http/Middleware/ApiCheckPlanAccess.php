@@ -33,6 +33,7 @@ class ApiCheckPlanAccess
 
         $subscription = Subscription::forEntity($entityId)
             ->accessible()
+            ->currentFirst()
             ->with('plan.features')
             ->first();
 

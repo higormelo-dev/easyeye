@@ -16,6 +16,8 @@ use App\Http\Controllers\{
     EyeImageMontageController,
     EyeImageReportController,
     EyeImagesController,
+    Financial\BillingBulkActionsController,
+    Financial\BillingClaimActionsController,
     Financial\BillingController as FinancialBillingController,
     Financial\CashClosingController,
     Financial\CashFlowController,
@@ -639,6 +641,20 @@ Route::group(
                 // Fluxo de caixa
                 Route::get('cash-flow', [CashFlowController::class, 'index'])->name('cash-flow.index');
 
+                // Telas de leitura fora do throttle financial-write (30/min): o
+                // limite de gravação derrubava a navegação com 429 no meio do trabalho.
+                Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
+                Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
+                Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
+                // Listas/prévia dos modais em lote do faturamento (JSON, só leitura).
+                Route::get('billing/batches/{batch}/attachable-claims', [BillingBulkActionsController::class, 'attachableClaims'])->name('billing.batches.attachable-claims');
+                Route::get('billing/claims/{claim}/attach-targets', [BillingBulkActionsController::class, 'attachTargets'])->name('billing.claims.attach-targets');
+                Route::get('billing/batches/{batch}/receipt-preview', [BillingBulkActionsController::class, 'batchReceiptPreview'])->name('billing.batches.receipt-preview');
+                // CID-10 da guia TISS (indicação clínica) para quem fatura: mesmo
+                // Cid10SearchController, sob a permissão do financeiro — a rota do
+                // prontuário (cid10.search) exige admin/médico/secretária.
+                Route::get('cid10/search', Cid10SearchController::class)->name('cid10.search');
+
                 // Preço/período de procedimento, faturamento, fechamento de caixa,
                 // recurso de glosa, exportação e importação de retorno: throttle
                 // financial-write (30/min/usuário) — sem teto, sessão comprometida
@@ -649,22 +665,31 @@ Route::group(
                     Route::delete('cash-flow/{entry}', [CashFlowController::class, 'destroy'])->name('cash-flow.destroy');
 
                     // Tabela de preço por procedimento × convênio
-                    Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
                     Route::post('procedure-prices', [ProcedurePricesController::class, 'store'])->name('procedure-prices.store');
 
                     // Fechamento de caixa (lock por período)
-                    Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
                     Route::post('cash-closing', [CashClosingController::class, 'store'])->name('cash-closing.store');
-                    Route::delete('cash-closing/{cashClose}', [CashClosingController::class, 'destroy'])->name('cash-closing.destroy');
+                    // Reabrir período: só admin da clínica e com motivo (ReopenCashCloseRequest).
+                    Route::delete('cash-closing/{cashClose}', [CashClosingController::class, 'destroy'])
+                        ->middleware('entity.role:admin')
+                        ->name('cash-closing.destroy');
 
                     // Faturamento TISS (individual e lote)
-                    Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
                     Route::post('billing/individual', [FinancialBillingController::class, 'storeIndividual'])->name('billing.individual.store');
                     Route::post('billing/batch', [FinancialBillingController::class, 'storeBatch'])->name('billing.batch.store');
                     Route::post('billing/batches/{batch}/submit', [FinancialBillingController::class, 'submitBatch'])->name('billing.batches.submit');
                     Route::get('billing/batches/{batch}/xml', [FinancialBillingController::class, 'exportBatchXml'])->name('billing.batches.xml');
                     Route::post('billing/claims/{claim}/paid', [FinancialBillingController::class, 'markClaimPaid'])->name('billing.claims.paid');
                     Route::post('billing/claims/{claim}/denied', [FinancialBillingController::class, 'markClaimDenied'])->name('billing.claims.denied');
+                    // Cancelar guia/lote em rascunho (motivo) e corrigir pendência TISS da guia.
+                    Route::post('billing/claims/{claim}/cancel', [BillingClaimActionsController::class, 'cancelClaim'])->name('billing.claims.cancel');
+                    Route::post('billing/claims/{claim}/fix-pending', [BillingClaimActionsController::class, 'fixPending'])->name('billing.claims.fix-pending');
+                    Route::post('billing/batches/{batch}/cancel', [BillingClaimActionsController::class, 'cancelBatch'])->name('billing.batches.cancel');
+                    // Ações em lote: anexar guias ao lote, reprocessar pendentes e recebimento em massa.
+                    Route::post('billing/batches/{batch}/attach-claims', [BillingBulkActionsController::class, 'attachClaims'])->name('billing.batches.attach-claims');
+                    Route::post('billing/batches/{batch}/reprocess-pending', [BillingBulkActionsController::class, 'reprocessPending'])->name('billing.batches.reprocess-pending');
+                    Route::post('billing/claims/bulk-receipt', [BillingBulkActionsController::class, 'bulkReceipt'])->name('billing.claims.bulk-receipt');
+                    Route::post('billing/batches/{batch}/receipt', [BillingBulkActionsController::class, 'batchReceipt'])->name('billing.batches.receipt');
 
                     // Conciliação de glosas
                     Route::post('tiss/glosas/{glosa}/appeal', [TissGlosasController::class, 'appeal'])->name('tiss.glosas.appeal');
@@ -688,6 +713,8 @@ Route::group(
                 // Relatórios financeiros
                 Route::get('reports/cash-flow', [FinancialReportsController::class, 'cashFlow'])->name('reports.cash-flow');
                 Route::get('reports/covenants', [FinancialReportsController::class, 'covenants'])->name('reports.covenants');
+                // Guias do convênio no período (linha expandida do relatório; JSON paginado).
+                Route::get('reports/covenants/claims', [FinancialReportsController::class, 'covenantClaims'])->name('reports.covenants.claims');
             });
         });
 

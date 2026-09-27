@@ -20,19 +20,19 @@ final class GuideItemsRequired implements TissGuideValidationRule
             return [];
         }
 
-        $typeLabel    = $guide->guide_type === TissGuideType::Sadt ? 'SP-SADT' : 'Consulta';
+        $typeLabel    = __('tiss_prevalidation.guide_type.' . ($guide->guide_type === TissGuideType::Sadt ? 'sadt' : 'consultation'));
         $operatorName = $guide->relationLoaded('operator')
-            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? 'a operadora')
-            : 'a operadora';
+            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? __('tiss_prevalidation.operator_fallback'))
+            : __('tiss_prevalidation.operator_fallback');
 
         return [
             new TissGuideValidationIssue(
                 severity: TissValidationSeverity::Error,
                 code: 'ITEMS_REQUIRED',
                 field: 'items',
-                message: "Guia de {$typeLabel} sem procedimentos cadastrados.",
-                suggestion: 'Adicione pelo menos um procedimento com código TUSS, quantidade e valor.',
-                operatorHint: "Atenção: {$operatorName} não paga guias sem procedimentos informados.",
+                message: __('tiss_prevalidation.ITEMS_REQUIRED.message', ['type' => $typeLabel]),
+                suggestion: __('tiss_prevalidation.ITEMS_REQUIRED.suggestion'),
+                operatorHint: __('tiss_prevalidation.ITEMS_REQUIRED.operator_hint', ['operator' => $operatorName]),
             ),
         ];
     }

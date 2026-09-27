@@ -21,13 +21,16 @@ it('renders the billing index without route errors when claims already exist', f
 
     $response = $this->get(route('panel.financial.billing.index'));
 
+    // Fase 4: as abas vêm paginadas (paginator do Laravel) — as linhas ficam em `data`.
     $response->assertOk();
     $response->assertInertia(fn ($page) => $page
         ->component('Panel/Financial/Billing/Index')
-        ->has('claims', 1)
-        ->where('claims.0.mark_paid_url', fn ($url) => str_contains($url, '/paid'))
-        ->where('claims.0.mark_denied_url', fn ($url) => str_contains($url, '/denied'))
-        ->where('claims.0.status_label', 'Rascunho'));
+        ->has('claims.data', 1)
+        ->where('claims.total', 1)
+        ->where('claims.data.0.mark_paid_url', fn ($url) => str_contains($url, '/paid'))
+        ->where('claims.data.0.mark_denied_url', fn ($url) => str_contains($url, '/denied'))
+        ->where('claims.data.0.cancel_url', fn ($url) => str_contains($url, '/cancel'))
+        ->where('claims.data.0.status_label', 'Rascunho'));
 });
 
 it('creates an individual claim via http and flashes a success message', function (): void {

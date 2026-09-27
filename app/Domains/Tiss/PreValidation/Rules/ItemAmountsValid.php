@@ -27,8 +27,8 @@ final class ItemAmountsValid implements TissGuideValidationRule
                     severity: TissValidationSeverity::Error,
                     code: 'ITEM_QUANTITY_ZERO',
                     field: "items.{$item->id}.quantity",
-                    message: "Procedimento TUSS {$code}: quantidade deve ser maior que zero.",
-                    suggestion: 'Corrija a quantidade do procedimento antes de incluir no lote.',
+                    message: __('tiss_prevalidation.ITEM_QUANTITY_ZERO.message', ['code' => $code]),
+                    suggestion: __('tiss_prevalidation.ITEM_QUANTITY_ZERO.suggestion'),
                 );
             }
 
@@ -37,8 +37,8 @@ final class ItemAmountsValid implements TissGuideValidationRule
                     severity: TissValidationSeverity::Error,
                     code: 'ITEM_AMOUNT_ZERO',
                     field: "items.{$item->id}.unit_amount",
-                    message: "Procedimento TUSS {$code}: valor unitário é zero ou negativo.",
-                    suggestion: 'Informe o valor do procedimento conforme a tabela do convênio.',
+                    message: __('tiss_prevalidation.ITEM_AMOUNT_ZERO.message', ['code' => $code]),
+                    suggestion: __('tiss_prevalidation.ITEM_AMOUNT_ZERO.suggestion'),
                 );
             }
         }

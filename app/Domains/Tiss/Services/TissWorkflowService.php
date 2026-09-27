@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Tiss\Services;
 
-use App\Domains\Tiss\Actions\{AttachGuideToBatchAction, CancelTissBatchAction, CancelTissGuideAction, CloseTissBatchAction, CreateTissBatchAction, CreateTissGuideAction, RetryTissBatchAction};
+use App\Domains\Tiss\Actions\{AttachGuideToBatchAction, CancelTissBatchAction, CancelTissGuideAction, CloseTissBatchAction, CreateTissBatchAction, CreateTissGuideAction, DetachGuideFromBatchAction, RetryTissBatchAction};
 use App\Domains\Tiss\Jobs\{GenerateTissBatchXmlJob, SendTissBatchJob};
 use App\Domains\Tiss\Models\{TissBatch, TissGuide, TissReturn};
 
@@ -21,6 +21,7 @@ class TissWorkflowService
         private readonly GenerateTissXmlService $generateTissXmlService,
         private readonly SendTissBatchService $sendTissBatchService,
         private readonly ReceiveTissResponseService $receiveTissResponseService,
+        private readonly DetachGuideFromBatchAction $detachGuideFromBatchAction,
     ) {
     }
 
@@ -43,6 +44,12 @@ class TissWorkflowService
     public function attachGuideToBatch(TissBatch $batch, TissGuide $guide): void
     {
         ($this->attachGuideToBatchAction)($batch, $guide);
+    }
+
+    /** Tira a guia de um lote TISS ainda não enviado (ver DetachGuideFromBatchAction). */
+    public function detachGuideFromBatch(TissBatch $batch, TissGuide $guide, ?string $reason = null): TissBatch
+    {
+        return ($this->detachGuideFromBatchAction)($batch, $guide, $reason);
     }
 
     public function closeBatch(TissBatch $batch): TissBatch

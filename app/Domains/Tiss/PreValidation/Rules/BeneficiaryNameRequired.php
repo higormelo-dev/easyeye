@@ -22,8 +22,8 @@ final class BeneficiaryNameRequired implements TissGuideValidationRule
                 severity: TissValidationSeverity::Warning,
                 code: 'BENEFICIARY_NAME_MISSING',
                 field: 'beneficiary_name',
-                message: 'Nome do beneficiário não informado.',
-                suggestion: 'Informe o nome completo conforme consta no cartão do plano de saúde.',
+                message: __('tiss_prevalidation.BENEFICIARY_NAME_MISSING.message'),
+                suggestion: __('tiss_prevalidation.BENEFICIARY_NAME_MISSING.suggestion'),
             ),
         ];
     }

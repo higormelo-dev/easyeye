@@ -27,8 +27,9 @@ class SubscriptionExpiredController extends Controller
             return redirect()->route('panel.dashboard');
         }
 
+        // currentFirst: mesmo desempate (created_at, id) de SubscriptionService::getCurrent.
         $lastSubscription = $entity
-            ? Subscription::forEntity($entity->id)->with('plan')->latest()->first()
+            ? Subscription::forEntity($entity->id)->with('plan')->currentFirst()->first()
             : null;
 
         $plans = Plan::active()

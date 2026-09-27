@@ -40,8 +40,8 @@ final class TussCodeActive implements TissGuideValidationRule
                     severity: TissValidationSeverity::Error,
                     code: 'TUSS_CODE_MISSING',
                     field: "items.{$item->id}.tuss_code",
-                    message: 'Procedimento sem código TUSS.',
-                    suggestion: 'Informe o código TUSS do procedimento conforme a Tabela 22 da ANS.',
+                    message: __('tiss_prevalidation.TUSS_CODE_MISSING.message'),
+                    suggestion: __('tiss_prevalidation.TUSS_CODE_MISSING.suggestion'),
                 );
 
                 continue;
@@ -54,8 +54,8 @@ final class TussCodeActive implements TissGuideValidationRule
                     severity: TissValidationSeverity::Warning,
                     code: 'TUSS_CODE_NOT_FOUND',
                     field: "items.{$item->id}.tuss_code",
-                    message: "Código TUSS {$code} não encontrado na tabela de referência.",
-                    suggestion: 'Verifique se o código TUSS está correto ou atualize a tabela de códigos no sistema.',
+                    message: __('tiss_prevalidation.TUSS_CODE_NOT_FOUND.message', ['code' => $code]),
+                    suggestion: __('tiss_prevalidation.TUSS_CODE_NOT_FOUND.suggestion'),
                 );
 
                 continue;
@@ -66,21 +66,21 @@ final class TussCodeActive implements TissGuideValidationRule
                     severity: TissValidationSeverity::Warning,
                     code: 'TUSS_CODE_INACTIVE',
                     field: "items.{$item->id}.tuss_code",
-                    message: "Código TUSS {$code} está inativo.",
-                    suggestion: 'Substitua o código TUSS por uma versão vigente ou contate o suporte.',
+                    message: __('tiss_prevalidation.TUSS_CODE_INACTIVE.message', ['code' => $code]),
+                    suggestion: __('tiss_prevalidation.TUSS_CODE_INACTIVE.suggestion'),
                 );
 
                 continue;
             }
 
             if ($tuss->effective_until && $tuss->effective_until->toDateString() < $today) {
-                $until    = $tuss->effective_until->format('d/m/Y');
+                $until    = $tuss->effective_until->isoFormat('L'); // data no formato do idioma
                 $issues[] = new TissGuideValidationIssue(
                     severity: TissValidationSeverity::Warning,
                     code: 'TUSS_CODE_EXPIRED',
                     field: "items.{$item->id}.tuss_code",
-                    message: "Código TUSS {$code} expirou em {$until}.",
-                    suggestion: 'Utilize o código TUSS substituto vigente para evitar glosa por código expirado.',
+                    message: __('tiss_prevalidation.TUSS_CODE_EXPIRED.message', ['code' => $code, 'until' => $until]),
+                    suggestion: __('tiss_prevalidation.TUSS_CODE_EXPIRED.suggestion'),
                 );
             }
         }

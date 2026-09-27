@@ -21,8 +21,8 @@ final class CidIndicationRequired implements TissGuideValidationRule
     public function validate(TissGuide $guide): array
     {
         $operatorName = $guide->relationLoaded('operator')
-            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? 'a operadora')
-            : 'a operadora';
+            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? __('tiss_prevalidation.operator_fallback'))
+            : __('tiss_prevalidation.operator_fallback');
 
         $cid = trim((string) ($guide->clinical_indication ?? ''));
 
@@ -32,9 +32,9 @@ final class CidIndicationRequired implements TissGuideValidationRule
                     severity: TissValidationSeverity::Error,
                     code: 'CID_REQUIRED',
                     field: 'clinical_indication',
-                    message: 'Código CID-10 não informado.',
-                    suggestion: 'Informe o CID-10 correspondente ao diagnóstico (ex.: H40.1 para glaucoma, H25.9 para catarata).',
-                    operatorHint: "Atenção: {$operatorName} vai glosar esta guia pois falta o CID-10.",
+                    message: __('tiss_prevalidation.CID_REQUIRED.message'),
+                    suggestion: __('tiss_prevalidation.CID_REQUIRED.suggestion'),
+                    operatorHint: __('tiss_prevalidation.CID_REQUIRED.operator_hint', ['operator' => $operatorName]),
                 ),
             ];
         }
@@ -45,9 +45,9 @@ final class CidIndicationRequired implements TissGuideValidationRule
                     severity: TissValidationSeverity::Error,
                     code: 'CID_FORMAT_INVALID',
                     field: 'clinical_indication',
-                    message: "Código CID-10 \"{$cid}\" está em formato inválido.",
-                    suggestion: 'O código CID deve seguir o padrão: uma letra maiúscula + 2 dígitos + sufixo opcional (ex.: H40.1, Z00.0, A09).',
-                    operatorHint: "Atenção: {$operatorName} pode rejeitar esta guia por formato de CID inválido.",
+                    message: __('tiss_prevalidation.CID_FORMAT_INVALID.message', ['cid' => $cid]),
+                    suggestion: __('tiss_prevalidation.CID_FORMAT_INVALID.suggestion'),
+                    operatorHint: __('tiss_prevalidation.CID_FORMAT_INVALID.operator_hint', ['operator' => $operatorName]),
                 ),
             ];
         }

@@ -152,6 +152,18 @@ class Subscription extends Model
         return $query->where('entity_id', $entityId);
     }
 
+    /**
+     * Com mais de uma assinatura acessível (ex.: trial automático ainda válido
+     * + plano pago recém-contratado), vale a MAIS RECENTE — mesma regra que os
+     * controllers de IA já usavam. Sem ordem, o `first()` dependia da ordem
+     * física no banco: o recurso do plano podia ser liberado ou bloqueado a
+     * cada consulta (e testes falhavam conforme a ordem de execução).
+     */
+    public function scopeCurrentFirst($query)
+    {
+        return $query->orderByDesc('created_at')->orderByDesc('id');
+    }
+
     public function scopeAccessible($query)
     {
         return $query->where(function ($q) {

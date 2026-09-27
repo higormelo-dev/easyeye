@@ -54,8 +54,8 @@ final class EyeSideRecommended implements TissGuideValidationRule
                 severity: TissValidationSeverity::Warning,
                 code: 'EYE_SIDE_RECOMMENDED',
                 field: "items.{$item->id}.eye_side",
-                message: "Procedimento \"{$description}\" indica lateralidade (monocular/binocular), mas o olho (OD/OE/AO) não foi informado.",
-                suggestion: 'Informe o olho no faturamento — evita duplicidade e facilita auditoria/glosa.',
+                message: __('tiss_prevalidation.EYE_SIDE_RECOMMENDED.message', ['description' => $description]),
+                suggestion: __('tiss_prevalidation.EYE_SIDE_RECOMMENDED.suggestion'),
             );
         }
 

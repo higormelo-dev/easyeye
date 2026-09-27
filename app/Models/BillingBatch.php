@@ -41,6 +41,10 @@ class BillingBatch extends Model
         'xml_path',
         'notes',
         'tiss_batch_id',
+        // Cancelamento (só rascunho): motivo, quem e quando — ver BillingAdjustmentService::cancelBatch().
+        'cancel_reason',
+        'cancelled_by',
+        'cancelled_at',
     ];
 
     protected function casts(): array
@@ -55,6 +59,7 @@ class BillingBatch extends Model
             'processed_at' => 'datetime',
             'total_claims' => 'integer',
             'total_amount' => 'decimal:2',
+            'cancelled_at' => 'datetime',
             'created_at'   => 'datetime',
             'updated_at'   => 'datetime',
             'deleted_at'   => 'datetime',
@@ -93,5 +98,11 @@ class BillingBatch extends Model
     public function tissBatch(): BelongsTo
     {
         return $this->belongsTo(TissBatch::class, 'tiss_batch_id');
+    }
+
+    /** Quem cancelou o lote (nulo se não cancelado ou se o usuário foi excluído). */
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 }

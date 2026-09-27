@@ -104,6 +104,7 @@ class SubscriptionService
     {
         return Subscription::forEntity($entity->id)
             ->accessible()
+            ->currentFirst()
             ->with('plan.features')
             ->first();
     }

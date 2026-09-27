@@ -27,17 +27,17 @@ final class AuthorizationNumberRequired implements TissGuideValidationRule
         }
 
         $operatorName = $guide->relationLoaded('operator')
-            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? 'a operadora')
-            : 'a operadora';
+            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? __('tiss_prevalidation.operator_fallback'))
+            : __('tiss_prevalidation.operator_fallback');
 
         return [
             new TissGuideValidationIssue(
                 severity: TissValidationSeverity::Error,
                 code: 'AUTHORIZATION_REQUIRED',
                 field: 'authorization_number',
-                message: 'Número de autorização prévia não informado.',
-                suggestion: 'Este convênio exige autorização prévia. Informe o número fornecido pela operadora.',
-                operatorHint: "Atenção: {$operatorName} vai glosar esta guia pois o procedimento exige autorização prévia.",
+                message: __('tiss_prevalidation.AUTHORIZATION_REQUIRED.message'),
+                suggestion: __('tiss_prevalidation.AUTHORIZATION_REQUIRED.suggestion'),
+                operatorHint: __('tiss_prevalidation.AUTHORIZATION_REQUIRED.operator_hint', ['operator' => $operatorName]),
             ),
         ];
     }

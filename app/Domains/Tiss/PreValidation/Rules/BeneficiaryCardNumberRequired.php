@@ -18,17 +18,17 @@ final class BeneficiaryCardNumberRequired implements TissGuideValidationRule
         }
 
         $operatorName = $guide->relationLoaded('operator')
-            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? 'a operadora')
-            : 'a operadora';
+            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? __('tiss_prevalidation.operator_fallback'))
+            : __('tiss_prevalidation.operator_fallback');
 
         return [
             new TissGuideValidationIssue(
                 severity: TissValidationSeverity::Error,
                 code: 'BENEFICIARY_CARD_REQUIRED',
                 field: 'beneficiary_card_number',
-                message: 'Número da carteirinha do beneficiário não informado.',
-                suggestion: 'Informe o número da carteirinha exatamente como consta no cartão do plano de saúde.',
-                operatorHint: "Atenção: {$operatorName} vai glosar esta guia pois o número da carteirinha é obrigatório.",
+                message: __('tiss_prevalidation.BENEFICIARY_CARD_REQUIRED.message'),
+                suggestion: __('tiss_prevalidation.BENEFICIARY_CARD_REQUIRED.suggestion'),
+                operatorHint: __('tiss_prevalidation.BENEFICIARY_CARD_REQUIRED.operator_hint', ['operator' => $operatorName]),
             ),
         ];
     }

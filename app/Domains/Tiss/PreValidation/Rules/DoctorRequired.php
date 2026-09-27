@@ -18,17 +18,17 @@ final class DoctorRequired implements TissGuideValidationRule
         }
 
         $operatorName = $guide->relationLoaded('operator')
-            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? 'a operadora')
-            : 'a operadora';
+            ? ($guide->operator?->trade_name ?? $guide->operator?->name ?? __('tiss_prevalidation.operator_fallback'))
+            : __('tiss_prevalidation.operator_fallback');
 
         return [
             new TissGuideValidationIssue(
                 severity: TissValidationSeverity::Error,
                 code: 'DOCTOR_REQUIRED',
                 field: 'doctor_id',
-                message: 'Médico executante não vinculado à guia.',
-                suggestion: 'Associe o médico responsável pelo atendimento. O CRM será incluído automaticamente no XML.',
-                operatorHint: "Atenção: {$operatorName} exige o CRM do médico executante para processar o pagamento.",
+                message: __('tiss_prevalidation.DOCTOR_REQUIRED.message'),
+                suggestion: __('tiss_prevalidation.DOCTOR_REQUIRED.suggestion'),
+                operatorHint: __('tiss_prevalidation.DOCTOR_REQUIRED.operator_hint', ['operator' => $operatorName]),
             ),
         ];
     }

@@ -1,8 +1,16 @@
+@php
+    // Idioma do usuário (lang financial_reports), como a tela e o CSV/XLSX:
+    // moeda igual ao Intl.NumberFormat do front, datas no formato do locale.
+    $locale = app()->getLocale();
+    $money  = fn ($value): string => \Illuminate\Support\Number::currency((float) $value, 'BRL', $locale);
+    $date   = fn ($value): string => \Carbon\Carbon::parse($value)->locale($locale)->isoFormat('L');
+    $t      = fn (string $key, array $replace = []): string => __("financial_reports.{$key}", $replace);
+@endphp
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="{{ str_replace('_', '-', $locale) }}">
 <head>
     <meta charset="UTF-8">
-    <title>Relatório de Fluxo de Caixa</title>
+    <title>{{ $t('cashflow.title') }}</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -59,27 +67,27 @@
 </head>
 <body>
     <div class="header">
-        <div class="title">Relatório de Fluxo de Caixa</div>
+        <div class="title">{{ $t('cashflow.title') }}</div>
         <div class="meta">
-            Clínica: {{ $entity->name }}<br>
-            Período: {{ \Carbon\Carbon::parse($from)->format('d/m/Y') }} até {{ \Carbon\Carbon::parse($to)->format('d/m/Y') }}<br>
-            Gerado em: {{ $generatedAt->format('d/m/Y H:i') }}
+            {{ $t('cashflow.pdf.clinic', ['name' => $entity->name]) }}<br>
+            {{ $t('cashflow.pdf.period', ['from' => $date($from), 'to' => $date($to)]) }}<br>
+            {{ $t('cashflow.pdf.generated_at', ['datetime' => $generatedAt->locale($locale)->isoFormat('L LT')]) }}
         </div>
     </div>
 
     <table class="summary">
         <thead>
             <tr>
-                <th>Total de receitas</th>
-                <th>Total de despesas</th>
-                <th>Saldo do período</th>
+                <th>{{ $t('cashflow.pdf.total_income') }}</th>
+                <th>{{ $t('cashflow.pdf.total_expense') }}</th>
+                <th>{{ $t('cashflow.pdf.period_balance') }}</th>
             </tr>
         </thead>
         <tbody>
             <tr>
-                <td>R$ {{ number_format((float) $summary['income'], 2, ',', '.') }}</td>
-                <td>R$ {{ number_format((float) $summary['expense'], 2, ',', '.') }}</td>
-                <td>R$ {{ number_format((float) $summary['balance'], 2, ',', '.') }}</td>
+                <td>{{ $money($summary['income']) }}</td>
+                <td>{{ $money($summary['expense']) }}</td>
+                <td>{{ $money($summary['balance']) }}</td>
             </tr>
         </tbody>
     </table>
@@ -87,31 +95,31 @@
     <table class="table">
         <thead>
             <tr>
-                <th>Data</th>
-                <th>Código</th>
-                <th>Descrição</th>
-                <th>Categoria</th>
-                <th>Convênio</th>
-                <th>Tipo</th>
-                <th>Status</th>
-                <th class="text-end">Valor</th>
+                <th>{{ $t('cashflow.col_date') }}</th>
+                <th>{{ $t('cashflow.col_code') }}</th>
+                <th>{{ $t('cashflow.col_description') }}</th>
+                <th>{{ $t('cashflow.col_category') }}</th>
+                <th>{{ $t('cashflow.col_covenant') }}</th>
+                <th>{{ $t('cashflow.col_type') }}</th>
+                <th>{{ $t('cashflow.col_status') }}</th>
+                <th class="text-end">{{ $t('cashflow.col_value') }}</th>
             </tr>
         </thead>
         <tbody>
             @forelse($entries as $entry)
                 <tr>
-                    <td>{{ $entry->entry_date?->format('d/m/Y') }}</td>
+                    <td>{{ $entry->entry_date ? $date($entry->entry_date) : '' }}</td>
                     <td>{{ $entry->code }}</td>
                     <td>{{ $entry->description }}</td>
-                    <td>{{ $entry->category?->name ?? 'Sem categoria' }}</td>
-                    <td>{{ $entry->covenant?->name ?? 'Sem convênio' }}</td>
+                    <td>{{ $entry->category?->name ?? $t('no_category') }}</td>
+                    <td>{{ $entry->covenant?->name ?? $t('no_covenant') }}</td>
                     <td>{{ $entry->type->label() }}</td>
                     <td>{{ $entry->status->label() }}</td>
-                    <td class="text-end">R$ {{ number_format((float) $entry->amount, 2, ',', '.') }}</td>
+                    <td class="text-end">{{ $money($entry->amount) }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8" class="muted">Nenhum lançamento no período.</td>
+                    <td colspan="8" class="muted">{{ $t('cashflow.no_entries') }}</td>
                 </tr>
             @endforelse
         </tbody>

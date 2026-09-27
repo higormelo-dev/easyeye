@@ -17,6 +17,14 @@
  * `[{id, code, description, category}]` — o método search() abaixo aceita
  * as duas formas de resposta.
  *
+ * Acessibilidade: padrão combobox do WAI-ARIA (input role=combobox +
+ * listbox/option, aria-activedescendant), Esc fecha só a lista (não o modal
+ * em volta), Tab para outro campo ou clique fora fecham a lista, região de
+ * status anuncia "buscando"/total. Textos no idioma do usuário via `t_ui.cid10`
+ * (lang/{locale}/ui.php, compartilhado em toda página); o português abaixo é só
+ * fallback, como no CenteredModal. Chips com as cores "subtle" do Bootstrap
+ * (acompanham o tema escuro).
+ *
  * Props:
  *   modelValue       – v-model, Array<{code, description, custom_diagnosis_id?, is_primary?}>
  *   searchUrl        – endpoint de busca (GET ?q=termo). Aceita array cru
@@ -40,14 +48,20 @@
  *   disabled         – desabilita input e remoção
  *   multiple         – permite mais de um CID selecionado (default true)
  *   maxItems         – limite de itens selecionáveis (default 20)
- *   placeholder      – placeholder do input de busca
- *   label            – rótulo exibido acima do campo (opcional)
+ *   placeholder      – placeholder do input de busca (padrão: t_ui.cid10.placeholder)
+ *   label            – rótulo exibido acima do campo (opcional, ligado ao input)
+ *   inputId          – (opcional) id do input, quando o rótulo fica fora (ex.: CidField)
+ *   ariaLabelledby   – (opcional) id do rótulo externo
+ *   ariaDescribedby  – (opcional) ids de dica/erro externos
+ *   invalid          – (opcional) marca o input com aria-invalid
  *
  * Emits:
  *   update:modelValue
  *   create(term: string) — termo sem match exato, só quando allowCustomEntry
  */
-import { ref, computed } from 'vue';
+import { ref, computed, useId, onMounted, onBeforeUnmount } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+import { useTrans } from '@/composables/useTrans';
 
 const props = defineProps({
     modelValue:       { type: Array,   default: () => [] },
@@ -58,12 +72,38 @@ const props = defineProps({
     primaryToggle:    { type: Boolean, default: false },
     disabled:         { type: Boolean, default: false },
     multiple:         { type: Boolean, default: true },
-    maxItems:         { type: Number, default: 20 },
-    placeholder: { type: String, default: 'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…' },
-    label:       { type: String, default: '' },
+    maxItems:         { type: Number,  default: 20 },
+    placeholder:      { type: String,  default: '' },
+    label:            { type: String,  default: '' },
+    inputId:          { type: String,  default: '' },
+    ariaLabelledby:   { type: String,  default: '' },
+    ariaDescribedby:  { type: String,  default: '' },
+    invalid:          { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue', 'create']);
+
+// Fallback (pt_BR) — o texto do idioma do usuário vem de t_ui.cid10.
+const FALLBACK_TEXT = {
+    placeholder:    'Buscar por código ou diagnóstico (ex: H40.1, glaucoma)…',
+    search_label:   'Buscar diagnóstico (CID-10)',
+    suggestions:    'Sugestões de diagnóstico',
+    most_used:      'Mais usados',
+    custom:         'Customizado',
+    create:         "Cadastrar novo diagnóstico: ':term'",
+    primary:        'Diagnóstico principal',
+    mark_primary:   'Marcar como diagnóstico principal',
+    primary_toggle: 'Diagnóstico principal: :item',
+    remove:         'Remover :item',
+    searching:      'Buscando…',
+    results_one:    ':count resultado',
+    results_other:  ':count resultados',
+    no_results:     'Nenhum diagnóstico encontrado.',
+};
+
+const page   = usePage();
+const text   = computed(() => ({ ...FALLBACK_TEXT, ...(page?.props?.t_ui?.cid10 ?? {}) }));
+const { tx } = useTrans(() => text.value);
 
 const selected = computed({
     get: () => props.modelValue ?? [],
@@ -78,6 +118,15 @@ const open            = ref(false);
 const searching       = ref(false);
 const loadingMostUsed = ref(false);
 const activeIndex     = ref(-1);
+// Busca concluída para o termo atual (para anunciar "nenhum encontrado").
+const searched        = ref(false);
+
+const rootRef    = ref(null);
+const uid        = useId();
+const inputDomId = computed(() => props.inputId || `cid10-${uid}`);
+const listboxId  = computed(() => `${inputDomId.value}-listbox`);
+const createId   = computed(() => `${listboxId.value}-create`);
+const optionId   = (index) => `${listboxId.value}-opt-${index}`;
 
 function csrf() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
@@ -91,6 +140,11 @@ function csrf() {
 function itemId(item) {
     if (!item) return '';
     return item.custom_diagnosis_id ? `custom:${item.custom_diagnosis_id}` : `cid10:${item.code}`;
+}
+
+/** Texto do chip para leitores de tela ("H40.1 – Glaucoma" ou só a descrição). */
+function itemText(item) {
+    return item.code ? `${item.code} – ${item.description}` : item.description;
 }
 
 /** Aceita tanto array cru quanto {data: [...]} — ver doc do componente. */
@@ -117,8 +171,33 @@ const showCreateRow = computed(() => (
     props.allowCustomEntry && !props.disabled && trimmedQuery.value.length >= 2 && !hasExactMatch.value
 ));
 
+const showingMostUsedList = computed(() => trimmedQuery.value.length === 0 && showingMostUsed.value);
+
+const listVisible = computed(() => open.value && (activeList.value.length > 0 || showCreateRow.value));
+
+const activeDescendant = computed(() => {
+    if (!listVisible.value || activeIndex.value < 0) return undefined;
+    if (activeIndex.value < activeList.value.length) return optionId(activeIndex.value);
+    return showCreateRow.value ? createId.value : undefined;
+});
+
+const statusText = computed(() => {
+    if (searching.value || loadingMostUsed.value) return text.value.searching;
+
+    const count = activeList.value.length;
+    if (listVisible.value && count > 0) return tx(count === 1 ? 'results_one' : 'results_other', { count });
+
+    return searched.value && trimmedQuery.value.length >= 2 && count === 0 ? text.value.no_results : '';
+});
+
+function closeList() {
+    open.value        = false;
+    activeIndex.value = -1;
+}
+
 async function search() {
     showingMostUsed.value = false;
+    searched.value        = false;
     const q = trimmedQuery.value;
     if (q.length < 2 || !props.searchUrl) {
         results.value = [];
@@ -139,6 +218,7 @@ async function search() {
         const list = unwrapList(await res.json());
         results.value = list.filter((c) => !selected.value.some((s) => itemId(s) === itemId(c)));
         activeIndex.value = -1;
+        searched.value    = true;
         open.value = results.value.length > 0 || showCreateRow.value;
     } catch (e) {
         console.error('CID-10 search error:', e);
@@ -169,6 +249,29 @@ async function onFocus() {
     }
 }
 
+/**
+ * Tab para outro campo fecha a lista. Sem relatedTarget (ex.: clique na barra
+ * de rolagem da própria lista) não fecha — o clique fora trata o resto.
+ */
+function onBlur(event) {
+    const next = event.relatedTarget;
+    if (next && !rootRef.value?.contains(next)) closeList();
+}
+
+/** Esc fecha só a lista; com ela fechada o Esc segue para o modal em volta. */
+function onEscape(event) {
+    if (!listVisible.value) return;
+    event.stopPropagation();
+    closeList();
+}
+
+function onDocumentPointerDown(event) {
+    if (open.value && rootRef.value && !rootRef.value.contains(event.target)) closeList();
+}
+
+onMounted(() => document.addEventListener('pointerdown', onDocumentPointerDown, true));
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPointerDown, true));
+
 function buildSelectedItem(item) {
     const built = { code: item.code ?? null, description: item.description };
     if (item.custom_diagnosis_id) built.custom_diagnosis_id = item.custom_diagnosis_id;
@@ -190,7 +293,8 @@ function selectItem(item) {
     results.value          = [];
     mostUsedResults.value  = [];
     showingMostUsed.value  = false;
-    open.value             = false;
+    searched.value         = false;
+    closeList();
 }
 
 function removeItem(id) {
@@ -212,9 +316,10 @@ function togglePrimary(id) {
 function triggerCreate() {
     if (props.disabled || props.creating || !trimmedQuery.value) return;
     emit('create', trimmedQuery.value);
-    query.value   = '';
-    results.value = [];
-    open.value    = false;
+    query.value    = '';
+    results.value  = [];
+    searched.value = false;
+    closeList();
 }
 
 function selectActive() {
@@ -235,42 +340,42 @@ function moveActive(delta) {
 </script>
 
 <template>
-    <div>
-        <label v-if="label" class="pmr-label">{{ label }}</label>
+    <div ref="rootRef">
+        <label v-if="label" :for="inputDomId" class="pmr-label">{{ label }}</label>
 
         <div v-if="selected.length > 0" class="d-flex flex-wrap gap-1 mb-1">
             <span
                 v-for="item in selected"
                 :key="itemId(item)"
-                class="badge d-inline-flex align-items-center gap-1"
-                :style="{
-                    background: primaryToggle && item.is_primary ? '#fff6e0' : '#e8f4fd',
-                    color: '#1a5c8a',
-                    fontSize: '.8rem',
-                    fontWeight: 500,
-                    border: primaryToggle && item.is_primary ? '1px solid #f0c14b' : '1px solid #b8d9f0',
-                    padding: '.3rem .5rem',
-                }"
+                class="badge cid-chip d-inline-flex align-items-center gap-1 border"
+                :class="primaryToggle && item.is_primary
+                    ? 'bg-warning-subtle text-warning-emphasis border-warning-subtle'
+                    : 'bg-primary-subtle text-primary-emphasis border-primary-subtle'"
+                data-test="cid-chip"
             >
                 <button
                     v-if="primaryToggle && !disabled"
                     type="button"
-                    class="btn btn-link p-0 border-0 lh-1"
-                    style="font-size:.75rem;"
-                    :title="item.is_primary ? 'Diagnóstico principal' : 'Marcar como diagnóstico principal'"
+                    class="btn btn-link p-0 border-0 lh-1 cid-chip__star"
+                    :title="item.is_primary ? text.primary : text.mark_primary"
+                    :aria-label="tx('primary_toggle', { item: itemText(item) })"
+                    :aria-pressed="item.is_primary ? 'true' : 'false'"
+                    data-test="cid-primary"
                     @click="togglePrimary(itemId(item))"
-                ><i class="fa" :class="item.is_primary ? 'fa-star text-warning' : 'fa-star-o text-muted'"></i></button>
-                <i v-else-if="primaryToggle && item.is_primary" class="fa fa-star text-warning" style="font-size:.75rem;" title="Diagnóstico principal"></i>
+                ><i class="fa" :class="item.is_primary ? 'fa-star text-warning' : 'fa-star-o text-body-secondary'" aria-hidden="true"></i></button>
+                <template v-else-if="primaryToggle && item.is_primary">
+                    <i class="fa fa-star text-warning cid-chip__star" :title="text.primary" aria-hidden="true"></i>
+                    <span class="visually-hidden">{{ text.primary }}</span>
+                </template>
                 <span v-if="item.code" class="fw-semibold">{{ item.code }}</span>
-                <span
-                    class="text-secondary fw-normal"
-                    style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-                >{{ item.code ? '– ' : '' }}{{ item.description }}</span>
+                <span class="fw-normal cid-chip__description">{{ item.code ? '– ' : '' }}{{ item.description }}</span>
                 <button
                     v-if="!disabled"
                     type="button"
-                    class="btn-close btn-close-sm ms-1"
-                    style="font-size:.6rem;"
+                    class="btn-close btn-close-sm ms-1 cid-chip__remove"
+                    :title="tx('remove', { item: itemText(item) })"
+                    :aria-label="tx('remove', { item: itemText(item) })"
+                    data-test="cid-remove"
                     @click="removeItem(itemId(item))"
                 ></button>
             </span>
@@ -279,59 +384,130 @@ function moveActive(delta) {
         <div v-if="!disabled && (multiple ? selected.length < maxItems : selected.length === 0)" class="position-relative">
             <div class="input-group input-group-sm">
                 <input
+                    :id="inputDomId"
                     v-model="query"
                     type="text"
                     class="form-control form-control-sm"
                     autocomplete="off"
-                    :placeholder="placeholder"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    :aria-expanded="listVisible ? 'true' : 'false'"
+                    :aria-controls="listboxId"
+                    :aria-activedescendant="activeDescendant"
+                    :aria-labelledby="ariaLabelledby || undefined"
+                    :aria-label="!label && !ariaLabelledby ? text.search_label : undefined"
+                    :aria-describedby="ariaDescribedby || undefined"
+                    :aria-invalid="invalid ? 'true' : undefined"
+                    :placeholder="placeholder || text.placeholder"
                     @input="search"
                     @focus="onFocus"
+                    @blur="onBlur"
                     @keydown.arrow-down.prevent="moveActive(1)"
                     @keydown.arrow-up.prevent="moveActive(-1)"
                     @keydown.enter.prevent="selectActive"
-                    @keydown.escape="open = false"
+                    @keydown.esc="onEscape"
                 >
                 <span v-if="searching || loadingMostUsed" class="input-group-text bg-transparent border-start-0 px-2">
-                    <span class="spinner-border spinner-border-sm text-secondary" style="width:.8rem;height:.8rem;"></span>
+                    <span class="spinner-border spinner-border-sm text-secondary cid-spinner" aria-hidden="true"></span>
                 </span>
             </div>
+            <span class="visually-hidden" role="status" aria-live="polite">{{ statusText }}</span>
             <ul
-                v-if="open && (activeList.length > 0 || showCreateRow)"
-                class="list-group shadow-sm position-absolute w-100"
-                style="z-index:1055;top:100%;max-height:260px;overflow-y:auto;"
+                v-if="listVisible"
+                :id="listboxId"
+                role="listbox"
+                :aria-label="showingMostUsedList ? text.most_used : text.suggestions"
+                class="list-group shadow-sm position-absolute w-100 cid-listbox"
             >
-                <li v-if="trimmedQuery.length === 0 && showingMostUsed && activeList.length > 0"
-                    class="list-group-item disabled text-muted fw-semibold py-1 px-2"
-                    style="font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;"
-                >Mais usados</li>
+                <li v-if="showingMostUsedList && activeList.length > 0"
+                    class="list-group-item disabled text-body-secondary fw-semibold py-1 px-2 cid-listbox__heading"
+                    aria-hidden="true"
+                >{{ text.most_used }}</li>
 
                 <li
                     v-for="(item, index) in activeList"
+                    :id="optionId(index)"
                     :key="itemId(item) || index"
-                    class="list-group-item list-group-item-action py-1 px-2"
+                    role="option"
+                    :aria-selected="index === activeIndex ? 'true' : 'false'"
+                    class="list-group-item list-group-item-action py-1 px-2 cid-listbox__option"
                     :class="{ active: index === activeIndex }"
-                    style="cursor:pointer;font-size:.82rem;"
                     @mouseenter="activeIndex = index"
                     @mousedown.prevent="selectItem(item)"
                 >
                     <span v-if="item.code" class="fw-semibold me-1">{{ item.code }}</span>
                     <span>{{ item.code ? '– ' : '' }}{{ item.description }}</span>
-                    <span v-if="!item.code" class="badge bg-secondary-subtle text-secondary ms-1" style="font-size:.6rem;">Customizado</span>
+                    <span v-if="!item.code" class="badge bg-secondary-subtle text-secondary-emphasis ms-1 cid-listbox__badge">{{ text.custom }}</span>
                 </li>
 
                 <li
                     v-if="showCreateRow"
-                    class="list-group-item list-group-item-action py-1 px-2 text-primary"
+                    :id="createId"
+                    role="option"
+                    :aria-selected="activeIndex === activeList.length ? 'true' : 'false'"
+                    :aria-disabled="creating ? 'true' : undefined"
+                    class="list-group-item list-group-item-action py-1 px-2 text-primary cid-listbox__option"
                     :class="{ active: activeIndex === activeList.length, disabled: creating }"
-                    style="cursor:pointer;font-size:.82rem;"
+                    data-test="cid-create"
                     @mouseenter="activeIndex = activeList.length"
                     @mousedown.prevent="triggerCreate"
                 >
-                    <span v-if="creating" class="spinner-border spinner-border-sm me-1" style="width:.75rem;height:.75rem;"></span>
-                    <span v-else>+</span>
-                    Cadastrar novo diagnóstico: '{{ trimmedQuery }}'
+                    <span v-if="creating" class="spinner-border spinner-border-sm me-1 cid-spinner" aria-hidden="true"></span>
+                    <span v-else aria-hidden="true">+</span>
+                    {{ tx('create', { term: trimmedQuery }) }}
                 </li>
             </ul>
         </div>
     </div>
 </template>
+
+<style scoped>
+.cid-chip {
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.3rem 0.5rem;
+}
+
+.cid-chip__star {
+    font-size: 0.75rem;
+}
+
+.cid-chip__description {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0.85;
+}
+
+.cid-chip__remove {
+    font-size: 0.6rem;
+}
+
+.cid-listbox {
+    z-index: 1055;
+    top: 100%;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.cid-listbox__heading {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.cid-listbox__option {
+    cursor: pointer;
+    font-size: 0.82rem;
+}
+
+.cid-listbox__badge {
+    font-size: 0.6rem;
+}
+
+.cid-spinner {
+    width: 0.8rem;
+    height: 0.8rem;
+}
+</style>

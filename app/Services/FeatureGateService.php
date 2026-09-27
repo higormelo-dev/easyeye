@@ -343,6 +343,7 @@ class FeatureGateService
         if (! array_key_exists($entityId, $this->subscriptionCache)) {
             $this->subscriptionCache[$entityId] = Subscription::forEntity($entityId)
                 ->accessible()
+                ->currentFirst()
                 ->with('plan.features')
                 ->first();
         }
