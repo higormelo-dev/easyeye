@@ -10,10 +10,8 @@ use App\Models\{Covenant,
     EntityIntegratorEquipment,
     EntityUser,
     EntityUserIntegrator,
-    ExamType,
     IrisType,
     Patient,
-    PatientExam,
     People,
     Plan,
     Schedule,
@@ -623,15 +621,14 @@ class DataFakersSeeder extends Seeder
         $this->markActivationSteps(array_keys($entitiesWithDoctors), ActivationStep::FirstDoctorAdded);
         $this->markActivationSteps(array_keys($entitiesWithDoctors), ActivationStep::TeamMemberInvited);
 
-        // ── Schedules + PatientExams ─────────────────────────────────────────
-        $this->command->info('⏳ Criando Schedules e PatientExams...');
+        // ── Schedules ─────────────────────────────────────────────────────────
+        $this->command->info('⏳ Criando Schedules...');
         $this->createSchedules();
     }
 
     /**
      * Criar schedules cobrindo 1 mês passado e 3 meses futuros (segunda a domingo).
      * Situações realistas: passados → Attended/NoShow/Cancelled; futuros → Scheduled/Cancelled.
-     * PatientExams são gerados para 30% dos agendamentos já Attended.
      */
     private function createSchedules(): void
     {
@@ -669,15 +666,11 @@ class DataFakersSeeder extends Seeder
         }
 
         // Janela temporal: 1 mês passado até 3 meses futuros (todos os dias)
-        $pastMonths         = $this->seedInt('SEED_FAKE_SCHEDULE_PAST_MONTHS', 1, 0);
-        $futureMonths       = $this->seedInt('SEED_FAKE_SCHEDULE_FUTURE_MONTHS', 3, 0);
-        $startDate          = Carbon::now()->subMonths($pastMonths)->startOfDay();
-        $endDate            = Carbon::now()->addMonths($futureMonths)->endOfDay();
-        $date               = $startDate->copy();
-        $attendedExamChance = $this->seedPercent('SEED_FAKE_ATTENDED_EXAM_PERCENT', 30);
-
-        // Coleta de agendamentos Attended para gerar PatientExams posteriormente
-        $attendedForExams      = [];
+        $pastMonths            = $this->seedInt('SEED_FAKE_SCHEDULE_PAST_MONTHS', 1, 0);
+        $futureMonths          = $this->seedInt('SEED_FAKE_SCHEDULE_FUTURE_MONTHS', 3, 0);
+        $startDate             = Carbon::now()->subMonths($pastMonths)->startOfDay();
+        $endDate               = Carbon::now()->addMonths($futureMonths)->endOfDay();
+        $date                  = $startDate->copy();
         $entitiesWithSchedules = [];
 
         while ($date->lte($endDate)) {
@@ -722,16 +715,6 @@ class DataFakersSeeder extends Seeder
                 foreach (array_merge($morningSlots, $afternoonSlots) as $slot) {
                     $schedulesBatch[]                          = $slot;
                     $entitiesWithSchedules[$slot['entity_id']] = true;
-
-                    // Seleciona 30% dos Attended passados para geração de exames
-                    if ($isPast && $slot['situation'] === ScheduleSituation::Attended->value && fake()->boolean($attendedExamChance)) {
-                        $attendedForExams[] = [
-                            'id'         => $slot['id'],
-                            'patient_id' => $slot['patient_id'],
-                            'doctor_id'  => $slot['doctor_id'],
-                            'entity_id'  => $slot['entity_id'],
-                        ];
-                    }
                 }
 
                 if (count($schedulesBatch) >= $batchSize) {
@@ -750,7 +733,6 @@ class DataFakersSeeder extends Seeder
         }
 
         $this->markActivationSteps(array_keys($entitiesWithSchedules), ActivationStep::FirstScheduleCreated);
-        $this->createPatientExams($attendedForExams);
     }
 
     /**
@@ -845,66 +827,8 @@ class DataFakersSeeder extends Seeder
     }
 
     /**
-     * Criar PatientExams para agendamentos Attended selecionados (1–3 exames cada).
-     * Usa inserção em lote com contador EXM-* em memória por paciente.
-     */
-    private function createPatientExams(array $attendedSchedules): void
-    {
-        if (empty($attendedSchedules)) {
-            return;
-        }
-
-        $patientExamBatch  = [];
-        $patientExamNow    = now();
-        $patientExamCode   = $this->loadPatientExamCodeCounters();
-        $allExamTypes      = ExamType::all();
-        $globalExamTypes   = $allExamTypes->whereNull('entity_id');
-        $examTypesByEntity = $allExamTypes->whereNotNull('entity_id')->groupBy('entity_id');
-
-        foreach ($attendedSchedules as $schedule) {
-            $examTypesOfEntity = $examTypesByEntity
-                ->get($schedule['entity_id'], collect())
-                ->merge($globalExamTypes);
-
-            if ($examTypesOfEntity->isEmpty()) {
-                continue;
-            }
-
-            $examCount = fake()->numberBetween(1, 3);
-
-            for ($i = 0; $i < $examCount; $i++) {
-                $patientId                   = (string) $schedule['patient_id'];
-                $patientExamCode[$patientId] = ($patientExamCode[$patientId] ?? 0) + 1;
-                $patientExamBatch[]          = [
-                    'id'          => (string) Str::uuid(),
-                    'patient_id'  => $patientId,
-                    'doctor_id'   => $schedule['doctor_id'],
-                    'schedule_id' => $schedule['id'],
-                    'exam_id'     => $examTypesOfEntity->random()->id,
-                    'code'        => sprintf('EXM-%010d', $patientExamCode[$patientId]),
-                    'archive'     => 'exams/fake-' . Str::uuid() . '.jpg',
-                    'name'        => fake()->optional(0.5)->sentence(3),
-                    'laterality'  => fake()->randomElement([null, null, 0, 1, 2]),
-                    'active'      => true,
-                    'created_at'  => $patientExamNow,
-                    'updated_at'  => $patientExamNow,
-                ];
-
-                if (count($patientExamBatch) >= 1000) {
-                    PatientExam::insert($patientExamBatch);
-                    $patientExamBatch = [];
-                }
-            }
-        }
-
-        if (! empty($patientExamBatch)) {
-            PatientExam::insert($patientExamBatch);
-        }
-    }
-
-    /**
      * Criar pacientes para a entidade de teste do integrador.
-     * Schedules e exames são gerados pelo createSchedules() via Doctor::all().
+     * Schedules são gerados pelo createSchedules() via Doctor::all().
      */
     private function createTestEntityData(Entity $entity): void
     {
@@ -975,32 +899,6 @@ class DataFakersSeeder extends Seeder
         return (int) substr($lastCode, strlen($prefix) + 1);
     }
 
-    /**
-     * @return array<string, int>
-     */
-    private function loadPatientExamCodeCounters(): array
-    {
-        $codes = [];
-        $rows  = PatientExam::withoutGlobalScopes()
-            ->select('patient_id', 'code')
-            ->where('code', 'like', 'EXM-%')
-            ->orderBy('patient_id')
-            ->orderByDesc('code')
-            ->get();
-
-        foreach ($rows as $row) {
-            $patientId = (string) $row->patient_id;
-
-            if (isset($codes[$patientId])) {
-                continue;
-            }
-
-            $codes[$patientId] = (int) substr((string) $row->code, 4);
-        }
-
-        return $codes;
-    }
-
     private function seedInt(string $key, int $default, int $min): int
     {
         $value = env($key);
@@ -1010,17 +908,6 @@ class DataFakersSeeder extends Seeder
         }
 
         return max($min, (int) $value);
-    }
-
-    private function seedPercent(string $key, int $default): int
-    {
-        $value = env($key);
-
-        if (! is_numeric($value)) {
-            return $default;
-        }
-
-        return min(100, max(0, (int) $value));
     }
 
     /**
