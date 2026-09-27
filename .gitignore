@@ -35,6 +35,9 @@ yarn-error.log
 /.vscode
 /.zed
 
+# macOS: metadados de pasta do Finder (qualquer diretório)
+.DS_Store
+
 # Claude Code agent worktrees (artefatos de runtime)
 .claude/worktrees/
 
