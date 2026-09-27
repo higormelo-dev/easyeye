@@ -16,15 +16,31 @@
 
                     <template v-if="document">
                         <p class="legal-meta" data-test="legal-version">{{ versionText }}</p>
+                        <!-- Idioma: o texto oficial é o em português. Em outro idioma aparece a
+                             tradução de cortesia (com link para o original) ou o original, avisado. -->
+                        <p v-if="document.isTranslation" class="legal-language" role="note" data-test="legal-translation">
+                            <i class="ti ti-language" aria-hidden="true"></i>
+                            <span>
+                                {{ t.legal.translation_notice }}
+                                <a :href="document.originalUrl">{{ t.legal.read_original }}</a>
+                            </span>
+                        </p>
+                        <p v-else-if="document.isOriginal" class="legal-language" role="note" data-test="legal-original">
+                            <i class="ti ti-language" aria-hidden="true"></i>
+                            <span>
+                                {{ document.hasTranslation ? t.legal.original_notice : t.legal.original_only }}
+                                <a v-if="document.hasTranslation" :href="document.translationUrl">{{ t.legal.read_translation }}</a>
+                            </span>
+                        </p>
                         <nav v-if="headings.length" class="legal-index" aria-labelledby="legal-index-title">
                             <h2 id="legal-index-title">{{ t.legal.contents }}</h2>
-                            <ol>
+                            <ol :lang="document.contentLang">
                                 <li v-for="heading in headings" :key="heading.id">
                                     <a :href="'#' + heading.id">{{ heading.text }}</a>
                                 </li>
                             </ol>
                         </nav>
-                        <article class="legal-body" data-test="legal-body" aria-labelledby="legal-title">
+                        <article class="legal-body" data-test="legal-body" aria-labelledby="legal-title" :lang="document.contentLang">
                             <template v-for="block in blocks" :key="block.id">
                                 <h2 v-if="block.type === 'heading'" :id="block.id" tabindex="-1">{{ block.text }}</h2>
                                 <ul v-else-if="block.type === 'list'">
@@ -66,7 +82,9 @@ import { useTrans } from '@/composables/useTrans';
  */
 const props = defineProps({
     kind: { type: String, required: true }, // 'privacy' | 'terms'
-    document: { type: Object, default: null }, // { version, effectiveFrom, content } | null
+    // { version, effectiveFrom, content, contentLang, isTranslation, isOriginal,
+    //   hasTranslation, originalUrl, translationUrl } | null
+    document: { type: Object, default: null },
     t: { type: Object, required: true },
     routes: { type: Object, required: true },
     contact: { type: Object, default: () => ({ sales: '', support: '' }) },

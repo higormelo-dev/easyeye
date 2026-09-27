@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call(SubscriptionSettingSeeder::class);
         $this->call(PrivacyPolicySeeder::class);
         $this->call(TermsOfUseSeeder::class);
+        $this->call(LegalDocumentTranslationsSeeder::class);
         $this->call(PlanSeeder::class);
         $this->call(BillingGatewaysSeeder::class);
         $this->call(AiModelPriceSeeder::class);

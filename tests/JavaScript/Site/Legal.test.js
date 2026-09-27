@@ -23,8 +23,19 @@ const t = {
         unavailable_title: 'Documento em publicação',
         unavailable_text: 'Para recebê-la agora, escreva para',
         back_home: 'Voltar para o início',
+        translation_notice: 'Courtesy translation. The original Portuguese version prevails.',
+        read_original: 'Read the original in Portuguese',
+        original_notice: 'You are reading the original text in Portuguese.',
+        read_translation: 'Back to the translation',
+        original_only: 'This document is only available in Portuguese.',
     },
 };
+
+const doc = (extra = {}) => ({
+    version: '1.0', effectiveFrom: 'September 27, 2026', content: '1. Who we are\n\nText.',
+    contentLang: 'en', isTranslation: false, isOriginal: false, hasTranslation: false,
+    originalUrl: '/privacidade?original=1', translationUrl: '/privacidade', ...extra,
+});
 
 let wrapper;
 
@@ -92,5 +103,39 @@ describe('Site/Legal', () => {
         expect(body.findAll('li').map((item) => item.text())).toEqual(['Nome', '<img src=x onerror="alert(1)">']);
         expect(body.find('img').exists()).toBe(false);
         expect(body.findAll('p').map((p) => p.text())).toEqual(['Introdução.', 'Solicite acesso.\nCom segurança.']);
+    });
+
+    it('tradução de cortesia: aviso, link para o original e lang do texto', () => {
+        mountLegal({ document: doc({ isTranslation: true }) });
+
+        const note = wrapper.get('[data-test="legal-translation"]');
+        expect(note.attributes('role')).toBe('note');
+        expect(note.text()).toContain('Courtesy translation.');
+        expect(note.get('a').attributes('href')).toBe('/privacidade?original=1');
+        expect(wrapper.get('[data-test="legal-body"]').attributes('lang')).toBe('en');
+        expect(wrapper.find('[data-test="legal-original"]').exists()).toBe(false);
+    });
+
+    it('original lido em outro idioma: avisa e oferece voltar à tradução quando ela existe', () => {
+        mountLegal({ document: doc({ contentLang: 'pt-BR', isOriginal: true, hasTranslation: true }) });
+
+        const note = wrapper.get('[data-test="legal-original"]');
+        expect(note.text()).toContain('You are reading the original text in Portuguese.');
+        expect(note.get('a').attributes('href')).toBe('/privacidade');
+        expect(wrapper.get('[data-test="legal-body"]').attributes('lang')).toBe('pt-BR');
+    });
+
+    it('sem tradução: avisa que só existe em português, sem link', () => {
+        mountLegal({ document: doc({ contentLang: 'pt-BR', isOriginal: true }) });
+
+        const note = wrapper.get('[data-test="legal-original"]');
+        expect(note.text()).toBe('This document is only available in Portuguese.');
+        expect(note.find('a').exists()).toBe(false);
+    });
+
+    it('no idioma oficial não há aviso de idioma', () => {
+        mountLegal({ document: doc({ contentLang: 'pt-BR' }) });
+
+        expect(wrapper.find('.legal-language').exists()).toBe(false);
     });
 });

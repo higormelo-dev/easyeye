@@ -1,0 +1,169 @@
+These Terms of Use set out the conditions for accessing the website and using the EasyEye platform. Read this document before contracting for or using the services. The specific conditions of the plan or of the accepted proposal supplement these terms, subject to the rights provided for by law.
+
+1. Who offers EasyEye and to whom these terms apply
+
+EasyEye is offered by {{provider_identity}}, referred to in this document as “EasyEye” or the “provider”.
+
+The “customer” is the individual or legal entity responsible for contracting the platform. “Users” are the persons authorized to use the features, including administrators, healthcare professionals and clinic staff. Patients and their representatives who use the portal are subject to the rules on access, proper use and protection of information applicable to that service, without assuming the clinic's subscription payment obligations.
+
+Anyone contracting on behalf of a clinic or another legal entity must have the authority to represent it. The use of professional functions requires the corresponding professional license. Registration and contact data must be true and kept up to date.
+
+2. Subject matter and license to use
+
+EasyEye is a cloud platform to support the management of ophthalmology clinics and the organization of healthcare information. Depending on the plan and the features enabled, it provides scheduling, patient registration, medical records, exams and images, clinical documents, financial management, health insurance plan billing, inventory, a patient portal, integrations and artificial intelligence features.
+
+Contracting grants a non-exclusive license to use, limited to the contracted period and conditions, to the customer and its authorized users. There is no transfer of the source code, the trademark or ownership of the software. Use by third parties outside the organization, resale or sublicensing requires specific authorization.
+
+Access depends on an internet connection, a compatible browser and suitable equipment. The service does not offer full functionality without a connection. The clinic must maintain contingency procedures proportionate to the needs of patient care.
+
+3. Contracting, applicable documents and acceptance
+
+Before contracting, the customer must have access to the plan or proposal, the prices, the billing frequency, the limits and these terms. Acceptance must result from an express declaration in the contracting process or in a specific instrument, by an authorized person, in a way that allows the accepted version to be identified.
+
+Merely visiting the website does not create a paid subscription, an authorization to charge or a generic consent to process data. Providing data for contact or a demonstration is also not equivalent to contracting a plan.
+
+Proposals and specific instruments accepted by the parties prevail with respect to the commercial conditions expressly negotiated, without overriding mandatory rules. The Privacy Policy, available at /privacidade, explains how personal data is processed. Contractual agreement does not replace specific consents required for a given purpose.
+
+4. Accounts, profiles and access security
+
+The customer must designate authorized persons, assign permissions consistent with their roles and review user associations when someone leaves or responsibilities change. A user's presence in more than one organization does not authorize access or sharing between clinics without a legitimate basis.
+
+Credentials are individual and must be kept confidential. It is prohibited to use another person's identity, share passwords or hand over access to circumvent user limits. The available authentication and protection features must be used according to the organization's security needs.
+
+Suspected unauthorized access must be reported to support. We may request proportionate information to confirm the identity, the representation or the legitimacy of a request, especially to change the persons responsible, grant access or deliver data. These precautions do not exclude EasyEye's responsibility for the security of the operations under its control.
+
+5. Plans, trial period and limits
+
+The features, number of users, storage capacity, integration limits, credits and other conditions are those presented in the plan or in the accepted proposal. The availability of a feature on the website does not mean that it is included in all plans. Additional services are subject to separate contracting when so indicated.
+
+When a free trial period is offered, its duration and limits will be those stated in the offer and at sign-up. The trial does not generate automatic charges without contracting and payment authorization. At the end of the trial, continued access depends on the account status and the applicable contract.
+
+The customer must monitor usage and assess the need to change plans. When a limit is reached, certain operations may be restricted until the allowance is renewed or additional capacity is contracted. Plan changes must state the new amounts, limits, effects and effective date before confirmation.
+
+6. Prices, payments and renewal
+
+Amounts, currency, due date, billing cycle and payment methods are those stated at the time of contracting. Activation of paid features depends on the confirmation applicable to the chosen payment method or on the conditions expressly agreed. Issuing a charge does not, by itself, prove that it has been paid.
+
+When the offer provides for renewal or recurring billing, this condition must be disclosed and authorized by the customer. The authorization is limited to the contracted services and amounts and may be ended by requesting cancellation, without prejudice to prior obligations legitimately owed.
+
+Price adjustments, price changes and the contracting of additional services must comply with the contract and the law, with prior information about their effects. These terms do not establish any price adjustment index, early termination fee or finance charges that have not been disclosed and validly agreed. There will be no retroactive charges for features that have not been contracted.
+
+The customer must keep its billing information up to date and report discrepancies through the customer service channel. Disputes will be reviewed based on the contract, the provision of the service and the transaction records. The use of payment providers does not relieve EasyEye of its obligations to correct improper charges attributable to it.
+
+7. Artificial intelligence credits and top-ups
+
+AI features may depend on the plan allowance or on separately purchased credits. The included quantity, the available packages and the applicable consumption are presented in the product information and in the usage flows.
+
+The plan allowance is valid for the stated cycle, and its unused balance does not carry over to the next cycle. Credits purchased in one-off top-ups make up a separate balance, which accumulates and does not expire when a cycle ends. Consumption first draws on the valid plan allowance and then on the top-up balance.
+
+The top-up balance does not replace a subscription or a permission required for the feature. The purchase is made available after the corresponding confirmation. Questions about deductions, execution failures, purchase cancellations or charge reversals may be submitted to customer service for review of the records and the applicable conditions.
+
+Credits represent units of use of the service, not a financial investment. Closing the account requires determining how any remaining balance will be handled according to the offer and the applicable rights; these terms do not provide for automatic forfeiture of purchased credits, nor do they rule out refunds in the cases provided for by law.
+
+8. Professional responsibility and healthcare records
+
+EasyEye provides support tools. The clinic and the responsible professionals must check patient data, the content of medical records, prescriptions, reports, instructions and documents before using them. Diagnoses, therapeutic decisions and courses of care are the responsibility of licensed professionals, within their scope of practice and in accordance with the applicable rules.
+
+Templates, suggested entries and calculations do not replace analysis of the specific case. Generating a file or document does not, by itself, guarantee a valid signature, compliance with all regulatory requirements or acceptance by third parties. The professional must verify the requirements for each purpose.
+
+In health insurance plan billing, the customer must review the data, procedures, authorizations, tables and rules of the health plan operator. TISS validations and files assist the process but do not ensure authorization, payment or the absence of claim denials. The quality of imported images and results also depends on their source, correct patient identification and the configuration used.
+
+The patient portal and service-related messages are not medical emergency channels. Making documents or information available does not replace guidance from the responsible professional.
+
+9. Use of artificial intelligence
+
+The assistant may produce analyses, suggestions and drafts based on the content provided, including through processing by external providers. The results may contain errors, omissions or information unsuitable for the case. They must be reviewed by a licensed professional before becoming part of a final document or guiding a course of care.
+
+It is the user's duty to provide only information that is necessary and compatible with the purpose, verify the legal basis for processing and observe confidentiality. Automatic identifier filters do not guarantee complete anonymization of text, images or attachments. The conditions for sharing and any international transfers are addressed in the Privacy Policy.
+
+The use of AI does not constitute a guarantee of clinical outcome, nor does it transfer to the patient the risk of unreviewed content. EasyEye remains responsible for the features and for the processing it performs. Acceptance of these terms does not authorize unrestricted use of medical records for model training or for purposes unrelated to the contracted service.
+
+10. Integrations, imports and third-party services
+
+Integrations with equipment, APIs, payment methods and communication services depend on the availability, compatibility and configuration of the respective resources. Direct contracts with third parties may have their own conditions, which must be checked before enabling them.
+
+The customer must authorize integrators and grant only the necessary permissions, protect their credentials and revoke them when they are no longer in use. Information imported from other systems must have a legitimate origin and be checked for format, completeness, identification and link to the clinic and the patient.
+
+Messages, confirmations and reminders may depend on the provider, the number provided and the recipient's availability. Sending does not prove reading, attendance or awareness of clinical content. Communications must respect the recipient's preferences and the law, without abusive bulk sending or improper disclosure of health information.
+
+Third-party failures will be handled according to the roles of each participant, without excluding EasyEye's legal obligations. An integration does not imply a guarantee of permanent compatibility with all existing versions or equipment.
+
+11. EasyEye's obligations, support and availability
+
+EasyEye is responsible for providing the contracted features, offering support on their use and operation, addressing failures under its responsibility and adopting technical and administrative measures appropriate to protect information. Support must respect need-based access, permissions and confidentiality.
+
+Interruptions may occur for maintenance, updates, bug fixes or incident response. Scheduled interventions with significant impact must be communicated whenever feasible; urgent situations may require immediate action. EasyEye must use appropriate efforts to restore the service and communicate relevant information to the customer.
+
+Support hours, availability levels, response times and any compensation follow the conditions expressly offered and contracted. This document does not establish an availability percentage or uninterrupted service that has not been contracted, nor does it exclude legal warranties or obligations arising from the offer.
+
+Customizations, visits, special training or assisted migrations beyond the contracted scope require prior agreement on scope, feasibility, price and timeline. Requesting support does not authorize additional charges without disclosure and agreement.
+
+12. Permitted use and intellectual property
+
+Use must respect the law, the contract, patients' rights and security measures. The following conduct, among others, is prohibited:
+
+- Accessing data of another clinic or person without legitimate authorization, including by attempting to circumvent permissions.
+- Entering unlawful or malicious content or content that infringes third-party rights, or using the service for fraud, discrimination or harassment.
+- Compromising the availability of the system through attacks, abusive automation or attempts to bypass technical and commercial limits.
+- Extracting data for purposes incompatible with the authorization received, or disclosing credentials and protected information.
+- Copying, commercializing or exploiting protected elements of the software without authorization, or removing ownership notices, except for uses permitted by law.
+
+The software, visual identity and EasyEye's own materials belong to their owners or licensors. Rights to records, images and documents submitted to the platform remain with those who legitimately hold them, without prejudice to the rights of personal data subjects.
+
+Contracting authorizes the processing of this content to the extent necessary to provide the service. It does not grant EasyEye the right to sell medical records, disclose clinical cases or use the customer's name, trademark or image in advertising without appropriate grounds and authorization.
+
+13. Privacy, confidentiality and data protection
+
+Data processing follows the LGPD (Brazilian General Data Protection Law, Law No. 13,709/2018) and the Privacy Policy. With respect to the healthcare information entered by the clinic, EasyEye acts as processor, in accordance with the controller's legitimate instructions and the contracted scope. In activities in which it determines its own purposes, such as commercial relationships and account management, it assumes the corresponding responsibilities.
+
+The clinic must define the purpose and legal basis of the processing it determines, provide information to patients and observe confidentiality and record-retention requirements. When the applicable basis is consent, it must be specific and valid. Not all processing of health data depends on consent, and acceptance of these terms does not replace consent when it is required.
+
+The parties must restrict access to information to the persons and suppliers who need it to perform their duties and preserve confidentiality during and after the contractual relationship. Data subject requests and incidents must receive the necessary cooperation from each processing agent, according to its responsibility and the law.
+
+Patients' requests concerning their own data are distinct from exporting the clinic's entire database and must be assessed according to their rights, the identification of the requester and the permitted scope.
+
+14. Suspension, cancellation and refunds
+
+The customer or its authorized representative may request cancellation through the customer service channel indicated at the end of these terms. The request must identify the account and allow the representation to be verified. EasyEye will state the termination date, how charges will be handled and any transition period for access.
+
+Access may be restricted after the end of the term or of the applicable transition period, or due to non-payment, improper use or security risk, subject to the contract and the law. Whenever compatible with the situation, the reason and how to resolve it will be communicated. Immediate measures may be necessary to contain fraud, unauthorized access or significant risk, with a subsequent explanation when permitted.
+
+Cancellation must stop renewals and future charges incompatible with the termination, without eliminating prior obligations legitimately owed. Discrepancies, amounts paid for periods in which the service was not provided and any credit balance will be assessed according to the offer, the reason for termination and the applicable rules. A waiver of refund is not presumed from mere use of the system.
+
+Where a consumer relationship exists and the legal requirements for distance contracting are met, the right of withdrawal provided for in Article 49 of the Brazilian Consumer Protection Code will be respected, including the 7-day period counted from signing or from receipt of the service, as applicable, and the refund of amounts in the manner provided by law. Other cases of refund or compensation provided for by law also remain guaranteed.
+
+Removing a user or ceasing to access the platform does not, by itself, amount to canceling the organization's subscription. Suspension or contractual termination also does not result in the immediate deletion of medical records, nor does it exclude the rights of data subjects.
+
+15. Data export and handling of data upon termination
+
+The clinic must arrange for the continued retention of healthcare records and, when necessary, request their export before termination. EasyEye will guide the responsible person on the scope, the available formats, identity validation and the secure means of delivery, subject to the contract and legal rights.
+
+The request for the clinic's database must come from the customer or from a legitimately authorized person. Before delivery, the representation, the organization involved and the information that may be provided will be verified. A professional's move or departure does not automatically give them access to the institution's entire patient database.
+
+Extraordinary conversion or migration services to another provider, when requested and outside the contracted scope, require a prior quote. This condition cannot be used to prevent the free-of-charge fulfillment of data subjects' rights provided for by law.
+
+Retention and deletion periods and conditions must observe the purpose, the controller's legitimate instructions, legal obligations and the Privacy Policy. Termination does not create a promise of unlimited storage nor an authorization to immediately delete data subject to retention. Any deletion must be preceded by the necessary checks and by guidance to the customer on the effects and on the possibilities of obtaining the records.
+
+16. Liability and resolution of disagreements
+
+Each party is responsible for the obligations incumbent upon it and liable for the damages attributable to it, in accordance with the law. Professional responsibility for patient care does not exempt EasyEye from liability for service defects, its own security failures or irregular data processing attributable to it.
+
+Performance also depends on connectivity, equipment, the information provided and integrated services. These circumstances must be considered when analyzing each occurrence, without automatic exclusion of liability or full transfer of risks to the customer and to patients.
+
+EasyEye does not guarantee clinical, financial or billing results, or approval by health insurance plans, arising from the use of the platform. The quality and characteristics of the contracted service, the obligations stated in the offer and mandatory rights to compensation remain enforceable. These terms do not impose a blanket waiver of compensation or mandatory arbitration.
+
+When disagreements are identified, the parties must share the information necessary for their investigation through a secure channel and seek an appropriate solution. An attempt at administrative resolution does not prevent access to rights protection agencies or to the Judiciary.
+
+17. Changes and governing law
+
+EasyEye may update the service and these terms to reflect changes in features, operations or legal requirements. This page shows the version and the effective date. Material changes affecting rights, obligations or contracted conditions must be communicated in advance, with new acceptance when necessary, preserving periods and rights already vested.
+
+Updating this page alone does not authorize new charges, an improper reduction of contracted services or data processing incompatible with the original purpose. In the event of a significant discontinuation, the conditions for continuity, transition or termination must be addressed with the customer, in compliance with the law.
+
+Brazilian law applies. Any disputes will be submitted to the competent venue in accordance with the legal rules, preserving consumer protection provisions where applicable. The invalidity of one provision does not eliminate the others that can remain in effect lawfully and consistently.
+
+18. Contact
+
+For contracting, billing, cancellation or questions about these terms, write to {{terms_email}}. Phone and WhatsApp: {{terms_phone}}.
+
+For technical support, use {{support_email}}. Requests about personal data may also be sent to the channel indicated in the Privacy Policy. State the organization and give an objective description of the request, without sending passwords, access keys or complete medical records in the first message.

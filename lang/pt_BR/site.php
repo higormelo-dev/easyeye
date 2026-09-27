@@ -55,6 +55,13 @@ return [
         'unavailable_title'   => 'Documento em publicação',
         'unavailable_text'    => 'A versão oficial deste documento ainda não foi publicada aqui. Para recebê-la agora, escreva para',
         'back_home'           => 'Voltar para o início',
+        // Avisos de idioma: o texto oficial é o em português; em outro idioma a
+        // página mostra a tradução de cortesia (ou o original, se não houver).
+        'translation_notice' => 'Tradução de cortesia. Em caso de divergência, prevalece a versão original em português.',
+        'read_original'      => 'Ler o original em português',
+        'original_notice'    => 'Você está lendo o texto original em português, que é a versão que vale.',
+        'read_translation'   => 'Voltar para a tradução',
+        'original_only'      => 'Este documento está disponível apenas em português, que é a versão que vale.',
     ],
 
     'hero' => [

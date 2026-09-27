@@ -68,3 +68,18 @@ organização, sem copiar cláusulas nem incorporar condições de outros fornec
 - [Código de Defesa do Consumidor](https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm): informação contratual, arrependimento e limites de cláusulas de responsabilidade, quando aplicável.
 - [Lei do Software](https://www.planalto.gov.br/ccivil_03/leis/l9609.htm): licença e direitos sobre programas de computador.
 - [LGPD](https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709compilado.htm): responsabilidades, finalidade e direitos dos titulares.
+
+## Tradução para o inglês
+
+O texto oficial é o em português (`term_versions.content`): é ele que vale e que
+os usuários aceitam. A tradução de cortesia fica em
+`resources/legal/terms-of-use-1.0.en.txt` e é gravada em `term_versions.translations.en`
+da mesma versão pelo `LegalDocumentTranslationsSeeder`, que não altera texto
+oficial, datas, estado ou identificadores nem sobrescreve uma tradução publicada.
+Em inglês, a página mostra a tradução com aviso de que o português prevalece e
+link para o original (`?original=1`); sem tradução, mostra o original e avisa.
+
+Em uma instalação existente: `php artisan migrate` e
+`php artisan db:seed --class=LegalDocumentTranslationsSeeder`. Uma nova versão do
+documento precisa do próprio arquivo `.en.txt` para ganhar tradução; a revisão
+jurídica vale também para o texto em inglês.

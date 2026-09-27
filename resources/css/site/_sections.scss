@@ -1916,6 +1916,28 @@ select.cf-control {
     a { color: $teal-ink; font-weight: 600; }
 }
 
+// Aviso de idioma do documento (tradução de cortesia / original em português).
+.legal-language {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 24px;
+    padding: 14px 18px;
+    border-radius: $radius;
+    background: rgba($teal, .08);
+    border: 1px solid rgba($teal, .3);
+    @include type-meta;
+    color: $text;
+
+    i { font-size: 18px; color: $teal-ink; flex-shrink: 0; margin-top: 1px; }
+
+    a {
+        color: $teal-ink;
+        font-weight: 600;
+        text-underline-offset: 3px;
+    }
+}
+
 .legal-unavailable-title {
     @include type-title-md;
     color: $navy;

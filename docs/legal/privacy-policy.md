@@ -25,6 +25,21 @@ o histórico e os vínculos de aceite existentes. O documento é compartilhado c
 os consumidores de `TermsService::REQUIRED_TYPES`; não há uma cópia independente
 para o site. Esta implementação não cria nem registra aceites em nome de usuários.
 
+## Tradução para o inglês
+
+O texto oficial é o em português (`term_versions.content`): é ele que vale e que
+os usuários aceitam. A tradução de cortesia fica em
+`resources/legal/privacy-policy-1.0.en.txt` e é gravada em `term_versions.translations.en`
+da mesma versão pelo `LegalDocumentTranslationsSeeder`, que não altera texto
+oficial, datas, estado ou identificadores nem sobrescreve uma tradução publicada.
+Em inglês, a página mostra a tradução com aviso de que o português prevalece e
+link para o original (`?original=1`); sem tradução, mostra o original e avisa.
+
+Em uma instalação existente: `php artisan migrate` e
+`php artisan db:seed --class=LegalDocumentTranslationsSeeder`. Uma nova versão do
+documento precisa do próprio arquivo `.en.txt` para ganhar tradução; a revisão
+jurídica vale também para o texto em inglês.
+
 ## Escopo e validação
 
 O texto considera os fluxos presentes no projeto: formulário comercial por

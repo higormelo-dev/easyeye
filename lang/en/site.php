@@ -55,6 +55,11 @@ return [
         'unavailable_title'   => 'Document being published',
         'unavailable_text'    => 'The official version of this document has not been published here yet. To get it now, write to',
         'back_home'           => 'Back to home',
+        'translation_notice'  => 'Courtesy translation. If there is any discrepancy, the original Portuguese version prevails.',
+        'read_original'       => 'Read the original in Portuguese',
+        'original_notice'     => 'You are reading the original text in Portuguese, which is the binding version.',
+        'read_translation'    => 'Back to the translation',
+        'original_only'       => 'This document is only available in Portuguese, which is the binding version.',
     ],
 
     'hero' => [
