@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ScheduleResource;
 use App\Models\Schedule;
 use Carbon\Carbon;
+use Closure;
+use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class SchedulesController extends Controller
 {
@@ -54,10 +57,7 @@ class SchedulesController extends Controller
         }
 
         if ($identifierSearch !== null) {
-            $schedules = $schedules->where(
-                $identifierSearch['column'],
-                $identifierSearch['value'],
-            );
+            $schedules = $schedules->where($identifierSearch['where']);
         } elseif (filled($search)) {
             $schedules = $schedules->where(function ($query) use ($search) {
                 $query->whereHas('patient', function ($q) use ($search) {
@@ -86,7 +86,7 @@ class SchedulesController extends Controller
     }
 
     /**
-     * @return array{column: 'id'|'code', value: string}|null
+     * @return array{where: Closure(Builder): void}|null
      */
     private function resolveIdentifierSearch(?string $search): ?array
     {
@@ -95,19 +95,31 @@ class SchedulesController extends Controller
         }
 
         if (Str::isUuid($search)) {
-            return ['column' => 'id', 'value' => $search];
+            return ['where' => fn (Builder $query) => $query->where('id', $search)];
         }
 
         if (ctype_digit($search)) {
-            return ['column' => 'code', 'value' => sprintf('SDL-%010d', (int) $search)];
+            $formattedCode = sprintf('SDL-%010d', (int) $search);
+
+            // Número puro: pode ser o código interno (SDL-0000000042) OU o
+            // código do sistema anterior do integrador (import_code costuma
+            // ser só numérico em sistemas legados) — tenta os dois.
+            return ['where' => fn (Builder $query) => $query->where(function ($q) use ($formattedCode, $search) {
+                $q->where('code', $formattedCode)
+                    ->orWhere('import_code', $search);
+            })];
         }
 
         $normalizedCode = mb_strtoupper($search, 'UTF-8');
 
         if (preg_match('/^SDL-\d{1,10}$/', $normalizedCode) === 1) {
-            $numericPart = (int) substr($normalizedCode, 4);
+            $numericPart   = (int) substr($normalizedCode, 4);
+            $formattedCode = sprintf('SDL-%010d', $numericPart);
 
-            return ['column' => 'code', 'value' => sprintf('SDL-%010d', $numericPart)];
+            return ['where' => fn (Builder $query) => $query->where(function ($q) use ($formattedCode, $search) {
+                $q->where('code', $formattedCode)
+                    ->orWhere('import_code', $search);
+            })];
         }
 
         return null;
@@ -120,18 +132,26 @@ class SchedulesController extends Controller
     {
         $integrator = request()->attributes->get('integrator');
 
-        [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id', $idOrCode],
-            ctype_digit($idOrCode) => ['code', sprintf('SDL-%010d', (int) $idOrCode)],
-            default                => ['code', $idOrCode],
-        };
+        // UUID, SDL-N, número puro ou import_code — ver Schedule::identifierMatches().
+        // Nunca devolve uma linha arbitrária: se o identificador casar com mais
+        // de um agendamento (número = SDL-N de um e import_code de outro, ou
+        // código duplicado), responde 409 e o desktop deve usar o UUID.
+        $matches = Schedule::identifierMatches(
+            (string) $integrator->user->entity_id,
+            $idOrCode,
+            ['doctor', 'patient', 'covenant', 'visitType'],
+        );
 
-        $schedule = $this->model->query()
-            ->with(['doctor', 'patient', 'covenant', 'visitType'])
-            ->where('entity_id', $integrator->user->entity_id)
-            ->where($column, $value)
-            ->firstOrFail();
+        if ($matches->isEmpty()) {
+            throw (new ModelNotFoundException())->setModel(Schedule::class, [$idOrCode]);
+        }
 
-        return new ScheduleResource($schedule);
+        abort_if(
+            $matches->count() > 1,
+            HttpResponse::HTTP_CONFLICT,
+            __('record_codes.ambiguous_identifier.schedule'),
+        );
+
+        return new ScheduleResource($matches->first());
     }
 }

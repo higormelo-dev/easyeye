@@ -402,16 +402,18 @@ Route::group(
             Route::middleware('entity.role:doctor')->group(function () {
                 Route::resource('patients.medicalrecords', MedicalRecordsController::class)
                     ->only(['create', 'store', 'edit', 'update', 'destroy']);
+                // Restaurar desfaz um destroy: mesma regra de quem pode excluir
+                // (antes ficava fora deste grupo — admin/secretária restauravam).
+                Route::patch(
+                    'patients/{patient}/medicalrecords/{medicalrecord}/restore',
+                    [MedicalRecordsController::class, 'restore'],
+                )->name('patients.medicalrecords.restore');
             });
 
             // Leitura aberta para admin/doctor/secretary — útil para admin/secretária
             // consultar histórico clínico do paciente sem poder editar.
             Route::resource('patients.medicalrecords', MedicalRecordsController::class)
                 ->only(['index', 'show']);
-            Route::patch(
-                'patients/{patient}/medicalrecords/{medicalrecord}/restore',
-                [MedicalRecordsController::class, 'restore'],
-            )->name('patients.medicalrecords.restore');
             Route::get(
                 'patients/{patient}/medicalrecords/{medicalrecord}/pdf',
                 [MedicalRecordsController::class, 'pdf'],

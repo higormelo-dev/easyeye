@@ -6,10 +6,12 @@ namespace App\Models;
 
 use App\Casts\PaymentMethodCast;
 use App\Concerns\HasEntityCode;
-use App\Enums\{CashEntryNature, FinancialEntryStatus, FinancialEntryType};
+use App\Enums\{CashEntryNature, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType};
 use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\{Builder, Model, Relations\BelongsTo, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\MorphTo, SoftDeletes};
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use InvalidArgumentException;
 
 class FinancialCashEntry extends Model
 {
@@ -69,6 +71,23 @@ class FinancialCashEntry extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Invariante de sistema (defesa em profundidade além da request): a
+        // referência só aceita os tipos da whitelist. Antes o reference_type
+        // vinha livre do cliente e alimentava um morphTo (qualquer classe).
+        // Só checa quando muda — linhas legadas continuam editáveis e são
+        // listadas por `php artisan financial:audit-cash-references`.
+        static::saving(function (self $entry): void {
+            $type = $entry->getAttribute('reference_type');
+
+            if ($entry->isDirty('reference_type') && $type !== null
+                && CashEntryReferenceType::tryFrom((string) $type) === null) {
+                throw new InvalidArgumentException('Tipo de referência de lançamento de caixa não permitido.');
+            }
+        });
+    }
+
     public function resolveRouteBinding($value, $field = null): ?self
     {
         // Sessão sem entity_id (ex.: vínculo desativado em sessão já aberta) não
@@ -118,8 +137,26 @@ class FinancialCashEntry extends Model
         return $this->belongsTo(Procedure::class, 'procedure_id');
     }
 
-    public function referenceable(): MorphTo
+    /**
+     * Lançamentos vinculados a um registro do tipo informado que pertence à
+     * MESMA clínica do lançamento. É assim que toda leitura da referência deve
+     * ser feita: uma linha legada/forjada apontando para agendamento de outra
+     * clínica não pode marcá-lo como pago nem bloquear o recebimento dele.
+     *
+     * Funciona em lazy e eager load (subquery correlacionada, sem depender do
+     * model pai) e independe do EntityScope global, que fica inerte em
+     * job/CLI/webhook.
+     */
+    public function scopeReferencingSameEntity(Builder $query, CashEntryReferenceType $type): Builder
     {
-        return $this->morphTo(__FUNCTION__, 'reference_type', 'reference_id');
+        $table = $this->getTable();
+
+        return $query
+            ->where("{$table}.reference_type", $type->value)
+            ->whereExists(fn (QueryBuilder $target) => $target
+                ->selectRaw('1')
+                ->from($type->table() . ' as cash_reference_target')
+                ->whereColumn('cash_reference_target.id', "{$table}.reference_id")
+                ->whereColumn('cash_reference_target.entity_id', "{$table}.entity_id"));
     }
 }

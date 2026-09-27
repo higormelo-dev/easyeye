@@ -264,6 +264,10 @@ return [
     'cash_entry_required'        => 'Lance no caixa (ou marque Cortesia) antes de concluir o atendimento.',
     'cash_copay_notice'          => 'Atendimento de convênio: registre aqui apenas a co-participação do paciente. O valor do convênio é faturado à parte via guia.',
 
+    // Bulk para Atendido: linhas sem caixa são ignoradas (contagem + motivo por linha).
+    'bulk_skipped_cash'            => ':blocked não marcado(s) como Atendido: lance no caixa (ou marque Cortesia) antes de concluir.',
+    'bulk_row_cash_entry_required' => 'Agendamento :code: lance no caixa (ou marque Cortesia) antes de concluir o atendimento.',
+
     // ── Agenda do médico: fluxo de atendimento ────────────────────────────────
     'btn_attend' => 'Iniciar atendimento',
     'btn_call'   => 'Chamar paciente',

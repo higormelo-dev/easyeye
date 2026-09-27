@@ -186,12 +186,20 @@ class EyeImageReportController extends Controller
             }
 
             // Abrir prontuário é ato médico (mesma regra de AiRunsController::openRecordForRun).
-            $record = MedicalRecord::query()->create(array_filter([
-                'entity_id'   => $entityId,
-                'patient_id'  => $patient->id,
-                'doctor_id'   => (string) $doctorId,
-                'schedule_id' => $scheduleId,
-            ]));
+            // Relê sob o lock de abertura do paciente: outra requisição (outro
+            // laudo, prontuário do laudo de IA) pode ter aberto o prontuário da
+            // consulta depois da busca acima — reaproveita em vez de abrir um segundo.
+            $record = MedicalRecord::withRecordOpeningLock(
+                $entityId,
+                (string) $patient->id,
+                fn (): MedicalRecord => $this->recordResolver->findRecord($entityId, (string) $patient->id, $scheduleId, $consultationDate)
+                    ?? MedicalRecord::query()->create(array_filter([
+                        'entity_id'   => $entityId,
+                        'patient_id'  => $patient->id,
+                        'doctor_id'   => (string) $doctorId,
+                        'schedule_id' => $scheduleId,
+                    ])),
+            );
         }
 
         $sanitized     = Purifier::clean($validated['content'], 'medical');

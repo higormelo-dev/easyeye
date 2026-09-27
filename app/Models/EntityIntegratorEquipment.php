@@ -3,10 +3,11 @@
 namespace App\Models;
 
 use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\{Builder, Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
+use Illuminate\Support\Str;
 
 class EntityIntegratorEquipment extends Model
 {
@@ -41,6 +42,12 @@ class EntityIntegratorEquipment extends Model
      */
     private const UPPERCASE_FIELDS = ['name', 'mac', 'serial_number'];
 
+    /** Prefixo do código sequencial por integrador (EIQ-0000000001). */
+    public const CODE_PREFIX = 'EIQ';
+
+    /** Namespace da chave do advisory lock da numeração EIQ (PostgreSQL). */
+    private const CODE_LOCK_NAMESPACE = 'integrator_equipment_code';
+
     /**
      * Get the mac attribute (uppercase) - PostgreSQL macaddr type stores in lowercase.
      */
@@ -70,24 +77,93 @@ class EntityIntegratorEquipment extends Model
         // Generate code on creating
         static::creating(static function (self $entityIntegratorEquipment) {
             if (blank($entityIntegratorEquipment->code)) {
-                $prefix = 'EIQ';
-
-                $lastEquipment = static::withoutGlobalScopes()
-                    ->where('integrator_id', $entityIntegratorEquipment->integrator_id)
-                    ->where('code', 'like', $prefix . '-%')
-                    ->orderBy('code', 'desc')
-                    ->first();
-
-                if ($lastEquipment) {
-                    $lastNumber = (int) substr($lastEquipment->code, strlen($prefix) + 1);
-                    $newNumber  = $lastNumber + 1;
-                } else {
-                    $newNumber = 1;
-                }
-
-                $entityIntegratorEquipment->code = sprintf('%s-%010d', $prefix, $newNumber);
+                $entityIntegratorEquipment->assignNextCode();
             }
         });
+    }
+
+    /**
+     * INSERT sempre dentro de uma transação: o lock da numeração
+     * (pg_advisory_xact_lock, tomado no `creating`) só é liberado no COMMIT,
+     * então o próximo equipamento do mesmo integrador já enxerga o código
+     * gravado. Dentro de transação do chamador (EntityIntegratorEquipmentService
+     * ::create) vira SAVEPOINT e o lock vale até o commit externo.
+     *
+     * @param array<string, mixed> $options
+     */
+    public function save(array $options = []): bool
+    {
+        if ($this->exists) {
+            return parent::save($options);
+        }
+
+        return $this->getConnection()->transaction(fn (): bool => parent::save($options));
+    }
+
+    /**
+     * Próximo EIQ do INTEGRADOR (a numeração é por integrator_id, por desenho:
+     * cada PC integrador da clínica tem seu EIQ-0000000001), serializado por
+     * integrador. Antes: último + 1 sem lock — dois POST /equipments
+     * simultâneos do mesmo integrador gravavam o mesmo código.
+     *
+     * PostgreSQL: advisory lock de transação por integrador; demais drivers:
+     * lock na linha do integrador.
+     */
+    private function assignNextCode(): void
+    {
+        $integratorId = (string) $this->integrator_id;
+        $connection   = $this->getConnection();
+
+        if ($connection->getDriverName() === 'pgsql') {
+            $connection->select('select pg_advisory_xact_lock(?)', [static::codeLockKey($integratorId)]);
+        } else {
+            EntityIntegrator::query()->withoutGlobalScopes()->whereKey($integratorId)->lockForUpdate()->first();
+        }
+
+        // withoutGlobalScopes: conta também os excluídos por soft delete (o código deles não é reaproveitado).
+        $lastCode = static::withoutGlobalScopes()
+            ->where('integrator_id', $integratorId)
+            ->where('code', 'like', self::CODE_PREFIX . '-%')
+            ->orderBy('code', 'desc')
+            ->value('code');
+
+        $newNumber = $lastCode !== null
+            ? ((int) substr($lastCode, strlen(self::CODE_PREFIX) + 1)) + 1
+            : 1;
+
+        $this->code = static::formatCode($newNumber);
+    }
+
+    /**
+     * Chave bigint estável por integrador para o advisory lock da numeração
+     * (60 bits do sha1, sempre positiva). Pública para os testes de
+     * concorrência disputarem o mesmo lock.
+     */
+    public static function codeLockKey(string $integratorId): int
+    {
+        return (int) hexdec(substr(sha1(self::CODE_LOCK_NAMESPACE . '|' . $integratorId), 0, 15));
+    }
+
+    public static function formatCode(int $number): string
+    {
+        return sprintf('%s-%010d', self::CODE_PREFIX, $number);
+    }
+
+    /**
+     * Filtra pelo identificador externo do equipamento: UUID, código
+     * (EIQ-0000000002) ou só o número (2). NÃO escopa o integrador — o código
+     * só é único dentro do integrador, então o chamador SEMPRE combina com
+     * where('integrator_id', ...).
+     */
+    public function scopeWhereIdentifier(Builder $query, string $identifier): Builder
+    {
+        $identifier = trim($identifier);
+
+        return match (true) {
+            Str::isUuid($identifier) => $query->whereKey($identifier),
+            ctype_digit($identifier) => $query->where('code', static::formatCode((int) $identifier)),
+            default                  => $query->where('code', $identifier),
+        };
     }
 
     /**

@@ -707,7 +707,9 @@ class AiRunsController extends Controller
     /**
      * Abre um novo prontuário (do dia) para receber o laudo de um run já aprovado,
      * quando o médico confirma. Idempotente: se já houver documentação para o run,
-     * apenas retorna sucesso.
+     * apenas retorna sucesso. Se o prontuário da consulta foi aberto por outro
+     * fluxo depois da aprovação, o laudo vai para ele (nunca 2 prontuários da
+     * mesma consulta) — ver MedicalRecord::withRecordOpeningLock().
      */
     public function openRecordForRun(Request $request, AiRun $aiRun): JsonResponse|RedirectResponse
     {
@@ -736,24 +738,30 @@ class AiRunsController extends Controller
             abort(422, __('ai.record_doctor_required'));
         }
 
-        // Idempotência: laudo já documentado em algum prontuário.
-        $existing = MedicalRecordDocumentation::query()->where('ai_run_id', $aiRun->id)->exists();
+        // Vincula o novo prontuário ao agendamento da consulta, quando houver.
+        [$scheduleId, $consultationDate] = $this->documentationService->consultationAnchorForRun($aiRun);
 
-        if (! $existing) {
-            // Vincula o novo prontuário ao agendamento da consulta, quando houver.
-            [$scheduleId] = $this->documentationService->consultationAnchorForRun($aiRun);
+        // Tudo sob o lock de abertura do paciente (serializa com o laudo manual
+        // de imagem e com outro clique/aba neste mesmo run).
+        MedicalRecord::withRecordOpeningLock($entityId, (string) $patientId, function () use ($aiRun, $entityId, $patientId, $doctorId, $scheduleId, $consultationDate): void {
+            // Idempotência: laudo já documentado em algum prontuário.
+            if (MedicalRecordDocumentation::query()->where('ai_run_id', $aiRun->id)->exists()) {
+                return;
+            }
 
-            DB::transaction(function () use ($aiRun, $entityId, $patientId, $doctorId, $scheduleId): void {
-                $record = MedicalRecord::query()->create(array_filter([
+            // O prontuário da consulta pode ter sido aberto por outro fluxo
+            // depois da aprovação (que só pediu confirmação porque não havia
+            // nenhum): reaproveita em vez de abrir um segundo para a mesma consulta.
+            $record = $this->documentationService->findConsultationRecord($entityId, (string) $patientId, $scheduleId, $consultationDate)
+                ?? MedicalRecord::query()->create(array_filter([
                     'entity_id'   => $entityId,
                     'patient_id'  => $patientId,
                     'doctor_id'   => (string) $doctorId,
                     'schedule_id' => $scheduleId,
                 ]));
 
-                $this->documentationService->writeRunDocumentation($aiRun, $record, (string) $aiRun->final_output);
-            });
-        }
+            $this->documentationService->writeRunDocumentation($aiRun, $record, (string) $aiRun->final_output);
+        });
 
         if ($request->expectsJson()) {
             return response()->json([

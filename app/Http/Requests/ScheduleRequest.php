@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\{MedicalSpecialty, ScheduleAttendanceType};
+use App\Enums\{MedicalSpecialty, ScheduleAttendanceType, ScheduleSituation};
+use App\Models\Schedule;
 use App\Services\ScheduleService;
+use App\Support\BrazilianFormat;
 use Carbon\Carbon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -82,7 +84,7 @@ class ScheduleRequest extends FormRequest
                     }
 
                     $excludeId = ($this->isMethod('PUT') || $this->isMethod('PATCH'))
-                        ? $this->route('schedule')
+                        ? $this->routeScheduleId()
                         : null;
 
                     $errors = app(ScheduleService::class)->validateSlot(
@@ -102,7 +104,7 @@ class ScheduleRequest extends FormRequest
             'telephone'           => ['nullable', 'string', 'max:20'],
             'cellphone'           => ['nullable', 'string', 'max:20'],
             'cellphone_whatsapp'  => ['nullable', 'boolean'],
-            'situation'           => ['nullable', 'integer'],
+            'situation'           => ['nullable', 'integer', Rule::enum(ScheduleSituation::class)], // aplicado pelo fluxo, nunca direto — ver scheduleAttributes()
             'notes'               => ['nullable', 'string', 'max:2000'],
             'cancellation_reason' => ['nullable', 'string', 'max:2000'],
             'waiting_list_id'     => ['nullable', 'uuid', 'exists:waiting_list,id'],
@@ -120,11 +122,49 @@ class ScheduleRequest extends FormRequest
         ];
     }
 
+    /**
+     * Campos gravados direto no agendamento (mass assignment). `situation`
+     * é aceito (compatibilidade) mas fica de fora: o controller aplica via
+     * ScheduleService::changeSituation() — histórico, timestamps e a trava
+     * "Atendido exige caixa" — ver requestedSituation().
+     *
+     * @return array<string, mixed>
+     */
+    public function scheduleAttributes(): array
+    {
+        return $this->safe()->except(['situation']);
+    }
+
+    /** Situação pedida no formulário, a aplicar pelo fluxo (null = não mexe). */
+    public function requestedSituation(): ?ScheduleSituation
+    {
+        $value = $this->validated('situation');
+
+        return $value === null ? null : ScheduleSituation::from((int) $value);
+    }
+
+    /**
+     * Id do agendamento em edição. O route model binding (SubstituteBindings)
+     * roda antes do FormRequest, então route('schedule') já é o MODEL — antes
+     * ele ia cru para validateSlot() e virava o JSON do model como bind de
+     * UUID (500 "invalid input syntax for type uuid" em todo PUT).
+     */
+    private function routeScheduleId(): ?string
+    {
+        $schedule = $this->route('schedule');
+
+        if ($schedule instanceof Schedule) {
+            return (string) $schedule->getKey();
+        }
+
+        return is_string($schedule) ? $schedule : null;
+    }
+
     protected function prepareForValidation(): void
     {
         foreach (['telephone', 'cellphone'] as $field) {
             if ($this->has($field) && $this->input($field) !== null) {
-                $this->merge([$field => preg_replace('/\D/', '', $this->input($field))]);
+                $this->merge([$field => BrazilianFormat::canonicalPhone((string) $this->input($field))]);
             }
         }
 

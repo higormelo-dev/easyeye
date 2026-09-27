@@ -48,6 +48,10 @@ class BillingClaim extends Model
         'unit_price',
         'notes',
         'tiss_guide_id',
+        // Cancelamento (só rascunho): motivo, quem e quando — ver BillingAdjustmentService::cancelClaim().
+        'cancel_reason',
+        'cancelled_by',
+        'cancelled_at',
     ];
 
     protected static function booted(): void
@@ -57,6 +61,18 @@ class BillingClaim extends Model
                 $claim->guide_number = $claim->code;
             }
         });
+    }
+
+    /**
+     * guide_number nasce como cópia do code gerado: se o INSERT colidir e o
+     * código for descartado (HasEntityCode), a cópia é refeita com o novo — e
+     * a guia não fica com o número de outra.
+     *
+     * @return list<string>
+     */
+    protected function entityCodeMirrorAttributes(): array
+    {
+        return ['guide_number'];
     }
 
     protected function casts(): array
@@ -72,6 +88,7 @@ class BillingClaim extends Model
             'is_tiss_exported' => 'boolean',
             'quantity'         => 'integer',
             'unit_price'       => 'decimal:2',
+            'cancelled_at'     => 'datetime',
             'created_at'       => 'datetime',
             'updated_at'       => 'datetime',
             'deleted_at'       => 'datetime',
@@ -130,5 +147,11 @@ class BillingClaim extends Model
     public function tissGuide(): BelongsTo
     {
         return $this->belongsTo(TissGuide::class, 'tiss_guide_id');
+    }
+
+    /** Quem cancelou a guia (nulo se não cancelada ou se o usuário foi excluído). */
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 }

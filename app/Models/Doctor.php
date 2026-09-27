@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use App\Traits\{Auditable, HasAuditColumns};
+use Illuminate\Database\Eloquent\{Builder, Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\{Model, Relations\BelongsTo, Relations\HasMany, SoftDeletes};
 
 class Doctor extends Model
 {
@@ -80,6 +80,20 @@ class Doctor extends Model
     public function entityUser(): BelongsTo
     {
         return $this->belongsTo(EntityUser::class, 'entity_user_id', 'id');
+    }
+
+    /**
+     * Médicos da clínica. `doctors` não tem entity_id: o vínculo com a clínica
+     * é entity_user_id -> entity_users.entity_id (where('entity_id') aqui é
+     * erro SQL, não filtro).
+     *
+     * @param Builder<Doctor> $query
+     *
+     * @return Builder<Doctor>
+     */
+    public function scopeOfEntity(Builder $query, string $entityId): Builder
+    {
+        return $query->whereHas('entityUser', fn (Builder $entityUser) => $entityUser->where('entity_id', $entityId));
     }
 
     public function person(): BelongsTo

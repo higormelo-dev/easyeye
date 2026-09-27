@@ -69,26 +69,28 @@ class PatientExamRequest extends FormRequest
                         return;
                     }
 
-                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));
+
+                        return;
+                    }
+
+                    if ($this->isUuidLike((string) $value) && ! Str::isUuid($value)) {
                         $fail(trans('validation.uuid', ['attribute' => $attribute]));
 
                         return;
                     }
 
-                    [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id', $value],
-                        ctype_digit($value) => ['code', sprintf('SDL-%010d', (int) $value)],
-                        default             => ['code', $value],
-                    };
+                    // Mesma resolução do PatientExamService (Schedule::identifierMatches):
+                    // UUID, SDL-N, número puro ou import_code. Identificador que casa com
+                    // MAIS DE UM agendamento é recusado — o exame herdaria paciente e
+                    // médico de um agendamento arbitrário.
+                    $matches = Schedule::identifierMatches((string) $entityId, (string) $value);
 
-                    $exists = Schedule::query()
-                        ->where('entity_id', $entityId)
-                        ->whereNull('deleted_at')
-                        ->where($column, $lookupValue)
-                        ->exists();
-
-                    if (! $exists) {
+                    if ($matches->isEmpty()) {
                         $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));
+                    } elseif ($matches->count() > 1) {
+                        $fail(__('record_codes.ambiguous_identifier.schedule'));
                     }
                 },
             ],
@@ -138,25 +140,31 @@ class PatientExamRequest extends FormRequest
                         return;
                     }
 
-                    if ($this->isUuidLike($value) && ! Str::isUuid($value)) {
+                    if (! is_string($value) && ! is_int($value)) {
+                        $fail(__('validation.custom.validation_invalid.not_equipment_identifier'));
+
+                        return;
+                    }
+
+                    if ($this->isUuidLike((string) $value) && ! Str::isUuid($value)) {
                         $fail(trans('validation.uuid', ['attribute' => $attribute]));
 
                         return;
                     }
 
-                    $query = EntityIntegratorEquipment::query()
+                    // EIQ é numerado POR INTEGRADOR: o escopo aqui e no
+                    // PatientExamService::equipmentFindByIdOrCode é o mesmo
+                    // (integrator_id do token). Código duplicado (corrida antiga)
+                    // é ambíguo — recusado em vez de escolher um.
+                    $matchCount = EntityIntegratorEquipment::query()
                         ->where('integrator_id', $integrator->id)
-                        ->whereNull('deleted_at');
+                        ->whereIdentifier((string) $value)
+                        ->count();
 
-                    [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id', $value],
-                        ctype_digit($value) => ['code', sprintf('EIQ-%010d', (int) $value)],
-                        default             => ['code', $value],
-                    };
-                    $query->where($column, $lookupValue);
-
-                    if (! $query->exists()) {
+                    if ($matchCount === 0) {
                         $fail(__('validation.custom.validation_invalid.not_equipment_identifier'));
+                    } elseif ($matchCount > 1) {
+                        $fail(__('record_codes.ambiguous_identifier.equipment'));
                     }
                 },
             ],

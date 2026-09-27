@@ -175,7 +175,7 @@ test('tonometria PDF: staff de OUTRA entity recebe 404 ao gerar PDF de paciente 
 
 test('tonometria PDF: staff da entity correta consegue gerar o PDF normalmente', function () {
     actingAsA($this)
-        ->get(route('panel.patients.tonometry-pdf', $this->patientA, ['doctor_id' => $this->doctorA->id]))
+        ->get(route('panel.patients.tonometry-pdf', [$this->patientA, 'doctor_id' => $this->doctorA->id]))
         ->assertOk();
 });
 

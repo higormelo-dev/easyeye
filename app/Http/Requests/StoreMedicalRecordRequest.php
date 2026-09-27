@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Doctor;
+use App\Models\{Doctor, Patient};
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -84,11 +84,14 @@ class StoreMedicalRecordRequest extends FormRequest
                     $fail(__('actions.medical_records.doctor_exists_validation'));
                 }
             }],
-            // Vínculo com a agenda escopado por tenant: um schedule_id de outra
-            // clínica não pode ser gravado no prontuário (FK cruzada mataria o
-            // fluxo Finalizar/Dilatar/Exame e vazaria referência entre clínicas).
+            // Vínculo com a agenda escopado por tenant E pelo paciente da rota:
+            // um schedule_id de outra clínica — ou de OUTRO paciente da mesma
+            // clínica — não pode ser gravado no prontuário (Finalizar/Dilatar/
+            // Exame mexeria na agenda do outro paciente e o "Atender" dele
+            // passaria a abrir este prontuário).
             'schedule_id' => ['nullable', 'uuid', Rule::exists('schedules', 'id')
                 ->where('entity_id', (string) session('selected_entity_id'))
+                ->where('patient_id', $this->routePatientId())
                 ->whereNull('deleted_at')],
             // Fluxo do atendimento (Agenda ↔ Prontuário): o que acontece com o
             // paciente após salvar — save (mantém aberto) | finish (Atendido) |
@@ -294,6 +297,15 @@ class StoreMedicalRecordRequest extends FormRequest
         return [
             'doctor_id.required' => __('actions.medical_records.doctor_required_validation'),
             'doctor_id.exists'   => __('actions.medical_records.doctor_exists_validation'),
+            'schedule_id.exists' => __('actions.medical_records.schedule_exists_validation'),
         ];
+    }
+
+    /** Paciente da rota patients/{patient}/medicalrecords: model já resolvido ou id cru. */
+    private function routePatientId(): string
+    {
+        $patient = $this->route('patient');
+
+        return (string) ($patient instanceof Patient ? $patient->getKey() : $patient);
     }
 }

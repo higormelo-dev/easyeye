@@ -131,3 +131,27 @@ describe('validação de pagamento misto (breakdown)', function () {
         ])->assertOk();
     });
 });
+
+describe('limite do valor (financial_cash_entries: decimal 12,2)', function () {
+    it('aceita o maior valor que cabe na coluna', function () {
+        postCashEntry($this, ['amount' => '9.999.999.999,99'])->assertOk();
+
+        expect((string) FinancialCashEntry::query()->firstOrFail()->amount)->toBe('9999999999.99');
+    });
+
+    it('rejeita com 422 valor acima da coluna (antes: 500 do banco) e não grava nada', function (array $payload, string $field) {
+        postCashEntry($this, $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors([$field]);
+
+        expect(FinancialCashEntry::query()->count())->toBe(0);
+    })->with([
+        'total'                       => [['amount' => '10000000000'], 'amount'],
+        'total com máscara BR'        => [['amount' => '10.000.000.000,00'], 'amount'],
+        'total em notação científica' => [['amount' => '1e20'], 'amount'],
+        'parcela em dinheiro'         => [['payment_method' => PaymentMethod::CreditCash->value, 'amount' => 100, 'amount_credit' => 50, 'amount_cash' => '99999999999', 'installments' => 1], 'amount_cash'],
+        'parcela no crédito'          => [['payment_method' => PaymentMethod::CreditCash->value, 'amount' => 100, 'amount_credit' => '99999999999', 'amount_cash' => 50, 'installments' => 1], 'amount_credit'],
+        'parcela no débito'           => [['payment_method' => PaymentMethod::DebitCash->value, 'amount' => 100, 'amount_debit' => '99999999999', 'amount_cash' => 50], 'amount_debit'],
+        'parcela ignorada (à vista)'  => [['payment_method' => PaymentMethod::Cash->value, 'amount' => 90, 'amount_credit' => '99999999999'], 'amount_credit'],
+    ]);
+});

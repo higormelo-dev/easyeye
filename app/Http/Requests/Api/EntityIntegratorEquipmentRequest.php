@@ -73,24 +73,35 @@ class EntityIntegratorEquipmentRequest extends FormRequest
 
     /**
      * Regra unique com escopo do integrador.
+     *
+     * No update, o próprio registro é ignorado PELO IDENTIFICADOR DA ROTA
+     * (id ou code), sem consulta prévia. Antes o id a ignorar era buscado por
+     * `code` em TODOS os tenants — como cada integrador tem seu
+     * EIQ-0000000001, vinha o equipamento de outra clínica, o registro editado
+     * não era ignorado e reenviar o próprio nome/IP/MAC dava 422 "já em uso".
+     * O Rule::unique já filtra integrator_id do token, então ignorar por code
+     * aqui é exatamente o registro que EntityIntegratorEquipmentService::
+     * findByIdOrCode resolve.
      */
     private function uniqueRule(string $column): Unique
     {
-        $param    = $this->route('equipment');
-        $ignoreId = match (true) {
-            $param === null              => null,
-            Str::isUuid((string) $param) => $param,
-            ctype_digit((string) $param) => EntityIntegratorEquipment::where(
-                'code',
-                sprintf('EIQ-%010d', (int) $param),
-            )->value('id'),
-            default => EntityIntegratorEquipment::where('code', $param)->value('id'),
-        };
-
-        return Rule::unique(self::TABLE, $column)
-            ->ignore($ignoreId)
+        $rule = Rule::unique(self::TABLE, $column)
             ->whereNull('deleted_at')
             ->where('integrator_id', request()->attributes->get('integrator')->id);
+
+        $param = $this->route('equipment');
+
+        if ($param === null) {
+            return $rule;
+        }
+
+        $param = (string) $param;
+
+        return match (true) {
+            Str::isUuid($param) => $rule->ignore($param),
+            ctype_digit($param) => $rule->ignore(EntityIntegratorEquipment::formatCode((int) $param), 'code'),
+            default             => $rule->ignore($param, 'code'),
+        };
     }
 
     /**

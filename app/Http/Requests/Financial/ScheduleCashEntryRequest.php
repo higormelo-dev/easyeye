@@ -18,6 +18,13 @@ class ScheduleCashEntryRequest extends FormRequest
 {
     use ValidatesPaymentBreakdown;
 
+    /**
+     * Maior valor que cabe em financial_cash_entries.amount/amount_* (decimal
+     * 12,2) — acima disso o PostgreSQL recusava (22003) e o lançamento virava
+     * HTTP 500. Mesmo teto de CashEntryRequest.
+     */
+    private const MAX_AMOUNT = '9999999999.99';
+
     public function authorize(): bool
     {
         return true;
@@ -69,10 +76,10 @@ class ScheduleCashEntryRequest extends FormRequest
                     ->whereNull('deleted_at')),
             ],
             'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
-            'amount'         => ['required', 'numeric', 'min:0'],
-            'amount_cash'    => ['nullable', 'numeric', 'min:0'],
-            'amount_credit'  => ['nullable', 'numeric', 'min:0'],
-            'amount_debit'   => ['nullable', 'numeric', 'min:0'],
+            'amount'         => ['required', 'numeric', 'min:0', 'max:' . self::MAX_AMOUNT],
+            'amount_cash'    => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_AMOUNT],
+            'amount_credit'  => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_AMOUNT],
+            'amount_debit'   => ['nullable', 'numeric', 'min:0', 'max:' . self::MAX_AMOUNT],
             'installments'   => ['nullable', 'integer', 'min:0', 'max:12'],
             'status'         => ['nullable', Rule::enum(FinancialEntryStatus::class)],
             'notes'          => ['nullable', 'string', 'max:2000'],

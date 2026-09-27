@@ -7,9 +7,16 @@ use App\Models\{Doctor, EntityUser, People, User};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class DoctorService
 {
+    public function __construct(
+        private readonly PatientService $patientService,
+        private readonly EntityUserService $entityUserService,
+    ) {
+    }
+
     /**
      * Create a new doctor with all related entities.
      */
@@ -65,8 +72,19 @@ class DoctorService
             $this->updateEntityUser($doctor->entityUser, $request);
 
             if (! $request->has('type_method')) {
-                $this->updatePerson($doctor->person, $request);
-                $this->updateUser($doctor->entityUser->user, $request);
+                $entityId = (string) $doctor->entityUser->entity_id;
+
+                // People e User são GLOBAIS: barrados (422) quando a edição
+                // alteraria o cadastro/login usado por outra clínica.
+                // withTrashed: People apagado indevidamente (exclusão em outra
+                // clínica, antes do deletePersonIfUnused) não vira TypeError/500.
+                $this->updatePerson($doctor->person()->withTrashed()->firstOrFail(), $request, $entityId);
+                $this->entityUserService->updateLoginGuarded(
+                    $doctor->entityUser->user,
+                    (string) $request->nickname,
+                    (string) $request->email,
+                    $entityId,
+                );
             }
 
             return $doctor;
@@ -159,6 +177,12 @@ class DoctorService
 
     /**
      * Find or create person.
+     *
+     * O DoctorRequest já barra CPF de People ativo; aqui só chega People
+     * EXCLUÍDO. Se ele ainda for usado por cadastro ativo de outra clínica,
+     * vale a regra do unique (CPF em uso) — nunca reescreve o cadastro dela.
+     *
+     * @throws ValidationException
      */
     private function findOrCreatePerson(DoctorRequest $request): People
     {
@@ -170,6 +194,12 @@ class DoctorService
         $recordData = $this->getPersonFromRequest($request);
 
         if ($existingRecord) {
+            if ($this->patientService->personSharedWithOtherEntities($existingRecord->id, (string) session()->get('selected_entity_id'))) {
+                throw ValidationException::withMessages([
+                    'national_registry' => __('validation.unique', ['attribute' => __('validation.attributes.national_registry')]),
+                ]);
+            }
+
             if ($existingRecord->trashed()) {
                 $existingRecord->restore();
             }
@@ -250,11 +280,14 @@ class DoctorService
     }
 
     /**
-     * Update person data.
+     * Update person data — barrado (422) quando o People é usado por cadastro
+     * ativo de outra clínica e o formulário altera algum dado pessoal.
+     *
+     * @throws ValidationException
      */
-    private function updatePerson(People $person, Request $request): void
+    private function updatePerson(People $person, Request $request, string $entityId): void
     {
-        $person->update([
+        $this->patientService->fillPersonGuarded($person, [
             'full_name'              => $request->name,
             'nickname'               => $request->nickname,
             'birth_date'             => $request->birth_date,
@@ -279,7 +312,7 @@ class DoctorService
             'city'                   => $request->city,
             'state'                  => $request->state,
             'country'                => $request->country,
-        ]);
+        ], $entityId, 'name')->save();
     }
 
     /**
@@ -289,17 +322,6 @@ class DoctorService
     {
         $entityUser->update([
             'active' => $request->active,
-        ]);
-    }
-
-    /**
-     * Update user data.
-     */
-    private function updateUser(User $user, Request $request): void
-    {
-        $user->update([
-            'name'  => $request->nickname,
-            'email' => $request->email,
         ]);
     }
 }

@@ -259,4 +259,8 @@ return [
     'cash_entry_duplicate'       => 'This appointment already has a cash entry.',
     'cash_entry_required'        => 'Register a cash entry (or mark as Courtesy) before completing the attendance.',
     'cash_copay_notice'          => 'Covenant appointment: record only the patient co-payment here. The covenant amount is billed separately via claim.',
+
+    // Bulk to Attended: rows without a cash entry are skipped (count + per-row reason).
+    'bulk_skipped_cash'            => ':blocked not marked as Attended: register a cash entry (or mark as Courtesy) before completing.',
+    'bulk_row_cash_entry_required' => 'Appointment :code: register a cash entry (or mark as Courtesy) before completing the attendance.',
 ];

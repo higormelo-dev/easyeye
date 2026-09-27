@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Doctor;
+use App\Models\{Doctor, MedicalRecord, Patient};
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -85,14 +85,22 @@ class UpdateMedicalRecordRequest extends FormRequest
                     ->exists();
 
                 if (! $exists) {
-                    $fail('Médico selecionado não pertence à entidade ativa.');
+                    $fail(__('actions.medical_records.doctor_exists_validation'));
                 }
             }],
-            // Vínculo com a agenda escopado por tenant: um schedule_id de outra
-            // clínica não pode ser gravado no prontuário (FK cruzada mataria o
-            // fluxo Finalizar/Dilatar/Exame e vazaria referência entre clínicas).
+            // Vínculo com a agenda escopado por tenant E pelo paciente da rota
+            // (ver StoreMedicalRecordRequest). O vínculo que o prontuário JÁ tem
+            // continua aceito: o form de edit reenvia o schedule_id hidratado e
+            // um vínculo legado não pode impedir o médico de salvar.
             'schedule_id' => ['sometimes', 'nullable', 'uuid', Rule::exists('schedules', 'id')
                 ->where('entity_id', (string) session('selected_entity_id'))
+                ->where(function ($query): void {
+                    $query->where('patient_id', $this->routePatientId());
+
+                    if (filled($current = $this->currentScheduleId())) {
+                        $query->orWhere('id', $current);
+                    }
+                })
                 ->whereNull('deleted_at')],
             // Fluxo do atendimento (Agenda ↔ Prontuário): o que acontece com o
             // paciente após salvar — save (mantém aberto) | finish (Atendido) |
@@ -299,8 +307,25 @@ class UpdateMedicalRecordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'doctor_id.required' => 'Selecione o médico responsável antes de salvar o prontuário.',
-            'doctor_id.exists'   => 'Médico selecionado não pertence à entidade ativa.',
+            'doctor_id.required' => __('actions.medical_records.doctor_required_validation'),
+            'doctor_id.exists'   => __('actions.medical_records.doctor_exists_validation'),
+            'schedule_id.exists' => __('actions.medical_records.schedule_exists_validation'),
         ];
+    }
+
+    /** Paciente da rota patients/{patient}/medicalrecords/{medicalrecord}: model já resolvido ou id cru. */
+    private function routePatientId(): string
+    {
+        $patient = $this->route('patient');
+
+        return (string) ($patient instanceof Patient ? $patient->getKey() : $patient);
+    }
+
+    /** Agendamento que o prontuário da rota já tem (vínculo existente continua aceito). */
+    private function currentScheduleId(): ?string
+    {
+        $record = $this->route('medicalrecord');
+
+        return $record instanceof MedicalRecord && filled($record->schedule_id) ? (string) $record->schedule_id : null;
     }
 }

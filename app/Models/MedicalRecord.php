@@ -4,9 +4,10 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToEntity;
 use App\Traits\{Auditable, HasAuditColumns, Signable, Versionable};
-use DB;
+use Closure;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Eloquent\{Builder, Factories\HasFactory, Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\{Factories\HasFactory, Model, SoftDeletes};
 use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 
 class MedicalRecord extends Model
@@ -102,15 +103,22 @@ class MedicalRecord extends Model
         'is_locked',
     ];
 
+    /** Prefixo do código sequencial do prontuário (`PMR-NNNNNNNNNN`). */
+    private const CODE_PREFIX = 'PMR';
+
+    /** Largura FIXA do sequencial: com largura fixa, ordem textual == ordem numérica. */
+    private const CODE_DIGITS = 10;
+
+    /** Namespaces das chaves de advisory lock (PostgreSQL) deste model. */
+    private const CODE_LOCK_NAMESPACE = 'medical_record_code';
+
+    private const OPENING_LOCK_NAMESPACE = 'medical_record_opening';
+
     /**
      * Resolve entity_id + gera code sequencial por entidade.
      *
      * Multi-tenancy correto: entity_id é coluna direta (não derivada via
      * schedule), permitindo prontuário sem agenda (walk-in/admin SaaS).
-     *
-     * Code generator usa transaction + lockForUpdate na última row do mesmo
-     * prefix/entity para mitigar race em saves concorrentes (clínica
-     * pequena, baixo throughput — lock pessimista é suficiente).
      *
      * Sem entity_id resolvível, fallback global (legado / fixtures de teste).
      */
@@ -124,6 +132,7 @@ class MedicalRecord extends Model
 
             if (blank($record->code)) {
                 $record->code = self::generateCodeForEntity(
+                    $record->getConnection(),
                     blank($record->entity_id) ? null : (string) $record->entity_id,
                 );
             }
@@ -131,31 +140,124 @@ class MedicalRecord extends Model
     }
 
     /**
-     * Gera próximo code sequencial `PMR-NNNNNNNNNN`.
-     * Filtra por entity quando id presente; fallback global caso contrário.
+     * Todo INSERT de prontuário roda numa transação: o lock da numeração
+     * (generateCodeForEntity, pego no `creating`) é de TRANSAÇÃO e precisa
+     * durar até o INSERT ser confirmado. Antes o lock vivia numa transação
+     * própria que terminava ANTES do INSERT — sem transação externa
+     * (MedicalRecordService::store, laudo manual) dois prontuários
+     * simultâneos da mesma clínica saíam com o mesmo código. Com transação
+     * externa (laudo de IA) isto vira savepoint e o lock dura até o commit
+     * externo — quem espera só relê o último código depois disso.
+     *
+     * @param Builder<static> $query
      */
-    private static function generateCodeForEntity(?string $entityId): string
+    protected function performInsert(Builder $query)
     {
-        $prefix = 'PMR';
+        return $this->getConnection()->transaction(fn () => parent::performInsert($query));
+    }
 
-        return DB::transaction(function () use ($prefix, $entityId) {
-            $query = static::withoutGlobalScopes()
-                ->where('code', 'like', $prefix . '-%')
-                ->orderByDesc('code')
-                ->lockForUpdate();
+    /**
+     * Gera o próximo code sequencial `PMR-NNNNNNNNNN` da clínica.
+     *
+     * 1. Serializa a numeração da clínica até o fim da transação do INSERT
+     *    (performInsert) — quem espera relê o último código já confirmado.
+     * 2. Considera excluídos (soft delete) e ignora o escopo de tenant da
+     *    sessão: código nunca é reaproveitado.
+     * 3. Só códigos na largura padrão entram na conta — um código fora do
+     *    padrão ("PMR-123") venceria a ordem textual e o próximo repetiria
+     *    um código existente. Usa o índice (entity_id, code): O(1).
+     *
+     * Sem entity_id: fallback global (legado / fixtures de teste).
+     */
+    private static function generateCodeForEntity(Connection $connection, ?string $entityId): string
+    {
+        self::lockCodeNumbering($connection, $entityId);
 
-            if ($entityId !== null) {
-                $query->where('entity_id', $entityId);
+        $query = static::withoutGlobalScopes()
+            ->where('code', 'like', self::CODE_PREFIX . '-' . str_repeat('_', self::CODE_DIGITS));
+
+        if ($entityId !== null) {
+            $query->where('entity_id', $entityId);
+        }
+
+        $lastCode = $query->orderByDesc('code')->value('code');
+
+        $next = $lastCode !== null
+            ? (int) substr((string) $lastCode, strlen(self::CODE_PREFIX) + 1) + 1
+            : 1;
+
+        return sprintf('%s-%0' . self::CODE_DIGITS . 'd', self::CODE_PREFIX, $next);
+    }
+
+    /**
+     * PostgreSQL: advisory lock de transação por clínica — só quem numera
+     * prontuário na mesma clínica espera (a linha de `entities` fica livre;
+     * um FOR UPDATE nela bloquearia todo INSERT com FK para a clínica).
+     * Demais drivers: lock na linha da entidade (mesmo padrão de
+     * OpenGlosaAppealAction).
+     */
+    private static function lockCodeNumbering(Connection $connection, ?string $entityId): void
+    {
+        if ($connection->getDriverName() === 'pgsql') {
+            $connection->select('select pg_advisory_xact_lock(?)', [self::codeNumberingLockKey($entityId)]);
+
+            return;
+        }
+
+        if ($entityId !== null) {
+            Entity::query()->withoutGlobalScopes()->whereKey($entityId)->lockForUpdate()->first();
+        }
+    }
+
+    /**
+     * Executa $callback numa transação com a abertura de prontuário do
+     * paciente serializada — para fluxos "acha o prontuário da consulta ou
+     * abre um" (laudo manual de imagem, prontuário do laudo de IA). Dentro
+     * do callback o caller RELÊ o prontuário: quem esperou encontra o que a
+     * outra requisição acabou de abrir, em vez de abrir um segundo.
+     *
+     * Chave por paciente (não por agendamento): ConsultationRecordResolver
+     * cai para "qualquer prontuário do mesmo dia", então fluxos com âncoras
+     * diferentes (agendamento X vs. exame avulso) disputam o mesmo prontuário.
+     *
+     * @template TReturn
+     *
+     * @param Closure(): TReturn $callback
+     *
+     * @return TReturn
+     */
+    public static function withRecordOpeningLock(string $entityId, string $patientId, Closure $callback): mixed
+    {
+        $connection = (new static())->getConnection();
+
+        return $connection->transaction(function () use ($connection, $entityId, $patientId, $callback) {
+            if ($connection->getDriverName() === 'pgsql') {
+                $connection->select('select pg_advisory_xact_lock(?)', [self::recordOpeningLockKey($entityId, $patientId)]);
+            } else {
+                Patient::query()->withoutGlobalScopes()->whereKey($patientId)->where('entity_id', $entityId)->lockForUpdate()->first();
             }
 
-            $lastRecord = $query->first();
-
-            $newNumber = $lastRecord
-                ? (int) substr($lastRecord->code, strlen($prefix) + 1) + 1
-                : 1;
-
-            return sprintf('%s-%010d', $prefix, $newNumber);
+            return $callback();
         });
+    }
+
+    private static function codeNumberingLockKey(?string $entityId): int
+    {
+        return self::advisoryLockKey(self::CODE_LOCK_NAMESPACE, $entityId ?? 'global');
+    }
+
+    private static function recordOpeningLockKey(string $entityId, string $patientId): int
+    {
+        return self::advisoryLockKey(self::OPENING_LOCK_NAMESPACE, $entityId . '|' . $patientId);
+    }
+
+    /**
+     * Chave bigint estável (60 bits do sha1, sempre positiva). Colisão entre
+     * escopos só serializaria os dois — nunca mistura números/prontuários.
+     */
+    private static function advisoryLockKey(string $namespace, string $scope): int
+    {
+        return (int) hexdec(substr(sha1($namespace . '|' . $scope), 0, 15));
     }
 
     /**
