@@ -31,11 +31,13 @@ export function useTrans(tOrGetter) {
      */
     function tx(key, params = {}) {
         const t   = resolve();
-        let   str = t[key] ?? key;
-        for (const [k, v] of Object.entries(params)) {
-            str = str.replaceAll(`:${k}`, v);
-        }
-        return str;
+        const str = String(t[key] ?? key);
+
+        // Um placeholder = ':' + o nome INTEIRO (como no Laravel): ':page' não
+        // corrompe ':pages', e um valor que contenha ':x' não é substituído de novo.
+        return str.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, (match, name) => (
+            Object.prototype.hasOwnProperty.call(params, name) ? String(params[name]) : match
+        ));
     }
 
     return { tx };

@@ -91,6 +91,22 @@ class AclTest extends TestCase
             ->assertOk();
     }
 
+    // ── /panel/financial/cid10/search (CID da guia TISS para quem fatura) ──
+
+    public function test_financial_pode_buscar_cid_pela_rota_do_financeiro(): void
+    {
+        $this->actingAsRole(ClientRule::Financial->value)
+            ->getJson('/panel/financial/cid10/search?q=H52')
+            ->assertOk();
+    }
+
+    public function test_secretary_nao_acessa_a_busca_cid_do_financeiro(): void
+    {
+        $this->actingAsRole(ClientRule::Secretary->value)
+            ->getJson('/panel/financial/cid10/search?q=H52')
+            ->assertForbidden();
+    }
+
     // ── /panel/schedules (admin, doctor, secretary) ───────────────────────
 
     public function test_financial_nao_pode_acessar_schedules(): void

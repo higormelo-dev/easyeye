@@ -59,7 +59,7 @@ describe('bloqueio de lançamentos em período fechado', function () {
 
     it('libera o período após reabertura', function () {
         $close = app(CashClosingService::class)->closePeriod($this->entity->id, '2026-06-01', '2026-06-30');
-        app(CashClosingService::class)->reopen($close);
+        app(CashClosingService::class)->reopen($close, 'Correção de lançamento do período', $this->user->id);
 
         postEntry($this, ['entry_date' => '2026-06-15', 'description' => 'x', 'type' => 'income', 'amount' => 50])
             ->assertOk();

@@ -34,11 +34,11 @@ class TissGuidePreValidateController extends Controller
             'passes'   => $result->passes(),
             'errors'   => $result->errors()->map(fn ($i) => $i->toArray())->values(),
             'warnings' => $result->warnings()->map(fn ($i) => $i->toArray())->values(),
-            'summary'  => $result->isEmpty()
-                ? 'Guia validada com sucesso. Nenhuma pendência encontrada.'
-                : ($result->hasErrors()
-                    ? 'Guia possui pendências que causarão glosa.'
-                    : 'Guia possui avisos. Verifique antes de enviar.'),
+            'summary'  => __('financial_billing.pre_validation.' . match (true) {
+                $result->isEmpty()   => 'ok',
+                $result->hasErrors() => 'errors',
+                default              => 'warnings',
+            }),
         ]);
     }
 }

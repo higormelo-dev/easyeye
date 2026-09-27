@@ -20,14 +20,8 @@ enum PaymentMethod: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Cash       => 'À Vista',
-            self::Credit     => 'Crédito',
-            self::CreditCash => 'Crédito e Dinheiro',
-            self::DebitCash  => 'Débito e Dinheiro',
-            self::Transfer   => 'Transferência Bancária',
-            self::Courtesy   => 'Cortesia',
-        };
+        // Texto em lang/{locale}/financial_cash_flow.php (pt_BR mantém os rótulos de sempre).
+        return __("financial_cash_flow.payment_methods.{$this->value}");
     }
 
     /** Cortesia: atendimento sem cobrança — registra entrada de R$ 0. */
