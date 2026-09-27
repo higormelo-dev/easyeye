@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Doctor;
+use App\Support\BrazilianFormat;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -210,6 +211,23 @@ class DoctorRequest extends FormRequest
 
         if ($this->has('color')) {
             $merge['color'] = mb_strtoupper($this->input('color'));
+        }
+
+        // Front envia CPF/telefones/CEP mascarados (v-mask); banco guarda só dígitos,
+        // igual PatientRequest e DoctorImportService — o max:11 e o unique de
+        // people.national_registry passam a comparar o mesmo formato.
+        foreach (['national_registry', 'zipcode'] as $digitsField) {
+            if ($this->has($digitsField) && $this->input($digitsField) !== null) {
+                $merge[$digitsField] = preg_replace('/\D/', '', (string) $this->input($digitsField)) ?: null;
+            }
+        }
+
+        // Telefones: só dígitos e sem DDI 55 (legado/colado com +55 vira DDD + número,
+        // formato que a máscara exibe e os gateways esperam — área = 2 primeiros dígitos).
+        foreach (['telephone', 'cellphone'] as $phoneField) {
+            if ($this->has($phoneField) && $this->input($phoneField) !== null) {
+                $merge[$phoneField] = BrazilianFormat::canonicalPhone((string) $this->input($phoneField));
+            }
         }
 
         foreach (['whatsapp', 'partner', 'active'] as $booleanField) {

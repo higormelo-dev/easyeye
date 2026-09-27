@@ -45,7 +45,7 @@ return [
     'supplier_updated' => 'Fornecedor atualizado.',
     'supplier_deleted' => 'Fornecedor removido.',
     // GAP fechado (revisão pós-Fase 4): documento aceitava qualquer string.
-    'supplier_document_invalid' => 'Documento inválido — informe um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.',
+    'supplier_document_invalid' => 'Documento inválido — informe um CPF (11 dígitos) ou CNPJ (14 caracteres) válido.',
 
     // Pedidos de compra (Fase 4)
     'purchase_order_created'                    => 'Pedido de compra criado.',

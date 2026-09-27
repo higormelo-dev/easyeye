@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\{Doctor, Entity, Patient, ReportSetting};
+use App\Support\BrazilianFormat;
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\{Request, Response};
 
@@ -36,19 +37,23 @@ class TonometryPdfController extends Controller
         //      filtrava por entity, permitindo vazar nome de médico de outra clínica).
         //   2. fallback: médico vinculado ao usuário logado (perfil médico)
         // Sem médico → aborta. PDF clínico exige autoria identificada.
-        $doctor = isset($validated['doctor_id'])
-            ? Doctor::with('person')->where('entity_id', $entity?->id)->find($validated['doctor_id'])
+        //   Escopo pela clínica via entity_users (Doctor::ofEntity): `doctors` não
+        //   tem entity_id — o where('entity_id') anterior era erro SQL (HTTP 500)
+        //   sempre que doctor_id vinha no request.
+        $entityId = (string) session('selected_entity_id');
+        $doctor   = isset($validated['doctor_id'])
+            ? Doctor::with('person')->ofEntity($entityId)->find($validated['doctor_id'])
             : null;
 
         if (! $doctor) {
             $doctor = Doctor::with('person')
                 ->whereHas('entityUser', fn ($q) => $q
-                    ->where('entity_id', $entity?->id)
+                    ->where('entity_id', $entityId)
                     ->where('user_id', auth()->id()))
                 ->first();
         }
 
-        abort_if(! $doctor, 422, 'Selecione o médico responsável antes de imprimir.');
+        abort_if(! $doctor, 422, __('actions.medical_records.doctor_required_for_print'));
 
         $time = $validated['time'] ?? now()->format('H:i');
         $od   = $validated['od'] ?? null;
@@ -62,7 +67,7 @@ class TonometryPdfController extends Controller
             ($entity?->city && $entity?->state)
                 ? $entity->city . '/' . $entity->state
                 : ($entity?->city ?? $entity?->state ?? null),
-            $entity?->zipcode ? 'CEP ' . $entity->zipcode : null,
+            $entity?->zipcode ? 'CEP ' . BrazilianFormat::cep($entity->zipcode) : null,
         ]);
 
         $footerHtml = view('pdf.partials.footer', [

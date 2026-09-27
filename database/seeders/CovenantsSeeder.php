@@ -7716,7 +7716,7 @@ class CovenantsSeeder extends Seeder
                     'color'             => $this->randomHexColor(),
                     'national_registry' => (string) $item['cnpj'],
                     'name'              => (string) mb_convert_case(
-                        ($item['nome_fantasia'] ?? $item['razao_social']),
+                        $this->displayName($item),
                         MB_CASE_TITLE,
                         'UTF-8',
                     ),
@@ -7730,6 +7730,21 @@ class CovenantsSeeder extends Seeder
                 ],
             );
         }
+    }
+
+    /**
+     * Na base aberta da ANS, "sem nome fantasia" vem como placeholder de
+     * asteriscos ("******") em vez de vazio — `??` não cai no fallback e o
+     * convênio ficava listado como "******". Trata vazio/asteriscos como
+     * ausente e usa a razão social.
+     */
+    private function displayName(array $item): string
+    {
+        $fantasia = trim((string) ($item['nome_fantasia'] ?? ''));
+
+        return ($fantasia === '' || preg_match('/^\*+$/', $fantasia) === 1)
+            ? (string) $item['razao_social']
+            : $fantasia;
     }
 
     /**

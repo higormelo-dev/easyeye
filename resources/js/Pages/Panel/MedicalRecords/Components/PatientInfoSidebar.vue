@@ -98,18 +98,17 @@ const genderLabel = computed(() => {
 
 <style scoped>
 /*
- * Background branco explícito em todos os níveis. Padrão visual clínico
- * (CFM): fundo neutro, lista compacta, label cinza à esquerda + valor em
- * negrito à direita. Itens longos (Convênio, E-mail) caem em duas linhas
- * via flex-column para evitar truncamento ilegível.
+ * Padrão visual clínico (CFM): fundo neutro, lista compacta, label cinza à
+ * esquerda + valor em negrito à direita. Itens longos (Convênio, E-mail)
+ * caem em duas linhas via flex-column para evitar truncamento ilegível.
+ *
+ * Fundo/borda do card (claro e escuro) vêm de .pmr-patient-card em
+ * resources/css/system/_medical-records.scss. Antes este CSS scoped pintava
+ * #fff fixo no corpo, na lista e nos itens por cima disso — no modo escuro
+ * o texto claro herdado do tema ficava sobre fundo branco.
  */
 .pmr-patient-card {
-    border: 1px solid rgba(0, 0, 0, .08);
     box-shadow: 0 1px 3px rgba(0, 0, 0, .05);
-    background-color: #fff;
-}
-.pmr-patient-card :deep(.card-body) {
-    background-color: #fff;
 }
 .patient-avatar {
     width: 60px;
@@ -117,13 +116,10 @@ const genderLabel = computed(() => {
     border-radius: 50%;
     font-size: 1.2rem;
 }
-.pmr-patient-info-list {
-    background-color: #fff;
-}
 .pmr-patient-info-list .list-group-item {
     padding: .45rem .75rem;
-    border-color: rgba(0, 0, 0, .05);
-    background-color: #fff;
+    border-color: var(--bs-border-color-translucent);
+    background-color: transparent;
     font-size: .82rem;
     line-height: 1.3;
 }

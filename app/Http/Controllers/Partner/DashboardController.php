@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\{Partner, PartnerCommission, PartnerLead};
 use App\Services\PartnerService;
+use App\Support\BrazilianFormat;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 class DashboardController extends Controller
@@ -38,7 +39,7 @@ class DashboardController extends Controller
                 'id'           => (string) $l->id,
                 'name'         => $l->name,
                 'email'        => $l->email,
-                'phone'        => $l->phone,
+                'phone'        => BrazilianFormat::phone($l->phone),
                 'city_state'   => $l->city ? $l->city . '/' . $l->state : null,
                 'status'       => $l->status->value,
                 'status_label' => $l->status->label(),

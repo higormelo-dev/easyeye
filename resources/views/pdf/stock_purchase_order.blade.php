@@ -79,20 +79,27 @@
         </div>
     </div>
 
+    @php
+        // Documento gravado sem pontuação. CNPJ alfanumérico (IN RFB 2.229/2024)
+        // sai como gravado — BrazilianFormat só conhece dígitos.
+        $formatDocument = fn (?string $value) => preg_match('/[A-Za-z]/', (string) $value)
+            ? $value
+            : \App\Support\BrazilianFormat::cpfCnpj($value);
+    @endphp
     <table class="parties">
         <tr>
             <td>
                 <span class="label">Comprador</span>
                 {{ $entity->name }}
                 @if($entity->national_registration)
-                    <br>CNPJ: {{ $entity->national_registration }}
+                    <br>CNPJ: {{ $formatDocument($entity->national_registration) }}
                 @endif
             </td>
             <td>
                 <span class="label">Fornecedor</span>
                 {{ $po->supplier->name }}
                 @if($po->supplier->document)
-                    <br>Documento: {{ $po->supplier->document }}
+                    <br>Documento: {{ $formatDocument($po->supplier->document) }}
                 @endif
                 @if($po->supplier->contact_name)
                     <br>Contato: {{ $po->supplier->contact_name }}
@@ -101,7 +108,7 @@
                     <br>E-mail: {{ $po->supplier->email }}
                 @endif
                 @if($po->supplier->phone)
-                    <br>Telefone: {{ $po->supplier->phone }}
+                    <br>Telefone: {{ \App\Support\BrazilianFormat::phone($po->supplier->phone) }}
                 @endif
             </td>
         </tr>

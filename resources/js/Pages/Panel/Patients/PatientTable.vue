@@ -63,7 +63,7 @@ const orderedColumns = computed(() => (
             title="Personalizar colunas"
             align="right"
             :min-width="230"
-            btn-class="bg-white border shadow-sm rounded px-2 py-1 d-flex align-items-center gap-1 fs-13 text-muted"
+            btn-class="bg-body border shadow-sm rounded px-2 py-1 d-flex align-items-center gap-1 fs-13 text-muted"
         >
             <template #trigger>
                 <i class="ti ti-adjustments"></i>

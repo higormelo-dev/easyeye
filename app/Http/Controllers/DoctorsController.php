@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\DTOs\ActionPolicy;
 use App\Enums\EntityGate;
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Requests\DoctorRequest;
 use App\Http\Resources\{DoctorResource, EntityUserResource};
-use App\Models\{Doctor, Entity, EntityUser, Patient, People, User};
-use App\Services\DoctorService;
+use App\Models\{Doctor, Entity, EntityUser, People, User};
+use App\Services\{DoctorService, PatientService};
+use App\Support\BrazilianFormat;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Routing\Redirector;
@@ -17,6 +21,11 @@ use Inertia\{Inertia, Response};
 
 class DoctorsController extends Controller
 {
+    use RedirectsToListing;
+
+    /** Parâmetros da listagem preservados ao voltar de uma ação (RedirectsToListing). */
+    private const LISTING_PARAMS = ['search', 'sort', 'direction', 'page'];
+
     /**
      * Instance of the standard model.
      */
@@ -31,56 +40,31 @@ class DoctorsController extends Controller
         $this->service         = $doctorService;
     }
 
+    /** Colunas ordenáveis (whitelist) → coluna real no banco. */
+    private const SORTABLE = [
+        'created_at' => 'doctors.created_at',
+        'full_name'  => 'users.name',
+        'email'      => 'users.email',
+        'code'       => 'doctors.code',
+        'record'     => 'doctors.record',
+        'cellphone'  => 'people.cellphone',
+    ];
+
     /**
-     * Return paginated JSON for the card view.
+     * Return paginated JSON for the card view — mesma query, busca e linha
+     * da tabela (toTableRow), para os dois modos exibirem os mesmos dados.
      */
     public function cards(Request $request): JsonResponse
     {
-        $search  = $request->string('search')->trim()->value();
-        $perPage = 12;
-
-        $doctors = Doctor::query()
-            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-            ->join('users', 'entity_users.user_id', '=', 'users.id')
-            ->join('people', 'doctors.person_id', '=', 'people.id')
-            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($inner) use ($search) {
-                    $inner->whereLikeUnaccent('users.name', $search)
-                        ->orWhereLikeUnaccent('doctors.code', $search)
-                        ->orWhereLikeUnaccent('users.email', $search);
-                });
-            })
-            ->select(
-                'doctors.*',
-                'users.name as user_name',
-                'users.email',
-                'entity_users.user_id',
-                'entity_users.entity_id',
-            )
-            ->orderBy('doctors.created_at', 'desc')
-            ->paginate($perPage);
-
         $entityId = session()->get('selected_entity_id');
 
-        $data = $doctors->map(function (Doctor $d) use ($entityId) {
-            $userPhotoPath = 'users/' . $d->user_id . '.jpg';
-
-            return [
-                'id'        => $d->id,
-                'full_name' => $d->user_name,
-                'code'      => $d->code,
-                'record'    => $d->record,
-                'email'     => $d->email,
-                'photo_url' => Storage::disk('public')->exists($userPhotoPath)
-                    ? Storage::disk('public')->url($userPhotoPath)
-                    : Vite::asset('resources/img/system/team.png'),
-                ...ActionPolicy::from($d, $entityId)->toArray(),
-            ];
-        });
+        $doctors = $this->searchListing($this->listingQuery($entityId), $request->string('search')->trim()->value())
+            ->orderBy('doctors.created_at', 'desc')
+            ->orderBy('doctors.id');
+        $doctors = $this->paginateClamped($doctors, 12);
 
         return response()->json([
-            'data' => $data,
+            'data' => $doctors->getCollection()->map(fn (Doctor $d) => $this->toTableRow($d, $entityId))->values(),
             'meta' => [
                 'total'        => $doctors->total(),
                 'per_page'     => $doctors->perPage(),
@@ -100,41 +84,15 @@ class DoctorsController extends Controller
         $sortBy   = $request->string('sort', 'created_at')->value();
         $sortDir  = $request->string('direction', 'desc')->value();
 
-        $allowedSorts = ['created_at', 'full_name', 'email', 'code', 'record'];
-        $sortBy       = in_array($sortBy, $allowedSorts, true) ? $sortBy : 'created_at';
-        $sortDir      = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
+        $sortBy  = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : 'created_at';
+        $sortDir = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
 
-        $query = Doctor::query()
-            ->select(
-                'doctors.*',
-                'entity_users.entity_id',
-                'entity_users.user_id',
-                'users.name as full_name',
-                'users.email',
-            )
-            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
-            ->join('users', 'entity_users.user_id', '=', 'users.id')
-            ->join('people', 'doctors.person_id', '=', 'people.id')
-            ->where('entity_users.entity_id', $entityId);
-
-        if ($search !== '') {
-            $query->where(
-                fn ($q) => $q
-                    ->whereLikeUnaccent('users.name', $search)
-                    ->orWhereLikeUnaccent('users.email', $search)
-                    ->orWhereLikeUnaccent('doctors.code', $search)
-                    ->orWhereLikeUnaccent('doctors.record', $search),
-            );
-        }
-
-        $dbCol = match ($sortBy) {
-            'full_name' => 'users.name',
-            'email'     => 'users.email',
-            default     => "doctors.{$sortBy}",
-        };
-        $query->orderBy($dbCol, $sortDir);
-
-        $doctors = $query->paginate(15)->withQueryString();
+        // `id` desempata valores iguais (nome, telefone...) — sem ele a ordem
+        // entre páginas não é determinística no PostgreSQL.
+        $doctors = $this->searchListing($this->listingQuery($entityId), $search)
+            ->orderBy(self::SORTABLE[$sortBy], $sortDir)
+            ->orderBy('doctors.id');
+        $doctors = $this->paginateClamped($doctors, 15)->withQueryString();
 
         return Inertia::render('Panel/Doctors/Index', [
             'doctors'      => $doctors->through(fn ($d) => $this->toTableRow($d, $entityId)),
@@ -145,8 +103,61 @@ class DoctorsController extends Controller
             'genders'         => People::$genders,
             'maritalStatuses' => People::$maritalStatuses,
             'statesOfBrazil'  => People::$statesOfBrazil,
-            'filters'         => $request->only(['search', 'sort', 'direction']),
+            // Normalizados: a UI mostra o ícone da ordenação realmente aplicada.
+            'filters' => ['search' => $search, 'sort' => $sortBy, 'direction' => $sortDir],
+            't'       => trans('doctors'),
         ]);
+    }
+
+    /** Médicos da clínica ativa com os dados de usuário/pessoa usados na listagem. */
+    private function listingQuery(?string $entityId): Builder
+    {
+        return Doctor::query()
+            ->select(
+                'doctors.*',
+                'entity_users.entity_id',
+                'entity_users.user_id',
+                'users.name as full_name',
+                'users.email',
+                'people.cellphone',
+                'people.whatsapp',
+            )
+            ->join('entity_users', 'doctors.entity_user_id', '=', 'entity_users.id')
+            ->join('users', 'entity_users.user_id', '=', 'users.id')
+            ->join('people', 'doctors.person_id', '=', 'people.id')
+            ->where('entity_users.entity_id', $entityId);
+    }
+
+    /** Busca por nome, e-mail, código ou CRM — mesma na tabela e nos cards. */
+    private function searchListing(Builder $query, string $search): Builder
+    {
+        return $query->when($search !== '', fn ($q) => $q->where(
+            fn ($w) => $w
+                ->whereLikeUnaccent('users.name', $search)
+                ->orWhereLikeUnaccent('users.email', $search)
+                ->orWhereLikeUnaccent('doctors.code', $search)
+                ->orWhereLikeUnaccent('doctors.record', $search)
+                ->orWhereLikeUnaccent('people.cellphone', $search)
+                ->when(
+                    BrazilianFormat::searchDigits($search),
+                    fn ($q, $digits) => $q->orWhereLikeUnaccent('people.cellphone', $digits),
+                ),
+        ));
+    }
+
+    /**
+     * Pagina e, se a página pedida passou da última (ex.: excluiu o único
+     * médico da última página e o redirect manteve ?page=N), usa a última válida.
+     */
+    private function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage);
+
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        return $paginator;
     }
 
     private function toTableRow(Doctor $d, string $entityId): array
@@ -165,6 +176,8 @@ class DoctorsController extends Controller
             'created_at'       => $d->created_at?->format('d/m/Y'),
             'full_name'        => $d->full_name,
             'email'            => $d->email,
+            'cellphone'        => BrazilianFormat::phone($d->cellphone),
+            'whatsapp'         => (bool) $d->whatsapp,
             'user_id'          => $d->user_id,
             'photo_url'        => Storage::disk('public')->exists($userPhotoPath)
                 ? Storage::disk('public')->url($userPhotoPath)
@@ -191,7 +204,7 @@ class DoctorsController extends Controller
             return response()->json(['message' => $message, 'data' => new EntityUserResource($entityUser)]);
         }
 
-        return redirect()->route('panel.doctors.index')->with('success', $message);
+        return $this->redirectToListing('panel.doctors.index', self::LISTING_PARAMS)->with('success', $message);
     }
 
     /**
@@ -227,7 +240,7 @@ class DoctorsController extends Controller
                 'deleted_at'        => $record->deleted_at?->format('d/m/Y H:i'),
                 'full_name'         => $person->full_name,
                 'nickname'          => $person->nickname,
-                'cpf'               => $person->national_registry ? $person->present()->getNationalRegistry() : null,
+                'cpf'               => BrazilianFormat::cpf($person->national_registry),
                 'birth_date'        => $person->birth_date ? $person->present()->getBirthDate() : null,
                 'age'               => $person->birth_date ? $person->present()->getAge() : null,
                 'gender'            => $person->present()->getGender(),
@@ -239,8 +252,8 @@ class DoctorsController extends Controller
                 'rg_agency'         => $person->state_registry_agency,
                 'rg_state'          => $person->state_registry_initial,
                 'rg_date'           => $person->state_registry_date ? $person->present()->getStateRegistryDate() : null,
-                'telephone'         => $person->telephone ? $person->present()->getTelephone() : null,
-                'cellphone'         => $person->cellphone ? $person->present()->getCellphone() : null,
+                'telephone'         => BrazilianFormat::phone($person->telephone),
+                'cellphone'         => BrazilianFormat::phone($person->cellphone),
                 'whatsapp'          => (bool) $person->whatsapp,
                 'zipcode'           => $person->zipcode ? $person->present()->getZipcode() : null,
                 'address'           => $person->address,
@@ -335,28 +348,24 @@ class DoctorsController extends Controller
             ]);
         }
 
-        return redirect(action('\\' . static::class . '@index'))
-            ->with('message', $messageReturn);
+        return $this->redirectToListing('panel.doctors.index', self::LISTING_PARAMS)->with('message', $messageReturn);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): Application|View|JsonResponse|RedirectResponse
+    public function destroy(string $id, PatientService $patientService): Application|View|JsonResponse|RedirectResponse
     {
         Gate::authorize(EntityGate::ManageSettings->value, Entity::findOrFail(session('selected_entity_id')));
 
         $record = $this->service->findByIdOrCode($id);
 
-        return DB::transaction(function () use ($record) {
+        return DB::transaction(function () use ($record, $patientService) {
             $userId     = $record->entityUser->user_id;
             $recordData = $record->toArray();
 
             $userHasOtherEntityUsers = EntityUser::query()
                 ->where('user_id', $userId)
-                ->count();
-            $patientHasOtherEntityUsers = Patient::query()
-                ->where('person_id', $record->person_id)
                 ->count();
 
             $record->entityUser->delete();
@@ -367,10 +376,10 @@ class DoctorsController extends Controller
                 $user?->delete();
             }
 
-            if ($patientHasOtherEntityUsers <= 1) {
-                $person = People::query()->find($record->person_id);
-                $person?->delete();
-            }
+            // People é identidade GLOBAL: antes contava só Patients da clínica
+            // atual (EntityScope) e ignorava médicos — excluir o médico em A
+            // apagava o People do paciente/médico de B (ou do paciente de A).
+            $patientService->deletePersonIfUnused($record->person_id, exceptDoctorId: $record->id);
 
             if (request()->wantsJson()) {
                 return response()->json([
@@ -379,8 +388,7 @@ class DoctorsController extends Controller
                 ]);
             }
 
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $this->getDeleteMessage());
+            return $this->redirectToListing('panel.doctors.index', self::LISTING_PARAMS)->with('message', $this->getDeleteMessage());
         });
     }
 }

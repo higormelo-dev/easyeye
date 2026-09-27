@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleAttendanceType, ScheduleSituation};
+use App\Enums\{CashEntryReferenceType, ClientRule, EntityGate, FinancialEntryStatus, MedicalSpecialty, PatientMood, PaymentMethod, ScheduleAttendanceType, ScheduleSituation};
+use App\Exceptions\AttendanceRequiresCashEntryException;
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
 use App\Http\Requests\Financial\ScheduleCashEntryRequest;
 use App\Http\Requests\ScheduleRequest;
@@ -12,6 +13,7 @@ use App\Models\DoctorWorkSchedule;
 use App\Notifications\ScheduleNotification;
 use App\Services\Financial\{CashFlowService, ProcedurePriceService};
 use App\Services\ScheduleService;
+use App\Support\BrazilianFormat;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -235,8 +237,10 @@ class SchedulesController extends Controller
             'situation_icon'  => $schedule->situation->icon(),
 
             // ── Contato ───────────────────────────────────────────────────
-            'telephone'          => $schedule->telephone,
-            'cellphone'          => $schedule->cellphone,
+            // Formatado para o drawer; o form de edição (v-mask) aceita o valor
+            // formatado e o ScheduleRequest volta para só dígitos.
+            'telephone'          => BrazilianFormat::phone($schedule->telephone),
+            'cellphone'          => BrazilianFormat::phone($schedule->cellphone),
             'cellphone_whatsapp' => (bool) $schedule->cellphone_whatsapp,
 
             // ── Tempos ────────────────────────────────────────────────────
@@ -282,10 +286,14 @@ class SchedulesController extends Controller
             ? (string) Str::uuid()
             : null;
 
+        // Nasce Agendado; a situação pedida no formulário (se houver) entra
+        // pelo fluxo logo abaixo, na MESMA transação — nunca por mass
+        // assignment (pulava histórico, timestamps e a trava de caixa).
         $baseData = array_merge(
-            $request->validated(),
+            $request->scheduleAttributes(),
             [
                 'entity_id'           => $entityId,
+                'situation'           => ScheduleSituation::Scheduled->value,
                 'recurrence_group_id' => $recurrenceGroupId,
                 'recurrence_type'     => $recurrenceGroupId ? $recurrenceType : null,
                 'recurrence_until'    => $recurrenceGroupId ? $recurrenceUntil : null,
@@ -293,11 +301,17 @@ class SchedulesController extends Controller
         );
 
         try {
-            $schedule = $this->model->create($baseData);
-        } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages([
-                'date_time' => [__('validation.custom.schedule.doctor_datetime_unique')],
-            ]);
+            $schedule = DB::transaction(function () use ($baseData, $request): Schedule {
+                $schedule = $this->model->create($baseData);
+                $this->applyRequestedSituation($request, $schedule);
+
+                return $schedule;
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            $this->rethrowUnlessSlotConflict($e);
+        } catch (AttendanceRequiresCashEntryException) {
+            // Agendamento novo nunca tem caixa: nada foi gravado (rollback).
+            return $this->cashEntryRequiredResponse();
         }
 
         // Sync resources (many-to-many)
@@ -337,15 +351,19 @@ class SchedulesController extends Controller
     {
         $this->authorizeSchedule($schedule);
 
+        // Tudo-ou-nada: se a situação pedida esbarrar na trava de caixa, os
+        // demais campos do formulário também não são gravados (422 = nada mudou).
         try {
-            $schedule->update($request->validated());
-        } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages([
-                'date_time' => [__('validation.custom.schedule.doctor_datetime_unique')],
-            ]);
+            DB::transaction(function () use ($request, $schedule): void {
+                $schedule->update($request->scheduleAttributes());
+                $this->applyRequestedSituation($request, $schedule);
+                $schedule->resources()->sync($request->input('resource_ids', []));
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            $this->rethrowUnlessSlotConflict($e);
+        } catch (AttendanceRequiresCashEntryException) {
+            return $this->cashEntryRequiredResponse();
         }
-
-        $schedule->resources()->sync($request->input('resource_ids', []));
 
         Cache::forget("waiting_room:{$schedule->entity_id}");
 
@@ -393,23 +411,16 @@ class SchedulesController extends Controller
             ]);
         }
 
-        // Concluir o atendimento NÃO depende do financeiro por padrão.
-        // Apenas quando a entidade habilita `requires_cash_to_complete` é que
-        // exigimos um lançamento no caixa (ou cortesia R$ 0) para marcar Atendido.
-        if (
-            $situation === ScheduleSituation::Attended
-            && Entity::whereKey($schedule->entity_id)->value('requires_cash_to_complete')
-            && ! $this->scheduleHasCashEntry($schedule)
-        ) {
-            return response()->json([
-                'message'             => __('schedules.cash_entry_required'),
-                'requires_cash_entry' => true,
-            ], 422);
-        }
-
         // Transição centralizada no ScheduleService (log + timestamps + cache)
         // — mesmo caminho usado pelo prontuário (Finalizar/Dilatar/Exame).
-        $this->service->changeSituation($schedule, $situation, session('selected_entity_user_id'), $notes);
+        // Concluir o atendimento NÃO depende do financeiro por padrão; só
+        // quando a entidade habilita `requires_cash_to_complete` o service
+        // exige lançamento no caixa (ou cortesia R$ 0) para marcar Atendido.
+        try {
+            $this->service->changeSituation($schedule, $situation, session('selected_entity_user_id'), $notes);
+        } catch (AttendanceRequiresCashEntryException) {
+            return $this->cashEntryRequiredResponse();
+        }
 
         // ── Notificações por situação ─────────────────────────────────────────
         if ($situation === ScheduleSituation::Confirmed) {
@@ -424,15 +435,6 @@ class SchedulesController extends Controller
             'label'     => $situation->label(),
             'badge'     => $situation->badgeClass(),
         ]);
-    }
-
-    /** Há lançamento de caixa ativo (não cancelado) para este agendamento? */
-    private function scheduleHasCashEntry(Schedule $schedule): bool
-    {
-        return $schedule->financialEntries()
-            ->where('status', '!=', FinancialEntryStatus::Cancelled->value)
-            ->whereNull('deleted_at')
-            ->exists();
     }
 
     /**
@@ -595,10 +597,20 @@ class SchedulesController extends Controller
             $notes,
         );
 
+        // Contrato de bulk = sucesso parcial (200): linha barrada pela trava
+        // "Atendido exige caixa" é ignorada como as demais (entra em `skipped`)
+        // e sai também em `blocked`, com o motivo traduzido por linha.
+        $blocked      = $result['blocked'];
+        $otherSkipped = $result['skipped'] - count($blocked);
+
         $message = __('schedules.bulk_updated', ['updated' => $result['updated']]);
 
-        if ($result['skipped'] > 0) {
-            $message .= ' ' . __('schedules.bulk_skipped_trans', ['skipped' => $result['skipped']]);
+        if ($otherSkipped > 0) {
+            $message .= ' ' . __('schedules.bulk_skipped_trans', ['skipped' => $otherSkipped]);
+        }
+
+        if ($blocked !== []) {
+            $message .= ' ' . __('schedules.bulk_skipped_cash', ['blocked' => count($blocked)]);
         }
 
         // ── Notifica cada paciente afetado pela mudança de situação ───────────
@@ -618,6 +630,7 @@ class SchedulesController extends Controller
             'message' => $message,
             'updated' => $result['updated'],
             'skipped' => $result['skipped'],
+            'blocked' => $blocked,
         ]);
     }
 
@@ -749,11 +762,15 @@ class SchedulesController extends Controller
         $events = $eventQuery->orderBy('starts_at')->get();
 
         // IDs de agendamentos que já possuem lançamento de caixa ativo
-        // (1 query, evita N+1 ao montar has_cash_entry por linha).
+        // (1 query, evita N+1 ao montar has_cash_entry por linha). Filtro
+        // explícito de clínica: todos os agendamentos acima são de $entityId,
+        // então lançamento de outra clínica apontando para eles (linha legada/
+        // forjada) não marca a linha como paga — não depende do EntityScope.
         $cashEntryScheduleIds = $schedules->isEmpty() ? [] : FinancialCashEntry::query()
-            ->where('reference_type', 'schedule')
+            ->where('entity_id', $entityId)
+            ->where('reference_type', CashEntryReferenceType::Schedule->value)
             ->whereIn('reference_id', $schedules->pluck('id'))
-            ->where('status', '!=', 'cancelled')
+            ->where('status', '!=', FinancialEntryStatus::Cancelled->value)
             ->whereNull('deleted_at')
             ->pluck('reference_id')
             ->flip()
@@ -917,6 +934,65 @@ class SchedulesController extends Controller
                 'recurrence_until'    => $until,
             ]);
         }
+    }
+
+    /**
+     * `situation` do formulário (store/update) aplicada pelo fluxo — histórico,
+     * timestamps e a trava "Atendido exige caixa" de
+     * ScheduleService::changeSituation(). Mesma situação atual = no-op.
+     *
+     * @throws AttendanceRequiresCashEntryException
+     */
+    private function applyRequestedSituation(ScheduleRequest $request, Schedule $schedule): void
+    {
+        $situation = $request->requestedSituation();
+
+        if ($situation === null) {
+            return;
+        }
+
+        $notes = $situation === ScheduleSituation::Cancelled
+            ? ($request->validated('cancellation_reason') ?: null)
+            : null;
+
+        $this->service->changeSituation($schedule, $situation, session('selected_entity_user_id'), $notes);
+    }
+
+    /**
+     * 422 da trava "Atendido exige caixa" (regra em
+     * ScheduleService::changeSituation). `requires_cash_entry` é o que a agenda
+     * usa para abrir o lançamento e retomar; `errors.situation` atende o
+     * formulário de agendamento, que lê `errors`.
+     */
+    private function cashEntryRequiredResponse(): JsonResponse
+    {
+        $message = __('schedules.cash_entry_required');
+
+        return response()->json([
+            'message'             => $message,
+            'errors'              => ['situation' => [$message]],
+            'requires_cash_entry' => true,
+        ], 422);
+    }
+
+    /**
+     * Só a violação do índice de horário do médico vira "horário ocupado"
+     * (422 no campo date_time). Qualquer outra violação de unicidade (ex.:
+     * código SDL, import_code) é outro problema e sobe como erro — antes era
+     * mascarada como conflito de horário.
+     *
+     * @throws ValidationException                conflito de horário
+     * @throws UniqueConstraintViolationException qualquer outra violação
+     */
+    private function rethrowUnlessSlotConflict(UniqueConstraintViolationException $e): never
+    {
+        if (! Schedule::isDoctorSlotConflict($e)) {
+            throw $e;
+        }
+
+        throw ValidationException::withMessages([
+            'date_time' => [__('validation.custom.schedule.doctor_datetime_unique')],
+        ]);
     }
 
     private function authorizeSchedule(Schedule $schedule): void

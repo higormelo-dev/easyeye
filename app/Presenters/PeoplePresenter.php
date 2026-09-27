@@ -2,17 +2,14 @@
 
 namespace App\Presenters;
 
+use App\Support\BrazilianFormat;
 use Laracasts\Presenter\Presenter;
 
 class PeoplePresenter extends Presenter
 {
     public function getNationalRegistry(): string
     {
-        return preg_replace(
-            '/(\d{3})(\d{3})(\d{3})(\d{2})/',
-            '$1.$2.$3-$4',
-            $this->national_registry,
-        );
+        return BrazilianFormat::cpf($this->national_registry) ?? '';
     }
 
     public function getBirthDate(): string
@@ -64,21 +61,20 @@ class PeoplePresenter extends Presenter
         return $this->state_registry_date ? $this->state_registry_date->format('d/m/Y') : '';
     }
 
+    // Telefones/CPF/CEP delegam para BrazilianFormat: tamanho dinâmico (fixo x
+    // celular, DDI legado) e valor fora do padrão volta intacto.
     public function getTelephone(): string
     {
-        return $this->telephone ?
-            preg_replace('/(\d{2})(\d{4})(\d{4})/', '($1) $2-$3', $this->telephone) : '';
+        return BrazilianFormat::phone($this->telephone) ?? '';
     }
 
     public function getCellphone(): string
     {
-        return $this->cellphone ?
-            preg_replace('/(\d{2})(\d{5})(\d{4})/', '($1) $2-$3', $this->cellphone) : '';
+        return BrazilianFormat::phone($this->cellphone) ?? '';
     }
 
     public function getZipcode(): string
     {
-        return $this->zipcode ?
-            preg_replace('/(\d{5})(\d{3})/', '$1-$2', $this->zipcode) : '';
+        return BrazilianFormat::cep($this->zipcode) ?? '';
     }
 }

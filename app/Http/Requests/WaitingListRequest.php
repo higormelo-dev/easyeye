@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\BrazilianFormat;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -76,7 +77,7 @@ class WaitingListRequest extends FormRequest
     {
         foreach (['telephone', 'cellphone'] as $field) {
             if ($this->has($field) && $this->input($field) !== null) {
-                $this->merge([$field => preg_replace('/\D/', '', $this->input($field))]);
+                $this->merge([$field => BrazilianFormat::canonicalPhone((string) $this->input($field))]);
             }
         }
 

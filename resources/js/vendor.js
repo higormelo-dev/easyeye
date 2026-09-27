@@ -48,10 +48,6 @@ import { Portuguese } from 'flatpickr/dist/l10n/pt.js';
 flatpickr.localize(Portuguese);
 window.flatpickr = flatpickr;
 
-// ── InputMask (jQuery bridge auto-registered via side-effect import) ──────────
-import Inputmask from 'inputmask';
-window.Inputmask = Inputmask;
-
 // ── Feather Icons ─────────────────────────────────────────────────────────────
 import feather from 'feather-icons';
 window.feather = feather;

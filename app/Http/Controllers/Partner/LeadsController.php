@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Partner;
 use App\Http\Controllers\Controller;
 use App\Models\{Partner, PartnerLead};
 use App\Services\PartnerService;
+use App\Support\BrazilianFormat;
 use Illuminate\Http\{RedirectResponse, Request};
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -27,7 +28,7 @@ class LeadsController extends Controller
                 'id'           => (string) $l->id,
                 'name'         => $l->name,
                 'email'        => $l->email,
-                'phone'        => $l->phone,
+                'phone'        => BrazilianFormat::phone($l->phone),
                 'city'         => $l->city,
                 'state'        => $l->state,
                 'city_state'   => $l->city ? $l->city . '/' . $l->state : null,
@@ -45,6 +46,8 @@ class LeadsController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $this->normalizePhone($request);
+
         $data = $request->validate([
             'name'  => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255'],
@@ -67,5 +70,16 @@ class LeadsController extends Controller
         );
 
         return back()->with('success', __('actions.partners.lead_registered'));
+    }
+
+    /**
+     * Telefone chega mascarado da UI (v-mask="'phone'") — grava só dígitos,
+     * mesmo formato canônico dos FormRequests (PatientRequest, SupplierRequest).
+     */
+    private function normalizePhone(Request $request): void
+    {
+        if ($request->has('phone') && $request->input('phone') !== null) {
+            $request->merge(['phone' => BrazilianFormat::canonicalPhone((string) $request->input('phone'))]);
+        }
     }
 }

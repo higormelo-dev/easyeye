@@ -223,15 +223,19 @@ const statusOptions = computed(() => [
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_telephone }}</label>
-                        <input v-model="form.telephone" type="text" maxlength="20" class="form-control">
+                        <input v-model="form.telephone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 0000-0000"
+                               :class="{ 'is-invalid': form.errors.telephone }">
+                        <div v-if="form.errors.telephone" class="invalid-feedback">{{ form.errors.telephone }}</div>
                     </div>
                     <div class="col-6">
                         <label class="form-label">{{ t.field_cellphone }}</label>
-                        <input v-model="form.cellphone" type="text" maxlength="20" class="form-control">
+                        <input v-model="form.cellphone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 00000-0000"
+                               :class="{ 'is-invalid': form.errors.cellphone }">
+                        <div v-if="form.errors.cellphone" class="invalid-feedback">{{ form.errors.cellphone }}</div>
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_national_registration }}</label>
-                        <input v-model="form.national_registration" type="text" maxlength="20" class="form-control">
+                        <input v-model="form.national_registration" v-mask="'cpfCnpj'" type="text" autocapitalize="characters" class="form-control">
                     </div>
                     <div class="col-4">
                         <label class="form-label">{{ t.field_state_registration }}</label>
@@ -262,7 +266,7 @@ const statusOptions = computed(() => [
                     <div class="col-4">
                         <label class="form-label">{{ t.field_zipcode }}</label>
                         <div class="input-group">
-                            <input v-model="form.zipcode" type="text" maxlength="10" class="form-control" :placeholder="t.field_zipcode_placeholder" @blur="lookupCep">
+                            <input v-model="form.zipcode" v-mask="'cep'" type="text" inputmode="numeric" class="form-control" :placeholder="t.field_zipcode_placeholder" @blur="lookupCep">
                             <button type="button" class="btn btn-outline-secondary" :title="t.btn_lookup_cep" @click="lookupCep">
                                 <i class="ti ti-search"></i>
                             </button>

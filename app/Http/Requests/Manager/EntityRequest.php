@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Manager;
 
+use App\Support\BrazilianFormat;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -10,6 +11,37 @@ class EntityRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * Front envia CEP/telefones mascarados (v-mask); banco guarda só dígitos
+     * (mesmo formato do RegisterRequest e do Entity::setAttribute).
+     */
+    protected function prepareForValidation(): void
+    {
+        $merge = [];
+
+        if ($this->has('zipcode') && $this->input('zipcode') !== null) {
+            $merge['zipcode'] = preg_replace('/\D/', '', (string) $this->input('zipcode')) ?: null;
+        }
+
+        // Telefones: só dígitos e sem DDI 55 — Pagar.me/PagBank usam os 2 primeiros
+        // dígitos como área. Mesma regra do DoctorRequest (BrazilianFormat::canonicalPhone).
+        foreach (['telephone', 'cellphone'] as $phoneField) {
+            if ($this->has($phoneField) && $this->input($phoneField) !== null) {
+                $merge[$phoneField] = BrazilianFormat::canonicalPhone((string) $this->input($phoneField));
+            }
+        }
+
+        // CNPJ pode ser alfanumérico (IN RFB 2.229/2024): tira só a pontuação e
+        // mantém as letras, igual Entity::setAttribute — nunca \D aqui.
+        if ($this->has('national_registration') && $this->input('national_registration') !== null) {
+            $merge['national_registration'] = BrazilianFormat::documentChars((string) $this->input('national_registration'));
+        }
+
+        if (! empty($merge)) {
+            $this->merge($merge);
+        }
     }
 
     public function rules(): array

@@ -1,34 +1,76 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout        from '@/Layouts/AppLayout.vue';
-import PageHeader       from '@/Components/Panel/PageHeader.vue';
-import SearchInput      from '@/Components/Panel/SearchInput.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
-import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import AppLayout         from '@/Layouts/AppLayout.vue';
+import PageHeader        from '@/Components/Panel/PageHeader.vue';
+import SearchInput       from '@/Components/Panel/SearchInput.vue';
+import { useViewMode }   from '@/composables/useViewMode.js';
+import { useTrans }      from '@/composables/useTrans.js';
+import SupplierTable     from './SupplierTable.vue';
+import SupplierCards     from './SupplierCards.vue';
 import SupplierFormModal from './SupplierFormModal.vue';
 
+/**
+ * Listagem de fornecedores — mesmo layout de Panel/Patients/Index: cabeçalho
+ * com total, alternância tabela/cards (persistida no navegador), busca +
+ * filtro de status que preservam a ordenação, tabela/cards com as mesmas
+ * ações. Textos vêm de lang/{locale}/stock_suppliers.php (prop `t`).
+ */
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
     items:       { type: Object, required: true },
-    filters:     { type: Object, default: () => ({}) },
+    filters:     { type: Object, default: () => ({}) },   // { search, status, sort, direction }
     routes:      { type: Object, required: true },
+    t:           { type: Object, default: () => ({}) },
 });
+
+const { tx } = useTrans(() => props.t);
 
 const page = usePage();
 const flashMessage = computed(() => page.props?.flash?.message ?? null);
 
-const search = ref(props.filters?.search ?? '');
-const status = ref(props.filters?.status ?? 'all');
+// Fechar o aviso é estado local (nunca data-bs-dismiss: o Bootstrap removeria
+// o nó que o Vue controla). Nova resposta com flash — mesmo texto repetido
+// numa segunda ação — mostra o aviso de novo.
+const flashDismissed = ref(false);
+watch([flashMessage, () => page.props?.flash], () => { flashDismissed.value = false; });
 
-function applyFilters() {
-    router.get(props.routes.index, { search: search.value, status: status.value }, { preserveState: true, preserveScroll: true, replace: true });
+// ── View toggle (preferência no navegador) ───────────────────────────────────
+const { view, setView } = useViewMode('stock_suppliers_view');
+
+// ── Busca (debounce), status e ordenação — cada um preserva os outros ───────
+const search = ref(props.filters.search ?? '');
+const status = ref(props.filters.status ?? 'all');
+let searchTimer = null;
+
+function visit(params, options = {}) {
+    router.get(props.routes.index, params, { preserveState: true, preserveScroll: true, ...options });
 }
 
-let searchTimer = null;
-watch(search, () => { clearTimeout(searchTimer); searchTimer = setTimeout(applyFilters, 400); });
-watch(status, applyFilters);
+function currentParams(overrides = {}) {
+    return {
+        search:    search.value,
+        status:    status.value,
+        sort:      props.filters.sort,
+        direction: props.filters.direction,
+        ...overrides,
+    };
+}
 
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => visit(currentParams(), { replace: true }), 400);
+});
+
+watch(status, () => visit(currentParams(), { replace: true }));
+
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onSort({ sort, direction }) {
+    visit(currentParams({ sort, direction }));
+}
+
+// ── CRUD modal ───────────────────────────────────────────────────────────────
 const formOpen = ref(false);
 const editItem = ref(null);
 
@@ -36,84 +78,85 @@ function openCreate() { editItem.value = null; formOpen.value = true; }
 function openEdit(supplier) { editItem.value = supplier; formOpen.value = true; }
 function onSaved() { formOpen.value = false; router.reload({ only: ['items'] }); }
 
-function onDelete(event, supplier) {
-    event?.stopPropagation?.();
-    if (!confirm(`Desativar o fornecedor "${supplier.name}"?`)) return;
+function onDelete(supplier) {
+    if (!confirm(tx('confirm_delete', { name: supplier.name }))) return;
     router.delete(props.routes.destroy.replace('__ID__', supplier.id), { preserveScroll: true });
 }
+
+const pageTitle = computed(() => props.t.page_title ?? 'Fornecedores');
 </script>
 
 <template>
-    <AppLayout title="Fornecedores" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
+        <div class="page-stock-suppliers">
 
-            <PageHeader title="Fornecedores" :total="items.total">
+            <PageHeader
+                :title="pageTitle"
+                :total="items.total ?? 0"
+                :total-label="t.total_label ?? 'Total:'"
+                show-view-toggle
+                :view="view"
+                :view-table-title="t.view_table ?? 'Tabela'"
+                :view-cards-title="t.view_cards ?? 'Cards'"
+                @set-view="setView"
+            >
                 <template #actions>
-                    <Link :href="routes.purchase_orders_index" class="btn btn-outline-secondary btn-sm me-2">
-                        <i class="ti ti-shopping-cart me-1"></i>Pedidos de compra
-                    </Link>
-                    <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i>Novo fornecedor
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <Link :href="routes.purchase_orders_index" class="btn btn-outline-secondary fs-13 btn-md">
+                            <i class="ti ti-shopping-cart me-1" aria-hidden="true"></i> {{ t.btn_purchase_orders ?? 'Pedidos de compra' }}
+                        </Link>
+                        <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
+                            <i class="ti ti-plus me-1" aria-hidden="true"></i> {{ t.btn_new ?? 'Novo fornecedor' }}
+                        </button>
+                    </div>
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage" class="alert alert-success alert-dismissible fade show mb-3">
-                <i class="ti ti-circle-check me-1"></i>{{ flashMessage }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+                <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
+                <button type="button" class="btn-close" :aria-label="t.close ?? 'Fechar'" @click="flashDismissed = true"></button>
             </div>
 
-            <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-                <SearchInput v-model="search" placeholder="Buscar por nome ou documento..." style="min-width: 260px;" />
-                <select v-model="status" class="form-select form-select-sm" style="max-width: 160px;">
-                    <option value="all">Todos</option>
-                    <option value="active">Ativos</option>
-                    <option value="inactive">Inativos</option>
+            <!-- Busca + filtros na mesma linha -->
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+                <SearchInput
+                    v-model="search"
+                    wrapper-class=""
+                    :placeholder="t.search_placeholder ?? 'Buscar...'"
+                    :clear-label="t.search_clear ?? 'Limpar busca'"
+                    max-width="280px"
+                />
+                <select
+                    v-model="status"
+                    class="form-select form-select-sm w-auto"
+                    :aria-label="t.filter_status_label ?? 'Filtrar por status'"
+                >
+                    <option value="all">{{ t.filter_status_all ?? 'Todos' }}</option>
+                    <option value="active">{{ t.filter_status_active ?? 'Ativos' }}</option>
+                    <option value="inactive">{{ t.filter_status_inactive ?? 'Inativos' }}</option>
                 </select>
             </div>
 
-            <div v-if="items.data.length === 0" class="text-center text-muted py-5">
-                <i class="ti ti-truck-off fs-1 d-block mb-2"></i>
-                Nenhum fornecedor cadastrado.
-            </div>
-
-            <div v-else class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Nome</th>
-                            <th>Documento</th>
-                            <th>Contato</th>
-                            <th>Telefone</th>
-                            <th>Status</th>
-                            <th class="text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="s in items.data" :key="s.id" role="button" @click="openEdit(s)">
-                            <td class="text-muted small">{{ s.code }}</td>
-                            <td>{{ s.name }}</td>
-                            <td>{{ s.document ?? '—' }}</td>
-                            <td>{{ s.contact_name ?? '—' }}</td>
-                            <td>{{ s.phone ?? '—' }}</td>
-                            <td>
-                                <span class="badge rounded fs-11 fw-medium" :class="s.active ? 'badge-soft-success text-success border border-success' : 'badge-soft-secondary'">
-                                    {{ s.active ? 'Ativo' : 'Inativo' }}
-                                </span>
-                            </td>
-                            <td class="text-end">
-                                <ActionIconButton icon="ti ti-trash" title="Desativar" variant="danger" @click="onDelete($event, s)" />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <TablePagination :data="items" showing-suffix="fornecedores" />
-
-            <SupplierFormModal :open="formOpen" :item="editItem" :routes="routes" @close="formOpen = false" @saved="onSaved" />
-
+            <SupplierTable
+                v-if="view === 'table'"
+                :items="items"
+                :filters="filters"
+                :t="t"
+                :purchase-orders-url="routes.purchase_orders_index"
+                @sort="onSort"
+                @edit="openEdit"
+                @delete="onDelete"
+            />
+            <SupplierCards
+                v-else
+                :items="items"
+                :t="t"
+                :purchase-orders-url="routes.purchase_orders_index"
+                @edit="openEdit"
+                @delete="onDelete"
+            />
         </div>
+
+        <SupplierFormModal :open="formOpen" :item="editItem" :routes="routes" @close="formOpen = false" @saved="onSaved" />
     </AppLayout>
 </template>

@@ -134,7 +134,7 @@
         <p>{{ $entity->address_full }}</p>
         @endif
         @if(($setting->header_show_phone ?? false) && ($entity?->telephone || $entity?->cellphone))
-        <p>{{ $entity->telephone ?? $entity->cellphone }}</p>
+        <p>{{ \App\Support\BrazilianFormat::phone($entity->telephone ?: $entity->cellphone) }}</p>
         @endif
     </div>
 </div>

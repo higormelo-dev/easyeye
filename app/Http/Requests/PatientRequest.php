@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Patient;
+use App\Support\BrazilianFormat;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -260,14 +261,22 @@ class PatientRequest extends FormRequest
             $merge['father_name'] = mb_strtoupper($this->input('father_name'));
         }
 
-        if ($this->has('national_registry')) {
-            $merge['national_registry'] = preg_replace('/\D/', '', $this->input('national_registry'));
+        // CPF chega mascarado (v-mask 'cpf'); grava só dígitos. Null (campo
+        // limpo → ConvertEmptyStringsToNull) segue null — preg_replace(null) é
+        // deprecated e virava '' silenciosamente.
+        if ($this->has('national_registry') && $this->input('national_registry') !== null) {
+            $merge['national_registry'] = preg_replace('/\D/', '', (string) $this->input('national_registry')) ?: null;
         }
 
-        foreach (['telephone', 'cellphone', 'zipcode'] as $field) {
+        // Telefones chegam mascarados (v-mask 'phone'): grava só dígitos, sem DDI 55.
+        foreach (['telephone', 'cellphone'] as $field) {
             if ($this->has($field) && $this->input($field) !== null) {
-                $merge[$field] = preg_replace('/\D/', '', $this->input($field));
+                $merge[$field] = BrazilianFormat::canonicalPhone((string) $this->input($field));
             }
+        }
+
+        if ($this->has('zipcode') && $this->input('zipcode') !== null) {
+            $merge['zipcode'] = preg_replace('/\D/', '', (string) $this->input('zipcode'));
         }
 
         foreach (['whatsapp', 'active'] as $booleanField) {

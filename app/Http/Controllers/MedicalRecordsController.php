@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Domains\AI\Services\{AiCreditWalletService, AiProviderSettings, AiQuotaService};
 use App\Enums\AI\AiRunMode;
 use App\Enums\{ClientRule, DataAccessPurpose, ExamReportRegistry, FeatureKey, ScheduleSituation};
-use App\Exceptions\LockedMedicalRecordException;
+use App\Exceptions\{AttendanceRequiresCashEntryException, LockedMedicalRecordException};
 use App\Http\Requests\{StoreMedicalRecordRequest, UpdateMedicalRecordRequest};
 use App\Models\{AdditionType, ColorVisionType, CoverTestType, Doctor, Entity, Lense,
     MedicalRecord, MedicalRecordDocumentation, NearPointConvergence, Patient, PatientDocumentShare, Schedule, VisualAcuityType};
 use App\Models\{ReportSetting, ReportSettingContent};
 use App\Services\{FeatureGateService, LensFormatterService, MedicalRecordDocumentationService, MedicalRecordPdfService, MedicalRecordService, ScheduleService, UsageMeterService};
+use App\Support\BrazilianFormat;
 use App\Traits\LogsDataAccess;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request, Response};
 use Illuminate\Support\Str;
@@ -61,7 +62,7 @@ class MedicalRecordsController extends Controller
                 'age'           => $patient->person?->birth_date?->age,
                 'gender'        => $patient->person?->gender,
                 'cpf'           => $patient->person?->cpf,
-                'phone'         => $patient->person?->cellphone ?? $patient->person?->telephone,
+                'phone'         => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
                 'email'         => $patient->person?->email,
                 'covenant_name' => $patient->covenant?->name,
                 'skin_type'     => $patient->skinType?->name,
@@ -386,7 +387,16 @@ class MedicalRecordsController extends Controller
      */
     public function restore(Patient $patient, string $medicalrecord): RedirectResponse
     {
-        $this->service->restore($medicalrecord);
+        // Mesmo guard do destroy: paciente da clínica ativa e prontuário DESTE
+        // paciente (antes restaurava qualquer prontuário da clínica pelo id,
+        // com qualquer paciente na URL). Só médico chega aqui (rota no grupo
+        // entity.role:doctor, como o destroy — CFM 2.227/2018).
+        abort_unless(Str::isUuid($medicalrecord), 404);
+
+        $record = MedicalRecord::withTrashed()->whereKey($medicalrecord)->firstOrFail();
+        $this->assertMedicalRecordBelongsToPatient($patient, $record);
+
+        $this->service->restore((string) $record->id);
 
         return redirect()
             ->route('panel.patients.medicalrecords.index', $patient)
@@ -421,7 +431,7 @@ class MedicalRecordsController extends Controller
                 ->where('entity_id', $entityId)
                 ->where('user_id', auth()->id()))
                 ->first();
-            abort_if(! $doctor, 422, __('actions.medical_records.doctor_required') ?? 'Selecione o médico responsável antes de imprimir.');
+            abort_if(! $doctor, 422, __('actions.medical_records.doctor_required_for_print'));
             $medicalrecord->doctor_id = $doctor->id;
         }
 
@@ -485,12 +495,26 @@ class MedicalRecordsController extends Controller
         $this->assertMedicalRecordBelongsToPatient($patient, $medicalrecord);
         $validated = $request->validate([
             'report_setting_content_id' => ['required', 'uuid', 'exists:report_setting_contents,id'],
+            'doctor_id'                 => ['nullable', 'uuid'],
         ]);
 
         $content = ReportSettingContent::findOrFail($validated['report_setting_content_id']);
         $this->assertTemplateBelongsToCurrentEntity($content);
-        $doctor = $medicalrecord->doctor ?? Doctor::find($request->doctor_id);
         $entity = Entity::findOrFail(session('selected_entity_id'));
+        // doctor_id do request só vale para médico DESTA clínica (antes:
+        // Doctor::find sem escopo resolvia nome/CRM de médico de outra clínica
+        // no preview; valor não-UUID virava erro 500 do banco).
+        $doctor = $medicalrecord->doctor ?? (
+            filled($validated['doctor_id'] ?? null)
+                ? Doctor::query()->ofEntity((string) $entity->id)->find($validated['doctor_id'])
+                : null
+        );
+
+        // Sem médico o resolver de variáveis (MEDICO_NOME/CRM) não tem autor:
+        // antes estourava TypeError (HTTP 500).
+        if ($doctor === null) {
+            return response()->json(['message' => __('actions.medical_records.doctor_required_for_template')], 422);
+        }
 
         $resolved = $this->documentationService->loadTemplate($content, $patient, $doctor, $entity, $medicalrecord);
 
@@ -964,7 +988,7 @@ class MedicalRecordsController extends Controller
             'age'           => $patient->person?->birth_date?->age,
             'gender'        => $patient->person?->gender,
             'cpf'           => $patient->person?->cpf,
-            'phone'         => $patient->person?->cellphone ?? $patient->person?->telephone,
+            'phone'         => BrazilianFormat::phone($patient->person?->cellphone ?: $patient->person?->telephone),
             'email'         => $patient->person?->email,
             'covenant_name' => $patient->covenant?->name,
             'skin_type'     => $patient->skinType?->name,
@@ -1151,16 +1175,18 @@ class MedicalRecordsController extends Controller
                     ]));
                 }
 
-                if ($target === ScheduleSituation::Attended && $this->scheduleService->attendedBlockedByCash($schedule)) {
-                    // Um único aviso: o prontuário ficou salvo, a consulta segue aberta.
+                try {
+                    $this->scheduleService->changeSituation(
+                        $schedule,
+                        $target,
+                        session('selected_entity_user_id'),
+                    );
+                } catch (AttendanceRequiresCashEntryException) {
+                    // Trava de caixa (regra única em ScheduleService::changeSituation,
+                    // checada antes de qualquer escrita). Um único aviso: o
+                    // prontuário ficou salvo, a consulta segue aberta.
                     return redirect($editUrl)->with('error', __('actions.medical_records.flow_cash_blocked'));
                 }
-
-                $this->scheduleService->changeSituation(
-                    $schedule,
-                    $target,
-                    session('selected_entity_user_id'),
-                );
 
                 return redirect()
                     ->route('panel.schedules.index')

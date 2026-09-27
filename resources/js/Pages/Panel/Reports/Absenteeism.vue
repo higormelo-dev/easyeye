@@ -36,18 +36,18 @@ const hasResults = computed(() => props.summary !== null);
                     <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
                         <div class="col-md-3">
                             <label class="form-label small mb-1">De *</label>
-                            <input v-model="form.date_from" type="date" class="form-control form-control-sm" required>
+                            <input v-model="form.date_from" type="date" class="form-control" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small mb-1">Até *</label>
-                            <input v-model="form.date_until" type="date" class="form-control form-control-sm" required>
+                            <input v-model="form.date_until" type="date" class="form-control" required>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small mb-1">Médico</label>
                             <SearchSelect v-model="form.doctor_id" :options="doctors" :placeholder="'Todos'" />
                         </div>
                         <div class="col-md-3">
-                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <button type="submit" class="btn btn-primary w-100">
                                 <i class="ti ti-filter me-1"></i>Filtrar
                             </button>
                         </div>

@@ -17,6 +17,8 @@ const isEdit  = computed(() => !!props.doctorId);
 const title   = computed(() => isEdit.value ? 'Editar Médico' : 'Novo Médico');
 const loading = ref(false);
 const activeTab = ref('personal');
+const showPassword = ref(false);
+const showPasswordConfirmation = ref(false);
 
 const form = useForm({
     // Pessoal
@@ -58,6 +60,9 @@ function resetForm() {
     form.clearErrors();
     form.color = '#3699ff';
     activeTab.value = 'personal';
+    // Reabrir o modal nunca começa com senha visível.
+    showPassword.value = false;
+    showPasswordConfirmation.value = false;
 }
 
 async function loadEditData(id) {
@@ -220,9 +225,11 @@ const tabErrors = computed(() => ({
                     <div class="col-6">
                         <label class="form-label">CPF <span class="text-danger">*</span></label>
                         <input v-model="form.national_registry"
+                               v-mask="'cpf'"
                                type="text"
+                               inputmode="numeric"
                                class="form-control"
-                               placeholder="00000000000"
+                               placeholder="000.000.000-00"
                                :class="{ 'is-invalid': form.errors.national_registry }">
                         <div v-if="form.errors.national_registry" class="invalid-feedback">{{ form.errors.national_registry }}</div>
                     </div>
@@ -320,11 +327,11 @@ const tabErrors = computed(() => ({
                 <div class="row g-3 mb-3">
                     <div class="col-6">
                         <label class="form-label">Celular</label>
-                        <input v-model="form.cellphone" type="text" class="form-control" placeholder="(00) 00000-0000">
+                        <input v-model="form.cellphone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 00000-0000">
                     </div>
                     <div class="col-6">
                         <label class="form-label">Telefone</label>
-                        <input v-model="form.telephone" type="text" class="form-control" placeholder="(00) 0000-0000">
+                        <input v-model="form.telephone" v-mask="'phone'" type="text" inputmode="numeric" class="form-control" placeholder="(00) 0000-0000">
                     </div>
                 </div>
 
@@ -341,7 +348,9 @@ const tabErrors = computed(() => ({
                     <label class="form-label">CEP</label>
                     <div class="input-group">
                         <input v-model="form.zipcode"
+                               v-mask="'cep'"
                                type="text"
+                               inputmode="numeric"
                                class="form-control"
                                placeholder="00000-000"
                                @blur="lookupCep">
@@ -397,23 +406,39 @@ const tabErrors = computed(() => ({
 
                 <div class="mb-3">
                     <label class="form-label">Senha <span class="text-danger">*</span></label>
-                    <input v-model="form.password"
-                           type="password"
-                           class="form-control"
-                           autocomplete="new-password"
-                           :class="{ 'is-invalid': form.errors.password }">
-                    <div v-if="form.errors.password" class="invalid-feedback">{{ form.errors.password }}</div>
+                    <div class="input-group">
+                        <input v-model="form.password"
+                               :type="showPassword ? 'text' : 'password'"
+                               class="form-control"
+                               autocomplete="new-password"
+                               :class="{ 'is-invalid': form.errors.password }">
+                        <button type="button" class="btn btn-outline-secondary" tabindex="-1"
+                                :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
+                                :aria-pressed="showPassword"
+                                @click="showPassword = !showPassword">
+                            <i :class="showPassword ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
+                        </button>
+                    </div>
+                    <div v-if="form.errors.password" class="invalid-feedback d-block">{{ form.errors.password }}</div>
                     <div class="form-text">Mínimo 8 caracteres com letras maiúsculas, minúsculas, números e símbolos.</div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label">Confirmar senha <span class="text-danger">*</span></label>
-                    <input v-model="form.password_confirmation"
-                           type="password"
-                           class="form-control"
-                           autocomplete="new-password"
-                           :class="{ 'is-invalid': form.errors.password_confirmation }">
-                    <div v-if="form.errors.password_confirmation" class="invalid-feedback">{{ form.errors.password_confirmation }}</div>
+                    <div class="input-group">
+                        <input v-model="form.password_confirmation"
+                               :type="showPasswordConfirmation ? 'text' : 'password'"
+                               class="form-control"
+                               autocomplete="new-password"
+                               :class="{ 'is-invalid': form.errors.password_confirmation }">
+                        <button type="button" class="btn btn-outline-secondary" tabindex="-1"
+                                :aria-label="showPasswordConfirmation ? 'Ocultar senha' : 'Mostrar senha'"
+                                :aria-pressed="showPasswordConfirmation"
+                                @click="showPasswordConfirmation = !showPasswordConfirmation">
+                            <i :class="showPasswordConfirmation ? 'ti ti-eye-off' : 'ti ti-eye'"></i>
+                        </button>
+                    </div>
+                    <div v-if="form.errors.password_confirmation" class="invalid-feedback d-block">{{ form.errors.password_confirmation }}</div>
                 </div>
             </div>
 

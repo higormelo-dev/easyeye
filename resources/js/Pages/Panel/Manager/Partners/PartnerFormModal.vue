@@ -204,11 +204,12 @@ function showToast(msg, type = 'success') {
                 <label class="form-label">{{ t.field_document }}</label>
                 <input
                     v-model="form.document"
+                    v-mask="'cpfCnpj'"
                     type="text"
+                    autocapitalize="characters"
                     class="form-control"
                     :class="{ 'is-invalid': err('document') }"
                     :placeholder="t.field_document_ph"
-                    maxlength="18"
                 >
                 <div v-if="err('document')" class="invalid-feedback">{{ err('document') }}</div>
             </div>

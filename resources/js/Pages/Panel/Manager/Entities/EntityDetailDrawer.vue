@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue';
 import { useTrans } from '@/composables/useTrans.js';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+import { maskCep, maskCpfCnpj, maskPhone } from '@/utils/masks.js';
 
 const props = defineProps({
     open:     { type: Boolean, required: true },
@@ -14,6 +15,19 @@ const loading = ref(false);
 const entity  = ref(null);
 
 const { tx } = useTrans(() => props.t);
+
+// Exibição (espelha App\Support\BrazilianFormat): só formata tamanhos conhecidos.
+// Número estrangeiro/legado e CNPJ alfanumérico (IN RFB 2.229/2024 — as máscaras
+// descartariam as letras) aparecem exatamente como gravados.
+function displayPhone(value) {
+    const length = String(value ?? '').replace(/\D/g, '').length;
+    return length === 10 || length === 11 ? maskPhone(value) : value;
+}
+
+function displayRegistration(value) {
+    const raw = String(value ?? '').trim();
+    return /^(\d{11}|\d{14})$/.test(raw) ? maskCpfCnpj(raw) : value;
+}
 
 async function loadDetail(id) {
     loading.value = true; entity.value = null;
@@ -71,8 +85,8 @@ watch(() => props.open, (val) => {
                 <div class="detail-table">
                     <div class="detail-row"><span class="detail-label">{{ t.detail_email }}</span><span class="detail-value">{{ entity.email || '—' }}</span></div>
                     <div class="detail-row"><span class="detail-label">{{ t.detail_subdomain }}</span><span class="detail-value">{{ entity.subdomain || '—' }}</span></div>
-                    <div class="detail-row"><span class="detail-label">{{ t.detail_telephone }}</span><span class="detail-value">{{ entity.telephone || '—' }}</span></div>
-                    <div class="detail-row"><span class="detail-label">{{ t.detail_cellphone }}</span><span class="detail-value">{{ entity.cellphone || '—' }}</span></div>
+                    <div class="detail-row"><span class="detail-label">{{ t.detail_telephone }}</span><span class="detail-value">{{ displayPhone(entity.telephone) || '—' }}</span></div>
+                    <div class="detail-row"><span class="detail-label">{{ t.detail_cellphone }}</span><span class="detail-value">{{ displayPhone(entity.cellphone) || '—' }}</span></div>
                     <div class="detail-row">
                         <span class="detail-label">{{ t.detail_website }}</span>
                         <span class="detail-value">
@@ -87,7 +101,7 @@ watch(() => props.open, (val) => {
             <div class="detail-section">
                 <div class="detail-section__title"><i class="ti ti-file-text me-1"></i> {{ t.section_docs }}</div>
                 <div class="detail-table">
-                    <div class="detail-row"><span class="detail-label">{{ t.detail_national_registration }}</span><span class="detail-value">{{ entity.national_registration || '—' }}</span></div>
+                    <div class="detail-row"><span class="detail-label">{{ t.detail_national_registration }}</span><span class="detail-value">{{ displayRegistration(entity.national_registration) || '—' }}</span></div>
                     <div class="detail-row"><span class="detail-label">{{ t.detail_state_registration }}</span><span class="detail-value">{{ entity.state_registration || '—' }}</span></div>
                     <div class="detail-row"><span class="detail-label">{{ t.detail_municipal_registration }}</span><span class="detail-value">{{ entity.municipal_registration || '—' }}</span></div>
                 </div>
@@ -97,7 +111,7 @@ watch(() => props.open, (val) => {
             <div class="detail-section">
                 <div class="detail-section__title"><i class="ti ti-map-pin me-1"></i> {{ t.section_address }}</div>
                 <div class="detail-table">
-                    <div class="detail-row"><span class="detail-label">{{ t.detail_zipcode }}</span><span class="detail-value">{{ entity.zipcode || '—' }}</span></div>
+                    <div class="detail-row"><span class="detail-label">{{ t.detail_zipcode }}</span><span class="detail-value">{{ maskCep(entity.zipcode) || '—' }}</span></div>
                     <div class="detail-row">
                         <span class="detail-label">{{ t.detail_address }}</span>
                         <span class="detail-value">

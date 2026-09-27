@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Support\BrazilianFormat;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -16,11 +17,12 @@ class RegisterRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if ($this->company_cnpj) {
-            $this->merge(['company_cnpj' => preg_replace('/\D/', '', $this->company_cnpj)]);
+            // Preserva letras do CNPJ alfanumérico (IN RFB 2.229/2024), igual Entity::setAttribute.
+            $this->merge(['company_cnpj' => BrazilianFormat::documentChars((string) $this->company_cnpj)]);
         }
 
         if ($this->company_phone) {
-            $this->merge(['company_phone' => preg_replace('/\D/', '', $this->company_phone)]);
+            $this->merge(['company_phone' => BrazilianFormat::canonicalPhone((string) $this->company_phone)]);
         }
     }
 

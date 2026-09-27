@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\{ClientRule, FeatureKey, Permission, ScheduleSituation};
 use App\Models\{Doctor, Entity, EntityProduct, Patient, Schedule};
 use App\Services\{ActivationService, FeatureGateService};
+use App\Support\BrazilianFormat;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\{Inertia, Response};
@@ -113,7 +114,7 @@ class PanelDashboardController extends Controller
             ->map(fn ($p) => [
                 'id'      => $p->id,
                 'name'    => $p->person?->full_name ?? '—',
-                'phone'   => $p->person?->cellphone ?? $p->person?->telephone ?? '—',
+                'phone'   => BrazilianFormat::phone($p->person?->cellphone ?: $p->person?->telephone) ?? '—',
                 'code'    => $p->code,
                 'initial' => mb_strtoupper(mb_substr($p->person?->full_name ?? '?', 0, 1)),
                 'color'   => '#' . substr(md5($p->person?->full_name ?? '?'), 0, 6),

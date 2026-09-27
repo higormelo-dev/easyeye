@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\{DocumentationType, PaperSize};
 use App\Models\Entity;
 use App\Models\{MedicalRecord, MedicalRecordDocumentation, ReportSetting};
+use App\Support\BrazilianFormat;
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\Response;
 
@@ -129,7 +130,7 @@ class MedicalRecordPdfService
             ($entity->city && $entity->state)
                 ? $entity->city . '/' . $entity->state
                 : ($entity->city ?? $entity->state ?? null),
-            $entity->zipcode ? 'CEP ' . $entity->zipcode : null,
+            $entity->zipcode ? 'CEP ' . BrazilianFormat::cep($entity->zipcode) : null,
         ]);
 
         $html = view('pdf.partials.footer', [
@@ -274,7 +275,7 @@ class MedicalRecordPdfService
         }
 
         if (($setting->footer_show_phone ?? false) && ($entity?->telephone || $entity?->cellphone)) {
-            $parts[] = htmlspecialchars((string) ($entity->telephone ?? $entity->cellphone), ENT_QUOTES);
+            $parts[] = htmlspecialchars((string) BrazilianFormat::phone($entity->telephone ?: $entity->cellphone), ENT_QUOTES);
         }
 
         $parts[] = 'Emitido em ' . now()->isoFormat('L LT');

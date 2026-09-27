@@ -121,8 +121,10 @@ function submit() {
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Telefone</label>
-                                    <input v-model="form.phone" type="text" maxlength="20" class="form-control"
+                                    <input v-model="form.phone" v-mask="'phone'" type="text" inputmode="numeric"
+                                           class="form-control" placeholder="(00) 00000-0000"
                                            :class="{ 'is-invalid': form.errors.phone }">
+                                    <div v-if="form.errors.phone" class="invalid-feedback">{{ form.errors.phone }}</div>
                                 </div>
                                 <div class="col-md-9">
                                     <label class="form-label">Cidade</label>

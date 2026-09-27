@@ -552,11 +552,13 @@ async function onSubmit() {
             <div class="row g-2 mb-3">
                 <div class="col-6">
                     <label class="form-label fw-semibold">{{ t.form_telephone }}</label>
-                    <input v-model="form.telephone" type="text" class="form-control">
+                    <input v-model="form.telephone" v-mask="'phone'" type="text" inputmode="numeric"
+                           class="form-control" placeholder="(00) 0000-0000">
                 </div>
                 <div class="col-6">
                     <label class="form-label fw-semibold">{{ t.form_cellphone }}</label>
-                    <input v-model="form.cellphone" type="text" class="form-control">
+                    <input v-model="form.cellphone" v-mask="'phone'" type="text" inputmode="numeric"
+                           class="form-control" placeholder="(00) 00000-0000">
                 </div>
             </div>
             <div class="form-check mb-3">

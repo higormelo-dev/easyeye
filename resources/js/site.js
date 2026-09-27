@@ -2,6 +2,7 @@ import axios from 'axios';
 import { createSSRApp, h } from 'vue';
 import { createInertiaApp } from '@inertiajs/vue3';
 import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+import mask from './directives/mask.js';
 
 // BUG — ícones invisíveis no /register (e demais telas de auth servidas pelo
 // rootView 'app'): as páginas Auth/* usam <i class="ti ti-*"> (Tabler Icons),
@@ -32,6 +33,7 @@ createInertiaApp({
     setup({ el, App, props, plugin }) {
         createSSRApp({ render: () => h(App, props) })
             .use(plugin)
+            .directive('mask', mask)
             .mount(el);
     },
 

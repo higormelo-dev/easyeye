@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Support\BrazilianFormat;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -36,7 +37,9 @@ class SupplierRequest extends FormRequest
             'document' => [
                 'nullable',
                 'string',
-                'regex:/^\d{11}$|^\d{14}$/',
+                // CPF (11 dígitos) ou CNPJ (14 posições; as 12 primeiras podem ter
+                // letras desde a IN RFB 2.229/2024 — os 2 DVs são sempre numéricos).
+                'regex:/^\d{11}$|^[A-Z0-9]{12}\d{2}$/',
                 Rule::unique('suppliers', 'document')
                     ->ignore($supplierId)
                     ->where(fn ($query) => $query->where('entity_id', $entityId)->whereNull('deleted_at')),
@@ -70,7 +73,19 @@ class SupplierRequest extends FormRequest
         // validar, então "12.345.678/0001-90" e "12345678000190" batem
         // igual (usuário não precisa saber que a UI proibiu pontuação).
         if ($this->filled('document')) {
-            $this->merge(['document' => preg_replace('/\D/', '', (string) $this->input('document'))]);
+            $this->merge(['document' => BrazilianFormat::documentChars((string) $this->input('document'))]);
+        }
+
+        // Telefone chega mascarado da UI (v-mask="'phone'") — grava só dígitos.
+        // Na edição, valor idêntico ao gravado (o v-mask só formata a exibição,
+        // o form reenvia o cru) fica intacto: legado em texto livre como
+        // "(61) 3333-4444 r.21" não vira "613333444421" ao salvar outro campo.
+        if ($this->has('phone') && $this->input('phone') !== null) {
+            $phone = (string) $this->input('phone');
+
+            if ($phone !== $this->route('supplier')?->phone) {
+                $this->merge(['phone' => BrazilianFormat::canonicalPhone($phone)]);
+            }
         }
     }
 

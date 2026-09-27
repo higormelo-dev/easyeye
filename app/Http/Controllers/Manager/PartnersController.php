@@ -11,6 +11,7 @@ use App\Http\Requests\Manager\PartnerRequest;
 use App\Models\{Partner, PartnerCommission, PartnerLead, User};
 use App\Services\Audit\AuditLogger;
 use App\Services\PartnerService;
+use App\Support\BrazilianFormat;
 use Barryvdh\Snappy\Facades\SnappyPdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\{JsonResponse, Request, Response};
@@ -174,7 +175,7 @@ class PartnersController extends Controller
                 'status_label'      => trans('manager_partners.status_' . $partner->status),
                 'status_badge'      => $statusBadge,
                 'commission_rate'   => number_format((float) $partner->commission_rate, 1),
-                'document'          => $partner->document,
+                'document'          => BrazilianFormat::cpfCnpj($partner->document),
                 'token'             => $partner->token,
                 'notes'             => $partner->notes,
                 'created_at'        => $partner->created_at->format('d/m/Y'),

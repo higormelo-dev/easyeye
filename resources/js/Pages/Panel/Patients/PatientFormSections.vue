@@ -1,4 +1,5 @@
 <script setup>
+import { computed, watch } from 'vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
@@ -10,7 +11,7 @@ import SearchSelect from '@/Components/Panel/SearchSelect.vue';
  * v-model gravam direto nele. `section` controla qual aba está visível
  * (v-show: as ocultas continuam montadas, preservando estado).
  */
-defineProps({
+const props = defineProps({
     form:           { type: Object,   required: true },
     section:        { type: String,   required: true }, // personal | clinical | contact | address
     covenants:      { type: Array,    default: () => [] },
@@ -21,6 +22,17 @@ defineProps({
     stateOptions:   { type: Array,    default: () => [] },
     isEdit:         { type: Boolean,  default: false },
     lookupCep:      { type: Function, default: () => {} },
+});
+
+// Particular não tem carteirinha — o backend já descarta o valor
+// (PatientService::isParticular); aqui só evita o usuário digitar à toa.
+const isParticular = computed(() => {
+    const selected = props.covenants.find((c) => c.id === props.form.covenant_id);
+    return (selected?.name ?? '').trim().toUpperCase() === 'PARTICULAR';
+});
+
+watch(isParticular, (particular) => {
+    if (particular) props.form.card_number = '';
 });
 </script>
 
@@ -78,7 +90,9 @@ defineProps({
             <div class="col-6">
                 <label class="form-label">CPF <span class="text-danger">*</span></label>
                 <input v-model="form.national_registry"
+                       v-mask="'cpf'"
                        type="text"
+                       inputmode="numeric"
                        class="form-control"
                        placeholder="000.000.000-00"
                        :class="{ 'is-invalid': form.errors.national_registry }">
@@ -127,7 +141,10 @@ defineProps({
 
         <div class="mb-3">
             <label class="form-label">Número da carteirinha</label>
-            <input v-model="form.card_number" type="text" class="form-control">
+            <input v-model="form.card_number" type="text" class="form-control"
+                   :disabled="isParticular"
+                   :placeholder="isParticular ? 'Não se aplica a Particular' : ''">
+            <small v-if="isParticular" class="text-muted">Paciente particular não tem carteirinha de convênio.</small>
         </div>
 
         <div class="row g-3 mb-3">
@@ -150,11 +167,11 @@ defineProps({
             <div class="row g-3">
                 <div class="col-6">
                     <label class="form-label small">RG</label>
-                    <input v-model="form.state_registry" type="text" class="form-control form-control-sm">
+                    <input v-model="form.state_registry" type="text" class="form-control">
                 </div>
                 <div class="col-6">
                     <label class="form-label small">Órgão emissor</label>
-                    <input v-model="form.state_registry_agency" type="text" class="form-control form-control-sm">
+                    <input v-model="form.state_registry_agency" type="text" class="form-control">
                 </div>
                 <div class="col-6">
                     <label class="form-label small">UF do RG</label>
@@ -166,7 +183,7 @@ defineProps({
                 </div>
                 <div class="col-6">
                     <label class="form-label small">Data do RG</label>
-                    <input v-model="form.state_registry_date" type="date" class="form-control form-control-sm">
+                    <input v-model="form.state_registry_date" type="date" class="form-control">
                 </div>
             </div>
         </div>
@@ -177,7 +194,7 @@ defineProps({
         <div class="mb-3">
             <label class="form-label">Celular <span class="text-danger">*</span></label>
             <input v-model="form.cellphone"
-                   v-phone-mask="'cellphone'"
+                   v-mask="'phone'"
                    type="text"
                    inputmode="numeric"
                    class="form-control"
@@ -198,7 +215,7 @@ defineProps({
         <div class="mb-3">
             <label class="form-label">Telefone fixo</label>
             <input v-model="form.telephone"
-                   v-phone-mask="'landline'"
+                   v-mask="'phone'"
                    type="text"
                    inputmode="numeric"
                    class="form-control"
@@ -212,7 +229,9 @@ defineProps({
             <label class="form-label">CEP</label>
             <div class="input-group">
                 <input v-model="form.zipcode"
+                       v-mask="'cep'"
                        type="text"
+                       inputmode="numeric"
                        class="form-control"
                        placeholder="00000-000"
                        @blur="lookupCep">

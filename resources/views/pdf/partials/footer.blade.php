@@ -10,16 +10,11 @@
         $fontFamily  (string)       Família da fonte (default: Arial)
 --}}
 @php
-    function fmtPhone(string $n): string {
-        $n = preg_replace('/\D/', '', $n);
-        if (strlen($n) === 11) return '(' . substr($n,0,2) . ') ' . substr($n,2,5) . '-' . substr($n,7);
-        if (strlen($n) === 10) return '(' . substr($n,0,2) . ') ' . substr($n,2,4) . '-' . substr($n,6);
-        return $n;
-    }
-
+    // BrazilianFormat em vez de função declarada no Blade: `function` aqui dá
+    // "Cannot redeclare" quando o rodapé é renderizado 2x no mesmo processo.
     $contacts = array_filter([
-        ($telephone ?? null) ? 'Tel: ' . fmtPhone($telephone) : null,
-        ($cellphone ?? null) ? 'Cel: ' . fmtPhone($cellphone) : null,
+        ($telephone ?? null) ? 'Tel: ' . \App\Support\BrazilianFormat::phone($telephone) : null,
+        ($cellphone ?? null) ? 'Cel: ' . \App\Support\BrazilianFormat::phone($cellphone) : null,
         $email ?? null,
     ]);
 @endphp

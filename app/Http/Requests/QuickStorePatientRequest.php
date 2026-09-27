@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\BrazilianFormat;
 use Illuminate\Foundation\Http\FormRequest;
 
 class QuickStorePatientRequest extends FormRequest
@@ -31,7 +32,7 @@ class QuickStorePatientRequest extends FormRequest
     {
         if ($this->has('cellphone') && $this->input('cellphone') !== null) {
             $this->merge([
-                'cellphone' => preg_replace('/\D/', '', $this->input('cellphone')),
+                'cellphone' => BrazilianFormat::canonicalPhone((string) $this->input('cellphone')),
             ]);
         }
     }
