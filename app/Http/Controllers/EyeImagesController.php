@@ -11,6 +11,7 @@ use App\Enums\AI\{AiRunMode, AiRunStatus};
 use App\Enums\{ClientRule, FeatureKey};
 use App\Models\{Doctor, Entity, EntityIntegratorEquipment, ExamType, Patient, PatientDocumentShare, PatientExam};
 use App\Services\FeatureGateService;
+use App\Support\BrazilianFormat;
 use App\Traits\LogsDataAccess;
 use Closure;
 use Illuminate\Database\Eloquent\{Builder, Collection};
@@ -66,12 +67,13 @@ class EyeImagesController extends Controller
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('dashboard.module_eye_images'), 'url' => '#', 'active' => true],
             ],
+            // Telefones só para exibição (cabeçalho de impressão) — banco guarda só dígitos.
             'entity' => [
                 'id'        => $entity?->id,
                 'name'      => $entity?->name,
                 'address'   => $entity?->address,
-                'telephone' => $entity?->telephone,
-                'cellphone' => $entity?->cellphone,
+                'telephone' => BrazilianFormat::phone($entity?->telephone),
+                'cellphone' => BrazilianFormat::phone($entity?->cellphone),
                 'email'     => $entity?->email,
                 'logo'      => $entity?->logo,
             ],
@@ -502,10 +504,14 @@ class EyeImagesController extends Controller
      */
     private function examFilterClosure(EyeImageFilters $f, string $entityId): Closure
     {
-        $from = $this->periodStart($f->period);
+        [$from, $to] = $this->periodRange($f);
 
-        return function (Builder|Relation $q) use ($f, $entityId, $from): void {
+        return function (Builder|Relation $q) use ($f, $entityId, $from, $to): void {
             $q->where('created_at', '>=', $from);
+
+            if ($to !== null) {
+                $q->where('created_at', '<=', $to);
+            }
 
             if ($f->doctorId) {
                 $q->where('doctor_id', $f->doctorId);
@@ -551,6 +557,22 @@ class EyeImagesController extends Controller
                     ->where('ai_runs.status', AiRunStatus::Approved->value));
             }
         };
+    }
+
+    /**
+     * @return array{0: Carbon, 1: ?Carbon}
+     */
+    private function periodRange(EyeImageFilters $f): array
+    {
+        if ($f->period === 'custom' && $f->dateFrom !== null) {
+            $from = Carbon::parse($f->dateFrom)->startOfDay();
+            $to   = $f->dateTo !== null ? Carbon::parse($f->dateTo)->endOfDay() : now();
+
+            // Garante from <= to mesmo se o usuário inverter os campos na UI.
+            return $from->lte($to) ? [$from, $to] : [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+        }
+
+        return [$this->periodStart($f->period), null];
     }
 
     private function periodStart(string $period): Carbon

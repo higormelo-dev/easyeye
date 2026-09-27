@@ -52,6 +52,8 @@ const examsTotal     = ref(props.total_exams ?? 0);
 
 const search       = ref(props.filters?.search ?? '');
 const period       = ref(props.filters?.period ?? 'hoje');
+const customDateFrom = ref(props.filters?.date_from ?? '');
+const customDateTo   = ref(props.filters?.date_to ?? '');
 const laterality   = ref(props.filters?.eye ?? '');              // '' | 'od' | 'oe' | 'ao'
 const doctorId     = ref(props.filters?.doctor_id ?? '');
 const examTypeId   = ref(props.filters?.exam_type_id ?? '');
@@ -552,6 +554,10 @@ async function fetchPatients({ reset = true, page: requestedPage = 1 } = {}) {
     if (reset) loading.value = true; else loadingMore.value = true;
     try {
         const params = new URLSearchParams({ period: period.value, page: String(requestedPage) });
+        if (period.value === 'custom') {
+            if (customDateFrom.value) params.append('date_from', customDateFrom.value);
+            if (customDateTo.value)   params.append('date_to', customDateTo.value);
+        }
         if (search.value)      params.append('search', search.value);
         if (laterality.value)  params.append('eye', laterality.value);
         if (examTypeId.value)  params.append('exam_type_id', examTypeId.value);
@@ -590,12 +596,23 @@ function loadMorePatients() {
 // busca/olho/tipo/status + fetch manual só pra período/médico).
 let filterTimer = null;
 watch(
-    [search, period, laterality, examTypeId, equipmentId, cidCode, doctorId, examStatus, examSource],
+    [search, period, laterality, examTypeId, equipmentId, cidCode, doctorId, examStatus, examSource, customDateFrom, customDateTo],
     () => {
         clearTimeout(filterTimer);
         filterTimer = setTimeout(() => fetchPatients({ reset: true, page: 1 }), 400);
     },
 );
+
+// Ao entrar em "Período personalizado" sem datas ainda escolhidas, começa
+// com um intervalo razoável (hoje) em vez de disparar a busca sem filtro de
+// data nenhum (o backend cairia no fallback de period inválido = 1 dia).
+watch(period, (value) => {
+    if (value === 'custom' && !customDateFrom.value) {
+        const today = new Date().toISOString().slice(0, 10);
+        customDateFrom.value = today;
+        customDateTo.value   = today;
+    }
+});
 
 // ── Viewer ────────────────────────────────────────────────────────────────
 function openViewerModal(exams, startIndex = 0, initialPanelCount = 1) {
@@ -1667,9 +1684,20 @@ const printEntity = computed(() => props.entity ?? {});
                                           {value:'15',label:'Últimos 15 dias'},
                                           {value:'30',label:'Últimos 30 dias'},
                                           {value:'90',label:'Últimos 90 dias'},
+                                          {value:'custom',label:'Período personalizado'},
                                       ]"
                                       :value-key="'value'" :label-key="'label'"
                                       :clearable="false" />
+                    </div>
+
+                    <div v-if="period === 'custom'" class="col-auto d-flex align-items-center gap-1">
+                        <input type="date" class="form-control form-control-sm" style="width:9.5rem"
+                               v-model="customDateFrom" :max="customDateTo || undefined"
+                               aria-label="Data inicial">
+                        <span class="text-muted small">até</span>
+                        <input type="date" class="form-control form-control-sm" style="width:9.5rem"
+                               v-model="customDateTo" :min="customDateFrom || undefined"
+                               aria-label="Data final">
                     </div>
 
                     <div class="col-6 col-sm-auto">
@@ -2350,7 +2378,7 @@ const printEntity = computed(() => props.entity ?? {});
                                     {{ latLabel(exam.laterality) }}
                                 </span>
                                 <img v-if="examUrls[exam.id] && !brokenUrls[exam.id]"
-                                     :src="examUrls[exam.id]" :alt="examAlt(exam)"
+                                     :src="examThumbUrls[exam.id] ?? examUrls[exam.id]" :alt="examAlt(exam)"
                                      style="width:64px;height:64px;object-fit:cover;display:block;"
                                      @error="brokenUrls = { ...brokenUrls, [exam.id]: true }">
                                 <div v-else class="w-100 h-100 d-flex align-items-center justify-content-center"

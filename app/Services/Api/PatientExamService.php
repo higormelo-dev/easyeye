@@ -6,10 +6,11 @@ use App\Http\Requests\Api\{ExamRequest, PatientExamRequest};
 use App\Jobs\GenerateExamDerivatives;
 use App\Models\{Doctor, EntityIntegratorEquipment, ExamType, Patient, PatientExam, Schedule};
 use Closure;
-use Illuminate\Database\Eloquent\{Builder, ModelNotFoundException};
+use Illuminate\Database\Eloquent\{Builder, Collection, Model, ModelNotFoundException};
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\{Carbon, Str};
 use Illuminate\Support\Facades\{DB, Storage};
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -22,6 +23,9 @@ class PatientExamService
     // paciente da mesma clínica só enviando patient_id no body do update
     // (achado de auditoria de segurança — IDOR via mass-assignment).
     private const FILLABLE_FIELDS = ['exam_id', 'doctor_id', 'schedule_id', 'entity_integrator_equipment_id', 'archive', 'name', 'laterality'];
+
+    /** Prefixo do código sequencial de paciente (PAC-0000000042). */
+    private const PATIENT_CODE_PREFIX = 'PAC';
 
     /**
      * Create a new record with all related entities.
@@ -75,7 +79,7 @@ class PatientExamService
         } else {
             // Fluxo alternativo: resolve pelo patient_identifier
             $patient = $this->patientFindByIdOrCode($request->patient_identifier, $entityId);
-            abort_unless($patient !== null, 422, 'Patient not found.');
+            abort_unless($patient !== null, 422, __('validation.custom.validation_invalid.not_patient_identifier'));
 
             $patientId = $patient->id;
 
@@ -299,7 +303,12 @@ class PatientExamService
             ]);
 
             // Arquivo substituído: regenera JPEG de exibição + miniatura.
-            GenerateExamDerivatives::dispatch($existingRecord->id);
+            // afterCommit(): este método roda dentro de DB::transaction()
+            // (ver persistWithArchive) e QUEUE_CONNECTION=redis não tem
+            // after_commit=true por padrão (config/queue.php) — sem isso, um
+            // worker pode pegar o job e não achar o registro ainda não
+            // commitado, falhando silenciosamente sem gerar a miniatura.
+            GenerateExamDerivatives::dispatch($existingRecord->id)->afterCommit();
 
             return [$existingRecord->refresh(), $oldPath];
         }
@@ -317,7 +326,7 @@ class PatientExamService
             'observation'                    => $observation,
         ]);
 
-        GenerateExamDerivatives::dispatch($record->id);
+        GenerateExamDerivatives::dispatch($record->id)->afterCommit();
 
         return [$record, null];
     }
@@ -375,6 +384,18 @@ class PatientExamService
         return $query->where($column, $value)->first();
     }
 
+    /**
+     * Agendamento da clínica do integrador pelo identificador externo (UUID,
+     * SDL-N, número puro ou import_code — ver Schedule::identifierMatches()).
+     *
+     * O exame herda paciente e médico do agendamento resolvido: se o
+     * identificador casar com MAIS DE UM agendamento, recusa (422 em
+     * schedule_identifier) em vez de gravar o exame no paciente de um
+     * agendamento arbitrário. PatientExamRequest já recusa antes; este guard
+     * cobre ExamRequest e corridas entre a validação e a gravação.
+     *
+     * @throws ValidationException identificador ambíguo
+     */
     public function scheduleFindByIdOrCode(?string $idOrCode): ?Schedule
     {
         if ($idOrCode === null) {
@@ -382,16 +403,11 @@ class PatientExamService
         }
 
         $integrator = request()->attributes->get('integrator');
-        $query      = Schedule::query()
-            ->where('entity_id', $integrator->user->entity_id);
+        $matches    = Schedule::identifierMatches((string) $integrator->user->entity_id, $idOrCode);
 
-        [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id', $idOrCode],
-            ctype_digit($idOrCode) => ['code', sprintf('SDL-%010d', (int) $idOrCode)],
-            default                => ['code', $idOrCode],
-        };
+        $this->rejectAmbiguous($matches, 'schedule_identifier', 'record_codes.ambiguous_identifier.schedule');
 
-        return $query->where($column, $value)->first();
+        return $matches->first();
     }
 
     public function examFindByIdOrCode(string $idOrCode): ?ExamType
@@ -412,6 +428,15 @@ class PatientExamService
         return $query->where($column, $value)->first();
     }
 
+    /**
+     * Equipamento DO INTEGRADOR autenticado — mesmo escopo da validação
+     * (PatientExamRequest/ExamRequest: integrator_id do token). O código EIQ é
+     * numerado por integrador: cada PC da clínica tem seu EIQ-0000000001, então
+     * resolver pela entidade inteira (como antes) casava o equipamento de
+     * OUTRO integrador e gravava o exame no aparelho errado.
+     *
+     * @throws ValidationException código duplicado dentro do integrador
+     */
     public function equipmentFindByIdOrCode(?string $idOrCode): ?EntityIntegratorEquipment
     {
         if ($idOrCode === null) {
@@ -419,42 +444,77 @@ class PatientExamService
         }
 
         $integrator = request()->attributes->get('integrator');
-        $query      = EntityIntegratorEquipment::query()
-            ->where(function (Builder $query) use ($integrator) {
-                $query->whereHas(
-                    'integrator',
-                    fn (Builder $q) => $q
-                        ->whereHas(
-                            'user',
-                            fn (Builder $q2) => $q2
-                                ->where('entity_id', $integrator->user->entity_id),
-                        ),
-                )->orWhereNull('integrator_id');
-            });
+        $matches    = EntityIntegratorEquipment::query()
+            ->where('integrator_id', $integrator->id)
+            ->whereIdentifier($idOrCode)
+            ->limit(2)
+            ->get();
 
-        [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id', $idOrCode],
-            ctype_digit($idOrCode) => ['code', sprintf('EIQ-%010d', (int) $idOrCode)],
-            default                => ['code', $idOrCode],
-        };
+        $this->rejectAmbiguous($matches, 'equipment_identifier', 'record_codes.ambiguous_identifier.equipment');
 
-        return $query->where($column, $value)->first();
+        return $matches->first();
     }
 
+    /**
+     * Paciente da clínica pelo identificador externo: UUID, PAC-N, número puro
+     * ou import_code. Mesma política de Schedule::identifierMatches(): código
+     * explícito tem precedência sobre import_code; número puro que é PAC-N de
+     * um paciente e import_code de OUTRO é ambíguo e é recusado (422 em
+     * patient_identifier) — antes o first() sem ordem gravava o exame em
+     * qualquer um dos dois pacientes.
+     *
+     * @throws ValidationException identificador ambíguo
+     */
     public function patientFindByIdOrCode(?string $idOrCode, string $entityId): ?Patient
     {
         if ($idOrCode === null) {
             return null;
         }
 
-        [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id', $idOrCode],
-            ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
-            default                => ['code', $idOrCode],
-        };
+        $idOrCode = trim($idOrCode);
+        $scoped   = static fn (): Builder => Patient::query()->where('entity_id', $entityId);
 
-        return Patient::where('entity_id', $entityId)
-            ->where($column, $value)
-            ->first();
+        if (Str::isUuid($idOrCode)) {
+            return $scoped()->whereKey($idOrCode)->first();
+        }
+
+        if (ctype_digit($idOrCode)) {
+            $code    = sprintf('%s-%010d', self::PATIENT_CODE_PREFIX, (int) $idOrCode);
+            $matches = $scoped()
+                ->where(fn (Builder $query) => $query->where('code', $code)->orWhere('import_code', $idOrCode))
+                ->limit(2)
+                ->get();
+        } else {
+            $code = preg_match('/^' . self::PATIENT_CODE_PREFIX . '-(\d{1,10})$/i', $idOrCode, $match) === 1
+                ? sprintf('%s-%010d', self::PATIENT_CODE_PREFIX, (int) $match[1])
+                : $idOrCode;
+
+            $matches = $scoped()->where('code', $code)->limit(2)->get();
+
+            if ($matches->isEmpty()) {
+                $matches = $scoped()->where('import_code', $idOrCode)->limit(2)->get();
+            }
+        }
+
+        $this->rejectAmbiguous($matches, 'patient_identifier', 'record_codes.ambiguous_identifier.patient');
+
+        return $matches->first();
+    }
+
+    /**
+     * Identificador externo que casou com mais de um registro: recusa com erro
+     * de validação no campo (422 — erro permanente para o desktop). Não usa 409:
+     * nas escritas da API de integradores 409 significa "Idempotency-Key em
+     * processamento" (ApiIdempotency), que o cliente re-tenta indefinidamente.
+     *
+     * @param Collection<int, Model> $matches
+     *
+     * @throws ValidationException
+     */
+    private function rejectAmbiguous(Collection $matches, string $field, string $messageKey): void
+    {
+        if ($matches->count() > 1) {
+            throw ValidationException::withMessages([$field => [__($messageKey)]]);
+        }
     }
 }

@@ -21,6 +21,8 @@ final readonly class EyeImageFilters
     public function __construct(
         public string $period = 'hoje',
         public string $search = '',
+        public ?string $dateFrom = null,
+        public ?string $dateTo = null,
         public ?string $eye = null,
         public ?string $examTypeId = null,
         public ?string $equipmentId = null,
@@ -43,6 +45,8 @@ final readonly class EyeImageFilters
         return new self(
             period: $request->string('period', 'hoje')->trim()->value() ?: 'hoje',
             search: $request->string('search')->trim()->value(),
+            dateFrom: self::validDate($request->string('date_from')->trim()->value()),
+            dateTo: self::validDate($request->string('date_to')->trim()->value()),
             eye: in_array($eye, self::EYES, true) ? $eye : null,
             examTypeId: $request->string('exam_type_id')->trim()->value() ?: null,
             equipmentId: $request->string('equipment_id')->trim()->value() ?: null,
@@ -56,6 +60,12 @@ final readonly class EyeImageFilters
         );
     }
 
+    /** Allowlist estrita de formato (Y-m-d) — evita repassar lixo pro Carbon::parse(). */
+    private static function validDate(string $value): ?string
+    {
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 ? $value : null;
+    }
+
     /**
      * Eco pro front — permite exibir os filtros ativos e, futuramente,
      * espelhar em history.replaceState() para sobreviver a refresh/bookmark.
@@ -67,6 +77,8 @@ final readonly class EyeImageFilters
         return [
             'period'              => $this->period,
             'search'              => $this->search,
+            'date_from'           => $this->dateFrom,
+            'date_to'             => $this->dateTo,
             'eye'                 => $this->eye,
             'exam_type_id'        => $this->examTypeId,
             'equipment_id'        => $this->equipmentId,

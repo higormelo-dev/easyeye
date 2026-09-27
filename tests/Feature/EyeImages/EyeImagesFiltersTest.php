@@ -208,3 +208,45 @@ it('exame filtrado não aparece nem em paciente que também tem outro exame bate
     expect($patients)->toHaveCount(1);
     expect(collect($patients->first()['exams'])->pluck('id')->all())->toBe([(string) $matching->id]);
 });
+
+it('period=custom com date_from/date_to isola exames pelo intervalo informado', function () {
+    $inRange = PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'created_at' => now()->subDays(5),
+    ]);
+    PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'created_at' => now()->subDays(20),
+    ]);
+
+    $res = searchEyeImages($this, [
+        'period'    => 'custom',
+        'date_from' => now()->subDays(7)->format('Y-m-d'),
+        'date_to'   => now()->format('Y-m-d'),
+    ])->assertOk();
+
+    $patients = collect($res->json('patients'));
+    expect($patients)->toHaveCount(1);
+    expect(collect($patients->first()['exams'])->pluck('id')->all())->toBe([(string) $inRange->id]);
+});
+
+it('period=custom sem date_to considera até agora', function () {
+    PatientExam::factory()->create([
+        'patient_id' => $this->patient->id,
+        'created_at' => now()->subDay(),
+    ]);
+
+    $res = searchEyeImages($this, [
+        'period'    => 'custom',
+        'date_from' => now()->subDays(3)->format('Y-m-d'),
+    ])->assertOk();
+
+    expect(collect($res->json('patients')))->toHaveCount(1);
+});
+
+it('period=custom com date_from em formato invalido nao quebra (ignora e cai no fallback seguro)', function () {
+    PatientExam::factory()->create(['patient_id' => $this->patient->id]);
+
+    searchEyeImages($this, ['period' => 'custom', 'date_from' => 'DROP TABLE patients;--'])
+        ->assertOk();
+});
