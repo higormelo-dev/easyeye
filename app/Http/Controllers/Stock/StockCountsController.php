@@ -8,7 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StockCountRequest;
 use App\Models\{EntityProduct, ProductCategory};
 use App\Services\Stock\StockService;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\{JsonResponse, Request};
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
@@ -33,28 +37,69 @@ class StockCountsController extends Controller
     ) {
     }
 
+    /**
+     * Colunas ordenáveis (whitelist) → coluna real no banco. `category`
+     * ordena pelo nome da categoria via subquery (ver sortExpression()),
+     * sem join — o eager load de `category` continua igual.
+     */
+    private const SORTABLE = [
+        'name'        => 'entity_products.name',
+        'code'        => 'entity_products.code',
+        'category'    => 'product_categories.name',
+        'qty_on_hand' => 'entity_products.qty_on_hand',
+    ];
+
+    private const DEFAULT_SORT = 'name';
+
+    private const DEFAULT_DIRECTION = 'asc';
+
+    /**
+     * Página maior que a das outras listagens: a contagem é digitação em
+     * sequência; os valores digitados ficam guardados na tela ao trocar de
+     * página (ver Pages/Panel/Stock/Counts/Index.vue).
+     */
+    private const PER_PAGE = 50;
+
     public function index(Request $request): InertiaResponse
     {
         $entityId   = (string) session('selected_entity_id');
-        $categoryId = $request->string('category_id')->trim()->value();
+        $search     = $this->stringParam($request, 'search');
+        $categoryId = $this->stringParam($request, 'category_id');
+        $sortBy     = $this->stringParam($request, 'sort', self::DEFAULT_SORT);
+        $sortDir    = $this->stringParam($request, 'direction', self::DEFAULT_DIRECTION);
 
+        // Coluna uuid no PostgreSQL: valor fora do formato derrubava a tela (500).
+        $categoryId = Str::isUuid($categoryId) ? $categoryId : '';
+        $sortBy     = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : self::DEFAULT_SORT;
+        $sortDir    = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : self::DEFAULT_DIRECTION;
+
+        // `id` desempata valores iguais (nome, saldo...) — sem ele a ordem
+        // entre páginas não é determinística no PostgreSQL.
         $products = EntityProduct::query()
-            ->where('entity_id', $entityId)
+            ->where('entity_products.entity_id', $entityId)
             ->active()
             ->with('category:id,name')
-            ->when($categoryId !== '', fn ($q) => $q->where('product_category_id', $categoryId))
-            ->orderBy('name')
-            ->get()
-            ->map(fn (EntityProduct $p) => [
+            ->when($categoryId !== '', fn (Builder $q) => $q->where('entity_products.product_category_id', $categoryId))
+            ->when($search !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
+                ->whereLikeUnaccent('entity_products.name', $search)
+                ->orWhereLikeUnaccent('entity_products.code', $search)
+                ->orWhereLikeUnaccent('entity_products.barcode', $search)))
+            ->orderBy($this->sortExpression($sortBy), $sortDir)
+            ->orderBy('entity_products.id')
+            ->paginate(self::PER_PAGE)
+            ->withQueryString()
+            ->through(fn (EntityProduct $p) => [
                 'id'            => $p->id,
                 'name'          => $p->name,
                 'code'          => $p->code,
+                'unit'          => $p->unit?->value,
                 'unit_label'    => $p->unit?->label(),
                 'category_name' => $p->category?->name,
                 'qty_on_hand'   => (float) $p->qty_on_hand,
                 'requires_lot'  => (bool) $p->requires_lot,
-            ])
-            ->values();
+                // Atalho "ver movimentações" — mesma permissão do grupo stock.
+                'movements_url' => route('panel.stock.movements.index', ['entity_product_id' => $p->id]),
+            ]);
 
         return Inertia::render('Panel/Stock/Counts/Index', [
             'breadcrumbs' => [
@@ -68,11 +113,19 @@ class StockCountsController extends Controller
                 ->active()
                 ->orderBy('name')
                 ->get(['id', 'name']),
-            'filters' => ['category_id' => $categoryId],
-            'routes'  => [
-                'index' => route('panel.stock.counts.index'),
-                'store' => route('panel.stock.counts.store'),
+            // Normalizados: a UI mostra a ordenação/filtro realmente aplicados.
+            'filters' => [
+                'search'      => $search,
+                'category_id' => $categoryId,
+                'sort'        => $sortBy,
+                'direction'   => $sortDir,
             ],
+            'routes' => [
+                'index'           => route('panel.stock.counts.index'),
+                'store'           => route('panel.stock.counts.store'),
+                'movements_index' => route('panel.stock.movements.index'),
+            ],
+            't' => trans('stock_counts'),
         ]);
     }
 
@@ -119,5 +172,25 @@ class StockCountsController extends Controller
             'message'   => __('stock.count_applied', ['count' => count($variances)]),
             'variances' => $variances,
         ]);
+    }
+
+    /** Coluna (ou subquery, para o nome da categoria) usada no ORDER BY. */
+    private function sortExpression(string $sortBy): string|QueryBuilder
+    {
+        if ($sortBy !== 'category') {
+            return self::SORTABLE[$sortBy];
+        }
+
+        return DB::table('product_categories')
+            ->select(self::SORTABLE['category'])
+            ->whereColumn('product_categories.id', 'entity_products.product_category_id');
+    }
+
+    /** Parâmetro de query como string; array/objeto (ex.: `sort[]=x`) volta ao padrão. */
+    private function stringParam(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->input($key, $default);
+
+        return is_string($value) ? trim($value) : $default;
     }
 }

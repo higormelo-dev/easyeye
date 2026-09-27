@@ -1,59 +1,90 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import AppLayout        from '@/Layouts/AppLayout.vue';
 import PageHeader       from '@/Components/Panel/PageHeader.vue';
 import SearchInput      from '@/Components/Panel/SearchInput.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
-import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import { useViewMode }  from '@/composables/useViewMode.js';
+import { useTrans }     from '@/composables/useTrans.js';
+import IolLensTable     from './IolLensTable.vue';
+import IolLensCards     from './IolLensCards.vue';
 import IolLensFormModal from './IolLensFormModal.vue';
 
 /**
- * Lentes de catarata (inventário IOL da clínica) — listagem em CARDS
- * (ver task original: grid, não tabela) com busca/filtro server-side
- * (paginação Inertia padrão, mesmo idioma de PatientsController/
- * CashFlowController — ver comentário em IolLensesController::index()).
+ * Lentes de catarata (inventário IOL da clínica) — mesmo layout de
+ * Panel/Patients/Index: cabeçalho com total, alternância tabela/cards
+ * (tabela como padrão, preferência persistida no navegador), busca + filtro
+ * de status que preservam a ordenação, e tabela/cards com as mesmas ações.
+ * Os cards usam o MESMO paginator da tabela (busca/filtro server-side).
+ * Textos vêm de lang/{locale}/stock_iollenses.php (prop `t`).
  */
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
     items:       { type: Object, required: true }, // paginator Laravel (through())
-    filters:     { type: Object, default: () => ({}) },
-    routes:      { type: Object, required: true },  // { index, store, search, show, update, destroy }
+    filters:     { type: Object, default: () => ({}) }, // { search, status, sort, direction } — normalizados
+    routes:      { type: Object, required: true },  // { index, store, search, show, update, destroy, movements_index }
+    t:           { type: Object, default: () => ({}) },
 });
 
-const page = usePage();
+const { tx } = useTrans(() => props.t);
+const { view, setView } = useViewMode('stock_iollenses_view');
 
-// Backend flasheia `message` (não `success`) em store/update/destroy — ver
-// IolLensesController — e o AppLayout global só escuta `flash.success`/
-// `flash.error`/`flash.status` (HandleInertiaRequests::share()), então o
-// toast automático do layout NUNCA dispararia pra essas 3 ações. Em vez de
-// alterar o controller (fora do escopo desta tarefa — backend já pronto),
-// mostramos esse flash localmente, mesmo padrão de alerta dismissível já
-// usado em Patients/Import.vue.
+const page = usePage();
+// Backend flasheia `message` (não `success`) em store/update/destroy e o
+// toast do AppLayout só escuta success/error/status — alerta local.
 const flashMessage = computed(() => page.props?.flash?.message ?? null);
 
-// ── Filtros (search + status) ───────────────────────────────────────────
+// Fechar o alerta é estado local: `data-bs-dismiss` faria o Bootstrap remover
+// do DOM um nó que o Vue controla. Cada flash novo volta a exibi-lo — mesmo
+// com o texto repetido (ex.: duas edições seguidas trazem outro objeto flash).
+const flashDismissed = ref(false);
+watch([() => page.props?.flash, flashMessage], () => {
+    flashDismissed.value = false;
+});
+
+const pageTitle = computed(() => props.t.page_title ?? 'Lentes de catarata');
+
+// ── Busca (debounce) + status + ordenação — um preserva os outros ───────────
 const search = ref(props.filters?.search ?? '');
 const status = ref(props.filters?.status ?? 'all');
 
-function applyFilters() {
-    router.get(props.routes.index, { search: search.value, status: status.value }, {
-        preserveState: true,
-        preserveScroll: true,
-        replace: true,
-    });
+function currentParams(overrides = {}) {
+    return {
+        search:    search.value,
+        status:    status.value,
+        sort:      props.filters?.sort,
+        direction: props.filters?.direction,
+        ...overrides,
+    };
+}
+
+function visit(params, options = {}) {
+    router.get(props.routes.index, params, { preserveState: true, preserveScroll: true, ...options });
 }
 
 let searchTimer = null;
+
+function applyFilters() {
+    clearTimeout(searchTimer);
+    visit(currentParams(), { replace: true });
+}
+
 watch(search, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(applyFilters, 400);
 });
 watch(status, applyFilters);
 
-// ── Modal criar/editar ───────────────────────────────────────────────────
-const formOpen  = ref(false);
-const editItem  = ref(null);
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onSort({ sort, direction }) {
+    clearTimeout(searchTimer);
+    visit(currentParams({ sort, direction }));
+}
+
+// ── Modal criar/editar ──────────────────────────────────────────────────────
+const formOpen = ref(false);
+const editItem = ref(null);
 
 function openCreate() {
     editItem.value = null;
@@ -70,156 +101,140 @@ function onSaved() {
     router.reload({ only: ['items'] });
 }
 
-// ── Exclusão ──────────────────────────────────────────────────────────────
-// `event.stopPropagation()` explícito (em vez de `@click.stop` no template):
-// ActionIconButton emite um evento CUSTOM ('click', repassando o Event nativo
-// recebido), e o modificador `.stop` do Vue só reescreve com segurança
-// listeners de evento NATIVO — em evento custom componentizado o comportamento
-// não é garantido. Chamando stopPropagation() manualmente aqui evitamos que o
-// clique no botão de excluir borbulhe pro `@click` do card (que abriria o
-// offcanvas de edição junto com o confirm() de exclusão).
-function onDelete(event, lens) {
-    event?.stopPropagation?.();
-    if (!confirm(`Excluir a lente "${lens.manufacturer} ${lens.model_name}"?`)) return;
-    router.delete(props.routes.destroy.replace('__ID__', lens.id), { preserveScroll: true });
+// ── Ações da linha/card ─────────────────────────────────────────────────────
+const actionError = ref(null);
+
+// Ativar/desativar usa o mesmo update do modal: EntityIolLensRequest exige
+// fabricante/modelo e o bridge regrava tipo/dioptrias/valor com o que vier,
+// então o payload repete os dados da lente (sem imagem nem iol_lens_model_id
+// — ambos ficam como estão quando ausentes). Esses dados vêm do registro
+// ATUAL (routes.show, que re-checa posse), não da linha carregada — assim o
+// clique em "Desativar" não desfaz uma edição de tipo/dioptria/valor feita
+// depois que a página abriu. O status alvo é o inverso do que o usuário viu.
+async function onToggleActive(lens) {
+    actionError.value = null;
+    let current;
+    try {
+        const { data } = await window.axios.get(props.routes.show.replace('__ID__', lens.id));
+        current = data?.data;
+    } catch {
+        current = null;
+    }
+    if (!current) {
+        actionError.value = props.t.toggle_error ?? 'Não foi possível carregar os dados atuais da lente.';
+        return;
+    }
+    router.put(
+        props.routes.update.replace('__ID__', lens.id),
+        {
+            manufacturer: current.manufacturer,
+            model_name:   current.model_name,
+            category:     current.category,
+            diopter_min:  current.diopter_min,
+            diopter_max:  current.diopter_max,
+            price:        current.price,
+            active:       !lens.active,
+        },
+        { preserveScroll: true },
+    );
 }
 
-function statusLabel(active) {
-    return active ? 'Ativa' : 'Inativa';
+function onDelete(lens) {
+    const name = [lens.manufacturer, lens.model_name].filter(Boolean).join(' ');
+    if (!confirm(tx('confirm_delete', { name }))) return;
+    router.delete(props.routes.destroy.replace('__ID__', lens.id), { preserveScroll: true });
 }
 </script>
 
 <template>
-    <AppLayout title="Lentes de catarata" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
+        <div class="page-stock-iollenses">
 
-            <PageHeader title="Lentes de catarata" :total="items.total">
+            <PageHeader
+                :title="pageTitle"
+                :total="items.total ?? 0"
+                :total-label="t.total_label ?? 'Total:'"
+                show-view-toggle
+                :view="view"
+                :view-table-title="t.view_table ?? 'Tabela'"
+                :view-cards-title="t.view_cards ?? 'Cards'"
+                @set-view="setView"
+            >
                 <template #actions>
-                    <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i>Nova lente
+                    <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
+                        <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.btn_new ?? 'Nova lente' }}
                     </button>
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage" class="alert alert-success alert-dismissible fade show mb-3">
-                <i class="ti ti-circle-check me-1"></i>{{ flashMessage }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+                <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="flashDismissed = true"
+                ></button>
             </div>
 
-            <!-- ── Filtros ──────────────────────────────────────────────────── -->
-            <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
+            <div v-if="actionError" class="alert alert-danger alert-dismissible mb-3" role="alert">
+                <i class="ti ti-alert-circle me-1" aria-hidden="true"></i>{{ actionError }}
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="actionError = null"
+                ></button>
+            </div>
+
+            <!-- Busca + filtro de status (mesma linha) -->
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
                 <SearchInput
                     v-model="search"
-                    placeholder="Buscar por nome ou fabricante..."
-                    style="min-width: 280px;"
+                    wrapper-class=""
+                    :placeholder="t.search_placeholder ?? 'Buscar...'"
+                    :clear-label="t.search_clear ?? 'Limpar busca'"
+                    max-width="280px"
                 />
-                <select v-model="status" class="form-select form-select-sm" style="max-width: 180px;">
-                    <option value="all">Todas</option>
-                    <option value="active">Ativas</option>
-                    <option value="inactive">Inativas</option>
+                <select
+                    v-model="status"
+                    class="form-select form-select-sm w-auto"
+                    :aria-label="t.filter_status_label ?? 'Status'"
+                >
+                    <option value="all">{{ t.filter_status_all ?? 'Todas' }}</option>
+                    <option value="active">{{ t.filter_status_active ?? 'Ativas' }}</option>
+                    <option value="inactive">{{ t.filter_status_inactive ?? 'Inativas' }}</option>
                 </select>
             </div>
 
-            <!-- ── Grid de cards ────────────────────────────────────────────── -->
-            <div v-if="items.data.length === 0" class="text-center text-muted py-5">
-                <i class="ti ti-eye-off fs-1 d-block mb-2"></i>
-                Nenhuma lente cadastrada.
-            </div>
-
-            <div v-else class="row row-cols-1 row-cols-md-3 g-3">
-                <div v-for="lens in items.data" :key="lens.id" class="col">
-                    <div class="card h-100 iol-lens-card" role="button" @click="openEdit(lens)">
-                        <div class="iol-lens-card__image">
-                            <img v-if="lens.image_url" :src="lens.image_url" :alt="lens.model_name">
-                            <i v-else class="ti ti-eye"></i>
-                            <ActionIconButton
-                                icon="ti ti-trash"
-                                title="Excluir"
-                                variant="danger"
-                                class="iol-lens-card__delete"
-                                @click="onDelete($event, lens)"
-                            />
-                        </div>
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                                <h6 class="mb-0 fw-semibold">Modelo: {{ lens.model_name }}</h6>
-                                <span
-                                    class="badge rounded fs-11 fw-medium text-nowrap"
-                                    :class="lens.active
-                                        ? 'badge-soft-success text-success border border-success'
-                                        : 'badge-soft-secondary'"
-                                >
-                                    {{ statusLabel(lens.active) }}
-                                </span>
-                            </div>
-                            <p class="text-muted small mb-1">Fabricante: {{ lens.manufacturer }}</p>
-                            <p v-if="lens.diopter_range" class="text-muted small mb-1">
-                                Dioptrias disponíveis: {{ lens.diopter_range }}
-                            </p>
-                            <p class="small mb-0 fw-medium">
-                                Valor: {{ lens.price_formatted ?? 'Não informado' }}
-                            </p>
-                            <p v-if="lens.stock" class="text-muted small mb-0 mt-1">
-                                <i class="ti ti-package me-1"></i>Estoque: {{ lens.stock.qty_on_hand }} {{ lens.stock.unit_label }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <TablePagination :data="items" showing-suffix="lentes" />
-
-            <IolLensFormModal
-                :open="formOpen"
-                :item="editItem"
-                :routes="routes"
-                @close="formOpen = false"
-                @saved="onSaved"
+            <IolLensTable
+                v-if="view === 'table'"
+                :items="items"
+                :filters="filters"
+                :t="t"
+                :movements-index-url="routes.movements_index"
+                @sort="onSort"
+                @edit="openEdit"
+                @toggle-active="onToggleActive"
+                @delete="onDelete"
             />
-
+            <IolLensCards
+                v-else
+                :items="items"
+                :t="t"
+                :movements-index-url="routes.movements_index"
+                @edit="openEdit"
+                @toggle-active="onToggleActive"
+                @delete="onDelete"
+            />
         </div>
+
+        <IolLensFormModal
+            :open="formOpen"
+            :item="editItem"
+            :routes="routes"
+            @close="formOpen = false"
+            @saved="onSaved"
+        />
     </AppLayout>
 </template>
-
-<style scoped>
-.iol-lens-card {
-    cursor: pointer;
-    transition: box-shadow .15s ease, transform .15s ease;
-}
-
-.iol-lens-card:hover {
-    box-shadow: 0 .5rem 1rem rgba(0, 0, 0, .1);
-    transform: translateY(-2px);
-}
-
-.iol-lens-card__image {
-    position: relative;
-    height: 160px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bs-tertiary-bg, #f8f9fa);
-    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
-    border-radius: calc(var(--bs-card-border-radius, .375rem) - 1px) calc(var(--bs-card-border-radius, .375rem) - 1px) 0 0;
-    overflow: hidden;
-}
-
-.iol-lens-card__image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.iol-lens-card__image > i {
-    font-size: 3rem;
-    color: var(--bs-secondary-color, #adb5bd);
-}
-
-.iol-lens-card__delete {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: var(--white, #fff);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .15);
-}
-</style>

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Stock;
 
-use App\Enums\{FinancialEntryStatus, FinancialEntryType};
+use App\Enums\{FinancialEntryStatus, FinancialEntryType, PurchaseOrderStatus};
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\{PurchaseOrderRequest, ReceivePurchaseOrderRequest};
 use App\Http\Resources\PurchaseOrderResource;
@@ -12,8 +13,10 @@ use App\Models\{Entity, EntityProduct, PurchaseOrder, StockLot, Supplier};
 use App\Services\Financial\CashFlowService;
 use App\Services\Stock\PurchaseOrderService;
 use Barryvdh\Snappy\Facades\SnappyPdf;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
 use InvalidArgumentException;
 use Throwable;
@@ -31,6 +34,22 @@ use Throwable;
  */
 class PurchaseOrdersController extends Controller
 {
+    use RedirectsToListing;
+
+    /** Parâmetros da listagem preservados ao voltar de uma ação (RedirectsToListing). */
+    private const LISTING_PARAMS = ['search', 'status', 'supplier_id', 'sort', 'direction', 'page'];
+
+    /**
+     * Colunas ordenáveis da listagem (whitelist) → coluna real no banco.
+     * `supplier_name` é resolvida por subquery em applyListingSort().
+     */
+    private const SORTABLE = [
+        'order_date'    => 'purchase_orders.order_date',
+        'code'          => 'purchase_orders.code',
+        'total_amount'  => 'purchase_orders.total_amount',
+        'supplier_name' => 'suppliers.name',
+    ];
+
     public function __construct(
         private readonly PurchaseOrderService $purchaseOrderService,
         private readonly CashFlowService $cashFlowService,
@@ -39,20 +58,38 @@ class PurchaseOrdersController extends Controller
 
     public function index(Request $request): InertiaResponse
     {
-        $entityId   = (string) session('selected_entity_id');
-        $status     = $request->string('status', 'all')->value();
-        $supplierId = $request->string('supplier_id')->trim()->value();
+        $entityId = (string) session('selected_entity_id');
+        // Leitura à prova de array: ?search[]=x chegava como array e
+        // $request->string() estourava erro 500 — agora vira o padrão.
+        $search     = self::queryString($request, 'search');
+        $status     = self::queryString($request, 'status', 'all');
+        $supplierId = self::queryString($request, 'supplier_id');
+        $sortBy     = self::queryString($request, 'sort', 'order_date');
+        $sortDir    = self::queryString($request, 'direction', 'desc');
 
-        $records = PurchaseOrder::query()
-            ->where('entity_id', $entityId)
+        // Normalizados: a UI mostra o filtro/ordenação realmente aplicados.
+        // supplier_id é coluna uuid — valor fora do formato derrubava a
+        // query com erro 500 (SQLSTATE 22P02); agora vira "todos".
+        $status     = PurchaseOrderStatus::tryFrom($status) !== null ? $status : 'all';
+        $supplierId = Str::isUuid($supplierId) ? $supplierId : '';
+        $sortBy     = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : 'order_date';
+        $sortDir    = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
+
+        $query = PurchaseOrder::query()
+            ->where('purchase_orders.entity_id', $entityId)
             ->with('supplier')
-            ->when($status !== 'all', fn ($query) => $query->where('status', $status))
-            ->when($supplierId !== '', fn ($query) => $query->where('supplier_id', $supplierId))
-            ->orderByDesc('order_date')
-            ->orderByDesc('created_at')
+            ->when($search !== '', fn ($query) => $query->where(fn ($q) => $q
+                ->whereLikeUnaccent('purchase_orders.code', $search)
+                ->orWhereHas('supplier', fn ($s) => $s->whereLikeUnaccent('suppliers.name', $search))))
+            ->when($status !== 'all', fn ($query) => $query->where('purchase_orders.status', $status))
+            ->when($supplierId !== '', fn ($query) => $query->where('purchase_orders.supplier_id', $supplierId));
+
+        $records = $this->applyListingSort($query, $sortBy, $sortDir)
             ->paginate(15)
             ->withQueryString()
             ->through(fn (PurchaseOrder $po) => (new PurchaseOrderResource($po))->resolve());
+
+        $suppliers = Supplier::query()->where('entity_id', $entityId)->active()->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('Panel/Stock/PurchaseOrders/Index', [
             'breadcrumbs' => [
@@ -61,7 +98,17 @@ class PurchaseOrdersController extends Controller
                 ['label' => __('actions.sidemenu.purchase_orders'), 'url' => '#', 'active' => true],
             ],
             'items'     => $records,
-            'suppliers' => Supplier::query()->where('entity_id', $entityId)->active()->orderBy('name')->get(['id', 'name']),
+            'suppliers' => $suppliers,
+            // Filtro vindo do atalho de um fornecedor INATIVO (fora de
+            // `suppliers`): o seletor mostra o nome dele em vez de um rótulo
+            // genérico. Só da clínica da sessão — id de outra clínica,
+            // excluído ou inexistente volta null (rótulo neutro na tela).
+            'selectedSupplier' => $this->selectedSupplier($entityId, $supplierId, $suppliers->pluck('id')->all()),
+            // Rótulos traduzidos de App\Enums\PurchaseOrderStatus (lang/*/stock_enums.php)
+            // — a tela não duplica mais os textos de status.
+            'statuses' => collect(PurchaseOrderStatus::cases())
+                ->map(fn (PurchaseOrderStatus $s) => ['value' => $s->value, 'label' => $s->label()])
+                ->values(),
             // GAP fechado (revisão pós-Fase 4 — max_qty existia no cadastro
             // do produto desde a Fase 1 mas nunca era lido em lugar nenhum
             // do sistema, decorativo): `suggested_qty` alimenta o botão
@@ -104,8 +151,15 @@ class PurchaseOrdersController extends Controller
                     'expiry_date' => $l->expiry_date?->format('d/m/Y'),
                     'qty_on_hand' => (float) $l->qty_on_hand,
                 ])->values()),
-            'filters' => ['status' => $status, 'supplier_id' => $supplierId],
-            'routes'  => [
+            'filters' => [
+                'search'      => $search,
+                'status'      => $status,
+                'supplier_id' => $supplierId,
+                'sort'        => $sortBy,
+                'direction'   => $sortDir,
+            ],
+            't'      => trans('stock_purchase_orders'),
+            'routes' => [
                 'index'           => route('panel.stock.purchase-orders.index'),
                 'store'           => route('panel.stock.purchase-orders.store'),
                 'show'            => route('panel.stock.purchase-orders.show', ['__ID__']),
@@ -161,7 +215,8 @@ class PurchaseOrdersController extends Controller
 
         $this->purchaseOrderService->createDraft($entityId, $request->headerData(), $request->items());
 
-        return redirect()->route('panel.stock.purchase-orders.index')->with('message', __('stock.purchase_order_created'));
+        return $this->redirectToListing('panel.stock.purchase-orders.index', self::LISTING_PARAMS)
+            ->with('message', __('stock.purchase_order_created'));
     }
 
     public function update(PurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): RedirectResponse
@@ -174,7 +229,8 @@ class PurchaseOrdersController extends Controller
             return back()->withErrors(['items' => $e->getMessage()]);
         }
 
-        return redirect()->route('panel.stock.purchase-orders.index')->with('message', __('stock.purchase_order_updated'));
+        return $this->redirectToListing('panel.stock.purchase-orders.index', self::LISTING_PARAMS)
+            ->with('message', __('stock.purchase_order_updated'));
     }
 
     public function destroy(PurchaseOrder $purchaseOrder): RedirectResponse
@@ -187,7 +243,8 @@ class PurchaseOrdersController extends Controller
 
         $purchaseOrder->delete();
 
-        return redirect()->route('panel.stock.purchase-orders.index')->with('message', __('stock.purchase_order_deleted'));
+        return $this->redirectToListing('panel.stock.purchase-orders.index', self::LISTING_PARAMS)
+            ->with('message', __('stock.purchase_order_deleted'));
     }
 
     public function send(PurchaseOrder $purchaseOrder): RedirectResponse
@@ -200,7 +257,8 @@ class PurchaseOrdersController extends Controller
             return back()->withErrors(['status' => $e->getMessage()]);
         }
 
-        return redirect()->route('panel.stock.purchase-orders.index')->with('message', __('stock.purchase_order_sent'));
+        return $this->redirectToListing('panel.stock.purchase-orders.index', self::LISTING_PARAMS)
+            ->with('message', __('stock.purchase_order_sent'));
     }
 
     public function cancel(PurchaseOrder $purchaseOrder): RedirectResponse
@@ -213,7 +271,8 @@ class PurchaseOrdersController extends Controller
             return back()->withErrors(['status' => $e->getMessage()]);
         }
 
-        return redirect()->route('panel.stock.purchase-orders.index')->with('message', __('stock.purchase_order_cancelled'));
+        return $this->redirectToListing('panel.stock.purchase-orders.index', self::LISTING_PARAMS)
+            ->with('message', __('stock.purchase_order_cancelled'));
     }
 
     public function receive(ReceivePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder): RedirectResponse
@@ -257,9 +316,60 @@ class PurchaseOrdersController extends Controller
             }
         }
 
-        return redirect()
-            ->route('panel.stock.purchase-orders.index')
+        return $this->redirectToListing('panel.stock.purchase-orders.index', self::LISTING_PARAMS)
             ->with('message', $financialMessage ?? __('stock.purchase_order_received'));
+    }
+
+    /**
+     * Ordenação da listagem. Fornecedor ordena por subquery correlacionada
+     * (sem JOIN: não troca o `select`, não deixa `entity_id`/`status`
+     * ambíguos e mantém o eager load de `supplier`). Em "data do pedido" o critério
+     * secundário é a criação — mesma ordem padrão de sempre da tela — e
+     * `id` desempata tudo para a paginação ser determinística no PostgreSQL.
+     */
+    private function applyListingSort(Builder $query, string $sortBy, string $sortDir): Builder
+    {
+        if ($sortBy === 'supplier_name') {
+            $query->orderBy(
+                Supplier::query()->select('suppliers.name')->whereColumn('suppliers.id', 'purchase_orders.supplier_id'),
+                $sortDir,
+            );
+        } else {
+            $query->orderBy(self::SORTABLE[$sortBy], $sortDir);
+        }
+
+        if ($sortBy === 'order_date') {
+            $query->orderBy('purchase_orders.created_at', $sortDir);
+        }
+
+        return $query->orderBy('purchase_orders.id');
+    }
+
+    /** Parâmetro de query como texto aparado; array/ausente → padrão. */
+    private static function queryString(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->query($key);
+
+        return is_string($value) ? trim($value) : $default;
+    }
+
+    /**
+     * Fornecedor filtrado que não está na lista de ativos (inativo) — busca
+     * SEMPRE escopada pela clínica da sessão.
+     *
+     * @param list<string> $listedIds
+     *
+     * @return array{id: string, name: string}|null
+     */
+    private function selectedSupplier(string $entityId, string $supplierId, array $listedIds): ?array
+    {
+        if ($supplierId === '' || in_array($supplierId, $listedIds, true)) {
+            return null;
+        }
+
+        $supplier = Supplier::query()->where('entity_id', $entityId)->whereKey($supplierId)->first(['id', 'name']);
+
+        return $supplier ? ['id' => (string) $supplier->id, 'name' => (string) $supplier->name] : null;
     }
 
     private function assertOwnership(PurchaseOrder $purchaseOrder): void

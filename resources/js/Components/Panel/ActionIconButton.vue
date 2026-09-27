@@ -69,6 +69,7 @@ function handleClick(event) {
         v-else-if="tag === 'a'"
         :href="disabled ? null : href"
         :target="target"
+        :rel="target === '_blank' ? 'noopener noreferrer' : null"
         :class="classes"
         :title="title"
         :aria-label="title"

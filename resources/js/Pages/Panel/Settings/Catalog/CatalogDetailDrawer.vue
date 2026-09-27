@@ -37,8 +37,10 @@ function display(item, col) {
                 </h5>
                 <code v-if="item?.code" class="text-muted small">{{ item.code }}</code>
             </div>
+            <!-- Só registro da própria clínica é editável (ActionPolicy mode=full);
+                 padrão do sistema (global) é somente leitura — o backend responde 404. -->
             <button
-                v-if="item && !item.deleted"
+                v-if="item?.mode === 'full'"
                 class="btn btn-sm btn-outline-primary ms-2"
                 @click="$emit('edit', item)"
             >

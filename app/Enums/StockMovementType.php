@@ -23,16 +23,8 @@ enum StockMovementType: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::PurchaseIn     => 'Entrada por compra',
-            self::ManualIn       => 'Entrada manual',
-            self::ConsumptionOut => 'Consumo em procedimento',
-            self::ManualOut      => 'Saída manual',
-            self::AdjustmentIn   => 'Ajuste de balanço (entrada)',
-            self::AdjustmentOut  => 'Ajuste de balanço (saída)',
-            self::Loss           => 'Perda/quebra',
-            self::ReturnOut      => 'Devolução a fornecedor',
-        };
+        // Texto em lang/{locale}/stock_enums.php (pt_BR mantém os rótulos de sempre).
+        return __("stock_enums.movement_types.{$this->value}");
     }
 
     /** +1 soma ao saldo, -1 subtrai. Única fonte de verdade da direção do movimento. */

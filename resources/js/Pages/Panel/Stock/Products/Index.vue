@@ -1,54 +1,98 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
 import AppLayout        from '@/Layouts/AppLayout.vue';
 import PageHeader       from '@/Components/Panel/PageHeader.vue';
 import SearchInput      from '@/Components/Panel/SearchInput.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
-import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
+import { useViewMode }  from '@/composables/useViewMode.js';
+import { useTrans }     from '@/composables/useTrans.js';
+import ProductTable     from './ProductTable.vue';
+import ProductCards     from './ProductCards.vue';
 import ProductFormModal from './ProductFormModal.vue';
 
 /**
- * Catálogo de produtos/materiais de estoque (Fase 1) — tabela em vez de
- * cards (diferente de IolLenses): produto tem colunas numéricas (saldo,
- * custo, preço) que ficam ilegíveis num grid de cards, mesmo raciocínio de
- * telas financeiras (CashFlow/ProcedurePrices) desta base.
+ * Catálogo de produtos/materiais de estoque — mesmo layout de
+ * Panel/Patients/Index: cabeçalho com total, alternância tabela/cards
+ * (persistida no navegador), movimentação/importar/novo, busca + filtros do
+ * estoque (status, categoria, abaixo do mínimo, lote vencendo) que preservam
+ * a ordenação, e tabela/cards com as mesmas ações. Os cards usam o MESMO
+ * paginator da tabela, com saldo/custo/preço em linhas rotuladas.
+ * Textos vêm de lang/{locale}/stock_products.php (prop `t`).
  */
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
     items:       { type: Object, required: true },
     categories:  { type: Array,  default: () => [] },
     units:       { type: Array,  default: () => [] },
+    // { search, status, category_id, low_stock, expiring_lots, sort, direction } — normalizados no backend
     filters:     { type: Object, default: () => ({}) },
     routes:      { type: Object, required: true },
+    t:           { type: Object, default: () => ({}) },
 });
 
+const { tx } = useTrans(() => props.t);
+const { view, setView } = useViewMode('stock_products_view');
+
 const page = usePage();
+// Backend flasheia `message` (compartilhado por HandleInertiaRequests) — o
+// toast do AppLayout não o escuta, então o alerta é local.
 const flashMessage = computed(() => page.props?.flash?.message ?? null);
 
+// Fechar o alerta é estado local: `data-bs-dismiss` faria o Bootstrap remover
+// do DOM um nó que o Vue controla. Cada flash novo volta a exibi-lo — mesmo
+// com o texto repetido (ex.: duas edições seguidas trazem outro objeto flash).
+const flashDismissed = ref(false);
+watch([() => page.props?.flash, flashMessage], () => {
+    flashDismissed.value = false;
+});
+
+const pageTitle = computed(() => props.t.page_title ?? 'Produtos');
+
+// ── Busca (debounce) + filtros + ordenação — um preserva os outros ──────────
 const search       = ref(props.filters?.search ?? '');
 const status       = ref(props.filters?.status ?? 'all');
 const categoryId   = ref(props.filters?.category_id ?? '');
 const lowStock     = ref(!!props.filters?.low_stock);
 const expiringLots = ref(!!props.filters?.expiring_lots);
 
-function applyFilters() {
-    router.get(props.routes.index, {
-        search: search.value,
-        status: status.value,
-        category_id: categoryId.value,
-        low_stock: lowStock.value ? 1 : 0,
+function currentParams(overrides = {}) {
+    return {
+        search:        search.value,
+        status:        status.value,
+        category_id:   categoryId.value,
+        low_stock:     lowStock.value ? 1 : 0,
         expiring_lots: expiringLots.value ? 1 : 0,
-    }, { preserveState: true, preserveScroll: true, replace: true });
+        sort:          props.filters?.sort,
+        direction:     props.filters?.direction,
+        ...overrides,
+    };
+}
+
+function visit(params, options = {}) {
+    router.get(props.routes.index, params, { preserveState: true, preserveScroll: true, ...options });
 }
 
 let searchTimer = null;
+
+function applyFilters() {
+    clearTimeout(searchTimer);
+    visit(currentParams(), { replace: true });
+}
+
 watch(search, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(applyFilters, 400);
 });
 watch([status, categoryId, lowStock, expiringLots], applyFilters);
 
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onSort({ sort, direction }) {
+    clearTimeout(searchTimer);
+    visit(currentParams({ sort, direction }));
+}
+
+// ── Modal criar/editar ──────────────────────────────────────────────────────
 const formOpen = ref(false);
 const editItem = ref(null);
 
@@ -67,135 +111,175 @@ function onSaved() {
     router.reload({ only: ['items'] });
 }
 
-function onDelete(event, product) {
-    event?.stopPropagation?.();
-    if (!confirm(`Desativar o produto "${product.name}"?`)) return;
-    router.delete(props.routes.destroy.replace('__ID__', product.id), { preserveScroll: true });
+// ── Ações da linha/card ─────────────────────────────────────────────────────
+const actionError = ref(null);
+
+// Ativar/desativar reaproveita o update do produto só com os campos
+// obrigatórios + active (EntityProductRequest valida só o que vier; os demais
+// campos ficam como estão). Nome/unidade vêm do registro ATUAL (routes.show,
+// que re-checa posse), não da linha carregada — assim o clique não desfaz uma
+// edição feita por outra pessoa depois que a página abriu. O status alvo é o
+// inverso do que o usuário viu na linha.
+async function onToggleActive(product) {
+    actionError.value = null;
+    let current;
+    try {
+        const { data } = await window.axios.get(props.routes.show.replace('__ID__', product.id));
+        current = data?.data;
+    } catch {
+        current = null;
+    }
+    if (!current) {
+        actionError.value = props.t.toggle_error ?? 'Não foi possível carregar os dados atuais do produto.';
+        return;
+    }
+    router.put(
+        props.routes.update.replace('__ID__', product.id),
+        { name: current.name, unit: current.unit, active: !product.active },
+        { preserveScroll: true },
+    );
 }
 
-function money(v) {
-    return v === null || v === undefined ? '—' : `R$ ${Number(v).toFixed(2)}`;
+function onDelete(product) {
+    if (!confirm(tx('confirm_delete', { name: product.name }))) return;
+    router.delete(props.routes.destroy.replace('__ID__', product.id), { preserveScroll: true });
 }
 </script>
 
 <template>
-    <AppLayout title="Produtos" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
+        <div class="page-stock-products">
 
-            <PageHeader title="Produtos" :total="items.total">
+            <PageHeader
+                :title="pageTitle"
+                :total="items.total ?? 0"
+                :total-label="t.total_label ?? 'Total:'"
+                show-view-toggle
+                :view="view"
+                :view-table-title="t.view_table ?? 'Tabela'"
+                :view-cards-title="t.view_cards ?? 'Cards'"
+                @set-view="setView"
+            >
                 <template #actions>
-                    <Link :href="routes.movements_index" class="btn btn-outline-secondary btn-sm me-2">
-                        <i class="ti ti-transfer-in me-1"></i>Movimentação
-                    </Link>
-                    <!-- GAP fechado (revisão pós-Fase 4): importação em
-                         massa via CSV — ver ProductImportsController. -->
-                    <Link :href="routes.import_index" class="btn btn-outline-secondary btn-sm me-2">
-                        <i class="ti ti-upload me-1"></i>Importar
-                    </Link>
-                    <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i>Novo produto
-                    </button>
+                    <div class="d-flex align-items-center flex-wrap justify-content-end gap-2">
+                        <Link
+                            :href="routes.movements_index"
+                            class="btn btn-outline-secondary fs-13 btn-md"
+                            :title="t.btn_movements ?? 'Movimentação'"
+                            :aria-label="t.btn_movements ?? 'Movimentação'"
+                        >
+                            <i class="ti ti-transfer-in" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline ms-1">{{ t.btn_movements ?? 'Movimentação' }}</span>
+                        </Link>
+                        <!-- Importação em massa via CSV — ver ProductImportsController. -->
+                        <Link
+                            :href="routes.import_index"
+                            class="btn btn-outline-secondary fs-13 btn-md"
+                            :title="t.btn_import ?? 'Importar'"
+                            :aria-label="t.btn_import ?? 'Importar'"
+                        >
+                            <i class="ti ti-upload" aria-hidden="true"></i>
+                            <span class="d-none d-md-inline ms-1">{{ t.btn_import ?? 'Importar' }}</span>
+                        </Link>
+                        <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
+                            <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.btn_new ?? 'Novo produto' }}
+                        </button>
+                    </div>
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage" class="alert alert-success alert-dismissible fade show mb-3">
-                <i class="ti ti-circle-check me-1"></i>{{ flashMessage }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+                <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="flashDismissed = true"
+                ></button>
             </div>
 
-            <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-                <SearchInput v-model="search" placeholder="Buscar por nome, SKU, código ou código de barras..." style="min-width: 260px;" />
-                <select v-model="status" class="form-select form-select-sm" style="max-width: 160px;">
-                    <option value="all">Todos</option>
-                    <option value="active">Ativos</option>
-                    <option value="inactive">Inativos</option>
+            <div v-if="actionError" class="alert alert-danger alert-dismissible mb-3" role="alert">
+                <i class="ti ti-alert-circle me-1" aria-hidden="true"></i>{{ actionError }}
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="actionError = null"
+                ></button>
+            </div>
+
+            <!-- Busca + filtros do estoque (mesma linha) -->
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+                <SearchInput
+                    v-model="search"
+                    wrapper-class=""
+                    :placeholder="t.search_placeholder ?? 'Buscar...'"
+                    :clear-label="t.search_clear ?? 'Limpar busca'"
+                    max-width="280px"
+                />
+                <select
+                    v-model="status"
+                    class="form-select form-select-sm w-auto"
+                    :aria-label="t.filter_status_label ?? 'Status'"
+                >
+                    <option value="all">{{ t.filter_status_all ?? 'Todos' }}</option>
+                    <option value="active">{{ t.filter_status_active ?? 'Ativos' }}</option>
+                    <option value="inactive">{{ t.filter_status_inactive ?? 'Inativos' }}</option>
                 </select>
-                <select v-model="categoryId" class="form-select form-select-sm" style="max-width: 220px;">
-                    <option value="">Todas as categorias</option>
+                <select
+                    v-model="categoryId"
+                    class="form-select form-select-sm w-auto stock-toolbar-select"
+                    :aria-label="t.filter_category_label ?? 'Categoria'"
+                >
+                    <option value="">{{ t.category_all ?? 'Todas as categorias' }}</option>
                     <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
-                <div class="form-check ms-1">
+                <div class="form-check mb-0 ms-1">
                     <input id="low_stock_filter" v-model="lowStock" type="checkbox" class="form-check-input">
-                    <label class="form-check-label small" for="low_stock_filter">Só abaixo do mínimo</label>
+                    <label class="form-check-label small" for="low_stock_filter">{{ t.filter_low_stock ?? 'Só abaixo do mínimo' }}</label>
                 </div>
-                <div class="form-check">
+                <div class="form-check mb-0">
                     <input id="expiring_lots_filter" v-model="expiringLots" type="checkbox" class="form-check-input">
-                    <label class="form-check-label small" for="expiring_lots_filter">Só com lote vencendo (30d)</label>
+                    <label class="form-check-label small" for="expiring_lots_filter">{{ t.filter_expiring_lots ?? 'Só com lote vencendo (30d)' }}</label>
                 </div>
             </div>
 
-            <div v-if="items.data.length === 0" class="text-center text-muted py-5">
-                <i class="ti ti-package-off fs-1 d-block mb-2"></i>
-                Nenhum produto cadastrado.
-            </div>
-
-            <div v-else class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Nome</th>
-                            <th>Categoria</th>
-                            <th>Unidade</th>
-                            <th class="text-end">Saldo</th>
-                            <th class="text-end">Custo médio</th>
-                            <th class="text-end">Preço</th>
-                            <th>Status</th>
-                            <th class="text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="p in items.data" :key="p.id" role="button" @click="openEdit(p)">
-                            <td class="text-muted small">{{ p.code }}</td>
-                            <td>
-                                {{ p.name }}
-                                <span v-if="p.is_opm" class="badge badge-soft-info ms-1" title="OPM">OPM</span>
-                                <span
-                                    v-if="p.has_expiring_lot"
-                                    class="badge badge-soft-warning text-warning ms-1"
-                                    :title="`Vence: ${p.nearest_expiry}`"
-                                >
-                                    <i class="ti ti-alert-triangle"></i> Lote vencendo
-                                </span>
-                            </td>
-                            <td>{{ p.category_name ?? '—' }}</td>
-                            <td>{{ p.unit_label }}</td>
-                            <td class="text-end">
-                                <span :class="p.below_minimum ? 'text-danger fw-semibold' : ''">
-                                    {{ p.qty_on_hand }}
-                                </span>
-                                <i v-if="p.below_minimum" class="ti ti-alert-triangle text-danger ms-1" title="Abaixo do mínimo"></i>
-                            </td>
-                            <td class="text-end">{{ money(p.cost_avg) }}</td>
-                            <td class="text-end">{{ money(p.sale_price) }}</td>
-                            <td>
-                                <span
-                                    class="badge rounded fs-11 fw-medium"
-                                    :class="p.active ? 'badge-soft-success text-success border border-success' : 'badge-soft-secondary'"
-                                >
-                                    {{ p.active ? 'Ativo' : 'Inativo' }}
-                                </span>
-                            </td>
-                            <td class="text-end">
-                                <ActionIconButton icon="ti ti-trash" title="Desativar" variant="danger" @click="onDelete($event, p)" />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <TablePagination :data="items" showing-suffix="produtos" />
-
-            <ProductFormModal
-                :open="formOpen"
-                :item="editItem"
-                :routes="routes"
-                :categories="categories"
-                :units="units"
-                @close="formOpen = false"
-                @saved="onSaved"
+            <ProductTable
+                v-if="view === 'table'"
+                :items="items"
+                :filters="filters"
+                :t="t"
+                :movements-index-url="routes.movements_index"
+                @sort="onSort"
+                @edit="openEdit"
+                @toggle-active="onToggleActive"
+                @delete="onDelete"
             />
-
+            <ProductCards
+                v-else
+                :items="items"
+                :t="t"
+                :movements-index-url="routes.movements_index"
+                @edit="openEdit"
+                @toggle-active="onToggleActive"
+                @delete="onDelete"
+            />
         </div>
+
+        <ProductFormModal
+            :open="formOpen"
+            :item="editItem"
+            :routes="routes"
+            :categories="categories"
+            :units="units"
+            @close="formOpen = false"
+            @saved="onSaved"
+        />
     </AppLayout>
 </template>
+
+<style scoped>
+.stock-toolbar-select {
+    max-width: 220px;
+}
+</style>

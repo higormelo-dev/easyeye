@@ -38,7 +38,7 @@ class StockReportService
                 'name'          => $p->name,
                 'code'          => $p->code,
                 'category_name' => $p->category?->name,
-                'unit'          => $p->unit?->label(),
+                'unit'          => $p->unit?->label(), // rótulo traduzido (lang/{locale}/stock_enums.php)
                 'qty_on_hand'   => (float) $p->qty_on_hand,
                 'cost_avg'      => (float) $p->cost_avg,
                 'total_value'   => round((float) $p->qty_on_hand * (float) $p->cost_avg, 2),
@@ -124,6 +124,8 @@ class StockReportService
      * stock_movements(consumption_out) ao MedicalRecordProcedure que gerou
      * a baixa (Fase 3), valorizado ao custo médio no momento do consumo
      * (`unit_cost` gravado NO PRÓPRIO movimento, não recalculado agora).
+     * `executed_at` sai em ISO (Y-m-d): cada saída formata onde mostra — a
+     * tela no idioma do usuário, o CSV em d/m/Y (StockReportsController).
      *
      * @return list<array<string, mixed>>
      */
@@ -156,7 +158,7 @@ class StockReportService
                 return [
                     'procedure_name' => $execution?->procedure?->name ?? '—',
                     'doctor_name'    => $execution?->doctor?->person?->full_name ?? '—',
-                    'executed_at'    => $execution?->executed_at?->format('d/m/Y'),
+                    'executed_at'    => $execution?->executed_at?->format('Y-m-d'),
                     'items'          => $group->map(fn (StockMovement $m) => [
                         'product_name' => $m->product?->name,
                         'quantity'     => (float) $m->quantity,
@@ -207,7 +209,7 @@ class StockReportService
                 $firstPo = $ordersBySupplier->get($group->first()->reference_id);
 
                 return [
-                    'supplier_name' => $firstPo?->supplier?->name ?? 'Fornecedor removido',
+                    'supplier_name' => $firstPo?->supplier?->name ?? __('stock_reports.supplier_removed'),
                     'total_spent'   => round($group->sum(fn (StockMovement $m) => (float) $m->quantity * (float) ($m->unit_cost ?? 0)), 2),
                     'orders_count'  => $group->pluck('reference_id')->unique()->count(),
                 ];

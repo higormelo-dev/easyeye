@@ -22,10 +22,19 @@ return [
     'btn_cancel'         => 'Cancelar',
     'btn_close'          => 'Fechar',
     'btn_edit'           => 'Editar',
+    'search_clear'       => 'Limpar busca',
     'search_placeholder' => 'Buscar por nome ou código...',
     'total_label'        => 'Total:',
     'view_table'         => 'Tabela',
     'view_cards'         => 'Cards',
+
+    // Paginação ("Exibindo 1–15 de 812 registros")
+    'pagination_label'    => 'Paginação',
+    'pagination_previous' => 'Anterior',
+    'pagination_next'     => 'Próxima',
+    'pagination_showing'  => 'Exibindo',
+    'pagination_of'       => 'de',
+    'pagination_suffix'   => 'registros',
 
     // Form modal
     'form_title_create' => 'Novo registro',
@@ -58,6 +67,20 @@ return [
     'detail_origin'        => 'Origem',
     'detail_origin_clinic' => 'Cadastrado pela clínica',
     'detail_origin_global' => 'Padrão do sistema',
+
+    // Tabela (cabeçalhos, ordenação, colunas)
+    'col_status'          => 'Status',
+    'col_actions'         => 'Ações',
+    'sort_by'             => 'Ordenar por :column',
+    'columns_label'       => 'Colunas',
+    'columns_customize'   => 'Personalizar colunas',
+    'columns_order_title' => 'Ordem das colunas',
+    'columns_move_up'     => 'Mover para cima',
+    'columns_move_down'   => 'Mover para baixo',
+    'columns_reset'       => 'Restaurar padrão',
+    'retry'               => 'Tentar novamente',
+    'more_actions'        => 'Mais ações',
+    'load_error'          => 'Não foi possível carregar os registros. Tente novamente.',
 
     // Yes/No genérico
     'yes' => 'Sim',

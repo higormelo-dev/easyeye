@@ -1,75 +1,142 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router } from '@inertiajs/vue3';
-import AppLayout   from '@/Layouts/AppLayout.vue';
-import PageHeader  from '@/Components/Panel/PageHeader.vue';
+import AppLayout          from '@/Layouts/AppLayout.vue';
+import PageHeader         from '@/Components/Panel/PageHeader.vue';
+import SearchInput        from '@/Components/Panel/SearchInput.vue';
+import { useViewMode }    from '@/composables/useViewMode.js';
+import { useTrans }       from '@/composables/useTrans.js';
+import { useCountFormat } from './useCountFormat.js';
+import CountTable         from './CountTable.vue';
+import CountCards         from './CountCards.vue';
 
 /**
- * Contagem física de estoque em MASSA (GAP fechado — revisão pós-Fase 4,
- * "melhorar o módulo de estoque"). App\Services\Stock\StockService::
- * adjustToCountedQuantity() já existia desde a Fase 1 (usado produto a
- * produto na tela de Movimentação), mas nunca teve uma tela pra contar
- * MUITOS produtos de uma vez — aqui lista tudo, usuário digita o contado
- * ao lado do saldo do sistema, aplica tudo junto.
+ * Contagem física de estoque em MASSA — mesmo layout de Panel/Patients/Index:
+ * cabeçalho com total e alternância tabela/cards (persistida no navegador),
+ * busca + categoria na mesma barra (um preserva o outro e a ordenação) e
+ * tabela/cards paginados com os mesmos dados. Textos vêm de
+ * lang/{locale}/stock_counts.php (prop `t`).
  *
- * v1 é POR PRODUTO (agregado), não por lote — ver docblock de
- * StockCountRequest.
+ * App\Services\Stock\StockService::adjustToCountedQuantity() aplica cada item;
+ * v1 é POR PRODUTO (agregado), não por lote — ver docblock de StockCountRequest.
+ *
+ * O que foi digitado fica em `counted` (estado desta página, preservado pelo
+ * Inertia ao buscar/filtrar/ordenar/paginar) e TUDO que foi digitado vai no
+ * envio, mesmo o que não está na página atual — o botão mostra esse total.
+ * Item em branco NUNCA vai no envio (não é "contei zero", é "ainda não contei").
  */
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
-    products:    { type: Array,  required: true },
+    products:    { type: Object, required: true },   // paginator Laravel
     categories:  { type: Array,  default: () => [] },
-    filters:     { type: Object, default: () => ({}) },
+    filters:     { type: Object, default: () => ({}) },   // { search, category_id, sort, direction }
     routes:      { type: Object, required: true },
+    t:           { type: Object, default: () => ({}) },
 });
 
+const SEARCH_DEBOUNCE_MS = 400;
+const QUANTITY_PRECISION = 1000; // 3 casas (decimal:3)
+
+const { tx } = useTrans(() => props.t);
+const { quantity, signedQuantity } = useCountFormat(() => props.t);
+
+const pageTitle = computed(() => props.t.page_title ?? 'Contagem de estoque');
+
+// Link "Movimentações" abre em nova aba: o título (dica) também avisa.
+const movementsLinkTitle = computed(() => (
+    `${props.t.btn_movements ?? 'Movimentações'} (${props.t.opens_new_tab ?? 'abre em nova aba'})`
+));
+
+// ── Alternância tabela/cards (preferência no navegador) ──────────────────────
+const { view, setView } = useViewMode('stock_counts_view');
+
+// ── Busca (debounce), categoria e ordenação — cada um preserva os demais ─────
+const search     = ref(props.filters?.search ?? '');
 const categoryId = ref(props.filters?.category_id ?? '');
 
-function applyFilters() {
-    router.get(props.routes.index, { category_id: categoryId.value }, { preserveState: true, preserveScroll: true, replace: true });
+function currentParams(overrides = {}) {
+    return {
+        search:      search.value,
+        category_id: categoryId.value,
+        sort:        props.filters?.sort,
+        direction:   props.filters?.direction,
+        ...overrides,
+    };
 }
 
-// `counted` fica em branco até o usuário digitar — item sem contagem
-// digitada NUNCA vai no submit (não é "contei zero", é "ainda não contei
-// este aqui"), evita zerar por engano tudo que não deu tempo de contar.
-const counted = ref(Object.fromEntries(props.products.map((p) => [p.id, ''])));
-
-const touchedCount = computed(() => Object.values(counted.value).filter((v) => v !== '').length);
-
-function delta(product) {
-    const v = counted.value[product.id];
-    if (v === '') return null;
-
-    return Math.round((Number(v) - product.qty_on_hand) * 1000) / 1000;
+function visit(params, options = {}) {
+    router.get(props.routes.index, params, { preserveState: true, preserveScroll: true, ...options });
 }
 
+let searchTimer = null;
+
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => visit(currentParams(), { replace: true }), SEARCH_DEBOUNCE_MS);
+});
+
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+watch(categoryId, () => visit(currentParams(), { replace: true }));
+
+function onSort({ sort, direction }) {
+    visit(currentParams({ sort, direction }));
+}
+
+// ── Contagem digitada ────────────────────────────────────────────────────────
+const counted = ref({}); // { [productId]: texto digitado }
+
+function isTyped(value) {
+    return value !== '' && value !== null && value !== undefined;
+}
+
+const typedIds     = computed(() => Object.keys(counted.value).filter((id) => isTyped(counted.value[id])));
+const touchedCount = computed(() => typedIds.value.length);
+
+function onCount(productId, value) {
+    counted.value = { ...counted.value, [productId]: value };
+}
+
+const rows = computed(() => props.products?.data ?? []);
+
+// Diferença contado − sistema dos produtos da página (null = ainda não contado).
+const deltas = computed(() => Object.fromEntries(rows.value.map((p) => {
+    const value = counted.value[p.id];
+    if (!isTyped(value)) return [p.id, null];
+
+    return [p.id, Math.round((Number(value) - Number(p.qty_on_hand)) * QUANTITY_PRECISION) / QUANTITY_PRECISION];
+})));
+
+// ── Envio ────────────────────────────────────────────────────────────────────
 const submitting = ref(false);
-const result      = ref(null); // { message, variances } | null
-const errorMsg    = ref('');
+const result     = ref(null); // { message, variances } | null
+const errorMsg   = ref('');
+
+const resultMessage = computed(() => (
+    result.value ? tx('result_applied', { count: result.value.variances?.length ?? 0 }) : ''
+));
 
 async function submit() {
-    const items = props.products
-        .filter((p) => counted.value[p.id] !== '')
-        .map((p) => ({ entity_product_id: p.id, counted_qty: Number(counted.value[p.id]) }));
-
-    if (items.length === 0) return;
+    const sent = typedIds.value.map((id) => [id, counted.value[id]]);
+    if (sent.length === 0 || submitting.value) return;
 
     submitting.value = true;
-    errorMsg.value = '';
-    result.value = null;
+    errorMsg.value   = '';
+    result.value     = null;
     try {
+        const items = sent.map(([id, value]) => ({ entity_product_id: id, counted_qty: Number(value) }));
         const { data } = await window.axios.post(props.routes.store, { items });
         result.value = data;
-        // Reseta só os campos ENVIADOS — recém-carregados/saldo agora
-        // reflete o valor contado (evita reabrir a tela pra ver o saldo
-        // novo bater com o que acabou de digitar).
-        items.forEach((i) => {
-            const p = props.products.find((pp) => pp.id === i.entity_product_id);
-            if (p) p.qty_on_hand = i.counted_qty;
-            counted.value[i.entity_product_id] = '';
-        });
+
+        // Limpa só o que foi enviado e não mudou durante o envio; o saldo
+        // novo vem do servidor (sem mexer nas props).
+        const sentValues = Object.fromEntries(sent);
+        counted.value = Object.fromEntries(
+            Object.entries(counted.value).filter(([id, value]) => sentValues[id] !== value),
+        );
+        router.reload({ only: ['products'] });
     } catch (e) {
-        errorMsg.value = e.response?.data?.message ?? 'Não foi possível aplicar a contagem.';
+        errorMsg.value = e.response?.data?.message ?? props.t.apply_error ?? 'Não foi possível aplicar a contagem.';
     } finally {
         submitting.value = false;
     }
@@ -77,74 +144,128 @@ async function submit() {
 </script>
 
 <template>
-    <AppLayout title="Contagem de estoque" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
-            <PageHeader title="Contagem de estoque" />
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
+        <div class="page-stock-counts">
 
-            <p class="text-muted small">
-                Digite a quantidade CONTADA fisicamente ao lado de cada produto. Item deixado em branco não é alterado —
-                só quem tem um valor digitado entra no ajuste. Contagem igual ao saldo do sistema não gera movimentação.
-            </p>
+            <PageHeader
+                :title="pageTitle"
+                :total="products.total ?? 0"
+                :total-label="t.total_label ?? 'Total:'"
+                show-view-toggle
+                :view="view"
+                :view-table-title="t.view_table ?? 'Tabela'"
+                :view-cards-title="t.view_cards ?? 'Cards'"
+                @set-view="setView"
+            >
+                <template #actions>
+                    <div class="d-flex align-items-center gap-2">
+                        <!-- Nova aba: `counted` é estado desta página — navegar aqui perderia a contagem digitada. -->
+                        <a
+                            :href="routes.movements_index"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            :title="movementsLinkTitle"
+                            class="btn btn-outline-secondary fs-13 btn-md movements-link"
+                        >
+                            <i class="ti ti-transfer-in me-1" aria-hidden="true"></i> {{ t.btn_movements ?? 'Movimentações' }}
+                            <i class="ti ti-external-link ms-1" aria-hidden="true"></i>
+                            <span class="visually-hidden">({{ t.opens_new_tab ?? 'abre em nova aba' }})</span>
+                        </a>
+                        <button
+                            type="button"
+                            class="btn btn-primary fs-13 btn-md apply-count"
+                            :disabled="submitting || touchedCount === 0"
+                            @click="submit"
+                        >
+                            <span v-if="submitting" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                            <i v-else class="ti ti-clipboard-check me-1" aria-hidden="true"></i>
+                            {{ tx('btn_apply', { count: touchedCount }) }}
+                        </button>
+                    </div>
+                </template>
+            </PageHeader>
 
-            <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                <select v-model="categoryId" class="form-select form-select-sm" style="max-width:220px;" @change="applyFilters">
-                    <option value="">Todas as categorias</option>
+            <p class="text-muted small">{{ t.help }}</p>
+
+            <!-- Busca + categoria na mesma barra -->
+            <div class="stock-toolbar d-flex align-items-center flex-wrap gap-2 mb-3">
+                <SearchInput
+                    v-model="search"
+                    :placeholder="t.search_placeholder ?? 'Buscar...'"
+                    :clear-label="t.search_clear"
+                    max-width="280px"
+                    wrapper-class=""
+                />
+                <select
+                    v-model="categoryId"
+                    class="form-select form-select-sm stock-toolbar__select"
+                    :aria-label="t.filter_category ?? 'Filtrar por categoria'"
+                >
+                    <option value="">{{ t.filter_category_all ?? 'Todas as categorias' }}</option>
                     <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
-                <span class="text-muted small">{{ touchedCount }} de {{ products.length }} produto(s) com contagem digitada</span>
+                <span class="text-muted small touched-summary" aria-live="polite">
+                    {{ tx('touched_summary', { touched: touchedCount, total: products.total ?? 0 }) }}
+                </span>
             </div>
 
-            <div v-if="result" class="alert alert-success py-2">
-                {{ result.message }}
-                <ul v-if="result.variances.length > 0" class="mb-0 mt-2 small">
+            <!-- Fechar = estado local (sem data-bs-dismiss, que removeria o nó do Vue). -->
+            <div v-if="result" class="alert alert-success alert-dismissible py-2" role="status">
+                {{ resultMessage }}
+                <ul v-if="result.variances?.length" class="mb-0 mt-2 small">
                     <li v-for="v in result.variances" :key="v.entity_product_id">
-                        {{ v.product_name }}: {{ v.before }} → {{ v.counted }}
-                        (<span :class="v.delta > 0 ? 'text-success' : 'text-danger'">{{ v.delta > 0 ? '+' : '' }}{{ v.delta }}</span>)
+                        {{ v.product_name }}: {{ quantity(v.before) }} → {{ quantity(v.counted) }}
+                        (<span :class="v.delta > 0 ? 'text-success' : 'text-danger'">{{ signedQuantity(v.delta) }}</span>)
                     </li>
                 </ul>
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="result = null"
+                ></button>
             </div>
-            <div v-if="errorMsg" class="alert alert-danger py-2">{{ errorMsg }}</div>
+            <div v-if="errorMsg" class="alert alert-danger py-2" role="alert">{{ errorMsg }}</div>
 
-            <div v-if="products.length === 0" class="text-center text-muted py-5">
-                Nenhum produto ativo pra contar.
-            </div>
+            <CountTable
+                v-if="view === 'table'"
+                :products="products"
+                :counted="counted"
+                :deltas="deltas"
+                :filters="filters"
+                :t="t"
+                @sort="onSort"
+                @count="onCount"
+            />
+            <CountCards
+                v-else
+                :products="products"
+                :counted="counted"
+                :deltas="deltas"
+                :t="t"
+                @count="onCount"
+            />
 
-            <div v-else class="table-responsive">
-                <table class="table table-sm table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>Produto</th>
-                            <th>Categoria</th>
-                            <th class="text-end">Saldo do sistema</th>
-                            <th style="width:160px;">Contado</th>
-                            <th class="text-end">Diferença</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="p in products" :key="p.id">
-                            <td>
-                                {{ p.name }} <span class="text-muted small">({{ p.code }})</span>
-                                <span v-if="p.requires_lot" class="badge badge-soft-info ms-1">Exige lote</span>
-                            </td>
-                            <td class="small text-muted">{{ p.category_name ?? '—' }}</td>
-                            <td class="text-end">{{ p.qty_on_hand }} {{ p.unit_label }}</td>
-                            <td>
-                                <input v-model="counted[p.id]" type="number" step="0.001" min="0" class="form-control form-control-sm" placeholder="—">
-                            </td>
-                            <td class="text-end small" :class="{ 'text-success': delta(p) > 0, 'text-danger': delta(p) < 0 }">
-                                <template v-if="delta(p) !== null">{{ delta(p) > 0 ? '+' : '' }}{{ delta(p) }}</template>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div v-if="products.length > 0" class="d-flex justify-content-end mt-3">
-                <button type="button" class="btn btn-primary" :disabled="submitting || touchedCount === 0" @click="submit">
-                    <span v-if="submitting" class="spinner-border spinner-border-sm me-1"></span>
-                    Aplicar contagem ({{ touchedCount }})
+            <!-- Lista longa: aplicar também no fim, sem voltar ao topo -->
+            <div v-if="rows.length > 0" class="d-flex justify-content-end mt-3">
+                <button
+                    type="button"
+                    class="btn btn-primary fs-13 btn-md apply-count"
+                    :disabled="submitting || touchedCount === 0"
+                    @click="submit"
+                >
+                    <span v-if="submitting" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    {{ tx('btn_apply', { count: touchedCount }) }}
                 </button>
             </div>
+            <span v-if="submitting" class="visually-hidden" role="status">{{ t.applying }}</span>
+
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.stock-toolbar__select {
+    max-width: 240px;
+}
+</style>

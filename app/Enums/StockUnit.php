@@ -22,17 +22,8 @@ enum StockUnit: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Unit    => 'Unidade',
-            self::Box     => 'Caixa',
-            self::Bottle  => 'Frasco',
-            self::Pair    => 'Par',
-            self::Ampoule => 'Ampola',
-            self::Ml      => 'Mililitro (ml)',
-            self::Mg      => 'Miligrama (mg)',
-            self::Gram    => 'Grama (g)',
-            self::Liter   => 'Litro (l)',
-        };
+        // Texto em lang/{locale}/stock_enums.php (pt_BR mantém os rótulos de sempre).
+        return __("stock_enums.units.{$this->value}");
     }
 
     /**

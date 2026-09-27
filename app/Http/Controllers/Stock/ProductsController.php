@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Stock;
 
 use App\Enums\StockUnit;
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EntityProductRequest;
 use App\Http\Resources\EntityProductResource;
 use App\Models\{EntityProduct, ProductCategory};
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
@@ -30,16 +34,52 @@ use Inertia\{Inertia, Response as InertiaResponse};
  */
 class ProductsController extends Controller
 {
+    use RedirectsToListing;
+
+    /**
+     * Parâmetros da listagem preservados ao voltar de criar/editar/ativar/
+     * excluir (RedirectsToListing) — busca, filtros, ordenação e página.
+     */
+    private const LISTING_PARAMS = [
+        'search', 'status', 'category_id', 'low_stock', 'expiring_lots', 'sort', 'direction', 'page',
+    ];
+
+    /** Colunas ordenáveis da listagem (whitelist) → coluna real no banco. */
+    private const SORTABLE = [
+        'name'        => 'entity_products.name',
+        'code'        => 'entity_products.code',
+        'qty_on_hand' => 'entity_products.qty_on_hand',
+        'cost_avg'    => 'entity_products.cost_avg',
+        'sale_price'  => 'entity_products.sale_price',
+    ];
+
+    /** Ordem padrão = a de sempre da tela (nome A→Z). */
+    private const DEFAULT_SORT = 'name';
+
+    private const DEFAULT_DIRECTION = 'asc';
+
+    private const STATUSES = ['all', 'active', 'inactive'];
+
     public function index(Request $request): InertiaResponse
     {
         $entityId     = (string) session('selected_entity_id');
-        $search       = $request->string('search')->trim()->value();
-        $status       = $request->string('status', 'all')->value(); // active|inactive|all
-        $categoryId   = $request->string('category_id')->trim()->value();
+        $search       = $this->queryText($request, 'search');
+        $status       = $this->queryText($request, 'status', 'all');
+        $categoryId   = $this->queryText($request, 'category_id');
+        $sortBy       = $this->queryText($request, 'sort', self::DEFAULT_SORT);
+        $sortDir      = $this->queryText($request, 'direction', self::DEFAULT_DIRECTION);
         $lowStock     = $request->boolean('low_stock');
         $expiringLots = $request->boolean('expiring_lots');
 
-        $records = EntityProduct::query()
+        // Normalizados: valor fora da whitelist cai no padrão (a UI mostra o
+        // que foi realmente aplicado). category_id não-UUID quebraria o
+        // PostgreSQL (coluna uuid) — vira "todas as categorias".
+        $status     = in_array($status, self::STATUSES, true) ? $status : 'all';
+        $categoryId = Str::isUuid($categoryId) ? $categoryId : '';
+        $sortBy     = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : self::DEFAULT_SORT;
+        $sortDir    = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : self::DEFAULT_DIRECTION;
+
+        $query = EntityProduct::query()
             ->where('entity_id', $entityId)
             ->with(['category', 'lots' => fn ($q) => $q->active()->withBalance()->orderBy('expiry_date')])
             ->when($search !== '', function ($query) use ($search) {
@@ -57,8 +97,16 @@ class ProductsController extends Controller
             // 30 dias fixo por ora — o dono do SaaS pode querer configurar
             // esse limiar por clínica no futuro; não é pedido hoje.
             ->when($expiringLots, fn ($query) => $query->withExpiringLots(30))
-            ->orderBy('name')
-            ->paginate(15)
+            // NULLS LAST: sale_price é anulável e o PostgreSQL põe NULL
+            // primeiro em DESC — "Preço ↓" abriria com itens sem preço. Em
+            // ASC é o padrão do banco (ordem de sempre inalterada). Coluna e
+            // direção vêm só da whitelist acima, nunca crus do request.
+            ->orderByRaw(self::SORTABLE[$sortBy] . ' ' . $sortDir . ' NULLS LAST')
+            // `id` desempata valores iguais (nome, saldo, preço...) — sem ele
+            // a ordem entre páginas não é determinística no PostgreSQL.
+            ->orderBy('entity_products.id');
+
+        $records = $this->paginateClamped($query, 15)
             ->withQueryString()
             ->through(fn (EntityProduct $record) => (new EntityProductResource($record))->resolve());
 
@@ -83,7 +131,10 @@ class ProductsController extends Controller
                 'category_id'   => $categoryId,
                 'low_stock'     => $lowStock,
                 'expiring_lots' => $expiringLots,
+                'sort'          => $sortBy,
+                'direction'     => $sortDir,
             ],
+            't'      => trans('stock_products'),
             'routes' => [
                 'index'           => route('panel.stock.products.index'),
                 'store'           => route('panel.stock.products.store'),
@@ -115,7 +166,7 @@ class ProductsController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $term = $request->string('q')->trim()->value();
+        $term = $this->queryText($request, 'q');
 
         if (mb_strlen($term, 'UTF-8') < 2) {
             return response()->json(['data' => []]);
@@ -164,7 +215,7 @@ class ProductsController extends Controller
      */
     public function scanBarcode(Request $request): JsonResponse
     {
-        $barcode = $request->string('barcode')->trim()->value();
+        $barcode = $this->queryText($request, 'barcode');
 
         if ($barcode === '') {
             return response()->json(['message' => __('stock.barcode_required')], 422);
@@ -196,8 +247,7 @@ class ProductsController extends Controller
             EntityProduct::create($data);
         });
 
-        return redirect()
-            ->route('panel.stock.products.index')
+        return $this->redirectToListing('panel.stock.products.index', self::LISTING_PARAMS)
             ->with('message', __('stock.product_created'));
     }
 
@@ -207,8 +257,7 @@ class ProductsController extends Controller
 
         $entityProduct->update($request->validated());
 
-        return redirect()
-            ->route('panel.stock.products.index')
+        return $this->redirectToListing('panel.stock.products.index', self::LISTING_PARAMS)
             ->with('message', __('stock.product_updated'));
     }
 
@@ -218,9 +267,36 @@ class ProductsController extends Controller
 
         $entityProduct->delete();
 
-        return redirect()
-            ->route('panel.stock.products.index')
+        return $this->redirectToListing('panel.stock.products.index', self::LISTING_PARAMS)
             ->with('message', __('stock.product_deleted'));
+    }
+
+    /**
+     * Pagina e, se a página pedida passou da última (ex.: excluiu o único
+     * produto da última página e o redirect manteve ?page=N), usa a última
+     * válida — mesmo padrão de DoctorsController::paginateClamped().
+     */
+    private function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage);
+
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        return $paginator;
+    }
+
+    /**
+     * Parâmetro de query como texto (trim). Valor não textual (ex.:
+     * `?sort[]=x`) vira o padrão em vez de estourar "Array to string
+     * conversion" (500) em `$request->string()`.
+     */
+    private function queryText(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->query($key, $default);
+
+        return is_string($value) ? trim($value) : $default;
     }
 
     private function assertOwnership(EntityProduct $entityProduct): void

@@ -7,7 +7,8 @@ namespace App\Http\Controllers\Setting;
 use App\DTOs\ActionPolicy;
 use App\Http\Controllers\Controller;
 use App\Services\BaseSettingService;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\{Builder, Model};
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,9 @@ use Inertia\{Inertia, Response as InertiaResponse};
  */
 abstract class BaseSettingController extends Controller
 {
+    /** Registros por página na listagem (mesmo tamanho das demais tabelas do painel). */
+    protected const PER_PAGE = 15;
+
     protected BaseSettingService $service;
 
     protected string $resourceClass;
@@ -150,10 +154,12 @@ abstract class BaseSettingController extends Controller
             'items'   => $this->fetchTableRows($request),
             'filters' => [
                 'search' => $request->string('search')->trim()->value(),
-                'sort'   => $request->string('sort', 'name')->value(),
-                'dir'    => $request->string('dir', 'asc')->value(),
+                ...$this->resolveSort($request),
             ],
-            't' => trans('catalog_setting'),
+            // Colunas que o backend aceita ordenar (mesma whitelist de
+            // resolveSort) — a UI só mostra cabeçalho clicável nessas.
+            'sortable' => $this->sortableKeys(),
+            't'        => trans('catalog_setting'),
         ]);
     }
 
@@ -163,20 +169,14 @@ abstract class BaseSettingController extends Controller
      */
     public function cards(Request $request): JsonResponse
     {
-        $class    = $this->service->getModelClass();
-        $search   = $request->string('search')->trim()->value();
-        $perPage  = 12;
         $entityId = session('selected_entity_id');
 
-        $records = $class::query()
-            ->where(
-                fn ($q) => $q
-                    ->where('entity_id', $entityId)
-                    ->orWhereNull('entity_id'),
-            )
-            ->when($search, fn ($q) => $q->whereLikeUnaccent('name', $search))
-            ->orderBy('name')
-            ->paginate($perPage);
+        // Mesmo recorte da tabela (inclui excluídos da clínica → "Restaurar" e
+        // total iguais nos dois modos) e mesma volta à última página válida.
+        $records = $this->paginateClamped(
+            $this->listQuery($request->string('search')->trim()->value())->orderBy('name')->orderBy('id'),
+            12,
+        );
 
         return response()->json([
             'data' => $records->map(fn ($r) => array_merge(
@@ -288,47 +288,90 @@ abstract class BaseSettingController extends Controller
      * que importam; nós montamos o payload a partir delas. Isso evita escrever
      * `toTableRow` em cada catálogo (11 implementações idênticas).
      */
-    protected function fetchTableRows(Request $request): array
+    protected function fetchTableRows(Request $request): LengthAwarePaginator
+    {
+        $entityId                        = session('selected_entity_id');
+        ['sort' => $sort, 'dir' => $dir] = $this->resolveSort($request);
+
+        // `id` desempata nomes iguais — sem ele a ordem entre páginas não é
+        // determinística no PostgreSQL e registros repetem/somem na paginação.
+        $query = $this->listQuery($request->string('search')->trim()->value())
+            ->orderBy($sort, $dir)
+            ->orderBy('id');
+
+        // onEachSide(1): com ~66 páginas (980 convênios globais) a janela padrão (3)
+        // gera 15 links e corta "próxima"/última página em celular de 375px.
+        $paginator = $this->paginateClamped($query, static::PER_PAGE)->onEachSide(1)->withQueryString();
+
+        return $paginator->through(fn ($r) => array_merge(
+            $this->serializeRecord($r),
+            ActionPolicy::from($r, $entityId)->toArray(),
+        ));
+    }
+
+    /**
+     * Registros visíveis na listagem (tabela e cards): da clínica ativa ou
+     * globais, incluindo excluídos (a UI mostra "Removido"/"Restaurar"),
+     * filtrados por nome ou código.
+     */
+    protected function listQuery(string $search): Builder
     {
         $class    = $this->service->getModelClass();
         $entityId = session('selected_entity_id');
-        $search   = $request->string('search')->trim()->value();
-        $sort     = $request->string('sort', 'name')->value();
-        $dir      = $request->string('dir', 'asc')->value() === 'desc' ? 'desc' : 'asc';
 
-        $sortable = collect($this->getColumns())
+        return $class::query()
+            ->withTrashed()
+            ->where(fn ($q) => $q->where('entity_id', $entityId)->orWhereNull('entity_id'))
+            ->when($search !== '', fn ($q) => $q->where(
+                fn ($w) => $w->whereLikeUnaccent('name', $search)->orWhereLikeUnaccent('code', $search),
+            ));
+    }
+
+    /**
+     * Pagina e, se a página pedida passou da última (ex.: excluiu o único item
+     * da última página e o reload manteve ?page=N), devolve a última válida.
+     */
+    protected function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage);
+
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        return $paginator;
+    }
+
+    /**
+     * Colunas ordenáveis: as marcadas `sortable` pelo filho + name/code/created_at
+     * (existem em todos os catálogos). Whitelist — nunca ordena por input cru.
+     *
+     * @return list<string>
+     */
+    protected function sortableKeys(): array
+    {
+        return collect($this->getColumns())
             ->filter(fn ($c) => ($c['sortable'] ?? false) === true)
             ->pluck('key')
             ->push('name', 'code', 'created_at')
             ->unique()
+            ->values()
             ->all();
+    }
 
-        if (! \in_array($sort, $sortable, true)) {
-            $sort = 'name';
-        }
+    /**
+     * Ordenação pedida na query string, validada contra a whitelist.
+     *
+     * @return array{sort: string, dir: 'asc'|'desc'}
+     */
+    protected function resolveSort(Request $request): array
+    {
+        $sort = $request->string('sort', 'name')->value();
 
-        $query = $class::query()
-            ->withTrashed()
-            ->where(
-                fn ($q) => $q
-                    ->where('entity_id', $entityId)
-                    ->orWhereNull('entity_id'),
-            );
-
-        if ($search !== '') {
-            $query->where(function ($q) use ($search): void {
-                $q->whereLikeUnaccent('name', $search)
-                    ->orWhereLikeUnaccent('code', $search);
-            });
-        }
-
-        return $query->orderBy($sort, $dir)
-            ->get()
-            ->map(fn ($r) => array_merge(
-                $this->serializeRecord($r),
-                ActionPolicy::from($r, $entityId)->toArray(),
-            ))
-            ->all();
+        return [
+            'sort' => \in_array($sort, $this->sortableKeys(), true) ? $sort : 'name',
+            'dir'  => $request->string('dir', 'asc')->value() === 'desc' ? 'desc' : 'asc',
+        ];
     }
 
     /**

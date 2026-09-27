@@ -35,11 +35,14 @@ it('index() lista produtos ativos com saldo atual', function () {
 
     $res = actingAsCountAdmin($this)->get(route('panel.stock.counts.index'));
 
+    // `products` virou paginator (listagem no padrão de pacientes: tabela e
+    // cards leem o mesmo `products.data`).
     $res->assertOk();
     $res->assertInertia(fn ($page) => $page
         ->component('Panel/Stock/Counts/Index')
-        ->has('products', 1)
-        ->where('products.0.name', 'Lente IOL'));
+        ->has('products.data', 1)
+        ->where('products.total', 1)
+        ->where('products.data.0.name', 'Lente IOL'));
 });
 
 it('[GAP] store() aplica contagem MAIOR que o saldo — gera adjustment_in', function () {

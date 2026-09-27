@@ -19,6 +19,8 @@ const props = defineProps({
     columns:    { type: Array,   required: true }, // [{ key, label, hidden? }] na ordem atual
     title:      { type: String,  default: 'Ordem das colunas' },
     toggleable: { type: Boolean, default: false },
+    // Rótulos traduzidos (opcional) — sem eles, mantém os textos PT de sempre.
+    labels:     { type: Object,  default: () => ({}) },
 });
 
 const emit = defineEmits(['move', 'reset', 'toggle']);
@@ -69,34 +71,34 @@ function onDragEnd() {
                     @drop="onDrop(index)"
                     @dragend="onDragEnd"
                 >
-                    <i class="ti ti-grip-vertical text-muted column-order-grip"></i>
+                    <i class="ti ti-grip-vertical text-muted column-order-grip" aria-hidden="true"></i>
                     <span class="flex-grow-1 small text-truncate">{{ col.label }}</span>
                     <button
                         v-if="toggleable"
                         type="button"
                         class="btn btn-sm btn-link p-1 text-muted lh-1"
-                        :title="col.hidden ? 'Mostrar' : 'Ocultar'"
-                        @click="$emit('toggle', col.key)"
+                        :title="col.hidden ? (labels.show ?? 'Mostrar') : (labels.hide ?? 'Ocultar')"
+                        @click.stop="$emit('toggle', col.key)"
                     >
-                        <i class="ti fs-14" :class="col.hidden ? 'ti-eye-off' : 'ti-eye'"></i>
+                        <i class="ti fs-14" :class="col.hidden ? 'ti-eye-off' : 'ti-eye'" aria-hidden="true"></i>
                     </button>
                     <button
                         type="button"
                         class="btn btn-sm btn-link p-1 text-muted lh-1"
                         :disabled="index === 0"
-                        title="Mover para cima"
-                        @click="$emit('move', index, index - 1)"
+                        :title="labels.moveUp ?? 'Mover para cima'"
+                        @click.stop="$emit('move', index, index - 1)"
                     >
-                        <i class="ti ti-chevron-up fs-14"></i>
+                        <i class="ti ti-chevron-up fs-14" aria-hidden="true"></i>
                     </button>
                     <button
                         type="button"
                         class="btn btn-sm btn-link p-1 text-muted lh-1"
                         :disabled="index === columns.length - 1"
-                        title="Mover para baixo"
-                        @click="$emit('move', index, index + 1)"
+                        :title="labels.moveDown ?? 'Mover para baixo'"
+                        @click.stop="$emit('move', index, index + 1)"
                     >
-                        <i class="ti ti-chevron-down fs-14"></i>
+                        <i class="ti ti-chevron-down fs-14" aria-hidden="true"></i>
                     </button>
                 </li>
             </ul>
@@ -106,7 +108,7 @@ function onDragEnd() {
                 class="btn btn-sm btn-outline-secondary w-100"
                 @click="$emit('reset')"
             >
-                <i class="ti ti-restore me-1"></i>Restaurar padrão
+                <i class="ti ti-restore me-1" aria-hidden="true"></i>{{ labels.reset ?? 'Restaurar padrão' }}
             </button>
         </div>
     </li>

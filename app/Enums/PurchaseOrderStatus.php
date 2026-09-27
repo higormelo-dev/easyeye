@@ -21,13 +21,8 @@ enum PurchaseOrderStatus: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Draft             => 'Rascunho',
-            self::Sent              => 'Enviado ao fornecedor',
-            self::PartiallyReceived => 'Recebido parcialmente',
-            self::Received          => 'Recebido',
-            self::Cancelled         => 'Cancelado',
-        };
+        // Texto em lang/{locale}/stock_enums.php (pt_BR mantém os rótulos de sempre).
+        return __("stock_enums.purchase_order_statuses.{$this->value}");
     }
 
     /** Itens só podem ser adicionados/editados/removidos em rascunho. */

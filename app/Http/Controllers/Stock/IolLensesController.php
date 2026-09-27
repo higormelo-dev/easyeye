@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Stock;
 
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\EntityIolLensRequest;
 use App\Http\Resources\EntityIolLensResource;
 use App\Models\EntityIolLens;
 use App\Services\{IolLensCatalogService, IolLensStockBridgeService};
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Storage;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -46,23 +49,59 @@ use Inertia\{Inertia, Response as InertiaResponse};
  */
 class IolLensesController extends Controller
 {
+    use RedirectsToListing;
+
+    /**
+     * Parâmetros da listagem preservados ao voltar de criar/editar/ativar/
+     * excluir (RedirectsToListing) — busca, status, ordenação e página.
+     */
+    private const LISTING_PARAMS = ['search', 'status', 'sort', 'direction', 'page'];
+
     public function __construct(
         private readonly IolLensCatalogService $catalogService,
         private readonly IolLensStockBridgeService $bridge,
     ) {
     }
 
+    /**
+     * Colunas ordenáveis da listagem (whitelist) → coluna real no banco
+     * (da lente ou do produto de estoque vinculado, via JOIN do index()).
+     */
+    private const SORTABLE = [
+        'manufacturer' => 'entity_products.manufacturer',
+        'model_name'   => 'entity_products.name',
+        'category'     => 'entity_iol_lenses.category',
+        'diopter_min'  => 'entity_iol_lenses.diopter_min',
+        'price'        => 'entity_products.sale_price',
+        'qty_on_hand'  => 'entity_products.qty_on_hand',
+    ];
+
+    /** Ordem padrão = a de sempre da tela (fabricante, depois modelo). */
+    private const DEFAULT_SORT = 'manufacturer';
+
+    private const DEFAULT_DIRECTION = 'asc';
+
+    private const STATUSES = ['all', 'active', 'inactive'];
+
     public function index(Request $request): InertiaResponse
     {
         $entityId = (string) session('selected_entity_id');
-        $search   = $request->string('search')->trim()->value();
-        $status   = $request->string('status', 'all')->value(); // active|inactive|all
+        $search   = $this->queryText($request, 'search');
+        $status   = $this->queryText($request, 'status', 'all');
+        $sortBy   = $this->queryText($request, 'sort', self::DEFAULT_SORT);
+        $sortDir  = $this->queryText($request, 'direction', self::DEFAULT_DIRECTION);
+
+        // Normalizados: valor fora da whitelist cai no padrão (a UI mostra o
+        // que foi realmente aplicado).
+        $status  = in_array($status, self::STATUSES, true) ? $status : 'all';
+        $sortBy  = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : self::DEFAULT_SORT;
+        $sortDir = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : self::DEFAULT_DIRECTION;
 
         // JOIN (não whereHas) pra poder ORDENAR por manufacturer/name do
         // produto vinculado — Eloquent não ordena por coluna de relação sem
         // join explícito. `select('entity_iol_lenses.*')` evita ambiguidade
         // de colunas homônimas (id/created_at/etc.) entre as duas tabelas.
-        $records = EntityIolLens::query()
+        $query = EntityIolLens::query()
             ->join('entity_products', 'entity_products.id', '=', 'entity_iol_lenses.entity_product_id')
             ->where('entity_iol_lenses.entity_id', $entityId)
             ->with('entityProduct:id,name,manufacturer,code,unit,qty_on_hand,sale_price,image_path,active')
@@ -74,10 +113,19 @@ class IolLensesController extends Controller
             })
             ->when($status === 'active', fn ($query) => $query->where('entity_products.active', true))
             ->when($status === 'inactive', fn ($query) => $query->where('entity_products.active', false))
-            ->orderBy('entity_products.manufacturer')
-            ->orderBy('entity_products.name')
-            ->select('entity_iol_lenses.*')
-            ->paginate(12)
+            // NULLS LAST: fabricante/tipo/dioptria/valor são anuláveis e o
+            // PostgreSQL põe NULL primeiro em DESC. Em ASC é o padrão do
+            // banco (ordem de sempre inalterada). Coluna e direção vêm só da
+            // whitelist acima, nunca crus do request.
+            ->orderByRaw(self::SORTABLE[$sortBy] . ' ' . $sortDir . ' NULLS LAST')
+            // Padrão de sempre: dentro do mesmo fabricante, modelo A→Z.
+            ->when($sortBy === 'manufacturer', fn ($query) => $query->orderBy('entity_products.name'))
+            // `id` desempata valores iguais — sem ele a ordem entre páginas
+            // não é determinística no PostgreSQL.
+            ->orderBy('entity_iol_lenses.id')
+            ->select('entity_iol_lenses.*');
+
+        $records = $this->paginateClamped($query, 12)
             ->withQueryString()
             // `->through()` preserva o paginator (current_page/last_page/
             // total/links) e só troca os itens — mesmo idioma usado em
@@ -97,9 +145,12 @@ class IolLensesController extends Controller
             ],
             'items'   => $records,
             'filters' => [
-                'search' => $search,
-                'status' => $status,
+                'search'    => $search,
+                'status'    => $status,
+                'sort'      => $sortBy,
+                'direction' => $sortDir,
             ],
+            't'      => trans('stock_iollenses'),
             'routes' => [
                 'index'  => route('panel.stock.iollenses.index'),
                 'store'  => route('panel.stock.iollenses.store'),
@@ -110,6 +161,8 @@ class IolLensesController extends Controller
                 'show'    => route('panel.stock.iollenses.show', ['__ID__']),
                 'update'  => route('panel.stock.iollenses.update', ['__ID__']),
                 'destroy' => route('panel.stock.iollenses.destroy', ['__ID__']),
+                // Atalho "Movimentações da lente" (filtra pelo produto vinculado).
+                'movements_index' => route('panel.stock.movements.index'),
             ],
         ]);
     }
@@ -162,8 +215,7 @@ class IolLensesController extends Controller
 
         $this->bridge->create($entityId, $data);
 
-        return redirect()
-            ->route('panel.stock.iollenses.index')
+        return $this->redirectToListing('panel.stock.iollenses.index', self::LISTING_PARAMS)
             ->with('message', __('catalog_setting.created'));
     }
 
@@ -197,8 +249,7 @@ class IolLensesController extends Controller
 
         $this->bridge->update($entityIolLens, $data);
 
-        return redirect()
-            ->route('panel.stock.iollenses.index')
+        return $this->redirectToListing('panel.stock.iollenses.index', self::LISTING_PARAMS)
             ->with('message', __('catalog_setting.updated'));
     }
 
@@ -208,8 +259,7 @@ class IolLensesController extends Controller
 
         $this->bridge->delete($entityIolLens);
 
-        return redirect()
-            ->route('panel.stock.iollenses.index')
+        return $this->redirectToListing('panel.stock.iollenses.index', self::LISTING_PARAMS)
             ->with('message', __('catalog_setting.deleted'));
     }
 
@@ -221,7 +271,7 @@ class IolLensesController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $term = $request->string('q')->trim()->value();
+        $term = $this->queryText($request, 'q');
 
         if (mb_strlen($term, 'UTF-8') < 2) {
             return response()->json(['data' => []]);
@@ -239,6 +289,35 @@ class IolLensesController extends Controller
                 'label'        => trim($model->manufacturer . ' ' . $model->model_name),
             ])->values(),
         ]);
+    }
+
+    /**
+     * Pagina e, se a página pedida passou da última (ex.: excluiu a única
+     * lente da última página e o redirect manteve ?page=N), usa a última
+     * válida — mesmo padrão de DoctorsController::paginateClamped(). O clone
+     * leva junto o JOIN e o select('entity_iol_lenses.*').
+     */
+    private function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage);
+
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        return $paginator;
+    }
+
+    /**
+     * Parâmetro de query como texto (trim). Valor não textual (ex.:
+     * `?sort[]=x`) vira o padrão em vez de estourar "Array to string
+     * conversion" (500) em `$request->string()`.
+     */
+    private function queryText(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->query($key, $default);
+
+        return is_string($value) ? trim($value) : $default;
     }
 
     private function assertOwnership(EntityIolLens $entityIolLens): void

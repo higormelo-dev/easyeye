@@ -1,5 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
 
 /**
  * TablePagination — Paginação Inertia para tabelas server-side.
@@ -10,6 +11,8 @@ import { Link } from '@inertiajs/vue3';
  *   showingFrom   – prefixo "Exibindo"
  *   showingOf     – conector "de"
  *   showingSuffix – sufixo (ex: "empresas", "planos")
+ *   ariaLabel / previousLabel / nextLabel – rótulos acessíveis (opcionais,
+ *                   traduzidos pelo chamador) da <nav> e das setas
  *
  * Não exibe nada quando last_page === 1.
  */
@@ -18,7 +21,13 @@ defineProps({
     showingFrom:   { type: String,  default: 'Exibindo' },
     showingOf:     { type: String,  default: 'de' },
     showingSuffix: { type: String,  default: '' },
+    ariaLabel:     { type: String,  default: 'Paginação' },
+    previousLabel: { type: String,  default: 'Anterior' },
+    nextLabel:     { type: String,  default: 'Próxima' },
 });
+
+// Números no formato do idioma (1234 → "1.234" em pt-BR).
+const { number } = useLocaleFormat();
 </script>
 
 <template>
@@ -28,21 +37,22 @@ defineProps({
     >
         <!-- Range label -->
         <p class="text-muted small mb-0">
-            {{ showingFrom }} {{ data.from }}–{{ data.to }}
-            {{ showingOf }} {{ data.total }} {{ showingSuffix }}
+            {{ showingFrom }} {{ number(data.from) }}–{{ number(data.to) }}
+            {{ showingOf }} {{ number(data.total) }} {{ showingSuffix }}
         </p>
 
         <!-- Page links -->
-        <nav>
+        <nav :aria-label="ariaLabel">
             <ul class="pagination pagination-sm mb-0">
                 <!-- Previous -->
                 <li class="page-item" :class="{ disabled: data.current_page === 1 }">
                     <Link
                         class="page-link"
                         :href="data.prev_page_url ?? '#'"
+                        :aria-label="previousLabel"
                         preserve-scroll
                         preserve-state
-                    ><i class="ti ti-arrow-left"></i></Link>
+                    ><i class="ti ti-arrow-left" aria-hidden="true"></i></Link>
                 </li>
 
                 <!-- Page numbers -->
@@ -51,6 +61,7 @@ defineProps({
                         <Link
                             class="page-link"
                             :href="link.url ?? '#'"
+                            :aria-current="link.active ? 'page' : undefined"
                             preserve-scroll
                             preserve-state
                             v-html="link.label"
@@ -63,9 +74,10 @@ defineProps({
                     <Link
                         class="page-link"
                         :href="data.next_page_url ?? '#'"
+                        :aria-label="nextLabel"
                         preserve-scroll
                         preserve-state
-                    ><i class="ti ti-arrow-right"></i></Link>
+                    ><i class="ti ti-arrow-right" aria-hidden="true"></i></Link>
                 </li>
             </ul>
         </nav>

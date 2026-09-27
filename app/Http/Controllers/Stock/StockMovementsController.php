@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Stock;
 
 use App\Enums\StockMovementType;
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StockMovementRequest;
 use App\Http\Resources\StockMovementResource;
 use App\Models\{EntityProduct, StockLot, StockMovement};
 use App\Services\Stock\StockService;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\{RedirectResponse, Request};
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\{Inertia, Response as InertiaResponse};
 
 /**
@@ -24,24 +29,60 @@ use Inertia\{Inertia, Response as InertiaResponse};
  */
 class StockMovementsController extends Controller
 {
+    use RedirectsToListing;
+
+    /** Parâmetros da listagem preservados ao voltar do lançamento (RedirectsToListing). */
+    private const LISTING_PARAMS = ['search', 'entity_product_id', 'type', 'sort', 'direction', 'page'];
+
     public function __construct(
         private readonly StockService $stockService,
     ) {
     }
 
+    /**
+     * Colunas ordenáveis (whitelist) → coluna real no banco. `product`
+     * ordena pelo nome do produto via subquery (ver sortExpression()), sem
+     * join — o eager load de product/creator/lot continua igual.
+     */
+    private const SORTABLE = [
+        'occurred_at'   => 'stock_movements.occurred_at',
+        'product'       => 'entity_products.name',
+        'quantity'      => 'stock_movements.quantity',
+        'unit_cost'     => 'stock_movements.unit_cost',
+        'balance_after' => 'stock_movements.balance_after',
+    ];
+
+    private const DEFAULT_SORT = 'occurred_at';
+
+    private const DEFAULT_DIRECTION = 'desc';
+
     public function index(Request $request): InertiaResponse
     {
         $entityId  = (string) session('selected_entity_id');
-        $productId = $request->string('entity_product_id')->trim()->value();
-        $type      = $request->string('type')->trim()->value();
+        $search    = $this->stringParam($request, 'search');
+        $productId = $this->stringParam($request, 'entity_product_id');
+        $type      = StockMovementType::tryFrom($this->stringParam($request, 'type'))?->value ?? '';
+        $sortBy    = $this->stringParam($request, 'sort', self::DEFAULT_SORT);
+        $sortDir   = $this->stringParam($request, 'direction', self::DEFAULT_DIRECTION);
+
+        // Coluna uuid no PostgreSQL: valor fora do formato derrubava a tela (500).
+        $productId = Str::isUuid($productId) ? $productId : '';
+        $sortBy    = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : self::DEFAULT_SORT;
+        $sortDir   = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : self::DEFAULT_DIRECTION;
+
+        // Desempate: created_at (ordem de lançamento, como sempre foi) e por
+        // fim o id — sem ele a paginação não é determinística no PostgreSQL.
+        $tieDirection = $sortBy === 'occurred_at' ? $sortDir : 'desc';
 
         $records = StockMovement::query()
-            ->where('entity_id', $entityId)
+            ->where('stock_movements.entity_id', $entityId)
             ->with(['product', 'creator', 'lot'])
-            ->when($productId !== '', fn ($query) => $query->where('entity_product_id', $productId))
-            ->when($type !== '', fn ($query) => $query->where('type', $type))
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('created_at')
+            ->when($productId !== '', fn (Builder $query) => $query->where('stock_movements.entity_product_id', $productId))
+            ->when($type !== '', fn (Builder $query) => $query->where('stock_movements.type', $type))
+            ->when($search !== '', fn (Builder $query) => $this->applySearch($query, $search))
+            ->orderBy($this->sortExpression($sortBy), $sortDir)
+            ->orderBy('stock_movements.created_at', $tieDirection)
+            ->orderBy('stock_movements.id', $tieDirection)
             ->paginate(20)
             ->withQueryString()
             ->through(fn (StockMovement $record) => (new StockMovementResource($record))->resolve());
@@ -58,6 +99,14 @@ class StockMovementsController extends Controller
                 ->active()
                 ->orderBy('name')
                 ->get(['id', 'name', 'code', 'unit', 'qty_on_hand', 'requires_lot']),
+            // Produto do filtro, mesmo INATIVO (atalho vindo de Produtos): o
+            // select só tem os ativos e ficaria em branco. Escopado pela
+            // clínica — id de outra clínica volta null (não vaza o nome).
+            'filteredProduct' => $productId === '' ? null : EntityProduct::query()
+                ->where('entity_id', $entityId)
+                ->whereKey($productId)
+                ->first(['id', 'name'])
+                ?->only(['id', 'name']),
             // Lotes com saldo > 0 de TODOS os produtos ativos, agrupados por
             // produto — o form escolhe o grupo certo no client ao trocar o
             // produto selecionado, sem round-trip extra. Ordenado por
@@ -76,12 +125,22 @@ class StockMovementsController extends Controller
                     'qty_on_hand' => (float) $l->qty_on_hand,
                     'is_expired'  => $l->isExpired(),
                 ])->values()),
+            // Form de lançamento: só os tipos manuais (ver manualTypes()).
             'movementTypes' => collect(StockMovementType::manualTypes())
-                ->map(fn ($t) => ['value' => $t->value, 'label' => $t->label(), 'direction' => $t->direction()])
+                ->map(fn (StockMovementType $t) => $this->typeOption($t))
                 ->values(),
+            // Filtro da listagem: TODOS os tipos — o extrato também tem
+            // entradas por compra e consumos de procedimento.
+            'filterTypes' => collect(StockMovementType::cases())
+                ->map(fn (StockMovementType $t) => $this->typeOption($t))
+                ->values(),
+            // Normalizados: a UI mostra a ordenação/filtro realmente aplicados.
             'filters' => [
+                'search'            => $search,
                 'entity_product_id' => $productId,
                 'type'              => $type,
+                'sort'              => $sortBy,
+                'direction'         => $sortDir,
             ],
             'routes' => [
                 'index'          => route('panel.stock.movements.index'),
@@ -91,6 +150,7 @@ class StockMovementsController extends Controller
                 // barras, ver ProductsController::scanBarcode().
                 'scan_barcode' => route('panel.stock.products.scan-barcode'),
             ],
+            't' => trans('stock_movements'),
         ]);
     }
 
@@ -126,8 +186,51 @@ class StockMovementsController extends Controller
             lot: $lot,
         );
 
-        return redirect()
-            ->route('panel.stock.movements.index')
+        // Volta para o extrato com a busca/filtros/ordem/página de antes (só
+        // parâmetros da whitelist, URL montada pela nossa rota — ver trait).
+        return $this->redirectToListing('panel.stock.movements.index', self::LISTING_PARAMS)
             ->with('message', __('stock.movement_registered'));
+    }
+
+    /** Busca por produto (nome/código/código de barras), lote ou observação. */
+    private function applySearch(Builder $query, string $search): Builder
+    {
+        return $query->where(fn (Builder $w) => $w
+            ->whereHas('product', fn (Builder $p) => $p->where(fn (Builder $pp) => $pp
+                ->whereLikeUnaccent('entity_products.name', $search)
+                ->orWhereLikeUnaccent('entity_products.code', $search)
+                ->orWhereLikeUnaccent('entity_products.barcode', $search)))
+            ->orWhereHas('lot', fn (Builder $l) => $l->whereLikeUnaccent('stock_lots.lot_number', $search))
+            ->orWhereLikeUnaccent('stock_movements.note', $search));
+    }
+
+    /** Coluna (ou subquery, para o nome do produto) usada no ORDER BY. */
+    private function sortExpression(string $sortBy): string|QueryBuilder
+    {
+        if ($sortBy !== 'product') {
+            return self::SORTABLE[$sortBy];
+        }
+
+        return DB::table('entity_products')
+            ->select(self::SORTABLE['product'])
+            ->whereColumn('entity_products.id', 'stock_movements.entity_product_id');
+    }
+
+    /** @return array{value: string, label: string, direction: int} */
+    private function typeOption(StockMovementType $type): array
+    {
+        return [
+            'value'     => $type->value,
+            'label'     => $type->label(), // lang/{locale}/stock_enums.php
+            'direction' => $type->direction(),
+        ];
+    }
+
+    /** Parâmetro de query como string; array/objeto (ex.: `sort[]=x`) volta ao padrão. */
+    private function stringParam(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->input($key, $default);
+
+        return is_string($value) ? trim($value) : $default;
     }
 }

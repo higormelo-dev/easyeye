@@ -80,6 +80,8 @@ class HandleInertiaRequests extends Middleware
                 'success' => session('success'),
                 'error'   => session('error'),
                 'status'  => session('status'),
+                // Vários controllers (ex.: Stock/*, Doctors) usam ->with('message').
+                'message' => session('message'),
                 // Prontuário: ação da barra a abrir após o 1º save (one-shot).
                 'post_save_action' => session('post_save_action'),
             ],
@@ -118,6 +120,10 @@ class HandleInertiaRequests extends Middleware
             // Carregadas em todo request para que o ConfirmationWithReasonModal
             // funcione em qualquer página sem precisar passar t={} manualmente.
             't_hardening' => fn () => trans('manager_hardening'),
+
+            // Textos dos componentes compartilhados (rótulo "Fechar" dos modais,
+            // "Carregando..."), no idioma do usuário em qualquer página.
+            't_ui' => fn () => trans('ui'),
         ];
     }
 

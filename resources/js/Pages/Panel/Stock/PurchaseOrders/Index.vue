@@ -1,172 +1,267 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { router, usePage, Link } from '@inertiajs/vue3';
-import AppLayout        from '@/Layouts/AppLayout.vue';
-import PageHeader       from '@/Components/Panel/PageHeader.vue';
-import TablePagination  from '@/Components/Panel/TablePagination.vue';
-import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import PurchaseOrderFormModal   from './PurchaseOrderFormModal.vue';
+import AppLayout          from '@/Layouts/AppLayout.vue';
+import PageHeader         from '@/Components/Panel/PageHeader.vue';
+import SearchInput        from '@/Components/Panel/SearchInput.vue';
+import { useViewMode }    from '@/composables/useViewMode.js';
+import { useTrans }       from '@/composables/useTrans.js';
+import PurchaseOrderTable from './PurchaseOrderTable.vue';
+import PurchaseOrderCards from './PurchaseOrderCards.vue';
+import PurchaseOrderFormModal    from './PurchaseOrderFormModal.vue';
 import ReceivePurchaseOrderModal from './ReceivePurchaseOrderModal.vue';
 
+/**
+ * Listagem de pedidos de compra — mesmo layout de Panel/Patients/Index:
+ * cabeçalho com total, alternância tabela/cards (persistida no navegador),
+ * busca + filtros de status/fornecedor que preservam a ordenação, tabela/
+ * cards com as mesmas ações por status. Textos vêm de
+ * lang/{locale}/stock_purchase_orders.php (prop `t`).
+ */
 const props = defineProps({
     breadcrumbs:   { type: Array,  default: () => [] },
     items:         { type: Object, required: true },
     suppliers:     { type: Array,  default: () => [] },
+    // Fornecedor filtrado fora de `suppliers` (inativo), já escopado pela clínica: { id, name } | null.
+    selectedSupplier: { type: Object, default: null },
+    // Opções do filtro de status com rótulo traduzido (PurchaseOrderStatus::label()): [{ value, label }].
+    statuses:      { type: Array,  default: () => [] },
     products:      { type: Array,  default: () => [] },
     lotsByProduct: { type: Object, default: () => ({}) },
-    filters:       { type: Object, default: () => ({}) },
+    filters:       { type: Object, default: () => ({}) },   // { search, status, supplier_id, sort, direction }
     routes:        { type: Object, required: true },
+    t:             { type: Object, default: () => ({}) },
 });
+
+const { tx } = useTrans(() => props.t);
 
 const page = usePage();
 const flashMessage = computed(() => page.props?.flash?.message ?? null);
 
-const status     = ref(props.filters?.status ?? 'all');
-const supplierId = ref(props.filters?.supplier_id ?? '');
+// Fechar o aviso é estado local (nunca data-bs-dismiss: o Bootstrap removeria
+// o nó que o Vue controla). Nova resposta com flash — mesmo texto repetido
+// numa segunda ação — mostra o aviso de novo.
+const flashDismissed = ref(false);
+watch([flashMessage, () => page.props?.flash], () => { flashDismissed.value = false; });
+// Falha de transição (enviar/cancelar/excluir) volta como erro de sessão.
+const statusError  = computed(() => page.props?.errors?.status ?? null);
+const loadError    = ref('');
 
-function applyFilters() {
-    router.get(props.routes.index, { status: status.value, supplier_id: supplierId.value }, { preserveState: true, preserveScroll: true, replace: true });
+// ── View toggle (preferência no navegador) ───────────────────────────────────
+const { view, setView } = useViewMode('stock_purchase_orders_view');
+
+// ── Busca (debounce), filtros e ordenação — cada um preserva os outros ──────
+const search     = ref(props.filters.search ?? '');
+const status     = ref(props.filters.status ?? 'all');
+const supplierId = ref(props.filters.supplier_id ?? '');
+let searchTimer = null;
+
+function visit(params, options = {}) {
+    router.get(props.routes.index, params, { preserveState: true, preserveScroll: true, ...options });
 }
-watch([status, supplierId], applyFilters);
 
-const STATUS_LABELS = {
-    draft: 'Rascunho', sent: 'Enviado ao fornecedor', partially_received: 'Recebido parcialmente', received: 'Recebido', cancelled: 'Cancelado',
-};
-const STATUS_BADGE = {
-    draft: 'badge-soft-secondary', sent: 'badge-soft-info text-info', partially_received: 'badge-soft-warning text-warning',
-    received: 'badge-soft-success text-success border border-success', cancelled: 'badge-soft-danger text-danger',
-};
+function currentParams(overrides = {}) {
+    return {
+        search:      search.value,
+        status:      status.value,
+        supplier_id: supplierId.value,
+        sort:        props.filters.sort,
+        direction:   props.filters.direction,
+        ...overrides,
+    };
+}
 
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => visit(currentParams(), { replace: true }), 400);
+});
+
+watch([status, supplierId], () => visit(currentParams(), { replace: true }));
+
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onSort({ sort, direction }) {
+    visit(currentParams({ sort, direction }));
+}
+
+// supplier_id fora da lista de ativos (atalho de um fornecedor inativo): a
+// opção precisa aparecer no select. Com o nome quando o backend o encontrou
+// na clínica (`selectedSupplier`); excluído, de outra clínica ou inexistente
+// (lista vazia) fica com rótulo neutro, sem afirmar nada sobre ele.
+const supplierUnlisted = computed(() => (
+    supplierId.value !== '' && !props.suppliers.some((s) => s.id === supplierId.value)
+));
+
+const supplierUnlistedLabel = computed(() => {
+    const selected = props.selectedSupplier;
+    if (selected?.id === supplierId.value && selected?.name) {
+        return props.t.filter_supplier_inactive
+            ? tx('filter_supplier_inactive', { name: selected.name })
+            : selected.name;
+    }
+
+    return props.t.filter_supplier_unlisted ?? supplierId.value;
+});
+
+// ── Form modal (rascunho) ────────────────────────────────────────────────────
 const formOpen = ref(false);
 const editItem = ref(null);
+
 function openCreate() { editItem.value = null; formOpen.value = true; }
+
 async function openEdit(po) {
-    const { data } = await window.axios.get(props.routes.show.replace('__ID__', po.id));
-    editItem.value = data.data;
-    formOpen.value = true;
+    loadError.value = '';
+    try {
+        const { data } = await window.axios.get(props.routes.show.replace('__ID__', po.id));
+        editItem.value = data.data;
+        formOpen.value = true;
+    } catch {
+        loadError.value = props.t.load_error ?? 'Não foi possível abrir o pedido.';
+    }
 }
+
 function onSaved() { formOpen.value = false; router.reload({ only: ['items'] }); }
 
+// ── Recebimento ──────────────────────────────────────────────────────────────
 const receiveOpen = ref(false);
 const receivingPo = ref(null);
+
 function openReceive(po) { receivingPo.value = po; receiveOpen.value = true; }
 function onReceived() { receiveOpen.value = false; router.reload({ only: ['items', 'products', 'lotsByProduct'] }); }
 
-function onSend(event, po) {
-    event?.stopPropagation?.();
-    if (!confirm(`Enviar o pedido ${po.code} ao fornecedor?`)) return;
+// ── Transições de status ─────────────────────────────────────────────────────
+function onSend(po) {
+    if (!confirm(tx('confirm_send', { code: po.code }))) return;
     router.post(props.routes.send.replace('__ID__', po.id), {}, { preserveScroll: true });
 }
 
-function onCancel(event, po) {
-    event?.stopPropagation?.();
-    if (!confirm(`Cancelar o pedido ${po.code}?`)) return;
+function onCancel(po) {
+    if (!confirm(tx('confirm_cancel', { code: po.code }))) return;
     router.post(props.routes.cancel.replace('__ID__', po.id), {}, { preserveScroll: true });
 }
 
-function onDelete(event, po) {
-    event?.stopPropagation?.();
-    if (!confirm(`Excluir o rascunho ${po.code}?`)) return;
+function onDelete(po) {
+    if (!confirm(tx('confirm_delete', { code: po.code }))) return;
     router.delete(props.routes.destroy.replace('__ID__', po.id), { preserveScroll: true });
 }
 
-function money(v) { return `R$ ${Number(v).toFixed(2)}`; }
+const pageTitle = computed(() => props.t.page_title ?? 'Pedidos de compra');
 </script>
 
 <template>
-    <AppLayout title="Pedidos de compra" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
+        <div class="page-stock-purchase-orders">
 
-            <PageHeader title="Pedidos de compra" :total="items.total">
+            <PageHeader
+                :title="pageTitle"
+                :total="items.total ?? 0"
+                :total-label="t.total_label ?? 'Total:'"
+                show-view-toggle
+                :view="view"
+                :view-table-title="t.view_table ?? 'Tabela'"
+                :view-cards-title="t.view_cards ?? 'Cards'"
+                @set-view="setView"
+            >
                 <template #actions>
-                    <Link :href="routes.suppliers_index" class="btn btn-outline-secondary btn-sm me-2">
-                        <i class="ti ti-truck-delivery me-1"></i>Fornecedores
-                    </Link>
-                    <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i>Novo pedido
-                    </button>
+                    <div class="d-flex align-items-center gap-2">
+                        <Link :href="routes.suppliers_index" class="btn btn-outline-secondary fs-13 btn-md">
+                            <i class="ti ti-truck-delivery me-1" aria-hidden="true"></i> {{ t.btn_suppliers ?? 'Fornecedores' }}
+                        </Link>
+                        <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
+                            <i class="ti ti-plus me-1" aria-hidden="true"></i> {{ t.btn_new ?? 'Novo pedido' }}
+                        </button>
+                    </div>
                 </template>
             </PageHeader>
 
-            <div v-if="flashMessage" class="alert alert-success alert-dismissible fade show mb-3">
-                <i class="ti ti-circle-check me-1"></i>{{ flashMessage }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+                <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
+                <button type="button" class="btn-close" :aria-label="t.close ?? 'Fechar'" @click="flashDismissed = true"></button>
             </div>
 
-            <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-                <select v-model="status" class="form-select form-select-sm" style="max-width: 220px;">
-                    <option value="all">Todos os status</option>
-                    <option value="draft">Rascunho</option>
-                    <option value="sent">Enviado ao fornecedor</option>
-                    <option value="partially_received">Recebido parcialmente</option>
-                    <option value="received">Recebido</option>
-                    <option value="cancelled">Cancelado</option>
+            <div v-if="statusError || loadError" class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+                <i class="ti ti-alert-triangle" aria-hidden="true"></i>
+                <span>{{ statusError ?? loadError }}</span>
+            </div>
+
+            <!-- Busca + filtros na mesma linha -->
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+                <SearchInput
+                    v-model="search"
+                    wrapper-class=""
+                    :placeholder="t.search_placeholder ?? 'Buscar...'"
+                    :clear-label="t.search_clear ?? 'Limpar busca'"
+                    max-width="280px"
+                />
+                <select
+                    v-model="status"
+                    class="form-select form-select-sm w-auto"
+                    :aria-label="t.filter_status_label ?? 'Filtrar por status'"
+                >
+                    <option value="all">{{ t.filter_status_all ?? 'Todos os status' }}</option>
+                    <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
                 </select>
-                <select v-model="supplierId" class="form-select form-select-sm" style="max-width: 220px;">
-                    <option value="">Todos os fornecedores</option>
+                <select
+                    v-model="supplierId"
+                    class="form-select form-select-sm w-auto stock-toolbar-select"
+                    :aria-label="t.filter_supplier_label ?? 'Filtrar por fornecedor'"
+                >
+                    <option value="">{{ t.filter_supplier_all ?? 'Todos os fornecedores' }}</option>
+                    <option v-if="supplierUnlisted" :value="supplierId">{{ supplierUnlistedLabel }}</option>
                     <option v-for="s in suppliers" :key="s.id" :value="s.id">{{ s.name }}</option>
                 </select>
             </div>
 
-            <div v-if="items.data.length === 0" class="text-center text-muted py-5">
-                <i class="ti ti-shopping-cart-off fs-1 d-block mb-2"></i>
-                Nenhum pedido de compra cadastrado.
-            </div>
-
-            <div v-else class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Fornecedor</th>
-                            <th>Data</th>
-                            <th class="text-end">Total</th>
-                            <th>Status</th>
-                            <th class="text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="po in items.data" :key="po.id" role="button" @click="po.is_editable ? openEdit(po) : null">
-                            <td class="text-muted small">{{ po.code }}</td>
-                            <td>{{ po.supplier_name }}</td>
-                            <td class="small">{{ po.order_date }}</td>
-                            <td class="text-end">{{ money(po.total_amount) }}</td>
-                            <td>
-                                <span class="badge rounded fs-11 fw-medium" :class="STATUS_BADGE[po.status]">{{ STATUS_LABELS[po.status] }}</span>
-                            </td>
-                            <td class="text-end" @click.stop>
-                                <ActionIconButton icon="ti ti-file-download" title="Baixar PDF" :href="routes.pdf.replace('__ID__', po.id)" />
-                                <ActionIconButton v-if="po.status === 'draft'" icon="ti ti-send" title="Enviar ao fornecedor" @click="onSend($event, po)" />
-                                <ActionIconButton v-if="['sent', 'partially_received'].includes(po.status)" icon="ti ti-package-import" title="Receber" variant="success" @click="openReceive(po)" />
-                                <ActionIconButton v-if="!['received', 'cancelled'].includes(po.status)" icon="ti ti-x" title="Cancelar" variant="danger" @click="onCancel($event, po)" />
-                                <ActionIconButton v-if="po.status === 'draft'" icon="ti ti-trash" title="Excluir" variant="danger" @click="onDelete($event, po)" />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <TablePagination :data="items" showing-suffix="pedidos" />
-
-            <PurchaseOrderFormModal
-                :open="formOpen"
-                :item="editItem"
-                :routes="routes"
-                :suppliers="suppliers"
-                :products="products"
-                @close="formOpen = false"
-                @saved="onSaved"
+            <PurchaseOrderTable
+                v-if="view === 'table'"
+                :items="items"
+                :filters="filters"
+                :t="t"
+                :pdf-url-template="routes.pdf"
+                @sort="onSort"
+                @edit="openEdit"
+                @send="onSend"
+                @receive="openReceive"
+                @cancel="onCancel"
+                @delete="onDelete"
             />
-
-            <ReceivePurchaseOrderModal
-                :open="receiveOpen"
-                :purchase-order="receivingPo"
-                :routes="routes"
-                :lots-by-product="lotsByProduct"
-                @close="receiveOpen = false"
-                @saved="onReceived"
+            <PurchaseOrderCards
+                v-else
+                :items="items"
+                :t="t"
+                :pdf-url-template="routes.pdf"
+                @edit="openEdit"
+                @send="onSend"
+                @receive="openReceive"
+                @cancel="onCancel"
+                @delete="onDelete"
             />
-
         </div>
+
+        <PurchaseOrderFormModal
+            :open="formOpen"
+            :item="editItem"
+            :routes="routes"
+            :suppliers="suppliers"
+            :products="products"
+            @close="formOpen = false"
+            @saved="onSaved"
+        />
+
+        <ReceivePurchaseOrderModal
+            :open="receiveOpen"
+            :purchase-order="receivingPo"
+            :routes="routes"
+            :lots-by-product="lotsByProduct"
+            @close="receiveOpen = false"
+            @saved="onReceived"
+        />
     </AppLayout>
 </template>
+
+<style scoped>
+/* Nome de fornecedor longo não estoura a linha no celular. */
+.stock-toolbar-select {
+    max-width: 260px;
+}
+</style>
