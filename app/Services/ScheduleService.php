@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\{FinancialEntryStatus, ScheduleSituation};
+use App\Exceptions\AttendanceRequiresCashEntryException;
 use App\Models\{ClinicResource, Doctor, DoctorWorkSchedule, Entity, ResourceBlock, ResourceWorkSchedule, Schedule, ScheduleBlock, ScheduleSituationLog};
 use Carbon\Carbon;
 use Illuminate\Support\Facades\{Cache, DB};
@@ -363,14 +364,24 @@ class ScheduleService
     }
 
     /**
-     * Transição de situação de UM agendamento — caminho único usado pelo
-     * endpoint PATCH schedules/{id}/situation e pelo fluxo do prontuário
-     * (Salvar/Finalizar/Dilatar/Exame). Grava ScheduleSituationLog, ajusta
+     * Transição de situação de UM agendamento — caminho único de TODO writer
+     * do fluxo vivo: PATCH schedules/{id}/situation, bulk-update, store/update
+     * da agenda (campo `situation` do formulário) e o fluxo do prontuário
+     * (Finalizar/Dilatar/Exame). Grava ScheduleSituationLog, ajusta
      * arrived_at/confirmed_at/cancellation_reason e limpa o cache da sala de
-     * espera. Situação é livremente editável (sem grafo de transições).
+     * espera. Situação é livremente editável (sem grafo de transições), com
+     * UMA trava de negócio: "Atendido exige caixa" (guardSituationChange).
+     *
+     * Fora daqui, de propósito: ScheduleImportService (carga de histórico/
+     * migração — consultas passadas já atendidas no sistema anterior, sem
+     * caixa no EasyEye; exigir caixa inviabilizaria a migração) e as escritas
+     * que nunca levam a Atendido (reagendar → Cancelado, recorrência →
+     * Agendado, WhatsApp → Confirmado/Cancelado).
      *
      * Retorna false quando é no-op (já está na situação-alvo) — evita reset
      * indevido de timestamps e ruído no histórico.
+     *
+     * @throws AttendanceRequiresCashEntryException antes de qualquer escrita
      */
     public function changeSituation(
         Schedule $schedule,
@@ -378,46 +389,92 @@ class ScheduleService
         ?string $entityUserId,
         ?string $notes = null,
     ): bool {
-        if ($situation === $schedule->situation) {
-            return false;
+        return DB::transaction(function () use ($schedule, $situation, $entityUserId, $notes): bool {
+            // Relê situação/chegada com a linha travada até o COMMIT: dois
+            // cliques simultâneos ("Chegou" 2x, duas abas) liam a mesma situação
+            // antiga e os dois gravavam — 2 logs, arrived_at resetado e o "de"
+            // do histórico errado. Agora o segundo vê a situação nova (no-op).
+            // Update + log na MESMA transação: sem mudança de situação sem trilha.
+            $this->refreshSituationUnderLock($schedule);
+
+            if ($situation === $schedule->situation) {
+                return false;
+            }
+
+            $this->guardSituationChange($schedule, $situation);
+
+            $data = ['situation' => $situation->value];
+
+            if ($situation === ScheduleSituation::Waiting) {
+                $data['arrived_at'] = now();
+            }
+
+            // Retornando à consulta implica que já chegou: preenche só se vazio
+            // (marcado direto sem passar por Aguardando), nunca reseta a chegada.
+            if ($situation === ScheduleSituation::ReturningToDoctor && ! $schedule->arrived_at) {
+                $data['arrived_at'] = now();
+            }
+
+            if ($situation === ScheduleSituation::Confirmed) {
+                $data['confirmed_at'] = now();
+            }
+
+            if ($situation === ScheduleSituation::Cancelled && $notes) {
+                $data['cancellation_reason'] = $notes;
+            }
+
+            $fromSituation = $schedule->situation;
+
+            $schedule->update($data);
+
+            ScheduleSituationLog::create([
+                'schedule_id'    => $schedule->id,
+                'entity_user_id' => $entityUserId,
+                'from_situation' => $fromSituation->value,
+                'to_situation'   => $situation->value,
+                'notes'          => $notes,
+                'created_at'     => now(),
+            ]);
+
+            Cache::forget("waiting_room:{$schedule->entity_id}");
+
+            return true;
+        });
+    }
+
+    /**
+     * Trava a linha do agendamento (FOR UPDATE, mesmo lock do lançamento de
+     * caixa da chegada) e traz para a instância a situação/chegada ATUAIS do
+     * banco, como originais — os demais atributos (inclusive alterações ainda
+     * não salvas do chamador) ficam como estão. Agendamento não gravado: nada.
+     */
+    private function refreshSituationUnderLock(Schedule $schedule): void
+    {
+        if (! $schedule->exists) {
+            return;
         }
 
-        $data = ['situation' => $situation->value];
+        $current = Schedule::query()
+            ->whereKey($schedule->getKey())
+            ->lockForUpdate()
+            ->first(['situation', 'arrived_at']);
 
-        if ($situation === ScheduleSituation::Waiting) {
-            $data['arrived_at'] = now();
+        if ($current === null) {
+            return;
         }
 
-        if ($situation === ScheduleSituation::Confirmed) {
-            $data['confirmed_at'] = now();
-        }
+        $fresh = $current->getAttributes();
 
-        if ($situation === ScheduleSituation::Cancelled && $notes) {
-            $data['cancellation_reason'] = $notes;
-        }
-
-        $fromSituation = $schedule->situation;
-
-        $schedule->update($data);
-
-        ScheduleSituationLog::create([
-            'schedule_id'    => $schedule->id,
-            'entity_user_id' => $entityUserId,
-            'from_situation' => $fromSituation->value,
-            'to_situation'   => $situation->value,
-            'notes'          => $notes,
-            'created_at'     => now(),
-        ]);
-
-        Cache::forget("waiting_room:{$schedule->entity_id}");
-
-        return true;
+        $schedule->setRawAttributes(array_merge($schedule->getAttributes(), $fresh));
+        $schedule->syncOriginalAttributes(array_keys($fresh));
     }
 
     /**
      * Marcar "Atendido" exige lançamento no caixa quando a clínica habilita
-     * `requires_cash_to_complete` — mesma trava do endpoint de situação,
-     * reaproveitada pelo "Finalizar consulta" do prontuário.
+     * `requires_cash_to_complete`. Conta só lançamento ativo (não cancelado)
+     * da MESMA clínica do agendamento (Schedule::financialEntries é escopado
+     * por tenant) — linha de outra clínica apontando para o agendamento não
+     * libera. Agendamento ainda não gravado nunca tem caixa.
      */
     public function attendedBlockedByCash(Schedule $schedule): bool
     {
@@ -436,15 +493,19 @@ class ScheduleService
      *
      * AJUSTE: situação é um campo livremente editável (ver
      * SchedulesController::updateSituation) — não existe mais grafo de
-     * transições permitidas nem bloqueio por "terminal". Skips agora só
-     * cobrem registros que não existem/não pertencem à entity, e o próprio
-     * item já estar na situação-alvo (no-op — evita log/timestamp redundante).
+     * transições permitidas nem bloqueio por "terminal". Cada linha passa por
+     * changeSituation() (mesmo log/timestamps/cache e a MESMA trava de caixa
+     * do fluxo unitário).
      *
-     * Writes a ScheduleSituationLog entry for every record actually updated.
+     * Contrato de bulk (sucesso parcial, nunca aborta o lote): linha que não
+     * existe/não é da entity, que já está na situação-alvo (no-op) ou que
+     * esbarra na trava "Atendido exige caixa" é IGNORADA e contada em
+     * `skipped` (updated + skipped = total de ids). As barradas pela trava
+     * também saem em `blocked`, com mensagem traduzida por linha.
      *
      * @param string[] $ids
      *
-     * @return array{ updated: int, skipped: int }
+     * @return array{updated: int, skipped: int, updated_ids: string[], blocked: list<array{id: string, code: ?string, message: string}>}
      */
     public function bulkUpdateSituation(
         array $ids,
@@ -453,9 +514,9 @@ class ScheduleService
         string $entityUserId,
         ?string $notes = null,
     ): array {
-        $updated    = 0;
         $skipped    = 0;
         $updatedIds = [];
+        $blocked    = [];
 
         foreach ($ids as $id) {
             $schedule = Schedule::where('id', $id)
@@ -468,52 +529,52 @@ class ScheduleService
                 continue;
             }
 
-            if ($schedule->situation === $situation) {
+            try {
+                $changed = $this->changeSituation($schedule, $situation, $entityUserId, $notes);
+            } catch (AttendanceRequiresCashEntryException) {
+                $skipped++;
+                $blocked[] = [
+                    'id'      => $schedule->id,
+                    'code'    => $schedule->code,
+                    'message' => __('schedules.bulk_row_cash_entry_required', ['code' => $schedule->code]),
+                ];
+
+                continue;
+            }
+
+            if (! $changed) {
                 $skipped++;
 
                 continue;
             }
 
-            $data = ['situation' => $situation->value];
-
-            if ($situation === ScheduleSituation::Waiting) {
-                $data['arrived_at'] = now();
-            }
-
-            if ($situation === ScheduleSituation::Confirmed) {
-                $data['confirmed_at'] = now();
-            }
-
-            if ($situation === ScheduleSituation::Cancelled && $notes) {
-                $data['cancellation_reason'] = $notes;
-            }
-
-            $fromSituation = $schedule->situation;
-            $schedule->update($data);
-
-            ScheduleSituationLog::create([
-                'schedule_id'    => $schedule->id,
-                'entity_user_id' => $entityUserId,
-                'from_situation' => $fromSituation->value,
-                'to_situation'   => $situation->value,
-                'notes'          => $notes,
-                'created_at'     => now(),
-            ]);
-
             $updatedIds[] = $schedule->id;
-            $updated++;
         }
 
-        if ($updated > 0) {
-            Cache::forget("waiting_room:{$entityId}");
-        }
-
-        return ['updated' => $updated, 'skipped' => $skipped, 'updated_ids' => $updatedIds];
+        return [
+            'updated'     => count($updatedIds),
+            'skipped'     => $skipped,
+            'updated_ids' => $updatedIds,
+            'blocked'     => $blocked,
+        ];
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Trava única de negócio da transição de situação: "Atendido exige caixa"
+     * quando a clínica habilita `requires_cash_to_complete`.
+     *
+     * @throws AttendanceRequiresCashEntryException
+     */
+    private function guardSituationChange(Schedule $schedule, ScheduleSituation $situation): void
+    {
+        if ($situation === ScheduleSituation::Attended && $this->attendedBlockedByCash($schedule)) {
+            throw new AttendanceRequiresCashEntryException($schedule);
+        }
+    }
 
     private function terminalSituationValues(): array
     {

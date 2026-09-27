@@ -268,6 +268,8 @@ return [
         'cash_flow'             => 'Fluxo de caixa',
         'tiss_billing'          => 'Faturamento TISS',
         'financial_reports'     => 'Relatórios financeiros',
+        'cash_closing'          => 'Fechamento de caixa',
+        'procedure_prices'      => 'Tabela de preços',
         'management_dashboard'  => 'Dashboard Gerencial',
         'tiss_glosas'           => 'Glosas TISS',
         'report_cash_flow'      => 'Rel. Fluxo de Caixa',
@@ -351,6 +353,7 @@ return [
     'situation_waiting'    => 'Aguardando',
     'situation_dilating'   => 'Dilatando',
     'situation_exam'       => 'Em exame',
+    'situation_returning'  => 'Retornando à consulta',
     'situation_inprogress' => 'Em consulta',
     'situation_attended'   => 'Atendido',
     'situation_noshow'     => 'Faltou',
@@ -700,14 +703,16 @@ return [
         'save_first_then_action' => 'Salva o prontuário e abre esta ação automaticamente',
 
         // Guardas de ação — Swal client-side
-        'doctor_required_title'     => 'Médico obrigatório',
-        'doctor_required_for_issue' => 'Selecione o médico responsável antes de emitir o documento.',
-        'complaint_required_title'  => 'Queixa principal obrigatória',
-        'complaint_required_text'   => 'Preencha a queixa principal antes de emitir documentos ou adicionar anexos.',
+        'doctor_required_title'        => 'Médico obrigatório',
+        'doctor_required_for_issue'    => 'Selecione o médico responsável antes de emitir o documento.',
+        'doctor_required_for_template' => 'Selecione o médico responsável antes de carregar o template.',
+        'complaint_required_title'     => 'Queixa principal obrigatória',
+        'complaint_required_text'      => 'Preencha a queixa principal antes de emitir documentos ou adicionar anexos.',
 
         // Mensagens de validação server-side (FormRequest messages())
         'doctor_required_validation' => 'Selecione o médico responsável antes de salvar o prontuário.',
         'doctor_exists_validation'   => 'Médico selecionado não pertence à entidade ativa.',
+        'schedule_exists_validation' => 'O agendamento informado não é deste paciente nesta clínica.',
 
         // F9 — Labels dos campos para mensagens de validação client-side
         'field_doctor'        => 'Médico',

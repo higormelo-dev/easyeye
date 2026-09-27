@@ -38,8 +38,9 @@ const props = defineProps({
 const FLOW_KEY = { 7: 'finish', 4: 'dilate', 5: 'exam' };
 
 // Situações (espelho de App\Enums\ScheduleSituation)
-const SITUATION = { DILATING: 4, EXAM: 5, IN_PROGRESS: 6, ATTENDED: 7 };
-const AUTO_START_FROM = [1, 2, 3, 4, 5]; // Agendado, Confirmado, Aguardando, Dilatando, Em exame
+const SITUATION = { DILATING: 4, EXAM: 5, IN_PROGRESS: 6, ATTENDED: 7, RETURNING_TO_DOCTOR: 10 };
+// Agendado, Confirmado, Aguardando, Dilatando, Em exame, Retornando à consulta
+const AUTO_START_FROM = [1, 2, 3, 4, 5, SITUATION.RETURNING_TO_DOCTOR];
 
 const situation = ref(props.flow?.situation ?? null);
 const open      = ref(false);

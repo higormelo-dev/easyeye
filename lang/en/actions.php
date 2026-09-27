@@ -248,6 +248,14 @@ return [
         'schedules_calendar'       => 'Calendar',
         'lenses'                   => 'Lenses',
         'iol_lenses'               => 'Cataract Lenses',
+        'stock'                    => 'Stock',
+        'products'                 => 'Products',
+        'product_categories'       => 'Product categories',
+        'stock_movements'          => 'Stock movements',
+        'suppliers'                => 'Suppliers',
+        'purchase_orders'          => 'Purchase orders',
+        'stock_reports'            => 'Stock reports',
+        'stock_counts'             => 'Stock count',
         'nearpointconvergences'    => 'Near Point Convergences',
         'medical_records'          => 'Medical Records',
         'reports'                  => 'Reports',
@@ -259,6 +267,8 @@ return [
         'cash_flow'                => 'Cash Flow',
         'tiss_billing'             => 'TISS Billing',
         'financial_reports'        => 'Financial Reports',
+        'cash_closing'             => 'Cash closing',
+        'procedure_prices'         => 'Price table',
         'management_dashboard'     => 'Management Dashboard',
         'tiss_glosas'              => 'TISS Claims',
         'report_cash_flow'         => 'Cash Flow Report',
@@ -340,6 +350,7 @@ return [
     'situation_waiting'    => 'Waiting',
     'situation_dilating'   => 'Dilating',
     'situation_exam'       => 'In Exam',
+    'situation_returning'  => 'Returning to Doctor',
     'situation_inprogress' => 'In Consultation',
     'situation_attended'   => 'Attended',
     'situation_noshow'     => 'No Show',
@@ -689,14 +700,16 @@ return [
         'save_first_then_action' => 'Saves the record and opens this action automatically',
 
         // Action guards — Swal client-side
-        'doctor_required_title'     => 'Physician required',
-        'doctor_required_for_issue' => 'Please select the responsible physician before issuing a document.',
-        'complaint_required_title'  => 'Chief complaint required',
-        'complaint_required_text'   => 'Please fill in the chief complaint before issuing documents or adding attachments.',
+        'doctor_required_title'        => 'Physician required',
+        'doctor_required_for_issue'    => 'Please select the responsible physician before issuing a document.',
+        'doctor_required_for_template' => 'Please select the responsible physician before loading the template.',
+        'complaint_required_title'     => 'Chief complaint required',
+        'complaint_required_text'      => 'Please fill in the chief complaint before issuing documents or adding attachments.',
 
         // Server-side validation messages (FormRequest messages())
         'doctor_required_validation' => 'Please select the responsible physician before saving the medical record.',
         'doctor_exists_validation'   => 'The selected physician does not belong to the active entity.',
+        'schedule_exists_validation' => 'The selected appointment does not belong to this patient in this clinic.',
 
         // F9 — Field labels for client-side validation messages
         'field_doctor'        => 'Physician',

@@ -17,6 +17,7 @@ const badgeColorMap = {
     'bg-warning text-dark':  { bg: '#fef3c7', text: '#92400e' },
     'bg-purple text-white':  { bg: '#ede9fe', text: '#7c3aed' },
     'bg-orange text-white':  { bg: '#ffedd5', text: '#c2410c' },
+    'bg-teal text-white':    { bg: '#ccfbf1', text: '#0f766e' },
     'bg-primary':            { bg: '#dbeafe', text: '#1d4ed8' },
     'bg-success':            { bg: '#dcfce7', text: '#166534' },
     'bg-danger':             { bg: '#fee2e2', text: '#991b1b' },

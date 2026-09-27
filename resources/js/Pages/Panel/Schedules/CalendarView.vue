@@ -36,6 +36,9 @@ const BADGE_HEX = {
     'bg-warning':   '#ffc107',
     'bg-danger':    '#dc3545',
     'bg-dark':      '#212529',
+    'bg-purple':    '#7c3aed',
+    'bg-orange':    '#ea580c',
+    'bg-teal':      '#0e9384',
 };
 
 // ── Transforma scheduleItems em eventos FullCalendar ──────────────────────────
@@ -48,7 +51,9 @@ function toCalendarEvents(items) {
                 title:           item.name ?? '—',
                 start:           item.sort_time,
                 end:             new Date(startMs + 20 * 60_000).toISOString(),
-                backgroundColor: BADGE_HEX[item.badge] ?? '#6c757d',
+                // item.badge vem com a classe completa ("bg-info text-dark");
+                // só o 1º token é a cor — sem isso vários status saíam cinza.
+                backgroundColor: BADGE_HEX[item.badge?.split(' ')[0]] ?? '#6c757d',
                 borderColor:     item.doctor_color ?? '#0d6efd',
                 textColor:       '#fff',
                 extendedProps:   { ...item },
