@@ -25,7 +25,7 @@ class MarkClaimDeniedRequest extends FormRequest
                 'nullable', 'numeric', 'min:0',
                 function (string $attribute, mixed $value, Closure $fail) use ($claim): void {
                     if ((float) $value > (float) $claim->amount) {
-                        $fail(__('financial.billing.glosa_amount_exceeds_claim'));
+                        $fail(__('financial_billing.errors.glosa_amount_exceeds_claim'));
                     }
                 },
             ],

@@ -12,10 +12,7 @@ enum FinancialEntryStatus: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Pending   => 'Pendente',
-            self::Paid      => 'Pago',
-            self::Cancelled => 'Cancelado',
-        };
+        // Texto em lang/{locale}/financial_cash_flow.php (pt_BR mantém os rótulos de sempre).
+        return __("financial_cash_flow.statuses.{$this->value}");
     }
 }

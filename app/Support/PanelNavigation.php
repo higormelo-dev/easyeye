@@ -195,7 +195,9 @@ class PanelNavigation
                 'children' => [
                     ['route' => 'panel.financial.bi.index', 'icon' => 'ti ti-layout-dashboard', 'label' => __('actions.sidemenu.management_dashboard'), 'match' => ['panel.financial.bi.*']],
                     ['route' => 'panel.financial.cash-flow.index', 'icon' => 'ti ti-building-bank', 'label' => __('actions.sidemenu.cash_flow'), 'match' => ['panel.financial.cash-flow.*']],
+                    ['route' => 'panel.financial.cash-closing.index', 'icon' => 'ti ti-lock', 'label' => __('actions.sidemenu.cash_closing'), 'match' => ['panel.financial.cash-closing.*']],
                     ['route' => 'panel.financial.billing.index', 'icon' => 'ti ti-file-invoice', 'label' => __('actions.sidemenu.tiss_billing'), 'match' => ['panel.financial.billing.*']],
+                    ['route' => 'panel.financial.procedure-prices.index', 'icon' => 'ti ti-tags', 'label' => __('actions.sidemenu.procedure_prices'), 'match' => ['panel.financial.procedure-prices.*']],
                     ['route' => 'panel.financial.tiss.glosas.index', 'icon' => 'ti ti-gavel', 'label' => __('actions.sidemenu.tiss_glosas'), 'match' => ['panel.financial.tiss.glosas.*']],
                     ['route' => 'panel.financial.reports.cash-flow', 'icon' => 'ti ti-chart-arcs', 'label' => __('actions.sidemenu.report_cash_flow'), 'match' => ['panel.financial.reports.cash-flow*']],
                     ['route' => 'panel.financial.reports.covenants', 'icon' => 'ti ti-report-money', 'label' => __('actions.sidemenu.report_billing'), 'match' => ['panel.financial.reports.covenants*']],

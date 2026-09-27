@@ -30,6 +30,10 @@ class StockMovementResource extends JsonResource
             'created_by_name'   => $this->whenLoaded('creator', fn () => $this->creator?->name),
             'occurred_at'       => $this->occurred_at?->format('d/m/Y H:i'),
             'created_at'        => $this->created_at?->format('d/m/Y H:i'),
+            // ISO sem fuso (mesmo relógio dos campos acima): a tela formata no
+            // idioma do usuário (useLocaleFormat::dateTime).
+            'occurred_at_iso' => $this->occurred_at?->format('Y-m-d\TH:i:s'),
+            'created_at_iso'  => $this->created_at?->format('Y-m-d\TH:i:s'),
         ];
     }
 }

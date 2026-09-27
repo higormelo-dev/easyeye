@@ -1,127 +1,132 @@
 <script setup>
-import { ref } from 'vue';
-import { router } from '@inertiajs/vue3';
-import AppLayout  from '@/Layouts/AppLayout.vue';
-import PageHeader from '@/Components/Panel/PageHeader.vue';
+import { computed } from 'vue';
+import AppLayout    from '@/Layouts/AppLayout.vue';
+import PageHeader   from '@/Components/Panel/PageHeader.vue';
+import PeriodFilter from '@/Components/Panel/PeriodFilter.vue';
+import KpiCard      from '@/Components/Panel/KpiCard.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat';
+import { useTrans } from '@/composables/useTrans';
+import CovenantsTable   from './CovenantsTable.vue';
+import ReportExportMenu from './ReportExportMenu.vue';
+import { usePercent, useReportPage } from './useReportPage.js';
 
+/**
+ * Relatório de faturamento por convênio (FinancialReportsController::covenants).
+ *
+ * Mesma regra do Dashboard gerencial: período pela data de atendimento, guias
+ * em rascunho/canceladas fora dos totais e "Recebido" = valor pago das guias
+ * com status pago. Consolidado agregado no servidor (GROUP BY convênio); a
+ * linha expandida busca as guias do convênio (JSON paginado, paciente só por
+ * código + iniciais). Exportação (CSV/Excel) sempre do período aplicado.
+ */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    filters:     { type: Object, required: true },
-    summary:     { type: Object, default: () => ({}) },
-    byCovenant:  { type: Array,  default: () => [] },
-    export_url:  { type: String, default: '' },
-    t:           { type: Object, default: () => ({}) },
+    breadcrumbs:           { type: Array,  default: () => [] },
+    filters:               { type: Object, required: true },    // { from, to } normalizados no servidor
+    today:                 { type: String, default: '' },       // Y-m-d no fuso da clínica
+    summary:               { type: Object, default: () => ({}) }, // { total_claims, total_amount, total_paid, total_denied, total_open, glosa_rate, received_rate, glosa_alert }
+    byCovenant:            { type: Array,  default: () => [] },   // [{ covenant_id, covenant, inactive, claims, amount, paid, denied, open, glosa_rate, received_rate, glosa_alert }]
+    glosa_alert_threshold: { type: Number, default: 10 },
+    routes:                { type: Object, default: () => ({}) },
+    export_formats:        { type: Array,  default: () => ['csv', 'xlsx'] },
+    t:                     { type: Object, default: () => ({}) },
 });
 
-const from = ref(props.filters.from);
-const to   = ref(props.filters.to);
+const { money, number } = useLocaleFormat();
+const { percent } = usePercent();
+const { from, to, loading, loadError, applyPeriod, exportOptions, exportTitle } = useReportPage(props, 'panel.financial.reports.covenants');
 
-function brl(v) { return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); }
+const c         = computed(() => props.t.covenants ?? {});
+const pageTitle = computed(() => c.value.title ?? '');
+const { tx }    = useTrans(() => props.t.covenants ?? {});
 
-function applyFilter() {
-    router.get(route('panel.financial.reports.covenants'), { from: from.value, to: to.value },
-        { preserveState: true, preserveScroll: true });
+// Glosa em alerta só quando existe valor glosado (antes: alarme com R$ 0,00).
+const hasGlosa = computed(() => Number(props.summary.total_denied ?? 0) > 0);
+
+function rateOfBilled(rate) {
+    return rate === null || rate === undefined ? '' : tx('rate_of_billed', { percent: percent(rate) });
 }
+
+const kpis = computed(() => {
+    const s = props.summary ?? {};
+
+    return [
+        { key: 'claims', icon: 'ti ti-files', tone: 'primary', value: number(s.total_claims ?? 0) },
+        { key: 'billed', icon: 'ti ti-file-invoice', tone: 'primary', value: money(s.total_amount ?? 0) },
+        { key: 'received', icon: 'ti ti-cash', tone: 'success', value: money(s.total_paid ?? 0), subtitle: rateOfBilled(s.received_rate) },
+        {
+            key:      'glosa',
+            icon:     'ti ti-alert-triangle',
+            tone:     hasGlosa.value ? 'danger' : 'secondary',
+            value:    money(s.total_denied ?? 0),
+            subtitle: rateOfBilled(s.glosa_rate),
+        },
+        { key: 'open', icon: 'ti ti-hourglass', tone: 'warning', value: money(s.total_open ?? 0) },
+    ].map((kpi) => ({ ...kpi, label: c.value[`kpi_${kpi.key}`] ?? kpi.key, hint: c.value[`kpi_${kpi.key}_hint`] ?? '' }));
+});
 </script>
 
 <template>
-    <AppLayout :title="t.covenants?.title ?? 'Relatório por Convênio'" :breadcrumbs="breadcrumbs">
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader :title="t.covenants?.title ?? 'Relatório de Faturamento por Convênio'">
+            <PageHeader :title="pageTitle" :total="Number(summary.total_claims ?? 0)" :total-label="c.total_label">
                 <template #actions>
-                    <a :href="`${export_url}?from=${filters.from}&to=${filters.to}`" class="btn btn-outline-secondary btn-sm">
-                        <i class="ti ti-download me-1"></i>{{ t.covenants?.export_csv ?? 'Exportar CSV' }}
-                    </a>
+                    <ReportExportMenu :options="exportOptions" :title="exportTitle" :label="t.export" />
                 </template>
             </PageHeader>
 
-            <!-- Filtro -->
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body py-3">
-                    <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">{{ t.covenants?.filter_from ?? 'De' }}</label>
-                            <input v-model="from" type="date" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">{{ t.covenants?.filter_to ?? 'Até' }}</label>
-                            <input v-model="to" type="date" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-3">
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="ti ti-filter me-1"></i>{{ t.covenants?.filter_apply ?? 'Filtrar' }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
+            <!-- Período: atalhos + De/Até, aplicado na URL -->
+            <div class="d-flex flex-wrap align-items-end gap-2 mb-1" data-test="period-bar">
+                <PeriodFilter
+                    v-model:from="from"
+                    v-model:to="to"
+                    :today="today"
+                    :labels="t.shared?.period"
+                    compact
+                    :disabled="loading"
+                    @change="applyPeriod"
+                />
+                <span class="small text-body-secondary align-self-center" role="status" aria-live="polite" data-test="loading-status">
+                    <template v-if="loading">
+                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ t.loading }}
+                    </template>
+                </span>
+            </div>
+            <p class="small text-body-secondary mb-3" data-test="period-basis">
+                <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ c.period_basis }}
+            </p>
+
+            <div v-if="loadError" class="alert alert-danger d-flex align-items-center gap-2" role="alert" data-test="load-error">
+                <i class="ti ti-alert-circle" aria-hidden="true"></i>{{ loadError }}
             </div>
 
-            <!-- KPIs -->
-            <div class="row g-3 mb-3">
-                <div class="col-6 col-md-3">
-                    <div class="card h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.covenants?.col_guides ?? 'Guias' }}</small>
-                            <div class="fw-bold fs-5">{{ summary.total_claims ?? 0 }}</div>
+            <div :aria-busy="loading ? 'true' : 'false'">
+                <!-- KPIs -->
+                <section class="mb-3" :aria-label="c.kpis_label" data-test="kpis">
+                    <div class="row g-3 row-cols-2 row-cols-md-3 row-cols-xl-5">
+                        <div v-for="kpi in kpis" :key="kpi.key" class="col" :data-kpi="kpi.key">
+                            <KpiCard
+                                :label="kpi.label"
+                                :value="kpi.value"
+                                :icon="kpi.icon"
+                                :tone="kpi.tone"
+                                :hint="kpi.hint"
+                                :subtitle="kpi.subtitle ?? ''"
+                                :loading="loading"
+                                :test-id="kpi.key"
+                            />
                         </div>
                     </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.covenants?.kpi_total_billed ?? 'Total faturado' }}</small>
-                            <div class="fw-bold fs-5 text-primary">{{ brl(summary.total_amount) }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.covenants?.kpi_total_paid ?? 'Total pago' }}</small>
-                            <div class="fw-bold fs-5 text-success">{{ brl(summary.total_paid) }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.covenants?.col_glosa ?? 'Glosado' }}</small>
-                            <div class="fw-bold fs-5 text-danger">{{ brl(summary.total_denied) }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                </section>
 
-            <!-- Por convênio -->
-            <div class="card">
-                <div class="card-header bg-transparent">
-                    <h6 class="mb-0 fw-semibold"><i class="ti ti-medical-cross me-1 text-primary"></i>{{ t.covenants?.by_covenant ?? 'Por convênio' }}</h6>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-nowrap table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>{{ t.covenants?.col_covenant ?? 'Convênio' }}</th>
-                                <th class="text-center">{{ t.covenants?.col_guides ?? 'Guias' }}</th>
-                                <th class="text-end">{{ t.covenants?.col_billed ?? 'Faturado' }}</th>
-                                <th class="text-end">{{ t.covenants?.col_paid ?? 'Pago' }}</th>
-                                <th class="text-end">{{ t.covenants?.col_glosa ?? 'Glosado' }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="byCovenant.length === 0">
-                                <td colspan="5" class="text-center text-muted py-5">{{ t.covenants?.no_data ?? 'Sem dados no período.' }}</td>
-                            </tr>
-                            <tr v-for="(row, i) in byCovenant" :key="i">
-                                <td class="fw-medium">{{ row.covenant }}</td>
-                                <td class="text-center">{{ row.claims }}</td>
-                                <td class="text-end">{{ brl(row.amount) }}</td>
-                                <td class="text-end text-success">{{ brl(row.paid) }}</td>
-                                <td class="text-end text-danger">{{ brl(row.denied) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <!-- Consolidado por convênio (ordenável, linha expansível com as guias) -->
+                <CovenantsTable
+                    :rows="byCovenant"
+                    :summary="summary"
+                    :filters="filters"
+                    :threshold="glosa_alert_threshold"
+                    :claims-url="routes.claims ?? ''"
+                    :t="t"
+                />
             </div>
         </div>
     </AppLayout>

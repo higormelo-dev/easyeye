@@ -11,9 +11,7 @@ enum FinancialEntryType: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Income  => 'Receita',
-            self::Expense => 'Despesa',
-        };
+        // Texto em lang/{locale}/financial_cash_flow.php (pt_BR mantém os rótulos de sempre).
+        return __("financial_cash_flow.types.{$this->value}");
     }
 }

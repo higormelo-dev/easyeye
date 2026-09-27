@@ -37,9 +37,13 @@ class EntityProductResource extends JsonResource
             // active()+withBalance() — ver ProductsController::index()); sem
             // eager load, `lots` dispara 1 query por produto (N+1) — ok pro
             // volume de um show() avulso, evitar em listagens sem with().
+            // ISO (Y-m-d): a tela formata no idioma do usuário (date()).
+            // Lotes sem validade ficam de fora — no sortBy() do PHP o null
+            // viria primeiro e esconderia a data do lote que vence de fato.
             'nearest_expiry' => $this->whenLoaded('lots', fn () => $this->lots
+                ->filter(fn ($lot) => $lot->expiry_date !== null)
                 ->sortBy('expiry_date')
-                ->first()?->expiry_date?->format('d/m/Y')),
+                ->first()?->expiry_date?->toDateString()),
             'has_expiring_lot' => $this->whenLoaded('lots', fn () => $this->lots
                 ->contains(fn ($lot) => $lot->expiry_date !== null && $lot->expiry_date->lte(now()->addDays(30)))),
             'active'     => (bool) $this->active,

@@ -15,14 +15,8 @@ enum BillingBatchStatus: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Draft     => 'Rascunho',
-            self::Submitted => 'Enviado',
-            self::Processed => 'Processado',
-            self::Paid      => 'Pago',
-            self::Rejected  => 'Rejeitado',
-            self::Cancelled => 'Cancelado',
-        };
+        // Texto em lang/{locale}/financial_billing.php (pt_BR mantém os rótulos de sempre).
+        return __("financial_billing.batch_statuses.{$this->value}");
     }
 
     public function badgeClass(): string

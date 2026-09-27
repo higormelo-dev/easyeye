@@ -1,398 +1,409 @@
 <script setup>
-import { ref } from 'vue';
-import { useForm, router } from '@inertiajs/vue3';
-import AppLayout  from '@/Layouts/AppLayout.vue';
-import PageHeader from '@/Components/Panel/PageHeader.vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { router } from '@inertiajs/vue3';
+import AppLayout         from '@/Layouts/AppLayout.vue';
+import PageHeader        from '@/Components/Panel/PageHeader.vue';
+import TablePagination   from '@/Components/Panel/TablePagination.vue';
+import { useLocaleFormat } from '@/composables/useLocaleFormat.js';
+import { useTrans }      from '@/composables/useTrans.js';
+import ImportReturnModal from '../Billing/ImportReturnModal.vue';
+import { cleanParams }   from '../Billing/billingHelpers.js';
+import GlosaKpis         from './GlosaKpis.vue';
+import GlosaFilterBar    from './GlosaFilterBar.vue';
+import GlosaTable        from './GlosaTable.vue';
+import GlosaDetailPanel  from './GlosaDetailPanel.vue';
+import GlosaActionModal  from './GlosaActionModal.vue';
 
+/**
+ * Conciliação de glosas como fila de trabalho: aba "Pendentes" (abertas e
+ * recorridas de qualquer data, pelo prazo — vencidas primeiro) e o histórico
+ * em "Resolvidas"/"Todas" (período). KPIs são filtros (aria-pressed); busca,
+ * status, convênio e período ficam na URL e são aplicados na hora.
+ *
+ * Lista paginada no servidor (paginator do Laravel + TablePagination; os
+ * links levam os filtros da URL). KPIs e contagens das abas são agregados do
+ * servidor — valem para o filtro inteiro, não só para a página.
+ *
+ * Detalhes num painel lateral carregado por recarga parcial
+ * (only: ['glosaDetail'], data: { detail }) — sem rota nova. As transições
+ * (recorrer, marcar como enviado, decisão) e os 409 são do servidor.
+ * Textos: lang/{locale}/financial_glosas.php (+ t.shared, t.import).
+ */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    filters:     { type: Object, required: true },
-    summary:     { type: Object, required: true },
-    glosas:      { type: Array,  default: () => [] },
-    byOperator:  { type: Array,  default: () => [] },
-    t:           { type: Object, default: () => ({}) },
+    breadcrumbs:     { type: Array,  default: () => [] },
+    filters:         { type: Object, required: true },
+    today:           { type: String, default: '' },
+    summary:         { type: Object, required: true },
+    tabCounts:       { type: Object, default: () => ({}) },
+    /** Paginator do Laravel: { data, current_page, last_page, from, to, total, links, ... }. */
+    glosas:          { type: Object, default: () => ({ data: [] }) },
+    byOperator:      { type: Array,  default: () => [] },
+    operators:       { type: Array,  default: () => [] },
+    statusOptions:   { type: Object, default: () => ({}) },
+    glosaDetail:     { type: Object, default: null },
+    covenants:       { type: Array,  default: () => [] },
+    importReturnUrl: { type: String, default: '' },
+    t:               { type: Object, default: () => ({}) },
 });
 
-const from = ref(props.filters.from);
-const to   = ref(props.filters.to);
+const { money, number } = useLocaleFormat();
+const { tx } = useTrans(() => props.t);
 
-function brl(v) {
-    return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+const TAB_KEYS = ['pending', 'resolved', 'all'];
+
+const activeTab = ref(TAB_KEYS.includes(props.filters.tab) ? props.filters.tab : 'pending');
+
+watch(() => props.filters?.tab, (tab) => {
+    if (TAB_KEYS.includes(tab)) activeTab.value = tab;
+});
+
+const tabs = computed(() => [
+    { key: 'pending',  icon: 'ti ti-hourglass-high', label: props.t.tab_pending },
+    { key: 'resolved', icon: 'ti ti-circle-check',   label: props.t.tab_resolved },
+    { key: 'all',      icon: 'ti ti-list',           label: props.t.tab_all },
+].map((tab) => ({ ...tab, count: props.tabCounts?.[tab.key] ?? null })));
+
+const dueSoonDays = computed(() => Number(props.summary?.due_soon_days ?? 5));
+const tabStatusOptions = computed(() => props.statusOptions?.[activeTab.value] ?? []);
+
+/* ───────────────────────── Filtros (URL, aplicação automática) ───────────────────────── */
+const filtering = ref(false);
+
+const currentParams = computed(() => ({
+    tab:         activeTab.value,
+    from:        props.filters.from,
+    to:          props.filters.to,
+    status:      props.filters.status,
+    operator_id: props.filters.operator_id,
+    due:         props.filters.due,
+    search:      props.filters.search,
+}));
+
+function visit(params) {
+    router.get(route('panel.financial.tiss.glosas.index'), cleanParams(params), {
+        preserveState:  true,
+        preserveScroll: true,
+        replace:        true,
+        onStart:        () => { filtering.value = true; },
+        onFinish:       () => { filtering.value = false; },
+    });
 }
 
-function applyFilter() {
-    router.get(route('panel.financial.tiss.glosas.index'), { from: from.value, to: to.value },
-        { preserveState: true, preserveScroll: true });
+function applyFilters(patch) {
+    if (TAB_KEYS.includes(patch.tab)) activeTab.value = patch.tab;
+
+    const next = { ...currentParams.value, ...patch, tab: activeTab.value };
+    const allowed = props.statusOptions?.[next.tab];
+
+    // Filtros que não existem na aba saem da URL (o servidor também os ignora).
+    if (next.tab !== 'pending') next.due = '';
+    if (next.status && Array.isArray(allowed) && !allowed.some((option) => option.value === next.status)) next.status = '';
+
+    visit(next);
 }
 
-const statusBadge = (s) => {
-    if (s === 'reversed')         return 'bg-success';
-    if (s === 'partial_reversed') return 'bg-info text-dark';
-    if (s === 'appealed')         return 'bg-warning text-dark';
-    if (s === 'rejected')         return 'bg-danger';
-    if (s === 'open')             return 'bg-secondary';
-    return 'bg-light text-dark';
+function clearFilters() {
+    visit({ tab: activeTab.value });
+}
+
+function setTab(key) {
+    if (!TAB_KEYS.includes(key) || key === activeTab.value) return;
+
+    applyFilters({ tab: key });
+}
+
+function onTabKeydown(event, key) {
+    const index = TAB_KEYS.indexOf(key);
+    const moves = { ArrowRight: 1, ArrowLeft: -1, Home: -index, End: TAB_KEYS.length - 1 - index };
+    if (!(event.key in moves)) return;
+
+    event.preventDefault();
+    const next = TAB_KEYS[(index + moves[event.key] + TAB_KEYS.length) % TAB_KEYS.length];
+    setTab(next);
+    nextTick(() => document.getElementById(`glosas-tab-${next}`)?.focus());
+}
+
+/* ───────────────────────── KPIs como filtros ───────────────────────── */
+const activeKpi = computed(() => {
+    const { due, status } = props.filters;
+
+    if (due === 'overdue') return 'overdue';
+    if (due === 'soon') return 'soon';
+    if (status === 'recovered') return 'recovered';
+    if (activeTab.value === 'pending' && (status === 'open' || status === 'appealed')) return status;
+
+    return null;
+});
+
+const KPI_FILTERS = {
+    open:      { tab: 'pending',  status: 'open',      due: '' },
+    appealed:  { tab: 'pending',  status: 'appealed',  due: '' },
+    overdue:   { tab: 'pending',  status: '',          due: 'overdue' },
+    soon:      { tab: 'pending',  status: '',          due: 'soon' },
+    recovered: { tab: 'resolved', status: 'recovered', due: '' },
 };
 
-/* ───────────────────────── Recurso de glosa ───────────────────────── */
-const appealOpen = ref(false);
-const appealItem = ref(null);
+function toggleKpi(kind) {
+    if (!KPI_FILTERS[kind]) return;
 
-const appealForm = useForm({ reason: '' });
-
-function openAppeal(g) {
-    appealForm.reset();
-    appealForm.clearErrors();
-    appealItem.value = g;
-    appealOpen.value = true;
+    applyFilters(activeKpi.value === kind ? { status: '', due: '' } : KPI_FILTERS[kind]);
 }
 
-function submitAppeal() {
-    if (appealForm.reason.trim().length < 10) {
-        appealForm.setError('reason', props.t.glosas?.reason_required);
+/* ───────────────────────── Lista (página atual do paginator) ───────────────────────── */
+const listTitle = computed(() => props.t[`list_title_${activeTab.value}`] ?? props.t.title);
+
+const glosaRows = computed(() => (Array.isArray(props.glosas?.data) ? props.glosas.data : []));
+
+// Anunciado a leitores de tela ao trocar de página (o TablePagination só mostra o intervalo).
+const pageStatus = computed(() => {
+    const pages = Number(props.glosas?.last_page ?? 1);
+    if (pages <= 1) return '';
+
+    return tx('pagination_status', { page: number(props.glosas?.current_page ?? 1), pages: number(pages) });
+});
+
+const hasContextFilter = computed(() => Boolean(props.filters.search || props.filters.status || props.filters.operator_id || props.filters.due));
+
+const emptyText = computed(() => {
+    if (hasContextFilter.value) return props.t.empty_filtered;
+
+    return activeTab.value === 'pending' ? props.t.empty_pending : props.t.empty;
+});
+
+/* ───────────────────────── Ações (modal) ───────────────────────── */
+const actionModalRef = ref(null);
+const action         = ref({ kind: null, glosa: null, appeal: null });
+
+function openAction(kind, glosa, appeal = null) {
+    action.value = { kind, glosa, appeal };
+}
+
+function closeAction() {
+    action.value = { kind: null, glosa: null, appeal: null };
+}
+
+/* ───────────────────────── Detalhes (painel lateral, recarga parcial) ───────────────────────── */
+// Link direto (?detail=<id>): o servidor já manda o detalhe na carga da página
+// (ou `missing`, e o painel avisa que a glosa não foi encontrada).
+const initialDetail = props.glosaDetail ?? null;
+
+const detailOpen    = ref(Boolean(initialDetail));
+const detailId      = ref(initialDetail?.id ?? null);
+const detailLoading = ref(false);
+const detail        = ref(initialDetail);
+let detailReturnFocus = null;
+
+function loadDetail(id) {
+    detailLoading.value = true;
+
+    router.reload({
+        only:        ['glosaDetail'],
+        data:        { detail: id },
+        preserveUrl: true,
+        onFinish:    () => { detailLoading.value = false; },
+    });
+}
+
+function openDetail(glosa) {
+    detailReturnFocus = typeof document !== 'undefined' ? document.activeElement : null;
+    detailId.value    = glosa.id;
+    detail.value      = null;
+    detailOpen.value  = true;
+
+    loadDetail(glosa.id);
+}
+
+function closeDetail() {
+    detailOpen.value = false;
+    detailId.value   = null;
+    nextTick(() => detailReturnFocus?.focus?.());
+}
+
+// Resposta da recarga parcial (ou de uma ação feita com o painel aberto).
+// null depois de outras visitas não apaga o que o painel está mostrando.
+watch(() => props.glosaDetail, (value) => {
+    if (!value || !detailOpen.value) return;
+    if (value.missing || value.id === detailId.value) detail.value = value;
+});
+
+function onActionDone() {
+    // A ação recarrega a página (back()); com o painel aberto, busca o detalhe atualizado.
+    if (detailOpen.value && detailId.value) loadDetail(detailId.value);
+}
+
+/* ───────────────────────── Importar retorno TISS ───────────────────────── */
+const importOpen = ref(false);
+
+/* ───────────────────────── Teclado: Esc fecha o que estiver por cima ───────────────────────── */
+function onKeydown(event) {
+    if (event.key !== 'Escape') return;
+
+    if (action.value.kind) {
+        actionModalRef.value?.requestClose();
+
         return;
     }
 
-    appealForm.post(appealItem.value.appeal_url, {
-        preserveScroll: true,
-        onSuccess: () => { appealOpen.value = false; },
-    });
+    if (detailOpen.value) closeDetail();
 }
 
-/* ───────────────── Enviar recurso (Aberto → Enviado) ───────────────── */
-function activeAppeal(g) {
-    return g.appeals?.find((a) => a.can_be_submitted || a.can_be_resolved) ?? null;
-}
+watch(() => Boolean(action.value.kind) || detailOpen.value, (anyOpen) => {
+    if (typeof document === 'undefined') return;
+    if (anyOpen) document.addEventListener('keydown', onKeydown);
+    else document.removeEventListener('keydown', onKeydown);
+}, { immediate: true });
 
-function submitAppealToOperator(appeal) {
-    if (!window.confirm(props.t.glosas?.submit_appeal_btn + '?')) return;
-    router.post(appeal.submit_url, {}, { preserveScroll: true });
-}
-
-/* ───────────────── Decisão do recurso (Enviado → Aceito/Rejeitado) ───────────────── */
-const resolveOpen = ref(false);
-const resolveItem = ref(null);
-
-const resolveForm = useForm({
-    decision: '',
-    accepted_amount: '',
-    result_notes: '',
+onBeforeUnmount(() => {
+    if (typeof document !== 'undefined') document.removeEventListener('keydown', onKeydown);
 });
-
-function openResolve(appeal) {
-    resolveForm.reset();
-    resolveForm.clearErrors();
-    resolveItem.value = appeal;
-    resolveOpen.value = true;
-}
-
-function submitResolve() {
-    resolveForm.post(resolveItem.value.resolve_url, {
-        preserveScroll: true,
-        onSuccess: () => { resolveOpen.value = false; },
-    });
-}
 </script>
 
 <template>
-    <AppLayout :title="t.glosas?.title" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
-            <PageHeader :title="t.glosas?.title" />
-
-            <!-- Filtro -->
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body py-3">
-                    <form class="row g-2 align-items-end" @submit.prevent="applyFilter">
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">{{ t.period_from }}</label>
-                            <input v-model="from" type="date" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">{{ t.period_to }}</label>
-                            <input v-model="to" type="date" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-3">
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="ti ti-filter me-1"></i>{{ t.filter }}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Summary cards -->
-            <div class="row g-3 mb-3">
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-info border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.glosas?.total_glosa }}</small>
-                            <div class="fw-bold fs-5">{{ brl(summary.total) }}</div>
-                            <small class="text-muted">{{ summary.count }} {{ t.glosas?.glosa_count }}</small>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-warning border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.glosas?.open_amount }}</small>
-                            <div class="fw-bold fs-5 text-warning">{{ brl(summary.open) }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-primary border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.glosas?.appealed }}</small>
-                            <div class="fw-bold fs-5 text-primary">{{ brl(summary.appealed) }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-success border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.glosas?.recovered }}</small>
-                            <div class="fw-bold fs-5 text-success">{{ brl(summary.recovered) }}</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div
-                        class="card border-0 shadow-sm border-start border-3 h-100"
-                        :class="summary.due_soon_count > 0 ? 'border-danger' : 'border-secondary-subtle'"
+    <AppLayout :title="t.title" :breadcrumbs="breadcrumbs">
+        <div class="page-financial-glosas">
+            <PageHeader
+                :title="t.title"
+                :subtitle="t.subtitle"
+                :total="tabCounts.pending ?? null"
+                :total-label="t.total_label"
+            >
+                <template #actions>
+                    <button
+                        v-if="importReturnUrl"
+                        type="button"
+                        class="btn btn-outline-primary btn-sm"
+                        data-test="open-import"
+                        @click="importOpen = true"
                     >
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">
-                                {{ t.glosas?.due_soon_title?.replace(':days', summary.due_soon_days) }}
-                            </small>
-                            <div class="fw-bold fs-5" :class="summary.due_soon_count > 0 ? 'text-danger' : ''">
-                                {{ brl(summary.due_soon) }}
-                            </div>
-                            <small class="text-muted">{{ summary.due_soon_count }} {{ t.glosas?.due_soon_count_suffix }}</small>
-                        </div>
+                        <i class="ti ti-file-upload me-1" aria-hidden="true"></i>{{ t.btn_import_return }}
+                    </button>
+                </template>
+            </PageHeader>
+
+            <GlosaKpis :summary="summary" :active="activeKpi" :loading="filtering" :t="t" @toggle="toggleKpi" />
+
+            <!-- Abas (servidor: cada aba é uma consulta) -->
+            <ul class="nav nav-tabs mb-3" role="tablist" :aria-label="t.tabs_label">
+                <li v-for="tab in tabs" :key="tab.key" class="nav-item" role="presentation">
+                    <button
+                        :id="`glosas-tab-${tab.key}`"
+                        type="button"
+                        role="tab"
+                        :class="['nav-link', { active: activeTab === tab.key }]"
+                        :aria-selected="activeTab === tab.key ? 'true' : 'false'"
+                        aria-controls="glosas-panel"
+                        :tabindex="activeTab === tab.key ? 0 : -1"
+                        :data-test="`glosas-tab-${tab.key}`"
+                        @click="setTab(tab.key)"
+                        @keydown="onTabKeydown($event, tab.key)"
+                    >
+                        <i :class="[tab.icon, 'me-1']" aria-hidden="true"></i>{{ tab.label }}
+                        <span v-if="tab.count !== null" class="badge rounded-pill badge-soft-secondary ms-1">{{ tab.count }}</span>
+                    </button>
+                </li>
+            </ul>
+
+            <section id="glosas-panel" role="tabpanel" :aria-labelledby="`glosas-tab-${activeTab}`" :aria-busy="filtering ? 'true' : 'false'">
+                <GlosaFilterBar
+                    :filters="filters"
+                    :operators="operators"
+                    :status-options="tabStatusOptions"
+                    :tab="activeTab"
+                    :today="today"
+                    :filtering="filtering"
+                    :t="t"
+                    @change="applyFilters"
+                    @clear="clearFilters"
+                />
+
+                <div class="card mb-3">
+                    <div class="card-header bg-transparent border-bottom">
+                        <h2 class="h6 mb-0 fw-semibold"><i class="ti ti-gavel me-1 text-primary" aria-hidden="true"></i>{{ listTitle }}</h2>
+                    </div>
+                    <GlosaTable
+                        :glosas="glosaRows"
+                        :today="today"
+                        :due-soon-days="dueSoonDays"
+                        :busy="filtering"
+                        :empty-text="emptyText"
+                        :t="t"
+                        @action="openAction"
+                        @details="openDetail"
+                    />
+                    <TablePagination
+                        :data="glosas"
+                        class="px-3 pb-3"
+                        :showing-from="t.pagination_showing"
+                        :showing-of="t.pagination_of"
+                        :showing-suffix="t.pagination_suffix"
+                        :aria-label="t.pagination_label"
+                        :previous-label="t.pagination_previous"
+                        :next-label="t.pagination_next"
+                        data-test="glosas-pagination"
+                    />
+                    <p class="visually-hidden" role="status" aria-live="polite" data-test="glosas-page-status">{{ pageStatus }}</p>
+                </div>
+
+                <!-- Resumo por convênio (histórico do período) -->
+                <div v-if="activeTab !== 'pending' && byOperator.length > 0" class="card" data-test="by-operator">
+                    <div class="card-header bg-transparent border-bottom">
+                        <h2 class="h6 mb-0 fw-semibold"><i class="ti ti-chart-pie me-1 text-primary" aria-hidden="true"></i>{{ t.by_covenant }}</h2>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col">{{ t.col_covenant }}</th>
+                                    <th scope="col" class="text-center">{{ t.col_count }}</th>
+                                    <th scope="col" class="text-end">{{ t.col_total }}</th>
+                                    <th scope="col" class="text-end">{{ t.col_open }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="op in byOperator" :key="op.id || op.name">
+                                    <td class="fw-medium">{{ op.name }}</td>
+                                    <td class="text-center">{{ op.count }}</td>
+                                    <td class="text-end">{{ money(op.total) }}</td>
+                                    <td class="text-end fw-semibold text-body">{{ money(op.open) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Por operadora -->
-            <div v-if="byOperator.length > 0" class="card mb-3">
-                <div class="card-header bg-transparent border-bottom">
-                    <h6 class="mb-0 fw-semibold"><i class="ti ti-chart-pie me-1 text-primary"></i>{{ t.glosas?.by_covenant }}</h6>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>{{ t.glosas?.col_covenant }}</th>
-                                <th class="text-center">{{ t.glosas?.col_count }}</th>
-                                <th class="text-end">{{ t.glosas?.col_total }}</th>
-                                <th class="text-end">{{ t.glosas?.col_open }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(op, i) in byOperator" :key="i">
-                                <td class="fw-medium">{{ op.name }}</td>
-                                <td class="text-center">{{ op.count }}</td>
-                                <td class="text-end">{{ brl(op.total) }}</td>
-                                <td class="text-end text-warning fw-semibold">{{ brl(op.open) }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <GlosaDetailPanel
+                :open="detailOpen"
+                :loading="detailLoading"
+                :detail="detail"
+                :today="today"
+                :due-soon-days="dueSoonDays"
+                :busy="filtering"
+                :t="t"
+                @close="closeDetail"
+                @action="openAction"
+            />
 
-            <!-- Lista de glosas -->
-            <div class="card">
-                <div class="card-header bg-transparent border-bottom">
-                    <h6 class="mb-0 fw-semibold"><i class="ti ti-gavel me-1 text-primary"></i>{{ t.glosas?.period_glosas }}</h6>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-nowrap table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>{{ t.glosas?.col_date }}</th>
-                                <th>{{ t.glosas?.col_covenant }}</th>
-                                <th>{{ t.glosas?.col_guide }}</th>
-                                <th>{{ t.glosas?.col_reason }}</th>
-                                <th class="text-center">{{ t.glosas?.col_status }}</th>
-                                <th class="text-end">{{ t.glosas?.col_value }}</th>
-                                <th class="text-end"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="glosas.length === 0">
-                                <td colspan="7" class="text-center text-muted py-5">
-                                    <i class="ti ti-checks fs-1 d-block mb-2"></i>
-                                    {{ t.glosas?.empty }}
-                                </td>
-                            </tr>
-                            <tr v-for="g in glosas" :key="g.id">
-                                <td class="text-muted small">{{ g.identified_at }}</td>
-                                <td>{{ g.operator_name || t.glosas?.no_covenant }}</td>
-                                <td><code class="small">{{ g.guide_number || '—' }}</code></td>
-                                <td class="small">
-                                    <span class="badge badge-soft-secondary me-1">{{ g.reason_code }}</span>
-                                    {{ g.reason_text }}
-                                </td>
-                                <td class="text-center">
-                                    <span :class="`badge ${statusBadge(g.status)} fs-11`">{{ g.status_label }}</span>
-                                    <span v-if="g.appeals_count > 0" class="badge badge-soft-info ms-1 fs-11">
-                                        {{ g.appeals_count }} {{ t.glosas?.appeals_suffix }}
-                                    </span>
-                                </td>
-                                <td class="text-end fw-bold">{{ brl(g.amount) }}</td>
-                                <td class="text-end">
-                                    <button
-                                        v-if="g.is_actionable"
-                                        class="btn btn-sm btn-outline-warning"
-                                        :title="t.glosas?.appeal_btn"
-                                        @click="openAppeal(g)"
-                                    >
-                                        <i class="ti ti-message-circle-up me-1"></i>{{ t.glosas?.appeal_btn }}
-                                    </button>
-                                    <button
-                                        v-if="activeAppeal(g)?.can_be_submitted"
-                                        class="btn btn-sm btn-outline-info"
-                                        :title="t.glosas?.submit_appeal_btn"
-                                        @click="submitAppealToOperator(activeAppeal(g))"
-                                    >
-                                        <i class="ti ti-send me-1"></i>{{ t.glosas?.submit_appeal_btn }}
-                                    </button>
-                                    <button
-                                        v-if="activeAppeal(g)?.can_be_resolved"
-                                        class="btn btn-sm btn-outline-primary"
-                                        :title="t.glosas?.resolve_appeal_btn"
-                                        @click="openResolve(activeAppeal(g))"
-                                    >
-                                        <i class="ti ti-gavel me-1"></i>{{ t.glosas?.resolve_appeal_btn }}
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            <GlosaActionModal
+                ref="actionModalRef"
+                :kind="action.kind"
+                :glosa="action.glosa"
+                :appeal="action.appeal"
+                :appeal-response-days="Number(summary.appeal_response_days ?? 60)"
+                :t="t"
+                @close="closeAction"
+                @done="onActionDone"
+            />
 
-            <!-- Modal de recurso -->
-            <div
-                v-if="appealOpen"
-                class="modal d-block"
-                tabindex="-1"
-                style="background:rgba(0,0,0,.45);"
-                @click.self="appealOpen = false"
-            >
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="ti ti-message-circle-up me-1 text-warning"></i>
-                                {{ t.glosas?.appeal_title }}
-                            </h5>
-                            <button type="button" class="btn-close" @click="appealOpen = false"></button>
-                        </div>
-                        <form @submit.prevent="submitAppeal">
-                            <div class="modal-body">
-                                <div class="alert alert-warning small mb-3">
-                                    <strong>{{ t.glosas?.modal_glosa_label }}</strong> {{ appealItem?.reason_text }}
-                                    <br><strong>{{ t.glosas?.modal_value_label }}</strong> {{ brl(appealItem?.amount) }}
-                                </div>
-                                <label class="form-label">
-                                    {{ t.glosas?.justification_label }} <span class="text-danger">*</span>
-                                </label>
-                                <textarea
-                                    v-model="appealForm.reason"
-                                    rows="4"
-                                    maxlength="1000"
-                                    class="form-control"
-                                    :class="{ 'is-invalid': appealForm.errors.reason }"
-                                    :placeholder="t.glosas?.justification_placeholder"
-                                ></textarea>
-                                <div v-if="appealForm.errors.reason" class="invalid-feedback d-block">
-                                    {{ appealForm.errors.reason }}
-                                </div>
-                                <small class="text-muted">{{ t.glosas?.min_chars_audit_hint }}</small>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @click="appealOpen = false">
-                                    {{ t.glosas?.cancel_btn }}
-                                </button>
-                                <button type="submit" class="btn btn-warning btn-sm" :disabled="appealForm.processing">
-                                    <span v-if="appealForm.processing" class="spinner-border spinner-border-sm me-1"></span>
-                                    <i v-else class="ti ti-send me-1"></i>
-                                    {{ t.glosas?.submit_appeal }}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Modal de decisão do recurso -->
-            <div
-                v-if="resolveOpen"
-                class="modal d-block"
-                tabindex="-1"
-                style="background:rgba(0,0,0,.45);"
-                @click.self="resolveOpen = false"
-            >
-                <div class="modal-dialog modal-dialog-centered">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="ti ti-gavel me-1 text-primary"></i>
-                                {{ t.glosas?.resolve_title }}
-                            </h5>
-                            <button type="button" class="btn-close" @click="resolveOpen = false"></button>
-                        </div>
-                        <form @submit.prevent="submitResolve">
-                            <div class="modal-body">
-                                <div class="mb-3">
-                                    <label class="form-label">{{ t.glosas?.decision_label }} <span class="text-danger">*</span></label>
-                                    <select
-                                        v-model="resolveForm.decision"
-                                        class="form-select"
-                                        :class="{ 'is-invalid': resolveForm.errors.decision }"
-                                    >
-                                        <option value="">{{ t.glosas?.decision_select }}</option>
-                                        <option value="accepted">{{ t.glosas?.decision_accepted }}</option>
-                                        <option value="rejected">{{ t.glosas?.decision_rejected }}</option>
-                                    </select>
-                                    <div v-if="resolveForm.errors.decision" class="invalid-feedback">{{ resolveForm.errors.decision }}</div>
-                                </div>
-                                <div v-if="resolveForm.decision === 'accepted'" class="mb-3">
-                                    <label class="form-label">{{ t.glosas?.accepted_amount_label }}</label>
-                                    <input
-                                        v-model.number="resolveForm.accepted_amount"
-                                        type="number" step="0.01" min="0"
-                                        class="form-control"
-                                        :class="{ 'is-invalid': resolveForm.errors.accepted_amount }"
-                                    >
-                                    <div v-if="resolveForm.errors.accepted_amount" class="invalid-feedback">{{ resolveForm.errors.accepted_amount }}</div>
-                                </div>
-                                <div class="mb-0">
-                                    <label class="form-label">{{ t.glosas?.result_notes_label }}</label>
-                                    <textarea
-                                        v-model="resolveForm.result_notes"
-                                        rows="3" maxlength="1000"
-                                        class="form-control"
-                                        :class="{ 'is-invalid': resolveForm.errors.result_notes }"
-                                    ></textarea>
-                                    <div v-if="resolveForm.errors.result_notes" class="invalid-feedback d-block">{{ resolveForm.errors.result_notes }}</div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" @click="resolveOpen = false">
-                                    {{ t.glosas?.cancel_btn }}
-                                </button>
-                                <button type="submit" class="btn btn-primary btn-sm" :disabled="resolveForm.processing">
-                                    <span v-if="resolveForm.processing" class="spinner-border spinner-border-sm me-1"></span>
-                                    <i v-else class="ti ti-check me-1"></i>
-                                    {{ t.glosas?.resolve_submit_btn }}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
+            <ImportReturnModal
+                v-if="importReturnUrl"
+                :open="importOpen"
+                :covenants="covenants"
+                :url="importReturnUrl"
+                :t="t.import ?? {}"
+                @close="importOpen = false"
+                @saved="importOpen = false"
+            />
         </div>
     </AppLayout>
 </template>

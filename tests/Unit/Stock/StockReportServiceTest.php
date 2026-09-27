@@ -91,6 +91,7 @@ it('consumptionByProcedure() agrupa por execução de procedimento com custo tot
 
     expect($result)->toHaveCount(1)
         ->and($result[0]['procedure_name'])->toBe('Facectomia')
+        ->and($result[0]['executed_at'])->toBe(now()->toDateString()) // ISO: tela e CSV formatam onde mostram
         ->and($result[0]['total_cost'])->toBe(200.0);
 });
 
@@ -110,4 +111,24 @@ it('purchasesBySupplier() valoriza pelo recebido de verdade, não pelo total ped
     expect($result)->toHaveCount(1)
         ->and($result[0]['supplier_name'])->toBe('Fornecedor Alfa')
         ->and($result[0]['total_spent'])->toBe(200.0); // NÃO 500 (o total pedido)
+});
+
+it('purchasesBySupplier() mostra o fallback traduzido quando o fornecedor foi excluído', function () {
+    $supplier = Supplier::create(['entity_id' => $this->entity->id, 'name' => 'Fornecedor Beta', 'active' => true]);
+    $product  = EntityProduct::create(['entity_id' => $this->entity->id, 'name' => 'Produto', 'unit' => 'un', 'active' => true]);
+
+    $poService = app(PurchaseOrderService::class);
+    $po        = $poService->send($poService->createDraft($this->entity->id, ['supplier_id' => $supplier->id], [
+        ['entity_product_id' => $product->id, 'quantity_ordered' => 2, 'unit_cost' => 10.00],
+    ]));
+    $poService->receive($po, [['purchase_order_item_id' => $po->items->first()->id, 'quantity' => 2, 'stock_lot_id' => null, 'new_lot_number' => null, 'new_lot_expiry_date' => null]]);
+    $supplier->delete(); // soft delete: o relacionamento volta null
+
+    $period = [now()->subDay()->toDateString(), now()->addDay()->toDateString()];
+
+    app()->setLocale('pt_BR');
+    expect($this->reports->purchasesBySupplier($this->entity->id, ...$period)[0]['supplier_name'])->toBe('Fornecedor removido');
+
+    app()->setLocale('en');
+    expect($this->reports->purchasesBySupplier($this->entity->id, ...$period)[0]['supplier_name'])->toBe('Removed supplier');
 });

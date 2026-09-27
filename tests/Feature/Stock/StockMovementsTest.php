@@ -263,3 +263,65 @@ it('[ISOLAMENTO] stock_lot_id de outra clínica é rejeitado (exists rule escopa
         ->assertStatus(422)
         ->assertJsonValidationErrors('stock_lot_id');
 });
+
+/*
+ * Volta à listagem (App\Http\Controllers\Concerns\RedirectsToListing): antes o
+ * store() ia para o index "limpo" e a barra mostrava filtros que a lista já
+ * não aplicava.
+ */
+function movementStorePayload($test): array
+{
+    return [
+        'entity_product_id' => $test->product->id,
+        'type'              => 'manual_in',
+        'quantity'          => 1,
+        'unit_cost'         => 5.00,
+    ];
+}
+
+it('store() volta ao extrato mantendo só busca/produto/tipo/ordem/página da listagem', function () {
+    $index   = route('panel.stock.movements.index');
+    $referer = $index . '?' . http_build_query([
+        'search'            => 'colirio',
+        'entity_product_id' => $this->product->id,
+        'type'              => 'manual_in',
+        'sort'              => 'quantity',
+        'direction'         => 'asc',
+        'page'              => '2',
+        'next'              => 'https://evil.test',   // desconhecido: descartado
+        'empty'             => '',
+    ]);
+
+    actingAsMovementAdmin($this)
+        ->from($referer)
+        ->post(route('panel.stock.movements.store'), movementStorePayload($this))
+        ->assertRedirect($index . '?' . http_build_query([
+            'search'            => 'colirio',
+            'entity_product_id' => $this->product->id,
+            'type'              => 'manual_in',
+            'sort'              => 'quantity',
+            'direction'         => 'asc',
+            'page'              => '2',
+        ]))
+        ->assertSessionHas('message', __('stock.movement_registered'));
+});
+
+it('store() ignora Referer de outra página/domínio e parâmetros em array (sem open redirect)', function () {
+    $index = route('panel.stock.movements.index');
+    $path  = (string) parse_url($index, PHP_URL_PATH);
+
+    foreach (['https://evil.test/phish?search=x', route('panel.stock.products.index') . '?search=x'] as $referer) {
+        actingAsMovementAdmin($this)
+            ->from($referer)
+            ->post(route('panel.stock.movements.store'), movementStorePayload($this))
+            ->assertRedirect($index);
+    }
+
+    // Mesmo caminho em outro host: a URL é montada pela NOSSA rota; array cai fora.
+    actingAsMovementAdmin($this)
+        ->from('https://evil.test' . $path . '?search=x&type[]=loss&sort[]=quantity')
+        ->post(route('panel.stock.movements.store'), movementStorePayload($this))
+        ->assertRedirect($index . '?search=x');
+
+    expect(StockMovement::query()->where('entity_product_id', $this->product->id)->count())->toBe(3);
+});

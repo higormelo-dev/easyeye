@@ -1,4 +1,7 @@
 <script setup>
+import { computed, nextTick, useId, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
+
 /**
  * OffcanvasPanel — Modal centralizado na tela.
  *
@@ -20,14 +23,47 @@
  *   #default – conteúdo principal (body scrollável)
  *   #footer  – rodapé fixo com botões de ação
  */
-defineProps({
+const props = defineProps({
     open:         { type: Boolean, required: true },
     width:        { type: Number,  default: 540 },
     loading:      { type: Boolean, default: false },
-    loadingLabel: { type: String,  default: 'Carregando...' },
+    loadingLabel: { type: String,  default: '' },
+    /** Rótulo acessível do botão fechar; padrão: `t_ui.close` (idioma do usuário). */
+    closeLabel:   { type: String,  default: '' },
 });
 
 defineEmits(['close']);
+
+// Acessibilidade: o diálogo é nomeado pelo conteúdo do #header (título) e o
+// botão fechar tem rótulo no idioma do usuário (t_ui compartilhado).
+const page    = usePage();
+const titleId = `ee-modal-title-${useId()}`;
+
+const closeText   = computed(() => props.closeLabel || page?.props?.t_ui?.close || 'Fechar');
+
+// Foco: ao fechar, volta para quem abriu (botão/linha) — sem isso ia para o
+// <body> e o teclado recomeçava do topo. Só devolve se o foco ficou perdido: a
+// página pode ter movido o foco de propósito (ex.: abrir outro modal).
+let returnFocusTo = null;
+
+watch(() => props.open, (isOpen, wasOpen) => {
+    if (isOpen && !wasOpen) {
+        returnFocusTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+        return;
+    }
+
+    if (!isOpen && wasOpen) {
+        const target = returnFocusTo;
+        returnFocusTo = null;
+
+        nextTick(() => {
+            const active = document.activeElement;
+            if (target?.isConnected && (!active || active === document.body)) target.focus({ preventScroll: true });
+        });
+    }
+});
+const loadingText = computed(() => props.loadingLabel || page?.props?.t_ui?.loading || 'Carregando...');
 </script>
 
 <template>
@@ -46,6 +82,7 @@ defineEmits(['close']);
                  class="ee-modal__wrap"
                  role="dialog"
                  aria-modal="true"
+                 :aria-labelledby="$slots.header ? titleId : undefined"
                  @click.self="$emit('close')">
 
                 <div class="ee-modal__dialog"
@@ -53,11 +90,13 @@ defineEmits(['close']);
 
                     <!-- Header -->
                     <div class="ee-modal__header">
-                        <div class="ee-modal__header-content">
+                        <div :id="titleId" class="ee-modal__header-content">
                             <slot name="header" />
                         </div>
                         <button type="button"
                                 class="btn-close flex-shrink-0"
+                                :aria-label="closeText"
+                                :title="closeText"
                                 @click="$emit('close')" />
                     </div>
 
@@ -69,7 +108,7 @@ defineEmits(['close']);
                     <!-- Estado de carregamento -->
                     <div v-if="loading" class="text-center py-5">
                         <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">{{ loadingLabel }}</span>
+                            <span class="visually-hidden">{{ loadingText }}</span>
                         </div>
                     </div>
 

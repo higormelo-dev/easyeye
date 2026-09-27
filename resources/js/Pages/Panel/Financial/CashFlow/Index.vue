@@ -1,254 +1,617 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { router } from '@inertiajs/vue3';
-import AppLayout         from '@/Layouts/AppLayout.vue';
-import PageHeader        from '@/Components/Panel/PageHeader.vue';
-import TablePagination   from '@/Components/Panel/TablePagination.vue';
-import ActionDropdown    from '@/Components/Panel/ActionDropdown.vue';
-import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup   from '@/Components/Panel/ActionIconGroup.vue';
-import SearchSelect      from '@/Components/Panel/SearchSelect.vue';
-import CashEntryFormModal from './CashEntryFormModal.vue';
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from 'vue';
+import { Link, router } from '@inertiajs/vue3';
+import AppLayout          from '@/Layouts/AppLayout.vue';
+import PageHeader         from '@/Components/Panel/PageHeader.vue';
+import PeriodFilter       from '@/Components/Panel/PeriodFilter.vue';
+import KpiCard            from '@/Components/Panel/KpiCard.vue';
+import SearchInput        from '@/Components/Panel/SearchInput.vue';
+import SearchSelect       from '@/Components/Panel/SearchSelect.vue';
+import TablePagination    from '@/Components/Panel/TablePagination.vue';
+import CenteredModal      from '@/Components/Panel/CenteredModal.vue';
+import { useTrans }        from '@/composables/useTrans';
+import CashEntryFormModal  from './CashEntryFormModal.vue';
+import CashFlowTable       from './CashFlowTable.vue';
+import CashFlowCards       from './CashFlowCards.vue';
+import { useCashEntryFormat } from './useCashEntryFormat.js';
 
+/**
+ * Fluxo de caixa: filtros na mesma barra (período, busca, tipo, status,
+ * categoria) aplicados automaticamente, KPIs do servidor com os MESMOS
+ * filtros da tabela (overview), tabela ordenável (md+) / cards (abaixo de md)
+ * com totais do conjunto filtrado, lançamento em modal e exclusão confirmada.
+ */
 const props = defineProps({
-    breadcrumbs: { type: Array,  default: () => [] },
-    entries:     { type: Object, required: true },
-    categories:  { type: Array,  default: () => [] },
-    summary:     { type: Object, default: () => ({}) },
-    filters:     { type: Object, default: () => ({}) },
-    t:           { type: Object, default: () => ({}) },
+    breadcrumbs:       { type: Array,   default: () => [] },
+    entries:           { type: Object,  required: true },
+    overview:          { type: Object,  default: () => ({}) },
+    categories:        { type: Array,   default: () => [] },
+    covenants:         { type: Array,   default: () => [] },
+    payment_methods:   { type: Array,   default: () => [] },
+    // Fechamentos ativos que cruzam o período filtrado ([{ period_start, period_end }]).
+    closed_periods:    { type: Array,   default: () => [] },
+    filters:           { type: Object,  default: () => ({}) },
+    today:             { type: String,  default: '' },
+    can_edit_schedule: { type: Boolean, default: false },
+    t:                 { type: Object,  default: () => ({}) },
 });
 
-const form = ref({ ...props.filters });
+const { tx } = useTrans(() => props.t);
+const { money, signedMoney, date, typeLabel, statusLabel, entryAmount } = useCashEntryFormat(() => props.t);
 
-function applyFilter() {
-    router.get(route('panel.financial.cash-flow.index'), form.value, {
-        preserveState: true, preserveScroll: true,
+const uid = useId();
+const ids = {
+    category: `cash-flow-category-${uid}`,
+    delTitle: `cash-flow-delete-title-${uid}`,
+};
+
+const SEARCH_DEBOUNCE_MS = 400;
+const STATUSES           = ['pending', 'paid', 'cancelled'];
+const DEFAULT_SORT       = 'entry_date';
+const DEFAULT_DIRECTION  = 'desc';
+
+// `today` junto: aba aberta de um dia para o outro recebe o dia novo ao salvar/excluir.
+const RELOAD_PROPS = ['entries', 'overview', 'closed_periods', 'today'];
+
+const rows = computed(() => props.entries?.data ?? []);
+
+// ── Filtros: estado local (fonte da verdade da barra), aplicados na hora ────
+const period         = ref({ from: props.filters.from ?? '', to: props.filters.to ?? '' });
+
+// O servidor normaliza o período (data inválida → mês atual; início > fim →
+// invertido): a barra passa a mostrar o período que os KPIs/tabela usam.
+watch(() => [props.filters.from, props.filters.to], ([from, to]) => {
+    period.value = { from: from ?? '', to: to ?? '' };
+});
+const search         = ref(props.filters.search ?? '');
+const typeFilter     = ref(props.filters.type ?? '');
+const statusFilter   = ref(props.filters.status ?? '');
+const categoryFilter = ref(props.filters.category_id ?? '');
+const loading        = ref(false);
+
+function withoutEmpty(values) {
+    return Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null && v !== undefined && v !== ''));
+}
+
+function queryParams(overrides = {}) {
+    const params = {
+        from:        period.value.from,
+        to:          period.value.to,
+        search:      search.value.trim(),
+        type:        typeFilter.value,
+        status:      statusFilter.value,
+        category_id: categoryFilter.value,
+        sort:        props.filters.sort,
+        direction:   props.filters.direction,
+        ...overrides,
+    };
+
+    // Ordenação padrão fica fora da URL.
+    if (params.sort === DEFAULT_SORT && params.direction === DEFAULT_DIRECTION) {
+        params.sort      = '';
+        params.direction = '';
+    }
+
+    return withoutEmpty(params);
+}
+
+/** Troca de filtro/ordem: volta para a página 1, mantém o resto e não empilha histórico. */
+function visit(overrides = {}) {
+    router.get(route('panel.financial.cash-flow.index'), queryParams(overrides), {
+        preserveState:  true,
+        preserveScroll: true,
+        replace:        true,
+        onStart:        () => { loading.value = true; },
+        onFinish:       () => { loading.value = false; },
     });
 }
 
-function resetFilter() {
-    router.get(route('panel.financial.cash-flow.index'));
+let searchTimer       = null;
+let skipSearchWatcher = false;
+
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = null;
+
+    if (skipSearchWatcher) {
+        skipSearchWatcher = false;
+
+        return;
+    }
+
+    searchTimer = setTimeout(() => {
+        searchTimer = null;
+        visit();
+    }, SEARCH_DEBOUNCE_MS);
+});
+
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onPeriodChange({ from, to }) {
+    period.value = { from, to };
+    visit();
 }
 
-function brl(v) {
-    return 'R$ ' + Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const typeOptions = computed(() => [
+    { value: '',        label: props.t.filter_type_all },
+    { value: 'income',  label: props.t.filter_type_income },
+    { value: 'expense', label: props.t.filter_type_expense },
+]);
+
+function setType(value) {
+    if (typeFilter.value === value) return;
+
+    typeFilter.value = value;
+
+    // Categoria do outro tipo nunca teria resultado: sai junto.
+    const category = props.categories.find((c) => c.id === categoryFilter.value);
+    if (value && category && category.type !== value) categoryFilter.value = '';
+
+    visit();
 }
+
+function onStatusChange(event) {
+    statusFilter.value = event.target.value;
+    visit();
+}
+
+const categoryOptions = computed(() => (typeFilter.value
+    ? props.categories.filter((c) => c.type === typeFilter.value)
+    : props.categories));
+
+function onCategoryChange(value) {
+    const next = value ?? '';
+    if (next === categoryFilter.value) return;
+
+    categoryFilter.value = next;
+    visit();
+}
+
+function onSort({ sort, direction }) {
+    visit({ sort, direction });
+}
+
+const hasListFilters = computed(() => !!(search.value.trim() || typeFilter.value || statusFilter.value || categoryFilter.value));
+
+/** Limpa busca, tipo, status e categoria; o período escolhido continua. */
+function clearFilters() {
+    clearTimeout(searchTimer);
+    searchTimer = null;
+
+    if (search.value !== '') skipSearchWatcher = true;
+
+    search.value         = '';
+    typeFilter.value     = '';
+    statusFilter.value   = '';
+    categoryFilter.value = '';
+    visit();
+}
+
+/**
+ * Recarrega lista/KPIs após salvar ou excluir. Se a página atual (> 1) ficou
+ * vazia — excluiu o último item dela —, vai para a última página com dados em
+ * vez de mostrar "nenhum lançamento" com o total ainda > 0.
+ */
+function reloadList() {
+    router.reload({
+        only: RELOAD_PROPS,
+        onSuccess: (page) => {
+            const entries = page?.props?.entries;
+            if (!entries || entries.data?.length || !(entries.current_page > 1) || !entries.last_page_url) return;
+
+            router.get(entries.last_page_url, {}, { preserveState: true, preserveScroll: true, replace: true });
+        },
+    });
+}
+
+// ── Atalhos do cabeçalho (mantêm o De/Até atual) ────────────────────────────
+const periodParams = computed(() => withoutEmpty({ from: props.filters.from, to: props.filters.to }));
+
+// Fechamento não aceita fim no futuro: o atalho já leva o "Até" limitado a hoje.
+const closeCashHref = computed(() => {
+    const to = props.today && props.filters.to && props.filters.to > props.today ? props.today : props.filters.to;
+
+    return route('panel.financial.cash-closing.index', withoutEmpty({ from: props.filters.from, to }));
+});
+const reportHref = computed(() => route('panel.financial.reports.cash-flow', periodParams.value));
+
+// ── Aviso de período fechado ────────────────────────────────────────────────
+const closedPeriodsText = computed(() => props.closed_periods
+    .map((p) => `${date(p.period_start)}–${date(p.period_end)}`)
+    .join(', '));
+
+// ── KPIs (overview do servidor, mesmos filtros da tabela) ───────────────────
+const kpis = computed(() => {
+    const o = props.overview ?? {};
+
+    return [
+        { key: 'received',          tone: 'success',   icon: 'ti ti-arrow-down-left', value: money(o.received ?? 0) },
+        { key: 'receivable',        tone: 'info',      icon: 'ti ti-clock',           value: money(o.receivable ?? 0) },
+        { key: 'paid',              tone: 'danger',    icon: 'ti ti-arrow-up-right',  value: money(o.paid ?? 0) },
+        { key: 'payable',           tone: 'warning',   icon: 'ti ti-clock-pause',     value: money(o.payable ?? 0) },
+        { key: 'realized_balance',  tone: 'primary',   icon: 'ti ti-scale',           value: signedMoney(o.realized_balance ?? 0) },
+        { key: 'projected_balance', tone: 'secondary', icon: 'ti ti-trending-up',     value: signedMoney(o.projected_balance ?? 0) },
+    ].map((kpi) => ({ ...kpi, label: props.t[`kpi_${kpi.key}`], hint: props.t[`kpi_${kpi.key}_hint`] }));
+});
+
+// ── Modal de lançamento ─────────────────────────────────────────────────────
+const formOpen     = ref(false);
+const editingEntry = ref(null);
+
+function openCreate() {
+    editingEntry.value = null;
+    formOpen.value     = true;
+}
+
+function openEdit(entry) {
+    if (entry.lock_reason) return;
+
+    editingEntry.value = entry;
+    formOpen.value     = true;
+}
+
+/** `keepOpen`: "Salvar e lançar outro" — o modal continua aberto para o próximo. */
+function onSaved({ message = '', entryDate = '', keepOpen = false } = {}) {
+    if (!keepOpen) formOpen.value = false;
+
+    let text = message;
+    if (entryDate && ((props.filters.from && entryDate < props.filters.from) || (props.filters.to && entryDate > props.filters.to))) {
+        // Sem este aviso o lançamento "sumia" da lista e era lançado de novo (duplicado).
+        text = `${text} ${tx('saved_outside_period', { date: date(entryDate) })}`.trim();
+    }
+    if (text) window.showSuccessToast?.(text);
+
+    reloadList();
+}
+
+// ── Exclusão com confirmação (resumo do lançamento) ─────────────────────────
+const deleting        = ref(null);
+const deleteBusy      = ref(false);
+const deleteError     = ref('');
+const deleteCancelBtn = ref(null);
 
 function csrf() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 }
 
-// ── Form modal ──────────────────────────────────────────────────────────────
-const formOpen   = ref(false);
-const editingId  = ref(null);
+function errorMessageFrom(json, status, fallback) {
+    const first = json?.errors && typeof json.errors === 'object' ? Object.values(json.errors)[0] : null;
+    if (first) return Array.isArray(first) ? String(first[0] ?? '') : String(first);
+    if (status === 419) return props.t.session_expired;
 
-function openCreate() { editingId.value = null;  formOpen.value = true; }
-function openEdit(e)  { editingId.value = e.id; formOpen.value = true; }
-function onSaved()    { formOpen.value = false; router.reload({ only: ['entries', 'summary'] }); }
+    return json?.message || fallback;
+}
 
-async function onDelete(entry) {
-    if (!confirm('Excluir este lançamento?')) return;
-    const res = await fetch(route('panel.financial.cash-flow.destroy', entry.id), {
-        method: 'DELETE',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
-    });
-    if (res.ok) {
-        if (window.showSuccessToast) window.showSuccessToast('Lançamento removido.');
-        router.reload({ only: ['entries', 'summary'] });
-    } else if (window.showErrorToast) {
-        window.showErrorToast('Erro ao remover.');
+function askDelete(entry) {
+    if (entry.lock_reason) return;
+
+    deleteError.value = '';
+    deleting.value    = entry;
+}
+
+function cancelDelete() {
+    if (deleteBusy.value) return;
+
+    deleting.value = null;
+}
+
+async function confirmDelete() {
+    const entry = deleting.value;
+    if (!entry || deleteBusy.value) return;
+
+    deleteBusy.value  = true;
+    deleteError.value = '';
+
+    try {
+        const res = await fetch(route('panel.financial.cash-flow.destroy', entry.id), {
+            method:  'DELETE',
+            headers: { Accept: 'application/json', 'X-CSRF-TOKEN': csrf() },
+        });
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            deleteError.value = errorMessageFrom(json, res.status, props.t.delete_error);
+
+            return;
+        }
+
+        deleting.value = null;
+        window.showSuccessToast?.(json.message || props.t.deleted);
+        reloadList();
+    } catch {
+        deleteError.value = props.t.network_error;
+    } finally {
+        deleteBusy.value = false;
     }
 }
 
-const typeBadge = (t) => t === 'income'
-    ? 'badge badge-soft-success rounded text-success border border-success'
-    : 'badge badge-soft-danger rounded text-danger border border-danger';
+function onDeleteKeydown(event) {
+    if (event.key === 'Escape') cancelDelete();
+}
 
-const statusBadge = (s) => {
-    if (s === 'paid')      return 'badge bg-success';
-    if (s === 'pending')   return 'badge bg-warning text-dark';
-    if (s === 'cancelled') return 'badge bg-danger';
-    return 'badge bg-secondary';
-};
+watch(deleting, async (entry) => {
+    if (!entry) {
+        document.removeEventListener('keydown', onDeleteKeydown);
+
+        return;
+    }
+
+    document.addEventListener('keydown', onDeleteKeydown);
+    await nextTick();
+    deleteCancelBtn.value?.focus();
+});
+
+onBeforeUnmount(() => document.removeEventListener('keydown', onDeleteKeydown));
+
+const deletingId = computed(() => (deleteBusy.value ? deleting.value?.id : null));
 </script>
 
 <template>
-    <AppLayout :title="t.cashflow?.breadcrumb ?? 'Fluxo de Caixa'" :breadcrumbs="breadcrumbs">
+    <AppLayout :title="t.page_title" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader :title="t.cashflow?.breadcrumb ?? 'Fluxo de Caixa'">
+            <PageHeader :title="t.page_title" :total="entries.total ?? 0" :total-label="t.total_label">
                 <template #actions>
-                    <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i>{{ t.cashflow?.new_entry ?? 'Novo lançamento' }}
-                    </button>
+                    <div class="d-flex flex-wrap gap-2">
+                        <Link :href="reportHref" class="btn btn-outline-secondary btn-sm" data-test="report-link">
+                            <i class="ti ti-report-analytics me-1" aria-hidden="true"></i>{{ t.report }}
+                        </Link>
+                        <Link :href="closeCashHref" class="btn btn-outline-primary btn-sm" data-test="close-cash-link">
+                            <i class="ti ti-lock me-1" aria-hidden="true"></i>{{ t.close_cash }}
+                        </Link>
+                        <button type="button" class="btn btn-primary btn-sm" data-test="new-entry" @click="openCreate">
+                            <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.new_entry }}
+                        </button>
+                    </div>
                 </template>
             </PageHeader>
 
-            <!-- KPIs do período -->
-            <div class="row g-3 mb-3">
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-success border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.cashflow?.income_period ?? 'Receitas (período)' }}</small>
-                            <div class="fw-bold fs-5 text-success">{{ brl(summary.income) }}</div>
-                        </div>
-                    </div>
+            <!-- Filtros: aplicação automática (busca com debounce) -->
+            <div class="cash-flow-toolbar d-flex flex-wrap align-items-end gap-2 mb-3" role="search" :aria-label="t.filters_label" data-test="filters">
+                <PeriodFilter
+                    compact
+                    :from="period.from"
+                    :to="period.to"
+                    :today="today"
+                    :labels="t.shared?.period"
+                    @change="onPeriodChange"
+                />
+                <SearchInput
+                    v-model="search"
+                    :placeholder="t.search_placeholder"
+                    :clear-label="t.search_clear"
+                    max-width="300px"
+                    wrapper-class="cash-flow-toolbar__search"
+                />
+                <div class="btn-group btn-group-sm" role="group" :aria-label="t.filter_type" data-test="type-filter">
+                    <button
+                        v-for="option in typeOptions"
+                        :key="option.value || 'all'"
+                        type="button"
+                        class="btn"
+                        :class="typeFilter === option.value ? 'btn-primary' : 'btn-outline-secondary'"
+                        :aria-pressed="typeFilter === option.value ? 'true' : 'false'"
+                        :data-test="`type-${option.value || 'all'}`"
+                        @click="setType(option.value)"
+                    >{{ option.label }}</button>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-danger border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.cashflow?.expense_period ?? 'Despesas (período)' }}</small>
-                            <div class="fw-bold fs-5 text-danger">{{ brl(summary.expense) }}</div>
-                        </div>
-                    </div>
+                <select
+                    class="form-select form-select-sm cash-flow-toolbar__select"
+                    :aria-label="t.filter_status"
+                    :value="statusFilter"
+                    data-test="status-filter"
+                    @change="onStatusChange"
+                >
+                    <option value="">{{ t.filter_status_all }}</option>
+                    <option v-for="status in STATUSES" :key="status" :value="status">{{ statusLabel(status) }}</option>
+                </select>
+                <div class="cash-flow-toolbar__category">
+                    <span :id="ids.category" class="visually-hidden">{{ t.filter_category }}</span>
+                    <SearchSelect
+                        :model-value="categoryFilter"
+                        :options="categoryOptions"
+                        :placeholder="t.filter_category_all"
+                        :aria-labelledby="ids.category"
+                        sm
+                        @update:model-value="onCategoryChange"
+                    />
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-info border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.cashflow?.col_balance ?? 'Saldo' }}</small>
-                            <div class="fw-bold fs-5" :class="(summary.balance ?? 0) >= 0 ? 'text-success' : 'text-danger'">
-                                {{ brl(summary.balance) }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="card border-0 shadow-sm border-start border-warning border-3 h-100">
-                        <div class="card-body py-3">
-                            <small class="text-muted d-block">{{ t.cashflow?.pending ?? 'A receber' }}</small>
-                            <div class="fw-bold fs-5 text-warning">{{ brl(summary.pending) }}</div>
-                        </div>
-                    </div>
-                </div>
+                <button
+                    v-if="hasListFilters"
+                    type="button"
+                    class="btn btn-link btn-sm text-decoration-none"
+                    data-test="clear-filters"
+                    @click="clearFilters"
+                >
+                    <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear }}
+                </button>
+                <span class="small text-muted align-self-center" role="status" aria-live="polite" data-test="filtering">
+                    <template v-if="loading">
+                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ t.filtering }}
+                    </template>
+                </span>
             </div>
 
-            <!-- Filtros -->
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body py-3">
-                    <form @submit.prevent="applyFilter" class="row g-2 align-items-end">
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">{{ t.cashflow?.filter_from ?? 'De' }}</label>
-                            <input v-model="form.from" type="date" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">{{ t.cashflow?.filter_to ?? 'Até' }}</label>
-                            <input v-model="form.to" type="date" class="form-control form-control-sm">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">{{ t.cashflow?.col_type ?? 'Tipo' }}</label>
-                            <SearchSelect
-                                v-model="form.type"
-                                :options="[{ value: 'income', label: t.cashflow?.type_income ?? 'Receita' }, { value: 'expense', label: t.cashflow?.type_expense ?? 'Despesa' }]"
-                                :value-key="'value'"
-                                :label-key="'label'"
-                                :placeholder="t.billing?.all ?? 'Todos'"
-                            />
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">{{ t.cashflow?.col_status ?? 'Status' }}</label>
-                            <SearchSelect
-                                v-model="form.status"
-                                :options="[{ value: 'pending', label: t.cashflow?.status_pending ?? 'Pendente' }, { value: 'paid', label: t.cashflow?.status_paid ?? 'Pago' }, { value: 'cancelled', label: t.cashflow?.status_cancelled ?? 'Cancelado' }]"
-                                :value-key="'value'"
-                                :label-key="'label'"
-                                :placeholder="t.billing?.all ?? 'Todos'"
-                            />
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small mb-1">{{ t.cashflow?.col_category ?? 'Categoria' }}</label>
-                            <SearchSelect
-                                v-model="form.category_id"
-                                :options="categories"
-                                :placeholder="t.billing?.all ?? 'Todas'"
-                            />
-                        </div>
-                        <div class="col-md-1 d-flex gap-1">
-                            <button type="submit" class="btn btn-primary btn-sm">
-                                <i class="ti ti-filter"></i>
+            <!-- KPIs: mesmos filtros da lista, cancelados fora -->
+            <section :aria-label="t.kpis_label" class="mb-2" data-test="kpis">
+                <div class="row g-3">
+                    <div v-for="kpi in kpis" :key="kpi.key" class="col-6 col-md-4 col-xl-2">
+                        <KpiCard
+                            :label="kpi.label"
+                            :value="kpi.value"
+                            :icon="kpi.icon"
+                            :tone="kpi.tone"
+                            :hint="kpi.hint"
+                            :loading="loading"
+                            :test-id="kpi.key"
+                        />
+                    </div>
+                </div>
+            </section>
+            <p class="small text-muted mb-3">
+                <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ t.kpi_scope_note }}
+            </p>
+
+            <!-- Período com caixa fechado -->
+            <div v-if="closed_periods.length" class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2" role="status" data-test="closed-banner">
+                <i class="ti ti-lock" aria-hidden="true"></i>
+                <span class="me-auto">{{ tx('closed_banner', { periods: closedPeriodsText }) }}</span>
+                <Link :href="closeCashHref" class="btn btn-sm btn-outline-secondary">{{ t.closed_banner_link }}</Link>
+            </div>
+
+            <!-- Lista: tabela (md+) e cards (abaixo de md) -->
+            <div class="cash-flow-results" :class="{ 'cash-flow-results--loading': loading }" :aria-busy="loading ? 'true' : 'false'">
+                <div v-if="rows.length === 0" class="card">
+                    <div class="card-body text-center text-muted py-5" data-test="empty-state">
+                        <i class="ti ti-cash-register fs-1 d-block mb-2" aria-hidden="true"></i>
+                        <p class="mb-3">{{ hasListFilters ? t.empty_filtered : t.empty }}</p>
+                        <div class="d-flex justify-content-center flex-wrap gap-2">
+                            <button type="button" class="btn btn-primary btn-sm" data-test="empty-new-entry" @click="openCreate">
+                                <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.new_entry }}
                             </button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm" @click="resetFilter">
-                                <i class="ti ti-refresh"></i>
+                            <button v-if="hasListFilters" type="button" class="btn btn-outline-secondary btn-sm" data-test="empty-clear-filters" @click="clearFilters">
+                                <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear }}
                             </button>
                         </div>
-                    </form>
+                    </div>
                 </div>
+                <template v-else>
+                    <div class="d-none d-md-block">
+                        <CashFlowTable
+                            :rows="rows"
+                            :overview="overview"
+                            :filters="filters"
+                            :busy-id="deletingId"
+                            :t="t"
+                            @sort="onSort"
+                            @edit="openEdit"
+                            @delete="askDelete"
+                        />
+                    </div>
+                    <div class="d-md-none">
+                        <CashFlowCards
+                            :rows="rows"
+                            :overview="overview"
+                            :busy-id="deletingId"
+                            :t="t"
+                            @edit="openEdit"
+                            @delete="askDelete"
+                        />
+                    </div>
+                </template>
             </div>
 
-            <!-- Tabela -->
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="table table-nowrap table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>{{ t.cashflow?.col_date ?? 'Data' }}</th>
-                                <th>{{ t.cashflow?.col_description ?? 'Descrição' }}</th>
-                                <th>{{ t.cashflow?.col_category ?? 'Categoria' }}</th>
-                                <th>{{ t.cashflow?.col_covenant ?? 'Convênio' }}</th>
-                                <th class="text-center">{{ t.cashflow?.col_type ?? 'Tipo' }}</th>
-                                <th class="text-center">{{ t.cashflow?.col_status ?? 'Status' }}</th>
-                                <th class="text-end">{{ t.cashflow?.col_value ?? 'Valor' }}</th>
-                                <th class="text-end">{{ t.cashflow?.col_actions ?? 'Ações' }}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="entries.data.length === 0">
-                                <td colspan="8" class="text-center text-muted py-5">
-                                    <i class="ti ti-cash-register fs-1 d-block mb-2"></i>
-                                    Nenhum lançamento no período.
-                                </td>
-                            </tr>
-                            <tr v-for="entry in entries.data" :key="entry.id">
-                                <td class="text-muted small">{{ entry.entry_date }}</td>
-                                <td class="fw-medium">{{ entry.description }}</td>
-                                <td class="text-muted">{{ entry.category_name || '—' }}</td>
-                                <td class="text-muted">{{ entry.covenant_name || '—' }}</td>
-                                <td class="text-center">
-                                    <span :class="typeBadge(entry.type)">
-                                        {{ entry.type === 'income' ? 'Receita' : 'Despesa' }}
-                                    </span>
-                                </td>
-                                <td class="text-center">
-                                    <span :class="statusBadge(entry.status)" class="rounded fs-11 fw-medium">
-                                        {{ entry.status === 'paid' ? 'Pago' :
-                                           entry.status === 'pending' ? 'Pendente' :
-                                           entry.status === 'cancelled' ? 'Cancelado' : entry.status }}
-                                    </span>
-                                </td>
-                                <td class="text-end fw-bold" :class="entry.type === 'income' ? 'text-success' : 'text-danger'">
-                                    {{ brl(entry.amount) }}
-                                </td>
-                                <td class="text-end">
-                                    <ActionIconGroup align="end" gap="tight">
-                                        <ActionIconButton
-                                            icon="ti ti-edit"
-                                            title="Editar"
-                                            :disabled="entry.has_claim"
-                                            @click="openEdit(entry)"
-                                        />
-                                        <ActionIconButton
-                                            icon="ti ti-trash"
-                                            title="Excluir"
-                                            variant="danger"
-                                            :disabled="entry.has_claim"
-                                            @click="onDelete(entry)"
-                                        />
-                                    </ActionIconGroup>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <TablePagination :data="entries" class="mt-3" />
+            <TablePagination
+                :data="entries"
+                class="mt-3"
+                :showing-from="t.pagination_showing"
+                :showing-of="t.pagination_of"
+                :showing-suffix="t.pagination_suffix"
+                :aria-label="t.pagination_label"
+                :previous-label="t.pagination_previous"
+                :next-label="t.pagination_next"
+            />
 
             <CashEntryFormModal
                 :open="formOpen"
-                :entry-id="editingId"
+                :entry="editingEntry"
                 :categories="categories"
+                :covenants="covenants"
+                :payment-methods="payment_methods"
+                :today="today"
+                :can-edit-schedule="can_edit_schedule"
+                :t="t"
                 @close="formOpen = false"
                 @saved="onSaved"
             />
+
+            <!-- Confirmação de exclusão com o resumo do lançamento -->
+            <CenteredModal :open="!!deleting" size="sm" @close="cancelDelete">
+                <template #header>
+                    <h5 :id="ids.delTitle" class="modal-title mb-0">
+                        <i class="ti ti-trash me-1 text-danger" aria-hidden="true"></i>{{ t.delete_title }}
+                    </h5>
+                </template>
+
+                <template v-if="deleting">
+                    <p class="small text-muted mb-2">{{ t.delete_message }}</p>
+                    <dl class="row small mb-0" data-test="delete-summary">
+                        <template v-if="deleting.code">
+                            <dt class="col-5 fw-medium">{{ t.col_code }}</dt>
+                            <dd class="col-7 mb-1">{{ deleting.code }}</dd>
+                        </template>
+                        <dt class="col-5 fw-medium">{{ t.col_description }}</dt>
+                        <dd class="col-7 mb-1 text-break">{{ deleting.description }}</dd>
+                        <dt class="col-5 fw-medium">{{ t.col_date }}</dt>
+                        <dd class="col-7 mb-1">{{ date(deleting.entry_date) }}</dd>
+                        <dt class="col-5 fw-medium">{{ t.col_type }}</dt>
+                        <dd class="col-7 mb-1">{{ typeLabel(deleting.type) }}</dd>
+                        <dt class="col-5 fw-medium">{{ t.col_value }}</dt>
+                        <dd class="col-7 mb-0 fw-bold">{{ entryAmount(deleting) }}</dd>
+                    </dl>
+
+                    <div v-if="deleteError" class="alert alert-danger small d-flex gap-2 mt-3 mb-0" role="alert" data-test="delete-error">
+                        <i class="ti ti-alert-circle mt-1" aria-hidden="true"></i>
+                        <span>{{ deleteError }}</span>
+                    </div>
+                </template>
+
+                <template #footer>
+                    <button ref="deleteCancelBtn" type="button" class="btn btn-outline-secondary btn-sm" :disabled="deleteBusy" @click="cancelDelete">
+                        {{ t.cancel }}
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-danger btn-sm"
+                        :disabled="deleteBusy"
+                        :aria-busy="deleteBusy ? 'true' : 'false'"
+                        data-test="confirm-delete"
+                        @click="confirmDelete"
+                    >
+                        <span v-if="deleteBusy" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        <i v-else class="ti ti-trash me-1" aria-hidden="true"></i>
+                        {{ t.delete_confirm }}
+                    </button>
+                </template>
+            </CenteredModal>
         </div>
     </AppLayout>
 </template>
+
+<style scoped>
+.cash-flow-toolbar__select {
+    width: auto;
+    min-width: 10rem;
+}
+
+.cash-flow-toolbar__category {
+    min-width: 12rem;
+}
+
+.cash-flow-results {
+    transition: opacity var(--ee-duration-fast, 150ms) ease;
+}
+
+.cash-flow-results--loading {
+    opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cash-flow-results {
+        transition: none;
+    }
+}
+
+/* Celular: busca, status e categoria em linha inteira. */
+@media (max-width: 575.98px) {
+    .cash-flow-toolbar__search,
+    .cash-flow-toolbar__select,
+    .cash-flow-toolbar__category {
+        flex: 1 1 100%;
+    }
+
+    /* SearchInput fixa max-width inline. */
+    .cash-flow-toolbar__search :deep(.input-group) {
+        max-width: none !important;
+    }
+}
+</style>

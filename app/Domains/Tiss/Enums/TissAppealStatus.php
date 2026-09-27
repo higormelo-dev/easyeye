@@ -13,16 +13,14 @@ enum TissAppealStatus: string
     case Rejected   = 'rejected';
     case Cancelled  = 'cancelled';
 
-    public function label(): string
+    /**
+     * Texto em lang/{locale}/financial_glosas.php (pt_BR mantém os rótulos de sempre).
+     * $locale fixo serve para texto PERSISTIDO (histórico TISS), que não pode variar
+     * com o idioma de quem executou a ação.
+     */
+    public function label(?string $locale = null): string
     {
-        return match ($this) {
-            self::Opened     => 'Aberto',
-            self::Submitted  => 'Enviado',
-            self::InAnalysis => 'Em análise',
-            self::Accepted   => 'Aceito',
-            self::Rejected   => 'Rejeitado',
-            self::Cancelled  => 'Cancelado',
-        };
+        return __("financial_glosas.appeal_status.{$this->value}", [], $locale);
     }
 
     public function color(): string

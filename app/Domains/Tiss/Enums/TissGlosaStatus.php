@@ -13,16 +13,14 @@ enum TissGlosaStatus: string
     case Maintained      = 'maintained';
     case Cancelled       = 'cancelled';
 
-    public function label(): string
+    /**
+     * Texto em lang/{locale}/financial_glosas.php (pt_BR mantém os rótulos de sempre).
+     * $locale fixo serve para texto PERSISTIDO (histórico TISS), que não pode variar
+     * com o idioma de quem executou a ação.
+     */
+    public function label(?string $locale = null): string
     {
-        return match ($this) {
-            self::Open            => 'Aberta',
-            self::Appealed        => 'Recorrida',
-            self::PartialReversed => 'Revertida parcialmente',
-            self::Reversed        => 'Revertida',
-            self::Maintained      => 'Mantida',
-            self::Cancelled       => 'Cancelada',
-        };
+        return __("financial_glosas.glosa_status.{$this->value}", [], $locale);
     }
 
     public function color(): string
