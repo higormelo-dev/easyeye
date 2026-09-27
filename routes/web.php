@@ -49,6 +49,7 @@ use App\Http\Controllers\{
     MedicalRecordQuickActionsController,
     MedicalRecordsController,
     SiteController,
+    SiteLegalController,
     SubscriptionExpiredController,
 };
 use App\Http\Controllers\{CallPanelDisplayController, MedicationPresetsController};
@@ -85,7 +86,11 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::get('/', [SiteController::class, 'index'])->name('site.home');
-Route::post('/contato', [SiteController::class, 'contactStore'])->name('contact.store');
+// Documentos oficiais vigentes (term_versions). Outras páginas do rodapé
+// aparecem sozinhas quando ganharem rota nomeada (ver App\Support\Site\SiteLinks).
+Route::get('/privacidade', [SiteLegalController::class, 'privacy'])->name('site.privacy');
+Route::get('/termos', [SiteLegalController::class, 'terms'])->name('site.terms');
+Route::post('/contato', [SiteController::class, 'contactStore'])->middleware('throttle:5,1')->name('contact.store');
 
 // SEO: Sitemap XML dinâmico
 Route::get('/sitemap.xml', function () {

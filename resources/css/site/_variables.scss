@@ -1,3 +1,5 @@
+@use 'sass:color';
+
 // ─── Design Tokens ───────────────────────────────────────────
 $navy:       #0F2551;
 $navy-mid:   #1B3A6B;
@@ -6,6 +8,11 @@ $blue:       #1E5EBF;
 $teal:       #00B4D8;
 $teal-lt:    #90E0EF;
 $teal-dark:  #0096b5;
+// Teal para TEXTO sobre fundo claro (links, rótulos): o $teal dá 2,46:1 no
+// branco (reprova AA); este dá 5,70:1 no branco e 5,30:1 no $bg.
+$teal-ink:   #00708A;
+// Hover do botão primário: teal mais claro, texto navy continua acima de 7:1.
+$teal-hover: color.mix(#fff, $teal, 18%);
 $mint:       #06D6A0;
 $purple:     #6c63ff;
 $orange:     #f97316;
@@ -15,7 +22,7 @@ $yellow:     #f59e0b;
 $bg:         #F4F7FB;
 $bg-white:   #FFFFFF;
 $text:       #1A202C;
-$text-muted: #64748B;
+$text-muted: #5A6A80; // 5,13:1 no $bg e 5,51:1 no branco (o #64748B dava 4,43:1 no $bg)
 $border:     #E2E8F0;
 
 $radius:     12px;
@@ -42,6 +49,7 @@ $bp-xl:  960px;
     --blue:       #{$blue};
     --teal:       #{$teal};
     --teal-lt:    #{$teal-lt};
+    --teal-ink:   #{$teal-ink};
     --mint:       #{$mint};
     --bg:         #{$bg};
     --bg-white:   #{$bg-white};

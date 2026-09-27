@@ -60,6 +60,7 @@
     display: flex;
     align-items: center;
     text-decoration: none;
+    flex-shrink: 0;
 }
 
 .nav-logo-imgs {
@@ -94,6 +95,9 @@
     list-style: none;
 
     a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
         padding: 8px 10px;
         border-radius: 6px;
         color: #3a4a6b;
@@ -111,6 +115,9 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-shrink: 0;
+
+    .btn { white-space: nowrap; }
 }
 
 // Language switcher
@@ -119,6 +126,9 @@
 .lang-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
     gap: 6px;
     background: none;
     border: none;
@@ -148,6 +158,7 @@
 .lang-item {
     display: flex;
     align-items: center;
+    min-height: 44px;
     gap: 8px;
     padding: 9px 12px;
     border-radius: 6px;
@@ -161,16 +172,21 @@
 
     &.active {
         background: rgba($teal, .08);
-        color: $teal;
+        color: $teal-ink;
         font-weight: 600;
     }
 
-    .check { margin-left: auto; font-size: 14px; color: $teal; }
+    .check { margin-left: auto; font-size: 14px; color: $teal-ink; }
 }
 
 // Botão mobile
 .nav-mobile-btn {
     display: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
     background: none;
     border: none;
     cursor: pointer;
@@ -181,16 +197,19 @@
 
 .nav-mobile-menu {
     display: none;
-    position: fixed;
-    top: 70px;
+    position: absolute;
+    top: 100%;
     left: 0; right: 0;
     background: #fff;
     box-shadow: 0 20px 40px rgba($navy, .12);
     padding: 16px 24px 24px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+    max-height: calc(100vh - 76px);
+    max-height: calc(100dvh - 76px);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
     border-top: 1px solid $border;
     z-index: 999;
-
-    &.open { display: block; }
 
     ul {
         list-style: none;
@@ -217,6 +236,7 @@
     a {
         display: flex;
         align-items: center;
+        min-height: 44px;
         gap: 6px;
         padding: 6px 12px;
         border-radius: 999px;
@@ -228,7 +248,7 @@
         transition: all .18s;
 
         &.active,
-        &:hover { border-color: $teal; color: $teal; background: rgba($teal, .06); }
+        &:hover { border-color: $teal; color: $teal-ink; background: rgba($teal, .06); }
     }
 }
 
@@ -239,11 +259,20 @@
     margin-top: 16px;
 }
 
-@include below($bp-lg) {
-    .nav-links,
-    .nav-right    { display: none; }
-    .nav-mobile-btn { display: block; }
+// O conteúdo completo da navegação precisa da largura máxima do container.
+@include below(1200px) {
+    .nav-links { display: none; }
+    .nav-right { margin-left: auto; }
+    .nav-mobile-btn { display: flex; }
+    .nav-mobile-menu.open { display: block; }
 }
+
+@include below($bp-sm) {
+    .nav-right { display: none; }
+}
+
+// Menu móvel aberto: a página de trás não rola (SiteLayout alterna a classe).
+html.site-menu-open { overflow: hidden; }
 
 // ─── Footer ──────────────────────────────────────────────────
 footer {
@@ -253,13 +282,24 @@ footer {
 
 .footer-inner {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr;
+    grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
     gap: 40px;
     margin-bottom: 48px;
 
+    // Tablet: marca na linha de cima e as 3 listas lado a lado (antes 2+1,
+    // com "Empresa" sozinha e meia largura vazia).
     @include below($bp-lg) {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+
+    // Celular: 2 listas por linha. Em coluna única o rodapé passava de
+    // 1.300px de rolagem só de links.
+    @include below(560px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 32px 16px;
+    }
+
+    > * { min-width: 0; overflow-wrap: anywhere; }
 }
 
 .footer-brand {
@@ -278,9 +318,10 @@ footer {
         }
     }
 
+    // Branco a 45% no navy dava 4,49:1; 60% dá 7:1.
     p {
         font-size: 14px;
-        color: rgba(#fff, .45);
+        color: rgba(#fff, .6);
         line-height: 1.7;
         max-width: 280px;
     }
@@ -296,7 +337,7 @@ footer {
         height: 36px;
         border-radius: 8px;
         background: rgba(#fff, .06);
-        color: rgba(#fff, .5);
+        color: rgba(#fff, .6);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -304,12 +345,13 @@ footer {
         transition: all .2s;
         text-decoration: none;
 
-        &:hover { background: $teal; color: #fff; }
+        &:hover { background: $teal; color: $navy; }
     }
 }
 
 .footer-col {
-    h5 {
+    // h2 na hierarquia (antes h5 solto depois do h2 da última seção), mesmo visual.
+    h2 {
         font-size: 13px;
         font-weight: 700;
         color: rgba(#fff, .9);
@@ -326,7 +368,7 @@ footer {
 
         a {
             font-size: 14px;
-            color: rgba(#fff, .45);
+            color: rgba(#fff, .6);
             text-decoration: none;
             transition: color .18s;
 
@@ -344,23 +386,36 @@ footer {
     gap: 16px;
     flex-wrap: wrap;
 
-    p { font-size: 13px; color: rgba(#fff, .3); }
+    p { font-size: 13px; color: rgba(#fff, .5); } // .3 dava 2,6:1
 }
 
 .footer-legal {
     display: flex;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 12px 20px;
 
     a {
         font-size: 13px;
-        color: rgba(#fff, .3);
+        color: rgba(#fff, .5);
         text-decoration: none;
 
-        &:hover { color: rgba(#fff, .6); }
+        &:hover { color: rgba(#fff, .85); }
     }
 }
 
 @include below(500px) {
-    .footer-inner   { grid-template-columns: 1fr; }
     .footer-bottom  { flex-direction: column; text-align: center; }
+    .footer-legal   { justify-content: center; }
+}
+
+@media (pointer: coarse) {
+    .nav-logo { min-height: 44px; } // alvo de toque (a imagem tem 32px)
+    .footer-social a { width: 44px; height: 44px; }
+    .footer-col ul { gap: 0; }
+    .footer-col a,
+    .footer-legal a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+    }
 }

@@ -2,11 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FeatureKey;
 use App\Http\Middleware\SetLocale;
+use App\Http\Requests\SiteContactRequest;
+use App\Mail\SiteContactMessage;
 use App\Models\Plan;
-use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Support\Facades\Log;
+use App\Support\Site\SiteLinks;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\{Log, Mail};
 use Inertia\{Inertia, Response};
+use RuntimeException;
+use Throwable;
 
 class SiteController extends Controller
 {
@@ -27,9 +33,14 @@ class SiteController extends Controller
                 'is_featured'        => (bool) $plan->is_featured,
                 'is_free'            => (float) $plan->price === 0.0,
                 'features'           => $plan->features->map(fn ($f) => [
-                    'id'            => $f->id,
+                    'id' => $f->id,
+                    // Chave estável entre planos: "Tudo do Básico, mais:" e o selo
+                    // "Disponível no …" das funcionalidades comparam por ela.
+                    'key'           => $f->feature->value,
                     'display_label' => $f->formatForDisplay(),
                     'enabled'       => $f->feature->isBoolean() ? $f->boolValue() : true,
+                    // 0 créditos de IA = ausência (não "ilimitado", como nos limites).
+                    'is_none' => $f->feature === FeatureKey::AiMonthlyCredits && $f->intValue() === 0,
                 ])->toArray(),
             ]);
 
@@ -77,6 +88,7 @@ class SiteController extends Controller
             'contactPoint' => [
                 '@type'             => 'ContactPoint',
                 'contactType'       => 'sales',
+                'email'             => config('mail.contact_address'),
                 'availableLanguage' => ['Portuguese', 'English'],
             ],
         ];
@@ -105,27 +117,29 @@ class SiteController extends Controller
         $demoTabs   = ['prontuario', 'agenda', 'imagens', 'laudos'];
         $demoImages = collect($demoTabs)
             ->mapWithKeys(function (string $tab) {
-                $path = public_path("site/images/demo-{$tab}.png");
+                // Recortes em WebP sem dados de teste (os PNG originais ficam como matriz).
+                $path = public_path("site/images/demo-{$tab}.webp");
 
                 return [$tab => file_exists($path) ? filemtime($path) : false];
             })
             ->toArray();
 
-        $howImagePath = public_path('site/images/how-it-works.png');
+        $howImagePath = public_path('site/images/how-it-works.webp');
+        // Recorte real do prontuário no hero: sem o arquivo, o hero fica só com o
+        // texto (nunca com imagem quebrada). public/site/images/* está no .gitignore:
+        // os arquivos entram no repositório com `git add -f`.
+        $heroImagePath = public_path('site/images/hero-prontuario.webp');
 
         return Inertia::render('Site/Home', [
             'plans'          => $plans,
             'appName'        => config('app.name', 'EasyEye'),
+            'heroImage'      => file_exists($heroImagePath) ? filemtime($heroImagePath) : false,
             'howImageExists' => file_exists($howImagePath) ? filemtime($howImagePath) : false,
             'demoImages'     => $demoImages,
             't'              => array_merge(trans('site'), ['pricing_credit_note_html' => $creditNote]),
-            'routes'         => [
-                'siteHome'     => route('site.home'),
-                'register'     => route('register'),
-                'go'           => route('go'),
-                'contactStore' => route('contact.store'),
-            ],
-            'seo' => [
+            'routes'         => [...SiteLinks::routes(), 'contactStore' => route('contact.store')],
+            'contact'        => SiteLinks::contact(),
+            'seo'            => [
                 'canonicalUrl'     => $currentUrl,
                 'currentLocale'    => str_replace('_', '-', $currentLocale),
                 'alternateLocales' => $alternateLocales,
@@ -139,27 +153,27 @@ class SiteController extends Controller
         ]);
     }
 
-    public function contactStore(Request $request): JsonResponse
+    public function contactStore(SiteContactRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'name'      => ['required', 'string', 'max:120'],
-            'email'     => ['required', 'email', 'max:191'],
-            'phone'     => ['required', 'string', 'max:30'],
-            'is_client' => ['nullable', 'string', 'max:60'],
-            'role'      => ['nullable', 'string', 'max:80'],
-            'segment'   => ['nullable', 'string', 'max:80'],
-            'terms'     => ['accepted'],
-        ]);
+        try {
+            // Explicit SMTP avoids the default log mailer or a failover to logs:
+            // neither delivers the message, and both can expose personal data.
+            $sent = Mail::mailer('smtp')
+                ->to(config('mail.contact_address'))
+                ->send(new SiteContactMessage($request->validated()));
 
-        Log::channel('stack')->info('contact_form_submission', [
-            'name'      => $data['name'],
-            'email'     => $data['email'],
-            'phone'     => $data['phone'],
-            'is_client' => $data['is_client'] ?? null,
-            'role'      => $data['role'] ?? null,
-            'segment'   => $data['segment'] ?? null,
-            'ip'        => $request->ip(),
-        ]);
+            if ($sent === null) {
+                throw new RuntimeException('Contact delivery was cancelled.');
+            }
+        } catch (Throwable $exception) {
+            // Do not log the payload, SMTP response, recipient or credentials.
+            Log::error('contact_form_delivery_failed', ['exception_type' => $exception::class]);
+
+            return response()->json([
+                'ok'      => false,
+                'message' => __('site.contact.form.errors.server'),
+            ], 503);
+        }
 
         return response()->json(['ok' => true]);
     }

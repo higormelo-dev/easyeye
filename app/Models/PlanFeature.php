@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Number;
 
 class PlanFeature extends Model
 {
@@ -64,29 +65,22 @@ class PlanFeature extends Model
         }
 
         $n = $this->intValue();
+        // Plural e separador de milhar no idioma: "Até 1 médico", "Até 10.000 pacientes"
+        // (antes "Até 1 médico(s)" e "10000").
+        $count = fn (string $key): string => trans_choice("subscriptions.features.{$key}", $n, [
+            'n' => Number::format($n, locale: app()->getLocale()),
+        ]);
 
         return match ($feature) {
-            FeatureKey::MaxDoctors => $n === 0
-                                                ? __('subscriptions.features.max_doctors_unlimited')
-                                                : __('subscriptions.features.max_doctors_count', ['n' => $n]),
-            FeatureKey::MaxPatients => $n === 0
-                                                ? __('subscriptions.features.max_patients_unlimited')
-                                                : __('subscriptions.features.max_patients_count', ['n' => $n]),
-            FeatureKey::MaxUsers => $n === 0
-                                                ? __('subscriptions.features.max_users_unlimited')
-                                                : __('subscriptions.features.max_users_count', ['n' => $n]),
-            FeatureKey::MaxStorageGB => $n === 0
-                                                ? __('subscriptions.features.max_storage_unlimited')
-                                                : __('subscriptions.features.max_storage_count', ['n' => $n]),
-            FeatureKey::AiMonthlyCredits => $n === 0
-                                                ? __('subscriptions.features.ai_credits_none')
-                                                : __('subscriptions.features.ai_credits_count', ['n' => $n]),
-            FeatureKey::ApiMonthlyExamSends => $n === 0
-                                                ? __('subscriptions.features.api_exam_sends_unlimited')
-                                                : __('subscriptions.features.api_exam_sends_count', ['n' => $n]),
-            default => $n === 0
-                                                ? __('subscriptions.features.generic_unlimited', ['label' => $feature->label()])
-                                                : __('subscriptions.features.generic_count', ['label' => $feature->label(), 'n' => $n]),
+            FeatureKey::MaxDoctors          => $n === 0 ? __('subscriptions.features.max_doctors_unlimited') : $count('max_doctors_count'),
+            FeatureKey::MaxPatients         => $n === 0 ? __('subscriptions.features.max_patients_unlimited') : $count('max_patients_count'),
+            FeatureKey::MaxUsers            => $n === 0 ? __('subscriptions.features.max_users_unlimited') : $count('max_users_count'),
+            FeatureKey::MaxStorageGB        => $n === 0 ? __('subscriptions.features.max_storage_unlimited') : $count('max_storage_count'),
+            FeatureKey::AiMonthlyCredits    => $n === 0 ? __('subscriptions.features.ai_credits_none') : $count('ai_credits_count'),
+            FeatureKey::ApiMonthlyExamSends => $n === 0 ? __('subscriptions.features.api_exam_sends_unlimited') : $count('api_exam_sends_count'),
+            default                         => $n === 0
+                ? __('subscriptions.features.generic_unlimited', ['label' => $feature->label()])
+                : __('subscriptions.features.generic_count', ['label' => $feature->label(), 'n' => Number::format($n, locale: app()->getLocale())]),
         };
     }
 }

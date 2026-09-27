@@ -21,23 +21,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
-/**
- * Extrai o número alvo de um texto de métrica (ex: "50k+" → 50, "120 + " → 120,
- * "1.250" → 1250) e devolve { target, prefix, suffix } para preservar formatação.
- */
-function parseMetric(text) {
-    const trimmed = (text ?? '').trim();
-    const match = trimmed.match(/^(\D*)([\d.,]+)(.*)$/);
-    if (!match) return null;
-
-    const [, prefix, num, suffix] = match;
-    const target = parseInt(num.replace(/[.,]/g, ''), 10);
-    if (Number.isNaN(target) || target <= 0) return null;
-
-    return { target, prefix, suffix };
-}
-
-export function initSiteAnimations() {
+export function initSiteAnimations(locale = 'pt-BR') {
     // ── Acessibilidade ───────────────────────────────────────────────────────
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) {
@@ -46,6 +30,7 @@ export function initSiteAnimations() {
 
     // Garante limpeza de execuções anteriores (HMR/navegação Inertia)
     ScrollTrigger.getAll().forEach(st => st.kill());
+    const originalMetrics = new Map();
 
     const context = gsap.context(() => {
 
@@ -54,32 +39,13 @@ export function initSiteAnimations() {
         heroTl
             .from('.hero-title', { y: 40, opacity: 0, duration: 1.0 })
             .from('.hero-sub', { y: 24, opacity: 0, duration: 0.8 }, '-=0.5')
-            .from('.hero-ctas > *', { y: 16, opacity: 0, duration: 0.6, stagger: 0.1 }, '-=0.4')
+            // A nota do teste grátis (só existe com plano em teste) entra junto dos botões.
+            .from('.hero-ctas > *, .hero-cta-note', { y: 16, opacity: 0, duration: 0.6, stagger: 0.1 }, '-=0.4')
             .from('.hero-trust', { y: 16, opacity: 0, duration: 0.6 }, '-=0.3');
 
         // ── Hero visual: mockup + cards flutuantes (entrada imediata) ────────
-        gsap.from('.hero-mockup', {
-            scale: 0.94,
-            opacity: 0,
-            duration: 1.2,
-            ease: 'back.out(1.4)',
-            delay: 0.4,
-        });
-
-        gsap.from('.hero-float-card.card-top', {
-            x: -30, y: -20, opacity: 0, duration: 0.9, delay: 0.9, ease: 'power2.out',
-        });
-        gsap.from('.hero-float-card.card-bottom', {
-            x: 30, y: 20, opacity: 0, duration: 0.9, delay: 1.1, ease: 'power2.out',
-        });
-
-        // Float cards: movimento contínuo (subtle floating)
-        gsap.to('.hero-float-card.card-top', {
-            y: '+=12', duration: 3.5, ease: 'sine.inOut', repeat: -1, yoyo: true,
-        });
-        gsap.to('.hero-float-card.card-bottom', {
-            y: '-=12', duration: 4, ease: 'sine.inOut', repeat: -1, yoyo: true, delay: 0.5,
-        });
+        // Só existe com o print do prontuário publicado (ver heroImage no SiteController).
+        if (document.querySelector('.hero-visual')) animateHeroVisual();
 
         // ── Hero blobs: ambiente decorativo ──────────────────────────────────
         gsap.to('.hero-blob-1', {
@@ -91,18 +57,28 @@ export function initSiteAnimations() {
 
         // ── Metrics counter (fail-safe: sem trigger, o texto original fica) ──
         document.querySelectorAll('.metric-value').forEach(el => {
-            const parsed = parseMetric(el.textContent);
-            if (!parsed) return;
+            // Numeric data is separate from the translated display string.
+            // Parsing "99,9%" as digits previously changed the claim to 999%.
+            const target = Number(el.dataset.amount);
+            const decimals = Number(el.dataset.decimals ?? 0);
+            if (!Number.isFinite(target) || target <= 0 || !Number.isInteger(decimals) || decimals < 0 || decimals > 20) return;
+            const formatter = new Intl.NumberFormat(locale.replace('_', '-'), {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
+            });
+            const original = el.textContent;
+            originalMetrics.set(el, original);
 
             const obj = { val: 0 };
             gsap.to(obj, {
-                val: parsed.target,
+                val: target,
                 duration: 2.0,
                 ease: 'power2.out',
-                snap: { val: 1 },
+                snap: { val: 10 ** -decimals },
                 onUpdate: () => {
-                    el.textContent = `${parsed.prefix}${Math.round(obj.val).toLocaleString('pt-BR')}${parsed.suffix}`;
+                    el.textContent = `${el.dataset.prefix ?? ''}${formatter.format(obj.val)}${el.dataset.suffix ?? ''}`;
                 },
+                onComplete: () => { el.textContent = original; },
                 scrollTrigger: { trigger: el, start: 'top 88%', once: true },
             });
         });
@@ -115,6 +91,34 @@ export function initSiteAnimations() {
     // ── Cleanup function ─────────────────────────────────────────────────────
     return () => {
         context.revert();
+        originalMetrics.forEach((text, el) => { el.textContent = text; });
         ScrollTrigger.getAll().forEach(st => st.kill());
     };
+}
+
+// Print do prontuário e cartões flutuantes: entrada imediata e flutuação leve.
+// Chamada dentro do gsap.context acima (o revert do cleanup também desfaz estes).
+function animateHeroVisual() {
+    gsap.from('.hero-mockup', {
+        scale: 0.94,
+        opacity: 0,
+        duration: 1.2,
+        ease: 'back.out(1.4)',
+        delay: 0.4,
+    });
+
+    gsap.from('.hero-float-card.card-top', {
+        x: -30, y: -20, opacity: 0, duration: 0.9, delay: 0.9, ease: 'power2.out',
+    });
+    gsap.from('.hero-float-card.card-bottom', {
+        x: 30, y: 20, opacity: 0, duration: 0.9, delay: 1.1, ease: 'power2.out',
+    });
+
+    // Float cards: movimento contínuo (subtle floating)
+    gsap.to('.hero-float-card.card-top', {
+        y: '+=12', duration: 3.5, ease: 'sine.inOut', repeat: -1, yoyo: true,
+    });
+    gsap.to('.hero-float-card.card-bottom', {
+        y: '-=12', duration: 4, ease: 'sine.inOut', repeat: -1, yoyo: true, delay: 0.5,
+    });
 }
