@@ -1,0 +1,139 @@
+Esta Política de Privacidade explica como o EasyEye trata dados pessoais no site, no relacionamento comercial e na plataforma de gestão de clínicas oftalmológicas. Ela se aplica a visitantes, representantes de clínicas, profissionais, usuários, pacientes e seus responsáveis, conforme o serviço utilizado.
+
+Você encontrará aqui quais informações podem ser tratadas, para quais finalidades, com quem podem ser compartilhadas e como exercer seus direitos. A leitura desta política não constitui autorização genérica para o uso de dados nem substitui consentimentos específicos, quando necessários.
+
+1. Quem somos e qual é a nossa responsabilidade
+
+O EasyEye oferece ferramentas para agendamento, prontuário eletrônico, exames e imagens oftalmológicas, documentos clínicos, gestão financeira e acesso do paciente às informações disponibilizadas pela clínica.
+
+Responsável pelo EasyEye: {{controller_identity}}.
+
+No relacionamento comercial, na gestão das contas contratantes e nas operações próprias de suporte e segurança, o responsável pelo EasyEye atua como controlador: define a finalidade e as condições desses tratamentos.
+
+Em relação aos dados de pacientes inseridos pelas clínicas e pelos profissionais, o EasyEye atua como operador, tratando as informações em nome do controlador responsável pelo atendimento e conforme suas instruções e o contrato. A clínica ou o profissional define a finalidade assistencial, os registros necessários, as permissões de sua equipe e a base legal aplicável. Cada agente mantém as responsabilidades que a legislação lhe atribui.
+
+Para pedidos sobre prontuários, exames, correção de registros assistenciais ou atendimento, procure a clínica ou o profissional responsável. O canal indicado ao final desta política também pode orientar o encaminhamento e apoiar o atendimento da solicitação.
+
+2. Quais dados tratamos e de onde eles vêm
+
+As informações variam conforme os módulos utilizados e podem ser fornecidas diretamente por você, por representantes autorizados, pela clínica ou por integrações habilitadas por ela.
+
+- Contato e relacionamento comercial: nome, e-mail, telefone, cargo ou função, segmento de atuação, vínculo com a clínica e conteúdo das mensagens enviadas para contato, demonstração ou suporte.
+- Cadastro e acesso: dados de identificação e contato de usuários e profissionais, vínculo com a organização, registro profissional, credenciais protegidas, permissões e informações de autenticação.
+- Pacientes e responsáveis: nome, documentos de identificação, data de nascimento, dados de contato e endereço, identificação do responsável e informações de convênio necessárias ao atendimento.
+- Saúde e assistência: histórico clínico, anamnese, diagnósticos, prescrições, resultados de exames, laudos, imagens oftalmológicas, documentos anexados e outras informações registradas pelo profissional. Dados de saúde são dados pessoais sensíveis.
+- Gestão administrativa e financeira: agendamentos, procedimentos, dados de cobrança, pagamentos, notas e informações de faturamento de convênios, inclusive guias e arquivos TISS, conforme os recursos utilizados.
+- Uso e segurança: endereço IP, data e horário de acesso, navegador, dispositivo, registros de autenticação, operações realizadas e registros técnicos necessários ao funcionamento e à apuração de falhas.
+- Recursos de inteligência artificial: solicitações, contexto clínico, textos, imagens ou anexos selecionados no fluxo, respostas geradas e registros de uso e revisão, quando esses recursos forem utilizados.
+
+Importações de planilhas, APIs e equipamentos podem incluir dados provenientes de outros sistemas utilizados pela clínica. Quem realiza a importação deve verificar a origem, a necessidade e a legitimidade das informações. Evite enviar prontuários, exames ou dados de pacientes pelo formulário comercial do site.
+
+3. Para que utilizamos os dados
+
+- Responder contatos, apresentar a solução e conduzir demonstrações, propostas e contratações solicitadas.
+- Criar e administrar contas, autenticar usuários, recuperar acesso e aplicar permissões por clínica e perfil.
+- Executar as funcionalidades contratadas, incluindo agenda, prontuários, exames, documentos, portal do paciente e rotinas administrativas.
+- Processar cobranças e apoiar o faturamento e as integrações autorizadas pela clínica.
+- Prestar suporte, investigar erros, manter o serviço e prevenir acessos indevidos, fraudes e outras utilizações abusivas.
+- Enviar comunicações relacionadas ao serviço e, quando habilitado pela clínica, lembretes, confirmações e outras mensagens vinculadas ao atendimento.
+- Atender obrigações legais, solicitações de autoridades competentes e o exercício de direitos em procedimentos administrativos ou judiciais.
+
+Comunicações promocionais, quando realizadas, devem respeitar a base legal adequada e permitir que o destinatário solicite sua interrupção. Dados clínicos não se tornam disponíveis para publicidade pelo simples uso da plataforma.
+
+4. Quais bases legais se aplicam
+
+Para dados pessoais comuns, o tratamento pode decorrer de medidas solicitadas antes da contratação, da execução do contrato, de obrigações legais ou regulatórias, do exercício regular de direitos ou de consentimento, conforme cada finalidade. O legítimo interesse pode fundamentar operações de segurança e relacionamento quando houver necessidade, expectativa legítima e avaliação dos direitos do titular.
+
+Para dados de saúde, aplicam-se as hipóteses específicas do artigo 11 da Lei Geral de Proteção de Dados Pessoais — LGPD (Lei nº 13.709/2018). Conforme a operação, podem ser pertinentes a tutela da saúde em procedimentos realizados por profissionais ou serviços de saúde, o cumprimento de obrigações legais, o exercício regular de direitos ou o consentimento específico e destacado. A clínica deve identificar a hipótese adequada ao tratamento que determina; o legítimo interesse, por si só, não autoriza o tratamento de dados sensíveis.
+
+Quando necessário, o consentimento deve indicar a finalidade e pode ser revogado. A revogação não invalida operações anteriores lícitas nem afasta obrigações de conservação previstas em lei. A ciência desta política não substitui autorização para publicidade, uso de imagem, pesquisa ou outras finalidades que dependam de manifestação específica.
+
+5. Com quem os dados podem ser compartilhados
+
+O acesso e o compartilhamento devem se limitar às informações necessárias para a operação correspondente:
+
+- Equipe da clínica e profissionais autorizados, de acordo com os vínculos, perfis e permissões definidos no sistema.
+- Fornecedores de infraestrutura, armazenamento, entrega de e-mails, monitoramento de falhas e suporte necessários à prestação do serviço.
+- Prestadores de pagamento e cobrança e operadoras de convênios, quando a funcionalidade ou a operação solicitada exigir esses dados.
+- Serviços de mensagens, sistemas externos e integradores habilitados pela clínica, conforme a finalidade da integração.
+- Provedores de inteligência artificial, nas condições descritas na próxima seção.
+- Autoridades ou outros destinatários quando houver obrigação legal, ordem válida ou necessidade de exercício regular de direitos, dentro dos limites aplicáveis.
+
+Os fornecedores que tratam dados em nosso nome devem atuar conforme as finalidades contratadas e as obrigações de proteção de dados. Serviços que atuem como controladores independentes também podem possuir políticas próprias. Informações sobre destinatários de um tratamento específico podem ser solicitadas pelo canal de privacidade.
+
+Esta política não autoriza a venda de cadastros ou prontuários nem o compartilhamento de dados de saúde para publicidade. Exportações e compartilhamentos realizados pela clínica devem respeitar o sigilo profissional e os direitos do paciente.
+
+6. Inteligência artificial e revisão profissional
+
+Quando um recurso de IA é acionado, o conteúdo necessário à tarefa pode ser transmitido a provedores externos para gerar, revisar ou consolidar uma resposta. As integrações disponíveis incluem OpenAI, Anthropic e Google Gemini; os provedores efetivamente utilizados dependem da configuração e do recurso acionado.
+
+Essas operações podem envolver textos clínicos, imagens de exames e anexos. Há filtros para reduzir a exposição de certos identificadores em textos, mas eles não equivalem a anonimização completa e não garantem a remoção de dados presentes em imagens ou documentos. A clínica e o profissional devem selecionar apenas o conteúdo necessário e verificar a base legal para seu envio.
+
+As respostas servem de apoio e exigem avaliação do profissional responsável antes de seu uso assistencial. Esta política não concede autorização para empregar prontuários em treinamento de modelos para finalidades próprias ou alheias ao serviço solicitado. As condições de processamento dos fornecedores e eventuais transferências internacionais devem ser consideradas na contratação e no uso de cada recurso.
+
+7. Cookies e recursos de terceiros
+
+Utilizamos cookies e tecnologias de armazenamento necessários para manter sessões, autenticar acessos, proteger formulários e preservar preferências da interface. Você pode removê-los ou bloqueá-los pelo navegador, mas isso pode impedir o login ou prejudicar funcionalidades.
+
+O site carrega fontes do Google Fonts. Ao buscar esses arquivos, o navegador estabelece conexão com esse fornecedor e pode transmitir endereço IP e informações técnicas da requisição. Ao abrir links para serviços externos, como WhatsApp, você passa a interagir também com o respectivo fornecedor e suas regras de privacidade.
+
+O uso de cookies necessários não representa concordância com rastreamento publicitário. Caso sejam adotadas tecnologias não essenciais que dependam de consentimento, sua finalidade e a forma de escolher ou revogar a autorização deverão ser apresentadas antes de sua ativação.
+
+8. Armazenamento e transferências internacionais
+
+Os dados são armazenados na infraestrutura utilizada para operar o serviço. Dependendo dos fornecedores e das integrações acionadas, pode haver processamento ou armazenamento fora do Brasil, inclusive em serviços de infraestrutura, comunicação e IA.
+
+Quando houver transferência internacional, ela deverá observar as hipóteses e garantias previstas na LGPD e na regulamentação da ANPD, como cláusulas contratuais apropriadas ou outro mecanismo válido para a operação. O uso de um fornecedor estrangeiro não dispensa essas exigências. Você pode solicitar informações sobre destinos, finalidade e garantias aplicáveis ao tratamento dos seus dados.
+
+9. Por quanto tempo conservamos os dados
+
+O período depende da finalidade, da relação contratual e das obrigações de cada agente. Dados de contato e suporte são conservados enquanto necessários ao atendimento e ao relacionamento, e pelo período adicional justificado por obrigações legais ou exercício de direitos. Registros financeiros, de segurança e de acesso seguem as exigências aplicáveis à sua categoria.
+
+Prontuários e documentos assistenciais estão sujeitos a regras específicas de guarda e sigilo. O encerramento da assinatura ou um pedido de exclusão não implica apagar automaticamente o histórico clínico. A clínica deve avaliar suas obrigações e orientar a exportação, conservação ou eliminação, com o apoio do EasyEye no que lhe couber.
+
+Encerrada a finalidade e inexistindo fundamento para conservação, os dados devem ser eliminados ou anonimizados, considerando também cópias técnicas e os ciclos de retenção aplicáveis. Se um pedido não puder ser atendido integralmente, o responsável informará a justificativa e os limites pertinentes.
+
+10. Como protegemos as informações
+
+A plataforma dispõe de autenticação, controles de acesso por organização e perfil, registros de operações e mecanismos de proteção de credenciais. A autenticação em dois fatores está disponível nos fluxos que a suportam. O acesso deve se limitar a pessoas autorizadas e às informações necessárias às suas atividades.
+
+As medidas técnicas e administrativas precisam acompanhar os riscos e a operação do serviço. Nenhum sistema é imune a incidentes. Em caso de ocorrência, cabe aos agentes responsáveis avaliar os impactos, adotar as providências necessárias e realizar as comunicações exigidas pela legislação, inclusive à ANPD e aos titulares quando aplicável. Como operador, o EasyEye deve apoiar o controlador nessa resposta.
+
+Mantenha suas credenciais sob sigilo, utilize os recursos de proteção disponíveis e avise o suporte se identificar acesso suspeito. A clínica deve revisar as permissões de sua equipe e revogar os acessos que deixarem de ser necessários.
+
+11. Dados de crianças e adolescentes
+
+O site comercial é destinado a profissionais e representantes de clínicas. A plataforma pode tratar dados de pacientes crianças e adolescentes no contexto do atendimento de saúde, sempre com observância de seu melhor interesse e da hipótese legal adequada.
+
+A clínica é responsável por verificar a representação legal quando necessária e prestar informações compreensíveis aos responsáveis e ao paciente, conforme sua idade e capacidade de entendimento. Quando a base utilizada exigir consentimento do responsável, este deverá ser específico e destacado. Solicitações de acesso devem respeitar também o sigilo e as normas aplicáveis ao atendimento.
+
+12. Seus direitos e como exercê-los
+
+Nos limites e condições da legislação, você pode solicitar:
+
+- Confirmação de que há tratamento e acesso aos seus dados.
+- Correção de informações incompletas, incorretas ou desatualizadas.
+- Anonimização, bloqueio ou eliminação de informações desnecessárias, excessivas ou tratadas de forma irregular.
+- Portabilidade, conforme a regulamentação e resguardados os segredos comercial e industrial.
+- Informação sobre compartilhamentos e sobre a possibilidade de negar consentimento e suas consequências.
+- Revogação de consentimento e eliminação dos dados tratados com essa base, observadas as hipóteses legais de conservação.
+- Oposição a tratamento realizado em desacordo com a LGPD nas situações previstas em lei.
+- Revisão de decisões tomadas unicamente por tratamento automatizado que afetem seus interesses, quando aplicável, e informações sobre seus critérios e procedimentos, respeitados os limites legais.
+
+Os pedidos são gratuitos. Podemos solicitar informações proporcionais para confirmar sua identidade ou representação e localizar os registros, evitando entregá-los a terceiros indevidos. Não envie senhas nem prontuários completos na primeira mensagem.
+
+Pedidos relativos ao atendimento e aos registros mantidos pela clínica devem ser dirigidos ao controlador responsável. Quando recebidos pelo EasyEye na condição de operador, serão encaminhados ou tratados com apoio da clínica, conforme as instruções legítimas e as obrigações aplicáveis. Pedidos sobre o relacionamento direto com o EasyEye serão tratados por nossa equipe.
+
+Serão observados os prazos legais aplicáveis a cada solicitação. Para confirmação e acesso, a LGPD prevê resposta simplificada imediata ou declaração completa em até 15 dias, ressalvadas regras específicas aplicáveis. Eventuais impedimentos serão justificados. Você também pode apresentar petição à ANPD e recorrer aos órgãos competentes de defesa de seus direitos.
+
+13. Canal de privacidade
+
+Para dúvidas, solicitações ou relatos relacionados a dados pessoais, escreva para {{privacy_email}}, com o assunto “Privacidade — EasyEye”. Informe seu nome, um meio de retorno e uma descrição objetiva do pedido; se envolver atendimento, identifique a clínica para facilitar o encaminhamento.
+
+Telefone e WhatsApp para orientação: {{privacy_phone}}. Para preservar o sigilo, evite enviar dados clínicos por esse canal sem orientação sobre a forma adequada de compartilhamento.
+
+Esse canal recebe as solicitações e as direciona ao responsável pela proteção de dados ou à clínica controladora, conforme o caso. Informações sobre o controlador e o contato do encarregado, quando aplicável, também podem ser solicitadas por esse meio.
+
+14. Atualizações desta política
+
+Esta política pode ser atualizada para refletir mudanças no serviço, nas operações de tratamento ou na legislação. A versão e a data de vigência são apresentadas nesta página. Alterações relevantes serão comunicadas pelos canais apropriados; quando uma nova finalidade exigir consentimento, ele deverá ser solicitado de forma específica. A mera continuidade de uso não substitui esse consentimento.

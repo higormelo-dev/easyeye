@@ -1856,6 +1856,33 @@ select.cf-control {
     margin-bottom: 28px;
 }
 
+.legal-index {
+    margin-bottom: 32px;
+
+    h2 { @include type-title-sm; color: $navy; margin-bottom: 12px; }
+
+    ol {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 24px;
+
+        @include below($bp-sm) { grid-template-columns: 1fr; }
+    }
+
+    a {
+        @include type-meta;
+        display: block;
+        padding-block: 4px;
+        color: $teal-ink;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        overflow-wrap: anywhere;
+    }
+}
+
 .legal-body {
     background: $bg-white;
     border: 1px solid $border;
@@ -1865,15 +1892,26 @@ select.cf-control {
 
     @include below($bp-sm) { padding: 24px 20px; }
 
-    p {
-        font-size: 16px;
+    p, li {
+        @include type-body;
         line-height: 1.75;
         color: $text;
         white-space: pre-line;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
     }
 
-    p + p { margin-top: 16px; }
+    > * + * { margin-top: 16px; }
+
+    h2 {
+        @include type-title-md;
+        color: $navy;
+        scroll-margin-top: 112px;
+    }
+
+    > h2:not(:first-child) { margin-top: 36px; }
+
+    ul { padding-left: 24px; }
+    li + li { margin-top: 10px; }
 
     a { color: $teal-ink; font-weight: 600; }
 }

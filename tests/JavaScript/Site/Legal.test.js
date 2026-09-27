@@ -19,6 +19,7 @@ const t = {
         privacy_description: 'Política de Privacidade do EasyEye.',
         terms_description: 'Termos de Uso do EasyEye.',
         version: 'Versão :version · vigente desde :date',
+        contents: 'Neste documento',
         unavailable_title: 'Documento em publicação',
         unavailable_text: 'Para recebê-la agora, escreva para',
         back_home: 'Voltar para o início',
@@ -72,5 +73,24 @@ describe('Site/Legal', () => {
         expect(notice.text()).toContain('Documento em publicação');
         expect(notice.get('a').attributes('href')).toBe('mailto:suporte@easyeye.app');
         expect(wrapper.get('.legal-back').attributes('href')).toBe('/');
+    });
+
+    it('oferece navegação para as seções e listas sem interpretar HTML', () => {
+        mountLegal({
+            document: {
+                version: '1.0', effectiveFrom: 'hoje',
+                content: 'Introdução.\r\n\r\n1. Dados tratados\r\n\r\n- Nome\r\n- <img src=x onerror="alert(1)">\r\n\r\n2. Seus direitos\r\n\r\nSolicite acesso.\r\nCom segurança.',
+            },
+        });
+
+        const body = wrapper.get('[data-test="legal-body"]');
+        const headings = body.findAll('h2');
+        const links = wrapper.findAll('.legal-index a');
+        expect(headings.map((heading) => heading.text())).toEqual(['1. Dados tratados', '2. Seus direitos']);
+        expect(links.map((link) => link.attributes('href'))).toEqual(headings.map((heading) => '#' + heading.attributes('id')));
+        expect(wrapper.get('.legal-index').attributes('aria-labelledby')).toBe('legal-index-title');
+        expect(body.findAll('li').map((item) => item.text())).toEqual(['Nome', '<img src=x onerror="alert(1)">']);
+        expect(body.find('img').exists()).toBe(false);
+        expect(body.findAll('p').map((p) => p.text())).toEqual(['Introdução.', 'Solicite acesso.\nCom segurança.']);
     });
 });

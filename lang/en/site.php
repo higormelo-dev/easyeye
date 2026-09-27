@@ -51,6 +51,7 @@ return [
         'privacy_description' => 'EasyEye Privacy Policy: how we handle personal data of clinics, professionals and patients.',
         'terms_description'   => 'Terms of Use of the EasyEye platform.',
         'version'             => 'Version :version · effective since :date',
+        'contents'            => 'On this page',
         'unavailable_title'   => 'Document being published',
         'unavailable_text'    => 'The official version of this document has not been published here yet. To get it now, write to',
         'back_home'           => 'Back to home',

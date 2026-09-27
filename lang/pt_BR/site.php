@@ -51,6 +51,7 @@ return [
         'privacy_description' => 'Política de Privacidade do EasyEye: como tratamos dados pessoais de clínicas, profissionais e pacientes.',
         'terms_description'   => 'Termos de Uso da plataforma EasyEye.',
         'version'             => 'Versão :version · vigente desde :date',
+        'contents'            => 'Neste documento',
         'unavailable_title'   => 'Documento em publicação',
         'unavailable_text'    => 'A versão oficial deste documento ainda não foi publicada aqui. Para recebê-la agora, escreva para',
         'back_home'           => 'Voltar para o início',

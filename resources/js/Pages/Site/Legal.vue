@@ -16,9 +16,23 @@
 
                     <template v-if="document">
                         <p class="legal-meta" data-test="legal-version">{{ versionText }}</p>
-                        <div class="legal-body" data-test="legal-body">
-                            <p v-for="(paragraph, index) in paragraphs" :key="index">{{ paragraph }}</p>
-                        </div>
+                        <nav v-if="headings.length" class="legal-index" aria-labelledby="legal-index-title">
+                            <h2 id="legal-index-title">{{ t.legal.contents }}</h2>
+                            <ol>
+                                <li v-for="heading in headings" :key="heading.id">
+                                    <a :href="'#' + heading.id">{{ heading.text }}</a>
+                                </li>
+                            </ol>
+                        </nav>
+                        <article class="legal-body" data-test="legal-body" aria-labelledby="legal-title">
+                            <template v-for="block in blocks" :key="block.id">
+                                <h2 v-if="block.type === 'heading'" :id="block.id" tabindex="-1">{{ block.text }}</h2>
+                                <ul v-else-if="block.type === 'list'">
+                                    <li v-for="(item, index) in block.items" :key="index">{{ item }}</li>
+                                </ul>
+                                <p v-else>{{ block.text }}</p>
+                            </template>
+                        </article>
                     </template>
 
                     <div v-else class="legal-body" role="status" data-test="legal-unavailable">
@@ -47,8 +61,8 @@ import { useTrans } from '@/composables/useTrans';
 /**
  * /privacidade e /termos — versão vigente dos documentos oficiais
  * (term_versions, via SiteLegalController). O conteúdo é texto puro:
- * parágrafos separados por linha em branco, quebras simples preservadas
- * (white-space: pre-line). Nada de v-html.
+ * parágrafos separados por linha em branco, títulos numerados e listas com
+ * hífen. Todo conteúdo é interpolado como texto, nunca como HTML.
  */
 const props = defineProps({
     kind: { type: String, required: true }, // 'privacy' | 'terms'
@@ -68,8 +82,21 @@ const versionText = computed(() => tx('version', {
     version: props.document?.version ?? '',
     date: props.document?.effectiveFrom ?? '',
 }));
-const paragraphs = computed(() => (props.document?.content ?? '')
+const blocks = computed(() => (props.document?.content ?? '')
+    .replace(/\r\n?/g, '\n')
     .split(/\n\s*\n/)
     .map((paragraph) => paragraph.trim())
-    .filter(Boolean));
+    .filter(Boolean)
+    .map((text, index) => {
+        const id = `legal-section-${index}`;
+        if (/^\d+\.\s+[^\n]+$/.test(text)) return { id, type: 'heading', text };
+
+        const lines = text.split('\n');
+        if (lines.every((line) => /^-\s+/.test(line))) {
+            return { id, type: 'list', items: lines.map((line) => line.replace(/^-\s+/, '')) };
+        }
+
+        return { id, type: 'paragraph', text };
+    }));
+const headings = computed(() => blocks.value.filter((block) => block.type === 'heading'));
 </script>

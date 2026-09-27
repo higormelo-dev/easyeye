@@ -1,0 +1,169 @@
+Estes Termos de Uso estabelecem as condições de acesso ao site e de utilização da plataforma EasyEye. Leia o documento antes de contratar ou utilizar os serviços. As condições específicas do plano ou da proposta aceita complementam estes termos, respeitados os direitos previstos na legislação.
+
+1. Quem oferece o EasyEye e a quem estes termos se aplicam
+
+O EasyEye é oferecido por {{provider_identity}}, denominada neste documento “EasyEye” ou “contratada”.
+
+O “contratante” é a pessoa física ou jurídica responsável pela contratação da plataforma. Os “usuários” são as pessoas autorizadas a utilizar os recursos, incluindo administradores, profissionais de saúde e equipe da clínica. Aos pacientes e seus representantes que utilizem o portal aplicam-se as regras de acesso, uso adequado e proteção de informações pertinentes a esse serviço, sem assumir as obrigações de pagamento da assinatura da clínica.
+
+Quem contrata em nome de uma clínica ou outra pessoa jurídica deve possuir poderes para representá-la. O uso de funções profissionais exige a habilitação correspondente. Dados cadastrais e de contato devem ser verdadeiros e mantidos atualizados.
+
+2. Objeto e licença de uso
+
+O EasyEye é uma plataforma em nuvem para apoiar a gestão de clínicas oftalmológicas e a organização de informações assistenciais. Conforme o plano e as funcionalidades habilitadas, disponibiliza agenda, cadastro de pacientes, prontuários, exames e imagens, documentos clínicos, gestão financeira, faturamento de convênios, estoque, portal do paciente, integrações e recursos de inteligência artificial.
+
+A contratação concede uma licença de uso não exclusiva, limitada ao período e às condições contratadas, para o contratante e seus usuários autorizados. Não há transferência do código-fonte, da marca ou da titularidade do software. A utilização por terceiros fora da organização, a revenda ou o sublicenciamento dependem de autorização específica.
+
+O acesso depende de conexão com a internet, navegador compatível e equipamentos adequados. O serviço não oferece funcionamento integral sem conexão. A clínica deve manter procedimentos de contingência proporcionais às necessidades do atendimento.
+
+3. Contratação, documentos aplicáveis e aceite
+
+Antes da contratação, o contratante deve ter acesso ao plano ou à proposta, aos preços, à periodicidade, aos limites e a estes termos. O aceite deve decorrer de manifestação expressa no processo de contratação ou em instrumento específico, por pessoa habilitada, com possibilidade de identificação da versão aceita.
+
+A simples visita ao site não gera assinatura paga, autorização de cobrança ou consentimento genérico para tratar dados. O fornecimento de dados para contato ou demonstração também não equivale à contratação de um plano.
+
+Propostas e instrumentos específicos aceitos pelas partes prevalecem quanto às condições comerciais expressamente negociadas, sem afastar normas obrigatórias. A Política de Privacidade, disponível em /privacidade, explica o tratamento de dados pessoais. A concordância contratual não substitui consentimentos específicos exigidos para determinada finalidade.
+
+4. Contas, perfis e segurança de acesso
+
+O contratante deve indicar pessoas autorizadas, distribuir permissões compatíveis com suas funções e revisar os vínculos quando houver desligamento ou mudança de responsabilidade. A presença de um usuário em mais de uma organização não autoriza o acesso ou o compartilhamento entre clínicas sem fundamento legítimo.
+
+As credenciais são individuais e devem ser mantidas sob sigilo. É vedado utilizar a identidade de outra pessoa, compartilhar senhas ou ceder acessos para contornar limites de usuários. Os recursos de autenticação e proteção disponíveis devem ser utilizados conforme as necessidades de segurança da organização.
+
+Suspeitas de acesso indevido devem ser comunicadas ao suporte. Podemos solicitar informações proporcionais para confirmar a identidade, a representação ou a legitimidade de um pedido, especialmente para alterar responsáveis, liberar acesso ou entregar dados. Esses cuidados não afastam a responsabilidade do EasyEye pela segurança das operações sob seu controle.
+
+5. Planos, período de avaliação e limites
+
+As funcionalidades, quantidades de usuários, capacidade de armazenamento, limites de integrações, créditos e demais condições são os apresentados no plano ou na proposta aceita. A disponibilidade de um recurso no site não significa que esteja incluído em todos os planos. Serviços adicionais dependem de contratação quando assim informados.
+
+Quando oferecido um período gratuito de avaliação, sua duração e seus limites serão os informados na oferta e no cadastro. A avaliação não gera cobrança automática sem contratação e autorização de pagamento. Ao término, a continuidade do acesso depende da situação da conta e da contratação aplicável.
+
+O contratante deve acompanhar o uso e avaliar a necessidade de alterar o plano. Ao atingir um limite, determinadas operações podem ser restringidas até a renovação da franquia ou a contratação de capacidade adicional. Alterações de plano devem informar os novos valores, limites, efeitos e data de aplicação antes da confirmação.
+
+6. Preços, pagamentos e renovação
+
+Valores, moeda, vencimento, ciclo de cobrança e meios de pagamento são os informados na contratação. A ativação de recursos pagos depende da confirmação prevista para o meio de pagamento escolhido ou das condições expressamente ajustadas. A emissão de uma cobrança não comprova, por si só, sua quitação.
+
+Quando a oferta prever renovação ou cobrança recorrente, essa condição deverá estar informada e ser autorizada pelo contratante. A autorização se limita aos serviços e valores contratados e pode ser encerrada mediante pedido de cancelamento, sem prejuízo de obrigações anteriores legitimamente devidas.
+
+Reajustes, mudança de preço e contratação de serviços adicionais devem respeitar o contrato e a legislação, com informação prévia sobre os efeitos. Estes termos não estabelecem índice de reajuste, multa de fidelidade ou encargos financeiros que não tenham sido informados e validamente pactuados. Não haverá cobrança retroativa por funcionalidades que não tenham sido contratadas.
+
+O contratante deve manter seus dados de cobrança atualizados e comunicar divergências pelo canal de atendimento. Contestações serão verificadas com base no contrato, na prestação do serviço e nos registros da operação. O uso de prestadores de pagamento não afasta as obrigações do EasyEye de corrigir cobranças indevidas que lhe sejam atribuíveis.
+
+7. Créditos e recargas de inteligência artificial
+
+Recursos de IA podem depender de franquia do plano ou de créditos adquiridos separadamente. A quantidade incluída, os pacotes disponíveis e o consumo aplicável são apresentados nas informações do produto e nos fluxos de utilização.
+
+A franquia do plano é válida para o ciclo informado e seu saldo não utilizado não se acumula no ciclo seguinte. Créditos comprados em recargas avulsas compõem um saldo separado, acumulável e sem vencimento por passagem de ciclo. O consumo utiliza primeiro a franquia válida do plano e depois o saldo de recargas.
+
+O saldo de recargas não substitui uma assinatura ou uma permissão necessária ao recurso. A compra é disponibilizada após a confirmação correspondente. Dúvidas sobre débitos, falhas de execução, cancelamento de compras ou estornos podem ser apresentadas ao atendimento para verificação dos registros e das condições aplicáveis.
+
+Créditos representam unidades de uso do serviço, não uma aplicação financeira. O encerramento da conta exige a definição do tratamento do saldo remanescente conforme a oferta e os direitos aplicáveis; estes termos não estabelecem perda automática de créditos adquiridos nem afastam hipóteses legais de reembolso.
+
+8. Responsabilidade profissional e registros assistenciais
+
+O EasyEye oferece ferramentas de apoio. A clínica e os profissionais responsáveis devem conferir os dados dos pacientes, o conteúdo dos prontuários, prescrições, laudos, orientações e documentos antes de sua utilização. Diagnósticos, decisões terapêuticas e condutas assistenciais cabem aos profissionais habilitados, observadas suas atribuições e as normas aplicáveis.
+
+Modelos, preenchimentos sugeridos e cálculos não dispensam a análise do caso concreto. A geração de um arquivo ou documento não garante, por si só, assinatura válida, atendimento a todas as exigências regulatórias ou aceitação por terceiros. O profissional deve verificar os requisitos exigidos para cada finalidade.
+
+No faturamento de convênios, o contratante deve revisar dados, procedimentos, autorizações, tabelas e regras da operadora. Validações e arquivos TISS auxiliam o processo, mas não asseguram autorização, pagamento ou ausência de glosas. A qualidade de imagens e resultados importados também depende da origem, da identificação correta do paciente e da configuração utilizada.
+
+O portal do paciente e as mensagens vinculadas ao serviço não são canais de emergência médica. A disponibilização de documentos ou informações não substitui a orientação do profissional responsável.
+
+9. Uso de inteligência artificial
+
+O assistente pode produzir análises, sugestões e rascunhos a partir do conteúdo informado, inclusive com processamento por provedores externos. Os resultados podem conter erros, omissões ou informações inadequadas ao caso. Devem ser revisados por profissional habilitado antes de integrar um documento definitivo ou orientar uma conduta.
+
+É dever do usuário fornecer apenas informações necessárias e compatíveis com a finalidade, verificar a base legal para o tratamento e observar o sigilo. Filtros automáticos de identificadores não garantem anonimização completa de textos, imagens ou anexos. As condições de compartilhamento e eventuais transferências internacionais são tratadas na Política de Privacidade.
+
+O uso da IA não representa garantia de resultado clínico nem transfere ao paciente o risco de conteúdo não revisado. O EasyEye mantém suas responsabilidades pelas funcionalidades e pelos tratamentos que realiza. O aceite destes termos não autoriza o aproveitamento irrestrito de prontuários para treinamento de modelos ou para finalidades alheias à prestação contratada.
+
+10. Integrações, importações e serviços de terceiros
+
+Integrações com equipamentos, APIs, meios de pagamento e serviços de comunicação dependem da disponibilidade, compatibilidade e configuração dos respectivos recursos. Contratações diretas com terceiros podem possuir condições próprias, que devem ser verificadas antes da habilitação.
+
+O contratante deve autorizar os integradores e conceder somente as permissões necessárias, proteger suas credenciais e revogá-las quando deixarem de ser utilizadas. As informações importadas de outros sistemas devem ter origem legítima e ser conferidas quanto a formato, completude, identificação e vínculo com a clínica e o paciente.
+
+Mensagens, confirmações e lembretes podem depender do provedor, do número informado e da disponibilidade do destinatário. O envio não comprova leitura, comparecimento ou ciência de conteúdo clínico. Comunicações devem respeitar as preferências do destinatário e a legislação, sem disparos abusivos ou divulgação indevida de informações de saúde.
+
+Falhas de terceiros serão tratadas de acordo com as atribuições de cada participante, sem excluir obrigações legais do EasyEye. Uma integração não implica garantia de compatibilidade permanente com todas as versões ou equipamentos existentes.
+
+11. Obrigações do EasyEye, suporte e disponibilidade
+
+Compete ao EasyEye disponibilizar os recursos contratados, prestar suporte sobre seu uso e funcionamento, tratar falhas sob sua responsabilidade e adotar medidas técnicas e administrativas adequadas à proteção das informações. O suporte deve respeitar a necessidade de acesso, as permissões e o sigilo.
+
+Podem ocorrer interrupções para manutenção, atualização, correção de falhas ou resposta a incidentes. Intervenções programadas com impacto relevante devem ser comunicadas sempre que viável; situações urgentes podem exigir atuação imediata. O EasyEye deverá empregar esforços adequados à restauração do serviço e comunicar informações pertinentes ao contratante.
+
+Horários de suporte, níveis de disponibilidade, prazos de atendimento e eventuais compensações seguem as condições expressamente oferecidas e contratadas. Este documento não estabelece percentual de disponibilidade ou atendimento ininterrupto que não tenha sido contratado, nem afasta garantias legais ou obrigações decorrentes da oferta.
+
+Customizações, visitas, treinamento especial ou migrações assistidas além do escopo contratado dependem de combinação prévia de escopo, viabilidade, preço e prazo. Solicitar suporte não autoriza cobranças adicionais sem informação e concordância.
+
+12. Uso permitido e propriedade intelectual
+
+O uso deve respeitar a legislação, o contrato, os direitos dos pacientes e as medidas de segurança. São vedadas, entre outras condutas:
+
+- Acessar dados de outra clínica ou pessoa sem autorização legítima, inclusive por tentativa de contornar permissões.
+- Inserir conteúdo ilícito, malicioso ou que viole direitos de terceiros, ou utilizar o serviço para fraude, discriminação ou assédio.
+- Comprometer a disponibilidade do sistema por ataques, automações abusivas ou tentativas de burlar limites técnicos e comerciais.
+- Extrair dados para finalidades incompatíveis com a autorização recebida ou divulgar credenciais e informações protegidas.
+- Copiar, comercializar ou explorar elementos protegidos do software sem autorização, ou remover avisos de titularidade, ressalvadas as utilizações permitidas por lei.
+
+O software, a identidade visual e os materiais próprios do EasyEye pertencem a seus titulares ou licenciantes. Os direitos sobre registros, imagens e documentos enviados à plataforma permanecem com quem legitimamente os detém, resguardados os direitos dos titulares de dados pessoais.
+
+A contratação autoriza o processamento desses conteúdos na medida necessária à prestação do serviço. Não concede ao EasyEye direito de vender prontuários, divulgar casos clínicos ou usar o nome, a marca ou a imagem do contratante em publicidade sem fundamento e autorização adequados.
+
+13. Privacidade, sigilo e proteção de dados
+
+O tratamento de dados segue a LGPD e a Política de Privacidade. Em relação às informações assistenciais inseridas pela clínica, o EasyEye atua como operador, conforme instruções legítimas do controlador e o escopo contratado. Nas atividades em que define finalidades próprias, como relacionamento comercial e gestão de contas, assume as responsabilidades correspondentes.
+
+A clínica deve definir a finalidade e a base legal dos tratamentos que determina, prestar informações aos pacientes e observar as exigências de sigilo e guarda. Quando a base aplicável for o consentimento, este deve ser específico e válido. Nem todos os tratamentos de saúde dependem de consentimento, e a aceitação destes termos não o substitui quando exigido.
+
+As partes devem restringir o acesso às informações às pessoas e fornecedores que delas necessitem para suas atribuições e preservar a confidencialidade durante e após a relação contratual. Solicitações de titulares e incidentes devem receber a cooperação necessária de cada agente, conforme sua responsabilidade e a legislação.
+
+Pedidos de pacientes sobre dados próprios não se confundem com a exportação de toda a base da clínica e devem ser avaliados segundo seus direitos, a identificação do solicitante e o escopo permitido.
+
+14. Suspensão, cancelamento e reembolsos
+
+O contratante ou seu representante autorizado pode solicitar cancelamento pelo canal de atendimento indicado ao final destes termos. O pedido deverá identificar a conta e permitir a verificação da representação. O EasyEye informará a data de encerramento, o tratamento das cobranças e eventual período de transição de acesso.
+
+O acesso pode ser restringido após o fim da vigência ou do período de transição aplicável, ou por inadimplência, uso irregular ou risco de segurança, observados o contrato e a legislação. Sempre que compatível com a situação, o motivo e a forma de regularização serão comunicados. Medidas imediatas podem ser necessárias para conter fraude, acesso indevido ou risco relevante, com esclarecimento posterior quando permitido.
+
+O cancelamento deve interromper renovações e cobranças futuras incompatíveis com o encerramento, sem eliminar obrigações anteriores legitimamente devidas. Divergências, valores pagos por períodos não prestados e eventual saldo de créditos serão avaliados segundo a oferta, o motivo do encerramento e as regras aplicáveis. Não se presume renúncia a reembolso por simples uso do sistema.
+
+Quando caracterizada relação de consumo e presentes os requisitos legais da contratação à distância, será respeitado o direito de arrependimento previsto no artigo 49 do Código de Defesa do Consumidor, inclusive o prazo de 7 dias contado da assinatura ou do recebimento do serviço, conforme o caso, e a restituição dos valores na forma legal. Outras hipóteses de restituição ou reparação previstas em lei também permanecem asseguradas.
+
+Excluir um usuário ou deixar de acessar a plataforma não equivale, por si só, a cancelar a assinatura da organização. A suspensão ou o encerramento contratual também não determina a eliminação imediata de prontuários nem afasta os direitos dos titulares.
+
+15. Exportação e destino dos dados no encerramento
+
+A clínica deve organizar a continuidade da guarda dos registros assistenciais e solicitar, quando necessário, sua exportação antes do encerramento. O EasyEye orientará o responsável sobre o escopo, os formatos disponíveis, a validação da identidade e o meio seguro de entrega, respeitados o contrato e os direitos legais.
+
+O pedido da base da clínica deve partir do contratante ou de pessoa legitimamente autorizada. Antes da entrega, serão verificadas a representação, a organização envolvida e as informações que podem ser fornecidas. A mudança ou saída de um profissional não lhe confere automaticamente acesso a toda a base de pacientes da instituição.
+
+Serviços extraordinários de conversão ou migração para outro fornecedor, quando solicitados e fora do escopo contratado, dependem de orçamento prévio. Essa condição não pode ser usada para impedir o atendimento gratuito dos direitos de titulares previstos em lei.
+
+Prazos e condições de conservação e eliminação devem observar a finalidade, as instruções legítimas do controlador, as obrigações legais e a Política de Privacidade. O encerramento não gera promessa de armazenamento ilimitado nem autorização para apagar imediatamente dados sujeitos à guarda. Eventual eliminação deverá ser precedida das verificações necessárias e de orientação ao contratante sobre os efeitos e as possibilidades de obtenção dos registros.
+
+16. Responsabilidade e solução de divergências
+
+Cada parte responde pelas obrigações que lhe cabem e pelos danos a ela atribuíveis, conforme a legislação. A responsabilidade profissional sobre o atendimento não exonera o EasyEye por defeitos do serviço, falhas próprias de segurança ou tratamento irregular de dados que lhe sejam imputáveis.
+
+O desempenho também depende da conectividade, dos equipamentos, das informações fornecidas e dos serviços integrados. Essas circunstâncias devem ser consideradas na análise de cada ocorrência, sem exclusão automática de responsabilidade ou transferência integral de riscos ao contratante e aos pacientes.
+
+O EasyEye não garante resultado clínico, econômico, de faturamento ou aprovação por convênios decorrente do uso da plataforma. Permanecem exigíveis a qualidade e as características do serviço contratado, as obrigações informadas na oferta e os direitos obrigatórios de reparação. Estes termos não impõem renúncia genérica a indenização nem arbitragem compulsória.
+
+Ao identificar divergências, as partes devem compartilhar informações necessárias à apuração por canal seguro e buscar uma solução adequada. A tentativa de solução administrativa não impede o acesso aos órgãos de defesa de direitos ou ao Poder Judiciário.
+
+17. Alterações e legislação aplicável
+
+O EasyEye pode atualizar o serviço e estes termos para refletir mudanças de funcionalidades, operações ou requisitos legais. A página apresenta a versão e a data de vigência. Mudanças relevantes que afetem direitos, obrigações ou condições contratadas devem ser informadas previamente, com novo aceite quando necessário, preservados os períodos e direitos já constituídos.
+
+A atualização desta página, isoladamente, não autoriza cobrança nova, redução indevida de serviço contratado ou tratamento de dados incompatível com a finalidade original. Se houver descontinuação relevante, deverão ser tratadas com o contratante as condições de continuidade, transição ou encerramento, respeitada a legislação.
+
+Aplica-se a legislação brasileira. Eventuais controvérsias serão submetidas ao foro competente conforme as regras legais, preservadas as disposições de proteção ao consumidor quando aplicáveis. A invalidade de uma disposição não elimina as demais que possam subsistir de forma lícita e coerente.
+
+18. Contato
+
+Para contratação, cobrança, cancelamento ou dúvidas sobre estes termos, escreva para {{terms_email}}. Telefone e WhatsApp: {{terms_phone}}.
+
+Para suporte técnico, utilize {{support_email}}. Solicitações sobre dados pessoais também podem ser enviadas ao canal indicado na Política de Privacidade. Informe a organização e uma descrição objetiva do pedido, sem encaminhar senhas, chaves de acesso ou prontuários completos na primeira mensagem.
