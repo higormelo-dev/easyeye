@@ -69,7 +69,7 @@ return [
         // Initials of the testimonial authors (Dr. Ricardo Mendes, Dr. Ana Carvalho, Paulo Souza, Dr. Mariana Costa).
         'trust_initials' => ['RM', 'AC', 'PS', 'MC'],
         // Real crop of the patient record (public/site/images/hero-prontuario.webp), no patient data.
-        'visual_alt'   => 'EasyEye ophthalmology record with visual acuity, tonometry and dynamic and static refraction per eye (OD and OS)',
+        'visual_alt'   => "EasyEye dashboard with total patients, today's appointments and doctors, shortcuts and today's schedule (fictitious data)",
         'card_top_lbl' => 'Images per eye',
         'card_top_val' => 'OCT, retinography and biometry',
         'card_bot_lbl' => 'CFM and LGPD',

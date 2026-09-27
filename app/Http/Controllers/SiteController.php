@@ -125,10 +125,10 @@ class SiteController extends Controller
             ->toArray();
 
         $howImagePath = public_path('site/images/how-it-works.webp');
-        // Recorte real do prontuário no hero: sem o arquivo, o hero fica só com o
-        // texto (nunca com imagem quebrada). public/site/images/* está no .gitignore:
-        // os arquivos entram no repositório com `git add -f`.
-        $heroImagePath = public_path('site/images/hero-prontuario.webp');
+        // Painel inicial do sistema no hero (escolha do responsável em 2026-09-27;
+        // o recorte do prontuário, hero-prontuario.webp, continua no repositório).
+        // Sem o arquivo, o hero fica só com o texto (nunca com imagem quebrada).
+        $heroImagePath = public_path('site/images/hero-dashboard.webp');
 
         return Inertia::render('Site/Home', [
             'plans'          => $plans,

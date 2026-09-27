@@ -61,15 +61,13 @@
 
                         <a
                             :href="routes.go"
-                            class="btn btn-outline"
-                            style="padding:10px 20px;font-size:14px;"
+                            class="btn btn-outline btn-sm"
                         >
                             <i class="ti ti-login" aria-hidden="true"></i> {{ t.nav.login }}
                         </a>
                         <a
                             :href="routes.register"
-                            class="btn btn-primary"
-                            style="padding:10px 20px;font-size:14px;"
+                            class="btn btn-primary btn-sm"
                         >
                             {{ t.nav.get_started }} <i class="ti ti-arrow-right" aria-hidden="true"></i>
                         </a>

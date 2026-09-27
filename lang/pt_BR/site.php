@@ -69,7 +69,7 @@ return [
         // Iniciais de quem deu os depoimentos (Dr. Ricardo Mendes, Dra. Ana Carvalho, Paulo Souza, Dra. Mariana Costa).
         'trust_initials' => ['RM', 'AC', 'PS', 'MC'],
         // Recorte real do prontuário (public/site/images/hero-prontuario.webp), sem dados de paciente.
-        'visual_alt'   => 'Prontuário oftalmológico do EasyEye com acuidade visual, tonometria e refração dinâmica e estática por olho (OD e OE)',
+        'visual_alt'   => 'Painel inicial do EasyEye com total de pacientes, consultas e médicos do dia, atalhos e a agenda de hoje (dados fictícios)',
         'card_top_lbl' => 'Imagens por olho',
         'card_top_val' => 'OCT, retinografia e biometria',
         'card_bot_lbl' => 'CFM e LGPD',

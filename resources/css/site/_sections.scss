@@ -48,29 +48,33 @@
 .hero-text .badge-pill { margin-bottom: 20px; }
 
 .hero-title {
-    font-size: clamp(40px, 6vw, 72px);
-    font-weight: 900;
+    @include type-display-hero;
     color: #fff;
-    line-height: 1.05;
-    letter-spacing: -0.03em;
     margin-bottom: 24px;
     text-wrap: balance;
 
+    // A caixa do degradê cortava a cauda do "g" de "oftalmológicas":
+    // folga embaixo sem mudar o espaçamento das linhas.
     em {
         font-style: normal;
         background: linear-gradient(135deg, $teal 0%, #00e5ff 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         display: inline-block;
+        padding-bottom: .15em;
+        margin-bottom: -.15em;
     }
 }
 
+// Texto claro no navy: um pouco mais de entrelinha e de espaço entre letras.
 .hero-sub {
-    font-size: 20px;
+    font-size: clamp(#{rem(17)}, 1vw + #{rem(14)}, #{rem(20)});
     color: rgba(#fff, .85);
-    line-height: 1.6;
+    line-height: 1.65;
+    letter-spacing: 0.005em;
     margin-bottom: 36px;
     font-weight: 400;
+    max-width: 34em;
     text-wrap: pretty;
 }
 
@@ -100,7 +104,7 @@
     align-items: center;
     gap: 8px;
     margin-bottom: 36px;
-    font-size: 14px;
+    font-size: rem(14);
     font-weight: 500;
     color: rgba(#fff, .78);
 
@@ -111,7 +115,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    font-size: 14px;
+    font-size: rem(14);
     color: rgba(#fff, .7);
 }
 
@@ -145,6 +149,8 @@
         max-width: 600px;
         margin: 20px auto;
     }
+
+    @include below($bp-sm) { padding-block: 44px 52px; }
 }
 
 // Moldura de navegador em volta do recorte real do prontuário.
@@ -238,30 +244,29 @@
         padding: 10px 12px;
         gap: 10px;
 
-        &.card-top    { top: -18px; left: -4px; }
-        &.card-bottom { bottom: -18px; right: -4px; }
+        // O painel é baixo no celular (~190px): os cartões ficam nas faixas
+        // acima e abaixo dele (padding do .hero-visual), sem cobrir o miolo.
+        &.card-top    { top: 0; left: -4px; }
+        &.card-bottom { bottom: 0; right: -4px; }
 
-        .icon { width: 30px; height: 30px; font-size: 15px; border-radius: 8px; }
+        .icon { width: 30px; height: 30px; font-size: rem(15); border-radius: 8px; }
     }
 }
 
 .hero-float-lbl {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .05em;
-    text-transform: uppercase;
+    @include type-eyebrow;
     color: #475569;
     margin-bottom: 2px;
 }
 
 .hero-float-val {
-    font-size: 15px;
+    font-size: rem(15);
     font-weight: 700;
     line-height: 1.35;
     letter-spacing: -0.01em;
     color: $navy;
 
-    @include below($bp-sm) { font-size: 13px; }
+    @include below($bp-sm) { font-size: rem(13); }
 }
 
 // ─── Metrics ─────────────────────────────────────────────────
@@ -292,28 +297,29 @@
 }
 
 .metric-value {
-    font-size: clamp(36px, 5vw, 48px);
-    font-weight: 900;
+    font-size: clamp(#{rem(36)}, 5vw, #{rem(48)});
+    @include type-numeral;
     background: linear-gradient(135deg, #fff 0%, $teal 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     line-height: 1;
-    letter-spacing: -0.02em;
-    margin-bottom: 8px;
+    // Folga para a vírgula de "99,9%" (a caixa do degradê cortava).
+    padding-bottom: .12em;
+    margin-bottom: calc(8px - .12em);
     display: inline-block;
 
-    @include below($bp-sm) { font-size: clamp(32px, 6vw, 40px); }
+    @include below($bp-sm) { font-size: clamp(#{rem(32)}, 6vw, #{rem(40)}); }
 }
 
-.metric-label { font-size: 15px; color: rgba(#fff, .75); font-weight: 500; letter-spacing: 0.01em; }
+.metric-label { font-size: rem(15); color: rgba(#fff, .75); font-weight: 500; letter-spacing: 0.01em; }
 
 .metrics-context {
-    max-width: 72ch;
+    max-width: 36em;
     margin: 24px auto 0;
     text-align: center;
-    font-size: 14px;
+    @include type-meta;
     color: rgba(#fff, .65);
-    text-wrap: pretty;
+    text-wrap: balance;
 }
 
 // ─── Problemas que resolve ──────────────────────────────────────
@@ -340,17 +346,18 @@
     border: 1px solid $border;
     border-radius: $radius;
     padding: 28px 24px;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .3s ease;
+    transition: transform $dur-slow $ease-out, box-shadow $dur-slow $ease-out;
 
+    // Cartão não é clicável: elevação discreta, sem parecer botão.
     &:hover {
-        transform: translateY(-6px);
+        transform: translateY(-4px);
         box-shadow: $shadow-lg;
 
-        .problem-icon { transform: scale(1.1); }
+        .problem-icon { transform: scale(1.08); }
     }
 
-    h3 { font-size: 17px; font-weight: 700; line-height: 1.3; color: $navy; margin-bottom: 10px; letter-spacing: -0.01em; text-wrap: balance; }
-    p  { font-size: 15px; color: $text-muted; line-height: 1.65; }
+    h3 { @include type-title-sm; color: $navy; margin-bottom: 10px; text-wrap: balance; }
+    p  { @include type-body-card; color: $text-muted; text-wrap: pretty; }
 }
 
 .problem-icon {
@@ -364,14 +371,17 @@
     justify-content: center;
     font-size: 20px;
     margin-bottom: 16px;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform $dur-slow $ease-out;
 }
 
 .problems-bridge {
     text-align: center;
     margin-top: 48px;
-    font-size: 17px;
+    // Frase de transição, maior que os títulos dos cartões acima (antes igual a eles).
+    font-size: rem(20);
     font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
     color: $navy;
     display: flex;
     align-items: center;
@@ -430,14 +440,20 @@
     background: #fff;
     color: $text-muted;
     font-weight: 600;
-    font-size: 14px;
+    font-size: rem(14);
     cursor: pointer;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
+    transition:
+        transform $dur-base $ease-out,
+        box-shadow $dur-base $ease-out,
+        background-color $dur-fast ease,
+        border-color $dur-fast ease,
+        color $dur-fast ease;
     font-family: inherit;
 
-    i { font-size: 16px; }
+    i { font-size: rem(16); }
 
     &:hover { border-color: $teal; color: $navy; transform: translateY(-2px); }
+    &:active { transform: scale(0.97); transition-duration: $dur-press; }
 
     &.active {
         background: $navy;
@@ -447,6 +463,26 @@
         box-shadow: 0 4px 12px rgba($navy, .2);
     }
 }
+
+// Tempo até o próximo print: um brilho claro percorre a aba ativa em 5s
+// (Home.vue troca de aba no animationend). Pausado com mouse/foco na seção
+// ou fora da tela; sem troca automática (reduzir movimento, aba escolhida), não aparece.
+@property --demo-progress {
+    syntax: '<percentage>';
+    inherits: false;
+    initial-value: 0%;
+}
+
+@keyframes demo-timer {
+    to { --demo-progress: 100%; }
+}
+
+.demo-tabs.is-rotating .demo-tab.active {
+    background-image: linear-gradient(90deg, rgba(#fff, .16) var(--demo-progress), transparent var(--demo-progress));
+    animation: demo-timer 5s linear forwards;
+}
+
+.demo-tabs.is-paused .demo-tab.active { animation-play-state: paused; }
 
 .demo-panel-wrap {
     display: grid;
@@ -459,12 +495,15 @@
     min-width: 0;
     opacity: 0;
     visibility: hidden;
-    transition: opacity .35s ease, visibility 0s linear .35s;
+    translate: 0 10px;
+    transition: opacity $dur-base ease, translate $dur-base $ease-out, visibility 0s linear $dur-base;
 
+    // O print que chega sobe 10px enquanto aparece; o que sai só esmaece (mais rápido).
     &.is-active {
         opacity: 1;
         visibility: visible;
-        transition: opacity .35s ease, visibility 0s;
+        translate: 0 0;
+        transition: opacity $dur-slow ease, translate $dur-slow $ease-out, visibility 0s;
     }
 
     &:focus-visible {
@@ -510,15 +549,16 @@
 }
 
 .demo-caption {
-    max-width: 72ch;
+    max-width: 34em;
     margin: 20px auto 0;
     text-align: center;
     color: $text-muted;
-    font-size: 15px;
+    @include type-body-card;
     text-wrap: balance;
 }
 
-.demo-fictitious { font-style: italic; white-space: nowrap; }
+// A Inter itálica não é carregada (seriam +80 KB): nada de itálico sintetizado.
+.demo-fictitious { font-weight: 600; white-space: nowrap; }
 
 // Só no celular, onde o print fica pequeno: abre a imagem inteira.
 .demo-enlarge {
@@ -532,7 +572,7 @@
         width: fit-content;
         min-height: 44px;
         margin: 4px auto 0;
-        font-size: 14px;
+        font-size: rem(14);
         font-weight: 600;
         color: $teal-ink;
         text-decoration: underline;
@@ -572,10 +612,7 @@
     border-radius: $radius-lg;
 
     h3 {
-        font-size: 21px;
-        font-weight: 800;
-        line-height: 1.2;
-        letter-spacing: -0.02em;
+        @include type-title-md;
         color: $navy;
         margin-bottom: 6px;
         text-wrap: balance;
@@ -598,7 +635,7 @@
 }
 
 .audience-for {
-    font-size: 14px;
+    @include type-meta;
     font-weight: 600;
     color: $teal-ink;
     margin-bottom: 20px;
@@ -614,8 +651,7 @@
     li {
         display: flex;
         gap: 10px;
-        font-size: 15px;
-        line-height: 1.55;
+        @include type-body-card;
         color: $text;
     }
 
@@ -630,7 +666,7 @@
     border-radius: 999px;
     background: rgba($blue, .1);
     color: $navy-mid;
-    font-size: 12px;
+    font-size: rem(12);
     font-weight: 600;
     line-height: 1.6;
 }
@@ -643,10 +679,7 @@
 }
 
 .audience-flow-label {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
+    @include type-eyebrow;
     color: $text-muted;
     margin-bottom: 12px;
 }
@@ -670,18 +703,43 @@
         border-right: 1.5px solid $text-muted;
         transform: rotate(45deg);
         flex-shrink: 0;
+        transition: opacity $dur-base $ease-out;
     }
 
+    // Estado final (etapa concluída): pílula com o tom do teal.
     span {
         padding: 5px 10px;
         border-radius: 999px;
-        background: #fff;
-        border: 1px solid $border;
-        font-size: 13px;
+        background: rgba($teal, .08);
+        border: 1px solid rgba($teal, .4);
+        font-size: rem(13);
         font-weight: 600;
         color: $navy;
         white-space: nowrap;
+        transition:
+            background-color $dur-base $ease-out,
+            border-color $dur-base $ease-out,
+            color $dur-base $ease-out;
     }
+}
+
+// Fluxo TISS, momento principal do movimento (Home.vue → tissFlow): antes de
+// entrar na tela as etapas ficam "a fazer" (tracejadas, legíveis a 5,1:1) e,
+// ao entrar, se concluem na ordem da guia ao retorno, uma única vez.
+.audience-flow.is-armed .audience-flow-steps {
+    li:not(:last-child)::after { opacity: .3; }
+
+    span {
+        background: transparent;
+        border-style: dashed;
+        border-color: $border;
+        color: $text-muted;
+    }
+}
+
+.audience-flow.is-played .audience-flow-steps {
+    span,
+    li::after { transition-delay: calc(var(--step, 0) * 120ms); }
 }
 
 // ─── How It Works ─────────────────────────────────────────────
@@ -737,8 +795,8 @@
 .how-step-content {
     min-width: 0;
 
-    h3 { font-size: 18px; font-weight: 700; color: $navy; margin-bottom: 6px; letter-spacing: -0.01em; }
-    p  { font-size: 16px; color: $text-muted; line-height: 1.65; }
+    h3 { @include type-title-sm; color: $navy; margin-bottom: 6px; }
+    p  { @include type-body; color: $text-muted; }
 }
 
 .how-visual {
@@ -779,19 +837,19 @@
     gap: 16px;
     padding: 18px 20px;
     border-radius: $radius;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color .2s ease;
+    transition: transform $dur-slow $ease-out, background-color $dur-base ease;
 
     &:hover {
         background: $bg;
         transform: translateX(4px);
 
-        .diff-icon { transform: scale(1.1); }
+        .diff-icon { transform: scale(1.08); }
     }
 
     > div:last-child { min-width: 0; }
 
-    h3 { font-size: 17px; font-weight: 700; color: $navy; margin-bottom: 6px; text-wrap: balance; }
-    p  { font-size: 15px; color: $text-muted; line-height: 1.6; }
+    h3 { @include type-title-sm; color: $navy; margin-bottom: 6px; text-wrap: balance; }
+    p  { @include type-body-card; color: $text-muted; }
 }
 
 .diff-icon {
@@ -805,7 +863,7 @@
     justify-content: center;
     font-size: 21px;
     flex-shrink: 0;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform $dur-slow $ease-out;
 }
 
 // Conformidade na prática: mecanismos reais do produto (auditoria, versões,
@@ -825,10 +883,7 @@
 }
 
 .diff-proof-title {
-    font-size: clamp(20px, 2.4vw, 26px);
-    font-weight: 800;
-    line-height: 1.25;
-    letter-spacing: -0.02em;
+    @include type-title-lg;
     color: #fff;
     text-wrap: balance;
 }
@@ -848,7 +903,7 @@
     border-radius: 10px;
     background: rgba(#fff, .06);
     border: 1px solid rgba(#fff, .14);
-    font-size: 14px;
+    font-size: rem(14);
     font-weight: 600;
     color: #fff;
 
@@ -863,7 +918,8 @@
 
 .testimonials-header { margin-bottom: 56px; }
 
-.section-sub.testimonials-context { font-size: 15px; }
+// Ressalva, não linha fina: tamanho de metadado e medida curta.
+.section-sub.testimonials-context { @include type-meta; max-width: 34em; text-wrap: balance; }
 
 .testimonials-grid {
     display: grid;
@@ -901,12 +957,12 @@
     &.is-empty { fill: none; stroke: $yellow; stroke-width: 1.5; }
 }
 
+// Sem itálico sintetizado (a Inter itálica não é carregada); as aspas marcam a citação.
 .testimonial-text {
-    font-size: 15px;
+    @include type-body-card;
+    line-height: 1.65;
     color: $text;
-    line-height: 1.7;
     margin-bottom: 20px;
-    font-style: italic;
 }
 
 // Autor sempre no pé do cartão, alinhado entre os três.
@@ -922,12 +978,12 @@
     justify-content: center;
     color: #fff;
     font-weight: 700;
-    font-size: 16px;
+    font-size: rem(16);
     flex-shrink: 0;
 }
 
-.testimonial-name { font-weight: 700; font-size: 14px; color: $navy; }
-.testimonial-role { font-size: 13px; color: $text-muted; }
+.testimonial-name { font-weight: 700; font-size: rem(14); color: $navy; }
+.testimonial-role { @include type-micro; color: $text-muted; }
 
 // ─── Pricing ──────────────────────────────────────────────────
 .pricing {
@@ -943,13 +999,12 @@
     align-items: flex-start;
     justify-content: center;
     gap: 10px;
-    max-width: 880px;
+    max-width: 42em;
     margin: 0 auto 48px;
     padding: 14px 20px;
     border-radius: $radius;
     background: $bg;
-    font-size: 15px;
-    line-height: 1.6;
+    @include type-body-card;
     color: $text;
     text-wrap: pretty;
 
@@ -964,8 +1019,8 @@
     > i { display: block; font-size: 56px; color: $border; margin-bottom: 20px; }
 }
 
-.pricing-empty-title { font-size: 20px; font-weight: 700; color: $navy; letter-spacing: -0.01em; margin-bottom: 12px; }
-.pricing-empty-text  { font-size: 16px; color: $text-muted; line-height: 1.6; margin-bottom: 32px; }
+.pricing-empty-title { @include type-title-md; color: $navy; margin-bottom: 12px; }
+.pricing-empty-text  { @include type-body; color: $text-muted; margin-bottom: 32px; }
 
 .pricing-grid {
     display: grid;
@@ -989,10 +1044,10 @@
     padding: 36px;
     border: 1.5px solid $border;
     background: #fff;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .3s ease;
+    transition: transform $dur-slow $ease-out, box-shadow $dur-slow $ease-out;
 
     &:hover {
-        transform: translateY(-8px);
+        transform: translateY(-4px);
         box-shadow: $shadow-lg;
     }
 
@@ -1002,7 +1057,7 @@
         transform: scale(1.04);
 
         &:hover {
-            transform: scale(1.04) translateY(-8px);
+            transform: scale(1.04) translateY(-4px);
             box-shadow: 0 24px 60px rgba($navy, .2);
         }
 
@@ -1028,17 +1083,14 @@
     align-self: flex-start;
     background: $teal;
     color: $navy;
-    font-size: 11px;
-    font-weight: 700;
+    @include type-badge;
     padding: 4px 10px;
     border-radius: 999px;
-    letter-spacing: .06em;
-    text-transform: uppercase;
     margin-bottom: 16px;
 }
 
-.pricing-name { font-size: 20px; font-weight: 800; color: $navy; margin-bottom: 6px; }
-.pricing-desc { font-size: 14px; color: $text-muted; margin-bottom: 24px; }
+.pricing-name { @include type-title-md; color: $navy; margin-bottom: 6px; }
+.pricing-desc { @include type-meta; color: $text-muted; margin-bottom: 24px; }
 
 .pricing-price {
     display: flex;
@@ -1048,15 +1100,15 @@
     margin-bottom: 24px;
 }
 
-.price-currency { font-size: 20px; font-weight: 700; color: $navy; }
-.price-value    { font-size: 44px; font-weight: 900; color: $navy; line-height: 1; }
-.price-period   { font-size: 14px; color: $text-muted; }
+.price-currency { font-size: rem(20); font-weight: 700; color: $navy; }
+.price-value    { font-size: rem(44); @include type-numeral; color: $navy; line-height: 1; }
+.price-period   { font-size: rem(14); color: $text-muted; }
 
-.price-value--request { font-size: clamp(28px, 4vw, 36px); letter-spacing: -0.02em; }
+.price-value--request { font-size: clamp(#{rem(28)}, 4vw, #{rem(36)}); font-variant-numeric: normal; }
 
 // "Tudo do Básico, mais:" — o card só lista o que acrescenta ao anterior.
 .pricing-inherits {
-    font-size: 13px;
+    font-size: rem(13);
     font-weight: 700;
     color: $navy;
     margin-bottom: 12px;
@@ -1073,11 +1125,10 @@
         display: flex;
         align-items: flex-start;
         gap: 10px;
-        font-size: 14px;
-        line-height: 1.5;
+        @include type-meta;
         color: $text-muted;
 
-        i { font-size: 16px; color: $mint; flex-shrink: 0; margin-top: 2px; }
+        i { font-size: rem(16); color: $mint; flex-shrink: 0; margin-top: 2px; }
     }
 }
 
@@ -1093,10 +1144,7 @@
 }
 
 .pricing-upcoming-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .05em;
+    @include type-eyebrow;
     color: $text-muted;
     margin-bottom: 10px;
 
@@ -1108,10 +1156,10 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
+    font-size: rem(14);
     color: $text-muted;
 
-    i { font-size: 16px; color: $text-muted; flex-shrink: 0; }
+    i { font-size: rem(16); color: $text-muted; flex-shrink: 0; }
     > span:not(.pricing-upcoming-badge) { flex: 1; min-width: 0; }
 
     .pricing-card.featured & {
@@ -1127,10 +1175,7 @@
     border-radius: 999px;
     border: 1px solid $border;
     color: $text-muted;
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: .04em;
-    text-transform: uppercase;
+    @include type-badge;
     white-space: nowrap;
     flex-shrink: 0;
 
@@ -1149,11 +1194,11 @@
     justify-content: center;
     gap: 6px;
     margin-bottom: 12px;
-    font-size: 13px;
+    font-size: rem(13);
     font-weight: 600;
     color: $text-muted;
 
-    i { font-size: 15px; color: $mint; }
+    i { font-size: rem(15); color: $mint; }
 }
 
 .pricing-credit-note {
@@ -1170,9 +1215,8 @@
     i { font-size: 20px; color: $teal-ink; flex-shrink: 0; margin-top: 1px; }
 
     p {
-        font-size: 14px;
+        @include type-meta;
         color: $text-muted;
-        line-height: 1.65;
         margin: 0;
     }
 
@@ -1220,29 +1264,55 @@
     cursor: pointer;
     font-family: inherit;
     font-weight: 600;
-    font-size: 16px;
-    line-height: inherit;
+    font-size: rem(17);
+    line-height: 1.4;
     text-align: left;
     color: $navy;
     gap: 16px;
-    transition: background .18s;
+    transition: background-color $dur-fast ease;
 
     &:hover { background: $bg; }
 
     // .faq-item corta o que passa da borda (overflow hidden): anel por dentro.
     &:focus-visible { outline-offset: -2px; }
 
-    i { font-size: 18px; color: $text-muted; flex-shrink: 0; }
+    i {
+        font-size: 18px;
+        color: $text-muted;
+        flex-shrink: 0;
+        transition: transform $dur-base $ease-out, color $dur-fast ease;
+    }
+
+    // Aberta: o + gira para ×.
+    &[aria-expanded="true"] i { transform: rotate(45deg); color: $navy; }
 }
 
+// Altura animada sem medir em JS: a linha do grid vai de 0fr a 1fr. Fechar é
+// mais rápido que abrir; fechada, visibility: hidden (fora do Tab e do leitor).
 .faq-answer {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
     padding: 0 24px;
-    font-size: 15px;
+    @include type-body;
     color: $text-muted;
-    line-height: 1.7;
+    transition: grid-template-rows $dur-base $ease-out, visibility 0s linear $dur-base;
+
+    &.is-open {
+        grid-template-rows: 1fr;
+        visibility: visible;
+        transition: grid-template-rows $dur-slow $ease-out, visibility 0s;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        &, &.is-open { transition: none; }
+    }
 }
 
-.faq-answer-inner { padding-bottom: 20px; }
+.faq-answer-clip { min-height: 0; overflow: hidden; }
+
+// Medida de leitura (~70 caracteres); antes a resposta corria os 710px do cartão.
+.faq-answer-inner { max-width: 36em; padding-bottom: 20px; }
 
 // ─── Contact ──────────────────────────────────────────────────
 // Fundo branco: alterna com o FAQ ($bg) em vez de emendar duas faixas iguais.
@@ -1253,12 +1323,11 @@
 
 .contact-header { text-align: center; margin-bottom: 56px; }
 
+// Mesmo papel dos outros h2 de seção (antes 900, sem tracking, e menor no celular).
 .contact-headline {
-    font-size: clamp(24px, 3.5vw, 40px);
-    font-weight: 900;
+    @include type-title-xl;
     color: $navy;
-    line-height: 1.15;
-    margin-bottom: 12px;
+    margin-bottom: 20px;
     text-wrap: balance;
 
     // Texto grande: $teal-dark passa (3,5:1); o $teal não (2,5:1).
@@ -1266,11 +1335,11 @@
 }
 
 .contact-subline {
-    font-size: 17px;
+    @include type-lead;
     color: $text-muted;
-    max-width: 560px;
+    max-width: 34em;
     margin: 0 auto;
-    text-wrap: pretty;
+    text-wrap: balance;
 }
 
 .contact-main {
@@ -1296,8 +1365,8 @@
     // aparecia cortado ("voce@exemplo.con").
     container: cf-box / inline-size;
 
-    h3 { font-size: 22px; font-weight: 800; color: $navy; margin-bottom: 6px; }
-    > p { font-size: 15px; color: $text-muted; margin-bottom: 28px; }
+    h3 { @include type-title-md; color: $navy; margin-bottom: 6px; }
+    > p { @include type-body-card; color: $text-muted; margin-bottom: 28px; }
 
     @include below($bp-sm) { padding: 24px 20px; }
 }
@@ -1328,7 +1397,7 @@
 .cf-hint,
 .cf-field-error {
     margin: 6px 0 0;
-    font-size: 14px;
+    font-size: rem(14);
     line-height: 1.5;
     overflow-wrap: anywhere;
 }
@@ -1343,7 +1412,7 @@
     border-radius: 8px;
     color: #a11b2b;
     background: #fff5f6;
-    font-size: 14px;
+    font-size: rem(14);
     line-height: 1.6;
     overflow-wrap: anywhere;
 }
@@ -1356,7 +1425,7 @@
 
     label {
         display: block;
-        font-size: 13px;
+        font-size: rem(13);
         font-weight: 600;
         color: $navy;
         margin-bottom: 6px;
@@ -1369,7 +1438,7 @@
     padding: 11px 14px;
     border-radius: 8px;
     border: 1.5px solid $border;
-    font-size: 14px;
+    font-size: rem(14);
     color: $text;
     background-color: $bg;
     transition: border-color .18s, box-shadow .18s;
@@ -1391,7 +1460,7 @@
 
     @media (max-width: $bp-sm), (pointer: coarse) {
         min-height: 44px;
-        font-size: 16px;
+        font-size: rem(16);
     }
 }
 
@@ -1427,7 +1496,7 @@ select.cf-control {
     }
 
     label {
-        font-size: 13px;
+        font-size: rem(13);
         color: $text-muted;
         line-height: 1.5;
         cursor: pointer;
@@ -1449,15 +1518,19 @@ select.cf-control {
     background: $teal;
     color: $navy;
     border: none;
-    font-size: 15px;
-    font-weight: 700;
+    font-size: rem(15);
+    // Mesmo peso dos outros botões (.btn).
+    font-weight: 600;
     cursor: pointer;
     font-family: inherit;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color .2s ease, box-shadow .2s ease;
+    transition:
+        transform $dur-base $ease-out,
+        box-shadow $dur-base $ease-out,
+        background-color $dur-fast ease;
 
     &:hover:not(:disabled) {
         background: $teal-hover;
@@ -1465,7 +1538,7 @@ select.cf-control {
         box-shadow: 0 8px 24px rgba($teal, .35);
     }
 
-    &:active:not(:disabled) { transform: scale(0.97); }
+    &:active:not(:disabled) { transform: scale(0.97); transition-duration: $dur-press; }
 
     &:disabled { opacity: .55; cursor: not-allowed; }
 }
@@ -1521,12 +1594,11 @@ select.cf-control {
 
     > div:last-child { min-width: 0; overflow-wrap: anywhere; }
 
-    h3 { font-size: 16px; font-weight: 700; color: $navy; margin-bottom: 4px; }
+    h3 { @include type-title-sm; color: $navy; margin-bottom: 4px; }
 
     p {
-        font-size: 14px;
+        @include type-meta;
         color: $text-muted;
-        line-height: 1.6;
         margin-bottom: 8px;
     }
 
@@ -1535,9 +1607,13 @@ select.cf-control {
         align-items: center;
         gap: 6px;
         color: $teal-ink;
-        text-decoration: none;
         font-weight: 600;
-        &:hover { text-decoration: underline; text-underline-offset: 3px; }
+        // O sublinhado aparece (cor) em vez de surgir de uma vez.
+        text-decoration: underline;
+        text-decoration-color: transparent;
+        text-underline-offset: 3px;
+        transition: text-decoration-color $dur-fast ease;
+        &:hover { text-decoration-color: currentColor; }
 
         // WhatsApp, e-mail e "Criar conta grátis" tinham 20px de altura no toque.
         @media (pointer: coarse) { min-height: 44px; }
@@ -1561,8 +1637,8 @@ select.cf-control {
     border-radius: $radius-lg;
     border: 1px solid $border;
 
-    p { font-size: 14px; color: $text; font-style: italic; line-height: 1.7; margin-bottom: 8px; }
-    span { font-size: 13px; color: $text-muted; font-weight: 600; }
+    p { @include type-meta; line-height: 1.65; color: $text; margin-bottom: 8px; }
+    span { @include type-micro; color: $text-muted; font-weight: 600; }
 }
 
 .contact-trust {
@@ -1589,7 +1665,7 @@ select.cf-control {
 
     i    { font-size: 18px; color: $mint; }
     .ti-star { color: $yellow; }
-    span { font-size: 14px; font-weight: 600; color: $navy; }
+    span { font-size: rem(14); font-weight: 600; color: $navy; }
 }
 
 // ─── CTA Final ────────────────────────────────────────────────
@@ -1609,22 +1685,25 @@ select.cf-control {
 
     > .container { position: relative; z-index: 1; }
 
+    // Mesmo papel dos outros h2 (antes 50px/900, maior que os títulos de seção).
+    // Medida curta: a frase de fechamento quebra em duas linhas equilibradas
+    // (em 48px ela ocupava uma linha de ~1.100px).
     h2 {
-        font-size: clamp(30px, 4vw, 50px);
-        font-weight: 900;
-        line-height: 1.12;
-        letter-spacing: -0.025em;
+        @include type-title-xl;
         color: #fff;
-        margin-bottom: 16px;
+        max-width: 16em;
+        margin: 0 auto 16px;
         text-wrap: balance;
     }
 }
 
 // Classe própria: o antigo `.cta-final p` também pegava a nota de rodapé.
 .cta-final-sub {
-    max-width: 40em;
+    max-width: 34em;
     margin: 0 auto 36px;
-    font-size: 18px;
+    @include type-lead;
+    line-height: 1.65;
+    letter-spacing: 0.005em;
     color: rgba(#fff, .78);
     text-wrap: balance;
 }
@@ -1643,7 +1722,7 @@ select.cf-control {
     }
 }
 
-.cta-note { font-size: 13px; color: rgba(#fff, .65); margin-top: 20px; }
+.cta-note { @include type-micro; letter-spacing: 0.01em; color: rgba(#fff, .65); margin-top: 20px; }
 
 // ─── CTA fixo no celular ──────────────────────────────────────
 // Aparece depois do hero; some no contato, no CTA final e no rodapé
@@ -1682,6 +1761,63 @@ select.cf-control {
     }
 }
 
+// ─── Entrada das listas de cartões ────────────────────────────
+// Dores, públicos e depoimentos sobem 16px e aparecem conforme entram na tela.
+// Animação ligada à rolagem, em CSS nativo (animation-timeline: view()), sem
+// JavaScript: sem suporte no navegador, com "reduzir movimento" ou na
+// impressão, os cartões ficam no estado final, visíveis. Anima `translate`
+// (e não `transform`) para não disputar com o hover.
+@keyframes card-rise {
+    from { opacity: 0; translate: 0 16px; }
+    to   { opacity: 1; translate: 0 0; }
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+        .problem-card,
+        .audience-card,
+        .testimonial-card {
+            animation: card-rise both;
+            animation-timing-function: $ease-out;
+            animation-timeline: view();
+            animation-range: entry 5% entry 70%;
+        }
+
+        // Cartões lado a lado entram em sequência: a faixa do seguinte começa depois.
+        .problems-grid > :nth-child(2),
+        .audiences-grid > :nth-child(2),
+        .testimonials-grid > :nth-child(2) { animation-range: entry 12% entry 78%; }
+
+        .problems-grid > :nth-child(3),
+        .audiences-grid > :nth-child(3),
+        .testimonials-grid > :nth-child(3) { animation-range: entry 19% entry 86%; }
+
+        .problems-grid > :nth-child(4) { animation-range: entry 26% entry 94%; }
+    }
+}
+
+// ─── Reduzir movimento ────────────────────────────────────────
+// Sem deslocamentos no hover; cor, sombra e estados continuam como feedback.
+@media (prefers-reduced-motion: reduce) {
+    .problem-card:hover,
+    .problem-card:hover .problem-icon,
+    .diff-card:hover,
+    .diff-card:hover .diff-icon,
+    .pricing-card:not(.featured):hover,
+    .demo-tab:hover,
+    .demo-tab:active,
+    .cf-submit:hover:not(:disabled),
+    .cf-submit:active:not(:disabled) { transform: none; }
+
+    .pricing-card.featured:hover {
+        transform: scale(1.04);
+
+        @include below($bp-lg) { transform: none; }
+    }
+
+    .demo-panel { translate: none; }
+}
+
 // ─── Respiro vertical no tablet e no celular ──────────────────
 // 100px em cima e embaixo é proporção de desktop: no celular somava ~2.400px
 // de rolagem vazia entre as seções. Mesmo ritmo, escala menor.
@@ -1710,12 +1846,12 @@ select.cf-control {
 }
 
 .legal-inner {
-    max-width: 760px;
+    max-width: 680px;
     margin: 0 auto;
 }
 
 .legal-meta {
-    font-size: 14px;
+    font-size: rem(14);
     color: $text-muted;
     margin-bottom: 28px;
 }
@@ -1743,8 +1879,7 @@ select.cf-control {
 }
 
 .legal-unavailable-title {
-    font-size: 20px;
-    font-weight: 800;
+    @include type-title-md;
     color: $navy;
     margin-bottom: 8px;
 }

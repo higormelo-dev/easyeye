@@ -102,7 +102,7 @@
         border-radius: 6px;
         color: #3a4a6b;
         font-weight: 500;
-        font-size: 14px;
+        font-size: rem(14);
         text-decoration: none;
         transition: color .2s, background .2s;
         white-space: nowrap;
@@ -162,7 +162,7 @@
     gap: 8px;
     padding: 9px 12px;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: rem(14);
     font-weight: 500;
     color: $text;
     text-decoration: none;
@@ -176,7 +176,7 @@
         font-weight: 600;
     }
 
-    .check { margin-left: auto; font-size: 14px; color: $teal-ink; }
+    .check { margin-left: auto; font-size: rem(14); color: $teal-ink; }
 }
 
 // Botão mobile
@@ -220,7 +220,7 @@
             color: $text;
             font-weight: 500;
             text-decoration: none;
-            font-size: 16px;
+            font-size: rem(16);
             border-bottom: 1px solid $border;
         }
     }
@@ -240,12 +240,12 @@
         gap: 6px;
         padding: 6px 12px;
         border-radius: 999px;
-        font-size: 13px;
+        font-size: rem(13);
         font-weight: 600;
         border: 1.5px solid $border;
         color: $text-muted;
         text-decoration: none;
-        transition: all .18s;
+        transition: border-color $dur-fast ease, color $dur-fast ease, background-color $dur-fast ease;
 
         &.active,
         &:hover { border-color: $teal; color: $teal-ink; background: rgba($teal, .06); }
@@ -264,11 +264,21 @@
     .nav-links { display: none; }
     .nav-right { margin-left: auto; }
     .nav-mobile-btn { display: flex; }
-    .nav-mobile-menu.open { display: block; }
+    .nav-mobile-menu.open { display: block; animation: menu-in $dur-base $ease-out; }
 }
 
 @include below($bp-sm) {
     .nav-right { display: none; }
+}
+
+// Menu móvel desce 8px enquanto aparece (fechar é imediato: saída mais rápida).
+@keyframes menu-in {
+    from { opacity: 0; translate: 0 -8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav-mobile-menu.open { animation: none; }
+    #navbar:not(.scrolled) .nav-right .btn-outline:hover { transform: none; }
 }
 
 // Menu móvel aberto: a página de trás não rola (SiteLayout alterna a classe).
@@ -320,7 +330,7 @@ footer {
 
     // Branco a 45% no navy dava 4,49:1; 60% dá 7:1.
     p {
-        font-size: 14px;
+        font-size: rem(14);
         color: rgba(#fff, .6);
         line-height: 1.7;
         max-width: 280px;
@@ -341,8 +351,8 @@ footer {
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 16px;
-        transition: all .2s;
+        font-size: rem(16);
+        transition: background-color $dur-fast ease, color $dur-fast ease;
         text-decoration: none;
 
         &:hover { background: $teal; color: $navy; }
@@ -352,11 +362,8 @@ footer {
 .footer-col {
     // h2 na hierarquia (antes h5 solto depois do h2 da última seção), mesmo visual.
     h2 {
-        font-size: 13px;
-        font-weight: 700;
+        @include type-eyebrow;
         color: rgba(#fff, .9);
-        text-transform: uppercase;
-        letter-spacing: .06em;
         margin-bottom: 16px;
     }
 
@@ -367,7 +374,7 @@ footer {
         gap: 10px;
 
         a {
-            font-size: 14px;
+            font-size: rem(14);
             color: rgba(#fff, .6);
             text-decoration: none;
             transition: color .18s;
@@ -386,7 +393,8 @@ footer {
     gap: 16px;
     flex-wrap: wrap;
 
-    p { font-size: 13px; color: rgba(#fff, .5); } // .3 dava 2,6:1
+    // 13px claro no escuro fica fino a 50%: 60% (.3 dava 2,6:1).
+    p { font-size: rem(13); color: rgba(#fff, .6); }
 }
 
 .footer-legal {
@@ -395,8 +403,8 @@ footer {
     gap: 12px 20px;
 
     a {
-        font-size: 13px;
-        color: rgba(#fff, .5);
+        font-size: rem(13);
+        color: rgba(#fff, .6);
         text-decoration: none;
 
         &:hover { color: rgba(#fff, .85); }

@@ -4,11 +4,7 @@
         <title>{{ title }}</title>
         <meta name="description" :content="description">
         <link v-if="canonicalUrl" rel="canonical" :href="canonicalUrl">
-
-        <!-- Mesma fonte da Home (só os pesos usados). Ícones: Tabler, via site.js. -->
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <!-- A Inter vem no <head> do app.blade.php; ícones: Tabler, via site.js. -->
     </Head>
 
     <!-- O <main> vem do SiteLayout (alvo do "Pular para o conteúdo"). -->

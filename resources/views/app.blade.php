@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    {{-- Inter com eixo óptico (corte Display nos títulos) no HTML inicial, só nas
+         páginas do site. Com o SSR desligado, o link no <Head> do Vue só era
+         descoberto depois de o JavaScript rodar. --}}
+    @if (str_starts_with($page['component'] ?? '', 'Site/'))
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..900&display=swap">
+    @endif
+
     {{-- ───────────────────────────────────────────────────────────────────
          SEO + Social previews (WhatsApp, LinkedIn, Telegram, Twitter, etc.)
 

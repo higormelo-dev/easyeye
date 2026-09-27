@@ -48,10 +48,8 @@
             v-text="JSON.stringify(schema)"
         />
 
-        <!-- Fonte (só os pesos usados) e a imagem do hero (LCP). Ícones: Tabler, via site.js. -->
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+        <!-- Imagem do hero (LCP). A Inter vem no <head> do app.blade.php (HTML inicial);
+             ícones: Tabler, via site.js. -->
         <link v-if="heroSrc" rel="preload" as="image" type="image/webp" :href="heroSrc">
     </Head>
 
@@ -94,8 +92,8 @@
                         </div>
                     </div>
 
-                    <!-- Recorte real do prontuário oftalmológico (refração OD/OE), no lugar do
-                         esqueleto genérico de dashboard; os cartões dizem o que o produto faz. -->
+                    <!-- Painel inicial real do sistema (dados fictícios); os cartões flutuantes
+                         dizem o que o produto faz além do painel. -->
                     <div v-if="heroSrc" class="hero-visual">
                         <div class="hero-float-card card-top">
                             <div class="icon icon-mint"><i class="ti ti-photo" aria-hidden="true"></i></div>
@@ -116,8 +114,8 @@
                                 :src="heroSrc"
                                 :alt="t.hero.visual_alt"
                                 class="hero-shot"
-                                width="1061"
-                                height="857"
+                                width="1400"
+                                height="735"
                                 fetchpriority="high"
                                 decoding="async"
                             >
@@ -187,7 +185,15 @@
                     <p class="section-sub">{{ t.demo.subtitle }}</p>
                 </div>
 
-                <div class="demo-tabs" role="tablist" :aria-label="t.demo.title" @keydown="onDemoTabKeydown">
+                <!-- A aba ativa mostra quanto falta para o próximo print (is-rotating); a
+                     troca acontece no fim dessa animação, então pausar a animação (mouse,
+                     foco, seção fora da tela) pausa a troca junto. -->
+                <div
+                    :class="['demo-tabs', { 'is-rotating': demoAuto, 'is-paused': demoPaused }]"
+                    role="tablist"
+                    :aria-label="t.demo.title"
+                    @keydown="onDemoTabKeydown"
+                >
                     <button
                         v-for="(tab, i) in demoTabs"
                         :id="`demo-tab-${tab.key}`"
@@ -200,6 +206,7 @@
                         :tabindex="activeDemoTab === i ? 0 : -1"
                         :class="['demo-tab', { active: activeDemoTab === i }]"
                         @click="setDemoTab(i)"
+                        @animationend="onDemoTimerEnd"
                     >
                         <i :class="'ti ' + tab.icon" aria-hidden="true"></i> {{ tab.label }}
                     </button>
@@ -273,10 +280,10 @@
                                 </li>
                             </template>
                         </ul>
-                        <div v-if="group.flow?.length" class="audience-flow">
+                        <div v-if="group.flow?.length" :class="['audience-flow', `is-${tissFlow}`]" data-test="tiss-flow">
                             <p class="audience-flow-label">{{ group.flow_label }}</p>
                             <ol class="audience-flow-steps">
-                                <li v-for="step in group.flow" :key="step"><span>{{ step }}</span></li>
+                                <li v-for="(step, stepIndex) in group.flow" :key="step" :style="{ '--step': stepIndex }"><span>{{ step }}</span></li>
                             </ol>
                         </div>
                     </article>
@@ -500,20 +507,23 @@
                                 @click="toggleFaq(i)"
                             >
                                 <span>{{ faq.q }}</span>
-                                <i :class="'ti ' + (faqOpen === i ? 'ti-minus' : 'ti-plus')" aria-hidden="true"></i>
+                                <!-- O + gira para × ao abrir (CSS pelo aria-expanded). -->
+                                <i class="ti ti-plus" aria-hidden="true"></i>
                             </button>
                         </h3>
-                        <Transition name="fade">
-                            <div
-                                v-show="faqOpen === i"
-                                :id="`faq-a-${i}`"
-                                class="faq-answer"
-                                role="region"
-                                :aria-labelledby="`faq-q-${i}`"
-                            >
+                        <!-- Abre com altura suave (grid 0fr → 1fr); fechada, visibility: hidden
+                             tira a resposta do Tab e do leitor de tela. -->
+                        <div
+                            :id="`faq-a-${i}`"
+                            :class="['faq-answer', { 'is-open': faqOpen === i }]"
+                            role="region"
+                            :aria-labelledby="`faq-q-${i}`"
+                            data-test="faq-answer"
+                        >
+                            <div class="faq-answer-clip">
                                 <div class="faq-answer-inner">{{ faq.a }}</div>
                             </div>
-                        </Transition>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -651,8 +661,8 @@ function asset(path) {
     return '/' + path;
 }
 
-// Recorte real do prontuário (sem dados de paciente), em WebP; sem o arquivo, hero só com texto.
-const heroSrc = computed(() => (props.heroImage ? `${asset('site/images/hero-prontuario.webp')}?v=${props.heroImage}` : null));
+// Painel inicial do sistema (dados fictícios), em WebP; sem o arquivo, hero só com texto.
+const heroSrc = computed(() => (props.heroImage ? `${asset('site/images/hero-dashboard.webp')}?v=${props.heroImage}` : null));
 
 // ─── DEMONSTRAÇÃO VISUAL ───
 // Recortes em WebP sem dados de teste; aba sem imagem não aparece.
@@ -669,14 +679,32 @@ function demoSrc(key) {
 
 const activeDemoTab = ref(0);
 const demoTabEls = ref([]);
-// A troca automática pausa enquanto o visitante está na seção (mouse ou foco):
-// o painel não muda embaixo de quem está lendo ou navegando pelo teclado.
+// Troca automática: a aba ativa anima o tempo restante (CSS) e, no fim dessa
+// animação, passa para a próxima. Pausa com o mouse ou o foco na seção e fora
+// da tela: o painel não muda embaixo de quem está lendo ou navegando pelo
+// teclado. Escolher uma aba desliga a troca automática.
+const demoAuto = ref(false);
 const demoHovered = ref(false);
 const demoFocused = ref(false);
-let demoInterval = null;
+const demoInView = ref(false);
+const demoPaused = computed(() => demoHovered.value || demoFocused.value || !demoInView.value);
+let demoObserver = null;
 function setDemoTab(i) {
     activeDemoTab.value = i;
-    if (demoInterval) clearInterval(demoInterval);
+    demoAuto.value = false;
+}
+function onDemoTimerEnd(event) {
+    if (!demoAuto.value || (event.animationName && event.animationName !== 'demo-timer')) return;
+    activeDemoTab.value = (activeDemoTab.value + 1) % demoTabs.value.length;
+}
+function watchDemoVisibility() {
+    const demo = document.querySelector('#demonstracao');
+    if (!demo || !('IntersectionObserver' in window)) {
+        demoInView.value = true;
+        return;
+    }
+    demoObserver = new IntersectionObserver(([entry]) => { demoInView.value = entry.isIntersecting; }, { threshold: 0.25 });
+    demoObserver.observe(demo);
 }
 
 // Padrão de abas do WAI-ARIA: setas trocam de aba (com foco), Home/End vão às pontas.
@@ -777,6 +805,25 @@ function watchMobileCta() {
     targets.forEach((target) => ctaObserver.observe(target));
 }
 
+// ─── FLUXO TISS (momento principal do movimento) ───
+// Sem JavaScript ou com "reduzir movimento", as etapas já aparecem concluídas
+// ('static'). Com movimento: ficam "a fazer" (tracejadas, sempre legíveis) e,
+// ao entrarem na tela, se completam uma a uma, uma única vez.
+const tissFlow = ref('static');
+let flowObserver = null;
+function playTissFlowOnView(reduceMotion) {
+    const flow = document.querySelector('.audience-flow');
+    if (!flow || reduceMotion || !('IntersectionObserver' in window)) return;
+
+    tissFlow.value = 'armed';
+    flowObserver = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        tissFlow.value = 'played';
+        flowObserver.disconnect();
+    }, { threshold: 0.6 });
+    flowObserver.observe(flow);
+}
+
 // ─── ANIMAÇÕES (GSAP) ───
 // Import DINÂMICO e client-only: gsap/ScrollTrigger nunca entram no bundle
 // SSR nem rodam em Node. E por regra (pós-incidente "site em branco"),
@@ -787,14 +834,11 @@ onMounted(async () => {
     // Troca automática é movimento: quem pede menos movimento no sistema não recebe.
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
-    if (!reduceMotion && demoTabs.value.length > 1) {
-        demoInterval = setInterval(() => {
-            if (demoHovered.value || demoFocused.value) return;
-            activeDemoTab.value = (activeDemoTab.value + 1) % demoTabs.value.length;
-        }, 5000);
-    }
+    demoAuto.value = !reduceMotion && demoTabs.value.length > 1;
 
     watchMobileCta();
+    watchDemoVisibility();
+    playTissFlowOnView(reduceMotion);
 
     try {
         const { initSiteAnimations } = await import('@/site-animations');
@@ -806,6 +850,7 @@ onMounted(async () => {
 onUnmounted(() => {
     cleanupAnimations?.();
     ctaObserver?.disconnect();
-    if (demoInterval) clearInterval(demoInterval);
+    demoObserver?.disconnect();
+    flowObserver?.disconnect();
 });
 </script>

@@ -30,7 +30,7 @@ function buildT() {
         hero: {
             badge: 'b', title: 't', title_em: 'e', subtitle: 's', cta_primary: 'Começar grátis', cta_secondary: 'Ver o sistema',
             cta_note: ':days dias grátis · sem cartão de crédito', trust: 'Mais de :count', trust_initials: ['RM', 'AC'],
-            visual_alt: 'Prontuário oftalmológico do EasyEye', card_top_lbl: 'Imagens por olho', card_top_val: 'OCT',
+            visual_alt: 'Painel inicial do EasyEye', card_top_lbl: 'Imagens por olho', card_top_val: 'OCT',
             card_bot_lbl: 'CFM e LGPD', card_bot_val: 'Assinado',
         },
         metrics: [],
@@ -174,11 +174,17 @@ describe('Home — FAQ', () => {
         expect(button.attributes('aria-expanded')).toBe('false');
         expect(button.attributes('aria-controls')).toBe('faq-a-0');
 
+        const answer = wrapper.get('#faq-a-0');
+        expect(answer.classes()).not.toContain('is-open');
+
         await button.trigger('click');
         expect(button.attributes('aria-expanded')).toBe('true');
-        const answer = wrapper.get('#faq-a-0');
         expect(answer.attributes('aria-labelledby')).toBe('faq-q-0');
-        expect(answer.isVisible()).toBe(true);
+        expect(answer.classes()).toContain('is-open');
+        expect(answer.text()).toBe('Não.');
+
+        await button.trigger('click');
+        expect(answer.classes()).not.toContain('is-open');
     });
 });
 
@@ -232,32 +238,51 @@ describe('Home — demonstração', () => {
         expect(document.activeElement).toBe(tabs()[0].element);
     });
 
-    it('troca automática pausa com o mouse ou o foco na seção', async () => {
-        vi.useFakeTimers();
+    // A troca vem do fim da animação da aba ativa (o timer visível); pausar a
+    // animação (mouse, foco, fora da tela) pausa a troca junto.
+    const endTimer = async () => {
+        await tabs()[activeTabIndex()].trigger('animationend', { animationName: 'demo-timer' });
+        await nextTick();
+    };
+    const tablist = () => wrapper.get('[role="tablist"]');
+
+    it('fim do timer da aba ativa passa para a próxima, em ciclo', async () => {
+        await mountHome();
+
+        expect(tablist().classes()).toContain('is-rotating');
+        await endTimer();
+        expect(activeTabIndex()).toBe(1);
+        await endTimer();
+        await endTimer();
+        expect(activeTabIndex()).toBe(0);
+    });
+
+    it('timer pausa com o mouse ou o foco na seção', async () => {
         await mountHome();
         const demo = wrapper.get('#demonstracao');
 
-        vi.advanceTimersByTime(5000);
-        await nextTick();
-        expect(activeTabIndex()).toBe(1);
-
         await demo.trigger('mouseenter');
-        vi.advanceTimersByTime(10000);
-        await nextTick();
-        expect(activeTabIndex()).toBe(1);
+        expect(tablist().classes()).toContain('is-paused');
 
         await demo.trigger('mouseleave');
-        vi.advanceTimersByTime(5000);
-        await nextTick();
+        await demo.trigger('focusin');
+        expect(tablist().classes()).toContain('is-paused');
+    });
+
+    it('escolher uma aba desliga a troca automática', async () => {
+        await mountHome();
+
+        await tabs()[2].trigger('click');
+        expect(tablist().classes()).not.toContain('is-rotating');
+        await endTimer();
         expect(activeTabIndex()).toBe(2);
     });
 
-    it('com "reduzir movimento" no sistema não há troca automática', async () => {
-        vi.useFakeTimers();
+    it('com "reduzir movimento" no sistema não há timer nem troca automática', async () => {
         await mountHome({ reduceMotion: true });
 
-        vi.advanceTimersByTime(20000);
-        await nextTick();
+        expect(tablist().classes()).not.toContain('is-rotating');
+        await endTimer();
         expect(activeTabIndex()).toBe(0);
     });
 });
@@ -355,6 +380,14 @@ describe('Home — funcionalidades por público', () => {
         expect(wrapper.find('[data-test="audience-plan"]').exists()).toBe(false);
     });
 
+    it('fluxo TISS: sem movimento as etapas já aparecem concluídas', async () => {
+        await mountHome({ reduceMotion: true });
+
+        const flow = wrapper.get('[data-test="tiss-flow"]');
+        expect(flow.classes()).toContain('is-static');
+        expect(flow.findAll('li').map((li) => li.attributes('style'))).toEqual(['--step: 0;', '--step: 1;', '--step: 2;']);
+    });
+
     it('fluxo TISS é uma lista ordenada de etapas', async () => {
         await mountHome();
 
@@ -384,13 +417,13 @@ describe('Home — leitor de tela, contatos e hero', () => {
         expect(mailtos.some((href) => href.includes('easyeye.com.br'))).toBe(false);
     });
 
-    it('hero mostra o recorte real do prontuário com dimensões (sem salto de layout)', async () => {
+    it('hero mostra o painel inicial real com dimensões (sem salto de layout)', async () => {
         await mountHome();
 
         const shot = wrapper.get('.hero-shot');
-        expect(shot.attributes('src')).toBe('/site/images/hero-prontuario.webp?v=1');
-        expect(shot.attributes('alt')).toBe('Prontuário oftalmológico do EasyEye');
-        expect([shot.attributes('width'), shot.attributes('height'), shot.attributes('fetchpriority')]).toEqual(['1061', '857', 'high']);
+        expect(shot.attributes('src')).toBe('/site/images/hero-dashboard.webp?v=1');
+        expect(shot.attributes('alt')).toBe('Painel inicial do EasyEye');
+        expect([shot.attributes('width'), shot.attributes('height'), shot.attributes('fetchpriority')]).toEqual(['1400', '735', 'high']);
     });
 
     it('sem o arquivo do print, o hero fica só com o texto (nunca imagem quebrada)', async () => {

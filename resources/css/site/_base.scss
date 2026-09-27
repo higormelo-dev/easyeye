@@ -1,5 +1,17 @@
 @use 'variables' as *;
 
+// Reserva com as métricas da Inter (Arial ajustada): enquanto a Inter carrega,
+// o texto já ocupa quase o mesmo espaço. O system-ui é ~12% mais estreito e
+// fazia o título do hero trocar de quebra (e mover a página) na troca de fonte.
+@font-face {
+    font-family: 'Inter Fallback';
+    src: local('Arial'), local('ArialMT');
+    size-adjust: 107%;
+    ascent-override: 90.5%;
+    descent-override: 22.6%;
+    line-gap-override: 0%;
+}
+
 // ─── Reset ───────────────────────────────────────────────────
 *,
 *::before,
@@ -12,10 +24,13 @@
 html {
     scroll-behavior: smooth;
     scroll-padding-top: 96px;
+    // iOS não aumenta o texto sozinho ao girar para paisagem.
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
 }
 
 body {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: $font-sans;
     color: $text;
     background: $bg-white;
     line-height: 1.6;
@@ -54,7 +69,7 @@ main[tabindex="-1"]:focus { outline: none; }
     background: $navy;
     color: #fff;
     font-weight: 600;
-    font-size: 15px;
+    font-size: rem(15);
     text-decoration: none;
     box-shadow: $shadow-lg;
     transform: translateY(calc(-100% - 24px));
@@ -109,19 +124,26 @@ main[tabindex="-1"]:focus { outline: none; }
     padding: 12px 24px;
     border-radius: 8px;
     font-weight: 600;
-    font-size: 15px;
+    font-size: rem(15);
     letter-spacing: -0.01em;
     cursor: pointer;
     border: none;
     text-decoration: none;
     text-align: center;
-    transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1), background-color .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease;
+    transition:
+        transform $dur-base $ease-out,
+        box-shadow $dur-base $ease-out,
+        background-color $dur-fast ease,
+        border-color $dur-fast ease,
+        color $dur-fast ease;
 
-    &:active { transform: scale(0.97); }
+    // Pressionar responde na hora (90ms) e solta com a desaceleração normal.
+    &:active { transform: scale(0.97); transition-duration: $dur-press; }
 
-    i { flex-shrink: 0; transition: transform .3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    i { flex-shrink: 0; transition: transform $dur-base $ease-out; }
 
-    &-lg { padding: 16px 32px; font-size: 16px; }
+    &-lg { padding: 16px 32px; font-size: rem(16); }
+    &-sm { padding: 10px 20px; font-size: rem(14); }
 
     &-primary {
         background: $teal;
@@ -200,7 +222,7 @@ main[tabindex="-1"]:focus { outline: none; }
     border: 1px solid rgba($teal, .25);
     padding: 6px 14px;
     border-radius: 999px;
-    font-size: 13px;
+    font-size: rem(13);
     font-weight: 600;
 }
 
@@ -210,28 +232,23 @@ main[tabindex="-1"]:focus { outline: none; }
     color: $teal-ink;
     padding: 6px 16px;
     border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    @include type-eyebrow;
     margin-bottom: 16px;
 }
 
+// Mesmo papel para todo h2 de seção. break-word (e não anywhere) só quebra
+// uma palavra se ela sozinha não couber na linha.
 .section-title {
-    font-size: clamp(32px, 4vw, 48px);
-    font-weight: 800;
-    line-height: 1.1;
-    letter-spacing: -0.025em;
+    @include type-title-xl;
     color: $navy;
     margin-bottom: 20px;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     text-wrap: balance;
 }
 
 .section-sub {
-    font-size: 18px;
+    @include type-lead;
     color: $text-muted;
-    line-height: 1.65;
     max-width: 640px;
     text-wrap: pretty;
 }
@@ -248,6 +265,16 @@ main[tabindex="-1"]:focus { outline: none; }
 .icon-mint   { background: rgba($mint, .1);   color: $mint; }
 .icon-orange { background: rgba($orange, .1); color: $orange; }
 .icon-solid  { background: $teal;             color: $navy; }
+
+// Reduzir movimento: botões mantêm cor e sombra como feedback, sem deslocar.
+@media (prefers-reduced-motion: reduce) {
+    .btn,
+    .btn i { transition-property: box-shadow, background-color, border-color, color; }
+
+    .btn:hover,
+    .btn:active,
+    .btn:hover i { transform: none; }
+}
 
 // ─── Transições Vue ───────────────────────────────────────────
 .fade-enter-active,

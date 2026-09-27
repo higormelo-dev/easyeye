@@ -31,11 +31,14 @@ export function initSiteAnimations(locale = 'pt-BR') {
     // Garante limpeza de execuções anteriores (HMR/navegação Inertia)
     ScrollTrigger.getAll().forEach(st => st.kill());
     const originalMetrics = new Map();
+    // Loops decorativos do hero (manchas e cartões flutuantes): só rodam com o hero na tela.
+    const heroLoops = [];
 
     const context = gsap.context(() => {
 
         // ── Hero entrance (toca IMEDIATAMENTE — sem dependência de scroll) ──
-        const heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+        // Desaceleração natural (expo), a mesma curva do CSS ($ease-out).
+        const heroTl = gsap.timeline({ defaults: { ease: 'expo.out' } });
         heroTl
             .from('.hero-title', { y: 40, opacity: 0, duration: 1.0 })
             .from('.hero-sub', { y: 24, opacity: 0, duration: 0.8 }, '-=0.5')
@@ -45,15 +48,17 @@ export function initSiteAnimations(locale = 'pt-BR') {
 
         // ── Hero visual: mockup + cards flutuantes (entrada imediata) ────────
         // Só existe com o print do prontuário publicado (ver heroImage no SiteController).
-        if (document.querySelector('.hero-visual')) animateHeroVisual();
+        if (document.querySelector('.hero-visual')) heroLoops.push(...animateHeroVisual());
 
         // ── Hero blobs: ambiente decorativo ──────────────────────────────────
-        gsap.to('.hero-blob-1', {
-            x: 40, y: -30, scale: 1.1, duration: 12, ease: 'sine.inOut', repeat: -1, yoyo: true,
-        });
-        gsap.to('.hero-blob-2', {
-            x: -30, y: 40, scale: 0.95, duration: 14, ease: 'sine.inOut', repeat: -1, yoyo: true,
-        });
+        heroLoops.push(
+            gsap.to('.hero-blob-1', {
+                x: 40, y: -30, scale: 1.1, duration: 12, ease: 'sine.inOut', repeat: -1, yoyo: true,
+            }),
+            gsap.to('.hero-blob-2', {
+                x: -30, y: 40, scale: 0.95, duration: 14, ease: 'sine.inOut', repeat: -1, yoyo: true,
+            }),
+        );
 
         // ── Metrics counter (fail-safe: sem trigger, o texto original fica) ──
         document.querySelectorAll('.metric-value').forEach(el => {
@@ -83,13 +88,25 @@ export function initSiteAnimations(locale = 'pt-BR') {
             });
         });
 
-        // NOTA: NENHUM reveal de card gated por ScrollTrigger. Todo o conteúdo
-        // das seções (benefícios, funcionalidades, planos, contato...) renderiza
-        // 100% visível via CSS — sem JS no caminho crítico de visibilidade.
+        // NOTA: NENHUM reveal de card gated por ScrollTrigger. A entrada das
+        // listas de cartões é CSS nativo ligado à rolagem (_sections.scss,
+        // "Entrada das listas de cartões"), que sem suporte deixa tudo visível —
+        // sem JS no caminho crítico de visibilidade.
     });
+
+    // Loops decorativos param com o hero fora da tela (voltam ao reaparecer).
+    let loopObserver = null;
+    const hero = document.querySelector('.hero');
+    if (hero && heroLoops.length && 'IntersectionObserver' in window) {
+        loopObserver = new IntersectionObserver(([entry]) => {
+            heroLoops.forEach((tween) => (entry.isIntersecting ? tween.play() : tween.pause()));
+        });
+        loopObserver.observe(hero);
+    }
 
     // ── Cleanup function ─────────────────────────────────────────────────────
     return () => {
+        loopObserver?.disconnect();
         context.revert();
         originalMetrics.forEach((text, el) => { el.textContent = text; });
         ScrollTrigger.getAll().forEach(st => st.kill());
@@ -98,27 +115,31 @@ export function initSiteAnimations(locale = 'pt-BR') {
 
 // Print do prontuário e cartões flutuantes: entrada imediata e flutuação leve.
 // Chamada dentro do gsap.context acima (o revert do cleanup também desfaz estes).
+// Devolve os loops para pausarem com o hero fora da tela.
 function animateHeroVisual() {
+    // Sem overshoot: o print assenta com desaceleração natural.
     gsap.from('.hero-mockup', {
-        scale: 0.94,
+        scale: 0.96,
         opacity: 0,
-        duration: 1.2,
-        ease: 'back.out(1.4)',
+        duration: 1.1,
+        ease: 'expo.out',
         delay: 0.4,
     });
 
     gsap.from('.hero-float-card.card-top', {
-        x: -30, y: -20, opacity: 0, duration: 0.9, delay: 0.9, ease: 'power2.out',
+        x: -30, y: -20, opacity: 0, duration: 0.9, delay: 0.9, ease: 'expo.out',
     });
     gsap.from('.hero-float-card.card-bottom', {
-        x: 30, y: 20, opacity: 0, duration: 0.9, delay: 1.1, ease: 'power2.out',
+        x: 30, y: 20, opacity: 0, duration: 0.9, delay: 1.1, ease: 'expo.out',
     });
 
     // Float cards: movimento contínuo (subtle floating)
-    gsap.to('.hero-float-card.card-top', {
-        y: '+=12', duration: 3.5, ease: 'sine.inOut', repeat: -1, yoyo: true,
-    });
-    gsap.to('.hero-float-card.card-bottom', {
-        y: '-=12', duration: 4, ease: 'sine.inOut', repeat: -1, yoyo: true, delay: 0.5,
-    });
+    return [
+        gsap.to('.hero-float-card.card-top', {
+            y: '+=12', duration: 3.5, ease: 'sine.inOut', repeat: -1, yoyo: true,
+        }),
+        gsap.to('.hero-float-card.card-bottom', {
+            y: '-=12', duration: 4, ease: 'sine.inOut', repeat: -1, yoyo: true, delay: 0.5,
+        }),
+    ];
 }

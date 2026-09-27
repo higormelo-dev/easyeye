@@ -1,4 +1,5 @@
 @use 'sass:color';
+@use 'sass:math';
 
 // ─── Design Tokens ───────────────────────────────────────────
 $navy:       #0F2551;
@@ -30,6 +31,97 @@ $radius-lg:  20px;
 
 $shadow:     0 4px 24px rgba($navy, .08);
 $shadow-lg:  0 12px 48px rgba($navy, .14);
+
+// ─── Tipografia ──────────────────────────────────────────────
+// Inter com eixo óptico (opsz 14–32): a partir de ~32px o navegador usa o
+// corte Display, mais fechado, por isso o tracking negativo aqui é menor
+// que o de antes. Papéis nomeados pelo propósito; valores em rem para
+// respeitar o tamanho de fonte que o visitante configura no navegador.
+// Pesos: 900 só em display e numerais, 800 em títulos, 700 em títulos de
+// item e rótulos, 600 na interface (botões, abas, campos).
+@function rem($px) { @return math.div($px, 16) * 1rem; }
+
+$font-sans: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
+
+@mixin type-display-hero {
+    font-size: clamp(#{rem(38)}, 5.2vw, #{rem(64)});
+    font-weight: 900;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+}
+
+// Todo h2 de seção (inclusive contato e CTA final).
+@mixin type-title-xl {
+    font-size: clamp(#{rem(28)}, 2.5vw + #{rem(20)}, #{rem(48)});
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.015em;
+}
+
+// Título de painel dentro de uma seção.
+@mixin type-title-lg {
+    font-size: clamp(#{rem(20)}, 2.4vw, #{rem(26)});
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+}
+
+// Título de cartão grande (público, plano, formulário).
+@mixin type-title-md {
+    font-size: rem(20);
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+}
+
+// Título de item (dor, diferencial, passo, contato).
+@mixin type-title-sm {
+    font-size: rem(17);
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+}
+
+@mixin type-lead      { font-size: rem(18); line-height: 1.6; }
+@mixin type-body      { font-size: rem(16); line-height: 1.65; }
+@mixin type-body-card { font-size: rem(15); line-height: 1.6; }
+@mixin type-meta      { font-size: rem(14); line-height: 1.55; }
+@mixin type-micro     { font-size: rem(13); line-height: 1.5; }
+
+// Rótulo em maiúsculas acima de um bloco (eyebrow, título de coluna).
+@mixin type-eyebrow {
+    font-size: rem(12);
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+// Selo curto em maiúsculas dentro de pílula.
+@mixin type-badge {
+    font-size: rem(12);
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+// Métricas e preços: dígitos de largura fixa (o contador animado não
+// treme) e o peso de display.
+@mixin type-numeral {
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+// ─── Movimento ───────────────────────────────────────────────
+// Desaceleração natural para tudo que chega (sem "quique"/overshoot).
+// Feedback de toque é curto; saída é mais rápida que entrada.
+$ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+$dur-press:  90ms;
+$dur-fast:   160ms;
+$dur-base:   260ms;
+$dur-slow:   450ms;
 
 // ─── Breakpoints ─────────────────────────────────────────────
 $bp-sm:  640px;
