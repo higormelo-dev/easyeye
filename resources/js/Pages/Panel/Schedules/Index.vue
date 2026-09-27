@@ -426,6 +426,11 @@ const breadcrumbs = [
                     </ul>
                 </div>
 
+                <!-- Importação em lote de agendamentos (dados históricos via CSV) -->
+                <a :href="route('panel.schedules.import.index')" class="btn btn-outline-secondary btn-sm">
+                    <i class="ti ti-file-import me-1"></i>Importar
+                </a>
+
             </div>
 
             <!-- ════════════════════════════════════════════════════════════

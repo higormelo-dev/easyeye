@@ -97,6 +97,25 @@ describe('POST /api/integrators/v1/exams', function () {
             ->assertJsonFragment(['name' => 'Exame UUID Schedule']);
     });
 
+    it('accepts schedule_identifier as import_code (schedule from legacy system)', function () {
+        $this->schedule->forceFill(['import_code' => 'LEGACY-SDL-777'])->save();
+
+        $this->postJson(
+            '/api/integrators/v1/exams',
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => 'LEGACY-SDL-777',
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Schedule Import Code',
+            ],
+            $this->ctx['headers'],
+        )->assertCreated();
+
+        $exam = PatientExam::where('name', 'Exame Schedule Import Code')->first();
+        expect($exam->schedule_id)->toBe($this->schedule->id)
+            ->and($exam->patient_id)->toBe($this->patient->id);
+    });
+
     it('uploads archive to S3', function () {
         $this->postJson(
             '/api/integrators/v1/exams',
@@ -444,6 +463,25 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
         $exam = PatientExam::where('name', 'Exame Prioridade Schedule')->first();
         expect($exam->patient_id)->toBe($patientB->id)
             ->and($exam->patient_id)->not->toBe($patientA->id);
+    });
+
+    it('creates exam via patient_identifier as import_code (patient from legacy system)', function () {
+        $patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $patient->forceFill(['import_code' => 'LEGACY-PAC-321'])->save();
+
+        $this->postJson(
+            '/api/integrators/v1/exams',
+            [
+                'exam_identifier'    => $this->examType->code,
+                'patient_identifier' => 'LEGACY-PAC-321',
+                'archive'            => UploadedFile::fake()->image('exam.jpg'),
+                'name'               => 'Exame Via Patient Import Code',
+            ],
+            $this->ctx['headers'],
+        )->assertCreated();
+
+        $exam = PatientExam::where('name', 'Exame Via Patient Import Code')->first();
+        expect($exam->patient_id)->toBe($patient->id);
     });
 
     it('returns 422 when patient_identifier does not exist', function () {

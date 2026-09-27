@@ -61,6 +61,17 @@ describe('GET /api/integrators/v1/patients', function () {
         expect($response->json('meta.total'))->toBe(1);
     });
 
+    it('filters patients by import_code search', function () {
+        $target = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+        $target->forceFill(['import_code' => 'LEGACY-SEARCH-1'])->save();
+        Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
+
+        $response = $this->getJson('/api/integrators/v1/patients?search=LEGACY-SEARCH', $this->ctx['headers'])
+            ->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1);
+    });
+
     it('filters patients by card_number search', function () {
         Patient::factory()->create([
             'entity_id'   => $this->ctx['entity']->id,
@@ -159,5 +170,33 @@ describe('GET /api/integrators/v1/patients/{id}', function () {
     it('returns 401 without authentication', function () {
         $this->getJson("/api/integrators/v1/patients/{$this->patient->id}")
             ->assertUnauthorized();
+    });
+
+    it('shows patient by import_code (string)', function () {
+        $this->patient->forceFill(['import_code' => 'LEGACY-042'])->save();
+
+        $this->getJson('/api/integrators/v1/patients/LEGACY-042', $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonFragment(['id' => $this->patient->id])
+            ->assertJsonPath('data.attributes.import_code', 'LEGACY-042');
+    });
+
+    it('shows patient by import_code (puramente numerico, sistema legado)', function () {
+        // import_code numérico não pode ser engolido pela heurística de
+        // "número puro = número do código PAC" — precisa tentar os dois.
+        $this->patient->forceFill(['import_code' => '778899'])->save();
+
+        $this->getJson('/api/integrators/v1/patients/778899', $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonFragment(['id' => $this->patient->id]);
+    });
+
+    it('nao mistura import_code de outra entidade', function () {
+        $other        = setupIntegrator();
+        $otherPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $otherPatient->forceFill(['import_code' => 'SHARED-CODE'])->save();
+
+        $this->getJson('/api/integrators/v1/patients/SHARED-CODE', $this->ctx['headers'])
+            ->assertNotFound();
     });
 });

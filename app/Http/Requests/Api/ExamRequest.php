@@ -73,12 +73,23 @@ class ExamRequest extends FormRequest
                         ->where('entity_id', $entityId)
                         ->whereNull('deleted_at');
 
-                    [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id', $value],
-                        ctype_digit($value) => ['code', sprintf('PAC-%010d', (int) $value)],
-                        default             => ['code', $value],
-                    };
-                    $query->where($column, $lookupValue);
+                    if (Str::isUuid($value)) {
+                        $query->where('id', $value);
+                    } elseif (ctype_digit($value)) {
+                        // Número puro: pode ser o código interno (PAC-0000000042) OU o
+                        // código do sistema anterior do integrador (import_code costuma
+                        // ser só numérico em sistemas legados) — tenta os dois.
+                        $formattedCode = sprintf('PAC-%010d', (int) $value);
+                        $query->where(function ($q) use ($formattedCode, $value) {
+                            $q->where('code', $formattedCode)
+                                ->orWhere('import_code', $value);
+                        });
+                    } else {
+                        $query->where(function ($q) use ($value) {
+                            $q->where('code', $value)
+                                ->orWhere('import_code', $value);
+                        });
+                    }
 
                     if (! $query->exists()) {
                         $fail(__('validation.custom.validation_invalid.not_patient_identifier'));
@@ -102,12 +113,23 @@ class ExamRequest extends FormRequest
                         ->where('entity_id', $entityId)
                         ->whereNull('deleted_at');
 
-                    [$column, $lookupValue] = match (true) {
-                        Str::isUuid($value) => ['id', $value],
-                        ctype_digit($value) => ['code', sprintf('SDL-%010d', (int) $value)],
-                        default             => ['code', $value],
-                    };
-                    $query->where($column, $lookupValue);
+                    if (Str::isUuid($value)) {
+                        $query->where('id', $value);
+                    } elseif (ctype_digit($value)) {
+                        // Número puro: pode ser o código interno (SDL-0000000042) OU o
+                        // código do sistema anterior do integrador (import_code costuma
+                        // ser só numérico em sistemas legados) — tenta os dois.
+                        $formattedCode = sprintf('SDL-%010d', (int) $value);
+                        $query->where(function ($q) use ($formattedCode, $value) {
+                            $q->where('code', $formattedCode)
+                                ->orWhere('import_code', $value);
+                        });
+                    } else {
+                        $query->where(function ($q) use ($value) {
+                            $q->where('code', $value)
+                                ->orWhere('import_code', $value);
+                        });
+                    }
 
                     if (! $query->exists()) {
                         $fail(__('validation.custom.validation_invalid.not_schedule_identifier'));

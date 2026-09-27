@@ -7,6 +7,7 @@ use App\Http\Requests\{PatientRequest, QuickStorePatientRequest};
 use App\Http\Resources\PatientResource;
 use App\Models\{Covenant, IrisType, Patient, People, SkinType};
 use App\Services\PatientService;
+use App\Support\BrazilianFormat;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -55,11 +56,14 @@ class PatientsController extends Controller
             );
 
         if ($search !== '') {
+            $searchDigits = self::formattedNumberDigits($search);
+
             $query->where(
                 fn ($q) => $q
                     ->whereLikeUnaccent('people.full_name', $search)
                     ->orWhereLikeUnaccent('patients.code', $search)
-                    ->orWhereLikeUnaccent('people.cellphone', $search),
+                    ->orWhereLikeUnaccent('people.cellphone', $search)
+                    ->when($searchDigits, fn ($q, $digits) => $q->orWhereLikeUnaccent('people.cellphone', $digits)),
             );
         }
 
@@ -98,7 +102,7 @@ class PatientsController extends Controller
             'full_name'           => $p->full_name,
             'gender'              => $p->gender,
             'gender_label'        => People::$genders[(int) $p->gender] ?? null,
-            'cellphone'           => $p->cellphone,
+            'cellphone'           => BrazilianFormat::phone($p->cellphone),
             'whatsapp'            => (bool) $p->whatsapp,
             'active'              => (bool) $p->active,
             'deleted_at'          => $p->deleted_at,
@@ -212,6 +216,7 @@ class PatientsController extends Controller
             'data' => [
                 'id'                  => $record->id,
                 'code'                => $record->code,
+                'import_code'         => $record->import_code,
                 'covenant'            => $record->covenant?->name,
                 'card_number'         => $record->card_number,
                 'skin_type'           => $record->skinType?->name,
@@ -224,7 +229,7 @@ class PatientsController extends Controller
                 'deleted_at'          => $record->deleted_at?->format('d/m/Y H:i'),
                 'full_name'           => $person->full_name,
                 'nickname'            => $person->nickname,
-                'cpf'                 => $person->national_registry ? $person->present()->getNationalRegistry() : null,
+                'cpf'                 => BrazilianFormat::cpf($person->national_registry),
                 'birth_date'          => $person->birth_date ? $person->present()->getBirthDate() : null,
                 'age'                 => $person->birth_date ? $person->present()->getAge() : null,
                 'gender'              => $person->present()->getGender(),
@@ -236,8 +241,8 @@ class PatientsController extends Controller
                 'rg_agency'           => $person->state_registry_agency,
                 'rg_state'            => $person->state_registry_initial,
                 'rg_date'             => $person->state_registry_date ? $person->present()->getStateRegistryDate() : null,
-                'telephone'           => $person->telephone ? $person->present()->getTelephone() : null,
-                'cellphone'           => $person->cellphone ? $person->present()->getCellphone() : null,
+                'telephone'           => BrazilianFormat::phone($person->telephone),
+                'cellphone'           => BrazilianFormat::phone($person->cellphone),
                 'whatsapp'            => (bool) $person->whatsapp,
                 'zipcode'             => $person->zipcode ? $person->present()->getZipcode() : null,
                 'address'             => $person->address,
@@ -283,23 +288,48 @@ class PatientsController extends Controller
             return response()->json([]);
         }
 
+        $qDigits = self::formattedNumberDigits($q);
+
         $patients = Patient::query()
             ->join('people', 'patients.person_id', '=', 'people.id')
             ->where('patients.entity_id', $entityId)
             ->where('patients.active', true)
-            ->where(function ($inner) use ($q) {
+            ->where(function ($inner) use ($q, $qDigits) {
                 $inner->whereLikeUnaccent('people.full_name', $q)
                     ->orWhereLikeUnaccent('people.cellphone', $q)
                     ->orWhereLikeUnaccent('people.telephone', $q)
                     ->orWhereLikeUnaccent('people.national_registry', $q)
-                    ->orWhereLikeUnaccent('patients.code', $q);
+                    ->orWhereLikeUnaccent('patients.code', $q)
+                    ->when($qDigits, fn ($inner, $digits) => $inner
+                        ->orWhereLikeUnaccent('people.cellphone', $digits)
+                        ->orWhereLikeUnaccent('people.telephone', $digits)
+                        ->orWhereLikeUnaccent('people.national_registry', $digits));
             })
             ->select('patients.id', 'patients.code', 'people.full_name', 'people.cellphone', 'people.telephone')
             ->orderBy('people.full_name')
             ->limit(10)
             ->get();
 
-        return response()->json($patients);
+        // Telefones formatados para o dropdown; quem preenche form com eles
+        // (agenda/lista de espera) tem v-mask e o FormRequest volta pra dígitos.
+        return response()->json($patients->map(fn (Patient $p) => [
+            'id'        => $p->id,
+            'code'      => $p->code,
+            'full_name' => $p->full_name,
+            'cellphone' => BrazilianFormat::phone($p->cellphone),
+            'telephone' => BrazilianFormat::phone($p->telephone),
+        ])->values());
+    }
+
+    /**
+     * Telefone/CPF colado já formatado ("(61) 99999-8888", "123.456.789-09"),
+     * como a tabela e o dropdown exibem, não casa por LIKE com as colunas
+     * gravadas só com dígitos. Devolve os dígitos quando o termo é só número
+     * + pontuação de máscara; nome, código ou termo já sem máscara → null.
+     */
+    private static function formattedNumberDigits(string $term): ?string
+    {
+        return BrazilianFormat::searchDigits($term);
     }
 
     /**
@@ -429,15 +459,12 @@ class PatientsController extends Controller
         return DB::transaction(function () use ($record) {
             $recordData = $record->toArray();
 
-            $patientHasOtherEntities = Patient::query()
-                ->where('person_id', $record->person_id)
-                ->count();
             $record->delete();
 
-            if ($patientHasOtherEntities <= 1) {
-                $person = People::query()->find($record->person_id);
-                $person?->delete();
-            }
+            // People é identidade GLOBAL: a contagem antiga passava pelo
+            // EntityScope (só via esta clínica) e apagava o People que outra
+            // clínica ainda usava. Agora só sai sem nenhum uso ativo.
+            $this->service->deletePersonIfUnused($record->person_id, exceptPatientId: $record->id);
 
             // Retornar resposta
             if (request()->wantsJson()) {

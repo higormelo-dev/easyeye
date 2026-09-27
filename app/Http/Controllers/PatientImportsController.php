@@ -163,19 +163,38 @@ class PatientImportsController extends Controller
     }
 
     /**
-     * Cancela um import pendente (ainda não confirmado).
+     * Cancela um import.
+     *
+     * - Ainda não confirmado (preview): nenhum job foi disparado, apaga
+     *   arquivo e registro com segurança.
+     * - Já confirmado (na fila ou já processando): não dá pra apagar sem
+     *   risco de o job continuar criando pacientes com o registro sumido —
+     *   só sinaliza o cancelamento. O próprio job para sozinho no próximo
+     *   checkpoint (ver PatientImportService::process()/doProcess()).
      */
     public function cancel(PatientImport $patientImport): RedirectResponse
     {
         abort_if((string) $patientImport->entity_id !== session('selected_entity_id'), 403);
-        abort_if($patientImport->status !== ImportStatus::Pending, 409);
+        abort_if($patientImport->status->isDone(), 409);
 
-        Storage::disk('private')->delete($patientImport->file_path);
-        $patientImport->delete();
+        if ($patientImport->confirmed_at === null) {
+            Storage::disk('private')->delete($patientImport->file_path);
+            $patientImport->delete();
+
+            return redirect()
+                ->route('panel.patients.import.index')
+                ->with('message', __('imports.patients.cancelled'));
+        }
+
+        $patientImport->update([
+            'status'       => ImportStatus::Cancelled,
+            'abort_reason' => __('imports.patients.cancelled'),
+            'finished_at'  => now(),
+        ]);
 
         return redirect()
             ->route('panel.patients.import.index')
-            ->with('message', __('imports.patients.cancelled'));
+            ->with('message', __('imports.patients.cancel_requested'));
     }
 
     /**
@@ -229,7 +248,7 @@ class PatientImportsController extends Controller
             'data_nascimento', 'sexo', 'estado_civil',
             'nome_mae', 'nome_pai',
             'cep', 'endereco', 'numero', 'complemento', 'bairro', 'cidade', 'estado', 'pais',
-            'convenio', 'carteirinha',
+            'convenio', 'carteirinha', 'codigo_importacao',
         ];
 
         $example = [
@@ -237,7 +256,7 @@ class PatientImportsController extends Controller
             '15/06/1980', 'M', '1',
             'Maria da Silva', 'José da Silva',
             '01310100', 'Av. Paulista', '1000', 'Apto 1', 'Bela Vista', 'São Paulo', 'SP', 'Brasil',
-            'Unimed', '123456789',
+            'Unimed', '123456789', '00042',
         ];
 
         return response()->streamDownload(function () use ($headers, $example) {

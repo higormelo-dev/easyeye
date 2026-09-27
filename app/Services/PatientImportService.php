@@ -7,6 +7,7 @@ use App\Models\{Covenant, Patient, PatientImport, People};
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\{DB, Log, Storage};
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -18,8 +19,11 @@ use Throwable;
  * Colunas são mapeadas por cabeçalho normalizado (sem acento, minúsculo).
  *
  * Deduplicação:
- *   1. Se CPF presente → busca People por national_registry
- *   2. Se não → busca People por full_name + telefone
+ *   1. Se CPF presente → busca People por national_registry. Se ele for de
+ *      OUTRA clínica (e não desta), a linha vira erro: CPF de planilha não
+ *      prova posse, e o vínculo expunha o cadastro/portal de outra clínica.
+ *   2. Se não → busca People por full_name + telefone, só entre cadastros
+ *      desta clínica (nunca entre clínicas)
  *   3. Se paciente já existe nesta entidade → pula (não sobrescreve)
  *   4. Se pessoa existe mas sem paciente aqui → cria só o Patient
  *   5. Se pessoa não existe → cria People + Patient
@@ -126,12 +130,21 @@ class PatientImportService
         'num_carteira'       => '_card_number',
         'card_number'        => '_card_number',
         'numero_carteirinha' => '_card_number',
+        // patients.import_code (código do sistema anterior)
+        'codigo_importacao'       => '_import_code',
+        'codigo_sistema_anterior' => '_import_code',
+        'codigo_legado'           => '_import_code',
+        'import_code'             => '_import_code',
     ];
 
     private const DATE_FORMATS = ['d/m/Y', 'd-m-Y', 'Y-m-d', 'd/m/Y H:i:s', 'd-m-Y H:i:s'];
 
+    /** Chave normalizada (normalizeKey) do convênio usado quando a coluna vem vazia. */
+    private const PARTICULAR_KEY = 'particular';
+
     public function __construct(
         private readonly FeatureGateService $featureGate,
+        private readonly PatientService $patientService,
     ) {
     }
 
@@ -159,6 +172,7 @@ class PatientImportService
         'country'           => 'País',
         '_covenant'         => 'Convênio',
         '_card_number'      => 'Carteirinha',
+        '_import_code'      => 'Código de importação',
     ];
 
     private const REQUIRED_FIELDS = ['full_name', 'cellphone'];
@@ -266,16 +280,20 @@ class PatientImportService
 
     public function process(PatientImport $import): void
     {
+        // Cancelado enquanto ainda estava na fila (worker parado/reiniciado) —
+        // não inicia. O controller já marcou o status ao receber o cancelamento.
+        if ($import->fresh()->status === ImportStatus::Cancelled) {
+            return;
+        }
+
         $import->update(['status' => ImportStatus::Processing, 'started_at' => now()]);
 
         try {
             $this->doProcess($import);
         } catch (Throwable $e) {
-            Log::error('PatientImport falhou', ['import_id' => $import->id, 'error' => $e->getMessage()]);
-
             $import->update([
                 'status'       => ImportStatus::Failed,
-                'abort_reason' => $e->getMessage(),
+                'abort_reason' => $this->safeFailureReason($e, $import, null, 'shared_identity.import.failed'),
                 'finished_at'  => now(),
             ]);
         }
@@ -332,6 +350,10 @@ class PatientImportService
         // Pre-carrega convênios (nome → id) para evitar N+1
         $covenantsMap = $this->loadCovenantsMap($import->entity_id);
 
+        // Códigos de importação já usados nesta entidade (evita duplicidade
+        // entre linhas do arquivo e contra pacientes já importados antes).
+        $usedImportCodes = $this->loadUsedImportCodes($import->entity_id);
+
         $errors     = [];
         $imported   = 0;
         $skipped    = 0;
@@ -339,6 +361,23 @@ class PatientImportService
         $processed  = 0;
 
         while (($row = fgetcsv($handle, 0, $delimiter)) !== false) {
+            // Cancelamento solicitado em outra request enquanto este job
+            // rodava — para no próximo checkpoint, preservando o que já foi
+            // processado (não reverte linhas já importadas).
+            if ($import->fresh()->status === ImportStatus::Cancelled) {
+                fclose($handle);
+                $this->saveErrorsFile($import, $errors);
+                $import->update([
+                    'processed_rows' => $processed,
+                    'imported_rows'  => $imported,
+                    'skipped_rows'   => $skipped,
+                    'error_rows'     => $errorCount,
+                    'finished_at'    => now(),
+                ]);
+
+                return;
+            }
+
             $processed++;
             $rowNum = $processed + 1; // +1 pela linha do cabeçalho
 
@@ -385,12 +424,14 @@ class PatientImportService
 
             try {
                 $result = DB::transaction(
-                    fn () => $this->importRow($data, $import->entity_id, $covenantsMap),
+                    function () use ($data, $import, $covenantsMap, &$usedImportCodes) {
+                        return $this->importRow($data, $import->entity_id, $covenantsMap, $usedImportCodes);
+                    },
                 );
 
                 $result === 'imported' ? $imported++ : $skipped++;
             } catch (Throwable $e) {
-                $errors[] = $this->errorRow($rowNum, $e->getMessage(), $data);
+                $errors[] = $this->errorRow($rowNum, $this->safeFailureReason($e, $import, $rowNum, 'shared_identity.import.row_failed'), $data);
                 $errorCount++;
             }
 
@@ -415,7 +456,7 @@ class PatientImportService
 
     // ── Criação de People + Patient ───────────────────────────────────────────
 
-    private function importRow(array $data, string $entityId, array $covenantsMap): string
+    private function importRow(array $data, string $entityId, array $covenantsMap, array &$usedImportCodes): string
     {
         $cpf  = $this->onlyNumbers((string) ($data['national_registry'] ?? ''));
         $name = mb_strtoupper(trim((string) ($data['full_name'] ?? '')), 'UTF-8');
@@ -429,16 +470,21 @@ class PatientImportService
 
         if ($cpf !== '') {
             $person = People::withTrashed()->where('national_registry', $cpf)->first();
+
+            if ($person !== null && ! $this->patientService->personLinkableToEntity($person->id, $entityId)) {
+                throw new RuntimeException(__('shared_identity.import.cpf_linked_elsewhere'));
+            }
         }
 
-        // 2. Fallback: nome + telefone
+        // 2. Fallback: nome + telefone — só entre cadastros DESTA clínica
+        //    (nome e telefone não identificam ninguém entre clínicas).
         if (! $person && $cellphone !== '') {
-            $person = People::withTrashed()
+            $person = $this->patientService->whereLinkedToEntity(People::withTrashed(), $entityId)
                 ->where('full_name', $name)
                 ->where(function ($q) use ($cellphone, $telephone) {
                     $q->where('cellphone', $cellphone)
                         ->orWhere('telephone', $cellphone)
-                        ->orWhen($telephone !== '', fn ($q2) => $q2->orWhere('cellphone', $telephone));
+                        ->when($telephone !== '', fn ($q2) => $q2->orWhere('cellphone', $telephone));
                 })
                 ->first();
         }
@@ -460,18 +506,20 @@ class PatientImportService
 
             if ($existingPatient && $existingPatient->trashed()) {
                 $existingPatient->restore();
+                $this->assignImportCode($existingPatient, $data['_import_code'] ?? null, $usedImportCodes);
 
                 return 'imported';
             }
 
             // Pessoa existe, cria apenas o Patient
-            Patient::create([
+            $patient = Patient::create([
                 'entity_id'   => $entityId,
                 'person_id'   => $person->id,
                 'covenant_id' => $this->resolveCovenantId($data['_covenant'] ?? null, $covenantsMap),
                 'card_number' => $data['_card_number'] ?? null,
                 'active'      => true,
             ]);
+            $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
 
             return 'imported';
         }
@@ -505,15 +553,50 @@ class PatientImportService
 
         $person = People::create($personData);
 
-        Patient::create([
+        $patient = Patient::create([
             'entity_id'   => $entityId,
             'person_id'   => $person->id,
             'covenant_id' => $this->resolveCovenantId($data['_covenant'] ?? null, $covenantsMap),
             'card_number' => $data['_card_number'] ?? null,
             'active'      => true,
         ]);
+        $this->assignImportCode($patient, $data['_import_code'] ?? null, $usedImportCodes);
 
         return 'imported';
+    }
+
+    /**
+     * Grava o código de importação no paciente recém-criado/restaurado,
+     * garantindo unicidade por entidade (contra o banco e contra outras
+     * linhas do mesmo arquivo). Nunca é preenchido por outro caminho —
+     * telas de cadastro/edição não expõem nem validam este campo.
+     */
+    private function assignImportCode(Patient $patient, ?string $importCode, array &$usedImportCodes): void
+    {
+        $importCode = trim((string) $importCode);
+
+        if ($importCode === '') {
+            return;
+        }
+
+        $key = mb_strtolower($importCode, 'UTF-8');
+
+        if (isset($usedImportCodes[$key])) {
+            throw new RuntimeException("Código de importação '{$importCode}' já utilizado por outro paciente.");
+        }
+
+        $patient->forceFill(['import_code' => $importCode])->save();
+        $usedImportCodes[$key] = true;
+    }
+
+    /** Carrega os import_code já em uso nesta entidade (minúsculo → true). */
+    private function loadUsedImportCodes(string $entityId): array
+    {
+        return Patient::where('entity_id', $entityId)
+            ->whereNotNull('import_code')
+            ->pluck('import_code')
+            ->mapWithKeys(fn ($code) => [mb_strtolower((string) $code, 'UTF-8') => true])
+            ->toArray();
     }
 
     // ── Mapeamento de colunas ─────────────────────────────────────────────────
@@ -650,13 +733,22 @@ class PatientImportService
         return null;
     }
 
-    private function resolveCovenantId(?string $name, array $covenantsMap): ?string
+    /**
+     * patients.covenant_id é NOT NULL: convênio vazio vira "PARTICULAR"
+     * (mesma semântica do sistema de origem), e nome não encontrado vira erro
+     * legível na linha em vez de violação de NOT NULL com SQL cru no CSV.
+     */
+    private function resolveCovenantId(?string $name, array $covenantsMap): string
     {
-        if (empty($name)) {
-            return null;
+        $key = $this->normalizeKey((string) $name);
+
+        if ($key === '') {
+            return $covenantsMap[self::PARTICULAR_KEY]
+                ?? throw new RuntimeException('Convênio não informado e nenhum convênio "Particular" cadastrado.');
         }
 
-        return $covenantsMap[mb_strtolower(trim($name), 'UTF-8')] ?? null;
+        return $covenantsMap[$key]
+            ?? throw new RuntimeException("Convênio \"{$name}\" não encontrado. Cadastre-o em Configurações › Convênios ou corrija a planilha.");
     }
 
     private function onlyNumbers(string $value): string
@@ -669,13 +761,16 @@ class PatientImportService
     /** Retorna mapa nome-em-minúsculo → UUID para lookup eficiente, escopado à entidade. */
     private function loadCovenantsMap(string $entityId): array
     {
+        // Globais primeiro, da clínica por último: se a clínica cadastrou o
+        // próprio "Particular"/"Unimed", ele sobrescreve o global no mapa.
         return Covenant::where(function ($query) use ($entityId) {
             $query->where('entity_id', $entityId)
                 ->orWhere('entity_id', null);
         })
             ->whereNull('deleted_at')
-            ->pluck('id', 'name')
-            ->mapWithKeys(fn ($id, $name) => [mb_strtolower($name, 'UTF-8') => (string) $id])
+            ->orderByRaw('entity_id IS NOT NULL')
+            ->get(['id', 'name'])
+            ->mapWithKeys(fn (Covenant $c) => [$this->normalizeKey((string) $c->name) => (string) $c->id])
             ->toArray();
     }
 
@@ -694,6 +789,32 @@ class PatientImportService
     private function errorRow(int $lineNum, string $reason, array $data): array
     {
         return array_merge(['_linha' => $lineNum, '_erro' => $reason], $data);
+    }
+
+    /**
+     * Motivo gravado no CSV de erros (baixável pela clínica) e em abort_reason.
+     *
+     * Só a mensagem de negócio (RuntimeException lançada por este serviço)
+     * vai como está. Erro de banco (PDOException/QueryException) traz o SQL
+     * com os bindings — CPF, carteirinha, e-mail — e host/porta/banco da
+     * conexão: vira texto traduzido. O log leva só classe, SQLSTATE e local
+     * (nunca a mensagem, que tem PHI).
+     */
+    private function safeFailureReason(Throwable $e, PatientImport $import, ?int $rowNum, string $fallbackKey): string
+    {
+        if ($e::class === RuntimeException::class) {
+            return $e->getMessage();
+        }
+
+        Log::error($rowNum === null ? 'patient_import.failed' : 'patient_import.row_failed', [
+            'import_id' => (string) $import->id,
+            'row'       => $rowNum,
+            'exception' => $e::class,
+            'sqlstate'  => $e instanceof PDOException ? (string) $e->getCode() : null,
+            'at'        => basename($e->getFile()) . ':' . $e->getLine(),
+        ]);
+
+        return __($fallbackKey);
     }
 
     /** Salva CSV de erros no disco privado e registra o caminho no import. */

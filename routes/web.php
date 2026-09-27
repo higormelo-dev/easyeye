@@ -6,6 +6,7 @@ use App\Http\Controllers\{
     AiRunPromptsController,
     AiRunsController,
     ComplianceController,
+    DoctorImportsController,
     DoctorReportPhrasesController,
     DoctorWorkScheduleController,
     DoctorsController,
@@ -33,6 +34,7 @@ use App\Http\Controllers\{
     ReportsController,
     ResourceWorkScheduleController,
     ScheduleEventsController,
+    ScheduleImportsController,
     SchedulesController,
     UsersController,
     WaitingListController
@@ -297,6 +299,14 @@ Route::group(
             Route::get('doctors/{doctor}/edit-data', [DoctorsController::class, 'editData'])->name('doctors.editData');
             Route::get('doctors/{doctor}/work-schedule/data', [DoctorWorkScheduleController::class, 'data'])->name('doctors.work-schedule.data');
             Route::get('doctors/{doctor}/work-schedule', [DoctorWorkScheduleController::class, 'index'])->name('doctors.work-schedule.index');
+            // Importação em lote — rotas específicas antes do resource para não conflitar com {doctor}
+            Route::get('doctors/import', [DoctorImportsController::class, 'index'])->name('doctors.import.index');
+            Route::post('doctors/import', [DoctorImportsController::class, 'store'])->name('doctors.import.store');
+            Route::get('doctors/import/template', [DoctorImportsController::class, 'template'])->name('doctors.import.template');
+            Route::post('doctors/import/{doctorImport}/confirm', [DoctorImportsController::class, 'confirm'])->name('doctors.import.confirm');
+            Route::delete('doctors/import/{doctorImport}/cancel', [DoctorImportsController::class, 'cancel'])->name('doctors.import.cancel');
+            Route::get('doctors/import/{doctorImport}/status', [DoctorImportsController::class, 'status'])->name('doctors.import.status');
+            Route::get('doctors/import/{doctorImport}/errors', [DoctorImportsController::class, 'errors'])->name('doctors.import.errors');
             Route::resource('doctors', DoctorsController::class);
         });
 
@@ -549,6 +559,15 @@ Route::group(
                 ->name('document-shares.store');
             Route::delete('document-shares/{share}', [PatientDocumentSharesController::class, 'destroy'])
                 ->name('document-shares.destroy');
+
+            // Importação em lote — rotas específicas antes do resource para não conflitar com {schedule}
+            Route::get('schedules/import', [ScheduleImportsController::class, 'index'])->name('schedules.import.index');
+            Route::post('schedules/import', [ScheduleImportsController::class, 'store'])->name('schedules.import.store');
+            Route::get('schedules/import/template', [ScheduleImportsController::class, 'template'])->name('schedules.import.template');
+            Route::post('schedules/import/{scheduleImport}/confirm', [ScheduleImportsController::class, 'confirm'])->name('schedules.import.confirm');
+            Route::delete('schedules/import/{scheduleImport}/cancel', [ScheduleImportsController::class, 'cancel'])->name('schedules.import.cancel');
+            Route::get('schedules/import/{scheduleImport}/status', [ScheduleImportsController::class, 'status'])->name('schedules.import.status');
+            Route::get('schedules/import/{scheduleImport}/errors', [ScheduleImportsController::class, 'errors'])->name('schedules.import.errors');
 
             Route::post('schedules/ajaxlist', [SchedulesController::class, 'ajaxList'])->name('schedules.ajaxlist');
             Route::post('schedules/bulk-update', [SchedulesController::class, 'bulkUpdate'])->name('schedules.bulk-update');

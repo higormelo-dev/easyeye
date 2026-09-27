@@ -137,6 +137,23 @@ describe('GET /api/integrators/v1/schedules', function () {
             ->and($response->json('data.0.id'))->toBe($schedule->id);
     });
 
+    it('searches schedules by numeric import_code', function () {
+        // import_code de sistemas legados costuma ser só numérico — a mesma
+        // heurística de "número puro" usada para o código interno (SDL-N)
+        // precisa tentar os dois (resolveIdentifierSearch).
+        $schedule = makeSchedule($this->ctx);
+        $schedule->forceFill(['import_code' => '5551234'])->save();
+        makeSchedule($this->ctx);
+
+        $response = $this->getJson(
+            '/api/integrators/v1/schedules?search=5551234',
+            $this->ctx['headers'],
+        )->assertOk();
+
+        expect($response->json('meta.total'))->toBe(1)
+            ->and($response->json('data.0.id'))->toBe($schedule->id);
+    });
+
     it('searches schedules by code even when schedule date is not today', function () {
         $targetSchedule = makeSchedule($this->ctx, [
             'date_time' => now()->subDays(14),
@@ -337,5 +354,47 @@ describe('GET /api/integrators/v1/schedules/{id}', function () {
     it('returns 401 without authentication', function () {
         $this->getJson("/api/integrators/v1/schedules/{$this->schedule->id}")
             ->assertUnauthorized();
+    });
+
+    it('exposes null import_code when the schedule has none', function () {
+        $this->getJson(
+            "/api/integrators/v1/schedules/{$this->schedule->id}",
+            $this->ctx['headers'],
+        )->assertOk()
+            ->assertJsonPath('data.attributes.import_code', null);
+    });
+
+    it('shows schedule by import_code (string)', function () {
+        $this->schedule->forceFill(['import_code' => 'LEGACY-SDL-042'])->save();
+
+        $this->getJson(
+            '/api/integrators/v1/schedules/LEGACY-SDL-042',
+            $this->ctx['headers'],
+        )->assertOk()
+            ->assertJsonFragment(['id' => $this->schedule->id])
+            ->assertJsonPath('data.attributes.import_code', 'LEGACY-SDL-042');
+    });
+
+    it('shows schedule by import_code (puramente numerico, sistema legado)', function () {
+        // import_code numérico não pode ser engolido pela heurística de
+        // "número puro = número do código SDL" — precisa tentar os dois.
+        $this->schedule->forceFill(['import_code' => '998877'])->save();
+
+        $this->getJson(
+            '/api/integrators/v1/schedules/998877',
+            $this->ctx['headers'],
+        )->assertOk()
+            ->assertJsonFragment(['id' => $this->schedule->id]);
+    });
+
+    it('nao mistura import_code de outra entidade', function () {
+        $other         = setupIntegrator();
+        $otherSchedule = makeSchedule($other);
+        $otherSchedule->forceFill(['import_code' => 'SHARED-SDL-CODE'])->save();
+
+        $this->getJson(
+            '/api/integrators/v1/schedules/SHARED-SDL-CODE',
+            $this->ctx['headers'],
+        )->assertNotFound();
     });
 });

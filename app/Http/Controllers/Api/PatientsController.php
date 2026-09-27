@@ -41,6 +41,7 @@ class PatientsController extends Controller
                     $q->whereLikeUnaccent('full_name', $search);
                 })
                     ->orWhereLikeUnaccent('code', $search)
+                    ->orWhereLikeUnaccent('import_code', $search)
                     ->orWhereLikeUnaccent('card_number', $search);
             });
         }
@@ -57,17 +58,29 @@ class PatientsController extends Controller
     {
         $integrator = request()->attributes->get('integrator');
 
-        [$column, $value] = match (true) {
-            Str::isUuid($idOrCode) => ['id', $idOrCode],
-            ctype_digit($idOrCode) => ['code', sprintf('PAC-%010d', (int) $idOrCode)],
-            default                => ['code', $idOrCode],
-        };
-
-        $patient = $this->model->query()
+        $query = $this->model->query()
             ->with(['entity', 'person', 'covenant', 'skinType', 'irisType'])
-            ->where('entity_id', $integrator->user->entity_id)
-            ->where($column, $value)
-            ->firstOrFail();
+            ->where('entity_id', $integrator->user->entity_id);
+
+        if (Str::isUuid($idOrCode)) {
+            $query->where('id', $idOrCode);
+        } elseif (ctype_digit($idOrCode)) {
+            // Número puro: pode ser o código interno (PAC-0000000042) OU o
+            // código do sistema anterior do integrador (import_code costuma
+            // ser só numérico em sistemas legados) — tenta os dois.
+            $formattedCode = sprintf('PAC-%010d', (int) $idOrCode);
+            $query->where(function ($q) use ($formattedCode, $idOrCode) {
+                $q->where('code', $formattedCode)
+                    ->orWhere('import_code', $idOrCode);
+            });
+        } else {
+            $query->where(function ($q) use ($idOrCode) {
+                $q->where('code', $idOrCode)
+                    ->orWhere('import_code', $idOrCode);
+            });
+        }
+
+        $patient = $query->firstOrFail();
 
         // LGPD Art. 37 / CFM 2.227/2018: registra acesso ao cadastro do paciente.
         $this->logAccess($patient, DataAccessPurpose::ApiAccess, patientId: $patient->id);

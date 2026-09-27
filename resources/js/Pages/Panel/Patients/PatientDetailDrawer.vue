@@ -101,6 +101,7 @@ function invitePortal() {
                 <div class="detail-section__title"><i class="ti ti-id-badge me-1"></i> Identificação</div>
                 <div class="detail-table">
                     <div class="detail-row"><span class="detail-label">Código</span><span class="detail-value"><code>{{ patient.code }}</code></span></div>
+                    <div v-if="patient.import_code" class="detail-row"><span class="detail-label">Código de importação</span><span class="detail-value"><code>{{ patient.import_code }}</code></span></div>
                     <div class="detail-row"><span class="detail-label">Convênio</span><span class="detail-value">{{ patient.covenant ?? '—' }}</span></div>
                     <div v-if="patient.card_number" class="detail-row"><span class="detail-label">Nº Cartão</span><span class="detail-value">{{ patient.card_number }}</span></div>
                     <div class="detail-row"><span class="detail-label">Tipo de Pele</span><span class="detail-value">{{ patient.skin_type ?? '—' }}</span></div>

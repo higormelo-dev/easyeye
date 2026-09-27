@@ -134,6 +134,26 @@ describe('GET /api/integrators/v1/patients/{patient}/exams', function () {
         $this->getJson("/api/integrators/v1/patients/{$this->patient->id}/exams")
             ->assertUnauthorized();
     });
+
+    // PatientExamsController::resolvePatient() precisa aceitar import_code,
+    // igual ao PatientsController::show() (mesmo fallback code/import_code).
+    it('lists exams for a patient using import_code (resolvePatient fallback)', function () {
+        $this->patient->forceFill(['import_code' => 'LEGACY-PAC-999'])->save();
+        PatientExam::factory(2)->create(['patient_id' => $this->patient->id]);
+
+        $this->getJson('/api/integrators/v1/patients/LEGACY-PAC-999/exams', $this->ctx['headers'])
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2);
+    });
+
+    it('returns 404 when patient import_code belongs to another entity', function () {
+        $other          = setupIntegrator();
+        $foreignPatient = Patient::factory()->create(['entity_id' => $other['entity']->id]);
+        $foreignPatient->forceFill(['import_code' => 'SHARED-PAC-CODE'])->save();
+
+        $this->getJson('/api/integrators/v1/patients/SHARED-PAC-CODE/exams', $this->ctx['headers'])
+            ->assertNotFound();
+    });
 });
 
 // ---------------------------------------------------------------------------
@@ -200,6 +220,29 @@ describe('POST /api/integrators/v1/patients/{patient}/exams', function () {
             $this->ctx['headers'],
         )->assertCreated()
             ->assertJsonFragment(['name' => 'Exame Por UUID']);
+    });
+
+    // PatientExamRequest::rules()['schedule_identifier'] tem sua própria
+    // validação (separada de ExamRequest) — precisa do mesmo fallback
+    // code/import_code, senão a request é rejeitada (422) antes mesmo de
+    // chegar em PatientExamService::scheduleFindByIdOrCode().
+    it('creates a patient exam using schedule_identifier as import_code', function () {
+        $this->schedule->forceFill(['import_code' => 'LEGACY-SDL-555'])->save();
+
+        $this->postJson(
+            "/api/integrators/v1/patients/{$this->patient->id}/exams",
+            [
+                'exam_identifier'     => $this->examType->code,
+                'schedule_identifier' => 'LEGACY-SDL-555',
+                'archive'             => UploadedFile::fake()->image('exam.jpg'),
+                'name'                => 'Exame Schedule Import Code',
+            ],
+            $this->ctx['headers'],
+        )->assertCreated();
+
+        $exam = PatientExam::where('name', 'Exame Schedule Import Code')->first();
+        expect($exam->schedule_id)->toBe($this->schedule->id)
+            ->and($exam->doctor_id)->toBe($this->doctor->id);
     });
 
     it('returns 404 when patient is identified by code (UUID required)', function () {

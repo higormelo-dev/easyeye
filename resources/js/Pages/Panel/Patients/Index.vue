@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { router, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PatientTable    from './PatientTable.vue';
 import PatientCards    from './PatientCards.vue';
@@ -164,6 +164,10 @@ const breadcrumbs = [
                             <i class="ti ti-layout-grid fs-14 text-body"></i>
                         </button>
                     </div>
+                    <!-- Import -->
+                    <Link :href="route('panel.patients.import.index')" class="btn btn-outline-secondary fs-13 btn-md">
+                        <i class="ti ti-upload me-1"></i> Importar
+                    </Link>
                     <!-- New patient -->
                     <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
                         <i class="ti ti-plus me-1"></i> Novo paciente

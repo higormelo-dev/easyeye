@@ -24,6 +24,7 @@ class ScheduleResource extends JsonResource
                 'covenant_id'        => $this->covenant_id,
                 'visit_id'           => $this->visit_id,
                 'code'               => $this->code,
+                'import_code'        => $this->import_code,
                 'full_name'          => $this->full_name,
                 'date_time'          => $this->date_time,
                 'telephone'          => $this->telephone,

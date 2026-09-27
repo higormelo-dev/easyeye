@@ -5,20 +5,21 @@ import AppLayout  from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 /**
- * Importador CSV de pacientes:
+ * Importador CSV de agendamentos (mirror de Patients/Import.vue e
+ * Doctors/Import.vue):
  *  1. Upload do arquivo → backend gera preview (cabeçalho + 5 linhas) sem
  *     enfileirar o job. `preview_id` vem no flash.
  *  2. Usuário revisa preview e clica "Confirmar" → dispara o job.
  *  3. Polling do `status` endpoint (2s) até `is_done`.
  *
- * Padrão job-tries=1 + dedup CPF/(nome+tel) preservado no backend.
+ * Sem bloco de limite de plano (diferente de Patients/Doctors) — não existe
+ * feature key de limite de agendamentos (ver ScheduleImportService).
  */
 const props = defineProps({
     breadcrumbs:    { type: Array,  default: () => [] },
     imports:        { type: Array,  default: () => [] },
     pending_import: { type: Object, default: null },
     preview_id:     { type: String, default: null },
-    plan_status:    { type: Object, default: () => ({}) },
     urls:           { type: Object, required: true },
     t:              { type: Object, default: () => ({}) },
 });
@@ -137,11 +138,9 @@ async function pollStatus() {
         const res  = await fetch(pollingImport.value.urls.status, { headers: { Accept: 'application/json' } });
         const json = await res.json();
 
-        // Mescla os campos atualizados ao item em memória
         pollingImport.value = { ...pollingImport.value, ...json };
 
         if (json.is_done) {
-            // Recarrega lista completa para atualizar tudo
             router.reload({ only: ['imports', 'pending_import'] });
         }
     } catch { /* silent */ }
@@ -178,28 +177,18 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
 </script>
 
 <template>
-    <AppLayout title="Importar pacientes" :breadcrumbs="breadcrumbs">
+    <AppLayout title="Importar agendamentos" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader title="Importação em massa de pacientes" subtitle="Upload CSV — geração de preview antes da importação efetiva.">
+            <PageHeader title="Importação em massa de agendamentos" subtitle="Upload CSV — geração de preview antes da importação efetiva.">
                 <template #actions>
                     <a :href="urls.template" class="btn btn-outline-secondary btn-sm">
                         <i class="ti ti-download me-1"></i>Modelo CSV
                     </a>
-                    <Link :href="urls.patients" class="btn btn-outline-secondary btn-sm">
-                        <i class="ti ti-arrow-left me-1"></i>Pacientes
+                    <Link :href="urls.schedules" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-arrow-left me-1"></i>Agenda
                     </Link>
                 </template>
             </PageHeader>
-
-            <!-- Limite do plano -->
-            <div v-if="plan_status?.max" class="alert alert-info small d-flex align-items-start mb-3">
-                <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
-                <div>
-                    Seu plano permite até <strong>{{ plan_status.max }}</strong> pacientes.
-                    Utilizados: <strong>{{ plan_status.used }}</strong>.
-                    Disponíveis: <strong>{{ plan_status.available ?? '—' }}</strong>.
-                </div>
-            </div>
 
             <!-- Flash de erro -->
             <div v-if="flashError" class="alert alert-danger alert-dismissible fade show mb-3">
@@ -277,7 +266,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                         <i class="ti ti-alert-triangle me-1"></i>
                         Colunas obrigatórias ausentes: <strong>{{ previewImport.preview.missing_required.join(', ') }}</strong>
                         <div class="mt-1 text-muted">
-                            Confira se a <strong>primeira linha</strong> do arquivo tem os nomes das colunas (ex.: "nome", "celular") e não já os dados de um paciente. Baixe o
+                            Confira se a <strong>primeira linha</strong> do arquivo tem os nomes das colunas (ex.: "nome_paciente", "data_hora") e não já os dados de um agendamento. Baixe o
                             <a :href="urls.template">Modelo CSV</a> pra comparar o formato esperado.
                         </div>
                     </div>
@@ -328,8 +317,10 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                         </div>
                         <div v-if="uploadForm.errors.file" class="invalid-feedback d-block">{{ uploadForm.errors.file }}</div>
                         <small class="text-muted d-block mt-1">
-                            Separador: ponto-e-vírgula (;). Encoding UTF-8. Convênio vazio entra como Particular;
-                            convênio com nome não cadastrado na clínica vira erro na linha. Veja o
+                            Separador: ponto-e-vírgula (;). Encoding UTF-8. Colunas: codigo_importacao_medico ou
+                            crm_medico, nome_paciente, data_hora (obrigatórias) — codigo_importacao_paciente,
+                            cpf_paciente, situacao, tipo_atendimento, especialidade, convenio, telefone, celular,
+                            observacoes, codigo_importacao (opcionais). Veja o
                             <a :href="urls.template">modelo</a>.
                         </small>
                     </form>

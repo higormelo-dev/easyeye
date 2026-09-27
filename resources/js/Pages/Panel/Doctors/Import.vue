@@ -5,13 +5,14 @@ import AppLayout  from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 /**
- * Importador CSV de pacientes:
+ * Importador CSV de médicos (mirror de Patients/Import.vue):
  *  1. Upload do arquivo → backend gera preview (cabeçalho + 5 linhas) sem
  *     enfileirar o job. `preview_id` vem no flash.
  *  2. Usuário revisa preview e clica "Confirmar" → dispara o job.
  *  3. Polling do `status` endpoint (2s) até `is_done`.
  *
- * Padrão job-tries=1 + dedup CPF/(nome+tel) preservado no backend.
+ * Padrão job-tries=1 + dedupe de e-mail/CPF/CRM/especialidade/cor/código de
+ * importação preservado no backend (DoctorImportService).
  */
 const props = defineProps({
     breadcrumbs:    { type: Array,  default: () => [] },
@@ -137,11 +138,9 @@ async function pollStatus() {
         const res  = await fetch(pollingImport.value.urls.status, { headers: { Accept: 'application/json' } });
         const json = await res.json();
 
-        // Mescla os campos atualizados ao item em memória
         pollingImport.value = { ...pollingImport.value, ...json };
 
         if (json.is_done) {
-            // Recarrega lista completa para atualizar tudo
             router.reload({ only: ['imports', 'pending_import'] });
         }
     } catch { /* silent */ }
@@ -178,15 +177,15 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
 </script>
 
 <template>
-    <AppLayout title="Importar pacientes" :breadcrumbs="breadcrumbs">
+    <AppLayout title="Importar médicos" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
-            <PageHeader title="Importação em massa de pacientes" subtitle="Upload CSV — geração de preview antes da importação efetiva.">
+            <PageHeader title="Importação em massa de médicos" subtitle="Upload CSV — geração de preview antes da importação efetiva.">
                 <template #actions>
                     <a :href="urls.template" class="btn btn-outline-secondary btn-sm">
                         <i class="ti ti-download me-1"></i>Modelo CSV
                     </a>
-                    <Link :href="urls.patients" class="btn btn-outline-secondary btn-sm">
-                        <i class="ti ti-arrow-left me-1"></i>Pacientes
+                    <Link :href="urls.doctors" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-arrow-left me-1"></i>Médicos
                     </Link>
                 </template>
             </PageHeader>
@@ -195,7 +194,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
             <div v-if="plan_status?.max" class="alert alert-info small d-flex align-items-start mb-3">
                 <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                 <div>
-                    Seu plano permite até <strong>{{ plan_status.max }}</strong> pacientes.
+                    Seu plano permite até <strong>{{ plan_status.max }}</strong> médicos.
                     Utilizados: <strong>{{ plan_status.used }}</strong>.
                     Disponíveis: <strong>{{ plan_status.available ?? '—' }}</strong>.
                 </div>
@@ -277,7 +276,7 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                         <i class="ti ti-alert-triangle me-1"></i>
                         Colunas obrigatórias ausentes: <strong>{{ previewImport.preview.missing_required.join(', ') }}</strong>
                         <div class="mt-1 text-muted">
-                            Confira se a <strong>primeira linha</strong> do arquivo tem os nomes das colunas (ex.: "nome", "celular") e não já os dados de um paciente. Baixe o
+                            Confira se a <strong>primeira linha</strong> do arquivo tem os nomes das colunas (ex.: "nome", "cpf", "crm") e não já os dados de um médico. Baixe o
                             <a :href="urls.template">Modelo CSV</a> pra comparar o formato esperado.
                         </div>
                     </div>
@@ -328,8 +327,9 @@ const flashError = computed(() => page.props?.flash?.error ?? uploadForm.errors.
                         </div>
                         <div v-if="uploadForm.errors.file" class="invalid-feedback d-block">{{ uploadForm.errors.file }}</div>
                         <small class="text-muted d-block mt-1">
-                            Separador: ponto-e-vírgula (;). Encoding UTF-8. Convênio vazio entra como Particular;
-                            convênio com nome não cadastrado na clínica vira erro na linha. Veja o
+                            Separador: ponto-e-vírgula (;). Encoding UTF-8. Colunas: nome, apelido, cpf, crm,
+                            crm_especialidade, cor, email (obrigatórias) — cbo, telefone, celular, whatsapp,
+                            observacoes, codigo_importacao (opcionais). Veja o
                             <a :href="urls.template">modelo</a>.
                         </small>
                     </form>

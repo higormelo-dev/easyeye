@@ -8,6 +8,7 @@ enum ImportStatus: string
     case Processing = 'processing';
     case Done       = 'done';
     case Failed     = 'failed';
+    case Cancelled  = 'cancelled';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum ImportStatus: string
             self::Processing => __('imports.status.processing'),
             self::Done       => __('imports.status.done'),
             self::Failed     => __('imports.status.failed'),
+            self::Cancelled  => __('imports.status.cancelled'),
         };
     }
 
@@ -26,11 +28,15 @@ enum ImportStatus: string
             self::Processing => 'primary',
             self::Done       => 'success',
             self::Failed     => 'danger',
+            self::Cancelled  => 'dark',
         };
     }
 
+    /**
+     * Estado terminal: não é mais pollável e não deve mais rodar.
+     */
     public function isDone(): bool
     {
-        return $this === self::Done || $this === self::Failed;
+        return in_array($this, [self::Done, self::Failed, self::Cancelled], true);
     }
 }
