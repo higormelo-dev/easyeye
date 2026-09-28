@@ -55,8 +55,8 @@ class RoleRequest extends FormRequest
     {
         return [
             'name.required'           => trans('validation.custom.generic.required'),
-            'name.unique'             => 'Já existe um perfil com este nome nesta clínica.',
-            'permission_ids.*.exists' => 'Uma ou mais permissões selecionadas são inválidas.',
+            'name.unique'             => trans('access_control_roles.validation_name_unique'),
+            'permission_ids.*.exists' => trans('access_control_roles.validation_permissions_exists'),
         ];
     }
 

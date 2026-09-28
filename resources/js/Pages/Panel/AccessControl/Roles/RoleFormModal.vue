@@ -12,17 +12,23 @@ import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
  * já devolve a Role completa (permission_ids, permissions, users_count) via
  * RoleResource. Por isso o componente recebe o objeto `role` já pronto do
  * pai (Index.vue), em vez de buscar via fetch ao abrir.
+ *
+ * Textos vêm de lang/{locale}/access_control_roles.php (prop `t`); rótulos
+ * das permissões já chegam traduzidos em `availablePermissions`.
  */
 const props = defineProps({
     open:                { type: Boolean, required: true },
     role:                { type: Object,  default: null },
     availablePermissions: { type: Array,  default: () => [] },
     routes:              { type: Object,  required: true }, // { store, update } — update com placeholder __ID__
+    t:                   { type: Object,  default: () => ({}) },
 });
 
 const emit    = defineEmits(['close']);
 const isEdit  = computed(() => !!props.role);
-const title   = computed(() => isEdit.value ? 'Editar perfil' : 'Novo perfil');
+const title   = computed(() => (isEdit.value
+    ? (props.t.form_title_edit ?? 'Editar perfil')
+    : (props.t.form_title_create ?? 'Novo perfil')));
 
 const form = useForm({
     name:           '',
@@ -91,25 +97,32 @@ function submit() {
         <form @submit.prevent="submit">
             <div class="row g-3">
                 <div class="col-12">
-                    <label class="form-label">Nome <span class="text-danger">*</span></label>
+                    <label class="form-label" for="role_name">
+                        {{ t.field_name ?? 'Nome' }}
+                        <span class="text-danger" :title="t.required ?? 'obrigatório'" aria-hidden="true">*</span>
+                    </label>
                     <input
+                        id="role_name"
                         v-model="form.name"
                         type="text"
                         maxlength="255"
                         class="form-control"
                         :class="{ 'is-invalid': form.errors.name }"
+                        aria-required="true"
+                        :aria-invalid="form.errors.name ? 'true' : undefined"
                         autocomplete="off"
                     >
                     <div v-if="form.errors.name" class="invalid-feedback">{{ form.errors.name }}</div>
                 </div>
 
                 <div class="col-12">
-                    <label class="form-label">Descrição</label>
+                    <label class="form-label" for="role_description">{{ t.field_description ?? 'Descrição' }}</label>
                     <textarea
+                        id="role_description"
                         v-model="form.description"
                         class="form-control"
                         rows="2"
-                        placeholder="Opcional — explique quando este perfil deve ser usado"
+                        :placeholder="t.field_description_hint ?? 'Opcional — explique quando este perfil deve ser usado'"
                     ></textarea>
                     <div v-if="form.errors.description" class="invalid-feedback d-block">
                         {{ form.errors.description }}
@@ -120,14 +133,14 @@ function submit() {
             <hr class="my-3">
 
             <h6 class="text-muted fw-semibold mb-1" style="font-size:.75rem;letter-spacing:.05em;text-transform:uppercase;">
-                Permissões
+                {{ t.field_permissions ?? 'Permissões' }}
             </h6>
             <div v-if="form.errors.permission_ids" class="alert alert-danger small py-2 mb-2">
                 {{ form.errors.permission_ids }}
             </div>
 
             <div v-if="groups.length === 0" class="text-muted small py-3">
-                Nenhuma permissão disponível para atribuir.
+                {{ t.no_permissions ?? 'Nenhuma permissão disponível para atribuir.' }}
             </div>
 
             <div v-for="group in groups" :key="group.group" class="mb-3">
@@ -138,7 +151,7 @@ function submit() {
                         class="btn btn-link btn-sm p-0 fs-12"
                         @click="toggleGroup(group, !isGroupFullySelected(group))"
                     >
-                        {{ isGroupFullySelected(group) ? 'Desmarcar todos' : 'Marcar todos' }}
+                        {{ isGroupFullySelected(group) ? (t.unselect_all ?? 'Desmarcar todos') : (t.select_all ?? 'Marcar todos') }}
                     </button>
                 </div>
                 <div class="border rounded p-2">
@@ -160,10 +173,10 @@ function submit() {
 
         <!-- Footer -->
         <template #footer>
-            <button type="button" class="btn btn-light" @click="$emit('close')">Cancelar</button>
+            <button type="button" class="btn btn-light" @click="$emit('close')">{{ t.btn_cancel ?? 'Cancelar' }}</button>
             <button type="button" class="btn btn-primary" :disabled="form.processing" @click="submit">
                 <span v-if="form.processing" class="spinner-border spinner-border-sm me-1"></span>
-                {{ isEdit ? 'Salvar alterações' : 'Criar perfil' }}
+                {{ isEdit ? (t.btn_save ?? 'Salvar alterações') : (t.btn_create ?? 'Criar perfil') }}
             </button>
         </template>
     </OffcanvasPanel>

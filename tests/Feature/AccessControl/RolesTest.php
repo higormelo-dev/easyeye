@@ -203,12 +203,10 @@ it('isolamento multi-tenant: Role da Entity A não aparece na listagem da Entity
         ->get(route('panel.accesscontrol.roles.index'));
 
     $indexRes->assertOk();
-    // RoleResource::collection(...)->resolve() desembrulha o "data" (ver
-    // RolesController::index() — sem ->resolve() a página quebrava em
-    // branco no Vue, que espera um Array puro).
+    // `roles` é o paginator da listagem (itens em `data`, via ->through()).
     $indexRes->assertInertia(fn ($page) => $page
-        ->has('roles', 1)
-        ->where('roles.0.id', $roleB->id));
+        ->has('roles.data', 1)
+        ->where('roles.data.0.id', $roleB->id));
 
     // update direto por id: 404 (não 403 — abort_unless(...404) no controller)
     $this->actingAs($otherAdmin)->withSession(panelSession($otherAdminEntityUser))

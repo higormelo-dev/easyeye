@@ -64,6 +64,34 @@ enum Permission: string
     }
 
     /**
+     * label() no idioma atual (lang/{locale}/access_control_roles.php →
+     * permission_labels); sem tradução para esta chave, vale o label().
+     */
+    public function localizedLabel(): string
+    {
+        return $this->translated('permission_labels') ?? $this->label();
+    }
+
+    /** group() no idioma atual; sem tradução, vale o group(). */
+    public function localizedGroup(): string
+    {
+        return $this->translated('permission_groups') ?? $this->group();
+    }
+
+    /**
+     * O valor do case tem ponto ('settings.manage') — por isso lê o array
+     * inteiro em vez de trans('...permission_labels.settings.manage'), que o
+     * tradutor interpretaria como caminho aninhado.
+     */
+    private function translated(string $map): ?string
+    {
+        $texts = trans("access_control_roles.{$map}");
+        $text  = is_array($texts) ? ($texts[$this->value] ?? null) : null;
+
+        return is_string($text) && $text !== '' ? $text : null;
+    }
+
+    /**
      * All valid string values for this context.
      *
      * @return string[]

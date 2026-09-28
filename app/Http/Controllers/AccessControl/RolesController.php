@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\AccessControl;
 
 use App\Enums\Permission as PermissionEnum;
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RoleRequest;
 use App\Http\Resources\RoleResource;
 use App\Models\{PermissionRecord, Role, SystemProfile};
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Inertia\{Inertia, Response as InertiaResponse};
 
@@ -33,36 +36,88 @@ use Inertia\{Inertia, Response as InertiaResponse};
  */
 class RolesController extends Controller
 {
-    public function __construct()
-    {
-        $this->titleController = 'Perfil de acesso';
-    }
+    use RedirectsToListing;
 
-    public function index(): InertiaResponse
-    {
-        $entityId = session('selected_entity_id');
+    /**
+     * Parâmetros da listagem preservados ao voltar de criar/editar/excluir
+     * (RedirectsToListing) — busca, ordenação e página.
+     */
+    private const LISTING_PARAMS = ['search', 'sort', 'direction', 'page'];
 
-        $roles = Role::query()
-            ->where('entity_id', $entityId)
+    /**
+     * Colunas ordenáveis da listagem (whitelist) → coluna real. As contagens
+     * são os aliases de withCount() no index() (nunca valor cru do request).
+     */
+    private const SORTABLE = [
+        'name'              => 'roles.name',
+        'permissions_count' => 'permissions_count',
+        'users_count'       => 'entity_users_count',
+        'created_at'        => 'roles.created_at',
+    ];
+
+    /** Ordem padrão = a de sempre da tela (nome A→Z). */
+    private const DEFAULT_SORT = 'name';
+
+    private const DEFAULT_DIRECTION = 'asc';
+
+    private const PER_PAGE = 12;
+
+    /**
+     * Listagem no padrão de Panel/Patients: busca (nome/descrição, sem
+     * acento), ordenação por whitelist e paginação server-side — antes a
+     * tela carregava TODOS os perfis e filtrava no navegador.
+     */
+    public function index(Request $request): InertiaResponse
+    {
+        $entityId = (string) session('selected_entity_id');
+        $search   = $this->queryText($request, 'search');
+        $sortBy   = $this->queryText($request, 'sort', self::DEFAULT_SORT);
+        $sortDir  = $this->queryText($request, 'direction', self::DEFAULT_DIRECTION);
+
+        // Normalizados: valor fora da whitelist cai no padrão (a UI mostra o
+        // que foi realmente aplicado).
+        $sortBy  = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : self::DEFAULT_SORT;
+        $sortDir = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : self::DEFAULT_DIRECTION;
+
+        $query = Role::query()
+            ->where('roles.entity_id', $entityId)
             ->with('permissions')
-            ->withCount('entityUsers')
-            ->orderBy('name')
-            ->get();
+            ->withCount(['permissions', 'entityUsers'])
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $q) use ($search): void {
+                    $q->whereLikeUnaccent('roles.name', $search)
+                        ->orWhereLikeUnaccent('roles.description', $search);
+                });
+            })
+            // Coluna e direção vêm só da whitelist acima.
+            ->orderBy(self::SORTABLE[$sortBy], $sortDir)
+            // Contagens iguais: nome A→Z, como na ordem padrão.
+            ->when($sortBy !== 'name', fn (Builder $query) => $query->orderBy('roles.name'))
+            // `id` desempata — sem ele a ordem entre páginas não é
+            // determinística no PostgreSQL.
+            ->orderBy('roles.id');
+
+        $roles = $this->paginateClamped($query, self::PER_PAGE)
+            ->withQueryString()
+            // `->through()` preserva o paginator (current_page/last_page/
+            // total/links) e só troca os itens — RoleResource::collection()
+            // como prop perderia a paginação (ver Stock\IolLensesController).
+            ->through(fn (Role $role) => (new RoleResource($role))->resolve());
+
+        $pageTitle = __('access_control_roles.page_title');
 
         return Inertia::render('Panel/AccessControl/Roles/Index', [
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('actions.sidemenu.access_control'), 'url' => route('panel.accesscontrol.users.index'), 'active' => false],
-                ['label' => 'Perfis de acesso', 'url' => '#', 'active' => true],
+                ['label' => $pageTitle, 'url' => '#', 'active' => true],
             ],
-            // BUG — página em branco: RoleResource::collection() envolve o
-            // resultado em {"data": [...]} quando serializado pela resposta
-            // completa do Inertia (diferente de json_encode() direto, que não
-            // envolve). O Vue espera um Array puro (`roles.filter(...)` no
-            // computed de busca) — sem ->resolve(), o objeto {data:[...]}
-            // quebra o primeiro render sem erro capturado, tela fica em
-            // branco. ->resolve() força o array desembrulhado.
-            'roles' => RoleResource::collection($roles)->resolve(),
+            'roles'   => $roles,
+            'filters' => [
+                'search'    => $search,
+                'sort'      => $sortBy,
+                'direction' => $sortDir,
+            ],
             // Perfis FIXOS da plataforma — pré-definidos pelo dono do SaaS
             // (tabela system_profiles, fallback hardcoded), somente leitura
             // na tela. O perfil de cada usuário é escolhido no cadastro de
@@ -70,6 +125,7 @@ class RolesController extends Controller
             // ADITIVA administrativa.
             'systemProfiles'       => SystemProfile::catalogFor(SystemProfile::CONTEXT_CLIENT),
             'availablePermissions' => $this->groupedAvailablePermissions(),
+            't'                    => trans('access_control_roles'),
             'routes'               => [
                 'index' => route('panel.accesscontrol.roles.index'),
                 'store' => route('panel.accesscontrol.roles.store'),
@@ -99,7 +155,7 @@ class RolesController extends Controller
 
         $role->load('permissions')->loadCount('entityUsers');
 
-        $message = $this->getCreateMessage();
+        $message = __('access_control_roles.flash_created');
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -108,7 +164,8 @@ class RolesController extends Controller
             ]);
         }
 
-        return redirect()->route('panel.accesscontrol.roles.index')->with('message', $message);
+        return $this->redirectToListing('panel.accesscontrol.roles.index', self::LISTING_PARAMS)
+            ->with('message', $message);
     }
 
     public function update(RoleRequest $request, Role $role): RedirectResponse|JsonResponse
@@ -131,7 +188,7 @@ class RolesController extends Controller
 
         $role->load('permissions')->loadCount('entityUsers');
 
-        $message = $this->getUpdateMessage($request);
+        $message = __('access_control_roles.flash_updated');
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -140,7 +197,8 @@ class RolesController extends Controller
             ]);
         }
 
-        return redirect()->route('panel.accesscontrol.roles.index')->with('message', $message);
+        return $this->redirectToListing('panel.accesscontrol.roles.index', self::LISTING_PARAMS)
+            ->with('message', $message);
     }
 
     public function destroy(Request $request, Role $role): RedirectResponse|JsonResponse
@@ -162,17 +220,19 @@ class RolesController extends Controller
             $role->delete();
         });
 
-        $message = $this->getDeleteMessage();
+        $message = __('access_control_roles.flash_deleted');
 
         if ($request->wantsJson()) {
             return response()->json(['message' => $message]);
         }
 
-        return redirect()->route('panel.accesscontrol.roles.index')->with('message', $message);
+        return $this->redirectToListing('panel.accesscontrol.roles.index', self::LISTING_PARAMS)
+            ->with('message', $message);
     }
 
     /**
-     * Permissions do enum App\Enums\Permission agrupadas por group(), com o
+     * Permissions do enum App\Enums\Permission agrupadas por grupo (rótulos
+     * no idioma do usuário — localizedGroup()/localizedLabel()), com o
      * id do PermissionRecord correspondente — pra montar a matriz de
      * checkbox no frontend (grupo -> [{id, key, label}]).
      *
@@ -183,16 +243,44 @@ class RolesController extends Controller
         $records = PermissionRecord::query()->get()->keyBy('key');
 
         return collect(PermissionEnum::cases())
-            ->groupBy(fn (PermissionEnum $permission) => $permission->group())
+            ->groupBy(fn (PermissionEnum $permission) => $permission->localizedGroup())
             ->map(fn ($permissions, $group) => [
                 'group' => $group,
                 'items' => $permissions->map(fn (PermissionEnum $permission) => [
                     'id'    => $records->get($permission->value)?->id,
                     'key'   => $permission->value,
-                    'label' => $permission->label(),
+                    'label' => $permission->localizedLabel(),
                 ])->values()->all(),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Pagina e, se a página pedida passou da última (ex.: excluiu o único
+     * perfil da última página e o redirect manteve ?page=N), usa a última
+     * válida — mesmo padrão de DoctorsController::paginateClamped().
+     */
+    private function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage);
+
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        return $paginator;
+    }
+
+    /**
+     * Parâmetro de query como texto (trim). Valor não textual (ex.:
+     * `?sort[]=x`) vira o padrão em vez de estourar "Array to string
+     * conversion" (500).
+     */
+    private function queryText(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->query($key, $default);
+
+        return is_string($value) ? trim($value) : $default;
     }
 }

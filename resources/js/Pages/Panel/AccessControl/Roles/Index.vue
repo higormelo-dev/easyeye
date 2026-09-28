@@ -1,198 +1,226 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { router } from '@inertiajs/vue3';
-import AppLayout      from '@/Layouts/AppLayout.vue';
-import PageHeader     from '@/Components/Panel/PageHeader.vue';
-import SearchInput    from '@/Components/Panel/SearchInput.vue';
-import ActionIconButton from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup  from '@/Components/Panel/ActionIconGroup.vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
+import AppLayout       from '@/Layouts/AppLayout.vue';
+import PageHeader      from '@/Components/Panel/PageHeader.vue';
+import SearchInput     from '@/Components/Panel/SearchInput.vue';
+import { useViewMode } from '@/composables/useViewMode.js';
+import { useTrans }    from '@/composables/useTrans.js';
+import RoleTable       from './RoleTable.vue';
+import RoleCards       from './RoleCards.vue';
 import RoleFormModal   from './RoleFormModal.vue';
 
 /**
- * Listagem de Roles customizadas (RBAC granular ADITIVO por clínica).
+ * Perfis de acesso customizados (RBAC granular ADITIVO por clínica) — mesmo
+ * layout de Panel/Patients/Index: cabeçalho com total, alternância
+ * tabela/cards (tabela como padrão, preferência persistida no navegador),
+ * busca server-side que preserva a ordenação, e tabela/cards com as mesmas
+ * ações. Os cards usam o MESMO paginator da tabela.
  *
- * `roles` chega como array plano (RoleResource::collection sem wrap — ver
- * RolesController::index()), já com permissions/permission_ids/users_count
- * carregados. Não há paginação/busca no backend (lista tende a ser pequena,
- * poucas dezenas de perfis por clínica no máximo) — a busca abaixo é
- * client-side, mesmo racional do BaseSettingController::index() que também
- * não pagina catálogos pequenos.
+ * Os perfis FIXOS da plataforma (ClientRule) ficam numa seção recolhível,
+ * somente leitura. Textos vêm de lang/{locale}/access_control_roles.php
+ * (prop `t`).
  */
 const props = defineProps({
-    roles:               { type: Array,  default: () => [] },
-    // Perfis FIXOS da plataforma (ClientRule) — pré-definidos pelo SaaS,
-    // somente leitura: [{ value, label, description }].
-    systemProfiles:      { type: Array,  default: () => [] },
+    breadcrumbs:          { type: Array,  default: () => [] },
+    roles:                { type: Object, required: true },        // paginator Laravel (through())
+    filters:              { type: Object, default: () => ({}) },   // { search, sort, direction } — normalizados
+    // Perfis FIXOS da plataforma — somente leitura: [{ value, label, description }].
+    systemProfiles:       { type: Array,  default: () => [] },
     availablePermissions: { type: Array,  default: () => [] },
-    breadcrumbs:         { type: Array,  default: () => [] },
-    routes:              { type: Object, required: true }, // { index, store, update, destroy } — update/destroy com __ID__
+    routes:               { type: Object, required: true },        // { index, store, update, destroy } — update/destroy com __ID__
+    t:                    { type: Object, default: () => ({}) },
 });
 
-// ── Busca client-side (sem endpoint de listagem paginado no backend) ───────
-const search = ref('');
+const { tx } = useTrans(() => props.t);
+const { view, setView } = useViewMode('access_roles_view');
 
-const filteredRoles = computed(() => {
-    const term = search.value.trim().toLowerCase();
-    if (!term) return props.roles;
+const page = usePage();
+// Backend flasheia `message` (não `success`) em store/update/destroy e o
+// toast do AppLayout só escuta success/error/status — alerta local.
+const flashMessage = computed(() => page.props?.flash?.message ?? null);
 
-    return props.roles.filter((role) => (
-        role.name?.toLowerCase().includes(term)
-        || role.description?.toLowerCase().includes(term)
-    ));
+// Fechar o alerta é estado local (sem data-bs-dismiss, que removeria do DOM
+// um nó controlado pelo Vue). Cada flash novo volta a exibi-lo.
+const flashDismissed = ref(false);
+watch([() => page.props?.flash, flashMessage], () => {
+    flashDismissed.value = false;
 });
 
-const filteredSystemProfiles = computed(() => {
-    const term = search.value.trim().toLowerCase();
-    if (!term) return props.systemProfiles;
+const pageTitle = computed(() => props.t.page_title ?? 'Perfis de acesso');
 
-    return props.systemProfiles.filter((profile) => (
-        profile.label?.toLowerCase().includes(term)
-        || profile.description?.toLowerCase().includes(term)
-    ));
+const emptyText = computed(() => (props.filters?.search
+    ? (props.t.empty_search ?? 'Nenhum perfil encontrado para esta busca.')
+    : (props.t.empty_list ?? 'Nenhum perfil customizado cadastrado.')));
+
+// ── Busca (debounce) + ordenação — uma preserva a outra ─────────────────────
+const search = ref(props.filters?.search ?? '');
+let searchTimer = null;
+
+function visit(params, options = {}) {
+    router.get(props.routes.index, params, { preserveState: true, preserveScroll: true, ...options });
+}
+
+watch(search, (value) => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        visit({ search: value, sort: props.filters?.sort, direction: props.filters?.direction }, { replace: true });
+    }, 400);
 });
 
-// ── Form modal (criar/editar) ───────────────────────────────────────────────
-const modalOpen  = ref(false);
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onSort({ sort, direction }) {
+    clearTimeout(searchTimer);
+    visit({ search: search.value, sort, direction });
+}
+
+// ── Painel criar/editar ─────────────────────────────────────────────────────
+const modalOpen   = ref(false);
 const editingRole = ref(null);
 
 function openCreate() { editingRole.value = null; modalOpen.value = true; }
 function openEdit(role) { editingRole.value = role; modalOpen.value = true; }
 function closeModal() { modalOpen.value = false; editingRole.value = null; }
 
-// ── Exclusão ─────────────────────────────────────────────────────────────────
+// ── Exclusão ────────────────────────────────────────────────────────────────
 function onDelete(role) {
-    const msg = role.users_count > 0
-        ? `Excluir o perfil "${role.name}"? ${role.users_count} usuário(s) perderão estas permissões adicionais.`
-        : `Excluir o perfil "${role.name}"?`;
-    if (!confirm(msg)) return;
+    const key = role.users_count > 0 ? 'confirm_delete_with_users' : 'confirm_delete';
+    if (!confirm(tx(key, { name: role.name, count: role.users_count }))) return;
 
     router.delete(props.routes.destroy.replace('__ID__', role.id), { preserveScroll: true });
 }
 </script>
 
 <template>
-    <AppLayout title="Perfis de acesso" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
+        <div class="page-access-roles">
 
-            <!-- ── Header ─────────────────────────────────────────────────── -->
-            <PageHeader title="Perfis de acesso" :total="filteredSystemProfiles.length + filteredRoles.length">
+            <PageHeader
+                :title="pageTitle"
+                :total="roles.total ?? 0"
+                :total-label="t.total_label ?? 'Total:'"
+                show-view-toggle
+                :view="view"
+                :view-table-title="t.view_table ?? 'Tabela'"
+                :view-cards-title="t.view_cards ?? 'Cards'"
+                @set-view="setView"
+            >
                 <template #actions>
-                    <button type="button" class="btn btn-primary btn-sm" @click="openCreate">
-                        <i class="ti ti-plus me-1"></i>Novo perfil
+                    <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
+                        <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.btn_new ?? 'Novo perfil' }}
                     </button>
                 </template>
             </PageHeader>
 
-            <!-- ── Aviso de limite do sistema ────────────────────────────── -->
-            <div class="alert alert-info small py-2 mb-3">
-                <i class="ti ti-info-circle me-1"></i>
-                Os <strong>perfis do sistema</strong> já vêm pré-definidos pela plataforma e são
-                atribuídos a cada usuário no cadastro de usuários. Os <strong>perfis
-                customizados</strong> concedem permissões administrativas adicionais. Ações
-                clínicas (laudos, prescrições) continuam exclusivas de médicos, independente
-                de perfil.
+            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+                <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="flashDismissed = true"
+                ></button>
             </div>
 
-            <!-- ── Busca ──────────────────────────────────────────────────── -->
+            <!-- Perfis fixos da plataforma: contexto, não o foco da tela -->
+            <details v-if="systemProfiles.length > 0" class="system-profiles border rounded mb-3">
+                <summary class="system-profiles-summary d-flex align-items-center gap-2 px-3 py-2">
+                    <i class="ti ti-chevron-right system-profiles-chevron text-muted" aria-hidden="true"></i>
+                    <i class="ti ti-building-store text-primary" aria-hidden="true"></i>
+                    <span class="fw-semibold">{{ t.system_profiles_title ?? 'Perfis do sistema' }}</span>
+                    <span class="text-muted small">· {{ tx('system_profiles_count', { count: systemProfiles.length }) }}</span>
+                </summary>
+
+                <div class="px-3 pb-3">
+                    <p class="small text-muted mb-3">
+                        <i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ t.notice }}
+                    </p>
+                    <ul class="row g-2 list-unstyled mb-0">
+                        <li v-for="profile in systemProfiles" :key="profile.value" class="col-sm-6 col-lg-4 col-xl-3">
+                            <div class="system-profile h-100 rounded border px-3 py-2">
+                                <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
+                                    <span class="fw-semibold small text-truncate">
+                                        <i class="ti ti-shield-check me-1 text-primary" aria-hidden="true"></i>{{ profile.label }}
+                                    </span>
+                                    <span class="badge badge-soft-primary rounded fs-11 flex-shrink-0">
+                                        <i class="ti ti-lock me-1" aria-hidden="true"></i>{{ t.system_profile_badge ?? 'Padrão' }}
+                                    </span>
+                                </div>
+                                <p class="small text-muted mb-0">{{ profile.description }}</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </details>
+
             <SearchInput
                 v-model="search"
-                placeholder="Buscar por nome ou descrição..."
-                max-width="340px"
+                :placeholder="t.search_placeholder ?? 'Buscar...'"
+                :clear-label="t.search_clear ?? 'Limpar busca'"
+                max-width="320px"
             />
 
-            <!-- ── Perfis do sistema (pré-definidos pelo SaaS) ────────────── -->
-            <template v-if="filteredSystemProfiles.length > 0">
-                <h6 class="text-uppercase text-muted fs-12 fw-semibold mt-3 mb-2">
-                    <i class="ti ti-building-store me-1"></i>Perfis do sistema
-                </h6>
-                <div class="row g-3 mb-4">
-                    <div v-for="profile in filteredSystemProfiles" :key="profile.value" class="col-sm-6 col-lg-4 col-xl-3">
-                        <div class="card card-body h-100 border-primary-subtle bg-light-subtle">
-                            <div class="d-flex align-items-start justify-content-between mb-2">
-                                <h6 class="mb-0 fw-semibold text-truncate" :title="profile.label">
-                                    <i class="ti ti-shield-check me-1 text-primary"></i>{{ profile.label }}
-                                </h6>
-                                <span class="badge badge-soft-primary rounded fs-11 flex-shrink-0 ms-1">
-                                    <i class="ti ti-lock me-1"></i>Padrão
-                                </span>
-                            </div>
-                            <p class="small text-muted mb-0">{{ profile.description }}</p>
-                        </div>
-                    </div>
-                </div>
-            </template>
-
-            <!-- ── Perfis customizados da clínica ─────────────────────────── -->
-            <h6 class="text-uppercase text-muted fs-12 fw-semibold mt-3 mb-2">
-                <i class="ti ti-adjustments me-1"></i>Perfis customizados
-            </h6>
-
-            <!-- ── Empty state ────────────────────────────────────────────── -->
-            <div v-if="filteredRoles.length === 0" class="text-center text-muted py-5">
-                <i class="ti ti-shield-off fs-1 mb-2 d-block opacity-40"></i>
-                <p class="small mb-0">
-                    {{ roles.length === 0 ? 'Nenhum perfil customizado cadastrado. Os perfis do sistema acima já cobrem os papéis padrão da clínica.' : 'Nenhum perfil encontrado para esta busca.' }}
-                </p>
-            </div>
-
-            <!-- ── Cards ──────────────────────────────────────────────────── -->
-            <div v-else class="row g-3">
-                <div v-for="role in filteredRoles" :key="role.id" class="col-sm-6 col-lg-4 col-xl-3">
-                    <div class="card card-body h-100">
-                        <div class="d-flex align-items-start justify-content-between mb-2">
-                            <div class="min-w-0">
-                                <h6 class="mb-0 fw-semibold text-truncate" :title="role.name">
-                                    <i class="ti ti-shield-lock me-1 text-primary"></i>{{ role.name }}
-                                </h6>
-                            </div>
-                        </div>
-
-                        <p v-if="role.description" class="small text-muted mb-2" style="min-height:2.5em;">
-                            {{ role.description }}
-                        </p>
-                        <p v-else class="small text-muted fst-italic mb-2" style="min-height:2.5em;">
-                            Sem descrição
-                        </p>
-
-                        <div class="d-flex flex-wrap gap-1 mb-2">
-                            <span class="badge badge-soft-info rounded fs-11">
-                                <i class="ti ti-key me-1"></i>{{ role.permissions.length }}
-                                {{ role.permissions.length === 1 ? 'permissão' : 'permissões' }}
-                            </span>
-                            <span class="badge badge-soft-secondary rounded fs-11">
-                                <i class="ti ti-users me-1"></i>{{ role.users_count }}
-                                {{ role.users_count === 1 ? 'usuário' : 'usuários' }}
-                            </span>
-                        </div>
-
-                        <hr class="my-2">
-
-                        <ActionIconGroup align="end" gap="tight">
-                            <ActionIconButton
-                                icon="ti ti-edit"
-                                title="Editar"
-                                @click="openEdit(role)"
-                            />
-                            <ActionIconButton
-                                icon="ti ti-trash"
-                                title="Excluir"
-                                variant="danger"
-                                @click="onDelete(role)"
-                            />
-                        </ActionIconGroup>
-                    </div>
-                </div>
-            </div>
-
+            <RoleTable
+                v-if="view === 'table'"
+                :roles="roles"
+                :filters="filters"
+                :t="t"
+                :empty-text="emptyText"
+                @sort="onSort"
+                @edit="openEdit"
+                @delete="onDelete"
+            />
+            <RoleCards
+                v-else
+                :roles="roles"
+                :t="t"
+                :empty-text="emptyText"
+                @edit="openEdit"
+                @delete="onDelete"
+            />
         </div>
 
-        <!-- ── Form modal ─────────────────────────────────────────────────── -->
         <RoleFormModal
             :open="modalOpen"
             :role="editingRole"
             :available-permissions="availablePermissions"
             :routes="routes"
+            :t="t"
             @close="closeModal"
         />
     </AppLayout>
 </template>
+
+<style scoped>
+.system-profiles {
+    background: var(--bs-body-bg);
+}
+.system-profiles-summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+.system-profiles-summary::-webkit-details-marker {
+    display: none;
+}
+.system-profiles-summary:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+    border-radius: var(--bs-border-radius);
+}
+.system-profiles-chevron {
+    transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.system-profiles[open] .system-profiles-chevron {
+    transform: rotate(90deg);
+}
+.system-profile {
+    background: var(--bs-tertiary-bg);
+}
+@media (prefers-reduced-motion: reduce) {
+    .system-profiles-chevron {
+        transition: none;
+    }
+}
+</style>
