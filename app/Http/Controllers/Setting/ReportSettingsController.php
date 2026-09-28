@@ -4,105 +4,155 @@ namespace App\Http\Controllers\Setting;
 
 use App\DTOs\ActionPolicy;
 use App\Enums\{DocumentationType, PaperSize, ReportSettingStatus};
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
 use App\Models\{ReportCategory, ReportSetting};
 use App\Services\ReportSettingService;
 use BackedEnum;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\{Inertia, Response as InertiaResponse};
+use InvalidArgumentException;
 
 class ReportSettingsController extends Controller
 {
+    use RedirectsToListing;
+
+    /**
+     * Parâmetros da listagem preservados ao voltar de excluir/reimportar/
+     * salvar (RedirectsToListing) — busca, filtros, ordenação e página.
+     */
+    private const LISTING_PARAMS = ['search', 'category', 'status', 'sort', 'direction', 'page'];
+
+    /**
+     * Colunas ordenáveis da listagem (whitelist) → coluna real no banco
+     * (categoria vem do LEFT JOIN do index()).
+     */
+    private const SORTABLE = [
+        'title'      => 'report_settings.title',
+        'category'   => 'report_categories.name',
+        'paper_size' => 'report_settings.paper_size',
+        'updated_at' => 'report_settings.updated_at',
+    ];
+
+    /** Ordem padrão = a de sempre da tela (título A→Z). */
+    private const DEFAULT_SORT = 'title';
+
+    private const DEFAULT_DIRECTION = 'asc';
+
+    private const STATUSES = ['all', 'active', 'inactive'];
+
+    private const PER_PAGE = 12;
+
     public function __construct(
         private readonly ReportSettingService $service,
     ) {
     }
 
-    public function index(): InertiaResponse
+    /**
+     * Listagem no padrão de Panel/Patients: busca (título/descrição, sem
+     * acento), filtros de categoria e status, ordenação por whitelist e
+     * paginação server-side — antes carregava todos os modelos e filtrava
+     * só o título no navegador. Tabela e cards usam o MESMO paginator.
+     */
+    public function index(Request $request): InertiaResponse
     {
         $entityId = (string) session('selected_entity_id');
         $this->service->adoptPublishedGlobalsForEntity($entityId);
 
         $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
-        $records = ReportSetting::forEntity($entityId)
-            ->with('category')
-            ->orderBy('title')
-            ->get();
+        $search   = $this->queryText($request, 'search');
+        $category = $this->queryText($request, 'category');
+        $status   = $this->queryText($request, 'status', 'all');
+        $sortBy   = $this->queryText($request, 'sort', self::DEFAULT_SORT);
+        $sortDir  = $this->queryText($request, 'direction', self::DEFAULT_DIRECTION);
+
+        // Normalizados: valor fora da lista cai no padrão (a UI mostra o que
+        // foi realmente aplicado). Categoria só vale se for uma das ativas.
+        $category = $categories->contains('id', $category) ? $category : '';
+        $status   = in_array($status, self::STATUSES, true) ? $status : 'all';
+        $sortBy   = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : self::DEFAULT_SORT;
+        $sortDir  = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : self::DEFAULT_DIRECTION;
+
+        // report_categories também tem name/description/active: toda coluna
+        // é qualificada e o select fica só em report_settings.*.
+        $query = ReportSetting::query()
+            ->select('report_settings.*')
+            ->leftJoin('report_categories', 'report_categories.id', '=', 'report_settings.report_category_id')
+            ->where('report_settings.entity_id', $entityId)
+            // sourceSetting: hasUpdateAvailable() lia o modelo global de
+            // origem com uma consulta por linha (N+1).
+            ->with(['category:id,name', 'sourceSetting:id,version'])
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $q) use ($search): void {
+                    $q->whereLikeUnaccent('report_settings.title', $search)
+                        ->orWhereLikeUnaccent('report_settings.description', $search);
+                });
+            })
+            ->when($category !== '', fn (Builder $query) => $query->where('report_settings.report_category_id', $category))
+            ->when($status === 'active', fn (Builder $query) => $query->where('report_settings.active', true))
+            ->when($status === 'inactive', fn (Builder $query) => $query->where('report_settings.active', false))
+            // NULLS LAST: modelo sem categoria vai para o fim nos dois sentidos.
+            // Coluna e direção vêm só da whitelist acima.
+            ->orderByRaw(self::SORTABLE[$sortBy] . ' ' . $sortDir . ' NULLS LAST')
+            ->when($sortBy !== 'title', fn (Builder $query) => $query->orderBy('report_settings.title'))
+            // `id` desempata — ordem entre páginas determinística no PostgreSQL.
+            ->orderBy('report_settings.id');
+
+        $items = $this->paginateClamped($query, self::PER_PAGE)
+            ->withQueryString()
+            ->through(fn (ReportSetting $r) => $this->toRow($r, $entityId));
 
         return Inertia::render('Panel/Settings/ReportSettings/Index', [
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('actions.sidemenu.settings'), 'url' => '#', 'active' => false],
-                ['label' => __('actions.report_settings.title'), 'url' => '#', 'active' => true],
+                ['label' => __('report_settings.page_title'), 'url' => '#', 'active' => true],
             ],
             'categories' => $categories,
-            'items'      => $records->map(fn (ReportSetting $r) => array_merge([
-                'id'             => (string) $r->id,
-                'title'          => $r->title,
-                'description'    => $r->description,
-                'paper_size'     => $r->paper_size instanceof BackedEnum ? $r->paper_size->value : (string) $r->paper_size,
-                'show_header'    => (bool) $r->show_header,
-                'show_signature' => (bool) $r->show_signature,
-                'show_footer'    => (bool) $r->show_footer,
-                'is_adopted'     => $r->isAdopted(),
-                'has_update'     => $r->hasUpdateAvailable(),
-                'source_version' => $r->source_version,
-                'category'       => $r->category?->name,
-                'preview_url'    => route('panel.setting.report-settings.preview', $r),
-                'edit_url'       => route('panel.setting.report-settings.edit', $r),
-                'destroy_url'    => route('panel.setting.report-settings.destroy', $r),
-                'reimport_url'   => $r->isAdopted() ? route('panel.setting.report-settings.reimport', $r) : null,
-            ], ActionPolicy::from($r, $entityId)->toArray())),
+            'items'      => $items,
+            'filters'    => [
+                'search'    => $search,
+                'category'  => $category,
+                'status'    => $status,
+                'sort'      => $sortBy,
+                'direction' => $sortDir,
+            ],
+            't'    => trans('report_settings'),
             'urls' => [
+                'index'  => route('panel.setting.report-settings.index'),
                 'create' => route('panel.setting.report-settings.create'),
             ],
         ]);
     }
 
-    /**
-     * Cards endpoint for the view toggle.
-     */
-    public function cards(Request $request): JsonResponse
+    /** Linha da tabela/card (mesmo formato nos dois modos). */
+    private function toRow(ReportSetting $r, string $entityId): array
     {
-        $entityId   = session('selected_entity_id');
-        $search     = $request->string('search')->trim()->value();
-        $categoryId = $request->string('category_id')->trim()->value();
-        $perPage    = 12;
-
-        $records = ReportSetting::forEntity($entityId)
-            ->when($search, fn ($q) => $q->whereLikeUnaccent('title', $search))
-            ->when($categoryId, fn ($q) => $q->where('report_category_id', $categoryId))
-            ->with('category')
-            ->orderBy('title')
-            ->paginate($perPage);
-
-        return response()->json([
-            'data' => $records->map(fn ($r) => [
-                'id'             => $r->id,
-                'title'          => $r->title,
-                'paper_size'     => $r->paper_size,
-                'show_header'    => $r->show_header,
-                'show_signature' => $r->show_signature,
-                'show_footer'    => $r->show_footer,
-                'is_adopted'     => $r->isAdopted(),
-                'has_update'     => $r->hasUpdateAvailable(),
-                'source_version' => $r->source_version,
-                'category'       => $r->category?->name,
-                'preview_url'    => route('panel.setting.report-settings.preview', $r),
-                'edit_url'       => route('panel.setting.report-settings.edit', $r),
-                'delete_url'     => route('panel.setting.report-settings.destroy', $r),
-                'reimport_url'   => $r->isAdopted() ? route('panel.setting.report-settings.reimport', $r) : null,
-                ...ActionPolicy::from($r, $entityId)->toArray(),
-            ]),
-            'meta' => [
-                'total'        => $records->total(),
-                'per_page'     => $records->perPage(),
-                'current_page' => $records->currentPage(),
-                'last_page'    => $records->lastPage(),
-            ],
-        ]);
+        return [
+            'id'             => (string) $r->id,
+            'title'          => $r->title,
+            'description'    => $r->description,
+            'paper_size'     => $r->paper_size instanceof BackedEnum ? $r->paper_size->value : (string) $r->paper_size,
+            'show_header'    => (bool) $r->show_header,
+            'show_signature' => (bool) $r->show_signature,
+            'show_footer'    => (bool) $r->show_footer,
+            'active'         => (bool) $r->active,
+            'is_adopted'     => $r->isAdopted(),
+            'has_update'     => $r->hasUpdateAvailable(),
+            'source_version' => $r->source_version,
+            'category'       => $r->category?->name,
+            // ISO 8601: a tela formata no idioma do usuário (useLocaleFormat).
+            'updated_at'   => $r->updated_at?->toIso8601String(),
+            'preview_url'  => route('panel.setting.report-settings.preview', $r),
+            'edit_url'     => route('panel.setting.report-settings.edit', $r),
+            'destroy_url'  => route('panel.setting.report-settings.destroy', $r),
+            'reimport_url' => $r->isAdopted() ? route('panel.setting.report-settings.reimport', $r) : null,
+            ...ActionPolicy::from($r, $entityId)->toArray(),
+        ];
     }
 
     public function create(): InertiaResponse
@@ -110,7 +160,7 @@ class ReportSettingsController extends Controller
         $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
         return Inertia::render('Panel/Settings/ReportSettings/Form', [
-            'breadcrumbs'         => $this->buildBreadcrumbs(__('actions.report_settings.create')),
+            'breadcrumbs'         => $this->buildBreadcrumbs(__('report_settings.form_title_create')),
             'mode'                => 'create',
             'reportSetting'       => null,
             'categories'          => $categories,
@@ -137,9 +187,7 @@ class ReportSettingsController extends Controller
 
         $this->service->syncContents($setting, $request->input('contents', []));
 
-        return redirect()
-            ->route('panel.setting.report-settings.index')
-            ->with('message', __('actions.report_settings.saved'));
+        return $this->backToListing('message', __('report_settings.flash_saved'));
     }
 
     /**
@@ -199,7 +247,7 @@ class ReportSettingsController extends Controller
         $categories = ReportCategory::active()->ordered()->get(['id', 'name']);
 
         return Inertia::render('Panel/Settings/ReportSettings/Form', [
-            'breadcrumbs'   => $this->buildBreadcrumbs(__('actions.report_settings.edit')),
+            'breadcrumbs'   => $this->buildBreadcrumbs(__('report_settings.form_title_edit')),
             'mode'          => 'edit',
             'reportSetting' => [
                 'id'                 => (string) $reportSetting->id,
@@ -259,9 +307,7 @@ class ReportSettingsController extends Controller
 
         $this->service->syncContents($reportSetting, $request->input('contents', []));
 
-        return redirect()
-            ->route('panel.setting.report-settings.index')
-            ->with('message', __('actions.report_settings.updated'));
+        return $this->backToListing('message', __('report_settings.flash_updated'));
     }
 
     /**
@@ -273,9 +319,7 @@ class ReportSettingsController extends Controller
 
         $reportSetting->delete();
 
-        return redirect()
-            ->route('panel.setting.report-settings.index')
-            ->with('message', __('actions.report_settings.deleted'));
+        return $this->backToListing('message', __('report_settings.flash_deleted'));
     }
 
     /**
@@ -285,11 +329,15 @@ class ReportSettingsController extends Controller
     {
         $entityId = session('selected_entity_id');
 
-        $this->service->adopt($reportSetting, $entityId);
+        // Só modelo global publicado é adotável (o service recusa o resto) —
+        // antes a recusa estourava como erro 500.
+        try {
+            $this->service->adopt($reportSetting, $entityId);
+        } catch (InvalidArgumentException) {
+            return $this->backToListing('error', __('report_settings.error_adopt'));
+        }
 
-        return redirect()
-            ->route('panel.setting.report-settings.index')
-            ->with('message', __('actions.report_settings.adopted'));
+        return $this->backToListing('message', __('report_settings.flash_adopted'));
     }
 
     /**
@@ -299,14 +347,56 @@ class ReportSettingsController extends Controller
     {
         $this->assertOwnsReportSetting($reportSetting);
 
-        $this->service->reimport($reportSetting);
+        // Modelo global de origem excluído: o service recusa — antes a
+        // recusa estourava como erro 500 e a tela não dizia nada.
+        try {
+            $this->service->reimport($reportSetting);
+        } catch (InvalidArgumentException) {
+            return $this->backToListing('error', __('report_settings.error_reimport'));
+        }
 
-        return redirect()
-            ->route('panel.setting.report-settings.index')
-            ->with('message', __('actions.report_settings.reimported'));
+        return $this->backToListing('message', __('report_settings.flash_reimported'));
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * Volta para a listagem mantendo busca/filtros/ordenação/página (quando a
+     * ação saiu dela), com a mensagem de retorno (`message` ou `error`).
+     */
+    private function backToListing(string $flashKey, string $message): RedirectResponse
+    {
+        return $this->redirectToListing('panel.setting.report-settings.index', self::LISTING_PARAMS)
+            ->with($flashKey, $message);
+    }
+
+    /**
+     * Pagina e, se a página pedida passou da última (ex.: excluiu o único
+     * modelo da última página e o redirect manteve ?page=N), usa a última
+     * válida — mesmo padrão de DoctorsController::paginateClamped().
+     */
+    private function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage);
+
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        return $paginator;
+    }
+
+    /**
+     * Parâmetro de query como texto (trim). Valor não textual (ex.:
+     * `?sort[]=x`) vira o padrão em vez de estourar "Array to string
+     * conversion" (500).
+     */
+    private function queryText(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->query($key, $default);
+
+        return is_string($value) ? trim($value) : $default;
+    }
 
     private function validateRequest(Request $request): array
     {
@@ -352,7 +442,7 @@ class ReportSettingsController extends Controller
         return [
             ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
             ['label' => __('actions.sidemenu.settings'), 'url' => '#', 'active' => false],
-            ['label' => __('actions.report_settings.title'), 'url' => route('panel.setting.report-settings.index'), 'active' => false],
+            ['label' => __('report_settings.page_title'), 'url' => route('panel.setting.report-settings.index'), 'active' => false],
             ['label' => $pageTitle, 'url' => '#', 'active' => true],
         ];
     }

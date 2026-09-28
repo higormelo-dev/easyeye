@@ -844,8 +844,9 @@ Route::group(
                 Route::resource('resources', ResourcesController::class);
                 Route::get('resources/{resource}/restore', [ResourcesController::class, 'restore'])->name('resources.restore');
 
-                // Modelos de documentação (receituários, atestados, etc.)
-                Route::get('report-settings/cards', [ReportSettingsController::class, 'cards'])->name('report-settings.cards');
+                // Modelos de documentação (receituários, atestados, etc.) — tabela
+                // e cards usam o paginator do index (o endpoint JSON `cards`,
+                // que a tela nem chamava, saiu).
                 Route::get('report-settings/{report_setting}/preview', [ReportSettingsController::class, 'preview'])->name('report-settings.preview');
                 Route::post('report-settings/{report_setting}/adopt', [ReportSettingsController::class, 'adopt'])->name('report-settings.adopt');
                 Route::post('report-settings/{report_setting}/reimport', [ReportSettingsController::class, 'reimport'])->name('report-settings.reimport');

@@ -1,168 +1,194 @@
 <script setup>
-import { ref, computed } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
-import AppLayout         from '@/Layouts/AppLayout.vue';
-import PageHeader        from '@/Components/Panel/PageHeader.vue';
-import SearchInput       from '@/Components/Panel/SearchInput.vue';
-import ActionDropdown    from '@/Components/Panel/ActionDropdown.vue';
-import ActionIconButton  from '@/Components/Panel/ActionIconButton.vue';
-import ActionIconGroup   from '@/Components/Panel/ActionIconGroup.vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { router, usePage, Link } from '@inertiajs/vue3';
+import AppLayout          from '@/Layouts/AppLayout.vue';
+import PageHeader         from '@/Components/Panel/PageHeader.vue';
+import SearchInput        from '@/Components/Panel/SearchInput.vue';
+import { useViewMode }    from '@/composables/useViewMode.js';
+import { useTrans }       from '@/composables/useTrans.js';
+import ReportSettingTable from './ReportSettingTable.vue';
+import ReportSettingCards from './ReportSettingCards.vue';
 
 /**
- * Modelos de documentação clínica (receituários, atestados, laudos).
+ * Modelos de documentação da clínica (receituários, atestados, laudos) —
+ * mesmo layout de Panel/Patients/Index: cabeçalho com total, alternância
+ * tabela/cards (preferência persistida no navegador), busca + filtros de
+ * categoria e status server-side que preservam a ordenação, e tabela/cards
+ * com as mesmas ações sobre o MESMO paginator.
  *
- * - Templates próprios da clínica (entity_id != null) — totalmente editáveis
- * - Templates globais adotados (source_version controla atualizações disponíveis)
- *   → reimport puxa nova versão do template global
+ * - Modelos próprios da clínica — totalmente editáveis;
+ * - Modelos globais adotados (source_version controla atualizações) —
+ *   "Reimportar" puxa a versão atual do modelo global.
+ *
+ * Textos vêm de lang/{locale}/report_settings.php (prop `t`).
  */
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
-    categories:  { type: Array,  default: () => [] },
-    items:       { type: Array,  default: () => [] },
-    urls:        { type: Object, required: true },
+    categories:  { type: Array,  default: () => [] },        // [{ id, name }] ativas
+    items:       { type: Object, required: true },           // paginator Laravel (through())
+    filters:     { type: Object, default: () => ({}) },      // { search, category, status, sort, direction } — normalizados
+    t:           { type: Object, default: () => ({}) },
+    urls:        { type: Object, required: true },           // { index, create }
 });
 
-const search        = ref('');
-const categoryId    = ref('');
+const { tx } = useTrans(() => props.t);
+const { view, setView } = useViewMode('report_settings_view');
 
-const filteredItems = computed(() => {
-    const q = search.value.trim().toLowerCase();
-    return props.items.filter(item => {
-        if (categoryId.value && item.category !== categoryId.value) {
-            // categoria vem como nome, então só filtramos quando o ID === nome
-            // (na prática, vamos comparar por category name no select abaixo)
-            return false;
-        }
-        if (q && !(item.title?.toLowerCase().includes(q))) return false;
-        return true;
-    });
+const page = usePage();
+// Backend flasheia `message` (não `success`) e o toast do AppLayout só escuta
+// success/error/status — alerta local. Erros (`error`) já saem no toast.
+const flashMessage = computed(() => page.props?.flash?.message ?? null);
+
+// Fechar o alerta é estado local (sem data-bs-dismiss, que removeria do DOM
+// um nó controlado pelo Vue). Cada flash novo volta a exibi-lo.
+const flashDismissed = ref(false);
+watch([() => page.props?.flash, flashMessage], () => {
+    flashDismissed.value = false;
 });
 
-function csrf() {
-    return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+const pageTitle = computed(() => props.t.page_title ?? 'Modelos de documentação');
+
+const hasFilters = computed(() => Boolean(
+    props.filters?.search || props.filters?.category || (props.filters?.status && props.filters.status !== 'all'),
+));
+
+const emptyText = computed(() => (hasFilters.value
+    ? (props.t.empty_search ?? 'Nenhum modelo encontrado com estes filtros.')
+    : (props.t.empty_list ?? 'Nenhum modelo cadastrado.')));
+
+// ── Busca (debounce) + filtros + ordenação — um preserva os outros ──────────
+const search   = ref(props.filters?.search ?? '');
+const category = ref(props.filters?.category ?? '');
+const status   = ref(props.filters?.status ?? 'all');
+
+function currentParams(overrides = {}) {
+    return {
+        search:    search.value,
+        category:  category.value,
+        status:    status.value,
+        sort:      props.filters?.sort,
+        direction: props.filters?.direction,
+        ...overrides,
+    };
 }
 
-async function onDelete(item) {
-    if (!confirm(`Excluir "${item.title}"?`)) return;
-    await fetch(item.destroy_url, {
-        method:  'DELETE',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
-    });
-    router.reload({ only: ['items'] });
+function visit(params, options = {}) {
+    router.get(props.urls.index, params, { preserveState: true, preserveScroll: true, ...options });
 }
 
-async function onReimport(item) {
+let searchTimer = null;
+
+function applyFilters() {
+    clearTimeout(searchTimer);
+    visit(currentParams(), { replace: true });
+}
+
+watch(search, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(applyFilters, 400);
+});
+watch([category, status], applyFilters);
+
+onBeforeUnmount(() => clearTimeout(searchTimer));
+
+function onSort({ sort, direction }) {
+    clearTimeout(searchTimer);
+    visit(currentParams({ sort, direction }));
+}
+
+// ── Ações ───────────────────────────────────────────────────────────────────
+// Via router do Inertia (CSRF e redirect com a mensagem) — antes era fetch
+// manual que ignorava erro e não dava retorno.
+function onDelete(item) {
+    if (!confirm(tx('confirm_delete', { title: item.title }))) return;
+    router.delete(item.destroy_url, { preserveScroll: true });
+}
+
+function onReimport(item) {
     if (!item.reimport_url) return;
-    if (!confirm('Reimportar versão atualizada do template global? Suas alterações locais serão sobrescritas.')) return;
-    await fetch(item.reimport_url, {
-        method:  'POST',
-        headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
-    });
-    router.reload({ only: ['items'] });
-}
-
-function openPreview(item) {
-    window.open(item.preview_url, '_blank');
+    if (!confirm(tx('confirm_reimport', { title: item.title }))) return;
+    router.post(item.reimport_url, {}, { preserveScroll: true });
 }
 </script>
 
 <template>
-    <AppLayout title="Modelos de documentação" :breadcrumbs="breadcrumbs">
-        <div class="container-fluid py-3">
+    <AppLayout :title="pageTitle" :breadcrumbs="breadcrumbs">
+        <div class="page-report-settings">
+
             <PageHeader
-                title="Modelos de documentação"
-                :subtitle="`${items.length} modelos`"
+                :title="pageTitle"
+                :total="items.total ?? 0"
+                :total-label="t.total_label ?? 'Total:'"
+                show-view-toggle
+                :view="view"
+                :view-table-title="t.view_table ?? 'Tabela'"
+                :view-cards-title="t.view_cards ?? 'Cards'"
+                @set-view="setView"
             >
                 <template #actions>
-                    <Link :href="urls.create" class="btn btn-primary btn-sm">
-                        <i class="ti ti-plus me-1"></i>Novo modelo
+                    <Link :href="urls.create" class="btn btn-primary fs-13 btn-md">
+                        <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.btn_new ?? 'Novo modelo' }}
                     </Link>
                 </template>
             </PageHeader>
 
-            <!-- Toolbar -->
-            <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
-                <SearchInput v-model="search" placeholder="Buscar por título..." style="min-width: 280px;" />
+            <div v-if="flashMessage && !flashDismissed" class="alert alert-success alert-dismissible mb-3" role="status">
+                <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ flashMessage }}
+                <button
+                    type="button"
+                    class="btn-close"
+                    :aria-label="t.close ?? 'Fechar'"
+                    @click="flashDismissed = true"
+                ></button>
             </div>
 
-            <!-- Lista -->
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="table table-nowrap table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Título</th>
-                                <th>Categoria</th>
-                                <th class="text-center">Papel</th>
-                                <th class="text-center">Cabeçalho</th>
-                                <th class="text-center">Assinatura</th>
-                                <th class="text-center">Origem</th>
-                                <th class="text-end">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-if="filteredItems.length === 0">
-                                <td colspan="7" class="text-center text-muted py-5">
-                                    <i class="ti ti-file-text fs-1 d-block mb-2 opacity-25"></i>
-                                    Nenhum modelo cadastrado.
-                                </td>
-                            </tr>
-                            <tr v-for="item in filteredItems" :key="item.id">
-                                <td class="fw-medium">{{ item.title }}</td>
-                                <td class="text-muted">{{ item.category || '—' }}</td>
-                                <td class="text-center"><code class="small">{{ item.paper_size }}</code></td>
-                                <td class="text-center">
-                                    <i v-if="item.show_header" class="ti ti-check text-success"></i>
-                                    <i v-else class="ti ti-minus text-muted"></i>
-                                </td>
-                                <td class="text-center">
-                                    <i v-if="item.show_signature" class="ti ti-check text-success"></i>
-                                    <i v-else class="ti ti-minus text-muted"></i>
-                                </td>
-                                <td class="text-center">
-                                    <span v-if="item.is_adopted" class="badge badge-soft-info rounded fs-11">
-                                        <i class="ti ti-cloud-download me-1"></i>Adotado
-                                        <span v-if="item.has_update" class="badge bg-warning text-dark ms-1">Atualização disponível</span>
-                                    </span>
-                                    <span v-else class="badge badge-soft-secondary rounded fs-11">Próprio</span>
-                                </td>
-                                <td class="text-end">
-                                    <ActionIconGroup align="end" gap="tight">
-                                        <ActionIconButton
-                                            icon="ti ti-eye"
-                                            title="Pré-visualizar"
-                                            @click="openPreview(item)"
-                                        />
-                                        <Link
-                                            :href="item.edit_url"
-                                            class="btn btn-sm btn-ghost"
-                                            title="Editar"
-                                        >
-                                            <i class="ti ti-edit"></i>
-                                        </Link>
-                                        <ActionDropdown
-                                            btn-class="ee-action-icon ee-action-icon--default"
-                                            icon="ti ti-dots-vertical"
-                                        >
-                                            <li v-if="item.reimport_url">
-                                                <button class="dropdown-item rounded-1" @click="onReimport(item)">
-                                                    <i class="ti ti-refresh me-1"></i>Reimportar template global
-                                                </button>
-                                            </li>
-                                            <li v-if="item.reimport_url"><hr class="dropdown-divider"></li>
-                                            <li>
-                                                <button class="dropdown-item rounded-1 text-danger" @click="onDelete(item)">
-                                                    <i class="ti ti-trash me-1"></i>Excluir
-                                                </button>
-                                            </li>
-                                        </ActionDropdown>
-                                    </ActionIconGroup>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <!-- Busca + filtros (mesma linha) -->
+            <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
+                <SearchInput
+                    v-model="search"
+                    wrapper-class=""
+                    :placeholder="t.search_placeholder ?? 'Buscar...'"
+                    :clear-label="t.search_clear ?? 'Limpar busca'"
+                    max-width="280px"
+                />
+                <select
+                    v-if="categories.length > 0"
+                    v-model="category"
+                    class="form-select form-select-sm w-auto"
+                    :aria-label="t.filter_category_label ?? 'Categoria'"
+                >
+                    <option value="">{{ t.filter_category_all ?? 'Todas as categorias' }}</option>
+                    <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                </select>
+                <select
+                    v-model="status"
+                    class="form-select form-select-sm w-auto"
+                    :aria-label="t.filter_status_label ?? 'Status'"
+                >
+                    <option value="all">{{ t.filter_status_all ?? 'Todos' }}</option>
+                    <option value="active">{{ t.filter_status_active ?? 'Ativos' }}</option>
+                    <option value="inactive">{{ t.filter_status_inactive ?? 'Inativos' }}</option>
+                </select>
             </div>
+
+            <ReportSettingTable
+                v-if="view === 'table'"
+                :items="items"
+                :filters="filters"
+                :t="t"
+                :empty-text="emptyText"
+                @sort="onSort"
+                @reimport="onReimport"
+                @delete="onDelete"
+            />
+            <ReportSettingCards
+                v-else
+                :items="items"
+                :t="t"
+                :empty-text="emptyText"
+                @reimport="onReimport"
+                @delete="onDelete"
+            />
         </div>
     </AppLayout>
 </template>
