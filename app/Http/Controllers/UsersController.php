@@ -3,20 +3,52 @@
 namespace App\Http\Controllers;
 
 use App\DTOs\ActionPolicy;
+use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
-use App\Models\{EntityUser, Role, SystemProfile, User};
+use App\Models\{EntityUser, Role, SystemProfile};
 use App\Services\EntityUserService;
-use Illuminate\Contracts\View\View;
-use Illuminate\Foundation\Application;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
-use Illuminate\Routing\Redirector;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\{DB, Storage, Vite};
 use Illuminate\Validation\Rule;
 use Inertia\{Inertia, Response};
 
+/**
+ * Usuários (vínculos EntityUser) da clínica selecionada — admin only (rota
+ * `entity.role:admin`). Médicos têm tela própria (DoctorsController) e ficam
+ * fora desta listagem.
+ *
+ * Multi-tenancy: toda query é escopada por entity_id da sessão; show/edit/
+ * update/destroy/restore resolvem o registro via
+ * EntityUserService::findByIdOrCode(), que também escopa pela sessão.
+ */
 class UsersController extends Controller
 {
+    use RedirectsToListing;
+
+    /**
+     * Parâmetros da listagem preservados ao voltar de criar/editar/ativar/
+     * excluir/restaurar (RedirectsToListing) — busca, ordenação e página.
+     */
+    private const LISTING_PARAMS = ['search', 'sort', 'direction', 'page'];
+
+    /** Colunas ordenáveis da listagem (whitelist) → coluna real no banco. */
+    private const SORTABLE = [
+        'created_at' => 'entity_users.created_at',
+        'name'       => 'users.name',
+        'email'      => 'users.email',
+        'rule'       => 'entity_users.rule',
+    ];
+
+    /** Ordem padrão = a de sempre da tela (cadastro mais recente primeiro). */
+    private const DEFAULT_SORT = 'created_at';
+
+    private const DEFAULT_DIRECTION = 'desc';
+
+    private const PER_PAGE = 12;
+
     /**
      * Instance of the standard model.
      */
@@ -26,115 +58,74 @@ class UsersController extends Controller
 
     public function __construct(EntityUser $entityUser, EntityUserService $entityUserService)
     {
-        $this->titleController = __('actions.users');
-        $this->model           = $entityUser;
-        $this->service         = $entityUserService;
+        $this->model   = $entityUser;
+        $this->service = $entityUserService;
     }
 
     /**
-     * Return paginated JSON for the card view.
-     */
-    public function cards(Request $request): JsonResponse
-    {
-        $search  = $request->string('search')->trim()->value();
-        $perPage = 12;
-
-        $entityUsers = EntityUser::query()
-            ->withTrashed()
-            ->join('users', 'entity_users.user_id', '=', 'users.id')
-            ->where('entity_users.entity_id', session()->get('selected_entity_id'))
-            ->whereNot('entity_users.rule', 'doctor')
-            ->when($search, function ($q) use ($search) {
-                $q->where(function ($inner) use ($search) {
-                    $inner->whereLikeUnaccent('users.name', $search)
-                        ->orWhereLikeUnaccent('users.email', $search);
-                });
-            })
-            ->select('entity_users.*', 'users.name', 'users.email')
-            ->orderBy('entity_users.created_at', 'desc')
-            ->paginate($perPage);
-
-        $isClient = session()->get('selected_entity_is_client');
-        $entityId = session()->get('selected_entity_id');
-        $rolesMap = SystemProfile::labelMap($isClient ? SystemProfile::CONTEXT_CLIENT : SystemProfile::CONTEXT_SAAS);
-
-        $data = $entityUsers->map(function (EntityUser $eu) use ($rolesMap, $entityId) {
-            $userPhotoPath = 'users/' . $eu->user_id . '.jpg';
-
-            return [
-                'id'         => $eu->id,
-                'full_name'  => $eu->name,
-                'email'      => $eu->email,
-                'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
-                'photo_url'  => Storage::disk('public')->exists($userPhotoPath)
-                    ? Storage::disk('public')->url($userPhotoPath)
-                    : Vite::asset('resources/img/system/team.png'),
-                'is_owner' => (bool) $eu->is_owner,
-                'is_self'  => $eu->user_id === auth()->id(),
-                ...ActionPolicy::from($eu, $entityId)->toArray(),
-            ];
-        });
-
-        return response()->json([
-            'data' => $data,
-            'meta' => [
-                'total'        => $entityUsers->total(),
-                'per_page'     => $entityUsers->perPage(),
-                'current_page' => $entityUsers->currentPage(),
-                'last_page'    => $entityUsers->lastPage(),
-            ],
-        ]);
-    }
-
-    /**
-     * Display a listing of the resource.
+     * Listagem no padrão de Panel/Patients: busca (nome/e-mail, sem acento),
+     * ordenação por whitelist e paginação server-side — a MESMA página
+     * alimenta a tabela e os cards (antes os cards buscavam um endpoint JSON
+     * à parte, sem ordenação e sem tratar erro).
      */
     public function index(Request $request): Response
     {
-        $entityId = session('selected_entity_id');
+        $entityId = (string) session('selected_entity_id');
         $isClient = (bool) session('selected_entity_is_client');
-        $search   = $request->string('search')->trim()->value();
-        $sortBy   = $request->string('sort', 'created_at')->value();
-        $sortDir  = $request->string('direction', 'desc')->value();
+        $search   = $this->queryText($request, 'search');
+        $sortBy   = $this->queryText($request, 'sort', self::DEFAULT_SORT);
+        $sortDir  = $this->queryText($request, 'direction', self::DEFAULT_DIRECTION);
 
-        $allowedSorts = ['created_at', 'name', 'email', 'rule'];
-        $sortBy       = in_array($sortBy, $allowedSorts, true) ? $sortBy : 'created_at';
-        $sortDir      = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : 'desc';
+        // Normalizados: valor fora da whitelist cai no padrão (a UI mostra o
+        // que foi realmente aplicado).
+        $sortBy  = array_key_exists($sortBy, self::SORTABLE) ? $sortBy : self::DEFAULT_SORT;
+        $sortDir = in_array($sortDir, ['asc', 'desc'], true) ? $sortDir : self::DEFAULT_DIRECTION;
 
         $rolesMap = SystemProfile::labelMap($isClient ? SystemProfile::CONTEXT_CLIENT : SystemProfile::CONTEXT_SAAS);
 
+        // select() ANTES de withCount(): select() depois substituiria as
+        // colunas e descartaria a contagem. Removidos (soft delete) continuam
+        // na lista para poder restaurar.
         $query = EntityUser::query()
             ->withTrashed()
             ->select('entity_users.*', 'users.name', 'users.email')
             ->join('users', 'entity_users.user_id', '=', 'users.id')
             ->where('entity_users.entity_id', $entityId)
-            ->whereNot('entity_users.rule', 'doctor');
+            ->whereNot('entity_users.rule', 'doctor')
+            // Perfis customizados (RBAC aditivo) de cada usuário — só a
+            // contagem, para o selo "+N perfis adicionais".
+            ->withCount('roles')
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $q) use ($search): void {
+                    $q->whereLikeUnaccent('users.name', $search)
+                        ->orWhereLikeUnaccent('users.email', $search);
+                });
+            })
+            // Coluna e direção vêm só da whitelist acima.
+            ->orderBy(self::SORTABLE[$sortBy], $sortDir)
+            // `id` desempata — sem ele a ordem entre páginas não é
+            // determinística no PostgreSQL.
+            ->orderBy('entity_users.id');
 
-        if ($search !== '') {
-            $query->where(
-                fn ($q) => $q
-                    ->whereLikeUnaccent('users.name', $search)
-                    ->orWhereLikeUnaccent('users.email', $search),
-            );
-        }
-
-        $dbCol = match ($sortBy) {
-            'name'  => 'users.name',
-            'email' => 'users.email',
-            'rule'  => 'entity_users.rule',
-            default => 'entity_users.created_at',
-        };
-        $query->orderBy($dbCol, $sortDir);
-
-        $users = $query->paginate(15)->withQueryString();
+        $users = $this->paginateClamped($query, self::PER_PAGE)
+            ->withQueryString()
+            ->through(fn (EntityUser $eu) => $this->toTableRow($eu, $entityId, $rolesMap));
 
         return Inertia::render('Panel/Users/Index', [
-            'users'    => $users->through(fn ($eu) => $this->toTableRow($eu, $entityId, $rolesMap)),
-            'total'    => fn () => EntityUser::where('entity_id', $entityId)->whereNot('rule', 'doctor')->count(),
+            'breadcrumbs' => [
+                ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
+                ['label' => __('actions.sidemenu.access_control'), 'url' => '#', 'active' => false],
+                ['label' => __('access_control.page_title'), 'url' => '#', 'active' => true],
+            ],
+            'users'    => $users,
             'roles'    => $rolesMap,
             'isClient' => $isClient,
-            'filters'  => $request->only(['search', 'sort', 'direction']),
-            't'        => trans('access_control'),
+            'filters'  => [
+                'search'    => $search,
+                'sort'      => $sortBy,
+                'direction' => $sortDir,
+            ],
+            't' => trans('access_control'),
         ]);
     }
 
@@ -153,15 +144,17 @@ class UsersController extends Controller
         $userPhotoPath = 'users/' . $eu->user_id . '.jpg';
 
         return [
-            'id'         => $eu->id,
-            'user_id'    => $eu->user_id,
-            'name'       => $eu->name,
-            'email'      => $eu->email,
-            'rule'       => $eu->rule,
-            'rule_label' => $rolesMap[$eu->rule] ?? $eu->rule,
-            'active'     => (bool) $eu->active,
-            'deleted_at' => $eu->deleted_at,
-            'created_at' => $eu->created_at?->format('d/m/Y'),
+            'id'          => $eu->id,
+            'user_id'     => $eu->user_id,
+            'name'        => $eu->name,
+            'email'       => $eu->email,
+            'rule'        => $eu->rule,
+            'rule_label'  => $rolesMap[$eu->rule] ?? $eu->rule,
+            'roles_count' => (int) ($eu->roles_count ?? 0),
+            'active'      => (bool) $eu->active,
+            'deleted_at'  => $eu->deleted_at,
+            // ISO 8601: a tela formata no idioma do usuário (useLocaleFormat).
+            'created_at' => $eu->created_at?->toIso8601String(),
             'photo_url'  => Storage::disk('public')->exists($userPhotoPath)
                 ? Storage::disk('public')->url($userPhotoPath)
                 : Vite::asset('resources/img/system/team.png'),
@@ -175,11 +168,11 @@ class UsersController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(EntityUserRequest $request): Application|RedirectResponse|Redirector|JsonResponse|EntityUserResource
+    public function store(EntityUserRequest $request): RedirectResponse|JsonResponse
     {
         $record = $this->service->create($request);
 
-        $messageReturn = $this->getCreateMessage();
+        $messageReturn = __('access_control.flash_created');
 
         if (request()->wantsJson()) {
             return response()->json([
@@ -188,8 +181,7 @@ class UsersController extends Controller
             ]);
         }
 
-        return redirect(action('\\' . static::class . '@index'))
-            ->with('message', $messageReturn);
+        return $this->backToListing($messageReturn);
     }
 
     /**
@@ -277,7 +269,9 @@ class UsersController extends Controller
         });
 
         $record->load('roles');
-        $messageReturn = 'Perfis do usuário atualizados com sucesso.';
+        // Chamado pelo modal logo depois de salvar os dados do usuário: para
+        // quem usa a tela, é a mesma ação "salvar usuário".
+        $messageReturn = __('access_control.flash_updated');
 
         if (request()->wantsJson()) {
             return response()->json([
@@ -288,18 +282,23 @@ class UsersController extends Controller
             ]);
         }
 
-        return redirect(action('\\' . static::class . '@index'))
-            ->with('message', $messageReturn);
+        return $this->backToListing($messageReturn);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(EntityUserRequest $request, string $id): Application|JsonResponse|Redirector|RedirectResponse|EntityUserResource
+    public function update(EntityUserRequest $request, string $id): RedirectResponse|JsonResponse
     {
         $record        = $this->service->findByIdOrCode($id);
         $updatedRecord = $this->service->update($record, $request);
-        $messageReturn = $this->getUpdateMessage($request);
+
+        // Ativar/desativar pela listagem (type_method=toggle) x formulário.
+        $messageReturn = match (true) {
+            ! $request->has('type_method') => __('access_control.flash_updated'),
+            $request->boolean('active')    => __('access_control.flash_activated'),
+            default                        => __('access_control.flash_deactivated'),
+        };
 
         if (request()->wantsJson()) {
             return response()->json([
@@ -308,14 +307,13 @@ class UsersController extends Controller
             ]);
         }
 
-        return redirect(action('\\' . static::class . '@index'))
-            ->with('message', $messageReturn);
+        return $this->backToListing($messageReturn);
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id): Application|View|JsonResponse|RedirectResponse
+    public function destroy(string $id): RedirectResponse|JsonResponse
     {
         $record = $this->service->findByIdOrCode($id);
 
@@ -328,7 +326,7 @@ class UsersController extends Controller
         }
 
         return DB::transaction(function () use ($record) {
-            $messageReturn = $this->getDeleteMessage();
+            $messageReturn = __('access_control.flash_deleted');
             $recordData    = $record->toArray();
             $record->delete();
 
@@ -340,20 +338,23 @@ class UsersController extends Controller
                 ]);
             }
 
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
+            return $this->backToListing($messageReturn);
         });
     }
 
     /**
      * Restore the specified resource from storage.
+     *
+     * Rota PATCH (antes GET): restaurar devolve o acesso à clínica, e um GET
+     * passa sem token CSRF — bastava o admin logado abrir um link preparado
+     * por um usuário removido para ele recuperar o acesso.
      */
-    public function restore(string $id): Application|View|JsonResponse|RedirectResponse
+    public function restore(string $id): RedirectResponse|JsonResponse
     {
         $record = $this->service->findByIdOrCode($id);
 
         return DB::transaction(function () use ($record) {
-            $messageReturn = $this->getRestoreMessage();
+            $messageReturn = __('access_control.flash_restored');
             $recordData    = $record->toArray();
             $record->restore();
 
@@ -365,8 +366,42 @@ class UsersController extends Controller
                 ]);
             }
 
-            return redirect(action('\\' . static::class . '@index'))
-                ->with('message', $messageReturn);
+            return $this->backToListing($messageReturn);
         });
+    }
+
+    /** Volta para a listagem mantendo busca/ordenação/página, com a mensagem. */
+    private function backToListing(string $message): RedirectResponse
+    {
+        return $this->redirectToListing('panel.accesscontrol.users.index', self::LISTING_PARAMS)
+            ->with('message', $message);
+    }
+
+    /**
+     * Pagina e, se a página pedida passou da última (ex.: excluiu o único
+     * usuário da última página e o redirect manteve ?page=N), usa a última
+     * válida — mesmo padrão de DoctorsController::paginateClamped().
+     */
+    private function paginateClamped(Builder $query, int $perPage): LengthAwarePaginator
+    {
+        $paginator = (clone $query)->paginate($perPage);
+
+        if ($paginator->isEmpty() && $paginator->currentPage() > 1 && $paginator->lastPage() >= 1) {
+            $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
+        }
+
+        return $paginator;
+    }
+
+    /**
+     * Parâmetro de query como texto (trim). Valor não textual (ex.:
+     * `?sort[]=x`) vira o padrão em vez de estourar "Array to string
+     * conversion" (500) em `$request->string()`.
+     */
+    private function queryText(Request $request, string $key, string $default = ''): string
+    {
+        $value = $request->query($key, $default);
+
+        return is_string($value) ? trim($value) : $default;
     }
 }

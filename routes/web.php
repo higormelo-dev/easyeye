@@ -750,9 +750,11 @@ Route::group(
             Route::get('reports/compliance/access', [ComplianceController::class, 'exportDataAccessLogs'])->name('reports.compliance.access');
 
             Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
-                Route::get('users/cards', [UsersController::class, 'cards'])->name('users.cards');
+                // Tabela e cards usam o mesmo paginator do index (o antigo
+                // endpoint JSON `users/cards` saiu). Restaurar é PATCH: devolve
+                // o acesso à clínica e precisa do token CSRF (GET não tem).
                 Route::resource('users', UsersController::class);
-                Route::get('users/{user}/restore', [UsersController::class, 'restore'])->name('users.restore');
+                Route::patch('users/{user}/restore', [UsersController::class, 'restore'])->name('users.restore');
                 Route::patch('users/{user}/roles', [UsersController::class, 'updateRoles'])->name('users.roles.update');
 
                 // Gestão de Roles customizadas (RBAC granular ADITIVO) — CRUD

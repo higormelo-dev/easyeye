@@ -2,57 +2,84 @@
 
 declare(strict_types=1);
 
+/**
+ * Textos da tela de Usuários (Pages/Panel/Users/Index, UserTable, UserCards,
+ * UserFormModal) — injetados como prop `t` por UsersController::index. Também
+ * usados pelo controller (mensagens de retorno) e pelo EntityUserService
+ * (proteções do proprietário e da própria conta).
+ */
 return [
-    // Page
-    'page_title'         => 'Controle de Acesso',
-    'breadcrumb_home'    => 'Dashboard',
-    'breadcrumb_current' => 'Usuários',
-
-    // Header
+    // Página
+    'page_title'  => 'Usuários',
     'total_label' => 'Total:',
     'new_user'    => 'Novo usuário',
+    'roles_link'  => 'Perfis e permissões',
+    'close'       => 'Fechar',
 
-    // Search
+    // Busca
     'search_placeholder' => 'Buscar por nome ou e-mail…',
+    'search_clear'       => 'Limpar busca',
 
-    // View toggle
+    // Alternância tabela/cards
     'view_table' => 'Visualizar em tabela',
     'view_cards' => 'Visualizar em cards',
 
-    // Table columns
-    'col_created_at' => 'Cadastro',
-    'col_name'       => 'Nome',
-    'col_email'      => 'E-mail',
-    'col_role'       => 'Perfil',
-    'col_status'     => 'Status',
-    'col_actions'    => 'Ações',
+    // Colunas
+    'col_created_at'    => 'Cadastro',
+    'col_name'          => 'Nome',
+    'col_email'         => 'E-mail',
+    'col_role'          => 'Perfil',
+    'col_status'        => 'Status',
+    'col_actions'       => 'Ações',
+    'sort_by'           => 'Ordenar por :column',
+    'extra_roles_one'   => '+:count perfil adicional',
+    'extra_roles_other' => '+:count perfis adicionais',
 
-    // Pagination
-    'showing' => 'Exibindo :from–:to de :total usuários',
+    // Personalizar colunas
+    'columns_label'       => 'Colunas',
+    'columns_customize'   => 'Personalizar colunas',
+    'columns_order_title' => 'Ordem das colunas',
+    'columns_move_up'     => 'Mover para cima',
+    'columns_move_down'   => 'Mover para baixo',
+    'columns_reset'       => 'Restaurar padrão',
 
-    // Status badges
+    // Paginação ("Exibindo 1–12 de 40 usuários")
+    'pagination_showing'  => 'Exibindo',
+    'pagination_of'       => 'de',
+    'pagination_suffix'   => 'usuários',
+    'pagination_label'    => 'Paginação',
+    'pagination_previous' => 'Anterior',
+    'pagination_next'     => 'Próxima',
+
+    // Status
     'status_active'   => 'Ativo',
     'status_inactive' => 'Inativo',
     'status_deleted'  => 'Excluído',
 
-    // Empty state
-    'empty' => 'Nenhum usuário encontrado.',
+    // Selos
+    'badge_owner' => 'Proprietário',
+    'badge_self'  => 'Você',
 
-    // Row actions
+    // Estados
+    'empty'        => 'Nenhum usuário cadastrado.',
+    'empty_search' => 'Nenhum usuário encontrado para esta busca.',
+
+    // Ações
     'btn_edit'       => 'Editar',
     'btn_restore'    => 'Restaurar',
     'btn_deactivate' => 'Desativar',
     'btn_activate'   => 'Ativar',
     'btn_delete'     => 'Excluir',
+    'more_actions'   => 'Mais ações',
+    'owner_locked'   => 'O proprietário da clínica não pode ser alterado nesta tela.',
 
-    // Confirm messages
-    'confirm_delete'  => 'Tem certeza que deseja remover este usuário? Esta ação pode ser revertida via restauração.',
-    'confirm_restore' => 'Restaurar este usuário?',
+    // Confirmações
+    'confirm_delete'  => 'Remover o acesso de ":name" a esta clínica? Dá para desfazer depois, restaurando o usuário.',
+    'confirm_restore' => 'Restaurar o acesso de ":name" a esta clínica?',
 
-    // Form modal
-    'form_title_create' => 'Novo Usuário',
-    'form_title_edit'   => 'Editar Usuário',
-
+    // Formulário
+    'form_title_create'      => 'Novo usuário',
+    'form_title_edit'        => 'Editar usuário',
     'field_name'             => 'Nome completo',
     'field_email'            => 'E-mail',
     'field_role'             => 'Perfil de acesso',
@@ -61,18 +88,27 @@ return [
     'field_password'         => 'Senha',
     'field_password_hint'    => 'Mínimo 8 caracteres, com letras maiúsculas, minúsculas, números e símbolos.',
     'field_password_confirm' => 'Confirmar senha',
+    'field_extra_roles'      => 'Perfis adicionais',
+    'extra_roles_empty'      => 'Nenhum perfil customizado cadastrado nesta clínica.',
+    'extra_roles_hint'       => 'Permissões administrativas adicionais, além do perfil base acima.',
+    'credentials_info'       => 'O usuário receberá estas credenciais para acessar o sistema.',
+    'required'               => 'obrigatório',
+    'btn_cancel'             => 'Cancelar',
+    'btn_save'               => 'Salvar alterações',
+    'btn_create'             => 'Criar usuário',
 
-    'credentials_info' => 'O usuário receberá estas credenciais para acessar o sistema.',
+    // Retorno das ações (flash)
+    'flash_created'     => 'Usuário cadastrado com sucesso.',
+    'flash_updated'     => 'Usuário alterado com sucesso.',
+    'flash_activated'   => 'Usuário ativado com sucesso.',
+    'flash_deactivated' => 'Usuário desativado com sucesso.',
+    'flash_deleted'     => 'Acesso do usuário removido com sucesso.',
+    'flash_restored'    => 'Usuário restaurado com sucesso.',
 
-    'btn_cancel' => 'Cancelar',
-    'btn_save'   => 'Salvar alterações',
-    'btn_create' => 'Criar usuário',
-
-    // Owner / self-protection
-    'badge_owner'     => 'Proprietário',
+    // Proprietário / própria conta
     'owner_protected' => 'O proprietário da entidade não pode ser desativado nem removido.',
     'self_protected'  => 'Você não pode desativar ou remover sua própria conta.',
 
-    // JS errors
+    // Erros no navegador
     'js_error_load' => 'Erro ao carregar dados do usuário.',
 ];
