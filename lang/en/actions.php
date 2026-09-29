@@ -268,6 +268,8 @@ return [
         'tiss_billing'             => 'TISS Billing',
         'financial_reports'        => 'Financial Reports',
         'cash_closing'             => 'Cash closing',
+        'doctor_payouts'           => 'Doctor payouts',
+        'my_payouts'               => 'My payouts',
         'procedure_prices'         => 'Price table',
         'management_dashboard'     => 'Management Dashboard',
         'tiss_glosas'              => 'TISS Claims',

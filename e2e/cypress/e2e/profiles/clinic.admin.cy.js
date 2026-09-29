@@ -153,11 +153,13 @@ describe('Perfil clinic.admin — landing, menu, acessos e negações', () => {
       .parents('li.submenu')
       .should('not.exist');
 
-    // Grupo Financeiro tem exatamente 6 filhos.
+    // Grupo Financeiro tem exatamente 9 filhos (BI, fluxo de caixa, fechamento
+    // de caixa, faturamento, repasse médico, tabela de preços, glosas e os 2
+    // relatórios) — ver App\Support\PanelNavigation.
     cy.get('#sidebar-menu a[href$="/panel/financial/bi"]')
       .closest('li.submenu')
       .find('ul li')
-      .should('have.length', 6);
+      .should('have.length', 9);
   });
 
   // (b) Cada página permitida: navegação REAL pelo menu (clique no href;

@@ -78,10 +78,11 @@ return [
 
     // Origem do lançamento (vínculo de sistema)
     'origins' => [
-        'schedule' => 'Agenda',
-        'claim'    => 'Guia',
-        'purchase' => 'Compra',
-        'manual'   => 'Manual',
+        'schedule'      => 'Agenda',
+        'claim'         => 'Guia',
+        'purchase'      => 'Compra',
+        'doctor_payout' => 'Repasse médico',
+        'manual'        => 'Manual',
     ],
 
     // Motivo de trava por linha (lock_reason)
@@ -89,6 +90,8 @@ return [
     'lock_billing_claim_hint' => 'Lançamento gerado automaticamente ao registrar o recebimento de uma guia. Não pode ser alterado nem excluído aqui.',
     'lock_closed_period'      => 'Caixa fechado',
     'lock_closed_period_hint' => 'A data está num período de caixa fechado. Reabra o período no Fechamento de caixa para alterar.',
+    'lock_doctor_payout'      => 'Repasse médico',
+    'lock_doctor_payout_hint' => 'Despesa gerada automaticamente ao registrar o pagamento de um repasse médico. Para corrigir, estorne o pagamento em Financeiro › Repasse médico.',
 
     'types' => [
         'income'  => 'Receita',
@@ -156,12 +159,13 @@ return [
     'form_schedule_link'       => 'Editar pela agenda',
 
     // Mensagens do servidor
-    'created'                => 'Lançamento cadastrado com sucesso.',
-    'updated'                => 'Lançamento atualizado com sucesso.',
-    'destroyed'              => 'Lançamento excluído com sucesso.',
-    'locked_by_claim'        => 'Este lançamento foi gerado pelo recebimento de uma guia de convênio e não pode ser alterado nem excluído no fluxo de caixa.',
-    'category_type_mismatch' => 'Selecione uma categoria da clínica compatível com o tipo do lançamento.',
-    'schedule_split_locked'  => 'Este recebimento veio da agenda com pagamento dividido (dinheiro e cartão): valor e forma de pagamento só podem ser alterados pela agenda.',
+    'created'                 => 'Lançamento cadastrado com sucesso.',
+    'updated'                 => 'Lançamento atualizado com sucesso.',
+    'destroyed'               => 'Lançamento excluído com sucesso.',
+    'locked_by_claim'         => 'Este lançamento foi gerado pelo recebimento de uma guia de convênio e não pode ser alterado nem excluído no fluxo de caixa.',
+    'locked_by_doctor_payout' => 'Este lançamento foi gerado pelo pagamento de um repasse médico e não pode ser alterado nem excluído no fluxo de caixa. Estorne o pagamento na tela de Repasse médico.',
+    'category_type_mismatch'  => 'Selecione uma categoria da clínica compatível com o tipo do lançamento.',
+    'schedule_split_locked'   => 'Este recebimento veio da agenda com pagamento dividido (dinheiro e cartão): valor e forma de pagamento só podem ser alterados pela agenda.',
 
     'reference_managed_by_system' => 'O vínculo do lançamento (agendamento, guia ou compra) é definido pelo sistema e não pode ser informado.',
 

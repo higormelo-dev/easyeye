@@ -130,6 +130,7 @@ class Entity extends Model
             'schedule_interval'         => 'integer',
             'requires_cash_to_complete' => 'boolean',
             'requires_two_factor'       => 'boolean',
+            'doctor_payouts_visible'    => 'boolean',
             'two_factor_enabled_at'     => 'datetime',
             'created_at'                => 'datetime',
             'updated_at'                => 'datetime',

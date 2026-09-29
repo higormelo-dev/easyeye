@@ -21,14 +21,17 @@ class FinancialCategoriesSeeder extends Seeder
             ['name' => 'Insumos Clínicos', 'type' => FinancialEntryType::Expense],
             ['name' => 'Tributos', 'type' => FinancialEntryType::Expense],
             ['name' => 'Marketing', 'type' => FinancialEntryType::Expense],
+            ['name' => 'Repasse Médico', 'type' => FinancialEntryType::Expense],
             ['name' => 'Outras Despesas', 'type' => FinancialEntryType::Expense],
         ];
 
         foreach ($categories as $category) {
+            // HasUppercaseName grava o nome em maiúsculas: a busca precisa usar a
+            // mesma forma — antes cada nova execução do seeder duplicava as categorias.
             FinancialCategory::query()->updateOrCreate(
                 [
                     'entity_id' => null,
-                    'name'      => $category['name'],
+                    'name'      => mb_convert_case($category['name'], MB_CASE_UPPER, 'UTF-8'),
                     'type'      => $category['type'],
                 ],
                 [

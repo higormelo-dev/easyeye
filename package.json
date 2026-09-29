@@ -2,7 +2,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "npm run tinymce:install && NODE_OPTIONS='--max-old-space-size=800' vite build && NODE_OPTIONS='--max-old-space-size=800' vite build --ssr",
+        "build": "npm run tinymce:install && NODE_OPTIONS='--max-old-space-size=1024' vite build && NODE_OPTIONS='--max-old-space-size=1024' vite build --ssr",
         "dev": "vite",
         "ssr": "node bootstrap/ssr/ssr.js",
         "test": "vitest run",

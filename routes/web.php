@@ -22,11 +22,18 @@ use App\Http\Controllers\{
     Financial\CashClosingController,
     Financial\CashFlowController,
     Financial\ClinicBiController,
+    Financial\DoctorPayouts\DoctorPayoutAdjustmentsController,
+    Financial\DoctorPayouts\DoctorPayoutClosingsController,
+    Financial\DoctorPayouts\DoctorPayoutPaymentsController,
+    Financial\DoctorPayouts\DoctorPayoutRulesController,
+    Financial\DoctorPayouts\DoctorPayoutSettingsController,
+    Financial\DoctorPayouts\DoctorPayoutsController,
     Financial\FinancialReportsController,
     Financial\ProcedurePricesController,
     Financial\TissGlosasController,
     Financial\TissGuidePreValidateController,
     LocaleController,
+    MyPayoutsController,
     NoticesController,
     PatientDocumentSharesController,
     PatientImportsController,
@@ -651,6 +658,11 @@ Route::group(
                 Route::get('procedure-prices', [ProcedurePricesController::class, 'index'])->name('procedure-prices.index');
                 Route::get('cash-closing', [CashClosingController::class, 'index'])->name('cash-closing.index');
                 Route::get('billing', [FinancialBillingController::class, 'index'])->name('billing.index');
+                // Repasse médico: apuração, fechamentos (histórico e demonstrativo) e regras.
+                Route::get('doctor-payouts', [DoctorPayoutsController::class, 'index'])->name('doctor-payouts.index');
+                Route::get('doctor-payouts/closings', [DoctorPayoutClosingsController::class, 'index'])->name('doctor-payouts.closings.index');
+                Route::get('doctor-payouts/closings/{payout}', [DoctorPayoutClosingsController::class, 'show'])->name('doctor-payouts.closings.show');
+                Route::get('doctor-payouts/rules', [DoctorPayoutRulesController::class, 'index'])->name('doctor-payouts.rules.index');
                 // Listas/prévia dos modais em lote do faturamento (JSON, só leitura).
                 Route::get('billing/batches/{batch}/attachable-claims', [BillingBulkActionsController::class, 'attachableClaims'])->name('billing.batches.attachable-claims');
                 Route::get('billing/claims/{claim}/attach-targets', [BillingBulkActionsController::class, 'attachTargets'])->name('billing.claims.attach-targets');
@@ -707,6 +719,26 @@ Route::group(
                     // Relatórios financeiros (exportação com drill-down)
                     Route::get('reports/cash-flow/export', [FinancialReportsController::class, 'exportCashFlowCsv'])->name('reports.cash-flow.export');
                     Route::get('reports/covenants/export', [FinancialReportsController::class, 'exportCovenantsCsv'])->name('reports.covenants.export');
+
+                    // Repasse médico: regras, fechamento, ajustes, pagamento, planilhas e PDF.
+                    Route::post('doctor-payouts/rules', [DoctorPayoutRulesController::class, 'store'])->name('doctor-payouts.rules.store');
+                    Route::put('doctor-payouts/rules/{rule}', [DoctorPayoutRulesController::class, 'update'])->name('doctor-payouts.rules.update');
+                    Route::delete('doctor-payouts/rules/{rule}', [DoctorPayoutRulesController::class, 'destroy'])->name('doctor-payouts.rules.destroy');
+                    Route::post('doctor-payouts/closings', [DoctorPayoutClosingsController::class, 'store'])->name('doctor-payouts.closings.store');
+                    Route::post('doctor-payouts/closings/{payout}/adjustments', [DoctorPayoutAdjustmentsController::class, 'store'])->name('doctor-payouts.closings.adjustments.store');
+                    Route::delete('doctor-payouts/closings/{payout}/adjustments/{adjustment}', [DoctorPayoutAdjustmentsController::class, 'destroy'])
+                        ->whereUuid('adjustment')
+                        ->name('doctor-payouts.closings.adjustments.destroy');
+                    Route::post('doctor-payouts/closings/{payout}/payment', [DoctorPayoutPaymentsController::class, 'store'])->name('doctor-payouts.closings.payment.store');
+                    Route::get('doctor-payouts/export', [DoctorPayoutsController::class, 'export'])->name('doctor-payouts.export');
+                    Route::get('doctor-payouts/closings/{payout}/pdf', [DoctorPayoutClosingsController::class, 'pdf'])->name('doctor-payouts.closings.pdf');
+                    Route::get('doctor-payouts/closings/{payout}/export', [DoctorPayoutClosingsController::class, 'export'])->name('doctor-payouts.closings.export');
+                    // Reabrir fechamento, estornar pagamento e expor repasses ao médico: só admin.
+                    Route::middleware('entity.role:admin')->group(function () {
+                        Route::delete('doctor-payouts/closings/{payout}', [DoctorPayoutClosingsController::class, 'destroy'])->name('doctor-payouts.closings.destroy');
+                        Route::delete('doctor-payouts/closings/{payout}/payment', [DoctorPayoutPaymentsController::class, 'destroy'])->name('doctor-payouts.closings.payment.destroy');
+                        Route::patch('doctor-payouts/settings', [DoctorPayoutSettingsController::class, 'update'])->name('doctor-payouts.settings.update');
+                    });
                 });
 
                 // Pré-validação TISS (motor anti-glosa)
@@ -736,6 +768,16 @@ Route::group(
                         ->only(['index', 'store', 'update', 'destroy']);
                 });
             });
+
+        // Meus repasses: o médico vê os PRÓPRIOS fechamentos se a clínica permitir
+        // (entities.doctor_payouts_visible — desligado, o controller devolve 404).
+        Route::middleware('entity.role:doctor')->group(function () {
+            Route::get('my-payouts', [MyPayoutsController::class, 'index'])->name('my-payouts.index');
+            Route::get('my-payouts/{payout}', [MyPayoutsController::class, 'show'])->name('my-payouts.show');
+            Route::get('my-payouts/{payout}/pdf', [MyPayoutsController::class, 'pdf'])
+                ->middleware('throttle:financial-write')
+                ->name('my-payouts.pdf');
+        });
 
         // ── admin only: compliance, controle de acesso, segurança, gateways ───
         // "Chave do cofre" do RBAC — gestão de Roles/atribuição de perfil e o

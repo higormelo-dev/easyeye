@@ -58,9 +58,12 @@ const ids = {
 
 const isEdit   = computed(() => !!props.entry?.id);
 const isLocked = computed(() => !!props.entry?.lock_reason);
-const lockHint = computed(() => (props.entry?.lock_reason === 'billing_claim'
-    ? props.t.lock_billing_claim_hint
-    : props.t.lock_closed_period_hint));
+const lockHint = computed(() => {
+    if (props.entry?.lock_reason === 'billing_claim') return props.t.lock_billing_claim_hint;
+    if (props.entry?.lock_reason === 'doctor_payout') return props.t.lock_doctor_payout_hint;
+
+    return props.t.lock_closed_period_hint;
+});
 
 /** Recebimento da agenda com dinheiro + cartão: valor e forma só pela agenda. */
 const isScheduleSplit = computed(() => isEdit.value && props.entry?.origin === 'schedule' && !!props.entry?.has_split);

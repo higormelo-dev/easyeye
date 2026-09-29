@@ -24,12 +24,16 @@ class CashFlowController extends Controller
 
     public const LOCK_CLOSED_PERIOD = 'closed_period';
 
+    public const LOCK_DOCTOR_PAYOUT = 'doctor_payout';
+
     /** Origem do lançamento por linha (origin), a partir do vínculo de sistema. */
     public const ORIGIN_SCHEDULE = 'schedule';
 
     public const ORIGIN_CLAIM = 'claim';
 
     public const ORIGIN_PURCHASE = 'purchase';
+
+    public const ORIGIN_DOCTOR_PAYOUT = 'doctor_payout';
 
     public const ORIGIN_MANUAL = 'manual';
 
@@ -195,6 +199,7 @@ class CashFlowController extends Controller
             CashEntryReferenceType::Schedule      => self::ORIGIN_SCHEDULE,
             CashEntryReferenceType::BillingClaim  => self::ORIGIN_CLAIM,
             CashEntryReferenceType::PurchaseOrder => self::ORIGIN_PURCHASE,
+            CashEntryReferenceType::DoctorPayout  => self::ORIGIN_DOCTOR_PAYOUT,
             null                                  => self::ORIGIN_MANUAL,
         };
     }
@@ -341,6 +346,10 @@ class CashFlowController extends Controller
     {
         if ($entry->billing_claim_id !== null) {
             return self::LOCK_BILLING_CLAIM;
+        }
+
+        if ($entry->reference_type === CashEntryReferenceType::DoctorPayout->value) {
+            return self::LOCK_DOCTOR_PAYOUT;
         }
 
         $date = $entry->entry_date?->toDateString();

@@ -77,7 +77,8 @@ class SystemProfile extends Model
             'doctor' => [
                 'label'       => 'Médico',
                 'description' => 'Agenda, atendimento e prontuário, emissão de laudos e '
-                    . 'prescrições, importação de exames.',
+                    . 'prescrições, importação de exames. Consulta os próprios repasses '
+                    . 'quando a clínica permite.',
             ],
             'secretary' => [
                 'label'       => 'Secretária',

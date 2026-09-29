@@ -19,6 +19,9 @@ use App\Models\PurchaseOrder;
  *  - PurchaseOrder : despesa do recebimento de compra (PurchaseOrdersController::receive).
  *                    Guarda o FQCN por compatibilidade com linhas já gravadas
  *                    (mesmo desenho de stock_movements.reference_type).
+ *  - DoctorPayout  : despesa do pagamento de repasse médico
+ *                    (DoctorPayoutClosingService::pay); no máximo uma ativa por
+ *                    fechamento (índice único parcial) e travada no fluxo de caixa.
  *
  * Não é um morph map global: AuditLog/RecordVersion/DataAccessLog/
  * PatientDocumentShare continuam gravando FQCN nas próprias colunas polimórficas.
@@ -28,6 +31,7 @@ enum CashEntryReferenceType: string
     case Schedule      = 'schedule';
     case BillingClaim  = 'billing_claim';
     case PurchaseOrder = PurchaseOrder::class;
+    case DoctorPayout  = 'doctor_payout';
 
     /** Tabela do registro referenciado (todas com uuid `id` + `entity_id`). */
     public function table(): string
@@ -36,6 +40,7 @@ enum CashEntryReferenceType: string
             self::Schedule      => 'schedules',
             self::BillingClaim  => 'billing_claims',
             self::PurchaseOrder => 'purchase_orders',
+            self::DoctorPayout  => 'doctor_payouts',
         };
     }
 

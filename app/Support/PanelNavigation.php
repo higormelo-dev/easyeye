@@ -88,6 +88,19 @@ class PanelNavigation
             'match' => ['panel.eye-images.*'],
         ];
 
+        // Meus repasses: só médico e só se a clínica expôs os repasses aos
+        // médicos (entities.doctor_payouts_visible) — a rota devolve 404 no
+        // mesmo caso, então o item nunca aparece sem funcionar.
+        if ($rule === ClientRule::Doctor->value && self::doctorPayoutsVisible()) {
+            $nav[] = [
+                'key'   => 'my-payouts',
+                'route' => 'panel.my-payouts.index',
+                'icon'  => 'ti ti-receipt-2',
+                'label' => __('actions.sidemenu.my_payouts'),
+                'match' => ['panel.my-payouts.*'],
+            ];
+        }
+
         if ($canSeeAi) {
             $isDoctor = $rule === ClientRule::Doctor->value;
 
@@ -197,6 +210,7 @@ class PanelNavigation
                     ['route' => 'panel.financial.cash-flow.index', 'icon' => 'ti ti-building-bank', 'label' => __('actions.sidemenu.cash_flow'), 'match' => ['panel.financial.cash-flow.*']],
                     ['route' => 'panel.financial.cash-closing.index', 'icon' => 'ti ti-lock', 'label' => __('actions.sidemenu.cash_closing'), 'match' => ['panel.financial.cash-closing.*']],
                     ['route' => 'panel.financial.billing.index', 'icon' => 'ti ti-file-invoice', 'label' => __('actions.sidemenu.tiss_billing'), 'match' => ['panel.financial.billing.*']],
+                    ['route' => 'panel.financial.doctor-payouts.index', 'icon' => 'ti ti-stethoscope', 'label' => __('actions.sidemenu.doctor_payouts'), 'match' => ['panel.financial.doctor-payouts.*']],
                     ['route' => 'panel.financial.procedure-prices.index', 'icon' => 'ti ti-tags', 'label' => __('actions.sidemenu.procedure_prices'), 'match' => ['panel.financial.procedure-prices.*']],
                     ['route' => 'panel.financial.tiss.glosas.index', 'icon' => 'ti ti-gavel', 'label' => __('actions.sidemenu.tiss_glosas'), 'match' => ['panel.financial.tiss.glosas.*']],
                     ['route' => 'panel.financial.reports.cash-flow', 'icon' => 'ti ti-chart-arcs', 'label' => __('actions.sidemenu.report_cash_flow'), 'match' => ['panel.financial.reports.cash-flow*']],
@@ -399,6 +413,18 @@ class PanelNavigation
         }
 
         return app(FeatureGateService::class)->can((string) $entityId, FeatureKey::HasInventoryModule);
+    }
+
+    /** A clínica da sessão deixa os médicos verem os próprios repasses? */
+    private static function doctorPayoutsVisible(): bool
+    {
+        $entityId = session('selected_entity_id');
+
+        if (! $entityId) {
+            return false;
+        }
+
+        return (bool) Entity::query()->whereKey($entityId)->value('doctor_payouts_visible');
     }
 
     private static function managerNav(): array

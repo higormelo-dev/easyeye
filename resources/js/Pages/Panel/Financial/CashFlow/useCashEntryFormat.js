@@ -20,6 +20,7 @@ const ORIGIN_ICON = {
     schedule: 'ti ti-calendar-event',
     claim:    'ti ti-file-invoice',
     purchase: 'ti ti-shopping-cart',
+    doctor_payout: 'ti ti-stethoscope',
     manual:   'ti ti-pencil',
 };
 
@@ -48,6 +49,7 @@ export function useCashEntryFormat(getT) {
 
     function lockLabel(entry) {
         if (entry?.lock_reason === 'billing_claim') return text().lock_billing_claim;
+        if (entry?.lock_reason === 'doctor_payout') return text().lock_doctor_payout;
         if (entry?.lock_reason === 'closed_period') return text().lock_closed_period;
 
         return '';
@@ -55,6 +57,7 @@ export function useCashEntryFormat(getT) {
 
     function lockHint(entry) {
         if (entry?.lock_reason === 'billing_claim') return text().lock_billing_claim_hint;
+        if (entry?.lock_reason === 'doctor_payout') return text().lock_doctor_payout_hint;
         if (entry?.lock_reason === 'closed_period') return text().lock_closed_period_hint;
 
         return '';

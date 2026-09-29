@@ -78,10 +78,11 @@ return [
 
     // Entry origin (system link)
     'origins' => [
-        'schedule' => 'Schedule',
-        'claim'    => 'Claim',
-        'purchase' => 'Purchase',
-        'manual'   => 'Manual',
+        'schedule'      => 'Schedule',
+        'claim'         => 'Claim',
+        'purchase'      => 'Purchase',
+        'doctor_payout' => 'Doctor payout',
+        'manual'        => 'Manual',
     ],
 
     // Per-row lock reason (lock_reason)
@@ -89,6 +90,8 @@ return [
     'lock_billing_claim_hint' => 'Entry created automatically when a claim payment was recorded. It cannot be changed or deleted here.',
     'lock_closed_period'      => 'Register closed',
     'lock_closed_period_hint' => 'The date falls within a closed cash period. Reopen the period in Cash Closing to change it.',
+    'lock_doctor_payout'      => 'Doctor payout',
+    'lock_doctor_payout_hint' => 'Expense created automatically when a doctor payout payment was recorded. To fix it, reverse the payment in Financial › Doctor payouts.',
 
     'types' => [
         'income'  => 'Income',
@@ -156,12 +159,13 @@ return [
     'form_schedule_link'       => 'Edit in the schedule',
 
     // Server messages
-    'created'                => 'Entry created successfully.',
-    'updated'                => 'Entry updated successfully.',
-    'destroyed'              => 'Entry deleted successfully.',
-    'locked_by_claim'        => 'This entry was created by an insurance claim payment and cannot be changed or deleted in the cash flow.',
-    'category_type_mismatch' => 'Select a clinic category that matches the entry type.',
-    'schedule_split_locked'  => 'This payment came from the schedule split between cash and card: amount and payment method can only be changed in the schedule.',
+    'created'                 => 'Entry created successfully.',
+    'updated'                 => 'Entry updated successfully.',
+    'destroyed'               => 'Entry deleted successfully.',
+    'locked_by_claim'         => 'This entry was created by an insurance claim payment and cannot be changed or deleted in the cash flow.',
+    'locked_by_doctor_payout' => 'This entry was created by a doctor payout payment and cannot be changed or deleted in the cash flow. Reverse the payment on the Doctor payouts screen.',
+    'category_type_mismatch'  => 'Select a clinic category that matches the entry type.',
+    'schedule_split_locked'   => 'This payment came from the schedule split between cash and card: amount and payment method can only be changed in the schedule.',
 
     'reference_managed_by_system' => 'The entry link (appointment, insurance claim or purchase) is set by the system and cannot be provided.',
 

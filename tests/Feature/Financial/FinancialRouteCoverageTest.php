@@ -230,3 +230,20 @@ it('exports the cash-flow and covenants reports as csv', function () {
         ->assertOk()
         ->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
 });
+
+it('renders the doctor payout pages (calculation, closings and rules) without route errors', function () {
+    actingAsFinancialEntityUser($this->entity);
+    $doctor = createDoctorForEntity($this->entity);
+
+    $this->get(route('panel.financial.doctor-payouts.index', ['doctor' => $doctor->id]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Panel/Financial/DoctorPayouts/Index')->has('kpis'));
+
+    $this->get(route('panel.financial.doctor-payouts.closings.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Panel/Financial/DoctorPayouts/Closings')->has('payouts.data', 0));
+
+    $this->get(route('panel.financial.doctor-payouts.rules.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Panel/Financial/DoctorPayouts/Rules')->has('rules.data', 0));
+});

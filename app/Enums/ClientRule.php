@@ -39,8 +39,9 @@ enum ClientRule: string
                 . 'configurações da clínica, financeiro, agenda e importação de exames. '
                 . 'Ações clínicas (laudos, prescrições) continuam exclusivas de médicos.',
             self::Financial => 'Dados e relatórios financeiros da clínica.',
-            self::Doctor => 'Agenda, atendimento e prontuário, emissão de laudos e '
-                . 'prescrições, importação de exames.',
+            self::Doctor    => 'Agenda, atendimento e prontuário, emissão de laudos e '
+                . 'prescrições, importação de exames. Consulta os próprios repasses '
+                . 'quando a clínica permite.',
             self::Secretary => 'Agenda (criar, editar e remarcar), cadastro de pacientes '
                 . 'e importação de exames.',
             self::User => 'Acesso básico de membro da clínica, sem permissões '

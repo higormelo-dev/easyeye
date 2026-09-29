@@ -269,6 +269,8 @@ return [
         'tiss_billing'          => 'Faturamento TISS',
         'financial_reports'     => 'Relatórios financeiros',
         'cash_closing'          => 'Fechamento de caixa',
+        'doctor_payouts'        => 'Repasse médico',
+        'my_payouts'            => 'Meus repasses',
         'procedure_prices'      => 'Tabela de preços',
         'management_dashboard'  => 'Dashboard Gerencial',
         'tiss_glosas'           => 'Glosas TISS',

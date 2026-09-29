@@ -94,6 +94,7 @@ class CashFlowService
     {
         return DB::transaction(function () use ($entry, $data): FinancialCashEntry {
             $this->assertNotLinkedToClaim($entry);
+            $this->assertNotLinkedToDoctorPayout($entry);
 
             $entityId = (string) $entry->entity_id;
 
@@ -117,6 +118,7 @@ class CashFlowService
     {
         DB::transaction(function () use ($entry): void {
             $this->assertNotLinkedToClaim($entry);
+            $this->assertNotLinkedToDoctorPayout($entry);
 
             $this->assertDateNotClosed((string) $entry->entity_id, $entry->entry_date?->toDateString());
 
@@ -137,6 +139,23 @@ class CashFlowService
         if ($entry->billing_claim_id !== null) {
             throw ValidationException::withMessages([
                 'billing_claim_id' => __('financial_cash_flow.locked_by_claim'),
+            ]);
+        }
+    }
+
+    /**
+     * O pagamento de repasse médico (DoctorPayoutClosingService::pay) cria a
+     * despesa referenciando o fechamento: alterar ou excluir aqui deixaria o
+     * repasse "pago" sem a saída correspondente no caixa. A correção é pelo
+     * estorno do pagamento, na tela de Repasse médico.
+     *
+     * @throws ValidationException 422 com mensagem traduzida
+     */
+    private function assertNotLinkedToDoctorPayout(FinancialCashEntry $entry): void
+    {
+        if ($entry->reference_type === CashEntryReferenceType::DoctorPayout->value) {
+            throw ValidationException::withMessages([
+                'reference_id' => __('financial_cash_flow.locked_by_doctor_payout'),
             ]);
         }
     }
