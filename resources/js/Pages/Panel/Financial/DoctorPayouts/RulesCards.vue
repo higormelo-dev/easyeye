@@ -11,15 +11,17 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  */
 const props = defineProps({
     rules:     { type: Array,  default: () => [] },
+    doctors:   { type: Array,  default: () => [] },   // nomes dos médicos fixos na divisão (E4)
     t:         { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
-const emit = defineEmits(['edit', 'delete']);
+const emit = defineEmits(['edit', 'duplicate', 'delete']);
 
-const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon } = useDoctorPayoutFormat(() => props.t);
+const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon, splitSummary } = useDoctorPayoutFormat(() => props.t);
 
-const rows = computed(() => props.rules ?? []);
+const rows   = computed(() => props.rules ?? []);
+const splits = computed(() => new Map(rows.value.map((rule) => [rule.id, splitSummary(rule, props.doctors)])));
 
 const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.payer_scope;
 </script>
@@ -39,6 +41,9 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
                             <i :class="serviceTypeIcon(rule.service_type)" class="me-1 text-primary" aria-hidden="true"></i>{{ serviceTypeLabel(rule.service_type) }}
                         </p>
                         <p class="fs-5 fw-bold mb-0 text-body" data-test="rule-calculation">{{ ruleLabel(rule) }}</p>
+                        <p v-if="splits.get(rule.id)" class="small text-muted mb-0" data-test="rule-split">
+                            <i class="ti ti-arrows-split-2 me-1" aria-hidden="true"></i>{{ splits.get(rule.id) }}
+                        </p>
                     </div>
                     <StatusBadge :active="!!rule.active" :label-active="t.active" :label-inactive="t.inactive" />
                 </div>
@@ -70,6 +75,7 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
 
                 <ActionIconGroup align="end" gap="tight">
                     <ActionIconButton icon="ti ti-edit" :title="t.rules_edit" data-test="rule-edit" @click="emit('edit', rule)" />
+                    <ActionIconButton icon="ti ti-copy" :title="t.rules_duplicate" data-test="rule-duplicate" @click="emit('duplicate', rule)" />
                     <ActionIconButton icon="ti ti-trash" variant="danger" :title="t.rules_delete" data-test="rule-delete" @click="emit('delete', rule)" />
                 </ActionIconGroup>
             </div>

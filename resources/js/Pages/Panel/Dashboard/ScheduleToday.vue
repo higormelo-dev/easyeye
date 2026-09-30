@@ -3,8 +3,21 @@ import { computed } from 'vue';
 
 const props = defineProps({
     items:        { type: Array,   default: () => [] },
+    // Total de consultas de hoje (stats.today_count). A lista vem limitada
+    // pelo servidor; quando corta, avisa quantas estão sendo mostradas.
+    total:        { type: Number,  default: 0 },
     isRefreshing: { type: Boolean, default: false },
+    // Botão "ver agenda" só para quem pode abrir a agenda (regra da rota).
+    canOpenSchedule: { type: Boolean, default: false },
     t:            { type: Object,  required: true },
+});
+
+const truncatedText = computed(() => {
+    if (props.total <= props.items.length || !props.t.schedule_showing) return '';
+
+    return props.t.schedule_showing
+        .replace(':shown', String(props.items.length))
+        .replace(':total', String(props.total));
 });
 
 const activeCount = computed(() =>
@@ -44,7 +57,7 @@ function badgeStyle(badge) {
                 <span v-if="isRefreshing" class="text-muted" style="font-size:.75rem;">
                     <i class="ti ti-loader-2 db-spin"></i>
                 </span>
-                <a :href="route('panel.schedules.index')" class="btn btn-sm btn-outline-primary">
+                <a v-if="canOpenSchedule" :href="route('panel.schedules.index')" class="btn btn-sm btn-outline-primary">
                     {{ t.btn_see_schedule }} <i class="ti ti-arrow-right ms-1"></i>
                 </a>
             </div>
@@ -79,7 +92,9 @@ function badgeStyle(badge) {
                                 <span
                                     v-if="item.arrived"
                                     class="ti ti-circle-check text-success"
-                                    title="Chegou"
+                                    :title="t.arrived"
+                                    role="img"
+                                    :aria-label="t.arrived"
                                 ></span>
                                 <span class="fw-medium" style="font-size:.875rem;">{{ item.name }}</span>
                             </div>
@@ -96,6 +111,10 @@ function badgeStyle(badge) {
                     </tr>
                 </tbody>
             </table>
+
+            <p v-if="truncatedText" class="text-muted small text-center mb-0 py-2 border-top" role="note">
+                {{ truncatedText }}
+            </p>
         </div>
     </div>
 </template>

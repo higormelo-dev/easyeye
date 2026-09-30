@@ -20,7 +20,7 @@ const props = defineProps({
 });
 
 const {
-    tx, money, signedMoney, number, dateTime, periodText, serviceTypePlural, serviceTypeIcon,
+    tx, money, signedMoney, number, dateTime, periodText, serviceTypePlural, serviceTypeIcon, grossLabel,
 } = useDoctorPayoutFormat(() => props.t);
 
 const uid = useId();
@@ -158,7 +158,7 @@ const reversedText = computed(() => (payout.value.payment_reversed_at
                 <h3 :id="ids.totals" class="visually-hidden">{{ t.statement_net_total }}</h3>
                 <dl class="mb-0 statement-view__totals">
                     <div class="d-flex justify-content-between gap-3 py-1">
-                        <dt class="fw-normal text-muted">{{ t.statement_gross }}</dt>
+                        <dt class="fw-normal text-muted">{{ grossLabel(payout) }}</dt>
                         <dd class="mb-0 statement-view__value" data-test="total-gross">{{ money(payout.gross_amount) }}</dd>
                     </div>
                     <div class="d-flex justify-content-between gap-3 py-1">

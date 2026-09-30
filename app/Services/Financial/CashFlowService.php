@@ -6,7 +6,7 @@ namespace App\Services\Financial;
 
 use App\Enums\{CashEntryNature, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType};
 use App\Exceptions\Financial\{CashPeriodClosedException, DuplicateCashEntryException};
-use App\Models\{CashClose, FinancialCashEntry, Schedule};
+use App\Models\{CashClose, DoctorPayoutReceiptAllocation, FinancialCashEntry, Schedule};
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\{Builder as QueryBuilder, JoinClause};
@@ -95,6 +95,7 @@ class CashFlowService
         return DB::transaction(function () use ($entry, $data): FinancialCashEntry {
             $this->assertNotLinkedToClaim($entry);
             $this->assertNotLinkedToDoctorPayout($entry);
+            $this->assertNotAllocatedToDoctorPayout($entry);
 
             $entityId = (string) $entry->entity_id;
 
@@ -119,6 +120,7 @@ class CashFlowService
         DB::transaction(function () use ($entry): void {
             $this->assertNotLinkedToClaim($entry);
             $this->assertNotLinkedToDoctorPayout($entry);
+            $this->assertNotAllocatedToDoctorPayout($entry);
 
             $this->assertDateNotClosed((string) $entry->entity_id, $entry->entry_date?->toDateString());
 
@@ -145,7 +147,7 @@ class CashFlowService
 
     /**
      * O pagamento de repasse médico (DoctorPayoutClosingService::pay) cria a
-     * despesa referenciando o fechamento: alterar ou excluir aqui deixaria o
+     * despesa referenciando o pagamento (antes, o fechamento): alterar ou excluir aqui deixaria o
      * repasse "pago" sem a saída correspondente no caixa. A correção é pelo
      * estorno do pagamento, na tela de Repasse médico.
      *
@@ -153,9 +155,35 @@ class CashFlowService
      */
     private function assertNotLinkedToDoctorPayout(FinancialCashEntry $entry): void
     {
-        if ($entry->reference_type === CashEntryReferenceType::DoctorPayout->value) {
+        if (CashEntryReferenceType::tryFrom((string) $entry->reference_type)?->isDoctorPayout() === true) {
             throw ValidationException::withMessages([
                 'reference_id' => __('financial_cash_flow.locked_by_doctor_payout'),
+            ]);
+        }
+    }
+
+    /**
+     * Receita avulsa com recebimento manual de repasse médico alocado
+     * (DoctorPayoutReceiptAllocationService): alterar valor/data/status ou
+     * excluir mudaria repasse já calculado ou liberado. A linha é travada
+     * (FOR UPDATE) antes da checagem — a mesma trava da alocação, então as
+     * duas operações se serializam. A correção é estornar as alocações na
+     * tela de Repasse médico.
+     *
+     * @throws ValidationException 422 com mensagem traduzida
+     */
+    private function assertNotAllocatedToDoctorPayout(FinancialCashEntry $entry): void
+    {
+        FinancialCashEntry::query()->whereKey($entry->id)->lockForUpdate()->first();
+
+        $allocated = DoctorPayoutReceiptAllocation::query()
+            ->where('cash_entry_id', $entry->id)
+            ->whereNull('reversed_at')
+            ->exists();
+
+        if ($allocated) {
+            throw ValidationException::withMessages([
+                'reference_id' => __('financial_cash_flow.locked_by_doctor_payout_allocation'),
             ]);
         }
     }

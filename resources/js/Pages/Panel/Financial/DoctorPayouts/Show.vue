@@ -15,15 +15,16 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
 /**
  * Financeiro › Repasse médico › Demonstrativo (clínica): o fechamento com
- * ajustes manuais (enquanto não pago), registro do pagamento e, só para
- * admin, estornar o pagamento ou reabrir (cancelar) o fechamento — ambos com
- * motivo (ConfirmationWithReasonModal; limites de reason_limits). O servidor
- * decide as permissões (`permissions`) e revalida tudo.
+ * ajustes manuais (enquanto nada foi pago), pagamentos (parciais ou o saldo),
+ * estorno de cada pagamento (admin ou financeiro) e, só para admin e sem
+ * pagamento válido, reabrir (cancelar) o fechamento — estorno e reabertura
+ * com motivo (ConfirmationWithReasonModal; limites de reason_limits). O
+ * servidor decide as permissões (`permissions`) e revalida tudo.
  */
 const props = defineProps({
     breadcrumbs:     { type: Array,  default: () => [] },
     tabs:            { type: Object, default: () => ({}) },
-    statement:       { type: Object, required: true },   // { payout, groups, adjustments }
+    statement:       { type: Object, required: true },   // { payout, groups, adjustments, payments }
     permissions:     { type: Object, default: () => ({}) },
     payment_methods: { type: Array,  default: () => [] },
     today:           { type: String, default: '' },
@@ -36,9 +37,11 @@ const props = defineProps({
 const { periodText } = useDoctorPayoutFormat(() => props.t);
 
 const payout      = computed(() => props.statement?.payout ?? {});
+const payments    = computed(() => props.statement?.payments ?? []);
 const can         = computed(() => props.permissions ?? {});
-const showPayment = computed(() => payout.value.status === 'paid' || !!can.value.can_pay);
-const adminOnly   = computed(() => !can.value.is_admin && ['closed', 'paid'].includes(payout.value.status));
+const showPayment = computed(() => payments.value.length > 0 || !!can.value.can_pay);
+// Reabrir é só de admin e só sem pagamento válido (fechamento "Fechado").
+const adminOnly   = computed(() => !can.value.is_admin && payout.value.status === 'closed');
 
 function firstMessage(errors) {
     const first = errors && typeof errors === 'object' ? Object.values(errors)[0] : null;
@@ -70,23 +73,32 @@ function removeAdjustment(adjustment) {
     });
 }
 
-// ── Estornar pagamento / reabrir: só admin, com motivo ──────────────────────
+// ── Estornar um pagamento (admin ou financeiro) / reabrir (admin), com motivo ──
 const REASON_ACTIONS = {
-    reverse: { route: 'reverse', permission: 'can_reverse', title: 'reverse_payment_title', message: 'reverse_payment_hint', confirm: 'reverse_payment' },
-    reopen:  { route: 'reopen',  permission: 'can_reopen',  title: 'reopen_title',          message: 'reopen_hint',          confirm: 'reopen' },
+    reverse: { permission: 'can_reverse', title: 'reverse_payment_title', message: 'reverse_payment_hint', confirm: 'reverse_payment' },
+    reopen:  { permission: 'can_reopen',  title: 'reopen_title',          message: 'reopen_hint',          confirm: 'reopen' },
 };
 
 const reasonAction = ref(null);
+const reasonTarget = ref(null);   // pagamento a estornar
 const reasonBusy   = ref(false);
 const reasonError  = ref('');
 
 const reasonConfig = computed(() => REASON_ACTIONS[reasonAction.value] ?? null);
 
-function askReason(action) {
+function reasonUrl() {
+    return reasonAction.value === 'reverse'
+        ? props.routes.payments_destroy.replace('__ID__', reasonTarget.value?.id ?? '')
+        : props.routes.reopen;
+}
+
+function askReason(action, target = null) {
     const config = REASON_ACTIONS[action];
     if (!config || !can.value[config.permission]) return;
+    if (action === 'reverse' && !target?.id) return;
 
     reasonError.value  = '';
+    reasonTarget.value = target;
     reasonAction.value = action;
 }
 
@@ -103,7 +115,7 @@ function confirmReason(reason) {
     reasonBusy.value  = true;
     reasonError.value = '';
 
-    router.delete(props.routes[config.route], {
+    router.delete(reasonUrl(), {
         data:           { reason },
         preserveScroll: true,
         onSuccess: (page) => {
@@ -174,22 +186,19 @@ function confirmReason(reason) {
                 <PaymentPanel
                     v-if="showPayment"
                     :payout="payout"
+                    :payments="payments"
                     :can-pay="!!can.can_pay"
+                    :can-reverse="!!can.can_reverse"
                     :payment-methods="payment_methods"
                     :today="today"
                     :pay-url="routes.pay"
                     :cash-flow-url="routes.cash_flow"
                     :t="t"
+                    @reverse="askReason('reverse', $event)"
                 />
 
-                <div v-if="can.can_reverse || can.can_reopen || adminOnly" class="card mb-0" data-test="admin-actions">
+                <div v-if="can.can_reopen || adminOnly" class="card mb-0" data-test="admin-actions">
                     <div class="card-body d-flex flex-wrap gap-4">
-                        <div v-if="can.can_reverse" class="show__admin-action">
-                            <button type="button" class="btn btn-outline-danger btn-sm" data-test="reverse-open" @click="askReason('reverse')">
-                                <i class="ti ti-arrow-back-up me-1" aria-hidden="true"></i>{{ t.reverse_payment }}
-                            </button>
-                            <p class="small text-muted mb-0 mt-2">{{ t.reverse_payment_hint }}</p>
-                        </div>
                         <div v-if="can.can_reopen" class="show__admin-action">
                             <button type="button" class="btn btn-outline-danger btn-sm" data-test="reopen-open" @click="askReason('reopen')">
                                 <i class="ti ti-lock-open me-1" aria-hidden="true"></i>{{ t.reopen }}

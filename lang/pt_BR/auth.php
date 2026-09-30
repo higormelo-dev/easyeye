@@ -51,9 +51,6 @@ return [
         'benefit_support_text'  => 'Nossa equipe acompanha você desde o primeiro acesso.',
         'benefit_lgpd_title'    => 'CFM & LGPD por padrão',
         'benefit_lgpd_text'     => 'Conformidade com as regulamentações do CFM, ANS e LGPD.',
-        'testimonial_text'      => 'O EasyEye transformou nossa clínica. O faturamento TISS que levava dias agora é feito em horas.',
-        'testimonial_name'      => 'Dr. Ricardo Mendes',
-        'testimonial_role'      => 'Oftalmologista — Clínica Visão SP',
 
         /* faixa mobile */
         'days_free'  => 'dias grátis',
@@ -86,6 +83,7 @@ return [
         'back'               => 'Voltar',
         'create_account'     => 'Criar conta',
         'start_trial'        => 'Iniciar período grátis',
+        'trial_unavailable'  => 'O cadastro para teste está indisponível no momento. Entre em contato com nossa equipe comercial.',
         'processing'         => 'Processando...',
         'already_registered' => 'Já tem uma conta?',
         'log_in'             => 'Fazer login',
@@ -94,9 +92,6 @@ return [
 
         /* campos adicionais */
         'phone' => 'Telefone',
-
-        /* métricas do painel esquerdo */
-        'metric_clinics' => 'clínicas',
 
         /* validações JS */
         'email_taken'        => 'Este e-mail já está cadastrado.',
@@ -159,9 +154,7 @@ return [
     'panel' => [
         'feature_schedule'   => 'Agenda inteligente com confirmação automática',
         'feature_record'     => 'Prontuário oftalmológico completo e digital',
-        'feature_tiss'       => 'Faturamento TISS 3.06 homologado ANS',
+        'feature_tiss'       => 'Faturamento TISS 3.06 integrado',
         'feature_compliance' => 'Compliance CFM & LGPD integrado',
-        'quote_text'         => 'O EasyEye transformou nossa clínica. O faturamento TISS que levava dias agora é feito em horas.',
-        'quote_author'       => 'Dr. Ricardo Mendes — Clínica Visão SP',
     ],
 ];

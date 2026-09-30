@@ -44,7 +44,7 @@ $shadow-lg:  0 12px 48px rgba($navy, .14);
 $font-sans: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
 
 @mixin type-display-hero {
-    font-size: clamp(#{rem(38)}, 5.2vw, #{rem(64)});
+    font-size: clamp(#{rem(38)}, #{rem(24)} + 3vw, #{rem(64)});
     font-weight: 900;
     line-height: 1.08;
     letter-spacing: -0.02em;
@@ -52,15 +52,15 @@ $font-sans: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
 
 // Todo h2 de seção (inclusive contato e CTA final).
 @mixin type-title-xl {
-    font-size: clamp(#{rem(28)}, 2.5vw + #{rem(20)}, #{rem(48)});
+    font-size: clamp(#{rem(28)}, #{rem(20)} + 2vw, #{rem(44)});
     font-weight: 800;
-    line-height: 1.1;
+    line-height: 1.16;
     letter-spacing: -0.015em;
 }
 
 // Título de painel dentro de uma seção.
 @mixin type-title-lg {
-    font-size: clamp(#{rem(20)}, 2.4vw, #{rem(26)});
+    font-size: clamp(#{rem(20)}, #{rem(16)} + 1vw, #{rem(24)});
     font-weight: 800;
     line-height: 1.25;
     letter-spacing: -0.015em;
@@ -76,15 +76,15 @@ $font-sans: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
 
 // Título de item (dor, diferencial, passo, contato).
 @mixin type-title-sm {
-    font-size: rem(17);
+    font-size: rem(18);
     font-weight: 700;
-    line-height: 1.3;
+    line-height: 1.35;
     letter-spacing: -0.01em;
 }
 
 @mixin type-lead      { font-size: rem(18); line-height: 1.6; }
 @mixin type-body      { font-size: rem(16); line-height: 1.65; }
-@mixin type-body-card { font-size: rem(15); line-height: 1.6; }
+@mixin type-body-card { font-size: rem(16); line-height: 1.6; }
 @mixin type-meta      { font-size: rem(14); line-height: 1.55; }
 @mixin type-micro     { font-size: rem(13); line-height: 1.5; }
 

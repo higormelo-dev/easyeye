@@ -3,10 +3,11 @@ import { computed, watch } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
 import MoneyInput     from '@/Components/Panel/MoneyInput.vue';
+import RuleSplitEditor from './RuleSplitEditor.vue';
 import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 import {
     ALL_TYPES, CALCULATIONS, PAYER_SCOPES, SERVICE_TYPES,
-    decodeItem, emptyRuleForm, encodeItem, itemKindsFor, itemOptionsFor, ruleToForm, rulePayload,
+    decodeItem, emptyRuleForm, encodeItem, itemKindsFor, itemOptionsFor, ruleAsTemplate, ruleToForm, rulePayload,
 } from './ruleForm.js';
 
 /**
@@ -17,11 +18,16 @@ import {
  * - "Aplicar a" lista só os itens do tipo de serviço escolhido; trocar o tipo
  *   limpa um item que não pertence mais a ele. Vai no máximo UM id de item.
  * - Percentual ou valor fixo conforme o cálculo; convênio só com pagador
- *   "Convênio". Erros do servidor aparecem em cada campo.
+ *   "Convênio" (inclui os sem registro ANS, em grupo próprio). Erros do
+ *   servidor aparecem em cada campo.
+ * - Editar: "corrigir" (vale para o que ainda não foi fechado) ou "nova
+ *   vigência a partir de" (a atual vale até a véspera).
+ * - `template` (duplicar): abre como NOVA regra com os campos de outra.
  */
 const props = defineProps({
-    open:    { type: Boolean, required: true },
-    rule:    { type: Object,  default: null },
+    open:     { type: Boolean, required: true },
+    rule:     { type: Object,  default: null },
+    template: { type: Object,  default: null },
     options: { type: Object,  default: () => ({}) },   // { doctors, visit_types, procedures, exam_types, covenants }
     routes:  { type: Object,  required: true },        // { store, update } — update com __ID__
     t:       { type: Object,  default: () => ({}) },
@@ -73,17 +79,37 @@ watch(() => form.service_type, () => {
     if (isAllTypes.value || !itemAvailable(form.item)) form.item = '';
 });
 
-/** Convênios "de verdade" (particular já é o pagador "Particular"); o da regra editada sempre aparece. */
-const covenants = computed(() => {
-    const list = (props.options.covenants ?? []).filter((covenant) => !covenant.particular || covenant.id === form.covenant_id);
+/**
+ * Convênios em dois grupos: com registro ANS e os da clínica sem registro
+ * (no faturamento são tratados como particular, mas a regra por convênio
+ * específico vale para eles). O global sem registro ("PARTICULAR") não entra:
+ * particular já é o pagador "Particular". O da regra editada sempre aparece.
+ */
+const covenantGroups = computed(() => {
+    const list = [...(props.options.covenants ?? [])];
     const rule = props.rule;
 
     if (rule?.covenant_id && !list.some((covenant) => covenant.id === rule.covenant_id)) {
-        return [{ id: rule.covenant_id, name: rule.covenant_name ?? rule.covenant_id }, ...list];
+        list.unshift({ id: rule.covenant_id, name: rule.covenant_name ?? rule.covenant_id, particular: false });
     }
 
-    return list;
+    return [
+        { key: 'with_ans', label: props.t.covenants_with_ans, options: list.filter((covenant) => !covenant.particular) },
+        {
+            key:     'without_ans',
+            label:   props.t.covenants_without_ans,
+            options: list.filter((covenant) => covenant.particular && (covenant.own || covenant.id === rule?.covenant_id)),
+        },
+    ].filter((group) => group.options.length > 0);
 });
+
+/** Dica do "Aplicar a": de onde vem a lista de procedimentos / como vale o tipo de exame. */
+const itemHint = computed(() => ({
+    procedure: props.t.form_item_hint_procedure,
+    exam:      props.t.form_item_hint_exam,
+}[form.service_type] ?? ''));
+
+const isNewVersion = computed(() => isEdit.value && form.change_mode === 'new');
 
 const itemError = computed(() => form.errors.visit_type_id || form.errors.procedure_id || form.errors.exam_type_id || '');
 
@@ -99,7 +125,9 @@ function describedBy(field, ...hints) {
 function resetForm() {
     form.reset();
     form.clearErrors();
-    Object.assign(form, props.rule ? ruleToForm(props.rule) : emptyRuleForm());
+
+    if (props.rule) Object.assign(form, ruleToForm(props.rule));
+    else Object.assign(form, props.template ? ruleAsTemplate(props.template) : emptyRuleForm());
 }
 
 watch(() => props.open, (isOpen) => { if (isOpen) resetForm(); });
@@ -169,13 +197,14 @@ function submit() {
                         class="form-select"
                         :class="{ 'is-invalid': itemError }"
                         :aria-invalid="itemError ? 'true' : undefined"
-                        :aria-describedby="itemError ? 'rule_item_error' : undefined"
+                        :aria-describedby="[itemHint ? 'rule_item_hint' : null, itemError ? 'rule_item_error' : null].filter(Boolean).join(' ') || undefined"
                     >
                         <option value="">{{ t.form_item_any }}</option>
                         <optgroup v-for="group in itemGroups" :key="group.kind" :label="group.label" :data-kind="group.kind">
                             <option v-for="option in group.options" :key="option.id" :value="encodeItem(group.kind, option.id)">{{ option.name }}</option>
                         </optgroup>
                     </select>
+                    <div v-if="itemHint" id="rule_item_hint" class="form-text" data-test="item-hint">{{ itemHint }}</div>
                     <div v-if="itemError" id="rule_item_error" class="invalid-feedback d-block">{{ itemError }}</div>
                 </div>
 
@@ -205,7 +234,9 @@ function submit() {
                         :aria-describedby="describedBy('covenant_id')"
                     >
                         <option value="">{{ t.form_covenant_any }}</option>
-                        <option v-for="covenant in covenants" :key="covenant.id" :value="covenant.id">{{ covenant.name }}</option>
+                        <optgroup v-for="group in covenantGroups" :key="group.key" :label="group.label" :data-group="group.key">
+                            <option v-for="covenant in group.options" :key="covenant.id" :value="covenant.id">{{ covenant.name }}</option>
+                        </optgroup>
                     </select>
                     <div v-if="err('covenant_id')" id="rule_covenant_id_error" class="invalid-feedback d-block">{{ err('covenant_id') }}</div>
                 </div>
@@ -259,12 +290,50 @@ function submit() {
                     <div v-if="err('fixed_amount')" id="rule_fixed_amount_error" class="invalid-feedback d-block">{{ err('fixed_amount') }}</div>
                 </div>
 
+                <RuleSplitEditor
+                    v-if="form.calculation === 'percentage'"
+                    v-model="form.participants"
+                    :group-percentage="form.percentage"
+                    :doctors="options.doctors ?? []"
+                    :errors="form.errors"
+                    :disabled="form.processing"
+                    :t="t"
+                />
+
+                <fieldset v-if="isEdit" class="col-12" data-test="change-mode">
+                    <legend class="form-label fs-6 mb-2">{{ t.form_change_mode }}</legend>
+                    <div class="form-check">
+                        <input id="rule_change_fix" v-model="form.change_mode" type="radio" class="form-check-input" name="rule_change_mode" value="fix" aria-describedby="rule_change_fix_hint">
+                        <label class="form-check-label" for="rule_change_fix">{{ t.form_change_fix }}</label>
+                        <div id="rule_change_fix_hint" class="form-text mt-0">{{ t.form_change_fix_hint }}</div>
+                    </div>
+                    <div class="form-check mt-2">
+                        <input id="rule_change_new" v-model="form.change_mode" type="radio" class="form-check-input" name="rule_change_mode" value="new" aria-describedby="rule_change_new_hint" data-test="change-new">
+                        <label class="form-check-label" for="rule_change_new">{{ t.form_change_new }}</label>
+                        <div id="rule_change_new_hint" class="form-text mt-0">{{ t.form_change_new_hint }}</div>
+                        <input
+                            v-if="isNewVersion"
+                            id="rule_effective_from"
+                            v-model="form.effective_from"
+                            type="date"
+                            class="form-control mt-2 rule-form__date"
+                            :class="{ 'is-invalid': err('effective_from') }"
+                            :aria-label="t.form_change_new"
+                            :aria-invalid="err('effective_from') ? 'true' : undefined"
+                            :aria-describedby="describedBy('effective_from')"
+                            data-test="effective-from"
+                        >
+                        <div v-if="err('effective_from')" id="rule_effective_from_error" class="invalid-feedback d-block">{{ err('effective_from') }}</div>
+                    </div>
+                </fieldset>
+
                 <div class="col-6">
                     <label class="form-label" for="rule_valid_from">{{ t.form_valid_from }}</label>
                     <input
                         id="rule_valid_from"
                         v-model="form.valid_from"
                         type="date"
+                        :disabled="isNewVersion"
                         class="form-control"
                         :class="{ 'is-invalid': err('valid_from') }"
                         :aria-invalid="err('valid_from') ? 'true' : undefined"
@@ -321,3 +390,9 @@ function submit() {
         </template>
     </OffcanvasPanel>
 </template>
+
+<style scoped>
+.rule-form__date {
+    max-width: 12rem;
+}
+</style>

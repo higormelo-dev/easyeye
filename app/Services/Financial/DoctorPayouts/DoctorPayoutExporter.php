@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Financial\DoctorPayouts;
 
+use App\Models\DoctorPayout;
 use App\Services\Audit\AuditLogger;
 use App\Support\Export\SpreadsheetWriter;
 use Illuminate\Http\{Request, Response};
@@ -68,6 +69,30 @@ final class DoctorPayoutExporter
             auditableId: $entityId,
             reason: 'Exportação de repasse médico.',
             newValues: ['report' => $report, 'format' => $format, 'rows' => $rows] + $context,
+            request: $request,
+        );
+    }
+
+    /**
+     * Abertura do demonstrativo na tela (clínica ou "Meus repasses"): traz
+     * nome e procedimento de pacientes — a leitura fica na trilha, como o PDF
+     * e a planilha (sem dados do paciente no registro).
+     */
+    public function auditView(Request $request, string $entityId, DoctorPayout $payout, bool $forDoctor): void
+    {
+        $this->auditLogger->recordAdminAction(
+            event: 'financial.report.view',
+            targetEntityId: $entityId,
+            targetUserId: null,
+            auditableType: 'doctor_payout',
+            auditableId: (string) $payout->id,
+            reason: 'Visualização de demonstrativo de repasse médico.',
+            newValues: [
+                'report'      => 'doctor_payout_statement',
+                'code'        => $payout->code,
+                'items_count' => (int) $payout->items_count,
+                'viewer'      => $forDoctor ? 'doctor' : 'clinic',
+            ],
             request: $request,
         );
     }

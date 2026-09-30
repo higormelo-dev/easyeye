@@ -59,8 +59,9 @@ const options = {
     procedures: [{ id: 'pr1', code: '30310016', name: 'Facectomia' }],
     exam_types: [{ id: 'ex1', name: 'OCT' }],
     covenants: [
-        { id: 'c1', name: 'Unimed', particular: false },
-        { id: 'c0', name: 'PARTICULAR', particular: true },
+        { id: 'c1', name: 'Unimed', particular: false, own: false },
+        { id: 'c0', name: 'PARTICULAR', particular: true, own: false },
+        { id: 'c2', name: 'Convênio Prefeitura', particular: true, own: true },
     ],
 };
 
@@ -183,6 +184,7 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
             valid_until: null,
             active: true,
             notes: null,
+            participants: [],
         });
         expect(sent.data).not.toHaveProperty('item');
     });
@@ -209,13 +211,15 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
         expect([data.visit_type_id, data.procedure_id, data.exam_type_id]).toEqual([null, null, null]);
     });
 
-    it('convênio específico só com pagador "Convênio", sem os convênios particulares', async () => {
+    it('convênio específico só com pagador "Convênio"; convênio da clínica sem ANS em grupo próprio; "PARTICULAR" global fora', async () => {
         const w = await mountModal();
 
         expect(w.find('#rule_covenant_id').exists()).toBe(false);
 
         await w.find('#rule_payer_scope').setValue('covenant');
-        expect(w.findAll('#rule_covenant_id option').map((o) => o.text())).toEqual(['Any insurance', 'Unimed']);
+        expect(w.findAll('#rule_covenant_id option').map((o) => o.text())).toEqual(['Any insurance', 'Unimed', 'Convênio Prefeitura']);
+        expect(w.find('#rule_covenant_id optgroup[data-group="without_ans"]').attributes('label')).toBe('No ANS registry (treated as private in billing)');
+        expect(w.find('#rule_covenant_id optgroup[data-group="without_ans"]').text()).toContain('Convênio Prefeitura');
 
         await w.find('#rule_covenant_id').setValue('c1');
         await w.find('#rule_payer_scope').setValue('particular');
@@ -279,5 +283,141 @@ describe('Financial/DoctorPayouts/RuleFormModal', () => {
         await submit(w);
 
         expect(w.emitted('close')).toHaveLength(1);
+    });
+
+    it('divisão (E4): regra percentual mostra quanto fica com a clínica e monta os participantes', async () => {
+        const w = await mountModal();
+
+        await w.find('#rule_percentage').setValue('60');
+        expect(w.find('[data-test="split-clinic"]').text()).toBe('The clinic keeps 40%.');
+        expect(w.find('[data-test="split-sum"]').exists()).toBe(false);
+
+        // 1º participante = executor; o 2º já nasce como médico fixo.
+        await w.find('[data-test="split-add"]').trigger('click');
+        await w.find('[data-test="split-add"]').trigger('click');
+        const rows = w.findAll('[data-test="split-row"]');
+        expect(rows.map((row) => row.find('[data-test="split-role"]').element.value)).toEqual(['executor', 'doctor']);
+        expect(rows[0].find('[data-test="split-doctor"]').exists()).toBe(false);
+
+        await rows[0].find('[data-test="split-percentage"]').setValue('40');
+        await w.findAll('[data-test="split-row"]')[1].find('[data-test="split-doctor"]').setValue('d1');
+        await w.findAll('[data-test="split-row"]')[1].find('[data-test="split-percentage"]').setValue('50');
+
+        const sum = w.find('[data-test="split-sum"]');
+        expect(sum.text()).toBe('Total: 90% (must be 100%)');
+        expect(sum.classes()).toContain('text-danger');
+
+        await w.findAll('[data-test="split-row"]')[1].find('[data-test="split-percentage"]').setValue('60');
+        expect(w.find('[data-test="split-sum"]').classes()).toContain('text-success');
+
+        const { data } = await submit(w);
+        expect(data.participants).toEqual([
+            { role: 'executor', doctor_id: null, percentage: '40' },
+            { role: 'doctor', doctor_id: 'd1', percentage: '60' },
+        ]);
+    });
+
+    it('divisão (E4): remover participante e regra de valor fixo não leva participantes', async () => {
+        const w = await mountModal();
+
+        await w.find('[data-test="split-add"]').trigger('click');
+        await w.find('[data-test="split-add"]').trigger('click');
+        await w.findAll('[data-test="split-remove"]')[0].trigger('click');
+        expect(w.findAll('[data-test="split-row"]').map((row) => row.find('[data-test="split-role"]').element.value)).toEqual(['doctor']);
+
+        await w.find('[data-test="calculation-fixed"]').setValue(true);
+        expect(w.find('[data-test="split-editor"]').exists()).toBe(false);
+
+        const { data } = await submit(w);
+        expect(data.participants).toEqual([]);
+    });
+
+    it('divisão (E4): editar carrega os participantes e mostra os erros do servidor por linha', async () => {
+        const w = await mountModal({
+            rule: {
+                ...editRule,
+                calculation: 'percentage',
+                percentage: 60,
+                fixed_amount: null,
+                participants: [
+                    { role: 'doctor', doctor_id: 'd1', percentage: 60 },
+                    { role: 'executor', doctor_id: null, percentage: 40 },
+                ],
+            },
+        });
+
+        const rows = w.findAll('[data-test="split-row"]');
+        expect(rows).toHaveLength(2);
+        expect(rows[0].find('[data-test="split-doctor"]').element.value).toBe('d1');
+        expect(w.find('[data-test="split-sum"]').text()).toBe('Total: 100% (must be 100%)');
+
+        form().errors = {
+            participants: 'The shares must add up to 100%.',
+            'participants.0.doctor_id': 'The doctor is invalid.',
+        };
+        await nextTick();
+
+        expect(w.find('[data-test="split-error"]').text()).toBe('The shares must add up to 100%.');
+        expect(w.findAll('[data-test="split-row"]')[0].find('[data-test="split-doctor"]').attributes('aria-invalid')).toBe('true');
+        expect(w.findAll('[data-test="split-row"]')[0].text()).toContain('The doctor is invalid.');
+
+        const { data } = await submit(w);
+        expect(data.participants).toEqual([
+            { role: 'doctor', doctor_id: 'd1', percentage: 60 },
+            { role: 'executor', doctor_id: null, percentage: 40 },
+        ]);
+    });
+
+    it('editar: "corrigir" (padrão) não cria vigência; "nova vigência a partir de" envia a data e trava o início', async () => {
+        const w = await mountModal({ rule: editRule });
+
+        expect(w.find('[data-test="change-mode"]').text()).toContain('When the change applies');
+        expect(w.find('#rule_change_fix').element.checked).toBe(true);
+        expect((await submit(w)).data).not.toHaveProperty('effective_from');
+
+        await w.find('#rule_change_new').setValue(true);
+        expect(w.find('#rule_valid_from').attributes('disabled')).toBeDefined();
+        await w.find('[data-test="effective-from"]').setValue('2026-10-01');
+
+        const sent = await submit(w);
+        expect(sent.method).toBe('put');
+        expect(sent.data.effective_from).toBe('2026-10-01');
+        expect(sent.data.change_mode).toBe('new'); // o servidor exige a data nesse modo
+
+        // Data apagada: vai o modo com a data nula (o servidor recusa; não vira correção).
+        await w.find('[data-test="effective-from"]').setValue('');
+        expect((await submit(w)).data).toEqual(expect.objectContaining({ change_mode: 'new', effective_from: null }));
+    });
+
+    it('criar não oferece "nova vigência"', async () => {
+        const w = await mountModal();
+
+        expect(w.find('[data-test="change-mode"]').exists()).toBe(false);
+        expect((await submit(w)).data).not.toHaveProperty('effective_from');
+    });
+
+    it('duplicar: abre como NOVA regra com os campos da outra, sem vigência, e envia POST', async () => {
+        const w = await mountModal({ template: editRule });
+
+        expect(w.find('header').text()).toBe('New rule');
+        expect(w.find('#rule_item').element.value).toBe('procedure:pr1');
+        expect(w.find('#rule_valid_from').element.value).toBe('');
+
+        const sent = await submit(w);
+        expect(sent.method).toBe('post');
+        expect(sent.data).toEqual(expect.objectContaining({ procedure_id: 'pr1', calculation: 'fixed', fixed_amount: 80, valid_from: null }));
+    });
+
+    it('"Aplicar a" explica de onde vem a lista (procedimentos) e como vale o tipo de exame', async () => {
+        const w = await mountModal();
+
+        expect(w.find('[data-test="item-hint"]').exists()).toBe(false); // consulta
+
+        await w.find('#rule_service_type').setValue('procedure');
+        expect(w.find('[data-test="item-hint"]').text()).toBe('List of procedures.');
+        expect(w.find('#rule_item').attributes('aria-describedby')).toContain('rule_item_hint');
+
+        await w.find('#rule_service_type').setValue('exam');
+        expect(w.find('[data-test="item-hint"]').text()).toBe('Exam type applies to the equipment exam.');
     });
 });

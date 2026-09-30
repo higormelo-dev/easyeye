@@ -93,6 +93,10 @@ return [
     'lock_doctor_payout'      => 'Repasse médico',
     'lock_doctor_payout_hint' => 'Despesa gerada automaticamente ao registrar o pagamento de um repasse médico. Para corrigir, estorne o pagamento em Financeiro › Repasse médico.',
 
+    'lock_doctor_payout_allocation'      => 'Alocada em repasse',
+    'lock_doctor_payout_allocation_hint' => 'Parte desta receita foi alocada como recebimento de repasse médico. Para alterar ou excluir, estorne as alocações em Financeiro › Repasse médico.',
+    'locked_by_doctor_payout_allocation' => 'Esta receita tem recebimento de repasse médico alocado e não pode ser alterada nem excluída. Estorne as alocações em Financeiro › Repasse médico.',
+
     'types' => [
         'income'  => 'Receita',
         'expense' => 'Despesa',

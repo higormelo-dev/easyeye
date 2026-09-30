@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\TermVersion;
-use App\Support\Site\SiteLinks;
+use App\Support\Site\{SiteContent, SiteLinks};
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Inertia\{Inertia, Response};
 
 /**
@@ -58,12 +59,8 @@ class SiteLegalController extends Controller
                 'originalUrl'    => url()->current() . '?original=1',
                 'translationUrl' => url()->current(),
             ] : null,
-            'appName' => config('app.name', 'EasyEye'),
-            't'       => [
-                'nav'    => trans('site.nav'),
-                'footer' => trans('site.footer'),
-                'legal'  => trans('site.legal'),
-            ],
+            'appName'      => config('app.name', 'EasyEye'),
+            't'            => Arr::only(SiteContent::translations(), ['nav', 'footer', 'legal']),
             'routes'       => SiteLinks::routes(),
             'contact'      => SiteLinks::contact(),
             'canonicalUrl' => url()->current(),

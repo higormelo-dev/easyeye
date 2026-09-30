@@ -5,16 +5,14 @@ import { Link } from '@inertiajs/vue3';
 const props = defineProps({
     stats:        { type: Object,  required: true },
     isDoctor:     { type: Boolean, default: false },
-    rule:         { type: String,  default: '' },
+    // Telas que o usuário pode abrir (PanelDashboardController::buildAccess —
+    // mesmas regras das rotas): sem acesso, o card não vira link para um 403.
+    access:       { type: Object,  default: () => ({}) },
     isRefreshing: { type: Boolean, default: false },
     t:            { type: Object,  required: true },
 });
 
-// ── Atalhos: indicador → lista relacionada ───────────────────────────────────
-// `today` aponta pra agenda (panel.schedules.index), rota restrita a
-// admin/doctor/secretary — 'financial' não tem acesso, então fica sem link
-// (evita atalho que estoura 403 via EnsureEntityRole).
-const canOpenSchedule = computed(() => props.rule !== 'financial');
+// ── Atalhos: indicador → lista relacionada (só com acesso à tela) ───────────
 
 const row1 = computed(() => [
     {
@@ -23,7 +21,7 @@ const row1 = computed(() => [
         value:   props.stats.total_patients,
         label:   props.t.kpi_patients,
         variant: 'patients',
-        url:     route('panel.patients.index'),
+        url:     props.access.patients ? route('panel.patients.index') : null,
     },
     {
         key:     'today',
@@ -31,7 +29,7 @@ const row1 = computed(() => [
         value:   props.stats.today_count,
         label:   props.t.kpi_today,
         variant: 'today',
-        url:     canOpenSchedule.value ? route('panel.schedules.index') : null,
+        url:     props.access.schedules ? route('panel.schedules.index') : null,
     },
     {
         key:     'doctors',
@@ -39,7 +37,7 @@ const row1 = computed(() => [
         value:   props.stats.total_doctors,
         label:   props.t.kpi_doctors,
         variant: 'doctors',
-        url:     route('panel.doctors.index'),
+        url:     props.access.doctors ? route('panel.doctors.index') : null,
     },
     {
         key:     'surgeries',
@@ -97,8 +95,8 @@ const row2 = computed(() => {
 </script>
 
 <template>
-    <!-- Row 1 -->
-    <div class="row g-3 mb-3">
+    <!-- Row 1 (data-tour: âncora do tour guiado) -->
+    <div class="row g-3 mb-3" data-tour="dashboard-kpis">
         <div v-for="kpi in row1" :key="kpi.key" class="col-6 col-md-3">
             <component
                 :is="kpi.url ? Link : 'div'"
@@ -134,7 +132,7 @@ const row2 = computed(() => {
     </div>
 
     <!-- Row 2 -->
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4" data-tour="dashboard-kpis-soon">
         <div v-for="kpi in row2" :key="kpi.key" class="col-6 col-md-3">
             <div :class="['card stat-card h-100', `stat-card--${kpi.variant}`, kpi.soon ? 'stat-card-mock' : '']">
                 <div class="card-body d-flex align-items-center gap-3 p-3">

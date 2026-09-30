@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\{ClientRule, FeatureKey, Permission, ScheduleSituation};
+use App\Enums\{ClientRule, EntityGate, FeatureKey, Permission, ScheduleSituation};
 use App\Models\{Doctor, Entity, EntityProduct, Patient, Schedule};
 use App\Services\{ActivationService, FeatureGateService};
 use App\Support\BrazilianFormat;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\{Inertia, Response};
 
 class PanelDashboardController extends Controller
@@ -37,8 +38,43 @@ class PanelDashboardController extends Controller
             // E feature has_inventory_module) — se o menu Estoque não
             // aparece pro usuário, o card também não aparece.
             'stockAlerts' => fn () => $this->buildStockAlerts($entityId),
-            't'           => trans('dashboard'),
+            // Quais atalhos do Dashboard levam a telas que o usuário pode abrir
+            // — mesmas regras do middleware das rotas; antes os botões
+            // apareciam para todos e alguns perfis caíam num 403.
+            'access' => fn () => $this->buildAccess($entityId),
+            't'      => trans('dashboard'),
         ]);
+    }
+
+    /**
+     * Espelha o middleware de cada rota de destino:
+     *  - agenda: entity.role:admin,doctor,secretary;
+     *  - pacientes: permission:patients.manage,admin,financial,doctor,secretary;
+     *  - médicos: permission:patients.manage,admin,financial,secretary;
+     *  - financeiro (caixa e faturamento TISS): a rota aceita
+     *    permission:financial.manage, mas os controllers ainda exigem o Gate
+     *    ViewFinancial (perfil fixo admin/financeiro) — vale a regra efetiva.
+     *
+     * @return array{schedules: bool, patients: bool, doctors: bool, financial: bool}
+     */
+    private function buildAccess(string $entityId): array
+    {
+        $user   = auth()->user();
+        $entity = Entity::find($entityId);
+
+        if (! $user || ! $entity) {
+            return ['schedules' => false, 'patients' => false, 'doctors' => false, 'financial' => false];
+        }
+
+        $can = fn (Permission $permission, array $roles): bool => $user->hasPermissionInEntity($entity, $permission)
+            || $user->hasAnyRoleInEntity($entity, $roles);
+
+        return [
+            'schedules' => $user->hasAnyRoleInEntity($entity, [ClientRule::Admin, ClientRule::Doctor, ClientRule::Secretary]),
+            'patients'  => $can(Permission::PatientsManage, [ClientRule::Admin, ClientRule::Financial, ClientRule::Doctor, ClientRule::Secretary]),
+            'doctors'   => $can(Permission::PatientsManage, [ClientRule::Admin, ClientRule::Financial, ClientRule::Secretary]),
+            'financial' => Gate::forUser($user)->allows(EntityGate::ViewFinancial->value, $entity),
+        ];
     }
 
     private function buildStockAlerts(string $entityId): ?array
@@ -69,8 +105,11 @@ class PanelDashboardController extends Controller
         return [
             'below_minimum_count' => $belowMinimumCount,
             'expiring_lots_count' => $expiringLotsCount,
-            'products_url'        => route('panel.stock.products.index', ['low_stock' => 1]),
-            'expiring_url'        => route('panel.stock.products.index', ['expiring_lots' => 1]),
+            // "Ver estoque" do cabeçalho: lista sem filtro (o alerta pode ser
+            // só de validade); cada linha do card leva ao filtro dela.
+            'list_url'     => route('panel.stock.products.index'),
+            'products_url' => route('panel.stock.products.index', ['low_stock' => 1]),
+            'expiring_url' => route('panel.stock.products.index', ['expiring_lots' => 1]),
         ];
     }
 
@@ -118,7 +157,9 @@ class PanelDashboardController extends Controller
                 'code'    => $p->code,
                 'initial' => mb_strtoupper(mb_substr($p->person?->full_name ?? '?', 0, 1)),
                 'color'   => '#' . substr(md5($p->person?->full_name ?? '?'), 0, 6),
-                'url'     => route('panel.patients.show', $p),
+                // Abre o cadastro na lista (deep-link ?open=, como a Agenda);
+                // panel.patients.show fora de JSON só redireciona para a lista.
+                'url' => route('panel.patients.index', ['open' => $p->id]),
             ])
             ->values()
             ->toArray();

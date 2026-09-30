@@ -9,8 +9,9 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Registrar o pagamento de um fechamento de repasse. O valor é sempre o total
- * líquido do fechamento (itens + ajustes) — não vem do cliente.
+ * Registrar um pagamento (parcial ou o saldo) de um fechamento de repasse.
+ * O serviço confere, sob lock, 0 < valor ≤ saldo e que o "já pago" visto na
+ * tela (expected_paid_cents) não mudou — duplo envio vira 422.
  */
 class PayDoctorPayoutRequest extends FormRequest
 {
@@ -22,18 +23,36 @@ class PayDoctorPayoutRequest extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $amount = $this->input('amount');
+
+        if (is_string($amount)) {
+            $amount = trim(str_replace(['R$', ' ', "\u{00A0}"], '', $amount));
+
+            if (str_contains($amount, ',')) {
+                $amount = str_replace(',', '.', str_replace('.', '', $amount));
+            }
+
+            $this->merge(['amount' => $amount === '' ? null : $amount]);
+        }
+    }
+
     public function rules(): array
     {
         return [
-            'paid_at'        => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
-            'payment_method' => ['required', 'string', Rule::in(self::METHODS)],
-            'payment_notes'  => ['nullable', 'string', 'max:1000'],
+            'amount'              => ['required', 'numeric', 'min:0', 'max:' . DoctorPayoutRuleRequest::MONEY_MAX, 'decimal:0,2'],
+            'expected_paid_cents' => ['required', 'integer', 'min:0'],
+            'paid_at'             => ['required', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'payment_method'      => ['required', 'string', Rule::in(self::METHODS)],
+            'payment_notes'       => ['nullable', 'string', 'max:1000'],
         ];
     }
 
     public function attributes(): array
     {
         return [
+            'amount'         => __('financial_doctor_payouts.validation.amount'),
             'paid_at'        => __('financial_doctor_payouts.validation.paid_at'),
             'payment_method' => __('financial_doctor_payouts.validation.payment_method'),
             'payment_notes'  => __('financial_doctor_payouts.validation.notes'),

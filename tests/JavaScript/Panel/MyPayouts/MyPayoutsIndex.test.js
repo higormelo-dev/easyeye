@@ -72,6 +72,16 @@ describe('MyPayouts/Index', () => {
         expect(paid.find('[data-test="my-pdf"]').attributes('aria-label')).toBe('Download PDF: RM-000001');
     });
 
+    it('pago em parte: quanto já recebeu do total', () => {
+        const w = mountPage({
+            payouts: paginator([{ ...PAYOUTS[0], status: 'partially_paid', paid_at: '2026-09-05', paid_amount: 1000 }]),
+        });
+
+        const status = w.find('[data-test="my-row"] [data-test="my-status"]');
+        expect(status.text()).toBe(`Partly paid: ${brl(1000)} of ${brl(2520)}`);
+        expect(status.classes()).toContain('badge-soft-primary');
+    });
+
     it('celular: os mesmos fechamentos em cards', () => {
         const w = mountPage();
 
@@ -87,5 +97,20 @@ describe('MyPayouts/Index', () => {
         expect(w.find('[data-test="my-empty"]').text()).toBe('No payout closed yet.');
         expect(w.find('[data-test="my-row"]').exists()).toBe(false);
         expect(w.find('[data-test="my-card"]').exists()).toBe(false);
+    });
+
+    it('coluna "Produção" com o que ela é (recebido no regime atual) e o singular de 1 ato', () => {
+        const w = mountPage({
+            payouts: paginator([
+                { ...PAYOUTS[0], basis: 'receipt' },
+                { ...PAYOUTS[1], basis: 'production' },
+            ]),
+        });
+
+        expect(w.find('thead').text()).toContain('Production');
+        const [receipt, production] = w.findAll('[data-test="my-production-hint"]');
+        expect(receipt.text()).toBe('Received (installments base) · 14 acts in the period');
+        expect(production.text()).toBe('Charged amount (production) · 1 act in the period');
+        expect(w.find('[data-test="my-card-production"]').text()).toContain('Production:');
     });
 });

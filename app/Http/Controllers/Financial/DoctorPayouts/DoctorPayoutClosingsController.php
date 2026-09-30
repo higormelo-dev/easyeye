@@ -111,10 +111,12 @@ class DoctorPayoutClosingsController extends Controller
         return redirect()->to($url)->with('message', $message);
     }
 
-    public function show(DoctorPayout $payout): InertiaResponse
+    public function show(Request $request, DoctorPayout $payout): InertiaResponse
     {
         $entity = $this->authorizeFinancial();
         $this->assertBelongsToEntity($payout, $entity);
+
+        $this->exporter->auditView($request, (string) $entity->id, $payout, forDoctor: false);
 
         $isAdmin = $this->isEntityAdmin($entity);
 
@@ -123,9 +125,10 @@ class DoctorPayoutClosingsController extends Controller
             'tabs'        => $this->payoutTabs(),
             'statement'   => $this->presenter->statement($payout),
             'permissions' => [
-                'can_adjust'  => $payout->isClosed(),
-                'can_pay'     => $payout->isClosed(),
-                'can_reverse' => $payout->isPaid() && $isAdmin,
+                'can_adjust' => $payout->isClosed(),
+                'can_pay'    => $payout->status->acceptsPayment(),
+                // Estornar pagamento: admin ou financeiro (decisão de 2026-09-29).
+                'can_reverse' => $payout->status->hasPayments(),
                 'can_reopen'  => $payout->isClosed() && $isAdmin,
                 'is_admin'    => $isAdmin,
             ],
@@ -151,15 +154,13 @@ class DoctorPayoutClosingsController extends Controller
                 ]),
                 'pdf'                 => route('panel.financial.doctor-payouts.closings.pdf', $payout),
                 'export'              => route('panel.financial.doctor-payouts.closings.export', $payout),
-                'pay'                 => route('panel.financial.doctor-payouts.closings.payment.store', $payout),
-                'reverse'             => route('panel.financial.doctor-payouts.closings.payment.destroy', $payout),
+                'pay'                 => route('panel.financial.doctor-payouts.closings.payments.store', $payout),
+                'payments_destroy'    => route('panel.financial.doctor-payouts.closings.payments.destroy', [$payout, '__ID__']),
                 'reopen'              => route('panel.financial.doctor-payouts.closings.destroy', $payout),
                 'adjustments_store'   => route('panel.financial.doctor-payouts.closings.adjustments.store', $payout),
                 'adjustments_destroy' => route('panel.financial.doctor-payouts.closings.adjustments.destroy', [$payout, '__ID__']),
-                'cash_flow'           => $payout->cash_entry_id === null ? null : route('panel.financial.cash-flow.index', [
-                    'from' => $payout->paid_at?->toDateString(),
-                    'to'   => $payout->paid_at?->toDateString(),
-                ]),
+                // Base do atalho para a despesa de cada pagamento (?from=&to= na tela).
+                'cash_flow' => route('panel.financial.cash-flow.index'),
             ],
             't'      => trans('financial_doctor_payouts'),
             'shared' => trans('financial_shared'),

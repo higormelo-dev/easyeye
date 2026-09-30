@@ -60,6 +60,10 @@ class UserPreference extends Model
         $pref->data = array_merge($pref->data ?? [], $partial);
         $pref->save();
 
+        // Relação já carregada no User (ex.: lida antes, ainda sem linha)
+        // ficaria desatualizada para o resto da request.
+        $user->setRelation('preference', $pref);
+
         return $pref;
     }
 }

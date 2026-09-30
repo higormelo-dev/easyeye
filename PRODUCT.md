@@ -14,7 +14,7 @@ Três públicos decidem juntos a assinatura, com o mesmo peso (confirmado em 202
 - **Oftalmologista**: usa prontuário, laudos, exames e imagens durante a consulta; influencia a escolha.
 - **Gestão administrativa e financeira**: recepção, agenda, faturamento de convênio (TISS), glosas e caixa.
 
-Perfis dentro do produto: admin, financeiro, médico, secretária e usuário comum (clínica); parceiro comercial (portal de leads e comissões); integradores externos (API com token).
+Perfis dentro do produto: admin, financeiro, médico, secretária e usuário comum (clínica); parceiro comercial (portal de leads e comissões).
 
 ## Product Purpose
 
@@ -34,7 +34,7 @@ Quatro diferenciais confirmados, que um sistema genérico não afirma com verdad
 ## Operating Context
 
 - Rotina de recepção, consultório e faturamento; vários médicos, salas e equipamentos; atendimento por convênio (TISS) e particular.
-- Exames chegam dos aparelhos pelo integrador desktop local e pela API de integradores.
+- Exames dos aparelhos são enviados ao EasyEye pelo integrador instalado na própria clínica.
 - Uma conta pode operar várias unidades com um único login (multi-clínica).
 - Idiomas: português do Brasil (principal) e inglês.
 - Planos e preços vêm do banco (Básico, Pro, Premium na data deste registro); dias de teste grátis definidos por plano.
@@ -42,10 +42,11 @@ Quatro diferenciais confirmados, que um sistema genérico não afirma com verdad
 ## Capabilities and Constraints
 
 - Isolamento por clínica (tenant); autorização por perfil; dados de paciente nunca em logs, formulários de marketing ou materiais públicos.
+- A API é fechada e de uso exclusivo do integrador instalado na própria clínica.
 - Todo texto de interface vem dos arquivos de tradução (`lang/{pt_BR,en}`); a copy da landing fica em `lang/{pt_BR,en}/site.php`.
 - Assistente de IA existe como apoio (créditos por plano), com conduta final sempre do médico; nunca apresentado como substituto do julgamento clínico.
 - Programa de optotipos ainda não existe no produto: só aparece marcado como "Em breve", apenas no card do plano Premium, e nunca como já incluído.
-- Módulo de estoque está incluído em todos os planos; não é exclusividade do Premium.
+- Módulo de estoque depende de `has_inventory_module` no plano contratado. O catálogo inicial habilita Pro e Premium e desabilita Básico; a landing deve refletir os planos ativos do banco, sem alterar essa regra de acesso.
 - Stack atual: Laravel 12 (PHP 8.4), Vue 3 com Inertia, PostgreSQL; a landing tem renderização no servidor (SSR).
 
 ## Brand Commitments
@@ -55,14 +56,16 @@ Quatro diferenciais confirmados, que um sistema genérico não afirma com verdad
 
 ## Evidence on Hand
 
-Confirmado como real e verificável pelo responsável em 2026-09-27 (textos em `lang/{pt_BR,en}/site.php`):
+Atualizado pelo responsável em 2026-09-30: o EasyEye está em pré-lançamento e ainda não tem clínicas contratadas. Esta informação substitui o registro anterior que tratava os números e depoimentos da landing como verificados.
 
-- Métricas: 500+ clínicas ativas, 50k+ consultas por mês, 99,9% de uptime, 97% de satisfação; R$ 0 de taxa de implantação.
-- Depoimentos nominais: Dr. Ricardo Mendes (oftalmologista, Clínica Visão SP), Dra. Ana Carvalho (diretora, Instituto Ocular BH), Paulo Souza (gestor, Rede OftalmoClin RJ), Dra. Mariana Costa (Clínica Visão SP).
-- TISS 3.06 homologado pela ANS.
-- Capturas reais do produto: `public/site/images/how-it-works.png` e `demo-{agenda,imagens,laudos,prontuario}.png`.
+- Não há métricas de adoção, volume de consultas, disponibilidade ou satisfação verificadas para publicação, nem depoimentos reais autorizados.
+- O responsável informou que o EasyEye ainda não possui homologação para TISS. A comunicação deve descrever a integração existente, sem afirmar homologação, certificação ou conformidade TISS validada.
+- Os números e relatos fictícios foram removidos de `lang/{pt_BR,en}/site.php`. A estrutura visual dos indicadores e depoimentos foi preservada para uso futuro, mas permanece oculta por `site.social_proof_enabled = false`.
+- Para publicar essas seções, preencher os dois idiomas com dados reais, registrar fonte e período de medição dos indicadores e obter autorização para os depoimentos antes de habilitar a configuração.
+- A ausência de taxa de implantação é uma condição comercial apresentada nos planos, não uma evidência de adoção ou resultado de clientes.
+- Capturas reais do produto: `public/site/images/how-it-works.webp` e `demo-{agenda,imagens,laudos,prontuario}.webp`.
 
-Ausências: não há estudos de caso nem imprensa registrados. Qualquer número, depoimento ou selo novo precisa de fonte antes de ir para a landing.
+Ausências: não há estudos de caso nem imprensa registrados. Qualquer número, depoimento ou selo precisa de fonte antes de ir para a landing.
 
 ## Product Principles
 

@@ -6,7 +6,7 @@ namespace App\Models;
 
 use App\Casts\PaymentMethodCast;
 use App\Concerns\HasEntityCode;
-use App\Enums\DoctorPayout\DoctorPayoutStatus;
+use App\Enums\DoctorPayout\{DoctorPayoutBasis, DoctorPayoutStatus};
 use App\Models\Concerns\BelongsToEntity;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -42,6 +42,7 @@ class DoctorPayout extends Model
         'period_start',
         'period_end',
         'status',
+        'basis',
         'items_count',
         'gross_amount',
         'items_amount',
@@ -70,6 +71,7 @@ class DoctorPayout extends Model
      */
     protected $attributes = [
         'status'             => 'closed',
+        'basis'              => 'production',
         'items_count'        => 0,
         'gross_amount'       => 0,
         'items_amount'       => 0,
@@ -81,6 +83,7 @@ class DoctorPayout extends Model
     {
         return [
             'status'              => DoctorPayoutStatus::class,
+            'basis'               => DoctorPayoutBasis::class,
             'period_start'        => 'date',
             'period_end'          => 'date',
             'items_count'         => 'integer',
@@ -138,6 +141,12 @@ class DoctorPayout extends Model
         return $this->hasMany(DoctorPayoutAdjustment::class);
     }
 
+    /** Pagamentos (parciais ou total), inclusive os estornados, na ordem em que foram feitos. */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(DoctorPayoutPayment::class)->orderBy('paid_at')->orderBy('created_at');
+    }
+
     public function cashEntry(): BelongsTo
     {
         return $this->belongsTo(FinancialCashEntry::class, 'cash_entry_id');
@@ -171,6 +180,11 @@ class DoctorPayout extends Model
     public function isPaid(): bool
     {
         return $this->status === DoctorPayoutStatus::Paid;
+    }
+
+    public function isPartiallyPaid(): bool
+    {
+        return $this->status === DoctorPayoutStatus::PartiallyPaid;
     }
 
     public function isCancelled(): bool

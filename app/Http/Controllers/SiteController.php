@@ -6,8 +6,8 @@ use App\Enums\FeatureKey;
 use App\Http\Middleware\SetLocale;
 use App\Http\Requests\SiteContactRequest;
 use App\Mail\SiteContactMessage;
-use App\Models\Plan;
-use App\Support\Site\SiteLinks;
+use App\Models\{Plan, SubscriptionSetting};
+use App\Support\Site\{SiteContent, SiteLinks};
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\{Log, Mail};
 use Inertia\{Inertia, Response};
@@ -18,7 +18,8 @@ class SiteController extends Controller
 {
     public function index(): Response
     {
-        $plans = Plan::active()
+        $trialDays = SubscriptionSetting::trialDays();
+        $plans     = Plan::active()
             ->with(['features' => fn ($q) => $q->orderBy('feature')])
             ->orderBy('sort_order')
             ->get()
@@ -29,24 +30,21 @@ class SiteController extends Controller
                 'description'        => $plan->description,
                 'price'              => $plan->price,
                 'price_period_label' => $plan->pricePeriodLabel(),
-                'trial_days'         => $plan->trial_days,
+                'trial_days'         => $trialDays,
+                'register_url'       => route('register', ['plan' => $plan->id]),
                 'is_featured'        => (bool) $plan->is_featured,
                 'is_free'            => (float) $plan->price === 0.0,
                 'features'           => $plan->features->map(fn ($f) => [
                     'id' => $f->id,
-                    // Chave estável entre planos: "Tudo do Básico, mais:" e o selo
-                    // "Disponível no …" das funcionalidades comparam por ela.
+                    // Chave estável para o comparador e a disponibilidade por plano.
                     'key'           => $f->feature->value,
+                    'value'         => $f->feature->isBoolean() ? $f->boolValue() : $f->intValue(),
                     'display_label' => $f->formatForDisplay(),
                     'enabled'       => $f->feature->isBoolean() ? $f->boolValue() : true,
                     // 0 créditos de IA = ausência (não "ilimitado", como nos limites).
                     'is_none' => $f->feature === FeatureKey::AiMonthlyCredits && $f->intValue() === 0,
                 ])->toArray(),
             ]);
-
-        $creditNote = __('subscriptions.pricing_credit_note.title') . ' '
-            . __('subscriptions.pricing_credit_note.body') . ' '
-            . __('subscriptions.pricing_credit_note.topup');
 
         $currentUrl    = url('/');
         $currentLocale = app()->getLocale();
@@ -125,21 +123,24 @@ class SiteController extends Controller
             ->toArray();
 
         $howImagePath = public_path('site/images/how-it-works.webp');
-        // Painel inicial do sistema no hero (escolha do responsável em 2026-09-27;
-        // o recorte do prontuário, hero-prontuario.webp, continua no repositório).
+        // O prontuário demonstra a tarefa clínica destacada no hero.
         // Sem o arquivo, o hero fica só com o texto (nunca com imagem quebrada).
-        $heroImagePath = public_path('site/images/hero-dashboard.webp');
+        $heroImagePath = public_path('site/images/hero-prontuario.webp');
 
         return Inertia::render('Site/Home', [
-            'plans'          => $plans,
-            'appName'        => config('app.name', 'EasyEye'),
-            'heroImage'      => file_exists($heroImagePath) ? filemtime($heroImagePath) : false,
-            'howImageExists' => file_exists($howImagePath) ? filemtime($howImagePath) : false,
-            'demoImages'     => $demoImages,
-            't'              => array_merge(trans('site'), ['pricing_credit_note_html' => $creditNote]),
-            'routes'         => [...SiteLinks::routes(), 'contactStore' => route('contact.store')],
-            'contact'        => SiteLinks::contact(),
-            'seo'            => [
+            'plans'           => $plans,
+            'trialDays'       => $trialDays,
+            'appName'         => config('app.name', 'EasyEye'),
+            'heroImage'       => file_exists($heroImagePath) ? filemtime($heroImagePath) : false,
+            'heroImageUrl'    => asset('site/images/hero-prontuario.webp'),
+            'heroImageWidth'  => 1061,
+            'heroImageHeight' => 857,
+            'howImageExists'  => file_exists($howImagePath) ? filemtime($howImagePath) : false,
+            'demoImages'      => $demoImages,
+            't'               => array_merge(SiteContent::translations(), ['pricing_credit_note' => trans('subscriptions.pricing_credit_note')]),
+            'routes'          => [...SiteLinks::routes(), 'contactStore' => route('contact.store')],
+            'contact'         => SiteLinks::contact(),
+            'seo'             => [
                 'canonicalUrl'     => $currentUrl,
                 'currentLocale'    => str_replace('_', '-', $currentLocale),
                 'alternateLocales' => $alternateLocales,

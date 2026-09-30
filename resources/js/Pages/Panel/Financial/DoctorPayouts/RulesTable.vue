@@ -12,15 +12,17 @@ import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
  */
 const props = defineProps({
     rules:     { type: Array,  default: () => [] },
+    doctors:   { type: Array,  default: () => [] },   // nomes dos médicos fixos na divisão (E4)
     t:         { type: Object, default: () => ({}) },
     emptyText: { type: String, default: '' },
 });
 
-const emit = defineEmits(['edit', 'delete']);
+const emit = defineEmits(['edit', 'duplicate', 'delete']);
 
-const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon } = useDoctorPayoutFormat(() => props.t);
+const { ruleLabel, validityLabel, serviceTypeLabel, serviceTypeIcon, splitSummary } = useDoctorPayoutFormat(() => props.t);
 
-const rows = computed(() => props.rules ?? []);
+const rows   = computed(() => props.rules ?? []);
+const splits = computed(() => new Map(rows.value.map((rule) => [rule.id, splitSummary(rule, props.doctors)])));
 
 const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.payer_scope;
 </script>
@@ -60,7 +62,12 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
                         {{ payerLabel(rule) }}
                         <div v-if="rule.covenant_name" class="small text-muted">{{ rule.covenant_name }}</div>
                     </td>
-                    <td class="small" data-test="rule-calculation">{{ ruleLabel(rule) }}</td>
+                    <td class="small" data-test="rule-calculation">
+                        {{ ruleLabel(rule) }}
+                        <div v-if="splits.get(rule.id)" class="text-muted" data-test="rule-split">
+                            <i class="ti ti-arrows-split-2 me-1" aria-hidden="true"></i>{{ splits.get(rule.id) }}
+                        </div>
+                    </td>
                     <td class="small text-nowrap">{{ validityLabel(rule.valid_from, rule.valid_until) }}</td>
                     <td>
                         <StatusBadge :active="!!rule.active" :label-active="t.active" :label-inactive="t.inactive" />
@@ -68,6 +75,7 @@ const payerLabel = (rule) => props.t.payer_scopes?.[rule.payer_scope] ?? rule.pa
                     <td class="text-end">
                         <ActionIconGroup align="end" gap="tight">
                             <ActionIconButton icon="ti ti-edit" :title="t.rules_edit" data-test="rule-edit" @click="emit('edit', rule)" />
+                            <ActionIconButton icon="ti ti-copy" :title="t.rules_duplicate" data-test="rule-duplicate" @click="emit('duplicate', rule)" />
                             <ActionIconButton icon="ti ti-trash" variant="danger" :title="t.rules_delete" data-test="rule-delete" @click="emit('delete', rule)" />
                         </ActionIconGroup>
                     </td>

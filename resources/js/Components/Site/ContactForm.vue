@@ -1,7 +1,12 @@
 <template>
     <div class="contact-form-box">
         <div v-if="sent" class="cf-success" role="status">
-            <div class="cf-success-icon"><i class="ti ti-circle-check" aria-hidden="true"></i></div>
+            <div class="cf-success-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" focusable="false">
+                    <circle class="cf-success-ring" cx="12" cy="12" r="9" pathLength="1" />
+                    <path class="cf-success-check" d="m8 12 3 3 5-6" pathLength="1" />
+                </svg>
+            </div>
             <h3 ref="successHeading" tabindex="-1">{{ t.success_title }}</h3>
             <p>{{ t.success_body }}</p>
         </div>
@@ -38,26 +43,6 @@
                         <p v-if="errors.phone" id="cf-phone-error" class="cf-field-error">{{ errors.phone }}</p>
                     </div>
 
-                    <div class="cf-row">
-                        <div v-for="field in ['is_client', 'role']" :key="field" class="cf-group">
-                            <label :for="`cf-${field}`">{{ t[field] }}</label>
-                            <select :id="`cf-${field}`" v-model="form[field]" :name="field" class="cf-control" v-bind="errorAttributes(field)">
-                                <option value="">{{ t.select }}</option>
-                                <option v-for="option in t[`${field}_opts`]" :key="option" :value="option">{{ option }}</option>
-                            </select>
-                            <p v-if="errors[field]" :id="`cf-${field}-error`" class="cf-field-error">{{ errors[field] }}</p>
-                        </div>
-                    </div>
-
-                    <div class="cf-group">
-                        <label for="cf-segment">{{ t.segment }}</label>
-                        <select id="cf-segment" v-model="form.segment" name="segment" class="cf-control" v-bind="errorAttributes('segment')">
-                            <option value="">{{ t.select }}</option>
-                            <option v-for="option in t.segment_opts" :key="option" :value="option">{{ option }}</option>
-                        </select>
-                        <p v-if="errors.segment" id="cf-segment-error" class="cf-field-error">{{ errors.segment }}</p>
-                    </div>
-
                     <div class="cf-group">
                         <label for="cf-message">{{ t.message }} *</label>
                         <textarea id="cf-message" v-model="form.message" name="message" class="cf-control cf-message"
@@ -65,6 +50,31 @@
                         <p id="cf-message-hint" class="cf-hint">{{ t.message_hint }}</p>
                         <p v-if="errors.message" id="cf-message-error" class="cf-field-error">{{ errors.message }}</p>
                     </div>
+
+                    <details ref="optionalDetails" class="cf-optional">
+                        <summary class="cf-optional-title" aria-describedby="cf-optional-hint">{{ t.details_title }}</summary>
+                        <p id="cf-optional-hint" class="cf-optional-hint">{{ t.details_hint }}</p>
+                        <div class="cf-optional-fields">
+                            <div class="cf-row">
+                                <div v-for="field in ['is_client', 'role']" :key="field" class="cf-group">
+                                    <label :for="`cf-${field}`">{{ t[field] }} <span class="cf-optional-label">({{ t.optional }})</span></label>
+                                    <select :id="`cf-${field}`" v-model="form[field]" :name="field" class="cf-control" v-bind="errorAttributes(field)">
+                                        <option value="">{{ t.select }}</option>
+                                        <option v-for="option in t[`${field}_opts`]" :key="option" :value="option">{{ option }}</option>
+                                    </select>
+                                    <p v-if="errors[field]" :id="`cf-${field}-error`" class="cf-field-error">{{ errors[field] }}</p>
+                                </div>
+                            </div>
+                            <div class="cf-group">
+                                <label for="cf-segment">{{ t.segment }} <span class="cf-optional-label">({{ t.optional }})</span></label>
+                                <select id="cf-segment" v-model="form.segment" name="segment" class="cf-control" v-bind="errorAttributes('segment')">
+                                    <option value="">{{ t.select }}</option>
+                                    <option v-for="option in t.segment_opts" :key="option" :value="option">{{ option }}</option>
+                                </select>
+                                <p v-if="errors.segment" id="cf-segment-error" class="cf-field-error">{{ errors.segment }}</p>
+                            </div>
+                        </div>
+                    </details>
 
                     <div class="cf-check">
                         <input id="cf-terms" v-model="form.terms" name="terms" type="checkbox" required v-bind="errorAttributes('terms')">
@@ -101,6 +111,7 @@ const sent = ref(false);
 const formElement = ref(null);
 const errorSummary = ref(null);
 const successHeading = ref(null);
+const optionalDetails = ref(null);
 let requestController;
 
 function errorAttributes(field, hint) {
@@ -150,6 +161,9 @@ async function submit() {
             for (const field of Object.keys(form.value)) {
                 const messages = fieldErrors?.[field];
                 if (Array.isArray(messages) && typeof messages[0] === 'string') errors.value[field] = messages[0];
+            }
+            if (['is_client', 'role', 'segment'].some(field => errors.value[field])) {
+                optionalDetails.value.open = true;
             }
         } else if (status === 419) {
             key = 'session';

@@ -63,6 +63,7 @@ main[tabindex="-1"]:focus { outline: none; }
     position: fixed;
     top: 12px;
     left: 12px;
+    max-width: calc(100% - 24px);
     z-index: 1100;
     padding: 12px 18px;
     border-radius: 8px;
@@ -201,6 +202,31 @@ main[tabindex="-1"]:focus { outline: none; }
 // que clareia em vez de escurecer). As telas de login usam o mesmo .btn-primary
 // e ficam como estão, fora do escopo desta revisão.
 .site-shell {
+    // Com texto ampliado, termos longos não devem impor uma largura mínima
+    // às colunas de leitura nem empurrar a página para fora da tela.
+    overflow-wrap: anywhere;
+
+    .btn {
+        transition-duration: $dur-fast;
+
+        &:hover { transform: none; box-shadow: none; }
+        &:hover i { transform: none; }
+
+        @media (hover: hover) and (pointer: fine) {
+            &:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba($navy, .12); }
+            &:is(:hover, :focus-visible) .ti-arrow-right { transform: translateX(2px); }
+        }
+
+        // Depois do hover: pressionar sempre recebe resposta imediata.
+        &:active { transform: scale(.985); transition-duration: $dur-press; }
+
+        @media (prefers-reduced-motion: reduce) {
+            &:hover,
+            &:active,
+            &:is(:hover, :focus-visible) i { transform: none; }
+        }
+    }
+
     .btn-primary,
     .btn-featured {
         color: $navy;
@@ -242,6 +268,7 @@ main[tabindex="-1"]:focus { outline: none; }
     @include type-title-xl;
     color: $navy;
     margin-bottom: 20px;
+    max-width: 30ch;
     overflow-wrap: break-word;
     text-wrap: balance;
 }
@@ -249,7 +276,7 @@ main[tabindex="-1"]:focus { outline: none; }
 .section-sub {
     @include type-lead;
     color: $text-muted;
-    max-width: 640px;
+    max-width: 60ch;
     text-wrap: pretty;
 }
 
@@ -257,6 +284,7 @@ main[tabindex="-1"]:focus { outline: none; }
     text-align: center;
 
     .section-sub { margin: 0 auto; }
+    .section-title { margin-inline: auto; }
 }
 
 // ─── Ícones coloridos (hero e contato) ────────────────────────
@@ -268,6 +296,8 @@ main[tabindex="-1"]:focus { outline: none; }
 
 // Reduzir movimento: botões mantêm cor e sombra como feedback, sem deslocar.
 @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+
     .btn,
     .btn i { transition-property: box-shadow, background-color, border-color, color; }
 

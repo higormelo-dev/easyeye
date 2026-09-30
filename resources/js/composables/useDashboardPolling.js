@@ -21,9 +21,13 @@ export function useDashboardPolling(only, intervalMs = 30_000) {
         router.reload({
             only,
             preserveScroll: true,
+            // "Atualizado há X" só avança quando os dados chegaram de fato;
+            // em falha (rede, 500) continua mostrando a última atualização boa.
+            onSuccess: () => {
+                lastUpdated.value = new Date();
+            },
             onFinish: () => {
                 isRefreshing.value = false;
-                lastUpdated.value  = new Date();
             },
         });
     }

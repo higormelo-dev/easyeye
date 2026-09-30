@@ -9,7 +9,8 @@ const props = defineProps({
     t: { type: Object, default: () => ({}) },      // site translations for SiteLayout
     tAuth: { type: Object, default: () => ({}) },  // auth translations for the form
     plans: { type: Array, default: () => [] },
-    trialDays: { type: Number, default: 14 },
+    trialDays: { type: Number, default: 0 },
+    selectedPlanId: { type: String, default: null },
     routes: { type: Object, default: () => ({}) },
 });
 
@@ -84,13 +85,17 @@ const passwordStrengthColor = computed(() => strengthColors[passwordStrength.val
 const passwordStrengthLabel = computed(() => strengthLabels.value[passwordStrength.value]);
 
 // ── Plan selection ─────────────────────────────────────────────
-const selectedPlan = ref(props.plans[0]?.id ?? '');
+const selectedPlan = ref('');
 
-watch(() => props.plans, (plans) => {
-    if (plans.length && !selectedPlan.value) selectedPlan.value = plans[0].id;
+watch([() => props.plans, () => props.selectedPlanId], ([plans, preferredId], previous) => {
+    const preferredChanged = !previous || preferredId !== previous[1];
+    if (preferredChanged || !plans.some(plan => plan.id === selectedPlan.value)) {
+        selectPlan(plans.find(plan => plan.id === preferredId)?.id ?? plans[0]?.id ?? '');
+    }
 }, { immediate: true });
 
 const currentPlan = computed(() => props.plans.find(p => p.id === selectedPlan.value) ?? null);
+const testimonial = computed(() => props.t.testimonials?.items?.[0] ?? null);
 
 function selectPlan(id) {
     selectedPlan.value = id;
@@ -163,8 +168,6 @@ async function submit() {
 }
 
 async function quickStart() {
-    if (!validateStep2()) return;
-    selectPlan(props.plans[0]?.id ?? '');
     await submit();
 }
 
@@ -197,20 +200,6 @@ const showPwd2 = ref(false);
                         <em>{{ tAuth.register?.left_headline_em }}</em>
                     </h1>
                     <p class="reg-hero-sub">{{ tAuth.register?.left_sub }}</p>
-                    <div class="reg-hero-metrics">
-                        <div class="reg-hero-metric">
-                            <span class="reg-hero-metric-val">500+</span>
-                            <span class="reg-hero-metric-label">{{ tAuth.register?.metric_clinics }}</span>
-                        </div>
-                        <div class="reg-hero-metric">
-                            <span class="reg-hero-metric-val">{{ trialDays }}</span>
-                            <span class="reg-hero-metric-label">{{ tAuth.register?.days_free }}</span>
-                        </div>
-                        <div class="reg-hero-metric">
-                            <span class="reg-hero-metric-val">97%</span>
-                            <span class="reg-hero-metric-label">NPS</span>
-                        </div>
-                    </div>
                 </div>
             </div>
         </section>
@@ -256,14 +245,16 @@ const showPwd2 = ref(false);
                             </li>
                         </ul>
 
-                        <div class="reg-testimonial">
-                            <div class="reg-testimonial-stars">★★★★★</div>
-                            <p class="reg-testimonial-text">"{{ tAuth.register?.testimonial_text }}"</p>
+                        <div v-if="testimonial" class="reg-testimonial">
+                            <div v-if="testimonial.stars" class="reg-testimonial-stars" role="img" :aria-label="t.testimonials?.rating?.replace(':stars', testimonial.stars)">
+                                <i v-for="star in 5" :key="star" class="ti" :class="star <= testimonial.stars ? 'ti-star-filled' : 'ti-star'" aria-hidden="true"></i>
+                            </div>
+                            <p class="reg-testimonial-text">{{ testimonial.text }}</p>
                             <div class="reg-testimonial-author">
-                                <div class="reg-testimonial-avatar">DR</div>
+                                <div v-if="testimonial.initials" class="reg-testimonial-avatar" aria-hidden="true">{{ testimonial.initials }}</div>
                                 <div>
-                                    <div class="reg-testimonial-name">{{ tAuth.register?.testimonial_name }}</div>
-                                    <div class="reg-testimonial-role">{{ tAuth.register?.testimonial_role }}</div>
+                                    <div class="reg-testimonial-name">{{ testimonial.name }}</div>
+                                    <div class="reg-testimonial-role">{{ testimonial.role }}</div>
                                 </div>
                             </div>
                         </div>
@@ -272,7 +263,7 @@ const showPwd2 = ref(false);
                             <div class="reg-trust-item"><i class="ti ti-lock"></i> <span>SSL 256-bit</span></div>
                             <div class="reg-trust-item"><i class="ti ti-shield-check"></i> <span>LGPD</span></div>
                             <div class="reg-trust-item"><i class="ti ti-award"></i> <span>CFM</span></div>
-                            <div class="reg-trust-item"><i class="ti ti-mood-smile"></i> <span>97% NPS</span></div>
+                            <div v-if="t.contact?.trust_nps" class="reg-trust-item"><i class="ti ti-mood-smile"></i> <span>{{ t.contact.trust_nps }}</span></div>
                         </div>
                     </div>
 
@@ -470,20 +461,22 @@ const showPwd2 = ref(false);
                                     <div v-if="plans.length" class="reg-field">
                                         <label class="reg-label">{{ tAuth.register?.choose_plan }}</label>
                                         <div class="plan-grid">
-                                            <div
+                                            <button
                                                 v-for="plan in plans"
                                                 :key="plan.id"
+                                                type="button"
                                                 class="plan-grid-card"
                                                 :class="{ selected: selectedPlan === plan.id }"
+                                                :aria-pressed="selectedPlan === plan.id"
                                                 @click="selectPlan(plan.id)"
                                             >
-                                                <div class="plan-grid-badge">{{ trialDays }} {{ tAuth.register?.days_free }}</div>
-                                                <div class="plan-grid-name">{{ plan.name }}</div>
-                                                <div class="plan-grid-price">
+                                                <span v-if="trialDays > 0" class="plan-grid-badge">{{ trialDays }} {{ tAuth.register?.days_free }}</span>
+                                                <span class="plan-grid-name">{{ plan.name }}</span>
+                                                <span class="plan-grid-price">
                                                     R$ {{ plan.is_free ? '0,00' : Number(plan.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) }}
-                                                </div>
-                                                <div class="plan-grid-cycle">/ {{ plan.price_period_label }}</div>
-                                            </div>
+                                                </span>
+                                                <span class="plan-grid-cycle">{{ plan.price_period_label }}</span>
+                                            </button>
                                         </div>
 
                                         <div v-if="currentPlan && currentPlan.features?.length" class="plan-detail">
@@ -496,6 +489,10 @@ const showPwd2 = ref(false);
                                                 </li>
                                             </ul>
                                         </div>
+                                        <p v-if="errors.plan_id" class="reg-error" role="alert">
+                                            {{ errors.plan_id }}
+                                            <a :href="`${routes.siteHome || '/'}#contato`">{{ t.nav?.contact }}</a>
+                                        </p>
                                     </div>
 
                                     <div class="reg-btn-row">
@@ -517,7 +514,7 @@ const showPwd2 = ref(false);
                                     <template v-if="plans.length > 1">
                                         <div class="reg-divider"><span>{{ tAuth.register?.or }}</span></div>
                                         <button type="button" class="reg-quick-start" :disabled="loading" @click="quickStart">
-                                            {{ tAuth.register?.quick_start }} {{ plans[0]?.name }} &rarr;
+                                            {{ tAuth.register?.quick_start }} {{ currentPlan?.name }} &rarr;
                                         </button>
                                     </template>
 
@@ -529,7 +526,7 @@ const showPwd2 = ref(false);
                             <div class="reg-card-trust-item"><i class="ti ti-lock"></i> <span>SSL</span></div>
                             <div class="reg-card-trust-item"><i class="ti ti-shield-check"></i> <span>LGPD</span></div>
                             <div class="reg-card-trust-item"><i class="ti ti-award"></i> <span>CFM</span></div>
-                            <div class="reg-card-trust-item"><i class="ti ti-mood-smile"></i> <span>97% NPS</span></div>
+                            <div v-if="t.contact?.trust_nps" class="reg-card-trust-item"><i class="ti ti-mood-smile"></i> <span>{{ t.contact.trust_nps }}</span></div>
                         </div>
 
                     </div>
@@ -575,12 +572,7 @@ const showPwd2 = ref(false);
 }
 .reg-hero-title { font-size: clamp(28px,4.5vw,48px); font-weight: 900; color: #fff; line-height: 1.1; letter-spacing: -.02em; margin-bottom: 16px; }
 .reg-hero-title em { font-style: normal; color: var(--teal); }
-.reg-hero-sub { font-size: 17px; color: rgba(255,255,255,.7); line-height: 1.7; margin-bottom: 36px; }
-.reg-hero-metrics { display: inline-flex; align-items: stretch; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; overflow: hidden; }
-.reg-hero-metric { padding: 14px 24px; text-align: center; border-right: 1px solid rgba(255,255,255,.1); }
-.reg-hero-metric:last-child { border-right: none; }
-.reg-hero-metric-val { display: block; font-size: 22px; font-weight: 900; color: var(--teal); line-height: 1; margin-bottom: 4px; }
-.reg-hero-metric-label { font-size: 11px; color: rgba(255,255,255,.45); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.reg-hero-sub { font-size: 17px; color: rgba(255,255,255,.7); line-height: 1.7; }
 
 /* Form section */
 .reg-section { background: var(--bg); padding: 64px 0 80px; }
@@ -670,6 +662,8 @@ const showPwd2 = ref(false);
 .plan-grid-card { border: 2px solid var(--border); border-radius: 10px; padding: 12px 10px; text-align: center; cursor: pointer; transition: all .2s; background: #fff; user-select: none; }
 .plan-grid-card:hover { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(0,180,216,.08); }
 .plan-grid-card.selected { border-color: var(--teal); background: rgba(0,180,216,.03); box-shadow: 0 0 0 3px rgba(0,180,216,.12); }
+.plan-grid-card:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+.plan-grid-name, .plan-grid-price, .plan-grid-cycle { display: block; }
 .plan-grid-badge { display: inline-block; background: rgba(0,180,216,.1); color: var(--teal); font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-bottom: 5px; }
 .plan-grid-name { font-size: 12px; font-weight: 800; color: var(--navy); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-grid-price { font-size: 15px; font-weight: 900; color: var(--teal); line-height: 1; }
@@ -682,9 +676,6 @@ const showPwd2 = ref(false);
 @media (max-width: 1023px) { .reg-layout { grid-template-columns: 1fr; } .reg-marketing { order: 2; } .reg-card { position: static; order: 1; } }
 @media (max-width: 640px) {
     .reg-hero { padding: 100px 0 52px; }
-    .reg-hero-metrics { flex-direction: column; width: 100%; }
-    .reg-hero-metric { border-right: none; border-bottom: 1px solid rgba(255,255,255,.1); }
-    .reg-hero-metric:last-child { border-bottom: none; }
     .reg-section { padding: 36px 0 56px; }
     .reg-card { padding: 24px 18px; }
     .plan-grid { grid-template-columns: 1fr 1fr; }

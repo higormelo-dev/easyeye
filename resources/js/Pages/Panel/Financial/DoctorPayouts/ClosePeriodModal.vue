@@ -156,10 +156,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown));
                     class="form-control"
                     :class="{ 'is-invalid': form.errors.notes }"
                     :aria-invalid="form.errors.notes ? 'true' : undefined"
+                    :aria-describedby="form.errors.notes ? `${ids.notes}-hint ${ids.notes}-error` : `${ids.notes}-hint`"
                     :disabled="form.processing"
                     data-test="close-notes"
                 ></textarea>
-                <div v-if="form.errors.notes" class="invalid-feedback d-block">{{ form.errors.notes }}</div>
+                <div v-if="form.errors.notes" :id="`${ids.notes}-error`" class="invalid-feedback d-block">{{ form.errors.notes }}</div>
+                <div :id="`${ids.notes}-hint`" class="form-text small" data-test="close-notes-hint">{{ t.close_notes_hint }}</div>
             </div>
 
             <div

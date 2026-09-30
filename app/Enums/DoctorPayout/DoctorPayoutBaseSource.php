@@ -18,6 +18,9 @@ enum DoctorPayoutBaseSource: string
     /** Sem valor: exame de equipamento, cobrança cancelada/negada ou sem preço. */
     case None = 'none';
 
+    /** Recebido pela clínica (receita paga no caixa) — base das parcelas do regime por recebimento. */
+    case Received = 'received';
+
     public function label(): string
     {
         return __("financial_doctor_payouts.base_sources.{$this->value}");

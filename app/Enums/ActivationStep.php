@@ -18,17 +18,10 @@ enum ActivationStep: string
     case TeamMemberInvited      = 'team_member_invited';      // Membro da equipe convidado
     case IntegratorConnected    = 'integrator_connected';     // Equipamento conectado via API
 
+    /** Rótulo no idioma do usuário (dashboard.activation_steps nos arquivos de idioma). */
     public function label(): string
     {
-        return match ($this) {
-            self::EntityProfileCompleted => 'Perfil da clínica preenchido',
-            self::FirstDoctorAdded       => 'Primeiro médico cadastrado',
-            self::FirstPatientAdded      => 'Primeiro paciente cadastrado',
-            self::FirstScheduleCreated   => 'Primeira consulta agendada',
-            self::FirstMedicalRecord     => 'Primeiro prontuário criado',
-            self::TeamMemberInvited      => 'Membro da equipe convidado',
-            self::IntegratorConnected    => 'Equipamento conectado',
-        };
+        return __("dashboard.activation_steps.{$this->value}");
     }
 
     /** Peso da etapa no score total (soma = 100) */

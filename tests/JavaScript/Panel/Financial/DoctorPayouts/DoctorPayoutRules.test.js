@@ -34,11 +34,17 @@ vi.mock('@/Components/Panel/PageHeader.vue', () => ({
     },
 }));
 vi.mock('@/Components/Panel/TablePagination.vue', () => ({ default: { props: ['data'], template: '<nav class="pagination-stub" />' } }));
+vi.mock('@/Pages/Panel/Financial/DoctorPayouts/DeductionRatesCard.vue', () => ({
+    default: {
+        props: ['rates', 'routes'],
+        template: '<section class="deductions-stub" :data-count="rates.length" :data-store="routes.deduction_rate_store" />',
+    },
+}));
 vi.mock('@/Pages/Panel/Financial/DoctorPayouts/RuleFormModal.vue', () => ({
     default: {
-        props: ['open', 'rule', 'options', 'routes'],
+        props: ['open', 'rule', 'template', 'options', 'routes'],
         emits: ['close'],
-        template: '<div class="rule-modal-stub" :data-open="String(open)" :data-rule="rule?.id ?? \'\'" />',
+        template: '<div class="rule-modal-stub" :data-open="String(open)" :data-rule="rule?.id ?? \'\'" :data-template="template?.id ?? \'\'" />',
     },
 }));
 
@@ -48,6 +54,8 @@ const routes = {
     update: '/doctor-payouts/rules/__ID__',
     destroy: '/doctor-payouts/rules/__ID__',
     settings: '/doctor-payouts/settings',
+    deduction_rate_store: '/doctor-payouts/deduction-rates',
+    deduction_rate_destroy: '/doctor-payouts/deduction-rates/__ID__',
 };
 
 const RULES = [
@@ -184,7 +192,7 @@ describe('Financial/DoctorPayouts/Rules', () => {
         expect(general.text()).toContain('Consultation');
         expect(general.text()).toContain('Any item');
         expect(general.text()).toContain('Any payer');
-        expect(general.find('[data-test="rule-calculation"]').text()).toBe('60% of the charged amount');
+        expect(general.find('[data-test="rule-calculation"]').text()).toBe('60% of net received');
         expect(general.text()).toContain('Always');
         expect(general.text()).toContain('Active');
 
@@ -233,6 +241,29 @@ describe('Financial/DoctorPayouts/Rules', () => {
         expect(router.delete).not.toHaveBeenCalled();
     });
 
+    it('divisão (E4): resumo do grupo sob o cálculo, com o nome do médico fixo (tabela e cards)', async () => {
+        const split = { ...RULES[0], id: 'r3', participants: [{ role: 'doctor', doctor_id: 'd1', percentage: 60 }, { role: 'executor', doctor_id: null, percentage: 40 }] };
+        const w = mountPage({ rules: paginator([...RULES, split]) });
+
+        const rows = w.findAll('[data-test="rule-row"]');
+        expect(rows[0].find('[data-test="rule-split"]').exists()).toBe(false);
+        expect(rows[1].find('[data-test="rule-split"]').exists()).toBe(false);
+        expect(rows[2].find('[data-test="rule-split"]').text()).toBe('The clinic keeps 40%. Dra. Ana Lima 60% · Performer (item doctor) 40%');
+
+        await w.find('.to-cards').trigger('click');
+        const cards = w.findAll('[data-test="rule-card"]');
+        expect(cards[2].find('[data-test="rule-split"]').text()).toBe('The clinic keeps 40%. Dra. Ana Lima 60% · Performer (item doctor) 40%');
+        expect(cards[0].find('[data-test="rule-split"]').exists()).toBe(false);
+    });
+
+    it('deduções (E4): o card recebe as vigências e as rotas', () => {
+        const w = mountPage({ deduction_rates: [{ id: 'dr1', kind: 'tax', percentage: 6, valid_from: '2026-01-01', notes: null }] });
+
+        const card = w.find('.deductions-stub');
+        expect(card.attributes('data-count')).toBe('1');
+        expect(card.attributes('data-store')).toBe('/doctor-payouts/deduction-rates');
+    });
+
     it('nova regra e editar abrem o painel', async () => {
         const w = mountPage();
 
@@ -242,5 +273,17 @@ describe('Financial/DoctorPayouts/Rules', () => {
 
         await w.findAll('[data-test="rule-edit"]')[1].trigger('click');
         expect(w.find('.rule-modal-stub').attributes('data-rule')).toBe('r2');
+        expect(w.find('.rule-modal-stub').attributes('data-template')).toBe('');
+    });
+
+    it('duplicar abre o painel como NOVA regra com a regra escolhida de modelo', async () => {
+        const w = mountPage();
+
+        await w.findAll('[data-test="rule-duplicate"]')[1].trigger('click');
+
+        const modal = w.find('.rule-modal-stub');
+        expect(modal.attributes('data-open')).toBe('true');
+        expect(modal.attributes('data-rule')).toBe('');
+        expect(modal.attributes('data-template')).toBe('r2');
     });
 });

@@ -11,6 +11,7 @@ const t = {
     email: 'E-mail', email_ph: 'voce@exemplo.com', phone: 'WhatsApp', phone_ph: '(00) 00000-0000',
     is_client: 'Cliente?', is_client_opts: ['Sim', 'Não'], role: 'Cargo', role_opts: ['Outro'],
     segment: 'Estabelecimento', segment_opts: ['Outro'], select: 'Selecione', message: 'Mensagem',
+    optional: 'opcional', details_title: 'Mais detalhes (opcional)', details_hint: 'Ajude a personalizar o atendimento.',
     message_ph: 'Como podemos ajudar?', message_hint: 'Até 5.000 caracteres.', terms: 'Concordo com os termos.',
     submit: 'Enviar mensagem', sending: 'Enviando...', success_title: 'Mensagem enviada!', success_body: 'Entraremos em contato.',
     errors: Object.fromEntries(['required', 'email', 'terms', 'invalid', 'validation', 'server', 'network', 'timeout', 'session', 'rate_limit']
@@ -38,6 +39,58 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(() => wrapper?.unmount());
 
 describe('ContactForm', () => {
+    it('apresenta os detalhes opcionais fechados e identificados, depois da mensagem', () => {
+        render();
+        const details = wrapper.get('details');
+        expect(details.element.open).toBe(false);
+        expect(details.get('summary').text()).toBe(t.details_title);
+        expect(details.get('summary').attributes('aria-describedby')).toBe('cf-optional-hint');
+        expect(details.get('#cf-optional-hint').text()).toBe(t.details_hint);
+        for (const field of ['is_client', 'role', 'segment']) {
+            expect(details.get(`label[for="cf-${field}"]`).text()).toContain(t.optional);
+            expect(details.get(`[name="${field}"]`).element.required).toBe(false);
+        }
+        const fields = wrapper.findAll('input, select, textarea').map(field => field.attributes('name'));
+        expect(fields.indexOf('message')).toBeLessThan(fields.indexOf('is_client'));
+    });
+
+    it.each([true, false])('envia os valores opcionais preservados com a seção aberta = %s', async open => {
+        axios.post.mockResolvedValueOnce({ data: { ok: true } });
+        render();
+        await fill();
+        const details = wrapper.get('details').element;
+        details.open = true;
+        const optional = { is_client: 'Não', role: 'Outro', segment: 'Outro' };
+        for (const [field, value] of Object.entries(optional)) {
+            await wrapper.get(`[name="${field}"]`).setValue(value);
+        }
+        details.open = open;
+        await submit();
+        expect(axios.post).toHaveBeenCalledWith('/contato', { ...values, ...optional }, expect.any(Object));
+        expect(wrapper.get('.cf-success').text()).toContain(t.success_title);
+    });
+
+    it.each(['is_client', 'role', 'segment'])('abre os detalhes para corrigir erro 422 em %s antes de focar o campo', async field => {
+        axios.post.mockRejectedValueOnce({ response: { status: 422, data: { errors: { [field]: ['Revise esta opção.'] } } } });
+        render();
+        await fill();
+        const details = wrapper.get('details').element;
+        const input = wrapper.get(`[name="${field}"]`).element;
+        const focus = input.focus.bind(input);
+        const focusSpy = vi.spyOn(input, 'focus').mockImplementation(() => {
+            expect(details.open).toBe(true);
+            focus();
+        });
+        await submit();
+        expect(details.open).toBe(true);
+        expect(wrapper.get(`#cf-${field}-error`).text()).toBe('Revise esta opção.');
+        expect(focusSpy).toHaveBeenCalledOnce();
+        expect(document.activeElement).toBe(input);
+        await wrapper.get(`[name="${field}"]`).setValue(field === 'is_client' ? 'Sim' : 'Outro');
+        expect(wrapper.find(`#cf-${field}-error`).exists()).toBe(false);
+        focusSpy.mockRestore();
+    });
+
     it('mantém validação nativa e mostra campos obrigatórios sem chamar a API', async () => {
         render();
         await submit();
@@ -66,6 +119,7 @@ describe('ContactForm', () => {
         expect(wrapper.get('[role="alert"]').text()).toBe(t.errors.validation);
         expect(wrapper.get('#cf-email-error').text()).toBe('E-mail rejeitado.');
         expect(wrapper.get('#cf-email').attributes('aria-invalid')).toBe('true');
+        expect(wrapper.get('details').element.open).toBe(false);
         expect(document.activeElement).toBe(wrapper.get('#cf-email').element);
         for (const [field, value] of Object.entries(values).filter(([field]) => field !== 'terms')) {
             expect(wrapper.get(`[name="${field}"]`).element.value).toBe(value);

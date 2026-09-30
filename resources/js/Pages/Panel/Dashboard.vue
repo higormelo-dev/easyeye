@@ -15,6 +15,7 @@ import ActionDropdown   from '@/Components/Panel/ActionDropdown.vue';
 import ColumnOrderMenu  from '@/Components/Panel/ColumnOrderMenu.vue';
 import { useDashboardPolling } from '@/composables/useDashboardPolling.js';
 import { useUserPreferences }  from '@/composables/useUserPreferences.js';
+import { normalizeSectionOrder, moveVisibleSection } from './Dashboard/sectionOrder.js';
 
 const props = defineProps({
     stats:           { type: Object, required: true },
@@ -26,6 +27,10 @@ const props = defineProps({
     // não usa o módulo OU não tem nada crítico agora (ver
     // PanelDashboardController::buildStockAlerts()).
     stockAlerts:     { type: Object, default: null },
+    // Telas que o usuário pode abrir pelos atalhos (mesmas regras das rotas —
+    // PanelDashboardController::buildAccess()); sem a permissão, o atalho
+    // não vira link para um 403.
+    access:          { type: Object, default: () => ({}) },
     t:               { type: Object, default: () => ({}) },
 });
 
@@ -60,46 +65,44 @@ const breadcrumbs = [];
 // LiveStatusBar/WelcomeBanner/Activation ficam fixos (avisos/contexto, não
 // "conteúdo" reordenável). Agenda de hoje + Resumo do dia contam como UMA
 // seção — são desenhadas lado a lado de propósito, não faz sentido separar.
-// GAP fechado (revisão pós-Fase 4 do estoque): seção 'stock' só entra na
-// lista quando o Dashboard REALMENTE tem algo pra mostrar (stockAlerts !=
-// null — clínica usa o módulo E tem algo crítico agora). Construído a
-// partir de SECTION_DEFS (não array literal fixo) pra loadValidSectionOrder()
-// abaixo sempre comparar contra o tamanho REAL — clínica sem estoque nunca
-// vê "Alertas de estoque" nem na lista de reordenar.
+// 'stock' está sempre na ordem salva, mas só aparece (no painel e na lista de
+// reordenar) quando o Dashboard tem alerta de estoque — que pode surgir ou
+// sumir no meio do expediente (polling). A ordem escolhida pelo usuário não
+// volta ao padrão por isso (ver sectionOrder.js).
 const SECTION_DEFS = [
     { key: 'kpis',      label: props.t.section_kpis ?? 'Indicadores' },
     { key: 'shortcuts', label: props.t.section_shortcuts ?? 'Atalhos' },
     { key: 'agenda',    label: props.t.section_agenda ?? 'Agenda de hoje' },
     { key: 'patients',  label: props.t.section_patients ?? 'Pacientes recentes' },
-    ...(props.stockAlerts ? [{ key: 'stock', label: props.t.section_stock ?? 'Alertas de estoque' }] : []),
+    { key: 'stock',     label: props.t.section_stock ?? 'Alertas de estoque' },
 ];
 const DEFAULT_SECTION_ORDER = SECTION_DEFS.map((s) => s.key);
 
+// Rótulos traduzidos do menu de ordenar (mostrar/ocultar/mover/restaurar).
+const orderLabels = computed(() => ({
+    show:     props.t.order_show,
+    hide:     props.t.order_hide,
+    moveUp:   props.t.order_move_up,
+    moveDown: props.t.order_move_down,
+    reset:    props.t.order_reset,
+}));
+
 const { getPreference, savePreference } = useUserPreferences();
 
-function loadValidSectionOrder() {
-    const stored = getPreference('dashboard_widget_order');
-    const isValid = Array.isArray(stored)
-        && stored.length === DEFAULT_SECTION_ORDER.length
-        && DEFAULT_SECTION_ORDER.every((k) => stored.includes(k));
-
-    return isValid ? [...stored] : [...DEFAULT_SECTION_ORDER];
-}
-
-const sectionOrder = ref(loadValidSectionOrder());
+const sectionOrder = ref(normalizeSectionOrder(getPreference('dashboard_widget_order'), DEFAULT_SECTION_ORDER));
 
 const orderedSections = computed(() => (
-    sectionOrder.value.map((key) => SECTION_DEFS.find((s) => s.key === key)).filter(Boolean)
+    sectionOrder.value
+        .filter((key) => key !== 'stock' || props.stockAlerts)
+        .map((key) => SECTION_DEFS.find((s) => s.key === key))
+        .filter(Boolean)
 ));
 
 function moveSection(fromIndex, toIndex) {
-    if (fromIndex === toIndex) return;
-    if (fromIndex < 0 || toIndex < 0) return;
-    if (fromIndex >= sectionOrder.value.length || toIndex >= sectionOrder.value.length) return;
+    const visible = orderedSections.value.map((s) => s.key);
+    const next = moveVisibleSection(sectionOrder.value, visible, fromIndex, toIndex);
+    if (!next) return;
 
-    const next = [...sectionOrder.value];
-    const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
     sectionOrder.value = next;
     savePreference('dashboard_widget_order', next);
 }
@@ -111,33 +114,38 @@ function resetSectionOrder() {
 </script>
 
 <template>
-    <AppLayout title="Dashboard" :breadcrumbs="breadcrumbs">
+    <AppLayout :title="t.page_title ?? 'Dashboard'" :breadcrumbs="breadcrumbs">
         <div class="page-dashboard">
 
             <!-- ── Personalizar (item MELHORIA "mais humano") — discreto, canto -->
+            <!-- data-tour: âncoras do tour guiado (lang/*/tour.php → pages.panel.dashboard) -->
             <div class="d-flex justify-content-end mb-2">
-                <ActionDropdown
-                    title="Personalizar Dashboard"
-                    align="right"
-                    :min-width="230"
-                    btn-class="bg-white border shadow-sm rounded px-2 py-1 d-flex align-items-center gap-1 fs-13 text-muted"
-                >
-                    <template #trigger>
-                        <i class="ti ti-layout-dashboard"></i>
-                        <span class="d-none d-sm-inline">Personalizar</span>
-                    </template>
+                <div data-tour="dashboard-customize">
+                    <ActionDropdown
+                        :title="t.customize_title ?? 'Personalizar o painel'"
+                        align="right"
+                        :min-width="230"
+                        btn-class="bg-white border shadow-sm rounded px-2 py-1 d-flex align-items-center gap-1 fs-13 text-muted"
+                    >
+                        <template #trigger>
+                            <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
+                            <span class="d-none d-sm-inline">{{ t.customize ?? 'Personalizar' }}</span>
+                        </template>
 
-                    <ColumnOrderMenu
-                        title="Ordem das seções"
-                        :columns="orderedSections"
-                        @move="moveSection"
-                        @reset="resetSectionOrder"
-                    />
-                </ActionDropdown>
+                        <ColumnOrderMenu
+                            :title="t.sections_order ?? 'Ordem das seções'"
+                            :columns="orderedSections"
+                            :labels="orderLabels"
+                            @move="moveSection"
+                            @reset="resetSectionOrder"
+                        />
+                    </ActionDropdown>
+                </div>
             </div>
 
             <!-- ── Live status bar ── -->
             <LiveStatusBar
+                data-tour="dashboard-live"
                 :is-refreshing="isRefreshing"
                 :last-updated="lastUpdated"
                 :t="t"
@@ -145,11 +153,12 @@ function resetSectionOrder() {
             />
 
             <!-- ── Welcome Banner ── -->
-            <WelcomeBanner :t="t" />
+            <WelcomeBanner data-tour="dashboard-welcome" :access="access" :t="t" />
 
             <!-- ── Activation progress (only when etapas obrigatórias pendentes) ── -->
             <Activation
                 v-if="!activationComplete"
+                data-tour="dashboard-activation"
                 :activation="activation"
                 :activation-score="activationScore"
                 :t="t"
@@ -161,27 +170,32 @@ function resetSectionOrder() {
                     v-if="section.key === 'kpis'"
                     :stats="stats"
                     :is-doctor="isDoctor"
-                    :rule="rule"
+                    :access="access"
                     :is-refreshing="isRefreshing"
                     :t="t"
                 />
 
                 <ModuleShortcuts
                     v-else-if="section.key === 'shortcuts'"
-                    :rule="rule"
+                    :access="access"
+                    :order-labels="orderLabels"
                     :t="t"
                 />
 
                 <div v-else-if="section.key === 'agenda'" class="row g-3 mb-4">
                     <div class="col-lg-8">
                         <ScheduleToday
+                            data-tour="dashboard-schedule-today"
                             :items="scheduleToday"
+                            :total="stats.today_count ?? scheduleToday.length"
                             :is-refreshing="isRefreshing"
+                            :can-open-schedule="!!access.schedules"
                             :t="t"
                         />
                     </div>
                     <div class="col-lg-4">
                         <DaySummary
+                            data-tour="dashboard-day-summary"
                             :stats="stats"
                             :is-refreshing="isRefreshing"
                             :t="t"
@@ -191,7 +205,9 @@ function resetSectionOrder() {
 
                 <RecentPatients
                     v-else-if="section.key === 'patients'"
+                    data-tour="dashboard-recent-patients"
                     :patients="recentPatients"
+                    :can-open-patients="!!access.patients"
                     :t="t"
                 />
 
@@ -200,7 +216,9 @@ function resetSectionOrder() {
                      dois lados, não só a existência da seção. -->
                 <StockAlerts
                     v-else-if="section.key === 'stock' && stockAlerts"
+                    data-tour="dashboard-stock-alerts"
                     :alerts="stockAlerts"
+                    :t="t"
                 />
             </template>
 

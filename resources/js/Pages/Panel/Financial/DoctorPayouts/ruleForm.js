@@ -6,6 +6,10 @@
  * payload leva no máximo UM dos três ids (os outros null), o valor só do
  * cálculo escolhido e o convênio só com pagador "convênio" — a mesma
  * coerência que o backend confere (DoctorPayoutRuleRequest::after).
+ *
+ * Divisão (E4, só percentual): `participants` = [{ role: 'executor'|'doctor',
+ * doctor_id, percentage }] somando 100%; sem participantes o executor fica
+ * com o grupo inteiro. Regra de valor fixo não leva participantes.
  */
 export const SERVICE_TYPES = ['consultation', 'exam', 'procedure'];
 export const ALL_TYPES     = 'all';
@@ -70,6 +74,11 @@ export function emptyRuleForm() {
         valid_until:  '',
         active:       true,
         notes:        '',
+        participants: [],
+        // Edição: 'fix' corrige a regra (vale para o que ainda não foi
+        // fechado); 'new' cria nova vigência a partir de effective_from.
+        change_mode:    'fix',
+        effective_from: '',
     };
 }
 
@@ -88,14 +97,26 @@ export function ruleToForm(rule) {
         valid_until:  rule.valid_until ?? '',
         active:       rule.active !== false,
         notes:        rule.notes ?? '',
+        participants: (rule.participants ?? []).map((participant) => ({
+            role:       participant.role,
+            doctor_id:  participant.doctor_id ?? '',
+            percentage: participant.percentage,
+        })),
+        change_mode:    'fix',
+        effective_from: '',
     };
+}
+
+/** Regra existente como modelo de uma NOVA (duplicar): mesmos campos, sem vigência. */
+export function ruleAsTemplate(rule) {
+    return { ...ruleToForm(rule), valid_from: '', valid_until: '', active: true };
 }
 
 const blankToNull = (value) => (value === '' || value === undefined ? null : value);
 
 /** Campos do formulário → payload enviado (form.transform). */
 export function rulePayload(data) {
-    const { item, ...fields } = data;
+    const { item, change_mode: changeMode, effective_from: effectiveFrom, ...fields } = data;
     const { kind, id } = data.service_type === ALL_TYPES ? { kind: '', id: '' } : decodeItem(item);
 
     return {
@@ -111,5 +132,15 @@ export function rulePayload(data) {
         valid_until:   blankToNull(data.valid_until),
         notes:         blankToNull(data.notes),
         active:        Boolean(data.active),
+        participants:  data.calculation === 'percentage'
+            ? (data.participants ?? []).map((participant) => ({
+                role:       participant.role,
+                doctor_id:  participant.role === 'doctor' ? blankToNull(participant.doctor_id) : null,
+                percentage: blankToNull(participant.percentage),
+            }))
+            : [],
+        // Nova vigência só vai quando escolhida (e só existe ao editar); o
+        // servidor exige a data nesse modo — em branco não vira correção.
+        ...(changeMode === 'new' ? { change_mode: 'new', effective_from: blankToNull(effectiveFrom) } : {}),
     };
 }

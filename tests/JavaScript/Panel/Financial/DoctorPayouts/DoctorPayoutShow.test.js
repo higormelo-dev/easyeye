@@ -28,7 +28,11 @@ vi.mock('@inertiajs/vue3', async () => {
                 ...data,
                 errors: {},
                 processing: false,
+                transformer: (value) => value,
                 data: () => Object.fromEntries(fields.map((field) => [field, form[field]])),
+                // Payload como o Inertia enviaria (depois do transform).
+                sent: () => form.transformer(form.data()),
+                transform: (callback) => { form.transformer = callback; return form; },
                 reset: () => Object.assign(form, initial),
                 clearErrors: () => { form.errors = {}; },
                 post: vi.fn(),
@@ -63,25 +67,41 @@ const routes = {
     apuracao: '/doctor-payouts?doctor=d1&from=2026-08-01&to=2026-08-31',
     pdf: '/doctor-payouts/closings/po1/pdf',
     export: '/doctor-payouts/closings/po1/export',
-    pay: '/doctor-payouts/closings/po1/payment',
-    reverse: '/doctor-payouts/closings/po1/payment',
+    pay: '/doctor-payouts/closings/po1/payments',
+    payments_destroy: '/doctor-payouts/closings/po1/payments/__ID__',
     reopen: '/doctor-payouts/closings/po1',
     adjustments_store: '/doctor-payouts/closings/po1/adjustments',
     adjustments_destroy: '/doctor-payouts/closings/po1/adjustments/__ID__',
-    cash_flow: null,
+    cash_flow: '/cash-flow',
 };
 
 const CLOSED_FINANCIAL = { can_adjust: true, can_pay: true, can_reverse: false, can_reopen: false, is_admin: false };
 const CLOSED_ADMIN     = { can_adjust: true, can_pay: true, can_reverse: false, can_reopen: true, is_admin: true };
+// Estornar pagamento: admin OU financeiro (decisão de 2026-09-29).
 const PAID_ADMIN       = { can_adjust: false, can_pay: false, can_reverse: true, can_reopen: false, is_admin: true };
-const PAID_FINANCIAL   = { can_adjust: false, can_pay: false, can_reverse: false, can_reopen: false, is_admin: false };
+const PAID_FINANCIAL   = { can_adjust: false, can_pay: false, can_reverse: true, can_reopen: false, is_admin: false };
+const PARTIAL          = { can_adjust: false, can_pay: true, can_reverse: true, can_reopen: false, is_admin: false };
+
+const payment = (overrides = {}) => ({
+    id: 'pay1', paid_at: '2026-09-05', amount: 150, payment_method: 'transfer', notes: 'PIX 123', has_cash_entry: true,
+    paid_by_name: 'Carla Financeiro', created_at: '2026-09-05T10:00:00-03:00',
+    reversed_at: null, reversed_by_name: null, reversal_reason: null,
+    ...overrides,
+});
 
 const paidStatement = {
     ...statement,
-    payout: {
-        ...payoutSummary, status: 'paid', paid_at: '2026-09-05', paid_amount: 150, payment_method: 'transfer',
-        payment_notes: 'PIX 123', cash_entry_id: 'ce1',
-    },
+    payout: { ...payoutSummary, status: 'paid', paid_at: '2026-09-05', paid_amount: 150, remaining_amount: 0 },
+    payments: [payment()],
+};
+
+const partialStatement = {
+    ...statement,
+    payout: { ...payoutSummary, status: 'partially_paid', paid_at: '2026-09-05', paid_amount: 50, remaining_amount: 100 },
+    payments: [
+        payment({ id: 'pay0', paid_at: '2026-09-03', amount: 30, notes: null, reversed_at: '2026-09-04T09:00:00-03:00', reversed_by_name: 'Admin Clínica', reversal_reason: 'Conta errada' }),
+        payment({ id: 'pay1', amount: 50, notes: null }),
+    ],
 };
 
 let wrapper;
@@ -216,34 +236,72 @@ describe('Financial/DoctorPayouts/Show — demonstrativo da clínica', () => {
         expect(w.find('[data-test="reason-error"]').text()).toBe('Only administrators can perform this operation.');
     });
 
-    it('pago + admin: dados do pagamento e "Estornar pagamento"; sem formulário de pagamento nem ajustes', async () => {
-        const w = mountPage({ statement: paidStatement, permissions: PAID_ADMIN, routes: { ...routes, cash_flow: '/cash-flow?from=2026-09-05&to=2026-09-05' } });
+    it('pago: total, pago e saldo zero; o pagamento com forma, observação e atalho do caixa; sem formulário nem ajustes', () => {
+        const w = mountPage({ statement: paidStatement, permissions: PAID_ADMIN });
 
-        expect(w.find('[data-test="payment-paid"]').text()).toContain('Paid on 05/09/2026');
-        expect(w.find('[data-test="payment-amount"]').text()).toBe(brl(150));
-        expect(w.find('[data-test="payment-method"]').text()).toBe('Bank transfer');
-        expect(w.find('[data-test="payment-cash-flow"]').attributes('href')).toBe('/cash-flow?from=2026-09-05&to=2026-09-05');
-        expect(w.text()).toContain('PIX 123');
+        expect(w.find('[data-test="payment-total"]').text()).toBe(brl(150));
+        expect(w.find('[data-test="payment-paid"]').text()).toBe(brl(150));
+        expect(w.find('[data-test="payment-balance"]').text()).toBe(brl(0));
+
+        const [row] = w.findAll('[data-test="payment-row"]');
+        expect(row.find('[data-test="payment-row-amount"]').text()).toBe(brl(150));
+        expect(row.text()).toContain('05/09/2026');
+        expect(row.text()).toContain('Bank transfer');
+        expect(row.text()).toContain('by Carla Financeiro');
+        expect(row.find('[data-test="payment-row-notes"]').text()).toBe('PIX 123');
+        expect(row.find('[data-test="payment-row-cash-flow"]').attributes('href')).toBe('/cash-flow?from=2026-09-05&to=2026-09-05');
+
         expect(has(w, 'payment-form')).toBe(false);
         expect(has(w, 'adjustment-form')).toBe(false);
         expect(has(w, 'adjustment-remove')).toBe(false);
         expect(has(w, 'reopen-open')).toBe(false);
+        expect(has(w, 'admin-actions')).toBe(false);
+    });
 
-        await w.find('[data-test="reverse-open"]').trigger('click');
-        expect(w.find('.reason-modal-stub h5').text()).toBe('Reverse the payment of this payout?');
+    it('financeiro também estorna um pagamento: pede motivo e envia DELETE na rota do pagamento', async () => {
+        const w = mountPage({ statement: paidStatement, permissions: PAID_FINANCIAL });
+
+        expect(has(w, 'admin-only')).toBe(false);
+
+        const reverse = w.find('[data-test="payment-row-reverse"]');
+        expect(reverse.attributes('aria-label')).toBe(`Reverse the payment of 05/09/2026 (${brl(150)})`);
+
+        await reverse.trigger('click');
+        expect(w.find('.reason-modal-stub h5').text()).toBe('Reverse this payment?');
 
         await w.find('[data-test="reason-confirm"]').trigger('click');
-        expect(router.delete).toHaveBeenCalledWith('/doctor-payouts/closings/po1/payment', expect.objectContaining({
+        expect(router.delete).toHaveBeenCalledWith('/doctor-payouts/closings/po1/payments/pay1', expect.objectContaining({
             data: { reason: 'Pagamento lançado em duplicidade' },
+            preserveScroll: true,
         }));
     });
 
-    it('pago sem admin: nada de estorno, só o aviso', () => {
-        const w = mountPage({ statement: paidStatement, permissions: PAID_FINANCIAL });
+    it('pago em parte: saldo sugerido, estornado riscado com motivo e sem botão; envia o "já pago" que a tela mostra', async () => {
+        const w = mountPage({ statement: partialStatement, permissions: PARTIAL });
 
-        expect(has(w, 'reverse-open')).toBe(false);
-        expect(has(w, 'reopen-open')).toBe(false);
-        expect(has(w, 'admin-only')).toBe(true);
+        expect(w.find('[data-test="payment-balance"]').text()).toBe(brl(100));
+        expect(w.find('.card-header [data-status="partially_paid"]').text()).toBe('Partly paid');
+
+        const [reversed, valid] = w.findAll('[data-test="payment-row"]');
+        expect(reversed.attributes('data-reversed')).toBe('true');
+        expect(reversed.find('[data-test="payment-row-reversed"]').text()).toBe('Reversed');
+        expect(reversed.find('[data-test="payment-row-reversal"]').text()).toContain('by Admin Clínica. Reason: Conta errada');
+        expect(reversed.find('[data-test="payment-row-reverse"]').exists()).toBe(false);
+        expect(reversed.find('[data-test="payment-row-cash-flow"]').exists()).toBe(false);
+        expect(valid.find('[data-test="payment-row-reverse"]').exists()).toBe(true);
+
+        const form = inertia.forms.find((f) => 'paid_at' in f);
+        expect(form.amount).toBe(100);
+
+        form.amount = 40;
+        await w.find('[data-test="payment-use-balance"]').trigger('click');
+        expect(form.amount).toBe(100);
+
+        form.amount = 40;
+        await w.find('[data-test="payment-form"]').trigger('submit');
+
+        expect(form.post).toHaveBeenCalledWith('/doctor-payouts/closings/po1/payments', expect.objectContaining({ preserveScroll: true }));
+        expect(form.sent()).toEqual({ amount: 40, paid_at: '2026-09-28', payment_method: 'transfer', payment_notes: '', expected_paid_cents: 5000 });
     });
 
     it('cancelado: aviso com data, usuário e motivo; sem pagamento nem ações', () => {
@@ -308,23 +366,29 @@ describe('Financial/DoctorPayouts/Show — demonstrativo da clínica', () => {
         expect(date.element.value).toBe('2026-09-28');
         expect(date.attributes('max')).toBe('2026-09-28');
         expect(w.findAll('[data-test="payment-method-select"] option').map((o) => o.text())).toEqual(['Bank transfer', 'Cash']);
-        expect(w.find('[data-test="payment-hint"]').text()).toBe('Creates a paid expense in the Cash Flow.');
+        expect(w.find('[data-test="payment-hint"]').text()).toBe('You can pay in installments.');
+        expect(w.find('[data-test="payment-balance"]').text()).toBe(brl(150));
+        expect(has(w, 'payments-list')).toBe(false);
 
         await w.find('[data-test="payment-method-select"]').setValue('cash');
         await w.find('[data-test="payment-notes"]').setValue('Em espécie');
         await w.find('[data-test="payment-form"]').trigger('submit');
 
         const form = inertia.forms.find((f) => 'paid_at' in f);
-        expect(form.post).toHaveBeenCalledWith('/doctor-payouts/closings/po1/payment', expect.objectContaining({ preserveScroll: true }));
-        expect(form.data()).toEqual({ paid_at: '2026-09-28', payment_method: 'cash', payment_notes: 'Em espécie' });
+        expect(form.post).toHaveBeenCalledWith('/doctor-payouts/closings/po1/payments', expect.objectContaining({ preserveScroll: true }));
+        expect(form.sent()).toEqual({ amount: 150, paid_at: '2026-09-28', payment_method: 'cash', payment_notes: 'Em espécie', expected_paid_cents: 0 });
     });
 
     it('total zerado: dica de que não há lançamento no caixa; erros do servidor no formulário', async () => {
-        const w = mountPage({ statement: { ...statement, payout: { ...payoutSummary, total_amount: 0 } } });
+        const w = mountPage({ statement: { ...statement, payout: { ...payoutSummary, total_amount: 0, remaining_amount: 0 } } });
 
         expect(w.find('[data-test="payment-hint"]').text()).toBe('Zero total: no cash entry.');
+        expect(has(w, 'payment-amount-input')).toBe(false);
 
         const form = inertia.forms.find((f) => 'paid_at' in f);
+        await w.find('[data-test="payment-form"]').trigger('submit');
+        expect(form.sent()).toEqual(expect.objectContaining({ amount: 0, expected_paid_cents: 0 }));
+
         form.errors = { paid_at: 'The cash register of 05/09/2026 is closed.', status: 'Not allowed.' };
         await nextTick();
 

@@ -68,8 +68,18 @@ return [
     ],
 
     'pricing_credit_note' => [
-        'title' => 'How do AI credits work?',
-        'body'  => 'Each credit corresponds to 1 exam analysis or 1 AI-generated report draft. Credits are renewed monthly and do not carry over between cycles.',
-        'topup' => 'Once the plan limit is reached, you can purchase <strong>top-up credit packs</strong> without interrupting your workflow.',
+        'title'         => 'AI in your plan: what uses credits',
+        'intro'         => 'The AI features in your plan use the same credit balance, shared by the doctors in your clinic.',
+        'actions_title' => 'Analysis and drafts',
+        'actions_body'  => 'Exam analysis and report drafts use credits when these features are included in your plan.',
+        'chat_title'    => 'Questions and writing in the assistant',
+        'chat_body'     => 'Every question or writing request in the virtual assistant also uses this balance. Conversations are not unlimited.',
+        'usage_title'   => 'Variable usage',
+        'usage_body'    => 'One request may use more than one credit, depending on the task and the processing required.',
+        'renewal_title' => 'Plan allowance',
+        'renewal_body'  => 'The plan allowance is granted when the subscription becomes active and renewed each cycle. Unused credits from this allowance do not carry over.',
+        'topup'         => 'Purchased extra credits carry over, never expire and are used after the plan allowance. Without enough credits, only AI features become unavailable until you top up or the allowance renews.',
+        'trial_note'    => 'The plan allowance is not granted during the trial period.',
+        'medical_note'  => 'AI provides support. The doctor must review the generated content.',
     ],
 ];

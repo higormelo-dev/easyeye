@@ -6,14 +6,22 @@ use App\Actions\Register\RegisterAction;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\{Plan, SubscriptionSetting, User};
-use Illuminate\Http\{JsonResponse, Request};
+use App\Support\Site\SiteContent;
+use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Inertia\{Inertia, Response};
 
 class RegisteredUserController extends Controller
 {
-    public function create(): Response
+    public function create(Request $request): RedirectResponse|Response
     {
+        $trialDays = SubscriptionSetting::trialDays();
+
+        if ($trialDays <= 0) {
+            return redirect()->to(route('site.home') . '#contato');
+        }
+
         $plans = Plan::active()
             ->with(['features' => fn ($q) => $q->orderBy('feature')])
             ->orderBy('sort_order')
@@ -23,7 +31,7 @@ class RegisteredUserController extends Controller
                 'name'               => $plan->name,
                 'price'              => $plan->price,
                 'price_period_label' => $plan->pricePeriodLabel(),
-                'trial_days'         => $plan->trial_days,
+                'trial_days'         => $trialDays,
                 'is_featured'        => (bool) $plan->is_featured,
                 'is_free'            => (float) $plan->price === 0.0,
                 'features'           => $plan->features->map(fn ($f) => [
@@ -33,13 +41,20 @@ class RegisteredUserController extends Controller
                 ])->toArray(),
             ]);
 
+        // Resolve against the active catalogue, without querying untrusted UUIDs.
+        $requestedPlan = $request->query('plan');
+        $selectedPlan  = is_string($requestedPlan)
+            ? $plans->firstWhere('id', $requestedPlan)
+            : null;
+
         return Inertia::render('Auth/Register', [
-            'appName'   => config('app.name', 'EasyEye'),
-            't'         => trans('site'),   // SiteLayout uses t.nav / t.footer
-            'tAuth'     => trans('auth'),   // Register form uses tAuth.register.*
-            'plans'     => $plans,
-            'trialDays' => SubscriptionSetting::trialDays(),
-            'routes'    => [
+            'appName'        => config('app.name', 'EasyEye'),
+            't'              => SiteContent::translations(),   // SiteLayout uses t.nav / t.footer
+            'tAuth'          => trans('auth'),   // Register form uses tAuth.register.*
+            'plans'          => $plans,
+            'trialDays'      => $trialDays,
+            'selectedPlanId' => ($selectedPlan ?? $plans->first())['id'] ?? null,
+            'routes'         => [
                 'siteHome'     => route('site.home'),
                 'go'           => route('go'),
                 'login'        => route('login'),
@@ -64,6 +79,12 @@ class RegisteredUserController extends Controller
      */
     public function store(RegisterRequest $request, RegisterAction $action): JsonResponse
     {
+        if (SubscriptionSetting::trialDays() <= 0) {
+            throw ValidationException::withMessages([
+                'plan_id' => __('auth.register.trial_unavailable'),
+            ]);
+        }
+
         $result = $action->execute($request->validated());
 
         Auth::login($result['user']);

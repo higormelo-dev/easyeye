@@ -5,6 +5,7 @@ import AppLayout         from '@/Layouts/AppLayout.vue';
 import PageHeader        from '@/Components/Panel/PageHeader.vue';
 import TablePagination   from '@/Components/Panel/TablePagination.vue';
 import { useViewMode }   from '@/composables/useViewMode.js';
+import DeductionRatesCard from './DeductionRatesCard.vue';
 import FlashMessage      from './FlashMessage.vue';
 import PayoutTabs        from './PayoutTabs.vue';
 import RuleFormModal     from './RuleFormModal.vue';
@@ -27,7 +28,8 @@ const props = defineProps({
     filters:     { type: Object, default: () => ({}) },        // { doctor: '' | 'general' | uuid, service_type, status }
     options:     { type: Object, default: () => ({}) },        // { doctors, visit_types, procedures, exam_types, covenants }
     settings:    { type: Object, default: () => ({}) },        // { doctor_payouts_visible, can_manage }
-    routes:      { type: Object, required: true },             // { index, store, update, destroy, settings }
+    routes:      { type: Object, required: true },             // { index, store, update, destroy, settings, deduction_rate_store, deduction_rate_destroy }
+    deduction_rates: { type: Array, default: () => [] },       // vigências das deduções (E4)
     t:           { type: Object, default: () => ({}) },
     shared:      { type: Object, default: () => ({}) },
 });
@@ -60,10 +62,14 @@ function applyFilters(patch) {
 // ── Painel criar/editar ─────────────────────────────────────────────────────
 const modalOpen   = ref(false);
 const editingRule = ref(null);
+// Duplicar: abre como NOVA regra com os campos de outra (várias cirurgias,
+// variações de OCT...).
+const templateRule = ref(null);
 
-function openCreate() { editingRule.value = null; modalOpen.value = true; }
-function openEdit(rule) { editingRule.value = rule; modalOpen.value = true; }
-function closeModal() { modalOpen.value = false; editingRule.value = null; }
+function openCreate() { editingRule.value = null; templateRule.value = null; modalOpen.value = true; }
+function openEdit(rule) { editingRule.value = rule; templateRule.value = null; modalOpen.value = true; }
+function openDuplicate(rule) { editingRule.value = null; templateRule.value = rule; modalOpen.value = true; }
+function closeModal() { modalOpen.value = false; editingRule.value = null; templateRule.value = null; }
 
 // ── Exclusão (fechamentos antigos guardam a regra aplicada) ─────────────────
 function onDelete(rule) {
@@ -101,6 +107,7 @@ function onDelete(rule) {
             </p>
 
             <RulesSettingsCard :settings="settings" :action="routes.settings" :t="t" />
+            <DeductionRatesCard :rates="deduction_rates" :routes="routes" :t="t" />
 
             <div class="d-flex flex-wrap align-items-end gap-3 mb-3" data-test="rules-filters">
                 <div class="rules__filter">
@@ -157,17 +164,21 @@ function onDelete(rule) {
             <RulesTable
                 v-if="view === 'table'"
                 :rules="rows"
+                :doctors="options.doctors ?? []"
                 :t="t"
                 :empty-text="t.rules_empty"
                 @edit="openEdit"
+                @duplicate="openDuplicate"
                 @delete="onDelete"
             />
             <RulesCards
                 v-else
                 :rules="rows"
+                :doctors="options.doctors ?? []"
                 :t="t"
                 :empty-text="t.rules_empty"
                 @edit="openEdit"
+                @duplicate="openDuplicate"
                 @delete="onDelete"
             />
 
@@ -185,6 +196,7 @@ function onDelete(rule) {
         <RuleFormModal
             :open="modalOpen"
             :rule="editingRule"
+            :template="templateRule"
             :options="options"
             :routes="routes"
             :t="t"

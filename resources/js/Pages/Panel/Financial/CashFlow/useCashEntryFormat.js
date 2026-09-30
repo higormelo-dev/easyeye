@@ -50,6 +50,7 @@ export function useCashEntryFormat(getT) {
     function lockLabel(entry) {
         if (entry?.lock_reason === 'billing_claim') return text().lock_billing_claim;
         if (entry?.lock_reason === 'doctor_payout') return text().lock_doctor_payout;
+        if (entry?.lock_reason === 'doctor_payout_allocation') return text().lock_doctor_payout_allocation;
         if (entry?.lock_reason === 'closed_period') return text().lock_closed_period;
 
         return '';
@@ -58,6 +59,7 @@ export function useCashEntryFormat(getT) {
     function lockHint(entry) {
         if (entry?.lock_reason === 'billing_claim') return text().lock_billing_claim_hint;
         if (entry?.lock_reason === 'doctor_payout') return text().lock_doctor_payout_hint;
+        if (entry?.lock_reason === 'doctor_payout_allocation') return text().lock_doctor_payout_allocation_hint;
         if (entry?.lock_reason === 'closed_period') return text().lock_closed_period_hint;
 
         return '';

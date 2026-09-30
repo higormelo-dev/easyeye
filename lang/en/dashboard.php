@@ -82,4 +82,56 @@ return [
     'demo_description' => 'Populate test data or reset the environment for demonstrations.',
     'demo_btn_seed'    => 'Populate data',
     'demo_btn_reset'   => 'Reset environment',
+
+    // Header and customization
+    'page_title'      => 'Dashboard',
+    'customize'       => 'Customize',
+    'customize_title' => 'Customize the dashboard',
+    'sections_order'  => 'Section order',
+
+    // Reorderable sections
+    'section_kpis'      => 'Indicators',
+    'section_shortcuts' => 'Shortcuts',
+    'section_agenda'    => "Today's schedule",
+    'section_patients'  => 'Recent patients',
+    'section_stock'     => 'Stock alerts',
+
+    // Favorite shortcuts
+    'shortcuts'       => 'Shortcuts',
+    'shortcuts_title' => 'Choose favorite shortcuts',
+    'shortcuts_menu'  => 'Favorite shortcuts',
+
+    // Reorder menu (show/hide/move)
+    'order_show'      => 'Show',
+    'order_hide'      => 'Hide',
+    'order_move_up'   => 'Move up',
+    'order_move_down' => 'Move down',
+    'order_reset'     => 'Restore default',
+
+    // Today's schedule
+    'arrived' => 'Arrived',
+
+    // Stock alerts
+    'stock_title'               => 'Stock alerts',
+    'stock_see'                 => 'View stock',
+    'stock_below_minimum_one'   => ':count product below the minimum',
+    'stock_below_minimum_other' => ':count products below the minimum',
+    'stock_below_minimum_hint'  => 'Restock so you do not run out of supplies.',
+    'stock_expiring_one'        => ':count product with a lot expiring',
+    'stock_expiring_other'      => ':count products with lots expiring',
+    'stock_expiring_hint'       => 'Expired or expiring in the next 30 days.',
+
+    // Steps of the "Set up your clinic" card (App\Enums\ActivationStep)
+    'activation_steps' => [
+        'entity_profile_completed' => 'Clinic profile completed',
+        'first_doctor_added'       => 'First doctor registered',
+        'first_patient_added'      => 'First patient registered',
+        'first_schedule_created'   => 'First appointment booked',
+        'first_medical_record'     => 'First medical record created',
+        'team_member_invited'      => 'Team member invited',
+        'integrator_connected'     => 'Equipment connected',
+    ],
+
+    // Today's schedule: limited list
+    'schedule_showing' => 'Showing :shown of :total appointments today.',
 ];

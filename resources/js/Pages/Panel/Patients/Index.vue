@@ -76,19 +76,23 @@ function closeModal() {
     editPatientId.value = null;
 }
 
-// Deep-link ?open=<id> — usado pela Agenda ("Cadastro do paciente") pra
-// abrir direto o cadastro do paciente clicado, sem passar pela lista geral.
+// Deep-links: ?open=<id> — usado pela Agenda ("Cadastro do paciente") e
+// pelos pacientes recentes do Dashboard pra abrir direto o cadastro clicado;
+// ?new=1 — "Novo paciente" do Dashboard abre o formulário vazio.
 onMounted(() => {
     const params = new URLSearchParams(window.location.search);
     const openId = params.get('open');
-    if (!openId) return;
+    const isNew  = params.get('new') === '1';
+    if (!openId && !isNew) return;
 
-    openEdit(openId);
+    if (openId) openEdit(openId);
+    else openCreate();
 
-    // Limpa ?open= sem quebrar o histórico do Inertia (replaceState(null)
+    // Limpa ?open=/?new= sem quebrar o histórico do Inertia (replaceState(null)
     // apagaria o snapshot da página e travaria o "voltar" do navegador):
     // visita leve com replace, preservando estado (o modal segue aberto).
     params.delete('open');
+    params.delete('new');
     const clean = Object.fromEntries(params.entries());
     router.get(route('panel.patients.index'), clean, { replace: true, preserveState: true, preserveScroll: true });
 });

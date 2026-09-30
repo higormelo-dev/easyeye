@@ -50,5 +50,33 @@ describe('MyPayouts/Show', () => {
         expect(w.find('[data-test="adjustment-remove"]').exists()).toBe(false);
         expect(w.find('[data-test="payment-panel"]').exists()).toBe(false);
         expect(w.find('[data-test="admin-actions"]').exists()).toBe(false);
+        expect(w.find('[data-test="my-payments"]').exists()).toBe(false);
+    });
+
+    it('pago em parte: cada pagamento (data, valor, forma) e o saldo a receber, sem estornar', () => {
+        wrapper = mount(MyPayoutsShow, {
+            props: {
+                breadcrumbs: [],
+                statement: {
+                    ...statement,
+                    payout: { ...statement.payout, status: 'partially_paid', paid_amount: 50, remaining_amount: 100 },
+                    payments: [{ id: 'pay1', paid_at: '2026-09-05', amount: 50, payment_method: 'transfer' }],
+                },
+                routes: { index: '/my-payouts', pdf: '/my-payouts/po1/pdf' },
+                t,
+            },
+        });
+        const w = wrapper;
+
+        const section = w.find('[data-test="my-payments"]');
+        expect(section.find('h3').text()).toBe('Payments');
+        expect(section.find('[data-test="my-balance"]').text()).toBe(`Balance to pay: ${brl(100)}`);
+
+        const [row] = section.findAll('[data-test="payment-row"]');
+        expect(row.find('[data-test="payment-row-amount"]').text()).toBe(brl(50));
+        expect(row.text()).toContain('05/09/2026');
+        expect(row.text()).toContain('Bank transfer');
+        expect(row.find('[data-test="payment-row-reverse"]').exists()).toBe(false);
+        expect(row.find('[data-test="payment-row-cash-flow"]').exists()).toBe(false);
     });
 });

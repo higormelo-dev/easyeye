@@ -324,6 +324,10 @@ class PatientExamService
             'archive'                        => $archivePath,
             'exam_performed_at'              => $examPerformedAt,
             'observation'                    => $observation,
+            // Exame capturado nasce habilitado (a coluna tinha default false e
+            // o 'active' => true saiu num refactor de 02/02/2026): inativo é
+            // "desabilitado/cancelado" — fica fora de laudo, IA e repasse.
+            'active' => true,
         ]);
 
         GenerateExamDerivatives::dispatch($record->id)->afterCommit();

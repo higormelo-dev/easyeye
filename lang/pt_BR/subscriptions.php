@@ -68,8 +68,18 @@ return [
     ],
 
     'pricing_credit_note' => [
-        'title' => 'Como funcionam os créditos de IA?',
-        'body'  => 'Cada crédito corresponde a 1 análise de exame ou 1 rascunho de laudo gerado pelo assistente. Os créditos são renovados mensalmente e não acumulam entre ciclos.',
-        'topup' => 'Ao atingir o limite do plano, é possível adquirir <strong>pacotes de recarga avulsos</strong> sem interromper o atendimento.',
+        'title'         => 'IA no seu plano: o que consome créditos',
+        'intro'         => 'Os recursos de IA do seu plano usam o mesmo saldo de créditos, compartilhado pelos médicos da clínica.',
+        'actions_title' => 'Análises e rascunhos',
+        'actions_body'  => 'Análises de exames e rascunhos de laudos usam créditos quando esses recursos estão incluídos no plano.',
+        'chat_title'    => 'Dúvidas e textos no assistente',
+        'chat_body'     => 'Cada pergunta ou pedido de texto no assistente virtual também usa esse saldo. As conversas não são ilimitadas.',
+        'usage_title'   => 'Consumo variável',
+        'usage_body'    => 'Uma solicitação pode consumir mais de um crédito, conforme a tarefa e o processamento necessário.',
+        'renewal_title' => 'Franquia do plano',
+        'renewal_body'  => 'A franquia do plano é concedida na ativação da assinatura e renovada a cada ciclo. Créditos não utilizados dessa franquia não acumulam.',
+        'topup'         => 'Créditos extras comprados acumulam, não expiram e são usados após a franquia do plano. Sem saldo suficiente, apenas os recursos de IA ficam indisponíveis até a recarga ou renovação.',
+        'trial_note'    => 'A franquia do plano não é liberada durante o período de teste.',
+        'medical_note'  => 'A IA oferece apoio. O médico deve revisar o conteúdo gerado.',
     ],
 ];

@@ -33,7 +33,7 @@ const statusMessage = computed(() => props.flash?.status ?? null);
     <Head :title="t.sign_in" />
 
     <GuestLayout layout-mode="login-illustration" :app-name="appName">
-        <!-- ── Left panel: branding + features + quote ── -->
+        <!-- ── Left panel: branding + features ── -->
         <template #left-panel>
             <div class="ee-login-panel-wrapper">
                 <div class="ee-login-panel-blob ee-login-panel-blob-1"></div>
@@ -61,10 +61,6 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                     </div>
                 </div>
 
-                <div class="ee-login-quote">
-                    <p>"{{ t.panel?.quote_text }}"</p>
-                    <cite>{{ t.panel?.quote_author }}</cite>
-                </div>
             </div>
         </template>
 
@@ -172,7 +168,6 @@ const statusMessage = computed(() => props.flash?.status ?? null);
                         <div class="ee-login-trust-item"><i class="ti ti-lock"></i> SSL</div>
                         <div class="ee-login-trust-item"><i class="ti ti-shield-check"></i> LGPD</div>
                         <div class="ee-login-trust-item"><i class="ti ti-certificate"></i> CFM</div>
-                        <div class="ee-login-trust-item"><i class="ti ti-star"></i> 97% NPS</div>
                     </div>
                 </form>
             </div>

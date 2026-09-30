@@ -93,6 +93,10 @@ return [
     'lock_doctor_payout'      => 'Doctor payout',
     'lock_doctor_payout_hint' => 'Expense created automatically when a doctor payout payment was recorded. To fix it, reverse the payment in Financial › Doctor payouts.',
 
+    'lock_doctor_payout_allocation'      => 'Allocated to payout',
+    'lock_doctor_payout_allocation_hint' => 'Part of this income was allocated as a doctor payout receipt. To change or delete it, reverse the allocations in Financial › Doctor payouts.',
+    'locked_by_doctor_payout_allocation' => 'This income has a doctor payout receipt allocated and cannot be changed or deleted. Reverse the allocations on the Doctor payouts screen.',
+
     'types' => [
         'income'  => 'Income',
         'expense' => 'Expense',

@@ -9,8 +9,9 @@ use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Financial\DoctorPayouts\Concerns\AuthorizesDoctorPayouts;
 use App\Http\Requests\Financial\DoctorPayoutRuleRequest;
-use App\Models\DoctorPayoutRule;
+use App\Models\{DoctorPayoutDeductionRate, DoctorPayoutRule};
 use App\Services\Financial\DoctorPayouts\{DoctorPayoutOptions, DoctorPayoutRuleService};
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
@@ -59,7 +60,7 @@ class DoctorPayoutRulesController extends Controller
 
         $query = DoctorPayoutRule::query()
             ->where('doctor_payout_rules.entity_id', $entityId)
-            ->with(['doctor.person:id,full_name', 'visitType:id,name', 'procedure:id,code,name', 'examType:id,name', 'covenant:id,name'])
+            ->with([...$this->rowRelations()])
             ->when($doctor === self::DOCTOR_GENERAL, fn (Builder $q) => $q->whereNull('doctor_id'))
             ->when($doctor !== '' && $doctor !== self::DOCTOR_GENERAL, fn (Builder $q) => $q->where('doctor_id', $doctor))
             ->when($serviceType !== '', fn (Builder $q) => $q->where('service_type', $serviceType))
@@ -93,12 +94,28 @@ class DoctorPayoutRulesController extends Controller
             ],
             'tabs'   => $this->payoutTabs(),
             'routes' => [
-                'index'    => route('panel.financial.doctor-payouts.rules.index'),
-                'store'    => route('panel.financial.doctor-payouts.rules.store'),
-                'update'   => route('panel.financial.doctor-payouts.rules.update', ['__ID__']),
-                'destroy'  => route('panel.financial.doctor-payouts.rules.destroy', ['__ID__']),
-                'settings' => route('panel.financial.doctor-payouts.settings.update'),
+                'index'                  => route('panel.financial.doctor-payouts.rules.index'),
+                'store'                  => route('panel.financial.doctor-payouts.rules.store'),
+                'update'                 => route('panel.financial.doctor-payouts.rules.update', ['__ID__']),
+                'destroy'                => route('panel.financial.doctor-payouts.rules.destroy', ['__ID__']),
+                'settings'               => route('panel.financial.doctor-payouts.settings.update'),
+                'deduction_rate_store'   => route('panel.financial.doctor-payouts.deduction-rates.store'),
+                'deduction_rate_destroy' => route('panel.financial.doctor-payouts.deduction-rates.destroy', ['__ID__']),
             ],
+            'deduction_rates' => DoctorPayoutDeductionRate::query()
+                ->where('entity_id', $entityId)
+                ->orderBy('kind')
+                ->orderByDesc('valid_from')
+                ->get()
+                ->map(fn (DoctorPayoutDeductionRate $rate) => [
+                    'id'         => $rate->id,
+                    'kind'       => $rate->kind->value,
+                    'percentage' => (float) $rate->percentage,
+                    'valid_from' => $rate->valid_from->toDateString(),
+                    'notes'      => $rate->notes,
+                ])
+                ->values()
+                ->all(),
             't'      => trans('financial_doctor_payouts'),
             'shared' => trans('financial_shared'),
         ]);
@@ -121,9 +138,14 @@ class DoctorPayoutRulesController extends Controller
         $entity = $this->authorizeFinancial();
         $this->assertBelongsToEntity($rule, $entity);
 
-        $updated = $this->rules->update($rule, $request->validated());
+        $data    = $request->validated();
+        $updated = $this->rules->update($rule, $data);
 
-        return $this->respond($request, __('financial_doctor_payouts.flash.rule_updated'), $this->row($updated->load($this->rowRelations())));
+        $message = ($data['effective_from'] ?? null) !== null
+            ? __('financial_doctor_payouts.flash.rule_superseded', ['date' => CarbonImmutable::parse((string) $data['effective_from'])->locale(app()->getLocale())->isoFormat('L')])
+            : __('financial_doctor_payouts.flash.rule_updated');
+
+        return $this->respond($request, $message, $this->row($updated->load($this->rowRelations())));
     }
 
     public function destroy(Request $request, DoctorPayoutRule $rule): RedirectResponse|JsonResponse
@@ -149,7 +171,7 @@ class DoctorPayoutRulesController extends Controller
     /** @return list<string> */
     private function rowRelations(): array
     {
-        return ['doctor.person:id,full_name', 'visitType:id,name', 'procedure:id,code,name', 'examType:id,name', 'covenant:id,name'];
+        return ['doctor.person:id,full_name', 'visitType:id,name', 'procedure:id,code,name', 'examType:id,name', 'covenant:id,name', 'participants'];
     }
 
     /** @return array<string, mixed> */
@@ -181,6 +203,12 @@ class DoctorPayoutRulesController extends Controller
             'active'        => (bool) $rule->active,
             'notes'         => $rule->notes,
             'is_general'    => $rule->doctor_id === null && $rule->payer_scope === DoctorPayoutPayerScope::Any && $itemKind === null,
+            // Divisão (E4): % da regra = parte do grupo; a clínica fica com o restante.
+            'participants' => $rule->participants->map(fn ($participant) => [
+                'role'       => $participant->role,
+                'doctor_id'  => $participant->doctor_id,
+                'percentage' => (float) $participant->percentage,
+            ])->values()->all(),
         ];
     }
 

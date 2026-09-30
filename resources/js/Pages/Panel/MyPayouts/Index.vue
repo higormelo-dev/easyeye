@@ -9,9 +9,9 @@ import FlashMessage      from '@/Pages/Panel/Financial/DoctorPayouts/FlashMessag
 import { useDoctorPayoutFormat } from '@/Pages/Panel/Financial/DoctorPayouts/useDoctorPayoutFormat.js';
 
 /**
- * "Meus repasses" (médico): só os PRÓPRIOS fechamentos (fechados e pagos) —
- * a produção pendente nunca aparece aqui. Tabela a partir do md; cards no
- * celular. Demonstrativo na tela e em PDF.
+ * "Meus repasses" (médico): só os PRÓPRIOS fechamentos (fechados, pagos em
+ * parte e pagos) — a produção pendente nunca aparece aqui. Tabela a partir do
+ * md; cards no celular. Demonstrativo na tela e em PDF.
  */
 const props = defineProps({
     breadcrumbs: { type: Array,  default: () => [] },
@@ -20,28 +20,32 @@ const props = defineProps({
     t:           { type: Object, default: () => ({}) },
 });
 
-const { tx, money, number, date, periodText } = useDoctorPayoutFormat(() => props.t);
+const { tx, money, date, periodText, grossLabel, countText } = useDoctorPayoutFormat(() => props.t);
 
 const rows = computed(() => props.payouts?.data ?? []);
 
 const url = (template, payout) => String(template ?? '').replace('__ID__', payout.id);
 
-/** Pago → "Pago em dd/mm/aaaa"; fechado → "Aguardando pagamento". */
+/** Pago → "Pago em dd/mm/aaaa"; em parte → "Pago em parte: X de Y"; fechado → "Aguardando pagamento". */
 function statusText(payout) {
-    return payout.status === 'paid'
-        ? tx('payment_paid_on', { date: date(payout.paid_at) })
-        : props.t.my_awaiting;
+    if (payout.status === 'paid') return tx('payment_paid_on', { date: date(payout.paid_at) });
+    if (payout.status === 'partially_paid') return tx('my_partially_paid', { paid: money(payout.paid_amount), total: money(payout.total_amount) });
+
+    return props.t.my_awaiting;
 }
 
-function statusBadge(payout) {
-    return payout.status === 'paid'
-        ? 'badge-soft-success border border-success'
-        : 'badge-soft-warning border border-warning';
-}
+const STATUS_BADGE = {
+    paid:           'badge-soft-success border border-success',
+    partially_paid: 'badge-soft-primary border border-primary',
+};
 
-const statusIcon = (payout) => (payout.status === 'paid' ? 'ti ti-circle-check' : 'ti ti-clock');
+const STATUS_ICON = { paid: 'ti ti-circle-check', partially_paid: 'ti ti-progress-check' };
 
-const productionHint = (payout) => tx('kpi_production_hint', { count: number(payout.items_count) });
+const statusBadge = (payout) => STATUS_BADGE[payout.status] ?? 'badge-soft-warning border border-warning';
+const statusIcon  = (payout) => STATUS_ICON[payout.status] ?? 'ti ti-clock';
+
+/** "Recebido (base das parcelas) · 14 atos no período" — o que é a produção do fechamento. */
+const productionHint = (payout) => `${grossLabel(payout)} · ${countText('kpi_production_hint', payout.items_count)}`;
 </script>
 
 <template>
@@ -83,7 +87,7 @@ const productionHint = (payout) => tx('kpi_production_hint', { count: number(pay
                                     <td class="text-nowrap small">{{ payout.code }}</td>
                                     <td class="text-end text-nowrap">
                                         <div class="my-payouts__value">{{ money(payout.gross_amount) }}</div>
-                                        <div class="small text-muted">{{ productionHint(payout) }}</div>
+                                        <div class="small text-muted" data-test="my-production-hint">{{ productionHint(payout) }}</div>
                                     </td>
                                     <td class="text-end text-nowrap fw-bold my-payouts__value">{{ money(payout.total_amount) }}</td>
                                     <td>
@@ -116,7 +120,7 @@ const productionHint = (payout) => tx('kpi_production_hint', { count: number(pay
                                     <span class="visually-hidden">{{ t.my_payout }}: </span>{{ money(payout.total_amount) }}
                                 </span>
                             </div>
-                            <p class="small text-muted mt-2 mb-2">
+                            <p class="small text-muted mt-2 mb-2" data-test="my-card-production">
                                 {{ t.my_production }}: {{ money(payout.gross_amount) }} · {{ productionHint(payout) }}
                             </p>
                             <div class="d-flex align-items-center justify-content-between gap-2">

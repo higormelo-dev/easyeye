@@ -36,6 +36,17 @@ describe('POST /api/integrators/v1/exams', function () {
             ->assertJsonFragment(['name' => 'Exame Fundoscopia 01']);
     });
 
+    it('exame capturado nasce habilitado (entra em laudo, IA e repasse)', function () {
+        $this->postJson('/api/integrators/v1/exams', [
+            'exam_identifier'     => $this->examType->code,
+            'schedule_identifier' => $this->schedule->code,
+            'archive'             => UploadedFile::fake()->image('exam.jpg'),
+            'name'                => 'Exame Ativo 01',
+        ], $this->ctx['headers'])->assertCreated();
+
+        expect(PatientExam::query()->where('name', 'Exame Ativo 01')->sole()->active)->toBeTrue();
+    });
+
     it('resolves patient_id from schedule', function () {
         $this->postJson(
             '/api/integrators/v1/exams',
@@ -417,6 +428,9 @@ describe('POST /api/integrators/v1/exams — patient_identifier branch', functio
     });
 
     it("picks the most recent of today's schedules when the patient has more than one", function () {
+        // Relógio fixo no meio do dia: entre 00h e 03h, "agora − 3h" caía em ontem.
+        $this->travelTo(today()->setTime(15, 0));
+
         $patient = Patient::factory()->create(['entity_id' => $this->ctx['entity']->id]);
         createScheduleForEntity($this->ctx['entity'], [
             'patient_id' => $patient->id,

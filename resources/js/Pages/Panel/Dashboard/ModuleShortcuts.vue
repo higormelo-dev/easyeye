@@ -5,24 +5,26 @@ import ColumnOrderMenu from '@/Components/Panel/ColumnOrderMenu.vue';
 import { useUserPreferences } from '@/composables/useUserPreferences.js';
 
 const props = defineProps({
-    rule: { type: String, default: '' },
-    t:    { type: Object, required: true },
+    // Telas que o usuário pode abrir (PanelDashboardController::buildAccess —
+    // mesmas regras das rotas): atalho sem acesso não aparece.
+    access:      { type: Object, default: () => ({}) },
+    orderLabels: { type: Object, default: () => ({}) },
+    t:           { type: Object, required: true },
 });
-
-const isAdminOrFinancial = computed(() =>
-    ['admin', 'financial'].includes(props.rule),
-);
 
 const modules = computed(() => {
     const all = [
-        {
-            key:       'schedule',
-            label:     props.t.module_schedule,
-            icon:      'ti ti-calendar',
-            iconClass: 'module-icon--schedule',
-            url:       route('panel.schedules.index'),
-            soon:      false,
-        },
+        ...(props.access.schedules
+            ? [{
+                key:       'schedule',
+                label:     props.t.module_schedule,
+                icon:      'ti ti-calendar',
+                iconClass: 'module-icon--schedule',
+                url:       route('panel.schedules.index'),
+                soon:      false,
+            }]
+            : []
+        ),
         {
             key:       'eye-images',
             label:     props.t.module_eye_images,
@@ -31,7 +33,7 @@ const modules = computed(() => {
             url:       route('panel.eye-images.index'),
             soon:      false,
         },
-        ...(isAdminOrFinancial.value
+        ...(props.access.financial
             ? [
                 {
                     key:       'tiss',
@@ -116,29 +118,32 @@ function resetShortcuts() {
 
 <template>
     <div class="d-flex justify-content-end mb-1">
-        <ActionDropdown
-            title="Escolher atalhos favoritos"
-            align="right"
-            :min-width="230"
-            btn-class="btn btn-sm btn-link text-muted text-decoration-none p-0"
-        >
-            <template #trigger>
-                <i class="ti ti-adjustments-horizontal me-1"></i>
-                <span class="fs-12">Atalhos</span>
-            </template>
+        <div data-tour="dashboard-shortcuts-customize">
+            <ActionDropdown
+                :title="t.shortcuts_title ?? 'Escolher atalhos favoritos'"
+                align="right"
+                :min-width="230"
+                btn-class="btn btn-sm btn-link text-muted text-decoration-none p-0"
+            >
+                <template #trigger>
+                    <i class="ti ti-adjustments-horizontal me-1" aria-hidden="true"></i>
+                    <span class="fs-12">{{ t.shortcuts ?? 'Atalhos' }}</span>
+                </template>
 
-            <ColumnOrderMenu
-                title="Atalhos favoritos"
-                :columns="orderedModules"
-                toggleable
-                @move="moveShortcut"
-                @toggle="toggleShortcut"
-                @reset="resetShortcuts"
-            />
-        </ActionDropdown>
+                <ColumnOrderMenu
+                    :title="t.shortcuts_menu ?? 'Atalhos favoritos'"
+                    :columns="orderedModules"
+                    :labels="orderLabels"
+                    toggleable
+                    @move="moveShortcut"
+                    @toggle="toggleShortcut"
+                    @reset="resetShortcuts"
+                />
+            </ActionDropdown>
+        </div>
     </div>
 
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4" data-tour="dashboard-shortcuts">
         <div v-for="mod in visibleModules" :key="mod.key" class="col-6 col-sm-4 col-md-2">
             <component
                 :is="mod.soon ? 'div' : 'a'"

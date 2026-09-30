@@ -9,33 +9,46 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 
 /**
- * Produção pendente do médico já com a regra aplicada e o repasse de cada
- * item — a mesma conta usada na apuração (tela/exportação) e no fechamento,
- * para que o valor conferido seja exatamente o valor fechado.
+ * Parcelas do regime por recebimento já com a regra aplicada — a mesma conta
+ * usada na apuração (tela/exportação) e no fechamento, para que o valor
+ * conferido seja exatamente o valor fechado.
  */
 final class DoctorPayoutCalculator
 {
     public function __construct(
-        private readonly DoctorPayoutProductionService $production,
-        private readonly DoctorPayoutRuleService $rules,
-        private readonly DoctorPayoutRuleResolver $resolver,
+        private readonly DoctorPayoutReleaseService $releases,
     ) {
     }
 
     /**
+     * Parcelas a liberar até o fim do período (o que o fechamento grava).
+     *
      * @return Collection<int, PayoutItemData>
      */
     public function pending(string $entityId, string $doctorId, CarbonImmutable $from, CarbonImmutable $to): Collection
     {
-        return $this->resolver->resolve(
-            $this->rules->activeRulesFor($entityId, $doctorId),
-            $this->production->pendingItems($entityId, $doctorId, $from, $to),
-        );
+        return $this->releases->compute($entityId, $doctorId, $from, $to)['releases'];
+    }
+
+    /**
+     * Parcelas a liberar + atos aguardando recebimento (apuração).
+     *
+     * @return array{releases: Collection<int, PayoutItemData>, awaiting: Collection<int, PayoutItemData>}
+     */
+    public function apuracao(string $entityId, string $doctorId, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        return $this->releases->compute($entityId, $doctorId, $from, $to);
+    }
+
+    /** Fim do último fechamento válido do médico (parcelas acumuladas até ele). */
+    public function lastClosedUntil(string $entityId, string $doctorId): ?string
+    {
+        return $this->releases->lastClosedUntil($entityId, $doctorId);
     }
 
     /**
      * Totais em centavos (o fechamento compara estes números com os que o
-     * usuário conferiu na prévia).
+     * usuário conferiu na prévia): base = recebido liberado nas parcelas.
      *
      * @param Collection<int, PayoutItemData> $items
      *

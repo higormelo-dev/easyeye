@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Domains\AI\Services\AiAssistantWidgetPropsBuilder;
 use App\Models\{Entity, Partner};
-use App\Support\PanelNavigation;
+use App\Support\{PanelNavigation, PanelTour};
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\{Storage, Vite};
 use Inertia\Middleware;
@@ -98,6 +98,11 @@ class HandleInertiaRequests extends Middleware
             'nav' => fn () => ($request->routeIs('panel.*') || $request->routeIs('manager.*')) && $request->user()
                 ? PanelNavigation::build()
                 : [],
+
+            // Tour guiado do painel da clínica (driver.js): textos, id por
+            // perfil e se o usuário já viu a versão atual. Null fora do painel
+            // de clínica — ver App\Support\PanelTour.
+            'tour' => fn () => PanelTour::props($request),
 
             // Widget flutuante do Assistente Virtual de IA — disponível em
             // QUALQUER tela do painel (não manager.*: gestão SaaS não é

@@ -6,7 +6,7 @@ namespace App\Services\Financial\DoctorPayouts;
 
 use App\DTOs\DoctorPayout\PayoutItemData;
 use App\Enums\{CashEntryReferenceType, FinancialEntryType, MedicalRecordProcedureStatus, ScheduleSituation};
-use App\Enums\DoctorPayout\{DoctorPayoutBaseSource, DoctorPayoutServiceType, DoctorPayoutSourceType, DoctorPayoutStatus, DoctorPayoutWarning};
+use App\Enums\DoctorPayout\{DoctorPayoutBaseSource, DoctorPayoutBasis, DoctorPayoutServiceType, DoctorPayoutSourceType, DoctorPayoutWarning};
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -14,8 +14,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Produção PENDENTE de um médico num período: atos realizados que ainda não
- * estão em nenhum fechamento válido (item com voided_at nulo).
+ * Atos realizados por um ou mais médicos num período — a produção sobre a
+ * qual o regime por RECEBIMENTO calcula parcelas (DoctorPayoutReleaseService).
+ * Vários médicos saem numa consulta por fonte (participante fixo de regra vê
+ * os atos dos demais sem uma consulta por médico). Ato já
+ * liberado continua aparecendo (pode receber complemento ou estorno); só sai
+ * o ato fechado no regime anterior (basis = production), que é final.
  *
  * Fontes:
  *  1. Agendamentos atendidos (médico do agendamento — o mesmo do faturamento
@@ -32,13 +36,16 @@ use Illuminate\Support\Facades\DB;
  * Um ato = um item: agendamento de procedimento cujo procedimento foi
  * executado no prontuário conta só pelo prontuário (com o valor cobrado do
  * agendamento como base); exame de equipamento vinculado a agendamento de
- * exame não conta de novo.
+ * exame não conta de novo. Se o agendamento já tem parcela liberada, ele
+ * continua sendo o ato (o procedimento marcado depois não vira outro ato).
+ * Procedimentos iguais pareados com o mesmo agendamento (ex.: OD e OE)
+ * dividem o valor cobrado nele (previsão) — mesma divisão do recebido.
  *
  * Isolamento: query builder com filtro EXPLÍCITO de clínica em todas as
  * fontes — o EntityScope também devolve linhas sem entity_id (prontuários
  * legados) e Doctor/PatientExam nem têm a coluna.
  *
- * Valor base ("valor cobrado") em centavos:
+ * Valor base ("valor cobrado", PREVISÃO do que será recebido) em centavos:
  *  - caixa: lançamentos de receita não cancelados do agendamento;
  *  - guia: rascunho/enviada/paga (paga → valor recebido; demais → valor − glosa);
  *  - tabela de preços só quando NUNCA houve lançamento nem guia (sem convênio
@@ -56,28 +63,54 @@ final class DoctorPayoutProductionService
 
     private const EXTERNAL_EXAM_SOURCE = 'external_import';
 
+    /** Médico que executou o procedimento (inclui quem saiu da clínica); sem vínculo, o do procedimento. */
+    private const PROCEDURE_EXECUTOR = <<<'SQL'
+        COALESCE(
+            (SELECT d.id FROM doctors d WHERE d.entity_user_id = mrp.executed_by ORDER BY d.created_at LIMIT 1),
+            mrp.doctor_id
+        )
+        SQL;
+
     /**
      * @return Collection<int, PayoutItemData> ordenado por data do ato
      */
-    public function pendingItems(string $entityId, string $doctorId, CarbonImmutable $from, CarbonImmutable $to): Collection
+    public function acts(string $entityId, string $doctorId, CarbonImmutable $from, CarbonImmutable $to): Collection
     {
+        return $this->actsOf($entityId, [$doctorId], $from, $to);
+    }
+
+    /**
+     * Atos de vários médicos (cada item com o próprio médico executor).
+     *
+     * @param list<string> $doctorIds
+     *
+     * @return Collection<int, PayoutItemData> ordenado por data do ato
+     */
+    public function actsOf(string $entityId, array $doctorIds, CarbonImmutable $from, CarbonImmutable $to): Collection
+    {
+        $doctorIds = array_values(array_unique($doctorIds));
+
+        if ($doctorIds === []) {
+            return collect();
+        }
+
         $start = $from->startOfDay()->format('Y-m-d H:i:s');
         $end   = $to->endOfDay()->format('Y-m-d H:i:s');
 
-        $schedules  = $this->scheduleRows($entityId, $doctorId, $start, $end);
-        $procedures = $this->procedureRows($entityId, $doctorId, $start, $end);
-        $exams      = $this->examRows($entityId, $doctorId, $start, $end);
+        $schedules  = $this->scheduleRows($entityId, $doctorIds, $start, $end);
+        $procedures = $this->procedureRows($entityId, $doctorIds, $start, $end);
+        $exams      = $this->examRows($entityId, $doctorIds, $start, $end);
 
         $covenants    = $this->covenants($this->covenantIds($schedules, $procedures, $exams));
         $particularId = $this->globalParticularCovenantId();
         $prices       = $this->prices($entityId, $schedules, $procedures, $particularId);
 
         $items = collect()
-            ->merge($schedules->map(fn (object $row) => $this->scheduleItem($row, $doctorId, $covenants, $prices, $particularId)))
-            ->merge($procedures->map(fn (object $row) => $this->procedureItem($row, $doctorId, $covenants, $prices, $particularId)))
-            ->merge($this->examItems($entityId, $exams, $doctorId, $covenants));
+            ->merge($schedules->map(fn (object $row) => $this->scheduleItem($row, $covenants, $prices, $particularId)))
+            ->merge($procedures->map(fn (object $row) => $this->procedureItem($row, $covenants, $prices, $particularId)))
+            ->merge($this->examItems($entityId, $exams, $covenants));
 
-        return $this->flagLateItems($entityId, $doctorId, $items)
+        return $items
             ->sortBy([
                 fn (PayoutItemData $a, PayoutItemData $b) => $a->performedAt <=> $b->performedAt,
                 fn (PayoutItemData $a, PayoutItemData $b) => strcmp($a->key(), $b->key()),
@@ -89,25 +122,33 @@ final class DoctorPayoutProductionService
     // Fonte 1 — agendamentos atendidos
     // ---------------------------------------------------------------------
 
-    private function scheduleRows(string $entityId, string $doctorId, string $start, string $end): Collection
+    /** @param list<string> $doctorIds */
+    private function scheduleRows(string $entityId, array $doctorIds, string $start, string $end): Collection
     {
-        $procedureDone = MedicalRecordProcedureStatus::Done->value;
+        $procedureDone      = MedicalRecordProcedureStatus::Done->value;
+        $procedureCancelled = MedicalRecordProcedureStatus::Cancelled->value;
+        $scheduleType       = DoctorPayoutSourceType::Schedule->value;
 
         return DB::table('schedules as s')
             ->leftJoin('visit_types as vt', 'vt.id', '=', 's.visit_id')
             ->leftJoin('procedures as vp', 'vp.id', '=', 'vt.procedure_id')
             ->leftJoinSub($this->cashTotals($entityId), 'ce', 'ce.schedule_id', '=', 's.id')
             ->leftJoinSub($this->claimTotals($entityId), 'bc', 'bc.schedule_id', '=', 's.id')
+            // Exames de equipamento do agendamento (agendamento de exame conta
+            // como o ato; o tipo do exame capturado é o que a regra "por tipo
+            // de exame" — ex.: OCT — precisa enxergar).
+            ->leftJoinLateral($this->linkedExamTypes(), 'lx')
             ->where('s.entity_id', $entityId)
-            ->where('s.doctor_id', $doctorId)
+            ->whereIn('s.doctor_id', $doctorIds)
             ->whereNull('s.deleted_at')
             ->where('s.situation', ScheduleSituation::Attended->value)
             // Repete o predicado do índice parcial (doctor_id, date_time): o
             // planner só usa o índice quando a consulta implica a condição dele.
             ->whereNotIn('s.situation', [ScheduleSituation::NoShow->value, ScheduleSituation::Cancelled->value])
             ->whereBetween('s.date_time', [$start, $end])
-            ->whereNotExists(fn (Builder $q) => $this->activePayoutItem($q, $entityId, DoctorPayoutSourceType::Schedule, 's.id'))
-            // Um ato = um item: procedimento agendado e executado no prontuário conta pelo prontuário.
+            ->whereNotExists(fn (Builder $q) => $this->legacyPayoutItem($q, $entityId, DoctorPayoutSourceType::Schedule, 's.id'))
+            // Um ato = um item: procedimento agendado e executado no prontuário conta
+            // pelo prontuário — salvo se o agendamento já tem parcela liberada.
             ->whereRaw(<<<SQL
                 NOT (COALESCE(vp.treatment, 0) = ? AND EXISTS (
                     SELECT 1
@@ -118,10 +159,18 @@ final class DoctorPayoutProductionService
                       AND mrp.deleted_at IS NULL
                       AND mrp.status = '{$procedureDone}'
                       AND mrp.procedure_id = vt.procedure_id
+                ) AND NOT EXISTS (
+                    SELECT 1
+                    FROM doctor_payout_items dpi_s
+                    WHERE dpi_s.entity_id = s.entity_id
+                      AND dpi_s.source_type = '{$scheduleType}'
+                      AND dpi_s.source_id = s.id::text
+                      AND dpi_s.voided_at IS NULL
                 ))
                 SQL, [self::TREATMENT_PROCEDURE])
             ->select([
                 's.id',
+                's.doctor_id',
                 's.date_time',
                 's.patient_id',
                 's.covenant_id',
@@ -136,6 +185,9 @@ final class DoctorPayoutProductionService
                 'bc.active_amount as claim_active_amount',
                 'bc.active_count as claim_active_count',
                 'bc.total_count as claim_total_count',
+                'lx.exam_type_count as linked_exam_type_count',
+                'lx.exam_type_id as linked_exam_type_id',
+                'lx.exam_type_name as linked_exam_type_name',
             ])
             ->selectRaw(<<<'SQL'
                 (SELECT mr.doctor_id
@@ -158,16 +210,58 @@ final class DoctorPayoutProductionService
                       AND mrp2.procedure_id IS DISTINCT FROM vt.procedure_id
                 ) AS has_other_procedure
                 SQL, [self::TREATMENT_PROCEDURE])
+            // Procedimento do agendamento registrado no prontuário só como
+            // cancelado (nenhum executado): o agendamento "atendido" continua
+            // contando (fallback de quem não registra a execução), com alerta.
+            ->selectRaw(<<<SQL
+                (COALESCE(vp.treatment, 0) = ? AND EXISTS (
+                    SELECT 1
+                    FROM medical_record_procedures mrp3
+                    JOIN medical_records mr3 ON mr3.id = mrp3.medical_record_id
+                    WHERE mr3.schedule_id = s.id
+                      AND mr3.deleted_at IS NULL
+                      AND mrp3.deleted_at IS NULL
+                      AND mrp3.status = '{$procedureCancelled}'
+                      AND mrp3.procedure_id = vt.procedure_id
+                ) AND NOT EXISTS (
+                    SELECT 1
+                    FROM medical_record_procedures mrp4
+                    JOIN medical_records mr4 ON mr4.id = mrp4.medical_record_id
+                    WHERE mr4.schedule_id = s.id
+                      AND mr4.deleted_at IS NULL
+                      AND mrp4.deleted_at IS NULL
+                      AND mrp4.status = '{$procedureDone}'
+                      AND mrp4.procedure_id = vt.procedure_id
+                )) AS procedure_cancelled
+                SQL, [self::TREATMENT_PROCEDURE])
             ->orderBy('s.date_time')
             ->get();
+    }
+
+    /**
+     * Tipos de exame capturados pelo equipamento para o agendamento (lateral,
+     * pelo índice de schedule_id): quantidade, e o tipo/nome quando é um só.
+     * Mesmos filtros da fonte de exames (ativo, sem importação externa).
+     */
+    private function linkedExamTypes(): Builder
+    {
+        return DB::table('patient_exams as lpe')
+            ->join('exam_types as let', 'let.id', '=', 'lpe.exam_id')
+            ->whereColumn('lpe.schedule_id', 's.id')
+            ->where('lpe.active', true)
+            ->where(fn (Builder $q) => $q->whereNull('lpe.source')->orWhere('lpe.source', '<>', self::EXTERNAL_EXAM_SOURCE))
+            ->selectRaw('COUNT(DISTINCT lpe.exam_id) AS exam_type_count')
+            ->selectRaw('MIN(lpe.exam_id::text) AS exam_type_id')
+            ->selectRaw('MIN(let.name) AS exam_type_name');
     }
 
     /**
      * @param array<string, object> $covenants
      * @param array<string, int>    $prices
      */
-    private function scheduleItem(object $row, string $doctorId, array $covenants, array $prices, ?string $particularId): PayoutItemData
+    private function scheduleItem(object $row, array $covenants, array $prices, ?string $particularId): PayoutItemData
     {
+        $doctorId    = (string) $row->doctor_id;
         $serviceType = match ((int) ($row->visit_treatment ?? 0)) {
             self::TREATMENT_EXAM      => DoctorPayoutServiceType::Exam,
             self::TREATMENT_PROCEDURE => DoctorPayoutServiceType::Procedure,
@@ -177,6 +271,16 @@ final class DoctorPayoutProductionService
         $description = $serviceType === DoctorPayoutServiceType::Consultation
             ? ($row->visit_type_name ?? __('financial_doctor_payouts.descriptions.consultation'))
             : ($row->visit_procedure_name ?? $row->visit_type_name ?? $serviceType->label());
+
+        // Agendamento de exame com UM tipo de exame capturado: o ato leva esse
+        // tipo (a regra por tipo de exame vale; a por tipo de atendimento
+        // continua vencendo pela especificidade) e o nome do exame feito.
+        $examTypes  = $serviceType === DoctorPayoutServiceType::Exam ? (int) ($row->linked_exam_type_count ?? 0) : 0;
+        $examTypeId = $examTypes === 1 ? $row->linked_exam_type_id : null;
+
+        if ($examTypeId !== null) {
+            $description = (string) $row->linked_exam_type_name;
+        }
 
         [$baseCents, $baseSource, $warnings] = $this->chargedBase(
             $row,
@@ -189,6 +293,14 @@ final class DoctorPayoutProductionService
 
         if ((bool) $row->has_other_procedure && $baseSource === DoctorPayoutBaseSource::Charged) {
             $warnings[] = DoctorPayoutWarning::SharedCharge;
+        }
+
+        if ($examTypes > 1) {
+            $warnings[] = DoctorPayoutWarning::MultipleExamTypes;
+        }
+
+        if ((bool) $row->procedure_cancelled) {
+            $warnings[] = DoctorPayoutWarning::ProcedureCancelled;
         }
 
         [$covenantName, $isParticular] = $this->payer($covenants, $row->covenant_id);
@@ -206,7 +318,7 @@ final class DoctorPayoutProductionService
             description: (string) $description,
             visitTypeId: $row->visit_id,
             procedureId: $row->visit_procedure_id,
-            examTypeId: null,
+            examTypeId: $examTypeId,
             baseCents: $baseCents,
             baseSource: $baseSource,
             warnings: $warnings,
@@ -217,7 +329,8 @@ final class DoctorPayoutProductionService
     // Fonte 2 — procedimentos executados no prontuário
     // ---------------------------------------------------------------------
 
-    private function procedureRows(string $entityId, string $doctorId, string $start, string $end): Collection
+    /** @param list<string> $doctorIds */
+    private function procedureRows(string $entityId, array $doctorIds, string $start, string $end): Collection
     {
         return DB::table('medical_record_procedures as mrp')
             ->join('medical_records as mr', 'mr.id', '=', 'mrp.medical_record_id')
@@ -234,15 +347,9 @@ final class DoctorPayoutProductionService
             ->whereBetween('mrp.executed_at', [$start, $end])
             // Tratamento nulo (procedimento sem classificação) conta como procedimento.
             ->whereRaw('COALESCE(p.treatment, ?) = ?', [self::TREATMENT_PROCEDURE, self::TREATMENT_PROCEDURE])
-            // Médico que executou (inclui quem saiu da clínica); sem vínculo, o do procedimento.
-            ->whereRaw(<<<'SQL'
-                COALESCE(
-                    (SELECT d.id FROM doctors d WHERE d.entity_user_id = mrp.executed_by ORDER BY d.created_at LIMIT 1),
-                    mrp.doctor_id
-                ) = ?
-                SQL, [$doctorId])
-            ->whereNotExists(fn (Builder $q) => $this->activePayoutItem($q, $entityId, DoctorPayoutSourceType::MedicalRecordProcedure, 'mrp.id'))
-            // Se o agendamento pareado já foi fechado (antes da execução ser marcada), o ato já foi pago.
+            ->whereRaw(self::PROCEDURE_EXECUTOR . ' IN (' . implode(', ', array_fill(0, count($doctorIds), '?')) . ')', $doctorIds)
+            ->whereNotExists(fn (Builder $q) => $this->legacyPayoutItem($q, $entityId, DoctorPayoutSourceType::MedicalRecordProcedure, 'mrp.id'))
+            // Agendamento pareado com parcela/fechamento válido: o ato é o agendamento.
             ->whereNotExists(fn (Builder $q) => $this->activePayoutItem($q, $entityId, DoctorPayoutSourceType::Schedule, 's.id')
                 ->whereColumn('vt.procedure_id', 'mrp.procedure_id'))
             ->select([
@@ -260,8 +367,10 @@ final class DoctorPayoutProductionService
                 'bc.active_count as claim_active_count',
                 'bc.total_count as claim_total_count',
             ])
+            ->selectRaw(self::PROCEDURE_EXECUTOR . ' AS executor_id')
             ->selectRaw('COALESCE(s.covenant_id, pat.covenant_id) AS covenant_id')
             ->selectRaw('(vt.procedure_id IS NOT NULL AND vt.procedure_id = mrp.procedure_id) AS paired')
+            ->selectRaw(self::pairedSiblingsSelect())
             ->orderBy('mrp.executed_at')
             ->get();
     }
@@ -270,8 +379,9 @@ final class DoctorPayoutProductionService
      * @param array<string, object> $covenants
      * @param array<string, int>    $prices
      */
-    private function procedureItem(object $row, string $doctorId, array $covenants, array $prices, ?string $particularId): PayoutItemData
+    private function procedureItem(object $row, array $covenants, array $prices, ?string $particularId): PayoutItemData
     {
+        $doctorId   = (string) $row->executor_id;
         $tablePrice = $this->priceFor($prices, $row->covenant_id ?? $particularId, $row->procedure_id);
 
         // Pareado com o agendamento do mesmo procedimento: o valor cobrado no
@@ -280,6 +390,16 @@ final class DoctorPayoutProductionService
         [$baseCents, $baseSource, $warnings] = (bool) $row->paired
             ? $this->chargedBase($row, $tablePrice)
             : $this->tableBase($tablePrice);
+
+        // Vários procedimentos iguais pareados com o mesmo agendamento (ex.: OD
+        // e OE em linhas separadas) dividem a MESMA cobrança — a mesma divisão
+        // (posição por executed_at, id) que o recebido usa nas parcelas.
+        $pairedCount = (int) ($row->paired_count ?? 0);
+
+        if ((bool) $row->paired && $baseSource === DoctorPayoutBaseSource::Charged && $pairedCount > 1) {
+            $baseCents  = Money::allocate($baseCents, $pairedCount)[min((int) $row->paired_rank, $pairedCount - 1)];
+            $warnings[] = DoctorPayoutWarning::SplitCharge;
+        }
 
         [$covenantName, $isParticular] = $this->payer($covenants, $row->covenant_id);
 
@@ -307,7 +427,8 @@ final class DoctorPayoutProductionService
     // Fonte 3 — exames de equipamento
     // ---------------------------------------------------------------------
 
-    private function examRows(string $entityId, string $doctorId, string $start, string $end): Collection
+    /** @param list<string> $doctorIds */
+    private function examRows(string $entityId, array $doctorIds, string $start, string $end): Collection
     {
         $examDay = 'CAST(COALESCE(pe.exam_performed_at, pe.created_at) AS date)';
 
@@ -318,13 +439,13 @@ final class DoctorPayoutProductionService
             ->leftJoin('visit_types as vt', 'vt.id', '=', 's.visit_id')
             ->leftJoin('procedures as vp', 'vp.id', '=', 'vt.procedure_id')
             ->where('pat.entity_id', $entityId)
-            ->where('pe.doctor_id', $doctorId)
+            ->whereIn('pe.doctor_id', $doctorIds)
             ->where('pe.active', true)
             ->where(fn (Builder $q) => $q->whereNull('pe.source')->orWhere('pe.source', '<>', self::EXTERNAL_EXAM_SOURCE))
             ->whereRaw('COALESCE(pe.exam_performed_at, pe.created_at) BETWEEN ? AND ?', [$start, $end])
-            ->groupBy('pe.patient_id', 'pe.exam_id', 'et.name')
+            ->groupBy('pe.doctor_id', 'pe.patient_id', 'pe.exam_id', 'et.name')
             ->groupByRaw($examDay)
-            ->select(['pe.patient_id', 'pe.exam_id', 'et.name as exam_name'])
+            ->select(['pe.doctor_id', 'pe.patient_id', 'pe.exam_id', 'et.name as exam_name'])
             ->selectRaw("{$examDay} AS exam_date")
             ->selectRaw('MIN(COALESCE(pe.exam_performed_at, pe.created_at)) AS performed_at')
             ->selectRaw('MIN(s.covenant_id::text) AS schedule_covenant_id')
@@ -347,13 +468,14 @@ final class DoctorPayoutProductionService
      *
      * @return Collection<int, PayoutItemData>
      */
-    private function examItems(string $entityId, Collection $rows, string $doctorId, array $covenants): Collection
+    private function examItems(string $entityId, Collection $rows, array $covenants): Collection
     {
-        // Agrupamento feito em SQL: o "já fechado" do exame é filtrado aqui,
-        // pela mesma chave gravada no item do fechamento.
+        // Agrupamento feito em SQL: o "fechado no regime anterior" do exame é
+        // filtrado aqui, pela mesma chave gravada no item do fechamento.
         $closed = $rows->isEmpty() ? [] : DB::table('doctor_payout_items')
             ->where('entity_id', $entityId)
             ->where('source_type', DoctorPayoutSourceType::PatientExam->value)
+            ->where('basis', DoctorPayoutBasis::Production->value)
             ->whereNull('voided_at')
             ->whereIn('source_id', $rows->pluck('source_id')->all())
             ->pluck('source_id')
@@ -362,7 +484,7 @@ final class DoctorPayoutProductionService
 
         return $rows
             ->reject(fn (object $row) => (bool) $row->linked_exam_appointment || isset($closed[$row->source_id]))
-            ->map(function (object $row) use ($doctorId, $covenants): PayoutItemData {
+            ->map(function (object $row) use ($covenants): PayoutItemData {
                 [$covenantName, $isParticular] = $this->payer($covenants, $row->covenant_id);
 
                 return new PayoutItemData(
@@ -370,7 +492,7 @@ final class DoctorPayoutProductionService
                     sourceId: $row->source_id,
                     serviceType: DoctorPayoutServiceType::Exam,
                     performedAt: CarbonImmutable::parse($row->performed_at),
-                    doctorId: $doctorId,
+                    doctorId: (string) $row->doctor_id,
                     patientId: $row->patient_id,
                     covenantId: $row->covenant_id,
                     covenantName: $covenantName,
@@ -386,10 +508,58 @@ final class DoctorPayoutProductionService
             ->values();
     }
 
+    /**
+     * Exames de equipamento do período SEM médico (integrador sem agendamento
+     * no dia): não entram no repasse de ninguém — a apuração avisa. Contados
+     * como atos (paciente + tipo + dia), com os mesmos filtros da fonte.
+     */
+    public function unassignedExamCount(string $entityId, CarbonImmutable $from, CarbonImmutable $to): int
+    {
+        return (int) DB::table('patient_exams as pe')
+            ->join('patients as pat', 'pat.id', '=', 'pe.patient_id')
+            ->where('pat.entity_id', $entityId)
+            ->whereNull('pe.doctor_id')
+            ->where('pe.active', true)
+            ->where(fn (Builder $q) => $q->whereNull('pe.source')->orWhere('pe.source', '<>', self::EXTERNAL_EXAM_SOURCE))
+            ->whereRaw('COALESCE(pe.exam_performed_at, pe.created_at) BETWEEN ? AND ?', [
+                $from->startOfDay()->format('Y-m-d H:i:s'),
+                $to->endOfDay()->format('Y-m-d H:i:s'),
+            ])
+            ->selectRaw('COUNT(DISTINCT (pe.patient_id, pe.exam_id, CAST(COALESCE(pe.exam_performed_at, pe.created_at) AS date))) AS acts')
+            ->value('acts');
+    }
+
     /** Chave do exame de equipamento: paciente|tipo|data local (Y-m-d). */
     public static function examKey(string $patientId, string $examTypeId, string $date): string
     {
         return $patientId . '|' . $examTypeId . '|' . substr($date, 0, 10);
+    }
+
+    /**
+     * Procedimentos iguais executados pareados com o mesmo agendamento: quantos
+     * são (paired_count) e a posição deste por (executed_at, id) (paired_rank)
+     * — a ordem do rateio (Money::allocate) da previsão e do recebido. Requer
+     * os aliases mrp (medical_record_procedures) e s (schedules).
+     */
+    public static function pairedSiblingsSelect(): string
+    {
+        $done = MedicalRecordProcedureStatus::Done->value;
+
+        $siblings = <<<SQL
+            FROM medical_record_procedures sib
+            JOIN medical_records sib_mr ON sib_mr.id = sib.medical_record_id
+            WHERE sib_mr.schedule_id = s.id
+              AND sib_mr.deleted_at IS NULL
+              AND sib.deleted_at IS NULL
+              AND sib.entity_id = mrp.entity_id
+              AND sib.status = '{$done}'
+              AND sib.procedure_id = mrp.procedure_id
+            SQL;
+
+        return <<<SQL
+            (SELECT COUNT(*) {$siblings}) AS paired_count,
+            (SELECT COUNT(*) {$siblings} AND (sib.executed_at, sib.id) < (mrp.executed_at, mrp.id)) AS paired_rank
+            SQL;
     }
 
     // ---------------------------------------------------------------------
@@ -465,6 +635,13 @@ final class DoctorPayoutProductionService
             ->whereNotNull('schedule_id')
             ->whereNull('deleted_at')
             ->groupBy('schedule_id');
+    }
+
+    /** Subconsulta "o ato foi fechado no regime anterior (produção)" — fechamento final. */
+    private function legacyPayoutItem(Builder $query, string $entityId, DoctorPayoutSourceType $type, string $column): Builder
+    {
+        return $this->activePayoutItem($query, $entityId, $type, $column)
+            ->where('dpi.basis', DoctorPayoutBasis::Production->value);
     }
 
     /** Subconsulta "o ato já está num fechamento válido". */
@@ -583,47 +760,5 @@ final class DoctorPayoutProductionService
         }
 
         return $prices[$covenantId . ':' . $procedureId] ?? null;
-    }
-
-    // ---------------------------------------------------------------------
-    // Alertas
-    // ---------------------------------------------------------------------
-
-    /**
-     * Item pendente com data dentro de um período já fechado para o médico:
-     * entrou depois do fechamento (atendimento marcado tarde, reenvio de exame)
-     * — revisar antes de pagar num fechamento complementar.
-     *
-     * @param Collection<int, PayoutItemData> $items
-     *
-     * @return Collection<int, PayoutItemData>
-     */
-    private function flagLateItems(string $entityId, string $doctorId, Collection $items): Collection
-    {
-        if ($items->isEmpty()) {
-            return $items;
-        }
-
-        $periods = DB::table('doctor_payouts')
-            ->where('entity_id', $entityId)
-            ->where('doctor_id', $doctorId)
-            ->where('status', '<>', DoctorPayoutStatus::Cancelled->value)
-            ->get(['period_start', 'period_end']);
-
-        if ($periods->isEmpty()) {
-            return $items;
-        }
-
-        return $items->map(function (PayoutItemData $item) use ($periods): PayoutItemData {
-            $day = $item->performedAt->toDateString();
-
-            foreach ($periods as $period) {
-                if ($period->period_start <= $day && $day <= $period->period_end) {
-                    return $item->withWarning(DoctorPayoutWarning::LateItem);
-                }
-            }
-
-            return $item;
-        });
     }
 }

@@ -413,6 +413,41 @@ it('[GAP] admin COM o módulo de estoque no plano vê o menu normalmente (bypass
 // inteiramente do menu, acessíveis só pelo dropdown "Relatórios" dentro da
 // própria tela de Agendas — ver SchedulesReportsButtonTest.php) ──────────
 
+it('[BUGFIX] "Agendas" e "Pacientes" espelham as rotas: financeiro não vê Agendas; perfil usuário só vê Pacientes com patients.manage', function () {
+    $this->seed(PermissionsSeeder::class);
+
+    $financial   = User::factory()->create();
+    $financialEu = createEntityUser($this->entity, $financial, ClientRule::Financial->value);
+    session(panelSession($financialEu));
+    $this->actingAs($financial);
+
+    $nav = PanelNavigation::build();
+    expect(findNavItemByKey($nav, 'schedules'))->toBeNull()
+        ->and(findNavItemByKey($nav, 'patients'))->not->toBeNull();
+
+    // O item existia e levava a um 403 (entity.role:admin,doctor,secretary).
+    $this->withSession(panelSession($financialEu))->get(route('panel.schedules.index'))->assertForbidden();
+
+    $plain   = User::factory()->create();
+    $plainEu = createEntityUser($this->entity, $plain, ClientRule::User->value);
+    session(panelSession($plainEu));
+    $this->actingAs($plain);
+
+    $nav = PanelNavigation::build();
+    expect(findNavItemByKey($nav, 'schedules'))->toBeNull()
+        ->and(findNavItemByKey($nav, 'patients'))->toBeNull();
+
+    $permission = PermissionRecord::where('key', Permission::PatientsManage->value)->firstOrFail();
+    $role       = Role::query()->create(['entity_id' => $this->entity->id, 'name' => 'Cadastro de pacientes']);
+    $role->permissions()->sync([$permission->id]);
+    $plainEu->roles()->sync([$role->id]);
+
+    // hasPermissionInEntity() cacheia por instância de User: usuário fresco.
+    $this->actingAs(User::find($plain->id));
+
+    expect(findNavItemByKey(PanelNavigation::build(), 'patients'))->not->toBeNull();
+});
+
 it('[GAP] "Agendas" é SEMPRE link direto (nunca submenu) — admin/financeiro e secretária', function () {
     session(panelSession($this->adminEntityUser));
     $adminItem = findNavItemByKey(PanelNavigation::build(), 'schedules');

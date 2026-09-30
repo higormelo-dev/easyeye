@@ -1,0 +1,558 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-30T02:54:46Z",
+  "title": "Design System: EasyEye",
+  "extensions": {
+    "colorMeta": {
+      "navy": {
+        "role": "primary",
+        "displayName": "Azul-marinho",
+        "tonalRamp": [
+          "oklch(15.00% 0.08550 262.32)",
+          "oklch(26.43% 0.08550 262.32)",
+          "oklch(37.86% 0.08550 262.32)",
+          "oklch(49.29% 0.08550 262.32)",
+          "oklch(60.71% 0.08550 262.32)",
+          "oklch(72.14% 0.08550 262.32)",
+          "oklch(83.57% 0.08550 262.32)",
+          "oklch(95.00% 0.08550 262.32)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "navy-mid": {
+        "role": "primary",
+        "displayName": "Azul-marinho intermediário",
+        "tonalRamp": [
+          "oklch(15.00% 0.09299 259.24)",
+          "oklch(26.43% 0.09299 259.24)",
+          "oklch(37.86% 0.09299 259.24)",
+          "oklch(49.29% 0.09299 259.24)",
+          "oklch(60.71% 0.09299 259.24)",
+          "oklch(72.14% 0.09299 259.24)",
+          "oklch(83.57% 0.09299 259.24)",
+          "oklch(95.00% 0.09299 259.24)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "navy-dark": {
+        "role": "neutral",
+        "displayName": "Azul-marinho profundo",
+        "tonalRamp": [
+          "oklch(15.00% 0.04028 258.29)",
+          "oklch(26.43% 0.04028 258.29)",
+          "oklch(37.86% 0.04028 258.29)",
+          "oklch(49.29% 0.04028 258.29)",
+          "oklch(60.71% 0.04028 258.29)",
+          "oklch(72.14% 0.04028 258.29)",
+          "oklch(83.57% 0.04028 258.29)",
+          "oklch(95.00% 0.04028 258.29)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "blue": {
+        "role": "secondary",
+        "displayName": "Azul de apoio",
+        "tonalRamp": [
+          "oklch(15.00% 0.16556 259.15)",
+          "oklch(26.43% 0.16556 259.15)",
+          "oklch(37.86% 0.16556 259.15)",
+          "oklch(49.29% 0.16556 259.15)",
+          "oklch(60.71% 0.16556 259.15)",
+          "oklch(72.14% 0.16556 259.15)",
+          "oklch(83.57% 0.16556 259.15)",
+          "oklch(95.00% 0.16556 259.15)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "teal": {
+        "role": "primary",
+        "displayName": "Teal",
+        "tonalRamp": [
+          "oklch(15.00% 0.12863 218.98)",
+          "oklch(26.43% 0.12863 218.98)",
+          "oklch(37.86% 0.12863 218.98)",
+          "oklch(49.29% 0.12863 218.98)",
+          "oklch(60.71% 0.12863 218.98)",
+          "oklch(72.14% 0.12863 218.98)",
+          "oklch(83.57% 0.12863 218.98)",
+          "oklch(95.00% 0.12863 218.98)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "teal-lt": {
+        "role": "primary",
+        "displayName": "Teal claro",
+        "tonalRamp": [
+          "oklch(15.00% 0.08090 210.70)",
+          "oklch(26.43% 0.08090 210.70)",
+          "oklch(37.86% 0.08090 210.70)",
+          "oklch(49.29% 0.08090 210.70)",
+          "oklch(60.71% 0.08090 210.70)",
+          "oklch(72.14% 0.08090 210.70)",
+          "oklch(83.57% 0.08090 210.70)",
+          "oklch(95.00% 0.08090 210.70)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "teal-ink": {
+        "role": "primary",
+        "displayName": "Teal de leitura",
+        "tonalRamp": [
+          "oklch(15.00% 0.09282 221.32)",
+          "oklch(26.43% 0.09282 221.32)",
+          "oklch(37.86% 0.09282 221.32)",
+          "oklch(49.29% 0.09282 221.32)",
+          "oklch(60.71% 0.09282 221.32)",
+          "oklch(72.14% 0.09282 221.32)",
+          "oklch(83.57% 0.09282 221.32)",
+          "oklch(95.00% 0.09282 221.32)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "mint": {
+        "role": "secondary",
+        "displayName": "Verde de confirmação",
+        "tonalRamp": [
+          "oklch(15.00% 0.15953 166.57)",
+          "oklch(26.43% 0.15953 166.57)",
+          "oklch(37.86% 0.15953 166.57)",
+          "oklch(49.29% 0.15953 166.57)",
+          "oklch(60.71% 0.15953 166.57)",
+          "oklch(72.14% 0.15953 166.57)",
+          "oklch(83.57% 0.15953 166.57)",
+          "oklch(95.00% 0.15953 166.57)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "bg": {
+        "role": "neutral",
+        "displayName": "Fundo frio",
+        "tonalRamp": [
+          "oklch(15.00% 0.00623 255.47)",
+          "oklch(26.43% 0.00623 255.47)",
+          "oklch(37.86% 0.00623 255.47)",
+          "oklch(49.29% 0.00623 255.47)",
+          "oklch(60.71% 0.00623 255.47)",
+          "oklch(72.14% 0.00623 255.47)",
+          "oklch(83.57% 0.00623 255.47)",
+          "oklch(95.00% 0.00623 255.47)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "bg-white": {
+        "role": "neutral",
+        "displayName": "Branco",
+        "tonalRamp": [
+          "oklch(15.00% 0.00000 0.00)",
+          "oklch(26.43% 0.00000 0.00)",
+          "oklch(37.86% 0.00000 0.00)",
+          "oklch(49.29% 0.00000 0.00)",
+          "oklch(60.71% 0.00000 0.00)",
+          "oklch(72.14% 0.00000 0.00)",
+          "oklch(83.57% 0.00000 0.00)",
+          "oklch(95.00% 0.00000 0.00)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Texto principal",
+        "tonalRamp": [
+          "oklch(15.00% 0.02470 263.95)",
+          "oklch(26.43% 0.02470 263.95)",
+          "oklch(37.86% 0.02470 263.95)",
+          "oklch(49.29% 0.02470 263.95)",
+          "oklch(60.71% 0.02470 263.95)",
+          "oklch(72.14% 0.02470 263.95)",
+          "oklch(83.57% 0.02470 263.95)",
+          "oklch(95.00% 0.02470 263.95)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Texto secundário",
+        "tonalRamp": [
+          "oklch(15.00% 0.03998 256.41)",
+          "oklch(26.43% 0.03998 256.41)",
+          "oklch(37.86% 0.03998 256.41)",
+          "oklch(49.29% 0.03998 256.41)",
+          "oklch(60.71% 0.03998 256.41)",
+          "oklch(72.14% 0.03998 256.41)",
+          "oklch(83.57% 0.03998 256.41)",
+          "oklch(95.00% 0.03998 256.41)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Divisória fria",
+        "tonalRamp": [
+          "oklch(15.00% 0.01262 255.51)",
+          "oklch(26.43% 0.01262 255.51)",
+          "oklch(37.86% 0.01262 255.51)",
+          "oklch(49.29% 0.01262 255.51)",
+          "oklch(60.71% 0.01262 255.51)",
+          "oklch(72.14% 0.01262 255.51)",
+          "oklch(83.57% 0.01262 255.51)",
+          "oklch(95.00% 0.01262 255.51)"
+        ],
+        "tonalRampSource": "generated-exploratory",
+        "tonalRampNote": "Rampa exploratória gerada do token existente para a prévia. Não é uma escala normativa nem adiciona cores à identidade. Mantém matiz/croma; o navegador pode mapear tons fora de gamut."
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Título do hero em Inter, 900; escala 38–64px com termo fluido rem + vw, entrelinha 1.08 e tracking -0.02em."
+      },
+      "headline": {
+        "displayName": "Título de seção",
+        "purpose": "Títulos h2 da landing e CTA final; Inter 800, escala 28–44px, entrelinha 1.16 e tracking -0.015em. Títulos de seção limitados a 30ch."
+      },
+      "title-panel": {
+        "displayName": "Título de painel",
+        "purpose": "Títulos de painéis internos, incluindo integrador, créditos e conformidade; Inter 800, escala 20–24px em rem + vw, entrelinha 1.25 e tracking -0.015em."
+      },
+      "title-card": {
+        "displayName": "Título de cartão",
+        "purpose": "Títulos de públicos, planos e formulário; Inter 800, 20px, entrelinha 1.25."
+      },
+      "title-item": {
+        "displayName": "Título de item",
+        "purpose": "Dor, diferencial, passo e contato; Inter 700, 18px, entrelinha 1.35."
+      },
+      "lead": {
+        "displayName": "Introdução",
+        "purpose": "Introduções de seção; 18px/1.6 e medida de até 60ch. Hero mantém variação contextual 17–20px/1.65."
+      },
+      "body": {
+        "displayName": "Corpo",
+        "purpose": "Prosa ordinária, passos e FAQ; Inter 400, 16px/1.65. A medida do FAQ é limitada a 68ch."
+      },
+      "body-card": {
+        "displayName": "Corpo de cartão",
+        "purpose": "Prosa de cartões, públicos, planos e créditos; 16px/1.6. Depoimentos usam entrelinha 1.65; a prosa de créditos tem medida de até 68ch."
+      },
+      "label": {
+        "displayName": "Rótulo",
+        "purpose": "Botões e rótulos de formulário: 15px/600/1.6. O valor dos campos é 16px/1.5 em todos os tamanhos. Eyebrows existentes em maiúsculas conservam 12px/700 e tracking próprio; não são corpo de leitura."
+      },
+      "meta": {
+        "displayName": "Metadado",
+        "purpose": "Contexto secundário, descrições curtas e informações de apoio; 14px/1.55."
+      },
+      "micro": {
+        "displayName": "Texto auxiliar",
+        "purpose": "Atribuição, notas e informação breve; 13px/1.5."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Métricas em 900 com tabular-nums e tracking -0.01em; tamanho contextual. Os preços possuem o papel próprio price."
+      },
+      "price": {
+        "displayName": "Preço",
+        "purpose": "Preços dos planos em Inter 900, tabular-nums, escala 36–44px: clamp(2.25rem, calc(1.75rem + 1vw), 2.75rem), entrelinha 1.1 e tracking -0.01em. Sob consulta usa 20–24px/800/1.25. Sem redução tipográfica por breakpoint mobile; até 14rem internos, moeda e valor se empilham."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow",
+        "value": "0 4px 24px rgba(15,37,81,0.08)",
+        "purpose": "Sombra compartilhada de superfície, aplicada ao formulário de contato."
+      },
+      {
+        "name": "shadow-lg",
+        "value": "0 12px 48px rgba(15,37,81,0.14)",
+        "purpose": "Elevação maior, usada no demonstrador e em elementos de navegação auxiliares."
+      },
+      {
+        "name": "navbar-scrolled",
+        "value": "0 2px 20px rgba(15,37,81,0.08)",
+        "purpose": "Separação da navegação fixa após rolagem, com fundo branco a 97% e blur de 12px."
+      },
+      {
+        "name": "hero-mockup",
+        "value": "0 32px 80px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15)",
+        "purpose": "Moldura visual do produto sobre o hero navy; backdrop-filter de 24px."
+      },
+      {
+        "name": "hero-float-card",
+        "value": "0 1px 2px rgba(0,0,0,0.06), 0 12px 32px rgba(0,0,0,0.14), 0 24px 56px rgba(0,0,0,0.08)",
+        "purpose": "Cartões brancos junto à captura acima de 640px; no celular, as notas formam uma legenda estática sem essa sombra."
+      },
+      {
+        "name": "button-primary-hover",
+        "value": "0 4px 12px rgba(15,37,81,0.12)",
+        "purpose": "Feedback discreto de hover nos botões da landing, somente com hover disponível e ponteiro preciso."
+      },
+      {
+        "name": "button-outline-hover",
+        "value": "0 4px 12px rgba(15,37,81,0.12)",
+        "purpose": "Feedback discreto de hover nos botões da landing, somente com hover disponível e ponteiro preciso."
+      },
+      {
+        "name": "input-focus",
+        "value": "0 0 0 4px rgba(0,180,216,0.12), 0 1px 2px rgba(0,0,0,0.05)",
+        "purpose": "Halo de foco do campo; borda teal e fundo branco."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Desaceleração compartilhada das transições, sem overshoot; hero e métricas usam seus easings específicos."
+      },
+      {
+        "name": "dur-press",
+        "value": "90ms",
+        "purpose": "Pressão imediata dos botões da landing com escala .985, com precedência sobre o hover."
+      },
+      {
+        "name": "dur-fast",
+        "value": "160ms",
+        "purpose": "Transformação, sombra e cores dos botões da landing; cores de detalhes e feedback breve de estado."
+      },
+      {
+        "name": "dur-base",
+        "value": "260ms",
+        "purpose": "Expansão e recolhimento do FAQ, troca dos painéis da demonstração e entrada do menu móvel."
+      },
+      {
+        "name": "button-hover",
+        "value": "translateY(-1px)",
+        "purpose": "Somente com hover disponível e ponteiro preciso; a preferência por reduzir movimento remove o deslocamento e preserva cor e sombra."
+      },
+      {
+        "name": "directional-arrow",
+        "value": "translateX(2px)",
+        "purpose": "Seta direcional de botões e CTA do integrador em hover ou foco visível com ponteiro preciso, sem movimento reduzido. No integrador, a transição dura 160ms."
+      },
+      {
+        "name": "hero-entrance",
+        "value": "620ms desktop; 580ms até 640px; expo.out",
+        "purpose": "Uma entrada por montagem, sem loops. Título: 440ms desde 0; subtítulo: 420ms desde 60; sinais de confiança: 380ms desde 120; captura: 500ms desde 80; cartões acima de 640px: 420ms desde 160/200. Textos/cartões partem de opacidade .94; captura de .96 e escala .985; deslocamentos por eixo entre 4 e 12px. CTAs e formas decorativas ficam estáticos. Ao concluir, remove estilos inline de transform/opacity; resize não recria a entrada."
+      },
+      {
+        "name": "metric-count",
+        "value": "700ms; power2.out",
+        "purpose": "Uma contagem para cada indicador positivo ao entrar na tela. Preserva locale, prefixos, sufixos e casas decimais; restaura o texto original ao concluir. Indicadores de valor zero ficam estáticos."
+      },
+      {
+        "name": "navbar-transition",
+        "value": "350ms",
+        "purpose": "Fundo, sombra, espaçamento e troca de versões do logo."
+      },
+      {
+        "name": "demo-timer",
+        "value": "5s linear",
+        "purpose": "Troca automática das abas; pausa por hover, foco, fora da tela ou documento oculto. Escolher uma aba desliga a reprodução; movimento reduzido inicial ou ativado durante o uso também a desliga."
+      },
+      {
+        "name": "tiss-step-delay",
+        "value": "120ms",
+        "purpose": "Intervalo por etapa no fluxo TISS observado; sem atraso sob movimento reduzido."
+      },
+      {
+        "name": "card-rise",
+        "value": "opacity .94 → 1; translate 0 8px → 0 0; animation-timeline: view()",
+        "purpose": "Somente cartões de funcionalidades, com suporte a view timeline e sem movimento reduzido. Faixas entry 5%–70%, 8%–73% e 11%–76% para os três cartões. Conteúdo visível antes e sem suporte."
+      },
+      {
+        "name": "state-feedback",
+        "value": "160ms ease-out; opacity .85 → 1",
+        "purpose": "Abertura dos detalhes de funcionalidades, problemas, diferenciais e campos opcionais; mensagens de erro e sucesso do formulário. Feedback não condiciona visibilidade nem envio e não anima sob movimento reduzido."
+      },
+      {
+        "name": "pricing-details",
+        "value": "160ms cubic-bezier(0.16, 1, 0.3, 1); opacity .85 → 1",
+        "purpose": "Abertura nativa dos detalhes dos planos; chevron gira 180° no mesmo tempo e a cor responde em 160ms. Movimento reduzido remove fade e transição do chevron, preservando o estado aberto."
+      },
+      {
+        "name": "visibility-pause",
+        "value": "document.hidden",
+        "purpose": "Pausa a timeline do hero, contadores em andamento e a demonstração quando a aba fica oculta; ao retornar, retoma apenas movimentos elegíveis, sem reproduzir novamente os já concluídos."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Remove deslocamentos animados, entradas, contadores, spinner e rolagem suave; cor, sombra e estados continuam disponíveis. A alteração durante o uso reverte o contexto GSAP, restaura números e interrompe a reprodução automática pertinente; retornar à preferência normal não repete entradas concluídas."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "900px"
+      },
+      {
+        "name": "xl",
+        "value": "960px"
+      },
+      {
+        "name": "navigation-mobile",
+        "value": "1200px"
+      },
+      {
+        "name": "demo-tabs-grid",
+        "value": "740px"
+      },
+      {
+        "name": "pricing-stack",
+        "value": "959px"
+      },
+      {
+        "name": "pricing-narrow",
+        "value": "359px"
+      },
+      {
+        "name": "container-narrow",
+        "value": "480px"
+      },
+      {
+        "name": "contact-fields-container",
+        "value": "420px"
+      },
+      {
+        "name": "pricing-amount-container",
+        "value": "14rem"
+      },
+      {
+        "name": "hero-notes-group",
+        "value": "640px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão primário",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação primária na landing: fundo teal, texto navy, hover mais claro e pressão breve.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Criar conta</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;gap:8px;padding:12px 24px;border-radius:8px;font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;font-size:.9375rem;font-weight:600;line-height:1.6;letter-spacing:-.01em;text-align:center;text-decoration:none;cursor:pointer;border:none;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1),box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),background-color 160ms ease,border-color 160ms ease,color 160ms ease;}.ds-btn-primary{background:var(--teal,#00B4D8);color:var(--navy,#0F2551);}.ds-btn-primary:hover{background:rgb(45.9 193.5 223.02);background:color-mix(in srgb,#fff 18%,var(--teal,#00B4D8));color:var(--navy,#0F2551);}.ds-btn-primary:focus-visible{outline:2px solid var(--navy-mid,#1B3A6B);outline-offset:2px;}@media(hover:hover) and (pointer:fine){.ds-btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,37,81,.12);}}.ds-btn-primary:active{transform:scale(.985);transition-duration:90ms;}@media(prefers-reduced-motion:reduce){.ds-btn-primary{transition-property:box-shadow,background-color,border-color,color;}.ds-btn-primary:hover,.ds-btn-primary:active{transform:none;}}"
+    },
+    {
+      "name": "Botão de contorno",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Ação secundária sobre superfície clara, com contorno navy e preenchimento no hover.",
+      "html": "<button class=\"ds-btn-outline\" type=\"button\">Entrar</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;gap:8px;padding:12px 24px;border-radius:8px;font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;font-size:.9375rem;font-weight:600;line-height:1.6;letter-spacing:-.01em;text-align:center;text-decoration:none;cursor:pointer;border:none;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1),box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),background-color 160ms ease,border-color 160ms ease,color 160ms ease;}.ds-btn-outline{background:transparent;color:var(--navy,#0F2551);border:2px solid var(--navy-mid,#1B3A6B);}.ds-btn-outline:hover{background:var(--navy,#0F2551);color:#fff;}.ds-btn-outline:focus-visible{outline:2px solid var(--navy-mid,#1B3A6B);outline-offset:2px;}@media(hover:hover) and (pointer:fine){.ds-btn-outline:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,37,81,.12);}}.ds-btn-outline:active{transform:scale(.985);transition-duration:90ms;}@media(prefers-reduced-motion:reduce){.ds-btn-outline{transition-property:box-shadow,background-color,border-color,color;}.ds-btn-outline:hover,.ds-btn-outline:active{transform:none;}}"
+    },
+    {
+      "name": "Botão do plano em destaque",
+      "kind": "button",
+      "refersTo": "button-featured",
+      "description": "Variante teal no contexto navy do plano destacado; na comparação ocupa a largura e tem altura mínima de 52px.",
+      "html": "<div class=\"ds-featured-surface\"><button class=\"ds-btn-featured\" type=\"button\">Escolher Pro</button></div>",
+      "css": ".ds-featured-surface{padding:28px;background:var(--navy,#0F2551);border-radius:16px;}.ds-btn-featured{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;gap:8px;padding:12px 24px;border-radius:8px;font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;font-size:.9375rem;font-weight:600;line-height:1.6;letter-spacing:-.01em;text-align:center;text-decoration:none;cursor:pointer;border:none;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1),box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),background-color 160ms ease,border-color 160ms ease,color 160ms ease;}.ds-btn-featured{width:100%;min-height:52px;padding-inline:12px;white-space:normal;background:var(--teal,#00B4D8);color:var(--navy,#0F2551);}.ds-btn-featured:hover{background:rgb(45.9 193.5 223.02);background:color-mix(in srgb,#fff 18%,var(--teal,#00B4D8));color:var(--navy,#0F2551);}.ds-btn-featured:focus-visible{outline:2px solid var(--teal-lt,#90E0EF);outline-offset:2px;}@media(hover:hover) and (pointer:fine){.ds-btn-featured:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,37,81,.12);}}.ds-btn-featured:active{transform:scale(.985);transition-duration:90ms;}@media(prefers-reduced-motion:reduce){.ds-btn-featured{transition-property:box-shadow,background-color,border-color,color;}.ds-btn-featured:hover,.ds-btn-featured:active{transform:none;}}"
+    },
+    {
+      "name": "Campo de contato",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Campo com label 15px/600 e valor 16px/1.5 em desktop e mobile. O foco mantém borda teal e halo.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-contact-email\">E-mail *</label><input class=\"ds-input\" id=\"ds-contact-email\" name=\"email\" type=\"email\" autocomplete=\"email\" placeholder=\"voce@exemplo.com\" required></div>",
+      "css": ".ds-field{min-width:0;margin-bottom:18px;font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;line-height:1.6;}.ds-field-label{display:block;font-size:.9375rem;font-weight:600;color:var(--navy,#0F2551);margin-bottom:6px;}.ds-input{box-sizing:border-box;width:100%;min-width:0;padding:11px 14px;border-radius:8px;border:1.5px solid var(--border,#E2E8F0);font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;font-size:1rem;line-height:1.5;color:var(--text,#1A202C);background-color:var(--bg,#F4F7FB);transition:border-color .18s,box-shadow .18s;outline:none;appearance:none;}.ds-input::placeholder{color:var(--text-muted,#5A6A80);opacity:1;}.ds-input:focus,.ds-input:focus-visible{border-color:var(--teal,#00B4D8);box-shadow:0 0 0 4px rgba(0,180,216,.12),0 1px 2px rgba(0,0,0,.05);background-color:#fff;outline:none;}.ds-input[aria-invalid=\"true\"]{border-color:#a11b2b;}@media(max-width:640px),(pointer:coarse){.ds-input{min-height:44px;}}"
+    },
+    {
+      "name": "Links de navegação",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Links desktop da barra sobre fundo claro. A barra completa possui uma variante clara sobre hero escuro e troca para menu móvel até 1200px.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Navegação da landing\"><a class=\"ds-nav-link\" href=\"#funcionalidades\">Funcionalidades</a><a class=\"ds-nav-link\" href=\"#precos\">Preços</a><a class=\"ds-nav-link\" href=\"#contato\">Contato</a></nav>",
+      "css": ".ds-nav{display:flex;align-items:center;gap:2px;font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;line-height:1.6;}.ds-nav-link{display:inline-flex;align-items:center;min-height:44px;padding:8px 10px;border-radius:6px;color:#3a4a6b;font-weight:500;font-size:.875rem;text-decoration:none;transition:color .2s,background .2s;white-space:nowrap;}.ds-nav-link:hover{color:var(--navy,#0F2551);background:rgba(15,37,81,.06);}.ds-nav-link:focus-visible{outline:2px solid var(--navy-mid,#1B3A6B);outline-offset:2px;}"
+    },
+    {
+      "name": "Selo de plano",
+      "kind": "chip",
+      "refersTo": "plan-badge",
+      "description": "Selo de destaque da comparação: 13px/700, superfície teal, texto navy, formato de pílula. É informativo, sem estados de botão.",
+      "html": "<span class=\"ds-plan-badge\">Mais popular</span>",
+      "css": ".ds-plan-badge{display:inline-flex;align-items:center;min-height:28px;margin:0;padding:4px 10px;border-radius:999px;background:var(--teal,#00B4D8);color:var(--navy,#0F2551);font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;font-size:.8125rem;font-weight:700;line-height:1.2;border:1px solid transparent;}"
+    },
+    {
+      "name": "Cartão por público",
+      "kind": "card",
+      "refersTo": "audience-card",
+      "description": "Cartão claro de funcionalidades por equipe: contorno suave, título 20px/800, prosa 16px/1.6 e detalhes expansíveis com feedback breve. A entrada por rolagem é progressiva e mantém o conteúdo visível.",
+      "html": "<article class=\"ds-audience\"><h3 class=\"ds-audience-title\">Consultório</h3><p class=\"ds-audience-for\">Para o oftalmologista</p><ul class=\"ds-audience-list\"><li><svg class=\"ds-check\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4 10-10\"/></svg><span>Prontuário oftalmológico com campos por olho.</span></li><li><svg class=\"ds-check\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m5 12 4 4 10-10\"/></svg><span>Imagens e exames organizados por olho e por data.</span></li></ul><details class=\"ds-audience-details\"><summary class=\"ds-audience-summary\">Ver mais recursos</summary><p class=\"ds-audience-extra\">Modelos de laudo, receituário e atestado.</p></details></article>",
+      "css": ".ds-audience{display:flex;flex-direction:column;min-width:0;padding:28px;background:var(--bg,#F4F7FB);border:1px solid var(--border,#E2E8F0);border-radius:16px;font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;line-height:1.6;}.ds-audience-title{font-size:1.25rem;font-weight:800;line-height:1.25;letter-spacing:-.015em;color:var(--navy,#0F2551);margin:0 0 8px;text-wrap:balance;}.ds-audience-for{font-size:.875rem;line-height:1.55;font-weight:600;color:var(--teal-ink,#00708A);margin:0 0 20px;}.ds-audience-list{list-style:none;display:flex;flex-direction:column;gap:14px;margin:0 0 20px;padding:0;}.ds-audience-list li{display:flex;gap:10px;font-size:1rem;line-height:1.6;color:var(--text,#1A202C);}.ds-check{color:var(--mint,#06D6A0);flex-shrink:0;margin-top:2px;}.ds-audience-details{margin-top:auto;}.ds-audience-summary{display:flex;align-items:baseline;gap:8px;min-height:44px;padding-block:10px;color:var(--teal-ink,#00708A);font-size:.9375rem;font-weight:600;line-height:1.5;cursor:pointer;list-style:none;transition:color 160ms ease;}.ds-audience-summary::-webkit-details-marker{display:none;}.ds-audience-summary::before{content:'';width:6px;height:6px;flex-shrink:0;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform 160ms cubic-bezier(0.16,1,0.3,1);}.ds-audience-details[open] .ds-audience-summary::before{transform:rotate(45deg);}.ds-audience-summary:focus-visible{outline:2px solid var(--teal-ink,#00708A);outline-offset:4px;border-radius:4px;}.ds-audience-extra{margin:8px 0 0;color:var(--text,#1A202C);font-size:1rem;line-height:1.6;}@media(max-width:640px){.ds-audience{padding:24px 20px;}} .ds-audience-summary:hover{color:var(--navy,#0F2551);}@keyframes ds-audience-rise{from{opacity:.94;translate:0 8px;}to{opacity:1;translate:0 0;}}@keyframes ds-audience-state-in{from{opacity:.85;}to{opacity:1;}}@media screen and (prefers-reduced-motion:no-preference){.ds-audience-details[open]>.ds-audience-extra{animation:ds-audience-state-in 160ms ease-out;}@supports(animation-timeline:view()){.ds-audience{animation:ds-audience-rise both;animation-timing-function:cubic-bezier(0.16,1,0.3,1);animation-timeline:view();animation-range:entry 5% entry 70%;}}}@media(prefers-reduced-motion:reduce){.ds-audience-summary::before{transition:color 160ms ease;}}"
+    },
+    {
+      "name": "Cartão de plano",
+      "kind": "card",
+      "refersTo": "pricing-card",
+      "description": "Cartão com dados tabulares, preço fluido 36–44px, prosa 16px, CTA e detalhes nativos. Moeda e valor se empilham em containers estreitos durante ampliação. Valores comerciais são apenas conteúdo ilustrativo.",
+      "html": "<article class=\"ds-pricing-card\"><div class=\"ds-pricing-badge-slot\" aria-hidden=\"true\"></div><h3 class=\"ds-pricing-name\">Básico</h3><div class=\"ds-pricing-price\"><span class=\"ds-pricing-amount\"><span class=\"ds-price-currency\">R$</span><span class=\"ds-price-value\">299,90</span></span><span class=\"ds-price-period\">/mês</span></div><dl class=\"ds-comparison\"><div class=\"ds-comparison-row\"><dt>Médicos</dt><dd>Até 1</dd></div><div class=\"ds-comparison-row\"><dt>Armazenamento</dt><dd>10 GB</dd></div></dl><button class=\"ds-plan-button\" type=\"button\">Escolher Básico</button><details class=\"ds-plan-details\"><summary class=\"ds-plan-summary\"><span>Ver todos os recursos</span><svg class=\"ds-plan-chevron\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"/></svg></summary><div class=\"ds-plan-detail-content\"><h4 class=\"ds-plan-group-title\">Capacidade</h4><p class=\"ds-plan-description\">Agenda, prontuário e recursos da clínica reunidos no plano.</p></div></details></article>",
+      "css": ".ds-pricing-card{display:flex;flex-direction:column;min-width:0;container:ds-pricing-card / inline-size;padding:28px;border:1px solid var(--border,#E2E8F0);border-radius:16px;color:var(--navy,#0F2551);background:#fff;transform:none;transition:border-color 160ms cubic-bezier(0.16,1,0.3,1);font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;line-height:1.6;}.ds-pricing-card:hover{transform:none;box-shadow:none;}.ds-pricing-badge-slot{display:flex;align-items:flex-start;min-height:28px;margin-bottom:12px;}.ds-pricing-name{min-height:1.25em;margin:0 0 18px;font-size:1.25rem;font-weight:800;line-height:1.25;letter-spacing:-.015em;overflow-wrap:anywhere;}.ds-pricing-price{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;min-height:84px;gap:8px;margin:0 0 20px;}.ds-pricing-amount{display:inline-flex;align-items:baseline;gap:6px;max-width:100%;white-space:nowrap;}.ds-price-currency{font-size:1rem;font-weight:700;}.ds-price-value{font-size:clamp(2.25rem,calc(1.75rem + 1vw),2.75rem);font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.01em;}.ds-price-period{color:var(--text-muted,#5A6A80);font-size:.9375rem;line-height:1.5;}.ds-comparison{margin:0 0 24px;}.ds-comparison-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:12px;padding:12px 0;border-top:1px solid var(--border,#E2E8F0);min-height:48px;font-size:.9375rem;line-height:1.5;}.ds-comparison-row dt{color:var(--text-muted,#5A6A80);font-weight:400;overflow-wrap:anywhere;}.ds-comparison-row dd{max-width:14ch;margin:0;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;overflow-wrap:anywhere;}.ds-plan-button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;gap:8px;padding:12px 24px;border-radius:8px;font-family:'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;font-size:.9375rem;font-weight:600;line-height:1.6;letter-spacing:-.01em;text-align:center;text-decoration:none;cursor:pointer;border:none;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1),box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),background-color 160ms ease,border-color 160ms ease,color 160ms ease;}.ds-plan-button{width:100%;min-height:52px;padding-inline:12px;white-space:normal;background:transparent;color:var(--navy,#0F2551);border:2px solid var(--navy-mid,#1B3A6B);}.ds-plan-button:hover{background:var(--navy,#0F2551);color:#fff;}.ds-plan-button:focus-visible{outline:2px solid var(--navy-mid,#1B3A6B);outline-offset:2px;}@media(hover:hover) and (pointer:fine){.ds-plan-button:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,37,81,.12);}}.ds-plan-button:active{transform:scale(.985);transition-duration:90ms;}@media(prefers-reduced-motion:reduce){.ds-plan-button{transition-property:box-shadow,background-color,border-color,color;}.ds-plan-button:hover,.ds-plan-button:active{transform:none;}}.ds-plan-details{margin-top:24px;border-top:1px solid var(--border,#E2E8F0);}.ds-plan-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:16px 0 0;font-size:.9375rem;font-weight:600;line-height:1.5;list-style:none;cursor:pointer;border-radius:4px;}.ds-plan-summary::-webkit-details-marker{display:none;}.ds-plan-summary:hover{color:var(--teal-ink,#00708A);}.ds-plan-summary:focus-visible{outline:2px solid var(--teal-ink,#00708A);outline-offset:6px;}.ds-plan-detail-content{padding-top:20px;}.ds-plan-group-title{margin:0 0 12px;font-size:1rem;font-weight:700;line-height:1.5;letter-spacing:normal;}.ds-plan-description{color:var(--text-muted,#5A6A80);font-size:1rem;line-height:1.6;margin:0 0 24px;}@media(max-width:959px){.ds-pricing-badge-slot{display:none;}.ds-pricing-price{min-height:0;}.ds-comparison-row{min-height:0;}}@media(max-width:359px){.ds-pricing-card{padding:24px 20px;}}.ds-price-value--request{font-size:clamp(1.25rem,calc(1rem + 1vw),1.5rem);font-weight:800;line-height:1.25;white-space:normal;}@container ds-pricing-card (max-width:14rem){.ds-pricing-amount{flex-direction:column;align-items:flex-start;gap:2px;white-space:normal;}.ds-price-value{max-width:100%;overflow-wrap:anywhere;}} .ds-plan-summary{transition:color 160ms cubic-bezier(0.16,1,0.3,1);}.ds-plan-chevron{flex-shrink:0;transition:transform 160ms cubic-bezier(0.16,1,0.3,1);}.ds-plan-details[open] .ds-plan-chevron{transform:rotate(180deg);}.ds-plan-details[open] .ds-plan-detail-content{animation:ds-pricing-details-open 160ms cubic-bezier(0.16,1,0.3,1);}@keyframes ds-pricing-details-open{from{opacity:.85;}to{opacity:1;}}@media(prefers-reduced-motion:reduce){.ds-plan-chevron{transition:none;}.ds-plan-details[open] .ds-plan-detail-content{animation:none;}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Precisão clínica",
+    "overview": "Precisão clínica traduz uma interface clara, confiável e organizada. A Inter estabelece uma voz única; o azul-marinho dá estrutura, o teal orienta as ações e os neutros frios oferecem superfícies tranquilas para a leitura. A identidade foi confirmada pelo responsável pelo produto.\n\nOs componentes são claros, organizados e têm cantos suavemente arredondados. Superfícies claras com bordas discretas formam a base; sombras suaves distinguem capturas do produto e áreas de destaque. A densidade se adapta à largura disponível, preservando o conteúdo, a leitura e os controles.",
+    "keyCharacteristics": [
+      "Uma única família tipográfica: Inter.",
+      "Azul-marinho, teal e neutros frios com papéis distintos.",
+      "Grades alinhadas e espaçamento consistente entre conteúdos relacionados.",
+      "Cantos suaves, bordas discretas e profundidade seletiva.",
+      "Capturas reais do produto e ícones consistentes, sem substituir conteúdo por decoração."
+    ],
+    "rules": [
+      {
+        "name": "The Inter Rule",
+        "body": "Preservar a Inter e sua hierarquia por função; não introduzir outra família sem uma mudança de identidade explicitamente solicitada.",
+        "section": "typography"
+      },
+      {
+        "name": "The Contrast Rule",
+        "body": "Nas ações teal da landing, usar texto azul-marinho. Sobre superfícies claras, links usam teal escuro; o teal de preenchimento não substitui a cor de texto.",
+        "section": "colors"
+      },
+      {
+        "name": "The Selective Depth Rule",
+        "body": "Usar a profundidade existente para distinguir camadas e estados; cartões de planos permanecem estáveis ao passar o mouse.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Purposeful Motion Rule",
+        "body": "Usar movimento breve para orientar a entrada e confirmar ações; o conteúdo e os controles permanecem disponíveis sem animação, sem loops decorativos e com respeito à preferência por movimento reduzido.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** preservar Inter, logos, azul-marinho, teal e neutros frios ao refinar a landing.",
+      "**Do** usar os papéis tipográficos existentes conforme a função do texto, com unidades relativas e quebras naturais.",
+      "**Do** manter os alinhamentos dos cartões e dos painéis nos respectivos breakpoints.",
+      "**Do** preservar foco visível, rótulos, estados de erro, alvos de toque e a preferência por movimento reduzido.",
+      "**Do** conferir a versão em português e inglês com textos reais e ampliação de texto."
+    ],
+    "donts": [
+      "**Don't** apresentar o visual do site público como se fosse a especificação do painel autenticado.",
+      "**Don't** usar texto branco sobre o teal dos botões primários da landing.",
+      "**Don't** fixar a altura de blocos de texto para disfarçar diferenças de conteúdo ou cortar traduções.",
+      "**Don't** trocar a fonte ou redesenhar a identidade durante um refinamento.",
+      "**Don't** incorporar uma melhoria apenas planejada como se já estivesse implementada."
+    ]
+  }
+}

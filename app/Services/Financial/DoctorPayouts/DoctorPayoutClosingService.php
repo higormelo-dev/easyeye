@@ -6,30 +6,46 @@ namespace App\Services\Financial\DoctorPayouts;
 
 use App\DTOs\DoctorPayout\PayoutItemData;
 use App\Enums\{CashEntryNature, CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType};
-use App\Enums\DoctorPayout\DoctorPayoutStatus;
-use App\Models\{CashClose, DoctorPayout, DoctorPayoutAdjustment, FinancialCashEntry, FinancialCategory};
+use App\Enums\DoctorPayout\{DoctorPayoutBasis, DoctorPayoutBeneficiaryRole, DoctorPayoutStatus};
+use App\Models\{CashClose, DoctorPayout, DoctorPayoutAdjustment, DoctorPayoutPayment, FinancialCashEntry, FinancialCategory};
 use App\Services\Financial\CashPeriodLock;
 use App\Support\Database\UniqueViolation;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\{Collection, Str};
+use Illuminate\Support\{Collection, Number, Str};
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Fechamento, ajustes, pagamento, estorno e reabertura de repasses.
  *
+ * Regime por recebimento: o fechamento grava PARCELAS (DoctorPayoutReleaseService)
+ * — devido sobre o recebido acumulado até o fim do período, menos o já
+ * liberado — com o retrato dos recebimentos considerados e da regra.
+ *
  * Integridade:
  *  - Fechar e reabrir tomam o advisory lock `doctor_payout|clínica|médico`
  *    (dois fechamentos do mesmo médico nunca se cruzam); o índice único
- *    parcial dos itens é a garantia final contra pagar o mesmo ato duas vezes
- *    — a violação vira 422 amigável, não 500.
+ *    parcial (ato + beneficiário + parcela) dos itens é a garantia final contra
+ *    liberar a mesma parcela duas vezes — a violação vira 422 amigável, não 500.
+ *  - Fechar toma também o lock COMPARTILHADO da configuração (regras,
+ *    participantes, taxas): quem edita espera o fechamento terminar, e
+ *    fechamentos de médicos diferentes do mesmo ato leem a mesma divisão.
+ *  - Parcelas são acumuladas até o fim do período: um fechamento não pode
+ *    terminar antes do último válido do médico, e o total não pode ser
+ *    negativo (estorno maior que o novo recebido espera o próximo).
  *  - A prévia conferida na tela (quantidade e total em centavos) é comparada
  *    com o recálculo dentro do lock: se mudou, o fechamento é recusado.
  *  - Pagar segue a ordem do recebimento de guia (BillingService::payLockedClaim):
  *    fechamento FOR UPDATE → CashPeriodLock de escrita → período de caixa aberto
  *    → despesa com entity_id explícito (nunca da sessão).
+ *  - Pagamentos parciais (E5): cada pagamento, sob o FOR UPDATE do fechamento,
+ *    confere o "já pago" que a tela viu (duplo envio vira 422) e o saldo
+ *    (0 < valor ≤ total − já pago); uma despesa por pagamento. Estornar um
+ *    pagamento (admin ou financeiro, com motivo) remove a despesa dele. O
+ *    status segue os pagamentos válidos: nenhum = closed, parte = partially_paid,
+ *    tudo = paid. Reabrir e ajustar só sem pagamento válido.
  *  - Fechamento nunca é apagado: reabrir = status cancelled com motivo; os
  *    itens recebem voided_at e voltam a ficar pendentes.
  */
@@ -37,7 +53,7 @@ final class DoctorPayoutClosingService
 {
     private const ITEMS_INSERT_CHUNK = 500;
 
-    private const ITEMS_UNIQUE_INDEX = 'doctor_payout_items_active_source_unique';
+    private const ITEMS_UNIQUE_INDEX = 'doctor_payout_items_active_beneficiary_tranche_unique';
 
     private const EXPENSE_CATEGORY = 'REPASSE MÉDICO';
 
@@ -63,6 +79,8 @@ final class DoctorPayoutClosingService
         try {
             return DB::transaction(function () use ($entityId, $doctorId, $doctor, $from, $to, $data, $userId): DoctorPayout {
                 $this->lockDoctor($entityId, $doctorId);
+                DoctorPayoutRuleService::lockConfig($entityId, shared: true);
+                $this->assertNotBeforeLastClosing($entityId, $doctorId, $to);
 
                 $items  = $this->calculator->pending($entityId, $doctorId, $from, $to);
                 $totals = DoctorPayoutCalculator::totals($items);
@@ -86,6 +104,10 @@ final class DoctorPayoutClosingService
                     throw ValidationException::withMessages(['period_start' => __('financial_doctor_payouts.errors.preview_changed')]);
                 }
 
+                if ($totals['payout_cents'] < 0) {
+                    throw ValidationException::withMessages(['period_start' => __('financial_doctor_payouts.errors.release_negative')]);
+                }
+
                 $payout = DoctorPayout::query()->create([
                     'entity_id'          => $entityId,
                     'doctor_id'          => $doctorId,
@@ -94,6 +116,7 @@ final class DoctorPayoutClosingService
                     'period_start'       => $from->toDateString(),
                     'period_end'         => $to->toDateString(),
                     'status'             => DoctorPayoutStatus::Closed->value,
+                    'basis'              => DoctorPayoutBasis::Receipt->value,
                     'items_count'        => $totals['count'],
                     'gross_amount'       => Money::fromCents($totals['charged_cents']),
                     'items_amount'       => Money::fromCents($totals['payout_cents']),
@@ -124,6 +147,11 @@ final class DoctorPayoutClosingService
             $this->lockDoctor((string) $payout->entity_id, (string) $payout->doctor_id);
 
             $payout = $this->lockPayout($payout);
+
+            if ($payout->status->hasPayments()) {
+                throw ValidationException::withMessages(['status' => __('financial_doctor_payouts.errors.reopen_has_payments')]);
+            }
+
             $this->assertTransition($payout, DoctorPayoutStatus::Cancelled);
 
             $payout->update([
@@ -177,25 +205,65 @@ final class DoctorPayoutClosingService
     }
 
     /**
-     * Registra o pagamento do total líquido e lança a despesa no Fluxo de Caixa
-     * (total zero: marca pago sem lançamento).
+     * Registra UM pagamento do fechamento (parcial ou o saldo) e lança a
+     * despesa dele no Fluxo de Caixa. Total zero: um pagamento de 0, sem
+     * lançamento, marca como pago.
      *
-     * @param array{paid_at: string, payment_method: string, payment_notes?: ?string} $data
+     * `amount` ausente = o saldo; `expected_paid_cents` (o "já pago" que a tela
+     * viu) é conferido quando vem — a requisição HTTP sempre manda.
+     *
+     * @param array{paid_at: string, payment_method: string, payment_notes?: ?string, amount?: string|int|float, expected_paid_cents?: int|string} $data
+     *
+     * @throws ValidationException
      */
     public function pay(DoctorPayout $payout, array $data, ?string $userId): DoctorPayout
     {
-        return DB::transaction(function () use ($payout, $data, $userId): DoctorPayout {
+        return DB::transaction(function () use ($payout, $data): DoctorPayout {
             $payout = $this->lockPayout($payout);
-            $this->assertTransition($payout, DoctorPayoutStatus::Paid);
 
-            $totalCents  = Money::toCents($payout->total_amount);
-            $paidAt      = CarbonImmutable::parse($data['paid_at'])->toDateString();
-            $cashEntryId = null;
+            if (! $payout->status->acceptsPayment()) {
+                throw ValidationException::withMessages(['status' => __('financial_doctor_payouts.errors.invalid_status')]);
+            }
 
-            if ($totalCents > 0) {
+            $paidCents = $this->activePaidCents($payout);
+
+            if (array_key_exists('expected_paid_cents', $data) && (int) $data['expected_paid_cents'] !== $paidCents) {
+                throw ValidationException::withMessages(['amount' => __('financial_doctor_payouts.errors.payment_changed')]);
+            }
+
+            $remaining = Money::toCents($payout->total_amount) - $paidCents;
+            $amount    = array_key_exists('amount', $data) ? Money::toCents($data['amount']) : $remaining;
+
+            // Saldo zero (total zero): só o pagamento de 0; senão 0 < valor ≤ saldo.
+            if ($remaining === 0 && $amount !== 0) {
+                throw ValidationException::withMessages(['amount' => __('financial_doctor_payouts.errors.payment_zero_only')]);
+            }
+
+            if ($remaining > 0 && ($amount <= 0 || $amount > $remaining)) {
+                throw ValidationException::withMessages([
+                    'amount' => __('financial_doctor_payouts.errors.payment_exceeds', [
+                        'remaining' => Number::currency($remaining / 100, 'BRL', app()->getLocale()),
+                    ]),
+                ]);
+            }
+
+            $paidAt = CarbonImmutable::parse($data['paid_at'])->toDateString();
+
+            if ($amount > 0) {
                 $this->assertCashPeriodOpen((string) $payout->entity_id, $paidAt, 'paid_at', 'paid_at_closed_period');
+            }
 
-                $cashEntryId = FinancialCashEntry::query()->create([
+            $payment = DoctorPayoutPayment::query()->create([
+                'entity_id'        => $payout->entity_id,
+                'doctor_payout_id' => $payout->id,
+                'amount'           => Money::fromCents($amount),
+                'paid_at'          => $paidAt,
+                'payment_method'   => $data['payment_method'],
+                'notes'            => $data['payment_notes'] ?? null,
+            ]);
+
+            if ($amount > 0) {
+                $entry = FinancialCashEntry::query()->create([
                     'entity_id'      => $payout->entity_id,
                     'category_id'    => $this->expenseCategoryId((string) $payout->entity_id),
                     'doctor_id'      => $payout->doctor_id,
@@ -203,41 +271,52 @@ final class DoctorPayoutClosingService
                     'description'    => Str::limit($this->cashEntryDescription($payout), 250, ''),
                     'type'           => FinancialEntryType::Expense->value,
                     'status'         => FinancialEntryStatus::Paid->value,
-                    'amount'         => Money::fromCents($totalCents),
+                    'amount'         => Money::fromCents($amount),
                     'payment_method' => $data['payment_method'],
                     'nature'         => CashEntryNature::General->value,
-                    'reference_type' => CashEntryReferenceType::DoctorPayout->value,
-                    'reference_id'   => $payout->id,
+                    'reference_type' => CashEntryReferenceType::DoctorPayoutPayment->value,
+                    'reference_id'   => $payment->id,
                     'notes'          => $data['payment_notes'] ?? null,
                     'active'         => true,
-                ])->id;
+                ]);
+
+                $payment->update(['cash_entry_id' => $entry->id]);
             }
 
-            $payout->update([
-                'status'         => DoctorPayoutStatus::Paid->value,
-                'paid_at'        => $paidAt,
-                'paid_amount'    => Money::fromCents($totalCents),
-                'payment_method' => $data['payment_method'],
-                'payment_notes'  => $data['payment_notes'] ?? null,
-                'paid_by'        => $userId,
-                'cash_entry_id'  => $cashEntryId,
-            ]);
+            $this->syncPaymentStatus($payout);
 
             return $payout->fresh();
         });
     }
 
-    /** Estorno (admin): remove a despesa do caixa e volta o fechamento para "Fechado". */
-    public function reversePayment(DoctorPayout $payout, string $reason, ?string $userId): DoctorPayout
+    /**
+     * Estorna UM pagamento (admin ou financeiro, com motivo): remove a despesa
+     * dele do caixa e o status volta a refletir os pagamentos que restam.
+     *
+     * @throws ValidationException
+     */
+    public function reversePayment(DoctorPayout $payout, DoctorPayoutPayment $payment, string $reason, ?string $userId): DoctorPayout
     {
-        return DB::transaction(function () use ($payout, $reason, $userId): DoctorPayout {
+        return DB::transaction(function () use ($payout, $payment, $reason, $userId): DoctorPayout {
             $payout = $this->lockPayout($payout);
-            $this->assertTransition($payout, DoctorPayoutStatus::Closed);
 
-            if ($payout->cash_entry_id !== null) {
+            $payment = DoctorPayoutPayment::query()
+                ->whereKey($payment->id)
+                ->where('entity_id', $payout->entity_id)
+                ->where('doctor_payout_id', $payout->id)
+                ->lockForUpdate()
+                ->first();
+
+            abort_if($payment === null, 404);
+
+            if ($payment->isReversed()) {
+                throw ValidationException::withMessages(['reason' => __('financial_doctor_payouts.errors.payment_already_reversed')]);
+            }
+
+            if ($payment->cash_entry_id !== null) {
                 $entry = FinancialCashEntry::query()
                     ->where('entity_id', $payout->entity_id)
-                    ->whereKey($payout->cash_entry_id)
+                    ->whereKey($payment->cash_entry_id)
                     ->first();
 
                 if ($entry !== null) {
@@ -249,21 +328,63 @@ final class DoctorPayoutClosingService
                 }
             }
 
-            $payout->update([
-                'status'                  => DoctorPayoutStatus::Closed->value,
-                'paid_at'                 => null,
-                'paid_amount'             => null,
-                'payment_method'          => null,
-                'payment_notes'           => null,
-                'paid_by'                 => null,
-                'cash_entry_id'           => null,
-                'payment_reversal_reason' => $reason,
-                'payment_reversed_by'     => $userId,
-                'payment_reversed_at'     => now(),
+            $payment->update([
+                'reversed_at'     => now(),
+                'reversed_by'     => $userId,
+                'reversal_reason' => $reason,
             ]);
+
+            $this->syncPaymentStatus($payout);
 
             return $payout->fresh();
         });
+    }
+
+    /** Soma dos pagamentos válidos (não estornados), em centavos. */
+    private function activePaidCents(DoctorPayout $payout): int
+    {
+        return Money::toCents(
+            DoctorPayoutPayment::query()
+                ->where('entity_id', $payout->entity_id)
+                ->where('doctor_payout_id', $payout->id)
+                ->whereNull('reversed_at')
+                ->sum('amount'),
+        );
+    }
+
+    /**
+     * Status e resumo do fechamento a partir dos pagamentos válidos: nenhum =
+     * closed, parte = partially_paid, tudo = paid. Os campos de pagamento
+     * único do fechamento (forma, observações, despesa, quem pagou) ficam do
+     * regime anterior — agora vivem em cada pagamento.
+     */
+    private function syncPaymentStatus(DoctorPayout $payout): void
+    {
+        $active = DoctorPayoutPayment::query()
+            ->where('entity_id', $payout->entity_id)
+            ->where('doctor_payout_id', $payout->id)
+            ->whereNull('reversed_at')
+            ->selectRaw('COUNT(*) AS payments, COALESCE(SUM(amount), 0) AS paid, MAX(paid_at) AS last_paid_at')
+            ->first();
+
+        $count = (int) $active->payments;
+        $paid  = Money::toCents($active->paid);
+
+        $status = match (true) {
+            $count === 0                                   => DoctorPayoutStatus::Closed,
+            $paid >= Money::toCents($payout->total_amount) => DoctorPayoutStatus::Paid,
+            default                                        => DoctorPayoutStatus::PartiallyPaid,
+        };
+
+        $payout->update([
+            'status'         => $status->value,
+            'paid_amount'    => $count === 0 ? null : Money::fromCents($paid),
+            'paid_at'        => $count === 0 ? null : substr((string) $active->last_paid_at, 0, 10),
+            'payment_method' => null,
+            'payment_notes'  => null,
+            'paid_by'        => null,
+            'cash_entry_id'  => null,
+        ]);
     }
 
     /**
@@ -277,29 +398,43 @@ final class DoctorPayoutClosingService
 
         $items->chunk(self::ITEMS_INSERT_CHUNK)->each(function (Collection $chunk) use ($payout, $now): void {
             DB::table('doctor_payout_items')->insert($chunk->map(fn (PayoutItemData $item) => [
-                'id'                    => (string) Str::uuid7(),
-                'entity_id'             => $payout->entity_id,
-                'doctor_payout_id'      => $payout->id,
-                'source_type'           => $item->sourceType->value,
-                'source_id'             => $item->sourceId,
-                'service_type'          => $item->serviceType->value,
-                'performed_at'          => $item->performedAt->format('Y-m-d H:i:s'),
-                'patient_id'            => $item->patientId,
-                'covenant_id'           => $item->covenantId,
-                'is_particular'         => $item->isParticular,
-                'covenant_name'         => $item->covenantName,
-                'description'           => Str::limit($item->description, 250, ''),
-                'visit_type_id'         => $item->visitTypeId,
-                'procedure_id'          => $item->procedureId,
-                'exam_type_id'          => $item->examTypeId,
-                'base_amount'           => Money::fromCents($item->baseCents),
-                'base_source'           => $item->baseSource->value,
-                'doctor_payout_rule_id' => $item->ruleId,
-                'rule_calculation'      => $item->ruleCalculation?->value,
-                'rule_percentage'       => $item->rulePercentage,
-                'rule_fixed_amount'     => $item->ruleFixedCents === null ? null : Money::fromCents($item->ruleFixedCents),
-                'payout_amount'         => Money::fromCents($item->payoutCents),
-                'warnings'              => $item->warnings === []
+                'id'               => (string) Str::uuid7(),
+                'entity_id'        => $payout->entity_id,
+                'doctor_payout_id' => $payout->id,
+                // Beneficiário = médico do fechamento (a clínica paga cada participante).
+                'doctor_id'              => $payout->doctor_id,
+                'beneficiary_role'       => ($item->beneficiaryRole ?? DoctorPayoutBeneficiaryRole::Executor)->value,
+                'source_type'            => $item->sourceType->value,
+                'source_id'              => $item->sourceId,
+                'service_type'           => $item->serviceType->value,
+                'performed_at'           => $item->performedAt->format('Y-m-d H:i:s'),
+                'patient_id'             => $item->patientId,
+                'covenant_id'            => $item->covenantId,
+                'is_particular'          => $item->isParticular,
+                'covenant_name'          => $item->covenantName,
+                'description'            => Str::limit($item->description, 250, ''),
+                'visit_type_id'          => $item->visitTypeId,
+                'procedure_id'           => $item->procedureId,
+                'exam_type_id'           => $item->examTypeId,
+                'base_amount'            => Money::fromCents($item->baseCents),
+                'base_source'            => $item->baseSource->value,
+                'basis'                  => DoctorPayoutBasis::Receipt->value,
+                'tranche'                => $item->tranche,
+                'received_amount'        => $item->receivedCents === null ? null : Money::fromCents($item->receivedCents),
+                'expected_amount'        => $item->expectedCents === null ? null : Money::fromCents($item->expectedCents),
+                'released_before_amount' => Money::fromCents($item->releasedBeforeCents),
+                'receipts_until'         => $item->receiptsUntil,
+                'receipts'               => $item->receipts === [] ? null : json_encode($item->receipts),
+                'share_percentage'       => $item->sharePercentage,
+                'net_amount'             => $item->netCents === null ? null : Money::fromCents($item->netCents),
+                'deductions_amount'      => Money::fromCents($item->deductionsCents),
+                'split'                  => $item->split === [] ? null : json_encode($item->split),
+                'doctor_payout_rule_id'  => $item->ruleId,
+                'rule_calculation'       => $item->ruleCalculation?->value,
+                'rule_percentage'        => $item->rulePercentage,
+                'rule_fixed_amount'      => $item->ruleFixedCents === null ? null : Money::fromCents($item->ruleFixedCents),
+                'payout_amount'          => Money::fromCents($item->payoutCents),
+                'warnings'               => $item->warnings === []
                     ? null
                     : json_encode(array_map(fn ($warning) => $warning->value, $item->warnings)),
                 'voided_at'  => null,
@@ -325,6 +460,24 @@ final class DoctorPayoutClosingService
             'adjustments_amount' => Money::fromCents($adjustmentsCents),
             'total_amount'       => Money::fromCents($totalCents),
         ]);
+    }
+
+    /**
+     * Parcelas são calculadas sobre o acumulado até o fim do período: fechar um
+     * período que termina antes do último fechamento válido do médico geraria
+     * parcelas negativas falsas.
+     */
+    private function assertNotBeforeLastClosing(string $entityId, string $doctorId, CarbonImmutable $to): void
+    {
+        $last = $this->calculator->lastClosedUntil($entityId, $doctorId);
+
+        if ($last !== null && $to->toDateString() < $last) {
+            throw ValidationException::withMessages([
+                'period_end' => __('financial_doctor_payouts.errors.period_before_last', [
+                    'date' => CarbonImmutable::parse($last)->isoFormat('L'),
+                ]),
+            ]);
+        }
     }
 
     private function lockPayout(DoctorPayout $payout): DoctorPayout

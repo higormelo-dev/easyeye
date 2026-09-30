@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\UserPreference;
+use App\Support\PanelTour;
 use Illuminate\Http\{JsonResponse, Request};
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\{Rule, ValidationException};
 
 /**
  * Preferências pessoais do usuário (item MELHORIA "mais humano" — ver
@@ -31,6 +32,9 @@ class PreferencesController extends Controller
         // AV:/BIO:/FO:/HD:/CD:) que pré-preenche a caixa nos próximos
         // atendimentos. Diferente do layout estruturado acima.
         'free_text_template',
+        // Tour guiado do painel (App\Support\PanelTour): {id: {version, status}}
+        // — só o que mudou; o servidor mescla com os demais e grava a data.
+        'tours',
     ];
 
     /**
@@ -67,6 +71,10 @@ class PreferencesController extends Controller
             'medical_record_layout.custom.hidden'   => ['sometimes', 'array'],
             'medical_record_layout.custom.hidden.*' => [Rule::in(self::RECORD_SECTIONS)],
             'free_text_template'                    => ['sometimes', 'nullable', 'string', 'max:20000'],
+            'tours'                                 => ['sometimes', 'array', 'max:20'],
+            'tours.*'                               => ['array'],
+            'tours.*.version'                       => ['required', 'integer', 'min:1', 'max:1000'],
+            'tours.*.status'                        => ['required', Rule::in(PanelTour::STATUSES)],
         ]);
 
         // Request::only() já filtra pra só as chaves permitidas — qualquer
@@ -80,8 +88,55 @@ class PreferencesController extends Controller
             ], 422);
         }
 
+        if (array_key_exists('tours', $partial)) {
+            // Impersonação (suporte vendo como o usuário): o tour é do suporte,
+            // não do usuário — nada é gravado na conta dele (também vale para
+            // uma aba antiga do suporte aberta antes de impersonar).
+            if (session()->has('impersonating')) {
+                unset($partial['tours']);
+
+                if ($partial === []) {
+                    return response()->json(['data' => $request->user()->preference?->data ?? []]);
+                }
+            } else {
+                $partial['tours'] = $this->mergeTours($request, (array) $partial['tours']);
+            }
+        }
+
         $pref = UserPreference::mergeFor($request->user(), $partial);
 
         return response()->json(['data' => $pref->data]);
+    }
+
+    /**
+     * Tours: só ids conhecidos (`panel:<perfil>` — PanelTour::ids()), só
+     * versão e status vindos do cliente; a data é do servidor e só muda
+     * quando versão ou status mudam. Os demais tours do usuário ficam
+     * intactos; ids que não existem mais saem do mapa.
+     *
+     * @param array<string, mixed> $incoming
+     *
+     * @return array<string, array{version: int, status: string, at: string}>
+     */
+    private function mergeTours(Request $request, array $incoming): array
+    {
+        $known   = PanelTour::ids();
+        $current = array_intersect_key((array) UserPreference::valueFor($request->user(), 'tours', []), array_flip($known));
+
+        foreach ($incoming as $id => $state) {
+            if (! is_string($id) || ! in_array($id, $known, true)) {
+                throw ValidationException::withMessages(['tours' => __('validation.in', ['attribute' => 'tours'])]);
+            }
+
+            $version = (int) $state['version'];
+            $status  = (string) $state['status'];
+            $before  = $current[$id] ?? null;
+
+            $current[$id] = is_array($before) && (int) ($before['version'] ?? 0) === $version && ($before['status'] ?? null) === $status
+                ? $before
+                : ['version' => $version, 'status' => $status, 'at' => now()->toIso8601String()];
+        }
+
+        return $current;
     }
 }

@@ -184,4 +184,12 @@ describe('Financial/DoctorPayouts/ClosePeriodModal', () => {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
         expect(w.emitted('close')).toBeUndefined();
     });
+
+    it('observações avisam que aparecem no demonstrativo do médico', async () => {
+        const w = await mountModal();
+
+        const notes = w.find('[data-test="close-notes"]');
+        expect(w.find('[data-test="close-notes-hint"]').text()).toBe('Shown on the doctor statement.');
+        expect(notes.attributes('aria-describedby')).toBe(w.find('[data-test="close-notes-hint"]').attributes('id'));
+    });
 });

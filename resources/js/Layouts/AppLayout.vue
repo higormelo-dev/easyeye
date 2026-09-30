@@ -5,6 +5,7 @@ import logoSvg from '@img/system/logo.svg';
 import logoSmallSvg from '@img/system/logo-small.svg';
 import logoWhiteSvg from '@img/system/logo-white.svg';
 import AiFloatingAssistant from '@/Components/Panel/AiFloatingAssistant.vue';
+import { usePanelTour } from '@/composables/usePanelTour.js';
 
 const props = defineProps({
     title:       { type: String, default: '' },
@@ -268,6 +269,26 @@ onUnmounted(() => {
     delete window.showErrorToast;
 });
 
+// ── Tour guiado (driver.js — ver composables/usePanelTour.js) ──────────────
+// Botão de ajuda no cabeçalho sempre que o painel de clínica tem tour; abre
+// sozinho uma vez no painel inicial para quem ainda não viu a versão atual.
+const panelTour     = usePanelTour();
+const tourAvailable = panelTour.available;
+const tourLabels    = computed(() => page.props.tour?.t?.ui ?? {});
+
+onMounted(() => {
+    let onDashboard = false;
+    try {
+        onDashboard = route().current('panel.dashboard');
+    } catch { /* sem Ziggy: não abre sozinho */ }
+
+    if (onDashboard) {
+        requestAnimationFrame(() => panelTour.autoStart());
+    }
+});
+
+onUnmounted(() => panelTour.stop());
+
 // A verificação de WhatsApp saiu do banner: virou etapa de onboarding com
 // gate próprio (middleware phone.verified → página Auth/VerifyPhone) — quem
 // chega ao painel já confirmou e-mail e WhatsApp.
@@ -289,7 +310,7 @@ onUnmounted(() => {
                             <span class="logo-lg"><img :src="logoWhiteSvg" alt="EasyEye"></span>
                         </span>
                     </a>
-                    <a id="mobile_btn" class="mobile-btn" href="#sidebar">
+                    <a id="mobile_btn" class="mobile-btn" href="#sidebar" data-tour="mobile-menu">
                         <i class="ti ti-menu-deep fs-24"></i>
                     </a>
                     <button class="sidenav-toggle-btn btn border-0 p-0 active" id="toggle_btn2">
@@ -301,8 +322,20 @@ onUnmounted(() => {
                     <!-- Contextual top actions (ex.: IA em páginas clínicas) -->
                     <slot name="top-actions" />
 
+                    <!-- Tour guiado: rever quando quiser -->
+                    <div v-if="tourAvailable" class="header-item me-2" data-tour="help">
+                        <button type="button"
+                                class="topbar-link btn btn-icon"
+                                :title="tourLabels.start"
+                                :aria-label="tourLabels.start"
+                                data-test="tour-start"
+                                @click="panelTour.start()">
+                            <i class="ti ti-help-circle fs-16" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
                     <!-- Locale selector -->
-                    <div class="header-item" v-if="locales.length > 1">
+                    <div class="header-item" v-if="locales.length > 1" data-tour="locale">
                         <div class="dropdown me-2">
                             <button class="topbar-link btn btn-icon dropdown-toggle drop-arrow-none"
                                     data-bs-toggle="dropdown" data-bs-offset="0,24">
@@ -321,14 +354,14 @@ onUnmounted(() => {
                     </div>
 
                     <!-- Dark mode -->
-                    <div class="header-item d-none d-sm-flex me-2">
+                    <div class="header-item d-none d-sm-flex me-2" data-tour="theme">
                         <button class="topbar-link btn btn-icon" type="button" @click="toggleDark">
                             <i :class="isDark ? 'ti ti-sun fs-16' : 'ti ti-moon fs-16'"></i>
                         </button>
                     </div>
 
                     <!-- User dropdown -->
-                    <div class="dropdown profile-dropdown d-flex align-items-center justify-content-center">
+                    <div class="dropdown profile-dropdown d-flex align-items-center justify-content-center" data-tour="user-menu">
                         <a href="#" class="topbar-link dropdown-toggle drop-arrow-none position-relative"
                            data-bs-toggle="dropdown" data-bs-offset="0,22">
                             <img :src="user.photo_url" width="32" class="rounded-circle d-flex" :alt="user.name">
@@ -395,7 +428,7 @@ onUnmounted(() => {
                         <img :src="logoWhiteSvg" alt="EasyEye">
                     </a>
                 </div>
-                <button class="sidenav-toggle-btn btn border-0 p-0 active" id="toggle_btn">
+                <button class="sidenav-toggle-btn btn border-0 p-0 active" id="toggle_btn" data-tour="sidebar-toggle">
                     <i class="ti ti-arrow-left"></i>
                 </button>
                 <button class="sidebar-close">
@@ -421,7 +454,7 @@ onUnmounted(() => {
                 </div>
 
                 <!-- ── Seletor de empresa (sidebar expandido) ─────────────── -->
-                <div class="sidebar-top p-2 mx-3 mb-3 dropend">
+                <div class="sidebar-top p-2 mx-3 mb-3 dropend" data-tour="entity-switcher">
                     <a href="javascript:void(0);"
                        class="drop-arrow-none"
                        data-bs-toggle="dropdown"
@@ -491,6 +524,7 @@ onUnmounted(() => {
                                     <li v-else-if="item.children" class="submenu">
                                         <a href="#"
                                            :class="{ 'subdrop active': isMenuOpen(item) }"
+                                           :data-tour="`nav-${item.key}`"
                                            @click.prevent="toggleMenu(item.key)">
                                             <i :class="item.icon"></i>
                                             <span>{{ item.label }}</span>
@@ -510,7 +544,8 @@ onUnmounted(() => {
                                     <!-- Simple item -->
                                     <li v-else>
                                         <a :href="safeRoute(item.route)"
-                                           :class="{ active: isActive(item.match) }">
+                                           :class="{ active: isActive(item.match) }"
+                                           :data-tour="`nav-${item.key}`">
                                             <i :class="item.icon"></i>
                                             <span>{{ item.label }}</span>
                                         </a>

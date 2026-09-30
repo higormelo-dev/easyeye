@@ -18,12 +18,23 @@ use Illuminate\Validation\Rules\Exists;
  * Coerência (after): no máximo um item específico, compatível com o tipo de
  * serviço; convênio específico só com pagador "convênio"; "todos os tipos"
  * (só ao criar) não combina com item específico.
+ *
+ * Nova vigência (só ao editar, opcional): `effective_from` encerra a regra
+ * atual na véspera e cria outra com os dados do formulário a partir dessa
+ * data — depois do início da atual e até o fim dela (se tiver).
+ *
+ * Divisão (E4, opcional, só regra percentual): `percentage` = parte do GRUPO
+ * sobre o recebido líquido (a clínica fica com o restante); `participants` =
+ * executor (médico do item) e/ou médicos fixos da clínica, cada um com % do
+ * grupo, somando exatamente 100%, no máximo um executor, sem médico repetido.
  */
 class DoctorPayoutRuleRequest extends FormRequest
 {
     public const ALL_TYPES = 'all';
 
     public const MONEY_MAX = '9999999999.99';
+
+    public const MAX_PARTICIPANTS = 10;
 
     public function authorize(): bool
     {
@@ -40,7 +51,15 @@ class DoctorPayoutRuleRequest extends FormRequest
                 : true,
         ];
 
-        foreach (['doctor_id', 'visit_type_id', 'procedure_id', 'exam_type_id', 'covenant_id', 'valid_from', 'valid_until', 'notes'] as $field) {
+        if (is_array($this->input('participants'))) {
+            $normalized['participants'] = array_values(array_map(fn ($participant) => is_array($participant) ? [
+                ...$participant,
+                'percentage' => self::normalizeDecimal($participant['percentage'] ?? null),
+                'doctor_id'  => is_string($participant['doctor_id'] ?? null) && trim($participant['doctor_id']) !== '' ? $participant['doctor_id'] : null,
+            ] : $participant, $this->input('participants')));
+        }
+
+        foreach (['doctor_id', 'visit_type_id', 'procedure_id', 'exam_type_id', 'covenant_id', 'valid_from', 'valid_until', 'effective_from', 'notes'] as $field) {
             $value = $this->input($field);
 
             if (is_string($value) && trim($value) === '') {
@@ -80,6 +99,20 @@ class DoctorPayoutRuleRequest extends FormRequest
             'valid_until'   => ['nullable', 'date_format:Y-m-d', 'after_or_equal:valid_from'],
             'active'        => ['boolean'],
             'notes'         => ['nullable', 'string', 'max:1000'],
+            // Nova vigência só existe ao editar uma regra; escolhida, a data é
+            // obrigatória (sem ela o envio viraria correção retroativa).
+            'change_mode'    => $this->isMethod('post') ? ['prohibited'] : ['nullable', 'string', Rule::in(['new'])],
+            'effective_from' => $this->isMethod('post') ? ['prohibited'] : ['nullable', 'required_if:change_mode,new', 'date_format:Y-m-d'],
+
+            'participants'             => ['nullable', 'array', 'max:' . self::MAX_PARTICIPANTS],
+            'participants.*.role'      => ['required', 'string', Rule::in(['executor', 'doctor'])],
+            'participants.*.doctor_id' => [
+                'nullable', 'uuid', 'required_if:participants.*.role,doctor',
+                Rule::exists('doctors', 'id')->where(fn ($q) => $q
+                    ->whereNull('deleted_at')
+                    ->whereIn('entity_user_id', DB::table('entity_users')->select('id')->where('entity_id', $entityId))),
+            ],
+            'participants.*.percentage' => ['required', 'numeric', 'gt:0', 'max:100', 'decimal:0,2'],
         ];
     }
 
@@ -114,26 +147,101 @@ class DoctorPayoutRuleRequest extends FormRequest
                 if ($this->input('covenant_id') !== null && $this->input('payer_scope') !== DoctorPayoutPayerScope::Covenant->value) {
                     $validator->errors()->add('covenant_id', __('financial_doctor_payouts.errors.covenant_scope'));
                 }
+
+                $this->validateEffectiveFrom($validator);
+                $this->validateParticipants($validator);
             },
         ];
+    }
+
+    /**
+     * Nova vigência: depois do início da regra atual (ela fica com pelo menos
+     * um dia), até o fim dela, e antes do fim informado para a nova.
+     */
+    private function validateEffectiveFrom(Validator $validator): void
+    {
+        $from = $this->input('effective_from');
+        $rule = $this->route('rule');
+
+        if (! is_string($from) || ! is_object($rule)) {
+            return;
+        }
+
+        $current = [
+            'from'  => $rule->valid_from?->toDateString(),
+            'until' => $rule->valid_until?->toDateString(),
+        ];
+        $until = $this->input('valid_until');
+
+        if (($current['from'] !== null && $from <= $current['from'])
+            || ($current['until'] !== null && $from > $current['until'])
+            || (is_string($until) && $until < $from)) {
+            $validator->errors()->add('effective_from', __('financial_doctor_payouts.errors.effective_from_range'));
+        }
+    }
+
+    /** Divisão coerente: só em regra percentual, soma 100%, um executor, médico sem repetir. */
+    private function validateParticipants(Validator $validator): void
+    {
+        $participants = (array) ($this->input('participants') ?? []);
+
+        if ($participants === []) {
+            return;
+        }
+
+        if ($this->input('calculation') !== DoctorPayoutCalculation::Percentage->value) {
+            $validator->errors()->add('participants', __('financial_doctor_payouts.errors.participants_percentage_only'));
+
+            return;
+        }
+
+        $sum       = array_sum(array_map(fn (array $participant) => (int) round(((float) $participant['percentage']) * 100), $participants));
+        $roles     = array_count_values(array_column($participants, 'role'));
+        $doctorIds = array_filter(array_column($participants, 'doctor_id'));
+
+        if ($sum !== 10000) {
+            $validator->errors()->add('participants', __('financial_doctor_payouts.errors.participants_sum'));
+        }
+
+        if (($roles['executor'] ?? 0) > 1) {
+            $validator->errors()->add('participants', __('financial_doctor_payouts.errors.participants_executor'));
+        }
+
+        if (count($doctorIds) !== count(array_unique($doctorIds))) {
+            $validator->errors()->add('participants', __('financial_doctor_payouts.errors.participants_duplicate'));
+        }
+
+        foreach ($participants as $index => $participant) {
+            if ($participant['role'] === 'executor' && $participant['doctor_id'] !== null) {
+                $validator->errors()->add("participants.{$index}.doctor_id", __('financial_doctor_payouts.errors.participants_executor_doctor'));
+            }
+        }
     }
 
     public function attributes(): array
     {
         return [
-            'doctor_id'     => __('financial_doctor_payouts.validation.doctor'),
-            'service_type'  => __('financial_doctor_payouts.validation.service_type'),
-            'visit_type_id' => __('financial_doctor_payouts.validation.visit_type'),
-            'procedure_id'  => __('financial_doctor_payouts.validation.procedure'),
-            'exam_type_id'  => __('financial_doctor_payouts.validation.exam_type'),
-            'payer_scope'   => __('financial_doctor_payouts.validation.payer_scope'),
-            'covenant_id'   => __('financial_doctor_payouts.validation.covenant'),
-            'calculation'   => __('financial_doctor_payouts.validation.calculation'),
-            'percentage'    => __('financial_doctor_payouts.validation.percentage'),
-            'fixed_amount'  => __('financial_doctor_payouts.validation.fixed_amount'),
-            'valid_from'    => __('financial_doctor_payouts.validation.valid_from'),
-            'valid_until'   => __('financial_doctor_payouts.validation.valid_until'),
-            'notes'         => __('financial_doctor_payouts.validation.notes'),
+            'doctor_id'      => __('financial_doctor_payouts.validation.doctor'),
+            'service_type'   => __('financial_doctor_payouts.validation.service_type'),
+            'visit_type_id'  => __('financial_doctor_payouts.validation.visit_type'),
+            'procedure_id'   => __('financial_doctor_payouts.validation.procedure'),
+            'exam_type_id'   => __('financial_doctor_payouts.validation.exam_type'),
+            'payer_scope'    => __('financial_doctor_payouts.validation.payer_scope'),
+            'covenant_id'    => __('financial_doctor_payouts.validation.covenant'),
+            'calculation'    => __('financial_doctor_payouts.validation.calculation'),
+            'percentage'     => __('financial_doctor_payouts.validation.percentage'),
+            'fixed_amount'   => __('financial_doctor_payouts.validation.fixed_amount'),
+            'valid_from'     => __('financial_doctor_payouts.validation.valid_from'),
+            'valid_until'    => __('financial_doctor_payouts.validation.valid_until'),
+            'notes'          => __('financial_doctor_payouts.validation.notes'),
+            'effective_from' => __('financial_doctor_payouts.validation.effective_from'),
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'effective_from.required_if' => __('financial_doctor_payouts.errors.effective_from_required'),
         ];
     }
 

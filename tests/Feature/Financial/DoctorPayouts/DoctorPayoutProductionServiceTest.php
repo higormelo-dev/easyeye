@@ -1,18 +1,19 @@
 <?php
 
 /*
- * Repasse médico — produção pendente (DoctorPayoutProductionService): quais
- * atos entram, de qual médico, com qual valor base, e as regras "um ato = um
- * item" entre agenda, prontuário e exames de equipamento.
+ * Repasse médico — atos de produção (DoctorPayoutProductionService::acts):
+ * quais atos entram, de qual médico, com qual valor base (previsão), e as
+ * regras "um ato = um item" entre agenda, prontuário e exames de equipamento.
+ * A liberação pelo recebido fica em DoctorPayoutReleaseServiceTest.
  */
 
 use App\DTOs\DoctorPayout\PayoutItemData;
 use App\Enums\DoctorPayout\{DoctorPayoutBaseSource, DoctorPayoutServiceType, DoctorPayoutSourceType, DoctorPayoutWarning};
 use App\Enums\ScheduleSituation;
-use App\Models\{BillingClaim, Covenant, Doctor, DoctorPayout, DoctorPayoutItem, Entity, ExamType, FinancialCashEntry, MedicalRecord, MedicalRecordProcedure, Patient, PatientExam, Procedure, ProcedurePrice, Schedule, VisitType};
-use App\Services\Financial\DoctorPayouts\DoctorPayoutProductionService;
+use App\Models\{BillingClaim, Covenant, Doctor, DoctorPayout, DoctorPayoutItem, DoctorPayoutRule, Entity, ExamType, FinancialCashEntry, MedicalRecord, MedicalRecordProcedure, Patient, PatientExam, Procedure, ProcedurePrice, Schedule, VisitType};
+use App\Services\Financial\DoctorPayouts\{DoctorPayoutProductionService, DoctorPayoutRuleResolver};
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
+use Illuminate\Support\{Collection, Str};
 use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
@@ -35,7 +36,7 @@ beforeEach(function () {
 
 function payoutProdRun($test, ?Doctor $doctor = null, string $from = '2026-06-01', string $to = '2026-06-30'): Collection
 {
-    return $test->service->pendingItems(
+    return $test->service->acts(
         $test->entity->id,
         ($doctor ?? $test->doctor)->id,
         CarbonImmutable::parse($from),
@@ -302,6 +303,42 @@ describe('consultas (agenda)', function () {
 });
 
 describe('procedimentos (prontuário)', function () {
+    it('agendamento de cirurgia atendido com o procedimento só CANCELADO no prontuário continua contando, com alerta', function () {
+        $facectomia = payoutProdProcedure(4, 'FACECTOMIA');
+        $type       = payoutProdVisitType($this, $facectomia, 'CIRURGIA CATARATA');
+        $schedule   = payoutProdSchedule($this, ['visit_id' => $type->id]);
+        $record     = payoutProdRecord($this, $schedule);
+        payoutProdExecuted($this, $record, $facectomia, ['status' => 'cancelled', 'executed_at' => null]);
+
+        $item = payoutProdBySource(payoutProdRun($this), DoctorPayoutSourceType::Schedule, $schedule->id);
+
+        expect($item)->not->toBeNull()
+            ->and($item->serviceType)->toBe(DoctorPayoutServiceType::Procedure)
+            ->and($item->warnings)->toContain(DoctorPayoutWarning::ProcedureCancelled);
+
+        // Um olho executado e o outro cancelado (agendamento mantido por parcela já
+        // liberada): não é "nenhum executado" — sem o alerta.
+        payoutProdExecuted($this, $record, $facectomia, ['eye' => 'OD']);
+        DB::table('doctor_payout_items')->insert([
+            'id' => (string) Str::uuid(), 'entity_id' => $this->entity->id, 'doctor_payout_id' => DoctorPayout::query()->create([
+                'entity_id'  => $this->entity->id, 'doctor_id' => $this->doctor->id, 'doctor_name' => 'Dr.', 'period_start' => '2026-06-01',
+                'period_end' => '2026-06-30', 'status' => 'closed', 'closed_at' => now(), 'basis' => 'receipt',
+            ])->id,
+            'source_type' => 'schedule', 'source_id' => $schedule->id, 'service_type' => 'procedure', 'performed_at' => '2026-06-10 09:00:00',
+            'description' => 'FACECTOMIA', 'base_source' => 'received', 'basis' => 'receipt', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $mixed = payoutProdBySource(payoutProdRun($this), DoctorPayoutSourceType::Schedule, $schedule->id);
+        expect($mixed?->warnings ?? [])->not->toContain(DoctorPayoutWarning::ProcedureCancelled);
+        MedicalRecordProcedure::query()->where('status', 'done')->delete();
+        DB::table('doctor_payout_items')->delete();
+
+        // Só "solicitado" (quem não registra a execução): fallback da agenda, sem alerta.
+        MedicalRecordProcedure::query()->update(['status' => 'requested']);
+        $again = payoutProdBySource(payoutProdRun($this), DoctorPayoutSourceType::Schedule, $schedule->id);
+
+        expect($again->warnings)->not->toContain(DoctorPayoutWarning::ProcedureCancelled);
+    });
+
     it('inclui executados com tratamento 4 para quem executou; ignora solicitados, cancelados, tratamentos 2/3 e prontuário excluído', function () {
         $yag      = payoutProdProcedure(4, 'CAPSULOTOMIA YAG');
         $record   = payoutProdRecord($this, null, $this->otherDoctor);
@@ -359,6 +396,45 @@ describe('procedimentos (prontuário)', function () {
             ->baseCents->toBe(30000)
             ->baseSource->toBe(DoctorPayoutBaseSource::Table);
     });
+
+    it('procedimentos iguais pareados com o mesmo agendamento (OD e OE) dividem o valor cobrado — a soma fecha com a cobrança', function () {
+        $injection = payoutProdProcedure(4, 'INJECAO INTRAVITREA');
+        $type      = payoutProdVisitType($this, $injection, 'INJECAO');
+        $schedule  = payoutProdSchedule($this, ['visit_id' => $type->id]);
+        payoutProdCash($this, $schedule, 1000.01);
+        payoutProdPrice($this, $injection, $this->ansCovenant, 700.00);
+
+        $record = payoutProdRecord($this, $schedule);
+        $od     = payoutProdExecuted($this, $record, $injection, ['eye' => 'OD', 'executed_at' => '2026-06-10 10:00:00']);
+        $oe     = payoutProdExecuted($this, $record, $injection, ['eye' => 'OE', 'executed_at' => '2026-06-10 10:05:00']);
+
+        $items  = payoutProdRun($this);
+        $first  = payoutProdBySource($items, DoctorPayoutSourceType::MedicalRecordProcedure, $od->id);
+        $second = payoutProdBySource($items, DoctorPayoutSourceType::MedicalRecordProcedure, $oe->id);
+
+        // Antes: cada um levava R$ 1.000,01 (base dobrada). Agora o centavo de
+        // resto vai para o executado primeiro.
+        expect($items)->toHaveCount(2)
+            ->and($first->baseCents)->toBe(50001)
+            ->and($second->baseCents)->toBe(50000)
+            ->and($first->hasWarning(DoctorPayoutWarning::SplitCharge))->toBeTrue()
+            ->and($second->hasWarning(DoctorPayoutWarning::SplitCharge))->toBeTrue();
+    });
+
+    it('pareados sem cobrança usam cada um o preço de tabela (sem dividir, sem alerta)', function () {
+        $injection = payoutProdProcedure(4, 'INJECAO INTRAVITREA');
+        $schedule  = payoutProdSchedule($this, ['visit_id' => payoutProdVisitType($this, $injection, 'INJECAO')->id]);
+        payoutProdPrice($this, $injection, $this->ansCovenant, 700.00);
+
+        $record = payoutProdRecord($this, $schedule);
+        payoutProdExecuted($this, $record, $injection, ['eye' => 'OD']);
+        payoutProdExecuted($this, $record, $injection, ['eye' => 'OE', 'executed_at' => '2026-06-10 10:05:00']);
+
+        $items = payoutProdRun($this);
+
+        expect($items->pluck('baseCents')->all())->toBe([70000, 70000])
+            ->and($items->every(fn (PayoutItemData $item) => $item->baseSource === DoctorPayoutBaseSource::Table && $item->warnings === []))->toBeTrue();
+    });
 });
 
 describe('exames de equipamento', function () {
@@ -399,6 +475,64 @@ describe('exames de equipamento', function () {
         expect($items)->toHaveCount(1)
             ->and($items->first()->sourceType)->toBe(DoctorPayoutSourceType::Schedule);
     });
+
+    it('agendamento de exame com UM tipo capturado leva o tipo e o nome do exame: a regra "OCT → R$ X" vale e a por tipo de atendimento continua vencendo', function () {
+        $oct      = ExamType::factory()->create(['name' => 'OCT de retina']);
+        $type     = payoutProdVisitType($this, payoutProdProcedure(3, 'RETINOGRAFIA'), 'EXAMES');
+        $schedule = payoutProdSchedule($this, ['visit_id' => $type->id]);
+        payoutProdExam($this, $oct, ['schedule_id' => $schedule->id]);
+        payoutProdExam($this, $oct, ['schedule_id' => $schedule->id, 'exam_performed_at' => '2026-06-10 11:05:00']); // 2ª imagem, mesmo tipo
+        // Importado de fora e desabilitado não contam como tipo do agendamento.
+        payoutProdExam($this, ExamType::factory()->create(['name' => 'CAMPIMETRIA']), ['schedule_id' => $schedule->id, 'source' => 'external_import']);
+        payoutProdExam($this, ExamType::factory()->create(['name' => 'TOPOGRAFIA']), ['schedule_id' => $schedule->id, 'active' => false]);
+
+        $item = payoutProdRun($this)->sole();
+
+        expect($item->sourceType)->toBe(DoctorPayoutSourceType::Schedule)
+            ->and($item->serviceType)->toBe(DoctorPayoutServiceType::Exam)
+            ->and($item->examTypeId)->toBe($oct->id)
+            ->and($item->description)->toBe($oct->name)
+            ->and($item->warnings)->not->toContain(DoctorPayoutWarning::MultipleExamTypes);
+
+        $rule    = fn (array $attrs) => tap(new DoctorPayoutRule(['service_type' => 'exam', 'payer_scope' => 'any', 'calculation' => 'fixed', 'active' => true] + $attrs), fn ($r) => $r->id = (string) Str::uuid());
+        $general = $rule(['fixed_amount' => '20.00']);
+        $byOct   = $rule(['exam_type_id' => $oct->id, 'fixed_amount' => '40.00']);
+        $byVisit = $rule(['visit_type_id' => $type->id, 'fixed_amount' => '55.00']);
+
+        $resolver = new DoctorPayoutRuleResolver();
+
+        expect($resolver->resolveItem(collect([$general, $byOct]), $item)->ruleFixedCents)->toBe(4000)
+            ->and($resolver->resolveItem(collect([$general, $byOct, $byVisit]), $item)->ruleFixedCents)->toBe(5500);
+    });
+
+    it('agendamento de exame com mais de um tipo capturado: um atendimento só, sem tipo, com alerta', function () {
+        $type     = payoutProdVisitType($this, payoutProdProcedure(3, 'RETINOGRAFIA'), 'EXAMES');
+        $schedule = payoutProdSchedule($this, ['visit_id' => $type->id]);
+        payoutProdExam($this, ExamType::factory()->create(['name' => 'OCT']), ['schedule_id' => $schedule->id]);
+        payoutProdExam($this, ExamType::factory()->create(['name' => 'CAMPIMETRIA']), ['schedule_id' => $schedule->id]);
+
+        $item = payoutProdRun($this)->sole();
+
+        expect($item->examTypeId)->toBeNull()
+            ->and($item->description)->toBe('RETINOGRAFIA')
+            ->and($item->warnings)->toContain(DoctorPayoutWarning::MultipleExamTypes);
+    });
+
+    it('exames sem médico no período são contados (avisados na apuração), só os da clínica, ativos e do integrador', function () {
+        $oct = ExamType::factory()->create(['name' => 'OCT']);
+        payoutProdExam($this, $oct, ['doctor_id' => null, 'exam_performed_at' => '2026-06-10 11:00:00']);
+        payoutProdExam($this, $oct, ['doctor_id' => null, 'exam_performed_at' => '2026-06-10 11:05:00']); // mesmo ato
+        payoutProdExam($this, $oct, ['doctor_id' => null, 'exam_performed_at' => '2026-06-11 09:00:00']);
+        payoutProdExam($this, $oct, ['doctor_id' => null, 'exam_performed_at' => '2026-06-12 09:00:00', 'active' => false]);
+        payoutProdExam($this, $oct, ['doctor_id' => null, 'exam_performed_at' => '2026-06-12 10:00:00', 'source' => 'external_import']);
+        payoutProdExam($this, $oct, ['doctor_id' => null, 'exam_performed_at' => '2026-07-01 09:00:00']); // fora do período
+
+        $otherEntity  = Entity::factory()->create(['is_client' => true, 'active' => true]);
+        $otherPatient = Patient::factory()->create(['entity_id' => $otherEntity->id, 'covenant_id' => $this->ansCovenant->id]);
+        payoutProdExam($this, $oct, ['patient_id' => $otherPatient->id, 'doctor_id' => null]);
+
+        expect($this->service->unassignedExamCount($this->entity->id, CarbonImmutable::parse('2026-06-01'), CarbonImmutable::parse('2026-06-30')))->toBe(2);
+    });
 });
 
 describe('fechamentos existentes', function () {
@@ -426,7 +560,7 @@ describe('fechamentos existentes', function () {
         ]);
     }
 
-    it('item em fechamento válido some da produção pendente; anulado volta a aparecer', function () {
+    it('ato fechado no regime anterior (produção) sai da lista; anulado volta; parcela por recebimento continua listada', function () {
         $schedule = payoutProdSchedule($this);
         $item     = payoutProdCloseSource($this, DoctorPayoutSourceType::Schedule, $schedule->id);
 
@@ -435,21 +569,21 @@ describe('fechamentos existentes', function () {
         $item->update(['voided_at' => now()]);
 
         expect(payoutProdRun($this)->pluck('sourceId')->all())->toBe([$schedule->id]);
+
+        // Regime por recebimento: o ato continua na lista (complemento/estorno).
+        payoutProdCloseSource($this, DoctorPayoutSourceType::Schedule, $schedule->id)->update(['basis' => 'receipt']);
+
+        expect(payoutProdRun($this)->pluck('sourceId')->all())->toBe([$schedule->id]);
     });
 
-    it('exame já fechado pela chave não volta; atendimento dentro de período já fechado recebe alerta de atraso', function () {
+    it('exame fechado no regime anterior (pela chave) não volta', function () {
         $oct = ExamType::factory()->create(['name' => 'OCT']);
         payoutProdExam($this, $oct);
         payoutProdCloseSource($this, DoctorPayoutSourceType::PatientExam, DoctorPayoutProductionService::examKey($this->patient->id, $oct->id, '2026-06-10'));
 
-        $late  = payoutProdSchedule($this, ['date_time' => '2026-06-12 09:00:00']);
-        $after = payoutProdSchedule($this, ['date_time' => '2026-06-20 09:00:00']);
+        $schedule = payoutProdSchedule($this, ['date_time' => '2026-06-12 09:00:00']);
 
-        $items = payoutProdRun($this);
-
-        expect($items->pluck('sourceId')->all())->toBe([$late->id, $after->id])
-            ->and(payoutProdBySource($items, DoctorPayoutSourceType::Schedule, $late->id)->hasWarning(DoctorPayoutWarning::LateItem))->toBeTrue()
-            ->and(payoutProdBySource($items, DoctorPayoutSourceType::Schedule, $after->id)->warnings)->toBe([]);
+        expect(payoutProdRun($this)->pluck('sourceId')->all())->toBe([$schedule->id]);
     });
 
     it('fechamento cancelado não conta como período fechado nem prende itens', function () {
@@ -462,6 +596,32 @@ describe('fechamentos existentes', function () {
         expect($items->pluck('sourceId')->all())->toBe([$schedule->id])
             ->and($items->first()->warnings)->toBe([]);
     });
+});
+
+it('vários médicos numa busca: cada ato com o próprio executor (agenda, prontuário e exame)', function () {
+    $schedule = payoutProdSchedule($this);
+    $yag      = payoutProdProcedure(4, 'CAPSULOTOMIA YAG');
+    $record   = payoutProdRecord($this, null, $this->otherDoctor);
+    $executed = payoutProdExecuted($this, $record, $yag, ['executed_by' => $this->otherDoctor->entity_user_id]);
+    $oct      = ExamType::factory()->create(['name' => 'OCT']);
+    payoutProdExam($this, $oct, ['doctor_id' => $this->otherDoctor->id]);
+
+    $items = $this->service->actsOf(
+        $this->entity->id,
+        [$this->doctor->id, $this->otherDoctor->id],
+        CarbonImmutable::parse('2026-06-01'),
+        CarbonImmutable::parse('2026-06-30'),
+    );
+
+    $exam = DoctorPayoutProductionService::examKey($this->patient->id, $oct->id, '2026-06-10');
+
+    expect($items)->toHaveCount(3)
+        ->and(payoutProdBySource($items, DoctorPayoutSourceType::Schedule, $schedule->id)->doctorId)->toBe($this->doctor->id)
+        ->and(payoutProdBySource($items, DoctorPayoutSourceType::MedicalRecordProcedure, $executed->id)->doctorId)->toBe($this->otherDoctor->id)
+        ->and(payoutProdBySource($items, DoctorPayoutSourceType::PatientExam, $exam)->doctorId)->toBe($this->otherDoctor->id)
+        // Um médico só continua vendo só os próprios atos.
+        ->and(payoutProdRun($this)->pluck('sourceId')->all())->toBe([$schedule->id])
+        ->and(payoutProdRun($this, $this->otherDoctor)->pluck('sourceId')->sort()->values()->all())->toBe(collect([$executed->id, $exam])->sort()->values()->all());
 });
 
 it('número de consultas ao banco não cresce com o número de atendimentos', function () {

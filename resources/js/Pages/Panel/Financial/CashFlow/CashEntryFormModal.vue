@@ -61,6 +61,7 @@ const isLocked = computed(() => !!props.entry?.lock_reason);
 const lockHint = computed(() => {
     if (props.entry?.lock_reason === 'billing_claim') return props.t.lock_billing_claim_hint;
     if (props.entry?.lock_reason === 'doctor_payout') return props.t.lock_doctor_payout_hint;
+    if (props.entry?.lock_reason === 'doctor_payout_allocation') return props.t.lock_doctor_payout_allocation_hint;
 
     return props.t.lock_closed_period_hint;
 });

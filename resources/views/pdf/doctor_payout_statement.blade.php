@@ -6,6 +6,8 @@
     $money  = fn ($value) => Number::currency((float) $value, 'BRL', $locale);
     $date   = fn ($value) => $value ? Carbon::parse($value)->locale($locale)->isoFormat('L') : '—';
     $t      = fn (string $key, array $replace = []) => __("financial_doctor_payouts.{$key}", $replace);
+    // Documento do médico: só os pagamentos válidos, com data, forma e valor.
+    $payments = array_values(array_filter($statement['payments'] ?? [], fn (array $payment) => empty($payment['reversed_at'])));
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', $locale) }}">
@@ -58,6 +60,9 @@
                 <span class="label">{{ $t('statement_period') }}</span>
                 {{ $date($payout['period_start']) }} – {{ $date($payout['period_end']) }}<br>
                 <span class="muted">{{ $t('statement_status') }}: {{ $t('statuses.' . $payout['status']) }}</span>
+                @if($payout['closed_at'])
+                    <br><span class="muted">{{ $t('statement_closed_on', ['date' => $date($payout['closed_at'])]) }}</span>
+                @endif
                 @if($payout['paid_at'])
                     <br><span class="muted">{{ $t('payment_paid_on', ['date' => $date($payout['paid_at'])]) }}</span>
                 @endif
@@ -81,14 +86,30 @@
             </thead>
             <tbody>
                 @foreach($group['items'] as $item)
+                    @php($lines = $presenter->compositionLines($item))
                     <tr>
                         <td>{{ $date($item['date']) }}</td>
                         <td>{{ $item['patient_name'] ?? '—' }}@if($item['patient_code'])<br><span class="muted">{{ $item['patient_code'] }}</span>@endif</td>
                         <td>{{ $item['description'] }}</td>
                         <td>{{ $presenter->payerLabel($item) }}</td>
-                        <td class="text-end">{{ $money($item['charged']) }}</td>
-                        <td>{{ $presenter->ruleLabel($item['rule']) }}</td>
-                        <td class="text-end">{{ $money($item['payout']) }}</td>
+                        <td class="text-end">
+                            {{ $money($item['charged']) }}
+                            @foreach($lines['base'] as $line)
+                                <br><span class="muted">{{ $line }}</span>
+                            @endforeach
+                        </td>
+                        <td>
+                            {{ $presenter->ruleLabel($item['rule'], $item['basis'] ?? null) }}
+                            @foreach($lines['rule'] as $line)
+                                <br><span class="muted">{{ $line }}</span>
+                            @endforeach
+                        </td>
+                        <td class="text-end">
+                            {{ $money($item['payout']) }}
+                            @foreach($lines['payout'] as $line)
+                                <br><span class="muted">{{ $line }}</span>
+                            @endforeach
+                        </td>
                     </tr>
                 @endforeach
                 <tr class="subtotal">
@@ -122,11 +143,37 @@
     @endif
 
     <table class="totals">
-        <tr><td>{{ $t('statement_gross') }}</td><td class="text-end">{{ $money($payout['gross_amount']) }}</td></tr>
+        <tr><td>{{ $t(($payout['basis'] ?? 'production') === 'receipt' ? 'statement_gross_receipt' : 'statement_gross') }}</td><td class="text-end">{{ $money($payout['gross_amount']) }}</td></tr>
         <tr><td>{{ $t('statement_items_total') }}</td><td class="text-end">{{ $money($payout['items_amount']) }}</td></tr>
         <tr><td>{{ $t('statement_adjustments_total') }}</td><td class="text-end">{{ $money($payout['adjustments_amount']) }}</td></tr>
         <tr class="net"><td>{{ $t('statement_net_total') }}</td><td class="text-end">{{ $money($payout['total_amount']) }}</td></tr>
     </table>
+
+    @if(count($payments) > 0)
+        <h2>{{ $t('payments_title') }}</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 20%">{{ $t('payment_date') }}</th>
+                    <th>{{ $t('payment_method') }}</th>
+                    <th class="text-end" style="width: 18%">{{ $t('payment_amount') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($payments as $payment)
+                    <tr>
+                        <td>{{ $date($payment['paid_at']) }}</td>
+                        <td>{{ $payment['payment_method'] ? $t('payment_methods.' . $payment['payment_method']) : '—' }}</td>
+                        <td class="text-end">{{ $money($payment['amount']) }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+        <table class="totals">
+            <tr><td>{{ $t('payment_paid_total') }}</td><td class="text-end">{{ $money($payout['paid_amount'] ?? 0) }}</td></tr>
+            <tr class="net"><td>{{ $t('payment_balance') }}</td><td class="text-end">{{ $money($payout['remaining_amount'] ?? 0) }}</td></tr>
+        </table>
+    @endif
 
     @if($payout['status'] === 'cancelled')
         <div class="notice">

@@ -7,20 +7,30 @@
  * nada crítico agora — o componente inteiro nem monta nesse caso (ver
  * Dashboard.vue: `v-if="section.key === 'stock' && alerts"`).
  */
-defineProps({
-    alerts: { type: Object, required: true }, // { below_minimum_count, expiring_lots_count, products_url, expiring_url }
+const props = defineProps({
+    alerts: { type: Object, required: true }, // { below_minimum_count, expiring_lots_count, list_url, products_url, expiring_url }
+    t:      { type: Object, default: () => ({}) },
 });
+
+/** Texto com plural (_one/_other) e :count. */
+function countText(key, count) {
+    const text = props.t[`${key}_${count === 1 ? 'one' : 'other'}`] ?? '';
+
+    return text.replace(':count', String(count));
+}
 </script>
 
 <template>
     <div class="card mb-4">
         <div class="card-header d-flex align-items-center justify-content-between">
             <span>
-                <i class="ti ti-building-warehouse me-2 text-primary"></i>
-                Alertas de estoque
+                <i class="ti ti-building-warehouse me-2 text-primary" aria-hidden="true"></i>
+                {{ t.stock_title }}
             </span>
-            <a :href="alerts.products_url" class="btn btn-sm btn-outline-primary">
-                Ver estoque <i class="ti ti-arrow-right ms-1"></i>
+            <!-- Lista completa: o alerta pode ser só de validade, e o filtro
+                 "abaixo do mínimo" mostraria uma lista vazia. -->
+            <a :href="alerts.list_url ?? alerts.products_url" class="btn btn-sm btn-outline-primary">
+                {{ t.stock_see }} <i class="ti ti-arrow-right ms-1" aria-hidden="true"></i>
             </a>
         </div>
 
@@ -32,8 +42,8 @@ defineProps({
                             <i class="ti ti-alert-triangle text-warning fs-4"></i>
                         </span>
                         <div>
-                            <div class="fw-semibold">{{ alerts.below_minimum_count }} produto(s) abaixo do mínimo</div>
-                            <div class="text-muted small">Reponha o estoque pra não faltar material</div>
+                            <div class="fw-semibold">{{ countText('stock_below_minimum', alerts.below_minimum_count) }}</div>
+                            <div class="text-muted small">{{ t.stock_below_minimum_hint }}</div>
                         </div>
                     </a>
                 </div>
@@ -44,8 +54,8 @@ defineProps({
                             <i class="ti ti-calendar-x text-danger fs-4"></i>
                         </span>
                         <div>
-                            <div class="fw-semibold">{{ alerts.expiring_lots_count }} produto(s) com lote vencendo</div>
-                            <div class="text-muted small">Vencimento nos próximos 30 dias</div>
+                            <div class="fw-semibold">{{ countText('stock_expiring', alerts.expiring_lots_count) }}</div>
+                            <div class="text-muted small">{{ t.stock_expiring_hint }}</div>
                         </div>
                     </a>
                 </div>

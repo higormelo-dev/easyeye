@@ -1,15 +1,17 @@
 <script setup>
 import { computed, useId } from 'vue';
 import PeriodFilter from '@/Components/Panel/PeriodFilter.vue';
-import { useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
+import { RECEIPT_STATUSES, useDoctorPayoutFormat } from './useDoctorPayoutFormat.js';
 
 /**
- * Filtros da apuração: médico, período (sem datas futuras — só entra o que
- * foi realizado) e, com médico escolhido, status e tipo dos itens. Cada troca
- * emite `change` com o conjunto COMPLETO de filtros; a página visita a URL.
+ * Filtros da apuração: médico, período (pela data do RECEBIMENTO, sem datas
+ * futuras; a regra vale pela data do atendimento) e, com médico escolhido,
+ * status (inclui "com recebimento" = tudo menos a previsão, as mesmas linhas
+ * do resumo por tipo), tipo, situação de recebimento e alerta dos itens. Cada
+ * troca emite `change` com o conjunto COMPLETO de filtros; a página visita a URL.
  */
 const props = defineProps({
-    filters:  { type: Object,  default: () => ({}) },   // { doctor, from, to, status, service_type }
+    filters:  { type: Object,  default: () => ({}) },   // { doctor, from, to, status, service_type, receipt, warning }
     doctors:  { type: Array,   default: () => [] },     // [{ id, name, record, active }]
     today:    { type: String,  default: '' },
     t:        { type: Object,  default: () => ({}) },
@@ -19,20 +21,26 @@ const props = defineProps({
 
 const emit = defineEmits(['change']);
 
-const ITEM_STATUSES = ['pending', 'closed', 'paid'];
+const ITEM_STATUSES = ['pending', 'awaiting', 'closed', 'partially_paid', 'paid'];
 const SERVICE_TYPES = ['consultation', 'exam', 'procedure'];
 
-const { doctorLabel, statusLabel, serviceTypeLabel } = useDoctorPayoutFormat(() => props.t);
+const { doctorLabel, statusLabel, serviceTypeLabel, receiptStatusLabel, warningLabel } = useDoctorPayoutFormat(() => props.t);
+
+/** Alertas do filtro, na ordem das traduções. */
+const warnings = computed(() => Object.keys(props.t.warnings ?? {}));
 
 const uid = useId();
 const ids = {
-    doctor: `dp-filter-doctor-${uid}`,
-    status: `dp-filter-status-${uid}`,
-    type:   `dp-filter-type-${uid}`,
+    doctor:     `dp-filter-doctor-${uid}`,
+    status:     `dp-filter-status-${uid}`,
+    type:       `dp-filter-type-${uid}`,
+    receipt:    `dp-filter-receipt-${uid}`,
+    warning:    `dp-filter-warning-${uid}`,
+    periodHint: `dp-filter-period-hint-${uid}`,
 };
 
 const hasDoctor      = computed(() => !!props.filters.doctor);
-const hasListFilters = computed(() => !!props.filters.status || !!props.filters.service_type);
+const hasListFilters = computed(() => !!props.filters.status || !!props.filters.service_type || !!props.filters.receipt || !!props.filters.warning);
 
 function change(patch) {
     emit('change', {
@@ -41,6 +49,8 @@ function change(patch) {
         to:           props.filters.to ?? '',
         status:       props.filters.status ?? '',
         service_type: props.filters.service_type ?? '',
+        receipt:      props.filters.receipt ?? '',
+        warning:      props.filters.warning ?? '',
         ...patch,
     });
 }
@@ -65,15 +75,19 @@ function change(patch) {
                     </select>
                 </div>
 
-                <PeriodFilter
-                    :from="filters.from ?? ''"
-                    :to="filters.to ?? ''"
-                    :today="today"
-                    :max="today"
-                    :labels="shared?.period"
-                    :disabled="disabled"
-                    @change="({ from, to }) => change({ from, to })"
-                />
+                <div>
+                    <PeriodFilter
+                        :from="filters.from ?? ''"
+                        :to="filters.to ?? ''"
+                        :today="today"
+                        :max="today"
+                        :labels="shared?.period"
+                        :disabled="disabled"
+                        :aria-describedby="ids.periodHint"
+                        @change="({ from, to }) => change({ from, to })"
+                    />
+                    <div :id="ids.periodHint" class="form-text small mt-1" data-test="period-hint">{{ t.filter_period_hint }}</div>
+                </div>
 
                 <template v-if="hasDoctor">
                     <div>
@@ -88,6 +102,7 @@ function change(patch) {
                         >
                             <option value="">{{ t.filter_status_all }}</option>
                             <option v-for="status in ITEM_STATUSES" :key="status" :value="status">{{ statusLabel(status) }}</option>
+                            <option value="in_payout">{{ t.filter_status_in_payout }}</option>
                         </select>
                     </div>
                     <div>
@@ -104,13 +119,41 @@ function change(patch) {
                             <option v-for="type in SERVICE_TYPES" :key="type" :value="type">{{ serviceTypeLabel(type) }}</option>
                         </select>
                     </div>
+                    <div>
+                        <label :for="ids.receipt" class="form-label small mb-1">{{ t.filter_receipt }}</label>
+                        <select
+                            :id="ids.receipt"
+                            class="form-select form-select-sm"
+                            :value="filters.receipt ?? ''"
+                            :disabled="disabled"
+                            data-test="filter-receipt"
+                            @change="change({ receipt: $event.target.value })"
+                        >
+                            <option value="">{{ t.filter_receipt_all }}</option>
+                            <option v-for="status in RECEIPT_STATUSES" :key="status" :value="status">{{ receiptStatusLabel(status) }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label :for="ids.warning" class="form-label small mb-1">{{ t.filter_warning }}</label>
+                        <select
+                            :id="ids.warning"
+                            class="form-select form-select-sm"
+                            :value="filters.warning ?? ''"
+                            :disabled="disabled"
+                            data-test="filter-warning"
+                            @change="change({ warning: $event.target.value })"
+                        >
+                            <option value="">{{ t.filter_warning_all }}</option>
+                            <option v-for="code in warnings" :key="code" :value="code">{{ warningLabel(code) }}</option>
+                        </select>
+                    </div>
                     <button
                         v-if="hasListFilters"
                         type="button"
                         class="btn btn-link btn-sm text-decoration-none px-1"
                         :disabled="disabled"
                         data-test="filters-clear"
-                        @click="change({ status: '', service_type: '' })"
+                        @click="change({ status: '', service_type: '', receipt: '', warning: '' })"
                     >
                         <i class="ti ti-filter-off me-1" aria-hidden="true"></i>{{ t.filter_clear }}
                     </button>

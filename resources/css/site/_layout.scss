@@ -22,7 +22,11 @@
 
         .nav-links a {
             color: rgba(#fff, .85);
-            &:hover { color: #fff; background: rgba(#fff, .1); }
+            &:is(:hover, :focus-visible, [aria-current='location']) {
+                color: #fff;
+                background: rgba(#fff, .1);
+                text-decoration-color: $teal-lt;
+            }
         }
 
         .lang-btn {
@@ -39,7 +43,6 @@
                 color: #fff;
                 border-color: rgba(#fff, .85);
                 background: rgba(#fff, .22);
-                transform: translateY(-1px);
                 box-shadow: 0 4px 16px rgba(#000, .18);
             }
         }
@@ -90,6 +93,9 @@
 // Links desktop
 .nav-links {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    min-width: 0;
     align-items: center;
     gap: 2px;
     list-style: none;
@@ -107,7 +113,7 @@
         transition: color .2s, background .2s;
         white-space: nowrap;
 
-        &:hover { color: $navy; background: rgba($navy, .06); }
+        &:is(:hover, :focus-visible) { color: $navy; background: rgba($navy, .06); }
     }
 }
 
@@ -115,9 +121,10 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    flex-shrink: 0;
+    min-width: 0;
+    flex-shrink: 1;
 
-    .btn { white-space: nowrap; }
+    .btn { white-space: normal; }
 }
 
 // Language switcher
@@ -204,8 +211,10 @@
     box-shadow: 0 20px 40px rgba($navy, .12);
     padding: 16px 24px 24px;
     padding-bottom: max(24px, env(safe-area-inset-bottom));
-    max-height: calc(100vh - 76px);
-    max-height: calc(100dvh - 76px);
+    // O menu absoluto usa a altura real do navbar (100%), inclusive quando
+    // os botões crescem com texto ampliado ou a tela muda de orientação.
+    max-height: calc(100vh - 100%);
+    max-height: calc(100dvh - 100%);
     overflow-y: auto;
     overscroll-behavior-y: contain;
     border-top: 1px solid $border;
@@ -224,6 +233,24 @@
             border-bottom: 1px solid $border;
         }
     }
+}
+
+// A seção sob leitura deixa uma referência discreta; sublinhado não muda
+// a largura dos links nem a altura do menu ao alternar o destino atual.
+.nav-links a,
+.nav-mobile-menu ul li a {
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+    transition: color $dur-fast ease, background-color $dur-fast ease, text-decoration-color $dur-fast ease;
+
+    &:is(:hover, :focus-visible, [aria-current='location']) {
+        color: $teal-ink;
+        text-decoration-color: $teal-ink;
+    }
+
+    @media (prefers-reduced-motion: reduce) { transition: none; }
 }
 
 .mobile-lang {
@@ -278,7 +305,6 @@
 
 @media (prefers-reduced-motion: reduce) {
     .nav-mobile-menu.open { animation: none; }
-    #navbar:not(.scrolled) .nav-right .btn-outline:hover { transform: none; }
 }
 
 // Menu móvel aberto: a página de trás não rola (SiteLayout alterna a classe).
@@ -295,6 +321,14 @@ footer {
     grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
     gap: 40px;
     margin-bottom: 48px;
+
+    &.footer-inner--compact {
+        grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+
+        @include below($bp-lg) {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
 
     // Tablet: marca na linha de cima e as 3 listas lado a lado (antes 2+1,
     // com "Empresa" sozinha e meia largura vazia).

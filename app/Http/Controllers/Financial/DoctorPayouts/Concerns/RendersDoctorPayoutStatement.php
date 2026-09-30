@@ -25,11 +25,14 @@ trait RendersDoctorPayoutStatement
         DoctorPayout $payout,
         DoctorPayoutPresenter $presenter,
         DoctorPayoutExporter $exporter,
+        bool $forDoctor = false,
     ): SymfonyResponse|RedirectResponse {
         try {
             $response = SnappyPdf::loadView('pdf.doctor_payout_statement', [
-                'entity'      => $entity,
-                'statement'   => $presenter->statement($payout),
+                'entity' => $entity,
+                // PDF do médico: o mesmo recorte da tela dele (sem estornos,
+                // observações de pagamento nem nomes da equipe).
+                'statement'   => $presenter->statement($payout, $forDoctor),
                 'presenter'   => $presenter,
                 'locale'      => app()->getLocale(),
                 'generatedAt' => now(),
@@ -38,7 +41,7 @@ trait RendersDoctorPayoutStatement
                 ->setOrientation('portrait')
                 ->setOption('footer-right', __('financial_doctor_payouts.pdf_page'))
                 ->setOption('footer-font-size', 8)
-                ->download("repasse_{$payout->code}.pdf");
+                ->download(sprintf('%s_%s.pdf', __('financial_doctor_payouts.export_filename'), $payout->code));
         } catch (Throwable $e) {
             report($e);
 

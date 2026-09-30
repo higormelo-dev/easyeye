@@ -323,7 +323,8 @@ onBeforeUnmount(cancelPolling);
 
 <template>
     <Teleport to="body">
-        <div class="ai-floating-assistant">
+        <!-- data-tour: âncora do tour guiado do painel (lang/*/tour.php → layout) -->
+        <div class="ai-floating-assistant" data-tour="ai-assistant">
             <!-- Ícone flutuante (fechado) -->
             <button v-if="windowState === 'closed'" type="button"
                     class="ai-fab" :title="tt('title', 'Assistente virtual')"

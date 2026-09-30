@@ -109,9 +109,9 @@ final class DoctorPayoutOptions
 
     /**
      * Convênios ativos (clínica + globais); `particular` segue a regra do
-     * faturamento (sem registro ANS).
+     * faturamento (sem registro ANS); `own` = cadastrado pela clínica.
      *
-     * @return list<array{id: string, name: string, particular: bool}>
+     * @return list<array{id: string, name: string, particular: bool, own: bool}>
      */
     public function covenants(string $entityId): array
     {
@@ -120,11 +120,12 @@ final class DoctorPayoutOptions
             ->whereNull('deleted_at')
             ->where('active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'ans_registry'])
+            ->get(['id', 'entity_id', 'name', 'ans_registry'])
             ->map(fn (object $row) => [
                 'id'         => (string) $row->id,
                 'name'       => (string) $row->name,
                 'particular' => preg_replace('/\D/', '', (string) ($row->ans_registry ?? '')) === '',
+                'own'        => $row->entity_id !== null,
             ])
             ->all();
     }

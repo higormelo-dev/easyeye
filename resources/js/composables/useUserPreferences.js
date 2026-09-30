@@ -29,11 +29,13 @@ export function useUserPreferences() {
     /**
      * Atualiza otimisticamente (reflete na UI na hora) e persiste em
      * background, debounced por chave — evita martelar o endpoint durante
-     * um drag-and-drop de várias etapas seguidas.
+     * um drag-and-drop de várias etapas seguidas. `optimistic`: valor local
+     * diferente do enviado (ex.: `tours` envia só o tour que mudou e o
+     * servidor mescla; na tela fica o mapa completo).
      */
-    function savePreference(key, value, { debounceMs = 500 } = {}) {
+    function savePreference(key, value, { debounceMs = 500, optimistic = value } = {}) {
         if (page.props.auth?.user) {
-            page.props.auth.user.preferences = { ...preferences.value, [key]: value };
+            page.props.auth.user.preferences = { ...preferences.value, [key]: optimistic };
         }
 
         clearTimeout(debounceTimers[key]);

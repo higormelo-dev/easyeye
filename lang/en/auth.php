@@ -53,9 +53,6 @@ return [
         'benefit_support_text'  => 'Our team walks you through from day one.',
         'benefit_lgpd_title'    => 'CFM & LGPD compliant by default',
         'benefit_lgpd_text'     => 'Built in compliance with CFM, ANS and data protection law.',
-        'testimonial_text'      => 'EasyEye transformed our clinic. TISS billing that used to take days now takes hours.',
-        'testimonial_name'      => 'Dr. Ricardo Mendes',
-        'testimonial_role'      => 'Ophthalmologist — Clínica Visão SP',
 
         /* mobile banner */
         'days_free'  => 'days free',
@@ -88,6 +85,7 @@ return [
         'back'               => 'Back',
         'create_account'     => 'Create account',
         'start_trial'        => 'Start free trial',
+        'trial_unavailable'  => 'Trial registration is currently unavailable. Please contact our sales team.',
         'processing'         => 'Processing...',
         'already_registered' => 'Already have an account?',
         'log_in'             => 'Log in',
@@ -96,9 +94,6 @@ return [
 
         /* additional fields */
         'phone' => 'Phone',
-
-        /* left panel metrics */
-        'metric_clinics' => 'clinics',
 
         /* JS validations */
         'email_taken'        => 'This e-mail is already registered.',
@@ -161,9 +156,7 @@ return [
     'panel' => [
         'feature_schedule'   => 'Smart scheduling with automatic confirmation',
         'feature_record'     => 'Complete digital ophthalmology records',
-        'feature_tiss'       => 'TISS 3.06 billing, ANS certified',
+        'feature_tiss'       => 'Integrated TISS 3.06 billing',
         'feature_compliance' => 'CFM & LGPD compliance built in',
-        'quote_text'         => 'EasyEye transformed our clinic. TISS billing that used to take days now takes hours.',
-        'quote_author'       => 'Dr. Ricardo Mendes — Clínica Visão SP',
     ],
 ];

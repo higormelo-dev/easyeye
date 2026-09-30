@@ -17,7 +17,7 @@ const props = defineProps({
     emptyText: { type: String, default: '' },
 });
 
-const { money, number, date, periodText } = useDoctorPayoutFormat(() => props.t);
+const { tx, money, number, date, periodText } = useDoctorPayoutFormat(() => props.t);
 
 const url = (template, payout) => String(template ?? '').replace('__ID__', payout.id);
 
@@ -36,7 +36,7 @@ const rows = computed(() => props.payouts ?? []);
                     <th scope="col" class="text-end">{{ t.col_items }}</th>
                     <th scope="col" class="text-end">{{ t.col_total }}</th>
                     <th scope="col">{{ t.col_status }}</th>
-                    <th scope="col">{{ t.col_paid_at }}</th>
+                    <th scope="col" class="text-end">{{ t.col_paid }}</th>
                     <th scope="col" class="text-end">{{ t.col_actions }}</th>
                 </tr>
             </thead>
@@ -64,7 +64,16 @@ const rows = computed(() => props.payouts ?? []);
                     <td class="text-end closings__value">{{ number(payout.items_count) }}</td>
                     <td class="text-end text-nowrap fw-semibold closings__value">{{ money(payout.total_amount) }}</td>
                     <td><PayoutStatusBadge :status="payout.status" :t="t" /></td>
-                    <td class="small text-nowrap">{{ payout.paid_at ? date(payout.paid_at) : t.none }}</td>
+                    <td class="text-end text-nowrap" data-test="closing-paid">
+                        <template v-if="payout.status === 'cancelled'">{{ t.none }}</template>
+                        <template v-else>
+                            <div class="closings__value">{{ money(payout.paid_amount ?? 0) }}</div>
+                            <div v-if="Number(payout.remaining_amount ?? 0) > 0" class="small text-warning-emphasis" data-test="closing-balance">
+                                {{ tx('balance_line', { value: money(payout.remaining_amount) }) }}
+                            </div>
+                            <div v-if="payout.paid_at" class="small text-muted">{{ tx('last_payment_on', { date: date(payout.paid_at) }) }}</div>
+                        </template>
+                    </td>
                     <td class="text-end">
                         <ActionIconGroup align="end" gap="tight">
                             <ActionIconButton

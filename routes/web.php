@@ -23,7 +23,9 @@ use App\Http\Controllers\{
     Financial\CashFlowController,
     Financial\ClinicBiController,
     Financial\DoctorPayouts\DoctorPayoutAdjustmentsController,
+    Financial\DoctorPayouts\DoctorPayoutAllocationsController,
     Financial\DoctorPayouts\DoctorPayoutClosingsController,
+    Financial\DoctorPayouts\DoctorPayoutDeductionRatesController,
     Financial\DoctorPayouts\DoctorPayoutPaymentsController,
     Financial\DoctorPayouts\DoctorPayoutRulesController,
     Financial\DoctorPayouts\DoctorPayoutSettingsController,
@@ -729,14 +731,27 @@ Route::group(
                     Route::delete('doctor-payouts/closings/{payout}/adjustments/{adjustment}', [DoctorPayoutAdjustmentsController::class, 'destroy'])
                         ->whereUuid('adjustment')
                         ->name('doctor-payouts.closings.adjustments.destroy');
-                    Route::post('doctor-payouts/closings/{payout}/payment', [DoctorPayoutPaymentsController::class, 'store'])->name('doctor-payouts.closings.payment.store');
+                    Route::post('doctor-payouts/closings/{payout}/payments', [DoctorPayoutPaymentsController::class, 'store'])->name('doctor-payouts.closings.payments.store');
+                    Route::delete('doctor-payouts/closings/{payout}/payments/{payment}', [DoctorPayoutPaymentsController::class, 'destroy'])
+                        ->whereUuid('payment')
+                        ->name('doctor-payouts.closings.payments.destroy');
+                    // Taxas de dedução antes de dividir (cartão, imposto, taxa administrativa), com vigência.
+                    Route::post('doctor-payouts/deduction-rates', [DoctorPayoutDeductionRatesController::class, 'store'])->name('doctor-payouts.deduction-rates.store');
+                    Route::delete('doctor-payouts/deduction-rates/{rate}', [DoctorPayoutDeductionRatesController::class, 'destroy'])
+                        ->whereUuid('rate')
+                        ->name('doctor-payouts.deduction-rates.destroy');
+                    // Recebimento manual (alocar receita avulsa a atos; estorno por admin ou financeiro, com motivo).
+                    Route::post('doctor-payouts/allocations', [DoctorPayoutAllocationsController::class, 'store'])->name('doctor-payouts.allocations.store');
+                    Route::delete('doctor-payouts/allocations/{allocation}', [DoctorPayoutAllocationsController::class, 'destroy'])
+                        ->whereUuid('allocation')
+                        ->name('doctor-payouts.allocations.destroy');
                     Route::get('doctor-payouts/export', [DoctorPayoutsController::class, 'export'])->name('doctor-payouts.export');
                     Route::get('doctor-payouts/closings/{payout}/pdf', [DoctorPayoutClosingsController::class, 'pdf'])->name('doctor-payouts.closings.pdf');
                     Route::get('doctor-payouts/closings/{payout}/export', [DoctorPayoutClosingsController::class, 'export'])->name('doctor-payouts.closings.export');
-                    // Reabrir fechamento, estornar pagamento e expor repasses ao médico: só admin.
+                    // Reabrir fechamento e expor repasses ao médico: só admin. (Estornar
+                    // pagamento: admin ou financeiro, com motivo — decisão de 2026-09-29.)
                     Route::middleware('entity.role:admin')->group(function () {
                         Route::delete('doctor-payouts/closings/{payout}', [DoctorPayoutClosingsController::class, 'destroy'])->name('doctor-payouts.closings.destroy');
-                        Route::delete('doctor-payouts/closings/{payout}/payment', [DoctorPayoutPaymentsController::class, 'destroy'])->name('doctor-payouts.closings.payment.destroy');
                         Route::patch('doctor-payouts/settings', [DoctorPayoutSettingsController::class, 'update'])->name('doctor-payouts.settings.update');
                     });
                 });

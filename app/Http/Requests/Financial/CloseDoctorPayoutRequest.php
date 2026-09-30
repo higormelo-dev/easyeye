@@ -36,10 +36,12 @@ class CloseDoctorPayoutRequest extends FormRequest
                 Rule::exists('doctors', 'id')->where(fn ($q) => $q
                     ->whereIn('entity_user_id', DB::table('entity_users')->select('id')->where('entity_id', $entityId))),
             ],
-            'period_start'           => ['required', 'date_format:Y-m-d'],
-            'period_end'             => ['required', 'date_format:Y-m-d', 'after_or_equal:period_start', 'before_or_equal:today'],
-            'expected_count'         => ['required', 'integer', 'min:0'],
-            'expected_charged_cents' => ['required', 'integer', 'min:0'],
+            'period_start'   => ['required', 'date_format:Y-m-d'],
+            'period_end'     => ['required', 'date_format:Y-m-d', 'after_or_equal:period_start', 'before_or_equal:today'],
+            'expected_count' => ['required', 'integer', 'min:0'],
+            // Base pode ser negativa (estorno de recebimento maior que o novo
+            // recebido) com repasse ≥ 0 — o que importa é bater com a prévia.
+            'expected_charged_cents' => ['required', 'integer'],
             'expected_payout_cents'  => ['required', 'integer', 'min:0'],
             'notes'                  => ['nullable', 'string', 'max:2000'],
         ];
@@ -74,10 +76,13 @@ class CloseDoctorPayoutRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'doctor_id'    => __('financial_doctor_payouts.validation.doctor'),
-            'period_start' => __('financial_doctor_payouts.validation.period_start'),
-            'period_end'   => __('financial_doctor_payouts.validation.period_end'),
-            'notes'        => __('financial_doctor_payouts.validation.notes'),
+            'doctor_id'              => __('financial_doctor_payouts.validation.doctor'),
+            'period_start'           => __('financial_doctor_payouts.validation.period_start'),
+            'period_end'             => __('financial_doctor_payouts.validation.period_end'),
+            'notes'                  => __('financial_doctor_payouts.validation.notes'),
+            'expected_count'         => __('financial_doctor_payouts.validation.expected_count'),
+            'expected_charged_cents' => __('financial_doctor_payouts.validation.expected_charged'),
+            'expected_payout_cents'  => __('financial_doctor_payouts.validation.expected_payout'),
         ];
     }
 }

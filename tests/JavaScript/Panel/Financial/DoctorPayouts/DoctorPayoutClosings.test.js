@@ -137,4 +137,19 @@ describe('Financial/DoctorPayouts/Closings', () => {
         await w.find('.to-cards').trigger('click');
         expect(w.find('[data-test="closings-empty"]').text()).toBe('No closing found.');
     });
+
+    it('pago em parte: mostra o pago, o saldo e o último pagamento; cancelado sem valores', () => {
+        const w = mountPage({
+            payouts: paginator([
+                { ...payoutSummary, id: 'pp', status: 'partially_paid', total_amount: 300, paid_amount: 100, remaining_amount: 200, paid_at: '2026-09-05' },
+                { ...payoutSummary, id: 'cc', status: 'cancelled', total_amount: 300, paid_amount: null, remaining_amount: 0, paid_at: null },
+            ]),
+        });
+        const [partial, cancelled] = w.findAll('[data-test="closing-row"]');
+
+        expect(partial.find('[data-test="closing-paid"]').text()).toContain(brl(100));
+        expect(partial.find('[data-test="closing-balance"]').text()).toBe(`Balance ${brl(200)}`);
+        expect(partial.find('[data-test="closing-paid"]').text()).toContain('Last payment on 05/09/2026');
+        expect(cancelled.find('[data-test="closing-paid"]').text()).toBe('—');
+    });
 });

@@ -82,4 +82,56 @@ return [
     'demo_description' => 'Popule dados de teste ou redefina o ambiente para demonstrações.',
     'demo_btn_seed'    => 'Popular dados',
     'demo_btn_reset'   => 'Resetar ambiente',
+
+    // Cabeçalho e personalização
+    'page_title'      => 'Painel de controle',
+    'customize'       => 'Personalizar',
+    'customize_title' => 'Personalizar o painel',
+    'sections_order'  => 'Ordem das seções',
+
+    // Seções reordenáveis
+    'section_kpis'      => 'Indicadores',
+    'section_shortcuts' => 'Atalhos',
+    'section_agenda'    => 'Agenda de hoje',
+    'section_patients'  => 'Pacientes recentes',
+    'section_stock'     => 'Alertas de estoque',
+
+    // Atalhos favoritos
+    'shortcuts'       => 'Atalhos',
+    'shortcuts_title' => 'Escolher atalhos favoritos',
+    'shortcuts_menu'  => 'Atalhos favoritos',
+
+    // Menu de ordenar (mostrar/ocultar/mover)
+    'order_show'      => 'Mostrar',
+    'order_hide'      => 'Ocultar',
+    'order_move_up'   => 'Mover para cima',
+    'order_move_down' => 'Mover para baixo',
+    'order_reset'     => 'Restaurar padrão',
+
+    // Agenda de hoje
+    'arrived' => 'Chegou',
+
+    // Alertas de estoque
+    'stock_title'               => 'Alertas de estoque',
+    'stock_see'                 => 'Ver estoque',
+    'stock_below_minimum_one'   => ':count produto abaixo do mínimo',
+    'stock_below_minimum_other' => ':count produtos abaixo do mínimo',
+    'stock_below_minimum_hint'  => 'Reponha o estoque para não faltar material.',
+    'stock_expiring_one'        => ':count produto com lote vencendo',
+    'stock_expiring_other'      => ':count produtos com lote vencendo',
+    'stock_expiring_hint'       => 'Vencidos ou vencendo nos próximos 30 dias.',
+
+    // Etapas do cartão "Configure sua clínica" (App\Enums\ActivationStep)
+    'activation_steps' => [
+        'entity_profile_completed' => 'Perfil da clínica preenchido',
+        'first_doctor_added'       => 'Primeiro médico cadastrado',
+        'first_patient_added'      => 'Primeiro paciente cadastrado',
+        'first_schedule_created'   => 'Primeira consulta agendada',
+        'first_medical_record'     => 'Primeiro prontuário criado',
+        'team_member_invited'      => 'Membro da equipe convidado',
+        'integrator_connected'     => 'Equipamento conectado',
+    ],
+
+    // Agenda de hoje: lista limitada
+    'schedule_showing' => 'Mostrando :shown de :total consultas de hoje.',
 ];

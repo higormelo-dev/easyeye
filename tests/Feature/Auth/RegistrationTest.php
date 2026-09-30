@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Register\RegisterAction;
 use App\Enums\SubscriptionStatus;
 use App\Models\AuditLog;
 use App\Models\{Plan, Subscription, SubscriptionSetting, User};
@@ -124,20 +125,23 @@ describe('Fluxo de registro', function () {
 
     // ── Cenário 4: trial desabilitado (trial_days = 0) ────────────────────────
 
-    it('falha e reverte a transação quando trial está desabilitado (trial_days = 0)', function () {
+    it('orienta contato sem executar o cadastro quando trial está desabilitado', function (int $days) {
         Plan::factory()->create(['sort_order' => 1]);
-        setTrialDays(0);
+        setTrialDays($days);
+        $this->mock(RegisterAction::class)->shouldNotReceive('execute');
 
         $response = $this->postJson('/register', registrationPayload());
 
-        $response->assertServerError();
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors('plan_id')
+            ->assertJsonPath('errors.plan_id.0', __('auth.register.trial_unavailable'));
 
-        // Transação completamente revertida — zero registros parciais
+        // A criação nem começou — zero registros parciais.
         $this->assertDatabaseCount('users', 0);
         $this->assertDatabaseCount('entities', 0);
         $this->assertDatabaseCount('entity_users', 0);
         $this->assertDatabaseCount('subscriptions', 0);
-    });
+    })->with([0, -1]);
 
     // ── Cenário 5: falha se email já existir ─────────────────────────────────
 

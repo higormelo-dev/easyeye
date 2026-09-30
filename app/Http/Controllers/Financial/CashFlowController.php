@@ -8,7 +8,7 @@ use App\Enums\{CashEntryReferenceType, EntityGate, FinancialEntryStatus, Financi
 use App\Exceptions\Financial\CashPeriodClosedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Financial\CashEntryRequest;
-use App\Models\{CashClose, Covenant, Entity, FinancialCashEntry, FinancialCategory, Schedule};
+use App\Models\{CashClose, Covenant, DoctorPayoutReceiptAllocation, Entity, FinancialCashEntry, FinancialCategory, Schedule};
 use App\Services\Financial\CashFlowService;
 use App\Support\ReportPeriod;
 use BackedEnum;
@@ -25,6 +25,9 @@ class CashFlowController extends Controller
     public const LOCK_CLOSED_PERIOD = 'closed_period';
 
     public const LOCK_DOCTOR_PAYOUT = 'doctor_payout';
+
+    /** Receita avulsa com recebimento manual alocado a repasse médico. */
+    public const LOCK_DOCTOR_PAYOUT_ALLOCATION = 'doctor_payout_allocation';
 
     /** Origem do lançamento por linha (origin), a partir do vínculo de sistema. */
     public const ORIGIN_SCHEDULE = 'schedule';
@@ -88,8 +91,9 @@ class CashFlowController extends Controller
             ->withQueryString();
 
         $scheduleDates = $this->scheduleDates($entityId, $entries->getCollection());
+        $allocatedIds  = $this->allocatedEntryIds($entityId, $entries->getCollection());
 
-        $entries->through(fn (FinancialCashEntry $e) => $this->row($e, $closedPeriods, $scheduleDates));
+        $entries->through(fn (FinancialCashEntry $e) => $this->row($e, $closedPeriods, $scheduleDates, $allocatedIds));
 
         return Inertia::render('Panel/Financial/CashFlow/Index', [
             'breadcrumbs' => [
@@ -156,10 +160,11 @@ class CashFlowController extends Controller
     /**
      * @param list<array{period_start: string, period_end: string}> $closedPeriods
      * @param array<string, string>                                 $scheduleDates
+     * @param array<string, true>                                   $allocatedIds
      *
      * @return array<string, mixed>
      */
-    private function row(FinancialCashEntry $e, array $closedPeriods, array $scheduleDates): array
+    private function row(FinancialCashEntry $e, array $closedPeriods, array $scheduleDates, array $allocatedIds = []): array
     {
         $origin = $this->origin($e);
 
@@ -183,7 +188,7 @@ class CashFlowController extends Controller
             // Recebimento da agenda com dinheiro + cartão: valor e forma só pela agenda.
             'has_split'   => CashEntryRequest::isScheduleSplit($e),
             'has_claim'   => $e->billing_claim_id !== null,
-            'lock_reason' => $this->lockReason($e, $closedPeriods),
+            'lock_reason' => $this->lockReason($e, $closedPeriods, $allocatedIds),
             'notes'       => $e->notes,
         ];
     }
@@ -199,8 +204,9 @@ class CashFlowController extends Controller
             CashEntryReferenceType::Schedule      => self::ORIGIN_SCHEDULE,
             CashEntryReferenceType::BillingClaim  => self::ORIGIN_CLAIM,
             CashEntryReferenceType::PurchaseOrder => self::ORIGIN_PURCHASE,
-            CashEntryReferenceType::DoctorPayout  => self::ORIGIN_DOCTOR_PAYOUT,
-            null                                  => self::ORIGIN_MANUAL,
+            CashEntryReferenceType::DoctorPayout,
+            CashEntryReferenceType::DoctorPayoutPayment => self::ORIGIN_DOCTOR_PAYOUT,
+            null                                        => self::ORIGIN_MANUAL,
         };
     }
 
@@ -314,6 +320,32 @@ class CashFlowController extends Controller
     }
 
     /**
+     * Receitas da página com recebimento manual de repasse alocado (válido),
+     * numa consulta só — espelha a trava do CashFlowService.
+     *
+     * @param Collection<int, FinancialCashEntry> $entries
+     *
+     * @return array<string, true>
+     */
+    private function allocatedEntryIds(string $entityId, Collection $entries): array
+    {
+        $ids = $entries->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return DoctorPayoutReceiptAllocation::query()
+            ->where('entity_id', $entityId)
+            ->whereNull('reversed_at')
+            ->whereIn('cash_entry_id', $ids)
+            ->distinct()
+            ->pluck('cash_entry_id')
+            ->mapWithKeys(fn ($id) => [(string) $id => true])
+            ->all();
+    }
+
+    /**
      * Fechamentos ativos que cruzam [from, to], carregados UMA vez por página
      * (sem N+1) para calcular o lock_reason de cada linha em PHP.
      *
@@ -341,15 +373,20 @@ class CashFlowController extends Controller
      * guardas do CashFlowService: guia vinculada e período de caixa fechado.
      *
      * @param list<array{period_start: string, period_end: string}> $closedPeriods
+     * @param array<string, true>                                   $allocatedIds
      */
-    private function lockReason(FinancialCashEntry $entry, array $closedPeriods): ?string
+    private function lockReason(FinancialCashEntry $entry, array $closedPeriods, array $allocatedIds = []): ?string
     {
         if ($entry->billing_claim_id !== null) {
             return self::LOCK_BILLING_CLAIM;
         }
 
-        if ($entry->reference_type === CashEntryReferenceType::DoctorPayout->value) {
+        if (CashEntryReferenceType::tryFrom((string) $entry->reference_type)?->isDoctorPayout() === true) {
             return self::LOCK_DOCTOR_PAYOUT;
+        }
+
+        if (isset($allocatedIds[(string) $entry->id])) {
+            return self::LOCK_DOCTOR_PAYOUT_ALLOCATION;
         }
 
         $date = $entry->entry_date?->toDateString();

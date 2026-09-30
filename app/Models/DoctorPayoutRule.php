@@ -9,7 +9,7 @@ use App\Models\Concerns\BelongsToEntity;
 use App\Traits\{Auditable, HasAuditColumns};
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\{Model, SoftDeletes};
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 use Illuminate\Support\Str;
 
 /**
@@ -108,5 +108,11 @@ class DoctorPayoutRule extends Model
     public function covenant(): BelongsTo
     {
         return $this->belongsTo(Covenant::class)->withTrashed();
+    }
+
+    /** Participantes da divisão (E4): executor e médicos fixos, na ordem da regra. */
+    public function participants(): HasMany
+    {
+        return $this->hasMany(DoctorPayoutRuleParticipant::class, 'doctor_payout_rule_id')->orderBy('sort_order');
     }
 }

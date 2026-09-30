@@ -1,6 +1,8 @@
 <script setup>
 defineProps({
     patients: { type: Array,  default: () => [] },
+    // "Ver todos"/"Ver" só para quem pode abrir Pacientes (regra da rota).
+    canOpenPatients: { type: Boolean, default: false },
     t:        { type: Object, required: true },
 });
 </script>
@@ -12,7 +14,7 @@ defineProps({
                 <i class="ti ti-users me-2 text-primary"></i>
                 {{ t.section_recent_patients }}
             </span>
-            <a :href="route('panel.patients.index')" class="btn btn-sm btn-outline-primary">
+            <a v-if="canOpenPatients" :href="route('panel.patients.index')" class="btn btn-sm btn-outline-primary">
                 {{ t.btn_see_all }} <i class="ti ti-arrow-right ms-1"></i>
             </a>
         </div>
@@ -50,7 +52,7 @@ defineProps({
                             <code class="text-muted small">{{ p.code }}</code>
                         </td>
                         <td class="text-end">
-                            <a :href="p.url" class="btn btn-xs btn-outline-secondary">
+                            <a v-if="canOpenPatients" :href="p.url" class="btn btn-xs btn-outline-secondary">
                                 {{ t.btn_view }}
                             </a>
                         </td>

@@ -10,7 +10,7 @@
 
 use App\Enums\{CashEntryReferenceType, FinancialEntryStatus, FinancialEntryType};
 use App\Enums\DoctorPayout\DoctorPayoutStatus;
-use App\Models\{DoctorPayout, Entity, FinancialCashEntry, FinancialCategory};
+use App\Models\{DoctorPayout, DoctorPayoutPayment, Entity, FinancialCashEntry, FinancialCategory};
 use Database\Seeders\FinancialCategoriesSeeder;
 use Illuminate\Database\UniqueConstraintViolationException;
 
@@ -54,6 +54,31 @@ function doctorPayoutCashLockEntry($test, ?DoctorPayout $payout = null): Financi
         'payment_method' => 'transfer',
         'reference_type' => CashEntryReferenceType::DoctorPayout->value,
         'reference_id'   => $payout->id,
+        'active'         => true,
+    ]);
+}
+
+/** Despesa de um pagamento (E5: reference_type doctor_payout_payment). */
+function doctorPayoutCashLockPaymentEntry($test, ?DoctorPayoutPayment $payment = null): FinancialCashEntry
+{
+    if ($payment === null) {
+        $payout  = doctorPayoutCashLockPayout($test);
+        $payment = DoctorPayoutPayment::query()->create([
+            'entity_id' => $test->entity->id, 'doctor_payout_id' => $payout->id, 'amount' => 300,
+            'paid_at'   => '2026-07-05', 'payment_method' => 'transfer',
+        ]);
+    }
+
+    return FinancialCashEntry::query()->create([
+        'entity_id'      => $test->entity->id,
+        'entry_date'     => '2026-07-05',
+        'description'    => 'Repasse médico (pagamento)',
+        'type'           => FinancialEntryType::Expense->value,
+        'status'         => FinancialEntryStatus::Paid->value,
+        'amount'         => 300,
+        'payment_method' => 'transfer',
+        'reference_type' => CashEntryReferenceType::DoctorPayoutPayment->value,
+        'reference_id'   => $payment->id,
         'active'         => true,
     ]);
 }
@@ -115,6 +140,36 @@ it('libera novo lançamento depois que o anterior foi excluído (estorno)', func
     doctorPayoutCashLockEntry($this, $payout)->delete();
 
     expect(doctorPayoutCashLockEntry($this, $payout)->exists)->toBeTrue();
+});
+
+it('despesa de pagamento (parcial ou total) fica travada, com origem de repasse, e é única por pagamento', function () {
+    $entry   = doctorPayoutCashLockPaymentEntry($this);
+    $payment = DoctorPayoutPayment::query()->findOrFail($entry->reference_id);
+
+    $this->deleteJson(route('panel.financial.cash-flow.destroy', $entry->id))
+        ->assertStatus(422)
+        ->assertJsonPath('errors.reference_id.0', __('financial_cash_flow.locked_by_doctor_payout'));
+
+    $this->get(route('panel.financial.cash-flow.index', ['from' => '2026-07-01', 'to' => '2026-07-31']))
+        ->assertOk()
+        ->assertInertia(function ($page) use ($entry) {
+            $row = collect($page->toArray()['props']['entries']['data'])->firstWhere('id', $entry->id);
+
+            expect($row['origin'])->toBe('doctor_payout')
+                ->and($row['lock_reason'])->toBe('doctor_payout');
+        });
+
+    // Último passo: a violação do índice aborta a transação do teste.
+    expect(fn () => doctorPayoutCashLockPaymentEntry($this, $payment))
+        ->toThrow(UniqueConstraintViolationException::class);
+});
+
+it('a auditoria de vínculos aceita a despesa de pagamento de repasse', function () {
+    doctorPayoutCashLockPaymentEntry($this);
+
+    $this->artisan('financial:audit-cash-references')
+        ->expectsOutputToContain(__('financial_cash_flow.audit_references.none'))
+        ->assertExitCode(0);
 });
 
 it('semeia a categoria global de sistema REPASSE MÉDICO (despesa)', function () {

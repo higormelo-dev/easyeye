@@ -16,7 +16,7 @@ const props = defineProps({
     emptyText: { type: String, default: '' },
 });
 
-const { money, number, date, periodText } = useDoctorPayoutFormat(() => props.t);
+const { tx, money, number, date, periodText } = useDoctorPayoutFormat(() => props.t);
 
 const url = (template, payout) => String(template ?? '').replace('__ID__', payout.id);
 
@@ -59,8 +59,15 @@ const rows = computed(() => props.payouts ?? []);
                         <dd class="mb-0">{{ number(payout.items_count) }}</dd>
                     </div>
                     <div class="d-flex gap-1">
-                        <dt class="fw-semibold">{{ t.col_paid_at }}:</dt>
-                        <dd class="mb-0">{{ payout.paid_at ? date(payout.paid_at) : t.none }}</dd>
+                        <dt class="fw-semibold">{{ t.col_paid }}:</dt>
+                        <dd class="mb-0" data-test="closing-paid">
+                            <template v-if="payout.status === 'cancelled'">{{ t.none }}</template>
+                            <template v-else>
+                                {{ money(payout.paid_amount ?? 0) }}
+                                <span v-if="Number(payout.remaining_amount ?? 0) > 0" class="text-warning-emphasis" data-test="closing-balance"> · {{ tx('balance_line', { value: money(payout.remaining_amount) }) }}</span>
+                                <span v-if="payout.paid_at" class="text-muted"> · {{ tx('last_payment_on', { date: date(payout.paid_at) }) }}</span>
+                            </template>
+                        </dd>
                     </div>
                 </dl>
 

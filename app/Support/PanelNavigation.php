@@ -52,6 +52,14 @@ class PanelNavigation
             'match' => ['panel.schedules.*'],
         ];
 
+        // Agenda e Pacientes espelham o middleware das rotas (senão o item
+        // leva a um 403 — ex.: perfil financeiro/usuário viam "Agendas"):
+        // agenda = entity.role:admin,doctor,secretary; pacientes =
+        // permission:patients.manage,admin,financial,doctor,secretary.
+        $canSeeSchedules = in_array($rule, [ClientRule::Admin->value, ClientRule::Doctor->value, ClientRule::Secretary->value], true);
+        $canSeePatients  = in_array($rule, [ClientRule::Admin->value, ClientRule::Financial->value, ClientRule::Doctor->value, ClientRule::Secretary->value], true)
+            || self::hasEntityPermission(Permission::PatientsManage);
+
         $nav = [
             [
                 'key'   => 'dashboard',
@@ -60,15 +68,21 @@ class PanelNavigation
                 'label' => __('actions.sidemenu.dashboard'),
                 'match' => ['panel.dashboard'],
             ],
-            $schedulesItem,
-            [
+        ];
+
+        if ($canSeeSchedules) {
+            $nav[] = $schedulesItem;
+        }
+
+        if ($canSeePatients) {
+            $nav[] = [
                 'key'   => 'patients',
                 'route' => 'panel.patients.index',
                 'icon'  => 'ti ti-users',
                 'label' => __('actions.sidemenu.patients'),
                 'match' => ['panel.patients.*'],
-            ],
-        ];
+            ];
+        }
 
         if ($canSeeDoctors) {
             $nav[] = [
@@ -87,19 +101,6 @@ class PanelNavigation
             'label' => __('dashboard.module_eye_images'),
             'match' => ['panel.eye-images.*'],
         ];
-
-        // Meus repasses: só médico e só se a clínica expôs os repasses aos
-        // médicos (entities.doctor_payouts_visible) — a rota devolve 404 no
-        // mesmo caso, então o item nunca aparece sem funcionar.
-        if ($rule === ClientRule::Doctor->value && self::doctorPayoutsVisible()) {
-            $nav[] = [
-                'key'   => 'my-payouts',
-                'route' => 'panel.my-payouts.index',
-                'icon'  => 'ti ti-receipt-2',
-                'label' => __('actions.sidemenu.my_payouts'),
-                'match' => ['panel.my-payouts.*'],
-            ];
-        }
 
         if ($canSeeAi) {
             $isDoctor = $rule === ClientRule::Doctor->value;
@@ -331,6 +332,20 @@ class PanelNavigation
             ];
         }
 
+        // Meus repasses: só médico e só se a clínica expôs os repasses aos
+        // médicos (entities.doctor_payouts_visible) — a rota devolve 404 no
+        // mesmo caso, então o item nunca aparece sem funcionar. Último item
+        // do menu (pedido do usuário), depois de IA e dos demais módulos.
+        if ($rule === ClientRule::Doctor->value && self::doctorPayoutsVisible()) {
+            $nav[] = [
+                'key'   => 'my-payouts',
+                'route' => 'panel.my-payouts.index',
+                'icon'  => 'ti ti-receipt-2',
+                'label' => __('actions.sidemenu.my_payouts'),
+                'match' => ['panel.my-payouts.*'],
+            ];
+        }
+
         return $nav;
     }
 
@@ -379,6 +394,12 @@ class PanelNavigation
      */
     private static function hasStockManagePermission(): bool
     {
+        return self::hasEntityPermission(Permission::StockManage);
+    }
+
+    /** Permissão (perfil customizado) do usuário logado na clínica da sessão. */
+    private static function hasEntityPermission(Permission $permission): bool
+    {
         $entityId = session('selected_entity_id');
         $user     = auth()->user();
 
@@ -392,7 +413,7 @@ class PanelNavigation
             return false;
         }
 
-        return $user->hasPermissionInEntity($entity, Permission::StockManage);
+        return $user->hasPermissionInEntity($entity, $permission);
     }
 
     /**

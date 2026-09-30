@@ -38,7 +38,7 @@ class MyPayoutsController extends Controller
         $payouts = DoctorPayout::query()
             ->where('entity_id', $entity->id)
             ->where('doctor_id', $doctor->id)
-            ->whereIn('status', [DoctorPayoutStatus::Closed->value, DoctorPayoutStatus::Paid->value])
+            ->whereIn('status', DoctorPayoutStatus::valid())
             ->orderByDesc('period_end')
             ->orderByDesc('closed_at')
             ->orderBy('id')
@@ -50,10 +50,13 @@ class MyPayoutsController extends Controller
                 'period_start' => $payout->period_start->toDateString(),
                 'period_end'   => $payout->period_end->toDateString(),
                 'items_count'  => $payout->items_count,
+                // Regime do fechamento: rótulo da produção (recebido × cobrado).
+                'basis'        => $payout->basis->value,
                 'gross_amount' => (float) $payout->gross_amount,
                 'total_amount' => (float) $payout->total_amount,
                 'status'       => $payout->status->value,
                 'paid_at'      => $payout->paid_at?->toDateString(),
+                'paid_amount'  => (float) ($payout->paid_amount ?? 0),
             ]);
 
         return Inertia::render('Panel/MyPayouts/Index', [
@@ -76,13 +79,15 @@ class MyPayoutsController extends Controller
         [, $doctor, $entity] = $this->resolveDoctor($request);
         $this->assertOwn($payout, $entity, $doctor);
 
+        $this->exporter->auditView($request, (string) $entity->id, $payout, forDoctor: true);
+
         return Inertia::render('Panel/MyPayouts/Show', [
             'breadcrumbs' => [
                 ['label' => __('actions.sidemenu.dashboard'), 'url' => route('panel.dashboard'), 'active' => false],
                 ['label' => __('financial_doctor_payouts.my_title'), 'url' => route('panel.my-payouts.index'), 'active' => false],
                 ['label' => (string) $payout->code, 'url' => '#', 'active' => true],
             ],
-            'statement' => $this->presenter->statement($payout),
+            'statement' => $this->presenter->statement($payout, forDoctor: true),
             'routes'    => [
                 'index' => route('panel.my-payouts.index'),
                 'pdf'   => route('panel.my-payouts.pdf', $payout),
@@ -96,7 +101,7 @@ class MyPayoutsController extends Controller
         [, $doctor, $entity] = $this->resolveDoctor($request);
         $this->assertOwn($payout, $entity, $doctor);
 
-        return $this->statementPdf($request, $entity, $payout, $this->presenter, $this->exporter);
+        return $this->statementPdf($request, $entity, $payout, $this->presenter, $this->exporter, forDoctor: true);
     }
 
     /**
