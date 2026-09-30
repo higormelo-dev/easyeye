@@ -10,9 +10,11 @@
 
 **Referências:** SaaS `8dac5624df679039ee30496db3532f75c4c798c4`; integrador `f7e8f958850441512d69141751bc850e0339a8da`.
 
-**Atualização após a revisão:** o responsável confirmou TISS 4.03.00 como a única versão implementada. As traduções públicas da landing e do login foram corrigidas para essa versão no workspace; publicação em produção não confirmada.
+**Situação da entrega:** publicada no ambiente de teste e disponível para homologação dos sócios, conforme confirmação do responsável.
 
-> Este documento consolida as entregas recentes dos dois repositórios. “Implementado” significa identificado no código analisado. Aprovação em testes, funcionamento com equipamentos reais e publicação em produção são situações diferentes, indicadas separadamente. O produto continua em pré-lançamento, sem clínicas contratadas informadas pelo responsável; os benefícios descritos são esperados, não resultados comerciais medidos.
+**Atualização após a revisão:** o responsável confirmou TISS 4.03.00 como a única versão implementada. As traduções públicas da landing e do login foram corrigidas para essa versão.
+
+> Este documento consolida as entregas recentes dos dois repositórios, já publicadas no ambiente de teste para homologação dos sócios. “Implementado” significa identificado no código analisado; a publicação em teste foi confirmada pelo responsável. A conclusão da homologação interna e a liberação em produção são etapas distintas. O produto continua em pré-lançamento, sem clínicas contratadas informadas pelo responsável; os benefícios descritos são esperados, não resultados comerciais medidos.
 
 ## 1. Resumo executivo
 
@@ -39,9 +41,9 @@ A conexão entre os projetos foi ampliada para transportar data/hora real da cap
 
 ### Pontos de atenção para decisão dos sócios
 
-- **TISS:** o motor e a comunicação pública agora indicam 4.03.00, única versão implementada. A divergência de texto foi corrigida no workspace. Homologação não foi obtida.
-- **Publicação:** a existência dos commits não comprova deploy, execução de migrações ou instalação do integrador nas clínicas.
-- **Validação:** há testes e verificações registrados para partes do SaaS; a auditoria deste relatório não executou as suítes completas dos dois projetos nem consultou resultados atuais do CI.
+- **TISS:** o motor e a comunicação pública agora indicam 4.03.00, única versão implementada. A divergência de texto foi corrigida no workspace. A homologação TISS não foi obtida.
+- **Publicação:** as entregas foram publicadas no ambiente de teste e estão disponíveis para homologação dos sócios. A aprovação dessa etapa e a posterior liberação em produção permanecem como próximos marcos.
+- **Homologação:** o ambiente de teste está disponível para os sócios avaliarem os fluxos, a usabilidade e as regras de negócio. Desenvolvimento, infraestrutura e validações técnicas permanecem centralizados no responsável técnico pelo projeto.
 - **Prova comercial:** métricas e depoimentos sem comprovação foram removidos; a estrutura permanece oculta para futura publicação de dados reais.
 
 ## 2. Escopo e método
@@ -52,12 +54,14 @@ As seções descrevem o estado final consolidado, evitando contar revisões suce
 
 O código atual prevalece sobre comentários ou documentos desatualizados. Quando há conflito material entre implementação e comunicação, ele é registrado como pendência. Não houve alteração funcional dos projetos durante a elaboração deste relatório.
 
+A situação de publicação foi atualizada com base na confirmação do responsável: o ambiente de teste já está disponível para homologação dos sócios. Essa informação complementa a análise do repositório; os resultados da homologação deverão ser registrados à medida que os fluxos forem conferidos.
+
 ### Guia de leitura
 
 - [Financeiro e TISS](#3-financeiro-faturamento-e-tiss-no-saas), [repasse médico](#4-módulo-de-repasse-médico) e [operação clínica/cadastros](#5-operação-clínica-imagens-importação-e-cadastros).
 - [Painel e tour](#6-painel-orientação-e-produtividade), [conexão entre os projetos](#7-conexão-entre-saas-e-integrador), [landing](#8-landing-page-e-experiência-de-navegação), [conteúdo comercial](#9-conteúdo-comercial-adequado-ao-pré-lançamento) e [hero](#10-hero-e-mockup-calibração-de-precisão).
 - [Integrador de equipamentos](#11-integrador-de-equipamentos).
-- [Validações](#12-validações-e-evidências), [pendências e próximos passos](#13-pendências-e-próximos-passos) e [referências/cronologia](#14-evidências-e-cronologia).
+- [Homologação e responsabilidades](#12-homologação-e-responsabilidades), [pendências e próximos passos](#13-pendências-e-próximos-passos) e [referências/cronologia](#14-evidências-e-cronologia).
 
 ## 3. Financeiro, faturamento e TISS no SaaS
 
@@ -381,7 +385,7 @@ A correção inclui:
 
 A recuperação exclui importações externas, registros anteriores ao recorte e exames com alteração de estado identificada na auditoria. No PostgreSQL, o índice pode ser criado de forma concorrente quando fora de transação.
 
-**Situação:** serviço e migração implementados. Não foi confirmada a execução da migração no ambiente de destino, nem há contagem verificada de exames recuperados.
+**Situação:** correção implementada na entrega disponibilizada para homologação. A avaliação deve conferir a disponibilidade dos novos exames e dos registros elegíveis à recuperação. A quantidade recuperada será registrada após essa conferência.
 
 ## 8. Landing page e experiência de navegação
 
@@ -395,7 +399,7 @@ Foram refinados espaçamentos e composições para desktop, tablet e celular, in
 
 O menu móvel utiliza a altura disponível da tela, considerando a navegação, para evitar que seu conteúdo fique prejudicado em telas baixas. Estados de foco, alvos de toque e preferência por movimento reduzido foram considerados nas alterações.
 
-**Limite da validação:** implementação responsiva e testes de comportamento não substituem inspeção visual em navegadores e aparelhos reais. A verificação visual final desta etapa permanece pendente.
+**Na homologação:** conferir leitura, alinhamento e navegação em computador, tablet e celular, registrando eventuais ajustes de apresentação.
 
 ### 8.2. Cartões de problemas alinhados
 
@@ -459,7 +463,7 @@ Foram criadas páginas públicas de privacidade e termos utilizando o sistema de
 
 As traduções de cortesia em inglês ficam vinculadas à versão oficial em português, com aviso, acesso ao original e alternativa quando não há tradução. Isso não cria um aceite jurídico paralelo.
 
-A publicação efetiva depende das migrações/seeders no ambiente; o repositório não comprova aprovação jurídica. A estrutura de SEO — metadados, canonical, idiomas alternativos, dados estruturados e sitemap — é anterior e foi preservada, sem resultado medido de posicionamento.
+A homologação no ambiente de teste deve conferir as versões dos documentos ativadas pelas migrações/seeders; a aprovação jurídica não foi verificada neste levantamento. A estrutura de SEO — metadados, canonical, idiomas alternativos, dados estruturados e sitemap — é anterior e foi preservada, sem resultado medido de posicionamento.
 
 ### 8.9. Acessibilidade, carregamento e acabamento
 
@@ -489,7 +493,7 @@ Não basta ativar a chave para transformar conteúdo de demonstração em prova 
 
 A comunicação foi alterada de “integrado e homologado” para **“Novo: integração com TISS 4.03.00”**. Diferenciais, perguntas frequentes e login foram alinhados ao mesmo posicionamento em português e inglês.
 
-A página descreve a integração existente, e a FAQ informa que ainda não há homologação. Não foi adotada uma afirmação de “conformidade” como substituição, pois ela também poderia sugerir uma validação ainda não obtida.
+A página descreve a integração existente, e a FAQ informa que ainda não há homologação TISS. Não foi adotada uma afirmação de “conformidade” como substituição, pois ela também poderia sugerir uma validação ainda não obtida.
 
 Essa foi uma correção de comunicação. **Homologação TISS não foi entregue nesta etapa.** A versão divulgada foi alinhada ao layout 4.03.00 do motor atual; não é anunciado suporte a outras versões.
 
@@ -663,7 +667,7 @@ O perfil de testes foi otimizado para a carga de OCR, e as dependências do perf
 
 Os workflows atuais incluem formatação, lint, análise de dependências, builds/testes Windows e um alvo para Windows 7 de 32 bits. A existência do alvo não comprova operação validada nessa plataforma ou com seus equipamentos.
 
-A infraestrutura anterior de atualização já verifica versão, baixa arquivo e confere checksum/assinatura. Instalação e rollback automáticos continuam pendentes. A configuração de geração do instalador e assinatura não demonstra que uma versão assinada tenha sido efetivamente publicada. Não foram consultados resultados atuais do GitHub Actions nesta revisão.
+A infraestrutura anterior de atualização já verifica versão, baixa arquivo e confere checksum/assinatura. Instalação e rollback automáticos continuam pendentes. A conferência do instalador e da assinatura cabe ao responsável técnico durante a preparação da distribuição.
 
 ### 11.12. Documentação operacional
 
@@ -671,66 +675,41 @@ Foram atualizados o manual e os guias de OCR, DICOM, criptografia, fila e corre�
 
 O documento de resumo de RPA contém afirmações de prontidão mais fortes do que as evidências verificadas. O relatório adota os limites do código atual e recomenda sincronizar esses materiais antes de utilizá-los comercialmente.
 
-## 12. Validações e evidências
+## 12. Homologação e responsabilidades
 
-### 12.1. Verificações do SaaS registradas na etapa anterior
+### 12.1. Objetivo da homologação dos sócios
 
-Os resultados abaixo correspondem às verificações realizadas durante esta etapa de trabalho. Não representam aprovação de toda a aplicação. A elaboração deste documento não repetiu as suítes; o commit posterior `8dac562` alterou somente espaçamento.
+As entregas estão publicadas no ambiente de teste. Nesta etapa, os sócios podem avaliar a aderência das funcionalidades à rotina da clínica, a clareza da experiência e as prioridades de ajuste antes da liberação em produção.
 
-| Verificação | Resultado registrado | Alcance |
-| --- | --- | --- |
-| Vitest — site, contato e planos | **123 testes aprovados em 6 arquivos** | Comportamentos da landing, layout, páginas legais, animações, contato e planos. |
-| Vitest — login e seleção de plano no cadastro | **9 testes aprovados** | Alinhamento do conteúdo e seleção de plano na autenticação/cadastro. |
-| PHP — `SiteContentTest` | **4 testes aprovados, 14 asserções** | Filtragem do conteúdo comercial e da prova social. |
-| Laravel Pint no conjunto PHP revisado | **Aprovado em 7 arquivos** | Padronização de estilo do conjunto verificado; não toda a base. |
-| Verificação de sintaxe das traduções PT/EN de site e autenticação | **Aprovada** | Sintaxe dos arquivos PHP alterados. |
-| Build Vite do cliente | **Concluído** | Compilação do frontend em diretório temporário. |
-| Build Vite SSR | **Concluído** | Compilação da versão SSR em diretório temporário; não comprova SSR habilitado em produção. |
-| `git diff --check` | **Sem erros nas verificações realizadas** | Espaços e integridade textual do diff, sem substituir testes funcionais. |
+A avaliação funcional complementa o trabalho técnico de desenvolvimento e infraestrutura. O aceite dos fluxos será registrado após a conferência dos cenários relevantes.
 
-Os números de testes não devem ser somados com resultados intermediários da conversa: várias execuções se sobrepõem e verificam os mesmos casos.
+### 12.2. Roteiro de avaliação funcional
 
-### 12.2. Testes implementados, sem execução confirmada nesta revisão
-
-O repositório também contém cobertura adicionada ou ampliada para:
-
-- Regras, produção, recebimentos, liberação, alocações, divisão, fechamento e pagamentos de repasse.
-- Proteção de lançamentos no caixa, isolamento entre clínicas e acesso individual a “Meus repasses”.
-- Demonstrativos, exportação, privacidade e componentes dos formulários financeiros.
-- Tour por perfil, idioma, versão, persistência e impersonação.
-- Permissões do Dashboard, ordem das seções e atualização automática.
-- Navegação direta para pacientes, agenda resumida e alertas de estoque.
-- Criação de exames ativos e recuperação seletiva pela migração.
-
-**A presença desses testes foi confirmada, mas esta revisão não executou essas suítes nem certificou seus resultados.**
-
-### 12.3. Verificações pendentes ou bloqueadas
-
-| Item | Situação e consequência |
+| Área | O que avaliar no ambiente de teste |
 | --- | --- |
-| Integração PHP de páginas públicas, conteúdo social e cadastro | A tentativa com 31 testes falhou antes das asserções por bloqueio de conexão ao PostgreSQL local no ambiente de execução. O resultado não permite aprovar nem reprovar o comportamento da aplicação. |
-| Inspeção visual final em navegadores | O recurso de navegador não estava disponível na última etapa. Não foi feita nova inspeção visual completa em desktop, tablet e celular. |
-| Desempenho da animação | Sem medição de fps, consumo ou fluidez em aparelhos reais. |
-| Fluxos financeiros com dados de teste em ambiente integrado | Necessária confirmação de execução da suíte e conferência ponta a ponta antes da liberação operacional. |
-| Publicação e migrações | Não há confirmação, nesta revisão, de deploy ou aplicação das migrações no ambiente de destino. |
+| Landing e cadastro | Clareza da oferta, diferenças entre planos, comunicação TISS 4.03.00, contato e continuidade do cadastro. |
+| Recepção e agenda | Cadastro de pacientes, importação, situações de atendimento e retorno do paciente à consulta. |
+| Consultório e exames | Localização e comparação de imagens, identificação do paciente, produção de laudos e consulta aos documentos. |
+| Financeiro | Conferência de cobranças, recebimentos, saldos, glosas, fechamento e demonstrativos. |
+| Repasse médico | Regras de remuneração, valores liberados, divisão entre médicos, fechamento e registro dos pagamentos. |
+| Integrador | Configuração do aparelho, chegada do exame ao paciente correto, entendimento das falhas e correção manual quando necessária. |
+| Experiência de uso | Clareza das telas, utilidade do tour, facilidade de navegação e apresentação em computador, tablet e celular. |
 
-### 12.4. Cobertura adicional identificada no ciclo ampliado
+Para cada ajuste identificado, registrar a tela, os passos realizados, o resultado esperado e o resultado observado. Isso permite reproduzir o cenário e priorizar a correção.
 
-No SaaS, foram encontrados testes para XML e pré-validação TISS, faturamento em lote, glosas/recursos, caixa e concorrência, preços, relatórios, exportações, importação, imagens/laudos, máscaras, listagens, permissões e comandos do integrador.
+### 12.3. Responsabilidades
 
-No integrador, existem testes para OCR com imagens sintéticas, identificação, datas, arquivos auxiliares tardios, fila, exclusão/restauração, retenção, criptografia, integridade, protocolo DICOM, comandos com API simulada e estados da interface. Há também workflows de build/lint/testes nas combinações de funcionalidades previstas.
+- **Sócios:** avaliar os fluxos de negócio, apontar dificuldades, alinhar prioridades e registrar o aceite funcional.
+- **Responsável técnico pelo projeto:** conduzir desenvolvimento, testes automatizados, infraestrutura, configuração dos ambientes, correções e preparação da publicação em produção.
+- **Alinhamento conjunto:** decidir quais ajustes impedem a liberação e quais podem seguir como melhorias posteriores.
 
-**Nenhuma dessas suítes adicionais foi executada durante a preparação do relatório.** Contagens antigas, como os “150 testes” registrados em documentação do integrador em 11/09, não foram reapresentadas como resultado da revisão atual. Da mesma forma, testes de protocolo simulados não comprovam compatibilidade com equipamento físico.
+As atividades técnicas permanecem centralizadas no responsável por desenvolvimento e infraestrutura. O foco da participação dos sócios é a avaliação do produto e das regras de negócio.
 
-### 12.5. Dependências entre os projetos
+### 12.4. Resultado esperado desta etapa
 
-O fluxo completo depende de configuração compatível do aparelho, identificadores válidos, API acessível, plano/permissões adequados, migrações aplicadas e serviços de fila ativos. Cobertura isolada de um lado não comprova o percurso completo.
+Consolidar os fluxos aprovados, os ajustes necessários e as prioridades para preparar a liberação em produção. A publicação no ambiente de teste já está concluída; a aprovação funcional será registrada ao término da homologação.
 
-Ainda precisam ser confirmados em conjunto: entrada de exame por pasta/OCR/DICOM, identificação do paciente, preservação de data/observação, interrupção de rede e retomada, recusa e correção de dados, geração de miniaturas e disponibilidade no prontuário/laudo.
-
-### 12.6. Verificação deste documento
-
-A elaboração incluiu leitura dos dois históricos, conferência dos comportamentos descritos no código e revisão cruzada dos blocos financeiro, clínico e integrador. Os links locais e a estrutura textual foram verificados. Não foram feitas operações em produção, envio de mensagens, uso de dados reais de pacientes ou instalação de novas versões para produzir este relatório.
+A homologação interna pelos sócios é distinta da homologação TISS e da validação de compatibilidade com cada equipamento ou operadora. Esses limites permanecem descritos nas respectivas funcionalidades.
 
 ## 13. Pendências e próximos passos
 
@@ -754,24 +733,26 @@ A elaboração incluiu leitura dos dois históricos, conferência dos comportame
 | Métricas de adoção e depoimentos | Sem evidência publicável; seções ocultas. |
 | 60 fps e conformidade integral de acessibilidade | Objetivos de projeto, sem medição/certificação final nesta etapa. |
 
-### 13.2. Sequência recomendada de validação e publicação
+### 13.2. Homologação no ambiente de teste e preparação para produção
 
-| Prioridade | Ação | Evidência esperada | Responsáveis sugeridos |
+A publicação no ambiente de teste já foi realizada. As ações abaixo orientam a homologação dos sócios e a preparação da liberação em produção.
+
+| Prioridade | Ação | Evidência esperada | Responsabilidade |
 | --- | --- | --- | --- |
-| Antes da divulgação de TISS | Publicar e conferir a comunicação corrigida para TISS 4.03.00 no ambiente de destino | Landing e login publicados com a versão implementada | Produto e engenharia |
-| Antes da liberação de TISS | Corrigir/conferir descoberta do XSD e testar transporte real em ambiente apropriado | XML validado e resposta real da operadora, sem usar simulação como comprovação | Engenharia e responsável pelo faturamento |
-| Antes da liberação financeira | Executar suítes e cenários de caixa, glosas, recebimentos e repasses | Valores e estornos conferidos, isolamento e concorrência validados | Engenharia e financeiro |
-| Antes da publicação do SaaS | Aplicar migrações/seeders necessários e verificar workers e agendamentos | Checklist de versão e execução do ambiente | Engenharia/operação |
-| Antes de habilitar funções dependentes | Conferir Imagick, gerador de PDF, suporte a planilhas e SMTP | Montagem, PDF, exportação e contato funcionando no destino | Engenharia/operação |
-| Antes da distribuição do integrador | Conferir resultados atuais do CI, assinatura e instalador | Instalação, atualização manual e remoção verificadas no Windows alvo | Engenharia/operação |
-| Antes de conectar cada modelo de aparelho | Validar exportação, código do paciente, OCR ou DICOM e formatos | Casos de teste reproduzíveis por configuração/modelo | Integrações e suporte |
-| Antes de utilizar RPA operacionalmente | Validar janela/campo, resolução, sequência e captura com o software real | Evidência de associação correta e falha controlada | Integrações e produto |
-| Antes da liberação conjunta | Rodar cenários de rede indisponível, correção manual, duplicidade e retenção | Fluxo equipamento → fila → API → prontuário conferido | Engenharia e suporte |
-| Antes da divulgação pública | Inspecionar landing/cadastro/tour em telas e navegadores reais | Leitura, foco, navegação e movimento reduzido conferidos | Produto/design |
-| Após validação | Registrar versões publicadas e resultado das verificações | Histórico de release distinto do histórico de commits | Engenharia |
-| Após o início da operação | Medir utilização, dúvidas, falhas, conversão e retenção | Indicadores reais para priorização e futura prova social | Sócios, produto e comercial |
+| Durante a homologação dos sócios | Conferir a comunicação de TISS 4.03.00 na landing e no login | Versão anunciada alinhada à implementação | Sócios, com ajustes pelo responsável técnico |
+| Antes da liberação de TISS | Validar a geração dos arquivos e a comunicação real com a operadora | Integração conferida no cenário de uso previsto | Responsável técnico, com conferência das regras de faturamento pelos sócios |
+| Durante a homologação financeira | Conferir cenários de caixa, glosas, recebimentos e repasses | Valores, saldos e estornos conferidos | Sócios, com apoio do responsável técnico |
+| Durante a homologação dos sócios | Conferir a configuração e os serviços do ambiente de teste | Ambiente preparado para os fluxos avaliados | Responsável técnico |
+| Antes de habilitar funções dependentes | Conferir geração de imagens, PDFs, planilhas e envio de e-mail | Recursos funcionando no ambiente de destino | Responsável técnico |
+| Antes da distribuição do integrador | Conferir instalação, assinatura, atualização manual e remoção no Windows alvo | Pacote preparado para distribuição | Responsável técnico |
+| Antes de conectar cada modelo de aparelho | Validar exportação, identificação do paciente e formato dos exames | Compatibilidade confirmada para a configuração utilizada | Responsável técnico |
+| Antes de utilizar RPA operacionalmente | Validar a sequência e a captura com o software real | Associação correta e comportamento de falha conferidos | Responsável técnico |
+| Antes da liberação conjunta | Conferir retomada após falha de rede, correção manual e prevenção de duplicidade | Fluxo equipamento → fila → API → prontuário conferido | Responsável técnico |
+| Antes da divulgação pública | Avaliar landing, cadastro e tour nas diferentes telas | Leitura e navegação adequadas | Sócios, com ajustes pelo responsável técnico |
+| Ao concluir a homologação | Registrar os fluxos aprovados e as pendências para produção | Aceite interno e plano de liberação documentados | Sócios e responsável técnico |
+| Após o início da operação | Acompanhar utilização, dúvidas e resultados comerciais | Indicadores reais para priorização e futura prova social | Sócios; coleta técnica pelo responsável técnico |
 
-Essas são próximas ações recomendadas. Não foram executadas como parte da elaboração do documento.
+Essas ações orientam a homologação e a preparação da liberação; sua conclusão será registrada conforme o andamento.
 
 ### 13.3. Documentação e manutenção do ciclo
 
@@ -905,4 +886,4 @@ A lista a seguir permite localizar o histórico que fundamentou a revisão. Tít
 | 2026-09-28 | `516b159` | Correção no deploy para gerar build |
 | 2026-09-28 | `f7e8f95` | Melhoria no cadastro de equipamento e fila do processo |
 
-**Critério final:** código identificado é implementação; resultados de execução explícitos são validação; disponibilidade para usuários exige confirmação de publicação. Os três estados devem permanecer separados ao comunicar as entregas aos sócios, à equipe comercial e a possíveis clientes.
+**Situação final da entrega:** implementada e publicada no ambiente de teste, disponível para homologação dos sócios. A aprovação interna, a validação com equipamentos/operadoras e a liberação em produção devem ter seus resultados registrados separadamente.
