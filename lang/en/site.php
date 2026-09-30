@@ -65,7 +65,7 @@ return [
     ],
 
     'hero' => [
-        'badge'    => 'New: TISS 3.06 integration',
+        'badge'    => 'New: TISS 4.03.00 integration',
         'title'    => 'Complete management for',
         'title_em' => 'ophthalmology clinics',
         'subtitle' => 'From scheduling to electronic health records with integrated TISS billing. Automate processes, reduce claim denials and focus on what really matters: your patients\' health.',
@@ -138,7 +138,7 @@ return [
                 'title'    => 'Billing and management',
                 'audience' => 'For whoever handles insurers and cash',
                 'items'    => [
-                    ['text' => 'TISS 3.06 claims, XML batches, electronic submission and returns, with pre-validation to reduce denials.'],
+                    ['text' => 'TISS 4.03.00 claims, XML batches, electronic submission and returns, with pre-validation to reduce denials.'],
                     ['text' => 'Cash flow, accounts receivable, management reports and integrated payment methods.'],
                     ['text' => 'Multiple units with a single login, consolidated reports and role-based access.'],
                 ],
@@ -182,7 +182,7 @@ return [
         'subtitle' => 'Not a generic management system adapted for healthcare — built for the ophthalmology routine from day one.',
         'items'    => [
             ['icon' => 'ti-eye', 'title' => 'Built for ophthalmology', 'text' => 'Fields, reports and workflows designed for the ophthalmology practice — not a generic record adapted after the fact.'],
-            ['icon' => 'ti-receipt', 'title' => 'TISS 3.06 integration', 'text' => 'Generate TISS claims and XML batches, submit them and process returns, with pre-validation to help reduce denials.'],
+            ['icon' => 'ti-receipt', 'title' => 'TISS 4.03.00 integration', 'text' => 'Generate TISS claims and XML batches, submit them and process returns, with pre-validation to help reduce denials.'],
             ['icon' => 'ti-layout-grid', 'title' => 'Everything in one system', 'text' => 'Scheduling, records, images, documents and finances in one place, with no disconnected tools.'],
             ['icon' => 'ti-shield-check', 'title' => 'CFM and LGPD compliance built into the architecture', 'text' => 'Audit trail, record versioning and digital signature built into the architecture — not bolted on.'],
         ],
@@ -274,7 +274,7 @@ return [
             // actual behavior.
             ['q' => 'Does EasyEye work offline?', 'a' => 'EasyEye is a 100% cloud solution — it works on any device with a browser and an internet connection. There is no offline mode at the moment: without a connection, you cannot access patient records, the schedule, or any other system data.'],
             ['q' => 'How does technical support work?', 'a' => 'We offer support by email and WhatsApp (on specific plans). Pro and Premium plans get priority support, with a 4-business-hour SLA.'],
-            ['q' => 'Is EasyEye certified for TISS yet?', 'a' => 'Not yet. EasyEye integrates tools for TISS 3.06 claims, XML batch generation, submission and return processing, but it is not yet certified.'],
+            ['q' => 'Is EasyEye certified for TISS yet?', 'a' => 'Not yet. EasyEye integrates tools for TISS 4.03.00 claims, XML batch generation, submission and return processing, but it is not yet certified.'],
             ['q' => 'How do exams from devices reach EasyEye?', 'a' => 'The exam integrator sends exams from your devices to EasyEye, where they stay organized for review. It communicates through a closed API reserved exclusively for that integrator.'],
         ],
     ],

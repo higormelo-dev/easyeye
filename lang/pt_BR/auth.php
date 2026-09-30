@@ -154,7 +154,7 @@ return [
     'panel' => [
         'feature_schedule'   => 'Agenda inteligente com confirmação automática',
         'feature_record'     => 'Prontuário oftalmológico completo e digital',
-        'feature_tiss'       => 'Faturamento TISS 3.06 integrado',
+        'feature_tiss'       => 'Faturamento TISS 4.03.00 integrado',
         'feature_compliance' => 'Compliance CFM & LGPD integrado',
     ],
 ];

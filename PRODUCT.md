@@ -27,7 +27,7 @@ Sucesso para a clínica: sair do papel, das planilhas e das ferramentas soltas; 
 Quatro diferenciais confirmados, que um sistema genérico não afirma com verdade:
 
 1. **Feito para oftalmologia**: campos, laudos, imagens organizadas por olho e integração com aparelhos oftalmológicos, em vez de prontuário genérico adaptado.
-2. **TISS integrado**: guias, lotes XML (TISS 3.06), envio, processamento de retorno e pré-validação para reduzir glosa.
+2. **TISS integrado**: guias, lotes XML (TISS 4.03.00), envio, processamento de retorno e pré-validação para reduzir glosa.
 3. **Tudo num só sistema**: agenda, prontuário, exames, documentos e financeiro sem ferramentas soltas.
 4. **Conformidade CFM/LGPD desde a arquitetura**: trilha de auditoria, versionamento e assinatura de prontuário.
 
@@ -60,6 +60,7 @@ Atualizado pelo responsável em 2026-09-30: o EasyEye está em pré-lançamento 
 
 - Não há métricas de adoção, volume de consultas, disponibilidade ou satisfação verificadas para publicação, nem depoimentos reais autorizados.
 - O responsável informou que o EasyEye ainda não possui homologação para TISS. A comunicação deve descrever a integração existente, sem afirmar homologação, certificação ou conformidade TISS validada.
+- A versão TISS implementada é 4.03.00, conforme confirmação do responsável. A comunicação pública deve usar essa versão, sem anunciar suporte a outras versões.
 - Os números e relatos fictícios foram removidos de `lang/{pt_BR,en}/site.php`. A estrutura visual dos indicadores e depoimentos foi preservada para uso futuro, mas permanece oculta por `site.social_proof_enabled = false`.
 - Para publicar essas seções, preencher os dois idiomas com dados reais, registrar fonte e período de medição dos indicadores e obter autorização para os depoimentos antes de habilitar a configuração.
 - A ausência de taxa de implantação é uma condição comercial apresentada nos planos, não uma evidência de adoção ou resultado de clientes.

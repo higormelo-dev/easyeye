@@ -156,7 +156,7 @@ return [
     'panel' => [
         'feature_schedule'   => 'Smart scheduling with automatic confirmation',
         'feature_record'     => 'Complete digital ophthalmology records',
-        'feature_tiss'       => 'Integrated TISS 3.06 billing',
+        'feature_tiss'       => 'Integrated TISS 4.03.00 billing',
         'feature_compliance' => 'CFM & LGPD compliance built in',
     ],
 ];

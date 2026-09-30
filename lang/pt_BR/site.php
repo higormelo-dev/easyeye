@@ -67,7 +67,7 @@ return [
     ],
 
     'hero' => [
-        'badge'    => 'Novo: integração com TISS 3.06',
+        'badge'    => 'Novo: integração com TISS 4.03.00',
         'title'    => 'Gestão completa para clínicas',
         'title_em' => 'oftalmológicas',
         'subtitle' => 'Do agendamento ao prontuário eletrônico com TISS integrado. Automatize processos, reduza glosas e foque no que realmente importa: a saúde dos seus pacientes.',
@@ -147,7 +147,7 @@ return [
                 'title'    => 'Faturamento e gestão',
                 'audience' => 'Para quem cuida dos convênios e do caixa',
                 'items'    => [
-                    ['text' => 'Guias TISS 3.06, lotes XML, envio eletrônico e retorno, com pré-validação para reduzir glosas.'],
+                    ['text' => 'Guias TISS 4.03.00, lotes XML, envio eletrônico e retorno, com pré-validação para reduzir glosas.'],
                     ['text' => 'Fluxo de caixa, contas a receber, relatórios gerenciais e meios de pagamento integrados.'],
                     ['text' => 'Várias unidades com um único login, relatórios consolidados e acesso por perfil.'],
                 ],
@@ -195,7 +195,7 @@ return [
         'subtitle' => 'Não é um sistema de gestão genérico adaptado para saúde — é feito para a rotina oftalmológica desde o primeiro dia.',
         'items'    => [
             ['icon' => 'ti-eye', 'title' => 'Feito para oftalmologia', 'text' => 'Campos, laudos e fluxos pensados para a rotina do consultório oftalmológico — não um prontuário genérico adaptado.'],
-            ['icon' => 'ti-receipt', 'title' => 'TISS 3.06 integrado', 'text' => 'Geração de guias e lotes XML, envio e processamento de retornos TISS, com pré-validação para ajudar a reduzir glosas.'],
+            ['icon' => 'ti-receipt', 'title' => 'TISS 4.03.00 integrado', 'text' => 'Geração de guias e lotes XML, envio e processamento de retornos TISS, com pré-validação para ajudar a reduzir glosas.'],
             ['icon' => 'ti-layout-grid', 'title' => 'Tudo num só sistema', 'text' => 'Agenda, prontuário, imagens, documentos e financeiro no mesmo lugar, sem ferramentas soltas.'],
             ['icon' => 'ti-shield-check', 'title' => 'Conformidade CFM e LGPD desde a arquitetura', 'text' => 'Trilha de auditoria, versionamento de prontuário e assinatura digital desde a arquitetura — não é um adendo.'],
         ],
@@ -288,7 +288,7 @@ return [
             // comportamento real.
             ['q' => 'O EasyEye funciona offline?', 'a' => 'O EasyEye é uma solução 100% em nuvem — funciona em qualquer dispositivo com navegador e internet. Não há modo offline no momento: sem conexão, não é possível acessar prontuários, agenda ou os demais dados do sistema.'],
             ['q' => 'Como funciona o suporte técnico?', 'a' => 'Oferecemos suporte por e-mail e WhatsApp (em planos específicos). Nos planos Pro e Premium, o atendimento é prioritário, com SLA de 4 horas úteis.'],
-            ['q' => 'O EasyEye já possui homologação para TISS?', 'a' => 'Ainda não. O EasyEye integra recursos para guias TISS 3.06, geração de lotes XML, envio e processamento de retornos, mas ainda não possui homologação.'],
+            ['q' => 'O EasyEye já possui homologação para TISS?', 'a' => 'Ainda não. O EasyEye integra recursos para guias TISS 4.03.00, geração de lotes XML, envio e processamento de retornos, mas ainda não possui homologação.'],
             ['q' => 'Como os exames dos aparelhos chegam ao EasyEye?', 'a' => 'O integrador de exames envia os exames dos aparelhos ao EasyEye, onde ficam organizados para consulta. A comunicação utiliza uma API fechada, exclusiva desse integrador.'],
         ],
     ],
