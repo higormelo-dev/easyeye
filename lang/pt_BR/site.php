@@ -216,7 +216,7 @@ return [
         'context' => '',
         'rating'  => ':stars de 5 estrelas',
         // Adicionar relatos verificados e autorizados antes de habilitar a publicação.
-        'items'   => [],
+        'items' => [],
     ],
 
     'pricing' => [

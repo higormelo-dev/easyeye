@@ -203,7 +203,7 @@ return [
         'context' => '',
         'rating'  => ':stars out of 5 stars',
         // Add verified testimonials with permission to publish before enabling this section.
-        'items'   => [],
+        'items' => [],
     ],
 
     'pricing' => [
