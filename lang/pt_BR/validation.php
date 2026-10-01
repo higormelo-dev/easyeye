@@ -285,6 +285,7 @@ return [
         'marital_status'           => 'estado civil',
         'mother_name'              => 'nome da mãe',
         'father_name'              => 'nome do pai',
+        'occupation'               => 'profissão',
         'national_registry'        => 'cpf',
         'state_registry'           => 'rg',
         'state_registry_agency'    => 'órgão expedidor do rg',

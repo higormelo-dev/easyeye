@@ -27,4 +27,10 @@ return [
         'results_other'  => ':count resultados',
         'no_results'     => 'Nenhum diagnóstico encontrado.',
     ],
+
+    // Cadastro de paciente (componente compartilhado Pacientes/Agenda).
+    'patient_form' => [
+        'occupation'             => 'Profissão',
+        'occupation_placeholder' => 'Ex.: professora, motorista, aposentado(a)',
+    ],
 ];

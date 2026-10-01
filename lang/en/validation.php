@@ -285,6 +285,7 @@ return [
         'marital_status'           => 'marital status',
         'mother_name'              => 'mother name',
         'father_name'              => 'father name',
+        'occupation'               => 'occupation',
         'national_registry'        => 'national registry',
         'state_registry'           => 'state registry',
         'state_registry_agency'    => 'state registry agency',

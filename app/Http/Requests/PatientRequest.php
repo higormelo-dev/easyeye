@@ -102,6 +102,12 @@ class PatientRequest extends FormRequest
                 'string',
                 'max:255',
             ],
+            // Profissão (opcional). Maiúsculas pelo People, como os nomes.
+            'occupation' => [
+                'nullable',
+                'string',
+                'max:120',
+            ],
             'national_registry' => [
                 'required_without:type_method',
                 'string',

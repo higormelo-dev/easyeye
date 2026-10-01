@@ -29,6 +29,7 @@ export function usePatientForm(catalogs) {
         email:             '',
         mother_name:       '',
         father_name:       '',
+        occupation:        '',
         // Documento
         state_registry:         '',
         state_registry_agency:  '',
@@ -55,7 +56,7 @@ export function usePatientForm(catalogs) {
         form.defaults({
             covenant_id: '', card_number: '', skin_id: '', iris_id: '', active: true,
             name: '', nickname: '', national_registry: '', birth_date: '', gender: '',
-            marital_status: '', email: '', mother_name: '', father_name: '',
+            marital_status: '', email: '', mother_name: '', father_name: '', occupation: '',
             state_registry: '', state_registry_agency: '', state_registry_initial: '', state_registry_date: '',
             telephone: '', cellphone: '', whatsapp: false,
             zipcode: '', address: '', number: '', complement: '', district: '', city: '', state: '', country: 'Brasil',
@@ -164,7 +165,7 @@ export function usePatientForm(catalogs) {
 
     const tabHasErrors = computed(() => ({
         personal: Object.keys(form.errors).some(k =>
-            ['name', 'nickname', 'national_registry', 'birth_date', 'gender', 'marital_status', 'email', 'mother_name', 'father_name'].includes(k),
+            ['name', 'nickname', 'national_registry', 'birth_date', 'gender', 'marital_status', 'email', 'mother_name', 'father_name', 'occupation'].includes(k),
         ),
         clinical: Object.keys(form.errors).some(k =>
             ['covenant_id', 'card_number', 'skin_id', 'iris_id'].includes(k),

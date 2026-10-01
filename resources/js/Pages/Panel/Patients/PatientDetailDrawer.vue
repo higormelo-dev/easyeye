@@ -1,7 +1,11 @@
 <script setup>
-import { ref, watch } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
+import { router, usePage } from '@inertiajs/vue3';
 import OffcanvasPanel from '@/Components/Panel/OffcanvasPanel.vue';
+
+// Rótulo compartilhado (lang/<locale>/ui.php → patient_form).
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
 
 const props = defineProps({
     open:      { type: Boolean, required: true },
@@ -126,6 +130,7 @@ function invitePortal() {
                     <div class="detail-row"><span class="detail-label">Gênero</span><span class="detail-value">{{ patient.gender || '—' }}</span></div>
                     <div class="detail-row"><span class="detail-label">Estado Civil</span><span class="detail-value">{{ patient.marital_status || '—' }}</span></div>
                     <div v-if="patient.mother_name" class="detail-row"><span class="detail-label">Nome da Mãe</span><span class="detail-value">{{ patient.mother_name }}</span></div>
+                    <div v-if="patient.occupation" class="detail-row"><span class="detail-label">{{ ui.occupation ?? 'Profissão' }}</span><span class="detail-value">{{ patient.occupation }}</span></div>
                     <div v-if="patient.father_name" class="detail-row"><span class="detail-label">Nome do Pai</span><span class="detail-value">{{ patient.father_name }}</span></div>
                 </div>
             </div>

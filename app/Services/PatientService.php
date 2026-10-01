@@ -290,6 +290,7 @@ class PatientService
             'email'                  => $request->email,
             'mother_name'            => $request->mother_name,
             'father_name'            => $request->father_name,
+            'occupation'             => $request->occupation,
             'national_registry'      => $request->national_registry,
             'state_registry'         => $request->state_registry,
             'state_registry_agency'  => $request->state_registry_agency,

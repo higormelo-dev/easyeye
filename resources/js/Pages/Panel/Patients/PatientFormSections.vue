@@ -1,5 +1,6 @@
 <script setup>
 import { computed, watch } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 
 /**
@@ -34,6 +35,11 @@ const isParticular = computed(() => {
 watch(isParticular, (particular) => {
     if (particular) props.form.card_number = '';
 });
+
+// Textos compartilhados (lang/<locale>/ui.php → patient_form) — o mesmo
+// componente serve Pacientes e Agenda, cada um com o seu `t` de página.
+const page = usePage();
+const ui = computed(() => page?.props?.t_ui?.patient_form ?? {});
 </script>
 
 <template>
@@ -118,6 +124,21 @@ watch(isParticular, (particular) => {
                 <label class="form-label">Nome do pai</label>
                 <input v-model="form.father_name" type="text" class="form-control">
             </div>
+        </div>
+
+        <div class="mb-3">
+            <label for="patient-occupation" class="form-label">{{ ui.occupation ?? 'Profissão' }}</label>
+            <input id="patient-occupation"
+                   v-model="form.occupation"
+                   type="text"
+                   class="form-control"
+                   maxlength="120"
+                   autocomplete="organization-title"
+                   :placeholder="ui.occupation_placeholder"
+                   :class="{ 'is-invalid': form.errors.occupation }"
+                   :aria-invalid="form.errors.occupation ? 'true' : 'false'"
+                   :aria-describedby="form.errors.occupation ? 'patient-occupation-error' : undefined">
+            <div v-if="form.errors.occupation" id="patient-occupation-error" class="invalid-feedback">{{ form.errors.occupation }}</div>
         </div>
 
         <div v-if="isEdit" class="mb-3">
