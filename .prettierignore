@@ -1,0 +1,19 @@
+# Prettier cobre só o frontend (JS/Vue). PHP é do Pint; Blade, docs, YAML e
+# lockfiles ficam de fora. Lista branca: ignora tudo e reabre o que é nosso.
+/*
+!/resources/
+/resources/*
+!/resources/js/
+!/tests/
+/tests/*
+!/tests/JavaScript/
+!/e2e/
+/e2e/*
+!/e2e/cypress/
+!/e2e/cypress.config.js
+!/*.config.js
+
+# Gerados / terceiros dentro do escopo
+/resources/js/ziggy.js
+/resources/js/preclinic-script.js
+*.jsx
