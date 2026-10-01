@@ -886,7 +886,7 @@ defineExpose({ parseStructured, extractFirstJsonObject, stripFence });
                     <i class="ti ti-photo me-1" aria-hidden="true"></i>{{ lbl('images_preview', 'Imagens para análise') }}
                 </h6>
                 <div v-if="examsLoading" class="text-center text-muted small py-3">
-                    <div class="spinner-border spinner-border-sm me-1" aria-hidden="true"></div>{{ lbl('images_loading', 'Carregando imagens…') }}
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>{{ lbl('images_loading', 'Carregando imagens…') }}
                 </div>
                 <template v-else>
                     <div v-if="examUrls[activeExamId]" class="border rounded bg-light d-flex align-items-center justify-content-center mb-2"

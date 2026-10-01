@@ -271,7 +271,7 @@ describe('Local de acesso: Prontuário (não mais o Gerenciador de Imagens)', ()
 
     it('prontuário: botão só para médico, resultado no form e modal travado quando assinado', () => {
         expect(form).toContain('contact_lens_calculation: r?.contact_lens_calculation ?? null');
-        expect(form).toMatch(/<button v-if="isDoctor"[^>]*\s+data-contact-lens-open\s+:disabled="isLocked && !contactLensRows\.length"/);
+        expect(form).toMatch(/<button\s+v-if="isDoctor"[^>]*\s+data-contact-lens-open\s+:disabled="isLocked && !contactLensRows\.length"/);
         expect(form).toMatch(/<ContactLensCalculatorModal[^>]*:readonly="isLocked"[^>]*@apply="applyContactLens"[^>]*@remove="removeContactLens"/);
         expect(form).toMatch(/v-if="contactLensRows\.length"[^>]*data-contact-lens-summary/);
     });

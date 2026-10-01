@@ -575,6 +575,9 @@ async function rejectRun() {
                         <div v-if="detailLoading" class="text-muted">{{ label('loading', 'Carregando') }}...</div>
                         <div v-else-if="!selectedRun" class="text-muted">{{ label('select_run', 'Selecione uma execução para visualizar.') }}</div>
                         <template v-else>
+                            <!-- Uma linha só: com quebra de linha entre </strong> e <span>,
+                                 o Vue apaga o espaço ("Status:Concluído"). -->
+                            <!-- prettier-ignore -->
                             <div class="mb-2"><strong>{{ label('status', 'Status') }}:</strong> <span :class="statusClass(selectedRun.status)">{{ statusLabel(selectedRun.status) }}</span></div>
                             <div class="mb-2"><strong>{{ label('patient', 'Paciente') }}:</strong> {{ selectedRun.patient || '-' }}</div>
                             <div class="mb-2"><strong>{{ label('medical_record', 'Prontuário') }}:</strong> {{ selectedRun.medical_record_code || '-' }}</div>

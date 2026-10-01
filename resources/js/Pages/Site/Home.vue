@@ -575,6 +575,9 @@
                     </div>
                 </div>
 
+                <!-- Espaço entre ícone e texto: o Vue apaga espaço com quebra de linha
+                     entre tags, então o Prettier não reformata este bloco. -->
+                <!-- prettier-ignore -->
                 <div class="contact-trust" :class="{ 'contact-trust--compact': !t.contact.trust_nps }">
                     <div class="contact-trust-item">
                         <i class="ti ti-lock" aria-hidden="true"></i> <span>{{ t.contact.trust_ssl }}</span>

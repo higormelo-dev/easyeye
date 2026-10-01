@@ -45,13 +45,14 @@ describe('MedicalRecordForm — organização da coluna esquerda', () => {
     const left    = source.slice(source.indexOf('<!-- COLUNA ESQUERDA -->'), source.indexOf('<!-- COLUNA DIREITA -->'));
     const right   = source.slice(source.indexOf('<!-- COLUNA DIREITA -->'));
     const at      = (block, key) => block.indexOf(`sectionStyle('${key}')`);
-    /** Marcação da seção (do seu <div> até a próxima seção). */
-    const section = (key) => {
-        const start = left.lastIndexOf('<div class="pmr-section', at(left, key));
-        const next  = left.indexOf('<div class="pmr-section', at(left, key));
+    /** Marcação da seção (do seu <div> até a próxima seção); aceita atributos quebrados em linhas. */
+    const sectionIn = (block, key) => {
+        const pos    = at(block, key);
+        const starts = [...block.matchAll(/<div\s+class="pmr-section/g)].map((m) => m.index);
 
-        return left.slice(start, next === -1 ? undefined : next);
+        return block.slice(starts.filter((i) => i < pos).at(-1), starts.find((i) => i > pos));
     };
+    const section = (key) => sectionIn(left, key);
 
     it('ordem: A/V sem correção → A/V com correção → Tonometria → Dinâmica → Estática', () => {
         expect(at(left, 'av_sem_tono')).toBeGreaterThan(-1);
@@ -105,8 +106,7 @@ describe('MedicalRecordForm — organização da coluna esquerda', () => {
     });
 
     it('Adição, Longe, Perto e botões na mesma linha quando cabem; lentes não aumentam a altura', () => {
-        const start = right.lastIndexOf('<div class="pmr-section', at(right, 'adicao'));
-        const lens  = right.slice(start, right.indexOf('<div class="pmr-section', at(right, 'adicao')));
+        const lens = sectionIn(right, 'adicao');
 
         // Antes: col-6 (2 por linha) — Perto e o lápis sempre na linha de baixo.
         expect(lens).not.toContain('col-6');
