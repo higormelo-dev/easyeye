@@ -30,7 +30,9 @@ it('não serializa rascunhos de prova social nas páginas públicas', function (
             ->assertInertia(fn (Assert $page) => $page
                 ->where('t.nav.testimonials', null));
 
-        $this->withSession(['locale' => $locale])->getJson(route($route), ['X-Inertia' => 'true'])
+        // inertiaHeaders(): manda também a versão dos assets — sem ela o
+        // Inertia responde 409 sempre que há ASSET_URL ou build local.
+        $this->withSession(['locale' => $locale])->getJson(route($route), inertiaHeaders())
             ->assertOk()
             ->assertDontSee($draft, false)
             ->assertJsonPath('props.t.nav.testimonials', null);
