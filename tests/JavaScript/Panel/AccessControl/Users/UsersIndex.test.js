@@ -67,6 +67,15 @@ vi.mock('@/Pages/Panel/Users/UserFormModal.vue', () => ({
     },
 }));
 
+// Convite a quem já usa o EasyEye (painel e pendentes têm teste próprio:
+// tests/JavaScript/Panel/Users/UserInvitation.test.js).
+vi.mock('@/Pages/Panel/Users/UserInviteModal.vue', () => ({
+    default: { props: ['open', 'roles', 't'], template: '<div class="invite-stub" :data-open="open" />' },
+}));
+vi.mock('@/Pages/Panel/Users/UserInvitationsPending.vue', () => ({
+    default: { props: ['invitations', 't'], template: '<div class="pending-stub">{{ invitations.map((i) => i.email).join(",") }}</div>' },
+}));
+
 const t = {
     page_title: 'Users', total_label: 'Total:', new_user: 'New user', roles_link: 'Roles & Permissions',
     search_placeholder: 'Search by name or e-mail…', search_clear: 'Clear search', close: 'Close',
@@ -228,5 +237,25 @@ describe('Users/Index', () => {
         await w.find('.edit-other').trigger('click');
         expect(w.get('.modal-stub').attributes('data-user')).toBe('u1');
         expect(w.get('.modal-stub').attributes('data-lock')).toBe('false');
+    });
+
+    it('convidar quem já usa o EasyEye: botão só com perfis convidáveis; abre o painel; lista os pendentes', async () => {
+        mountPage();
+        expect(wrapper.text()).not.toContain('Invite existing user');
+        expect(wrapper.find('.pending-stub').exists()).toBe(false);
+        wrapper.unmount();
+
+        mountPage({
+            t: { ...t, invitation: { button: 'Invite existing user' } },
+            invitableRoles: { financial: 'Financial' },
+            pendingInvitations: [{ id: 'i1', email: 'maria@example.com' }],
+        });
+
+        const button = wrapper.findAll('button').find((b) => b.text() === 'Invite existing user');
+        expect(button).toBeTruthy();
+        expect(wrapper.find('.pending-stub').text()).toBe('maria@example.com');
+
+        await button.trigger('click');
+        expect(wrapper.find('.invite-stub').attributes('data-open')).toBe('true');
     });
 });

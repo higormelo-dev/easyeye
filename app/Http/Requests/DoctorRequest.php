@@ -2,11 +2,15 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Doctor;
+use App\Enums\EntityGate;
+use App\Models\{Doctor, Entity};
+use App\Models\User;
+use App\Services\DoctorInvitationService;
 use App\Support\BrazilianFormat;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\{Rule, Validator};
 use Illuminate\Validation\Rules\Password;
 
 class DoctorRequest extends FormRequest
@@ -16,6 +20,15 @@ class DoctorRequest extends FormRequest
      */
     public function authorize(): bool
     {
+        // Cadastro novo (e convite): mesma permissão do controller, checada
+        // ANTES da validação — a validação agora diz se o e-mail/CPF já tem
+        // login no EasyEye, e isso só pode chegar a quem gerencia médicos.
+        if ($this->isMethod('POST')) {
+            $entity = Entity::query()->find(session('selected_entity_id'));
+
+            return $entity !== null && Gate::allows(EntityGate::ManageSettings->value, $entity);
+        }
+
         return true;
     }
 
@@ -32,11 +45,19 @@ class DoctorRequest extends FormRequest
             'required_without:type_method',
             'string',
             'max:11',
+            // Único entre os MÉDICOS desta clínica. CPF de médico de outra
+            // clínica cai em after() (convite); CPF de paciente (desta ou de
+            // outra clínica) não é conflito — cada cadastro é próprio.
             Rule::unique('people', 'national_registry')
                 ->ignore($this->getIgnoredPersonId(), 'id')
-                ->where(function ($query) {
-                    $query->whereNull('deleted_at');
-                }),
+                ->where(fn ($query) => $query
+                    ->whereNull('deleted_at')
+                    ->whereIn('id', fn ($doctors) => $doctors
+                        ->select('doctors.person_id')
+                        ->from('doctors')
+                        ->join('entity_users', 'entity_users.id', '=', 'doctors.entity_user_id')
+                        ->where('entity_users.entity_id', session('selected_entity_id'))
+                        ->whereNull('doctors.deleted_at'))),
         ];
         $rules['nickname'] = ['required_without:type_method', 'string', 'min:2', 'max:255'];
         $rules['record']   = [
@@ -94,8 +115,12 @@ class DoctorRequest extends FormRequest
             // BUGFIX (revisao de seguranca): unicidade de email deve ser validada contra "users" (tabela de
             // login usada por DoctorService::findOrCreateUser), nao "people" -- staff sem registro em
             // "people" (secretary/admin/financial) permitia colisao de email de login cross-tenant.
-            Rule::unique('users', 'email')
-                ->ignore($this->getIgnoredUserId(), 'id'),
+            // Cadastro NOVO: o e-mail de um login existente não vira erro seco
+            // aqui — after() decide (convite / duplicidade / conflito) e o
+            // DoctorService nunca reaproveita login existente.
+            ...($this->isMethod('POST') ? [] : [
+                Rule::unique('users', 'email')->ignore($this->getIgnoredUserId(), 'id'),
+            ]),
         ];
         $rules['mother_name']            = ['nullable', 'string', 'min:2', 'max:255'];
         $rules['father_name']            = ['nullable', 'string', 'min:2', 'max:255'];
@@ -135,6 +160,61 @@ class DoctorRequest extends FormRequest
         }
 
         return $rules;
+    }
+
+    /**
+     * Cadastro novo: o e-mail/CPF já pertencem a alguém com login no EasyEye?
+     * Roda só se e-mail e CPF passaram nas regras (formato, duplicidade na
+     * própria clínica).
+     *
+     * @return list<callable>
+     */
+    public function after(): array
+    {
+        if (! $this->isMethod('POST') || $this->has('type_method')) {
+            return [];
+        }
+
+        return [function (Validator $validator): void {
+            if ($validator->errors()->hasAny(['email', 'national_registry'])) {
+                return;
+            }
+
+            $this->handleExistingLogin($validator, app(DoctorInvitationService::class)->detect(
+                (string) $this->input('email'),
+                (string) $this->input('national_registry'),
+                (string) session('selected_entity_id'),
+            ));
+        }];
+    }
+
+    /**
+     * Cadastro normal: login de outra clínica → aviso "já possui cadastro no
+     * EasyEye, mas não nesta clínica" (chave existing_doctor — a tela oferece
+     * o convite). Nunca devolve nome, e-mail ou clínicas do médico.
+     *
+     * @param array{status: string, user: ?User, field: ?string} $detection
+     */
+    protected function handleExistingLogin(Validator $validator, array $detection): void
+    {
+        match ($detection['status']) {
+            DoctorInvitationService::DETECT_INVITE   => $validator->errors()->add('existing_doctor', __('doctors.invitation.exists_elsewhere')),
+            DoctorInvitationService::DETECT_MEMBER   => $this->addDuplicateError($validator, (string) $detection['field']),
+            DoctorInvitationService::DETECT_TAKEN    => $this->addDuplicateError($validator, (string) $detection['field']),
+            DoctorInvitationService::DETECT_CONFLICT => $this->addConflictError($validator),
+            default                                  => null,
+        };
+    }
+
+    protected function addDuplicateError(Validator $validator, string $field): void
+    {
+        $validator->errors()->add($field, __('validation.unique', ['attribute' => __('validation.attributes.' . $field)]));
+    }
+
+    protected function addConflictError(Validator $validator): void
+    {
+        $validator->errors()->add('national_registry', __('doctors.invitation.conflict'));
+        $validator->errors()->add('email', __('doctors.invitation.conflict'));
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Http\Controllers\{
     AiRunsController,
     ComplianceController,
     DoctorImportsController,
+    DoctorInvitationsController,
     DoctorReportPhrasesController,
     DoctorWorkScheduleController,
     DoctorsController,
@@ -47,6 +48,7 @@ use App\Http\Controllers\{
     ScheduleEventsController,
     ScheduleImportsController,
     SchedulesController,
+    UserInvitationsController,
     UsersController,
     WaitingListController
 };
@@ -312,6 +314,13 @@ Route::group(
         // administrativos. O menu já escondia; agora a rota também nega.
         Route::middleware('permission:patients.manage,admin,financial,secretary')->group(function () {
             Route::get('doctors/cards', [DoctorsController::class, 'cards'])->name('doctors.cards');
+            // Convite a médico que já tem login no EasyEye (outra clínica) —
+            // DoctorInvitationService. Limite de envios por clínica.
+            Route::post('doctors/invitations', [DoctorInvitationsController::class, 'store'])
+                ->middleware('throttle:doctor-invitations')
+                ->name('doctors.invitations.store');
+            Route::delete('doctors/invitations/{invitation}', [DoctorInvitationsController::class, 'destroy'])
+                ->name('doctors.invitations.destroy');
             Route::get('doctors/{doctor}/edit-data', [DoctorsController::class, 'editData'])->name('doctors.editData');
             Route::get('doctors/{doctor}/work-schedule/data', [DoctorWorkScheduleController::class, 'data'])->name('doctors.work-schedule.data');
             Route::get('doctors/{doctor}/work-schedule', [DoctorWorkScheduleController::class, 'index'])->name('doctors.work-schedule.index');
@@ -323,7 +332,12 @@ Route::group(
             Route::delete('doctors/import/{doctorImport}/cancel', [DoctorImportsController::class, 'cancel'])->name('doctors.import.cancel');
             Route::get('doctors/import/{doctorImport}/status', [DoctorImportsController::class, 'status'])->name('doctors.import.status');
             Route::get('doctors/import/{doctorImport}/errors', [DoctorImportsController::class, 'errors'])->name('doctors.import.errors');
-            Route::resource('doctors', DoctorsController::class);
+            // store com limite próprio: a validação diz se o e-mail/CPF já tem
+            // login de médico no EasyEye — sem limite, viraria varredura.
+            Route::post('doctors', [DoctorsController::class, 'store'])
+                ->middleware('throttle:doctor-registrations')
+                ->name('doctors.store');
+            Route::resource('doctors', DoctorsController::class)->except('store');
         });
 
         // ── admin + secretary + doctor + financial: pacientes ─────────────────
@@ -810,6 +824,13 @@ Route::group(
                 // Tabela e cards usam o mesmo paginator do index (o antigo
                 // endpoint JSON `users/cards` saiu). Restaurar é PATCH: devolve
                 // o acesso à clínica e precisa do token CSRF (GET não tem).
+                // Convite a usuário que já tem login no EasyEye (outra
+                // clínica) — UserInvitationService. Resposta sempre igual.
+                Route::post('users/invitations', [UserInvitationsController::class, 'store'])
+                    ->middleware('throttle:user-invitations')
+                    ->name('users.invitations.store');
+                Route::delete('users/invitations/{invitation}', [UserInvitationsController::class, 'destroy'])
+                    ->name('users.invitations.destroy');
                 Route::resource('users', UsersController::class);
                 Route::patch('users/{user}/restore', [UsersController::class, 'restore'])->name('users.restore');
                 Route::patch('users/{user}/roles', [UsersController::class, 'updateRoles'])->name('users.roles.update');

@@ -171,6 +171,69 @@
     margin-bottom: 0 !important;
 }
 
+// Coluna esquerda em fluxo (flex-wrap): cada seção ocupa a linha inteira;
+// as "inline" (A/V sem correção, A/V com correção, Tonometria) dividem a
+// linha quando cabem e a que sobra sozinha numa linha cresce até a largura
+// toda — sem vão em branco no meio. `order` do layout personalizado ("Meu
+// prontuário") vale igual no flex.
+.pmr-form .pmr-main-panel--flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    column-gap: .75rem;
+}
+
+.pmr-form .pmr-main-panel--flow > .pmr-section {
+    flex: 0 0 100%;
+    min-width: 0;
+}
+
+// Mínimos de cada bloco: A/V = um olho por linha (par OD/OE de 150px);
+// Tonometria = OD + OE (hora e impressão descem juntas se faltar espaço).
+// Com os três na mesma linha, todos crescem por igual — mesma altura.
+.pmr-form .pmr-main-panel--flow > .pmr-section--inline {
+    flex: 1 1 150px;
+}
+
+.pmr-form .pmr-main-panel--flow > .pmr-section--tonometry {
+    flex-basis: 184px;
+}
+
+// Campos da Tonometria ocupam a largura do bloco: OD e OE dividem a linha
+// (mínimo para "00,0") e hora + impressão crescem juntas — na mesma linha
+// quando cabe, senão na linha de baixo, de ponta a ponta.
+.pmr-form .pmr-tono-eye {
+    flex: 1 1 84px;
+    min-width: 84px;
+}
+
+.pmr-form .pmr-tono-time {
+    flex: 1 1 150px;
+    min-width: 150px;
+}
+
+.pmr-form .pmr-tono-time input[type="time"] {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+// Adição, Longe, Perto e botões (calculadora/receituário) numa linha só
+// quando cabem — como os blocos da coluna esquerda: cada campo tem uma base
+// mínima, todos crescem até a borda e a linha quebra quando falta espaço.
+// Longe/Perto ficam numa linha só por mais lentes que se escolha (resumo
+// "A, B, … [n]" do SearchSelect multiple); a base garante ao menos um nome
+// legível ao lado da quantidade. Adição é um valor curto (0.25 a 5.00).
+// (fatores de crescimento >= 1: o campo que sobra sozinho numa linha — no
+// celular — vai até a borda.)
+.pmr-form .pmr-lens-field {
+    flex: 1.3 1 150px;
+    min-width: 0;
+}
+
+.pmr-form .pmr-lens-field--short {
+    flex: 1 1 120px;
+}
+
 .pmr-form .form-control,
 .pmr-form .form-select,
 .pmr-form .input-group-text,

@@ -465,15 +465,17 @@ class PatientImportService
                   ?: $this->onlyNumbers((string) ($data['telephone'] ?? ''));
         $telephone = $this->onlyNumbers((string) ($data['telephone'] ?? ''));
 
-        // 1. Tenta encontrar pessoa existente por CPF
+        // 1. Tenta encontrar pessoa existente por CPF — só entre os cadastros
+        //    DESTA clínica. O mesmo paciente pode estar em outras clínicas, cada
+        //    uma com o seu People: CPF de outra clínica cria um cadastro novo
+        //    aqui (passo 3), sem ler nem tocar no dela.
         $person = null;
 
         if ($cpf !== '') {
-            $person = People::withTrashed()->where('national_registry', $cpf)->first();
-
-            if ($person !== null && ! $this->patientService->personLinkableToEntity($person->id, $entityId)) {
-                throw new RuntimeException(__('shared_identity.import.cpf_linked_elsewhere'));
-            }
+            $person = $this->patientService->whereLinkedToEntity(People::withTrashed(), $entityId)
+                ->where('national_registry', $cpf)
+                ->orderBy('created_at')
+                ->first();
         }
 
         // 2. Fallback: nome + telefone — só entre cadastros DESTA clínica

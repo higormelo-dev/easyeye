@@ -158,29 +158,35 @@ beforeEach(function (): void {
     $this->patientB = spiPatient($this->clinicB, $this->personB);
 });
 
-describe('importação de pacientes não vincula cadastro de outra clínica', function (): void {
-    it('CPF de paciente de OUTRA clínica vira erro de linha: nenhum Patient em A aponta para o People de B', function (): void {
+describe('importação de pacientes nunca vincula cadastro de outra clínica', function (): void {
+    // O mesmo paciente pode estar em várias clínicas: CPF de outra clínica
+    // gera o cadastro PRÓPRIO de A — sem erro de linha e sem tocar no de B.
+    it('CPF de paciente de OUTRA clínica: A importa com People próprio e o People de B fica intocado', function (): void {
         $original = $this->personB->only(['full_name', 'email', 'cellphone']);
 
         $import = spiPatientImport($this->clinicA, "nome;celular;cpf\nQUALQUER NOME;11911112222;529.982.247-25\n");
         app(PatientImportService::class)->process($import);
 
         $import->refresh();
-        expect($import->imported_rows)->toBe(0)
-            ->and($import->error_rows)->toBe(1)
-            ->and(spiErrorReason($import))->toBe(__('shared_identity.import.cpf_linked_elsewhere'))
-            ->and(Patient::withoutGlobalScopes()->where('entity_id', $this->clinicA->id)->where('person_id', $this->personB->id)->exists())->toBeFalse()
+        $patientA = Patient::withoutGlobalScopes()->where('entity_id', $this->clinicA->id)->sole();
+
+        expect($import->imported_rows)->toBe(1)
+            ->and($import->error_rows)->toBe(0)
+            ->and($patientA->person_id)->not->toBe($this->personB->id)
+            ->and($patientA->person->national_registry)->toBe('52998224725')
             ->and($this->personB->fresh()->only(['full_name', 'email', 'cellphone']))->toBe($original);
     });
 
     it('vale também quando o paciente de B foi excluído (os dados continuam sendo de B)', function (): void {
         $this->patientB->delete();
+        $original = $this->personB->only(['full_name', 'email', 'cellphone']);
 
         $import = spiPatientImport($this->clinicA, "nome;celular;cpf\nQUALQUER NOME;11911112222;52998224725\n");
         app(PatientImportService::class)->process($import);
 
-        expect($import->fresh()->error_rows)->toBe(1)
-            ->and(Patient::withoutGlobalScopes()->where('entity_id', $this->clinicA->id)->exists())->toBeFalse();
+        expect($import->fresh()->imported_rows)->toBe(1)
+            ->and(Patient::withoutGlobalScopes()->where('entity_id', $this->clinicA->id)->sole()->person_id)->not->toBe($this->personB->id)
+            ->and($this->personB->fresh()->only(['full_name', 'email', 'cellphone']))->toBe($original);
     });
 
     it('nome + telefone de paciente de OUTRA clínica não casa: cria um People novo para A', function (): void {
@@ -217,19 +223,22 @@ describe('importação de pacientes não vincula cadastro de outra clínica', fu
         expect($import->fresh()->skipped_rows)->toBe(1);
     });
 
-    it('People sem vínculo com nenhuma clínica continua reaproveitado pelo CPF', function (): void {
+    it('People sem vínculo com nenhuma clínica NÃO é reaproveitado pelo CPF (pode ser de outra conta do portal)', function (): void {
         $orphan = spiPerson(['national_registry' => '11144477735']);
 
         $import = spiPatientImport($this->clinicA, "nome;celular;cpf\n{$orphan->full_name};11911112222;11144477735\n");
         app(PatientImportService::class)->process($import);
 
         expect($import->fresh()->imported_rows)->toBe(1)
-            ->and(Patient::withoutGlobalScopes()->where('entity_id', $this->clinicA->id)->sole()->person_id)->toBe($orphan->id);
+            ->and(Patient::withoutGlobalScopes()->where('entity_id', $this->clinicA->id)->sole()->person_id)->not->toBe($orphan->id);
     });
 });
 
 describe('importação de médicos não vincula nem reescreve cadastro de outra clínica', function (): void {
-    it('CPF de paciente de OUTRA clínica vira erro de linha e o People de B não é sobrescrito', function (): void {
+    // CPF que só existe como PACIENTE (de outra clínica ou desta) não é
+    // conflito: o médico ganha o cadastro PRÓPRIO desta clínica, igual ao
+    // cadastro manual — o People de B nunca é lido nem sobrescrito.
+    it('CPF de paciente de OUTRA clínica: médico importado com People próprio e o People de B intocado', function (): void {
         $original = $this->personB->only(['full_name', 'nickname', 'email', 'cellphone']);
 
         $import = spiDoctorImport(
@@ -239,15 +248,13 @@ describe('importação de médicos não vincula nem reescreve cadastro de outra 
         app(DoctorImportService::class)->process($import);
 
         $import->refresh();
-        expect($import->imported_rows)->toBe(0)
-            ->and(spiErrorReason($import))->toBe(__('shared_identity.import.cpf_linked_elsewhere'))
+        expect($import->imported_rows)->toBe(1)
             ->and($this->personB->fresh()->only(['full_name', 'nickname', 'email', 'cellphone']))->toBe($original)
             ->and(Doctor::where('person_id', $this->personB->id)->exists())->toBeFalse()
-            // A linha inteira volta: nem o login novo fica órfão.
-            ->and(User::where('email', 'invasor@clinica-a.com')->exists())->toBeFalse();
+            ->and(Doctor::query()->sole()->person->national_registry)->toBe('52998224725');
     });
 
-    it('People da própria clínica também em uso por OUTRA é reaproveitado sem ser sobrescrito', function (): void {
+    it('People de PACIENTE da própria clínica (também usado por outra) não vira o cadastro do médico', function (): void {
         // Mesmo People: paciente em B e em A (vínculo legado).
         spiPatient($this->clinicA, $this->personB);
         $original = $this->personB->only(['full_name', 'nickname', 'email']);
@@ -260,7 +267,7 @@ describe('importação de médicos não vincula nem reescreve cadastro de outra 
 
         expect($import->fresh()->imported_rows)->toBe(1)
             ->and($this->personB->fresh()->only(['full_name', 'nickname', 'email']))->toBe($original)
-            ->and(Doctor::where('person_id', $this->personB->id)->exists())->toBeTrue();
+            ->and(Doctor::where('person_id', $this->personB->id)->exists())->toBeFalse();
     });
 });
 
@@ -338,7 +345,7 @@ describe('edição não reescreve o People usado por outra clínica', function (
         expect($this->personB->fresh()->email)->toBe('novo.email@example.com');
     });
 
-    it('cadastro com CPF de People excluído mas ainda usado por paciente ATIVO de outra clínica é recusado (422 no CPF)', function (): void {
+    it('cadastro com CPF de People excluído mas ainda usado por paciente ATIVO de outra clínica cria People próprio (o de B intocado)', function (): void {
         // Estado deixado pela exclusão antiga (apagava o People compartilhado).
         $this->patientA->forceDelete();
         $this->personB->delete();
@@ -356,8 +363,7 @@ describe('edição não reescreve o People usado por outra clínica', function (
                 'cellphone'         => '11911112222',
                 'whatsapp'          => false,
             ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('national_registry');
+            ->assertSuccessful();
 
         $person = People::withTrashed()->find($this->personB->id);
         expect($person->email)->toBe('vitima@clinicab.com')

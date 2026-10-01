@@ -10,7 +10,11 @@ const props = defineProps({
     genders:        { type: Object,  default: () => ({}) },
     maritalStatuses:{ type: Object,  default: () => ({}) },
     statesOfBrazil: { type: Object,  default: () => ({}) },
+    // Traduções de lang/<locale>/doctors.php (usa só a seção `invitation` aqui).
+    t:              { type: Object,  default: () => ({}) },
 });
+
+const inviteT = computed(() => props.t?.invitation ?? {});
 
 const emit    = defineEmits(['close']);
 const isEdit  = computed(() => !!props.doctorId);
@@ -84,6 +88,18 @@ watch(() => props.open, async (val) => {
     resetForm();
     if (props.doctorId) await loadEditData(props.doctorId);
 });
+
+// Médico que já tem login no EasyEye (outra clínica): o servidor não cadastra
+// e devolve `existing_doctor` — a clínica pode enviar um convite, que vai ao
+// e-mail do login dele (nunca ao digitado) e só ele aceita.
+const existingDoctor = computed(() => form.errors.existing_doctor ?? null);
+
+function sendInvitation() {
+    form.post(route('panel.doctors.invitations.store'), {
+        preserveScroll: true,
+        onSuccess: () => emit('close'),
+    });
+}
 
 function submit() {
     const opts = { preserveScroll: true, onSuccess: () => emit('close') };
@@ -184,6 +200,19 @@ const tabErrors = computed(() => ({
         </template>
 
         <!-- ── Corpo ─────────────────────────────────────────────────────────── -->
+        <div v-if="existingDoctor && !isEdit" class="alert alert-info d-flex flex-column gap-2" role="status" aria-live="polite">
+            <div><i class="ti ti-info-circle me-1" aria-hidden="true"></i>{{ existingDoctor }}</div>
+            <div>
+                <button type="button"
+                        class="btn btn-primary btn-sm"
+                        :disabled="form.processing"
+                        @click="sendInvitation">
+                    <span v-if="form.processing" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    <i v-else class="ti ti-send me-1" aria-hidden="true"></i>{{ inviteT.send_button }}
+                </button>
+            </div>
+        </div>
+
         <form @submit.prevent="submit">
 
             <!-- TAB: Pessoal -->

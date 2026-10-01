@@ -10,7 +10,7 @@ use Database\Factories\PatientAccountFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany};
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -22,10 +22,11 @@ use SensitiveParameter;
  * staff: identidade externa (paciente) não pode se misturar com a ACL
  * entity-scoped de staff.
  *
- * 1:1 com People (person_id, UNIQUE) — um único login cobre todas as
- * clínicas onde a pessoa já foi atendida (ver Patient::where('person_id', ...)
- * usado em PatientPortal\DashboardController). Não expor relação patients()
- * direta aqui: sempre acessar via $account->person->patients().
+ * person_id (UNIQUE) = cadastro TITULAR da conta. Cada clínica tem o seu
+ * cadastro (People) do paciente; os de outras clínicas entram na conta só
+ * quando o PRÓPRIO paciente aceita o convite de cada uma (links(), ver
+ * PatientAccountLinkService). Posse de Patient/documento no portal: SEMPRE
+ * via linkedPersonIds() — nunca comparar só com person_id.
  *
  * Estende Illuminate\Foundation\Auth\User (mesma base já usada por User e
  * EntityUserIntegrator neste projeto) em vez de compor manualmente os
@@ -47,6 +48,9 @@ class PatientAccount extends Authenticatable implements MustVerifyEmail
     use SoftDeletes;
 
     protected $primaryKey = 'id';
+
+    /** @var list<string>|null */
+    private ?array $linkedPersonIdsCache = null;
 
     /**
      * The attributes that are mass assignable.
@@ -90,6 +94,35 @@ class PatientAccount extends Authenticatable implements MustVerifyEmail
     public function person(): BelongsTo
     {
         return $this->belongsTo(People::class, 'person_id');
+    }
+
+    public function links(): HasMany
+    {
+        return $this->hasMany(PatientAccountLink::class, 'patient_account_id');
+    }
+
+    /**
+     * Cadastros (People) desta conta: o titular + os vinculados pelo paciente.
+     * Memorizado por instância (várias checagens de posse por request).
+     *
+     * @return list<string>
+     */
+    public function linkedPersonIds(): array
+    {
+        return $this->linkedPersonIdsCache ??= $this->links()
+            ->pluck('person_id')
+            ->push($this->person_id)
+            ->filter()
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** O cadastro pertence a esta conta? */
+    public function ownsPerson(?string $personId): bool
+    {
+        return $personId !== null && in_array((string) $personId, $this->linkedPersonIds(), true);
     }
 
     /**

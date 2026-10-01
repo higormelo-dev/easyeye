@@ -1,6 +1,10 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import PatientPortalLayout from '@/Layouts/PatientPortalLayout.vue';
+
+// Aviso vindo do servidor (ex.: "Clínica adicionada à sua conta"), já traduzido.
+const statusMessage = computed(() => usePage().props.flash?.status ?? null);
 
 defineProps({
     patientName: { type: String, default: '' },
@@ -16,6 +20,10 @@ defineProps({
             <i class="ti ti-building-hospital me-1 text-primary"></i>Minhas Clínicas
         </h4>
 
+        <div v-if="statusMessage" class="alert alert-success py-2" role="status">
+            <i class="ti ti-circle-check me-1" aria-hidden="true"></i>{{ statusMessage }}
+        </div>
+
         <div v-if="clinics.length === 0" class="card shadow-sm border-0">
             <div class="card-body text-center py-5 text-muted">
                 <i class="ti ti-building-hospital-off fs-1 mb-2 d-block"></i>
@@ -24,7 +32,7 @@ defineProps({
         </div>
 
         <div v-else class="row g-3">
-            <div v-for="clinic in clinics" :key="clinic.entity_id" class="col-12 col-md-6 col-lg-4">
+            <div v-for="clinic in clinics" :key="clinic.clinic_url" class="col-12 col-md-6 col-lg-4">
                 <Link :href="clinic.clinic_url" class="card shadow-sm border-0 h-100 text-decoration-none text-reset d-block">
                     <div class="card-body">
                         <div class="d-flex align-items-center gap-3">

@@ -22,7 +22,7 @@ class ClinicController extends Controller
         $account = Auth::guard('patient')->user();
 
         // Nunca 403: não revelar a um paciente que {patient} existe mas não é dele.
-        abort_unless((string) $patient->person_id === (string) $account->person_id, 404);
+        abort_unless($account->ownsPerson($patient->person_id), 404);
 
         $shares = PatientDocumentShare::query()
             ->where('patient_id', $patient->id)

@@ -7,7 +7,7 @@ use App\Enums\EntityGate;
 use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Requests\DoctorRequest;
 use App\Http\Resources\{DoctorResource, EntityUserResource};
-use App\Models\{Doctor, Entity, EntityUser, People, User};
+use App\Models\{Doctor, DoctorInvitation, Entity, EntityUser, People, User};
 use App\Services\{DoctorService, PatientService};
 use App\Support\BrazilianFormat;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -106,6 +106,22 @@ class DoctorsController extends Controller
             // Normalizados: a UI mostra o ícone da ordenação realmente aplicada.
             'filters' => ['search' => $search, 'sort' => $sortBy, 'direction' => $sortDir],
             't'       => trans('doctors'),
+            // Convites a médicos com login no EasyEye aguardando aceite — só o
+            // que esta clínica digitou (nome/CRM), nada do cadastro do médico.
+            'pendingInvitations' => fn () => DoctorInvitation::query()
+                ->where('entity_id', $entityId)
+                ->where('status', DoctorInvitation::STATUS_PENDING)
+                ->where('expires_at', '>', now())
+                ->latest('updated_at')
+                ->get()
+                ->map(fn (DoctorInvitation $invitation): array => [
+                    'id'         => $invitation->id,
+                    'name'       => $invitation->payload['name'] ?? '—',
+                    'record'     => $invitation->payload['record'] ?? '—',
+                    'sent_at'    => $invitation->updated_at?->toIso8601String(),
+                    'expires_at' => $invitation->expires_at?->toIso8601String(),
+                ])
+                ->values(),
         ]);
     }
 

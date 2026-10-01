@@ -7,6 +7,7 @@ import SearchInput        from '@/Components/Panel/SearchInput.vue';
 import DoctorTable        from './DoctorTable.vue';
 import DoctorCards        from './DoctorCards.vue';
 import DoctorFormModal    from './DoctorFormModal.vue';
+import DoctorInvitationsPending from './DoctorInvitationsPending.vue';
 import DoctorDetailDrawer from './DoctorDetailDrawer.vue';
 
 /**
@@ -23,6 +24,8 @@ const props = defineProps({
     statesOfBrazil:  { type: Object, default: () => ({}) },
     filters:         { type: Object, default: () => ({}) },   // { search, sort, direction }
     t:               { type: Object, default: () => ({}) },
+    // Convites a médicos que já têm login no EasyEye, aguardando aceite.
+    pendingInvitations: { type: Array, default: () => [] },
 });
 
 // ── View toggle (preferência no navegador) ───────────────────────────────────
@@ -168,12 +171,19 @@ const breadcrumbs = computed(() => [
             />
         </div>
 
+        <DoctorInvitationsPending
+            v-if="pendingInvitations.length"
+            :invitations="pendingInvitations"
+            :t="t"
+        />
+
         <DoctorFormModal
             :open="modalOpen"
             :doctor-id="editDoctorId"
             :genders="genders"
             :marital-statuses="maritalStatuses"
             :states-of-brazil="statesOfBrazil"
+            :t="t"
             @close="closeModal"
         />
 

@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\{Patient, PatientAccount};
+use App\Models\Patient;
 use App\Notifications\PatientPortalInvitation;
+use App\Services\PatientAccountLinkService;
 use Illuminate\Http\RedirectResponse;
 
 /**
@@ -27,7 +28,7 @@ use Illuminate\Http\RedirectResponse;
  */
 class PatientPortalInvitationsController extends Controller
 {
-    public function store(Patient $patient): RedirectResponse
+    public function store(Patient $patient, PatientAccountLinkService $links): RedirectResponse
     {
         abort_unless(
             (string) $patient->entity_id === (string) session('selected_entity_id'),
@@ -38,7 +39,10 @@ class PatientPortalInvitationsController extends Controller
 
         abort_if(blank($person?->email), 422, 'Este paciente não possui e-mail cadastrado. Atualize o cadastro antes de convidar.');
 
-        if (PatientAccount::where('person_id', $person->id)->exists()) {
+        // Cadastro já numa conta (titular ou clínica vinculada pelo paciente).
+        // E-mail com conta de OUTRA clínica não impede: o convite leva o
+        // paciente a entrar na conta dele e adicionar esta clínica.
+        if ($links->isLinked($person->id)) {
             return back()->with('error', 'Este paciente já possui conta no Portal do Paciente.');
         }
 

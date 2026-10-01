@@ -17,6 +17,7 @@ declare(strict_types=1);
 
 use App\Enums\ClientRule;
 use App\Models\{Entity, User};
+use App\Models\EntityUser;
 use Illuminate\Support\Facades\Hash;
 
 beforeEach(function () {
@@ -60,10 +61,16 @@ test('cadastro de medico com email de login de User de OUTRA entity e rejeitado 
             'email' => $this->victim->email,
         ]));
 
+    // Login existente nunca é reaproveitado no cadastro. A vítima não é
+    // médica: o erro é o "e-mail em uso" de sempre (o aviso de convite é só
+    // para login de médico — não confirma quem é staff). Nada é vinculado.
     $response->assertStatus(422);
     $response->assertJsonValidationErrors('email');
+    $response->assertJsonMissingValidationErrors('existing_doctor');
 
     $this->victim->refresh();
+
+    expect(EntityUser::query()->where('entity_id', $this->attackerEntity->id)->where('user_id', $this->victim->id)->exists())->toBeFalse();
 
     expect($this->victim->password)->toBe($originalHash);
     expect($this->victim->name)->not->toBe('Dr Teste');

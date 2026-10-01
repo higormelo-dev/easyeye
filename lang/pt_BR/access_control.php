@@ -111,4 +111,57 @@ return [
 
     // Erros no navegador
     'js_error_load' => 'Erro ao carregar dados do usuário.',
+
+    // Convite a usuário que já tem login no EasyEye (outra clínica). A
+    // resposta nunca diz se o e-mail tem conta.
+    'invitation' => [
+        'button'         => 'Convidar usuário existente',
+        'title'          => 'Convidar quem já usa o EasyEye',
+        'intro'          => 'Informe o e-mail que a pessoa usa para entrar no EasyEye e o perfil que ela terá nesta clínica. Se o e-mail já tiver acesso, ela receberá um convite para aceitar.',
+        'email'          => 'E-mail',
+        'rule'           => 'Perfil nesta clínica',
+        'rule_hint'      => 'Médicos são convidados pelo cadastro de médicos (com CRM).',
+        'submit'         => 'Enviar convite',
+        'close'          => 'Fechar',
+        'sent'           => 'Se este e-mail já tiver acesso ao EasyEye, ele receberá um convite. Se não for aceito, cadastre a pessoa como novo usuário.',
+        'plan_limit'     => 'O limite de usuários do plano foi atingido.',
+        'cancelled'      => 'Convite cancelado.',
+        'pending_title'  => 'Convites pendentes',
+        'pending_hint'   => 'Aguardando aceite. Convites para e-mails sem acesso ao EasyEye não chegam a ninguém e expiram sozinhos.',
+        'col_email'      => 'E-mail',
+        'col_rule'       => 'Perfil',
+        'col_sent_at'    => 'Enviado em',
+        'col_expires_at' => 'Expira em',
+        'cancel'         => 'Cancelar convite',
+        'confirm_cancel' => 'Cancelar este convite?',
+
+        'page' => [
+            'title'   => 'Convite para acessar :clinic',
+            'intro'   => ':clinic convidou você para acessar o EasyEye por ela, com o seu login de sempre.',
+            'note'    => 'Seu login, senha e acesso às outras clínicas não mudam.',
+            'role'    => 'Perfil oferecido nesta clínica: :role',
+            'accept'  => 'Aceitar convite',
+            'decline' => 'Recusar',
+            'closed'  => 'Este convite não está mais disponível (expirado, recusado ou cancelado).',
+            'back'    => 'Ir para minhas clínicas',
+        ],
+
+        'result' => [
+            'accepted'       => 'Pronto! Agora você também tem acesso a :clinic. Selecione a clínica para continuar.',
+            'already_member' => 'Você já tem acesso a :clinic.',
+            'plan_limit'     => ':clinic atingiu o limite de usuários do plano. Peça para a clínica falar com o suporte.',
+            'closed'         => 'Este convite não está mais disponível (expirado, recusado ou cancelado).',
+            'declined'       => 'Convite recusado.',
+        ],
+
+        'mail' => [
+            'subject'    => '[:clinic] Convite para acessar o EasyEye',
+            'greeting'   => 'Olá, :name!',
+            'intro'      => 'A clínica :clinic convidou você para acessar o EasyEye por ela.',
+            'login_note' => 'Você entra com o seu login de sempre — nada muda nas outras clínicas.',
+            'role'       => 'Perfil oferecido: :role.',
+            'action'     => 'Ver convite',
+            'expires'    => 'O convite vale por :days dias. Se você não reconhece esta clínica, ignore este e-mail.',
+        ],
+    ],
 ];

@@ -20,7 +20,8 @@ class DashboardController extends Controller
      * Sem tenant.bind/entity.selected na rota (ver routes/patient-portal.php)
      * — TenantContext fica sem vínculo, o EntityScope global de Patient fica
      * inerte, e a query abaixo retorna as linhas de TODAS as clínicas do
-     * titular (ver People::patients() e PatientService::findOrCreatePerson()).
+     * titular — um cadastro (People) por clínica, todos vinculados à conta
+     * pelo próprio paciente (PatientAccount::linkedPersonIds()).
      */
     public function index(): Response
     {
@@ -28,7 +29,7 @@ class DashboardController extends Controller
         $account = Auth::guard('patient')->user();
 
         $clinics = Patient::query()
-            ->where('person_id', $account->person_id)
+            ->whereIn('person_id', $account->linkedPersonIds())
             ->with('entity')
             ->get()
             ->map(fn (Patient $patient) => [

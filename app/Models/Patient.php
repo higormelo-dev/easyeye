@@ -137,6 +137,17 @@ class Patient extends Model
     }
 
     /**
+     * Serializa o CADASTRO de pacientes da clínica até o COMMIT (mesmo lock da
+     * numeração — reentrante na transação): duas telas cadastrando o mesmo CPF
+     * ao mesmo tempo não criam dois People/Patient; a segunda já encontra o
+     * cadastro gravado pela primeira. Chamar dentro de DB::transaction().
+     */
+    public static function lockRegistrations(?string $entityId): void
+    {
+        static::lockCodeNumbering($entityId);
+    }
+
+    /**
      * PostgreSQL: advisory lock de TRANSAÇÃO por clínica — só quem numera
      * paciente nesta clínica espera, e o lock vive até o COMMIT do chamador
      * (o próximo já lê o código gravado). A linha de `entities` fica livre.

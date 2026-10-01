@@ -7,6 +7,7 @@ use App\Support\BrazilianFormat;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
 
 class PatientRequest extends FormRequest
 {
@@ -61,11 +62,7 @@ class PatientRequest extends FormRequest
                 'required_without:type_method',
                 'string',
                 'max:255',
-                Rule::unique('people', 'full_name')
-                    ->ignore($this->getIgnoredPersonId(), 'id')
-                    ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
-                    }),
+                $this->uniqueInClinic('full_name'),
             ],
             'nickname' => [
                 'nullable',
@@ -93,11 +90,7 @@ class PatientRequest extends FormRequest
                 // Pest) e adiciona latência/flakiness de rede à validação.
                 // RFC continua valendo em todos os ambientes.
                 app()->environment('production') ? 'email:rfc,dns' : 'email:rfc',
-                Rule::unique('people', 'email')
-                    ->ignore($this->getIgnoredPersonId(), 'id')
-                    ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
-                    }),
+                $this->uniqueInClinic('email'),
             ],
             'mother_name' => [
                 'nullable',
@@ -112,11 +105,7 @@ class PatientRequest extends FormRequest
             'national_registry' => [
                 'required_without:type_method',
                 'string',
-                Rule::unique('people', 'national_registry')
-                    ->ignore($this->getIgnoredPersonId(), 'id')
-                    ->where(function ($query) {
-                        return $query->whereNull('deleted_at');
-                    }),
+                $this->uniqueInClinic('national_registry'),
             ],
             'state_registry' => [
                 'nullable',
@@ -221,6 +210,27 @@ class PatientRequest extends FormRequest
             'cellphone.required_without'         => __('validation.custom.generic.required'),
             'whatsapp.required_without'          => __('validation.custom.generic.required'),
         ];
+    }
+
+    /**
+     * Único entre os pacientes (não excluídos) DESTA clínica. O mesmo paciente
+     * pode ter cadastro em outras clínicas — cada uma com o SEU People —, então
+     * a regra nunca olha cadastros de outra clínica (e o erro não revela que o
+     * CPF/nome/e-mail existe em outro lugar).
+     */
+    private function uniqueInClinic(string $column): Unique
+    {
+        $entityId = (string) session()->get('selected_entity_id');
+
+        return Rule::unique('people', $column)
+            ->ignore($this->getIgnoredPersonId(), 'id')
+            ->where(fn ($query) => $query
+                ->whereNull('deleted_at')
+                ->whereIn('id', fn ($patients) => $patients
+                    ->select('person_id')
+                    ->from('patients')
+                    ->where('entity_id', $entityId)
+                    ->whereNull('deleted_at')));
     }
 
     private function getIgnoredPersonId()

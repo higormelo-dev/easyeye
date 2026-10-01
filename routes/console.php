@@ -58,6 +58,13 @@ Schedule::command('ai:notify-waiting-approval')
     ->name('ai:notify-waiting-approval')
     ->withoutOverlapping();
 
+// Convites de clínica (médico/usuário) vencidos: expira e descarta os dados
+// digitados (LGPD).
+Schedule::command('clinic-invitations:expire')
+    ->dailyAt('03:30')
+    ->name('clinic-invitations:expire')
+    ->withoutOverlapping();
+
 // Onda 4, C6 — Purga feedbacks antigos para conformidade LGPD (>90 dias).
 Schedule::command('ai:purge-feedbacks')
     ->weeklyOn(0, '03:00')

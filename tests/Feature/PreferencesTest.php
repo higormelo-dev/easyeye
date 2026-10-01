@@ -59,6 +59,22 @@ it('rejeita modo inválido (422)', function () {
         ->assertUnprocessable();
 });
 
+it('aceita a seção Tonometria (separada de A/V sem correção) e A/V com correção na coluna esquerda', function () {
+    $layout = [
+        'default_mode' => 'custom',
+        'custom'       => [
+            'left'   => ['cromatica_ppc_cover', 'av_sem_tono', 'av_com', 'tonometria', 'dinamica', 'estatica'],
+            'right'  => ['adicao', 'biomicroscopia', 'fundoscopia', 'obs_geral'],
+            'hidden' => ['tonometria'],
+        ],
+    ];
+
+    patchPreferences($this, ['medical_record_layout' => $layout])
+        ->assertOk()
+        ->assertJsonPath('data.medical_record_layout.custom.left.3', 'tonometria')
+        ->assertJsonPath('data.medical_record_layout.custom.hidden.0', 'tonometria');
+});
+
 it('rejeita chave de seção desconhecida no layout (422) — client não grava chave arbitrária', function () {
     patchPreferences($this, ['medical_record_layout' => [
         'default_mode' => 'custom',

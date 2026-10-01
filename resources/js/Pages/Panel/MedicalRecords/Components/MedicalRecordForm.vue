@@ -11,6 +11,7 @@ import MedicalRecordImagingModal from './MedicalRecordImagingModal.vue';
 import MedicalRecordProceduresModal from './MedicalRecordProceduresModal.vue';
 import AiAssistantPanel from '@/Components/Panel/AiAssistantPanel.vue';
 import { setAiContext, clearAiContext } from '@/Support/aiAssistantContext';
+import { recordColumnOrder } from './recordLayout.js';
 
 /**
  * MedicalRecordForm — Port fiel de _form.blade.php (1744 LOC) +
@@ -192,16 +193,22 @@ const presbyopiaObsForm   = reactive({ content: '' });
 // submit envia TODOS os campos, então dados já preenchidos num prontuário
 // antigo nunca são perdidos por causa do layout do médico atual.
 // ──────────────────────────────────────────────────────────────────────────
+// `labelKeys`: rótulos do modal "Meu prontuário" vêm das traduções da tela
+// (`label` só como reserva). A/V sem correção, A/V com correção e Tonometria
+// ficam lado a lado na esquerda quando cabem (30/09/2026) — equilibra as
+// colunas sem vão em branco; a chave 'av_sem_tono' é a antiga (a Tonometria
+// virou seção própria e entra logo depois de A/V com correção).
 const SECTION_DEFS = [
-    { key: 'cromatica_ppc_cover', col: 'left',  label: 'Visão cromática / PPC / Cover test' },
-    { key: 'av_sem_tono',         col: 'left',  label: 'A/V sem correção + Tonometria' },
-    { key: 'dinamica',            col: 'left',  label: 'Refração dinâmica' },
-    { key: 'estatica',            col: 'left',  label: 'Refração estática' },
-    { key: 'adicao',              col: 'right', label: 'Adição / Longe / Perto' },
-    { key: 'av_com',              col: 'right', label: 'A/V com correção' },
-    { key: 'biomicroscopia',      col: 'right', label: 'Biomicroscopia' },
-    { key: 'fundoscopia',         col: 'right', label: 'Fundoscopia' },
-    { key: 'obs_geral',           col: 'right', label: 'Observação geral' },
+    { key: 'cromatica_ppc_cover', col: 'left',  labelKeys: ['chromatic_vision', 'near_point', 'cover_test'], label: 'Vis. cromática / PPC / Cover test' },
+    { key: 'av_sem_tono',         col: 'left',  labelKeys: ['av_without'], label: 'A/V sem correção' },
+    { key: 'av_com',              col: 'left',  labelKeys: ['av_with'], label: 'A/V com correção' },
+    { key: 'tonometria',          col: 'left',  labelKeys: ['tonometry'], label: 'Tonometria' },
+    { key: 'dinamica',            col: 'left',  labelKeys: ['dynamic'], label: 'Dinâmica' },
+    { key: 'estatica',            col: 'left',  labelKeys: ['static'], label: 'Estática' },
+    { key: 'adicao',              col: 'right', labelKeys: ['addition', 'lens_away', 'lens_near'], label: 'Adição / Longe / Perto' },
+    { key: 'biomicroscopia',      col: 'right', labelKeys: ['biomicroscopy'], label: 'Biomicroscopia' },
+    { key: 'fundoscopia',         col: 'right', labelKeys: ['fundoscopy'], label: 'Fundoscopia' },
+    { key: 'obs_geral',           col: 'right', labelKeys: ['general_obs'], label: 'Observação geral' },
 ];
 
 // Snapshot local da preferência (Inertia shared props não re-hidratam após
@@ -214,13 +221,9 @@ const isFreeMode   = computed(() => recordMode.value === 'free');
 
 function seedLayout() {
     const saved = persistedLayout.value?.custom ?? null;
-    const buildColumn = (col) => {
-        const defaults   = SECTION_DEFS.filter(s => s.col === col).map(s => s.key);
-        const savedOrder = (saved?.[col] ?? []).filter(k => defaults.includes(k));
-        // Seções novas (adicionadas depois do médico salvar o modelo) entram
-        // no fim da coluna — nunca somem silenciosamente.
-        return [...savedOrder, ...defaults.filter(k => !savedOrder.includes(k))];
-    };
+    // Seções que faltam no modelo salvo (novas ou que mudaram de coluna)
+    // entram na posição padrão da coluna — nunca somem silenciosamente.
+    const buildColumn = (col) => recordColumnOrder(SECTION_DEFS.filter(s => s.col === col).map(s => s.key), saved?.[col]);
     return {
         left:   buildColumn('left'),
         right:  buildColumn('right'),
@@ -254,7 +257,10 @@ function toggleSection(key) {
 }
 
 function sectionLabel(key) {
-    return SECTION_DEFS.find(s => s.key === key)?.label ?? key;
+    const def = SECTION_DEFS.find(s => s.key === key);
+    if (!def) return key;
+
+    return def.labelKeys.map(k => tt(k)).filter(Boolean).join(' / ') || def.label;
 }
 
 const showLayoutModal = ref(false);
@@ -1779,7 +1785,7 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
         <div v-show="!isFreeMode" class="row g-2 px-3 pt-1 pb-1 pmr-main-columns">
             <!-- COLUNA ESQUERDA -->
             <div class="col-12 col-xl-6 pe-xl-2">
-                <div class="pmr-main-panel" :class="{ 'd-flex flex-column': isCustomMode }">
+                <div class="pmr-main-panel pmr-main-panel--flow">
 
                     <!-- Vis. cromática / PPC / Cover test -->
                     <div class="pmr-section mb-1" :style="sectionStyle('cromatica_ppc_cover')">
@@ -1805,62 +1811,84 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                         </div>
                     </div>
 
-                    <!-- A/V sem correção + Tonometria -->
-                    <div class="pmr-section mb-1" :style="sectionStyle('av_sem_tono')">
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <label class="pmr-label">{{ tt('av_without', 'A/V sem correção') }}</label>
-                                <div class="d-flex gap-1 flex-wrap">
-                                    <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
-                                        <span class="input-group-text pmr-eye-badge">OD</span>
-                                        <AcuitySelect v-model="form.visual_acuity_without_correction_right_id"
-                                                      :options="visualAcuityTypes"
-                                                      :placeholder="'—'" :disabled="isLocked" />
-                                    </div>
-                                    <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
-                                        <span class="input-group-text pmr-eye-badge">OE</span>
-                                        <AcuitySelect v-model="form.visual_acuity_without_correction_left_id"
-                                                      :options="visualAcuityTypes"
-                                                      :placeholder="'—'" :disabled="isLocked" />
-                                    </div>
-                                </div>
+                    <!-- Acuidade visual e tonometria em blocos "inline": dividem a
+                         linha quando cabem (A/V sem | A/V com | Tonometria) e o que
+                         sobra sozinho numa linha ocupa a largura toda — sem vão em
+                         branco no meio. Só posição; os campos são os de sempre. -->
+                    <div class="pmr-section pmr-section--inline mb-1" :style="sectionStyle('av_sem_tono')" data-section="av_sem_tono">
+                        <label class="pmr-label">{{ tt('av_without', 'A/V sem correção') }}</label>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <AcuitySelect v-model="form.visual_acuity_without_correction_right_id"
+                                              :options="visualAcuityTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="col-6">
-                                <label class="pmr-label">{{ tt('tonometry', 'Tonometria') }}</label>
-                                <div class="d-flex gap-1 align-items-center flex-wrap">
-                                    <div class="input-group input-group-sm flex-nowrap" style="max-width:90px;">
-                                        <span class="input-group-text pmr-eye-badge">OD</span>
-                                        <input v-model="form.tonometer_right" type="number" name="tonometer_right" step="0.5" min="0"
-                                               class="form-control form-control-sm text-center"
-                                               placeholder="00" :disabled="isLocked" style="min-width:0;"
-                                               @click="$event.target.select()">
-                                    </div>
-                                    <div class="input-group input-group-sm flex-nowrap" style="max-width:90px;">
-                                        <span class="input-group-text pmr-eye-badge">OE</span>
-                                        <input v-model="form.tonometer_left" type="number" name="tonometer_left" step="0.5" min="0"
-                                               class="form-control form-control-sm text-center"
-                                               placeholder="00" :disabled="isLocked" style="min-width:0;"
-                                               @click="$event.target.select()">
-                                    </div>
-                                    <input
-                                        type="time"
-                                        v-model="tonometryStampedTime"
-                                        step="600"
-                                        class="form-control form-control-sm"
-                                        style="max-width:110px;"
-                                        :disabled="isLocked"
-                                    >
-                                    <input type="hidden" name="tonometer_time" :value="tonometryStampedTime">
-                                    <!--
-                                        Impressão do laudo de tonometria: salva via storeTonometry no backend
-                                        (exige IssueReport — CFM 2.227/2018). Só médico pode emitir o laudo.
-                                    -->
-                                    <button v-if="isDoctor" type="button" class="btn btn-pink btn-sm flex-shrink-0"
-                                            :title="tt('print_tonometry', 'Imprimir tonometria')"
-                                            @click="printTonometry">
-                                        <i class="fas fa-print"></i>
-                                    </button>
-                                </div>
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <AcuitySelect v-model="form.visual_acuity_without_correction_left_id"
+                                              :options="visualAcuityTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pmr-section pmr-section--inline mb-1" :style="sectionStyle('av_com')" data-section="av_com">
+                        <label class="pmr-label">{{ tt('av_with', 'A/V com correção') }}</label>
+                        <div class="d-flex gap-1 flex-wrap">
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <AcuitySelect v-model="form.visual_acuity_with_correction_right_id"
+                                              :options="visualAcuityTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
+                            </div>
+                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <AcuitySelect v-model="form.visual_acuity_with_correction_left_id"
+                                              :options="visualAcuityTypes"
+                                              :placeholder="'—'" :disabled="isLocked" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pmr-section pmr-section--inline pmr-section--tonometry mb-1" :style="sectionStyle('tonometria')" data-section="tonometria">
+                        <label class="pmr-label">{{ tt('tonometry', 'Tonometria') }}</label>
+                        <div class="d-flex gap-1 align-items-center flex-wrap">
+                            <div class="input-group input-group-sm flex-nowrap pmr-tono-eye">
+                                <span class="input-group-text pmr-eye-badge">OD</span>
+                                <input v-model="form.tonometer_right" type="number" name="tonometer_right" step="0.5" min="0"
+                                       class="form-control form-control-sm text-center"
+                                       placeholder="00" :disabled="isLocked" style="min-width:0;"
+                                       @click="$event.target.select()">
+                            </div>
+                            <div class="input-group input-group-sm flex-nowrap pmr-tono-eye">
+                                <span class="input-group-text pmr-eye-badge">OE</span>
+                                <input v-model="form.tonometer_left" type="number" name="tonometer_left" step="0.5" min="0"
+                                       class="form-control form-control-sm text-center"
+                                       placeholder="00" :disabled="isLocked" style="min-width:0;"
+                                       @click="$event.target.select()">
+                            </div>
+                            <!-- Hora + impressão quebram juntas: estreito, fica OD/OE
+                                 numa linha e hora/impressão na de baixo. Os campos
+                                 crescem até ocupar a largura do bloco. -->
+                            <div class="d-flex gap-1 align-items-center flex-nowrap pmr-tono-time">
+                                <input
+                                    type="time"
+                                    v-model="tonometryStampedTime"
+                                    step="600"
+                                    class="form-control form-control-sm"
+                                    :disabled="isLocked"
+                                >
+                                <input type="hidden" name="tonometer_time" :value="tonometryStampedTime">
+                                <!--
+                                    Impressão do laudo de tonometria: salva via storeTonometry no backend
+                                    (exige IssueReport — CFM 2.227/2018). Só médico pode emitir o laudo.
+                                -->
+                                <button v-if="isDoctor" type="button" class="btn btn-pink btn-sm flex-shrink-0"
+                                        :title="tt('print_tonometry', 'Imprimir tonometria')"
+                                        @click="printTonometry">
+                                    <i class="fas fa-print"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1953,57 +1981,63 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
 
                     <!-- Adição / Longe / Perto + Calc -->
                     <div class="pmr-section mb-1" :style="sectionStyle('adicao')">
-                        <div class="row g-2 align-items-end">
-                            <div class="col-6">
+                        <!-- Adição, Longe, Perto e botões numa linha só quando cabem (a
+                             linha quebra só em telas estreitas). -->
+                        <div class="row g-2 align-items-start">
+                            <div class="pmr-lens-field pmr-lens-field--short">
                                 <label class="pmr-label">{{ tt('addition', 'Adição') }}</label>
                                 <SearchSelect v-model="form.addition_type_id"
                                               :options="additionTypes"
                                               :placeholder="tt('select', 'Selecione')" :disabled="isLocked" />
                             </div>
-                            <div class="col-6">
+                            <div class="pmr-lens-field">
                                 <label class="pmr-label">{{ tt('lens_away', 'Longe') }}</label>
-                                <!-- Multi: cada característica vira chip removível
-                                     (Multifocal + Antirreflexo...) -->
+                                <!-- Multi (Multifocal + Antirreflexo...): numa linha
+                                     só, com a quantidade; desmarca no dropdown. -->
                                 <SearchSelect v-model="form.lens_away_ids"
                                               :options="lenses"
                                               multiple
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="col-6">
+                            <div class="pmr-lens-field">
                                 <label class="pmr-label">{{ tt('lens_near', 'Perto') }}</label>
                                 <SearchSelect v-model="form.lens_near_ids"
                                               :options="lenses"
                                               multiple
                                               :placeholder="'—'" :disabled="isLocked" />
                             </div>
-                            <div class="col-6 d-flex gap-1 align-items-end">
-                                <!-- Campo "Add." saiu daqui (ticket "Add. → OBS."):
-                                     a adição da presbiopia agora é informada DENTRO
-                                     do modal da calculadora (lápis), único lugar que
-                                     a consome. O espaço vira o OBS. livre abaixo. -->
-                                <button type="button" class="btn btn-outline-secondary btn-sm"
-                                        :disabled="isLocked"
-                                        @click="openPresbyopiaCalc"
-                                        :title="tt('calc', 'Calcular presbiopia')">
-                                    <i class="fas fa-pencil-alt"></i>
-                                </button>
-                                <!--
-                                    Receituário de óculos: exclusivo para médicos (CFM Res. 2.227/2018).
-                                    Admin/secretária da clínica não pode emitir receituário — só visualizar.
-                                -->
-                                <div v-if="isEdit && isDoctor" class="btn-group" role="group">
-                                    <button type="button" class="btn btn-pink btn-sm dropdown-toggle"
-                                            data-bs-toggle="dropdown" aria-expanded="false"
-                                            :disabled="quickActionBusy || isLocked"
-                                            :title="tt('lens_prescription', 'Receituário de óculos')">
-                                        <i class="fas fa-print"></i>
+                            <div class="col-auto">
+                                <!-- Espaço do rótulo: botões na altura dos campos. -->
+                                <span class="pmr-label d-inline-block invisible" aria-hidden="true">&nbsp;</span>
+                                <div class="d-flex gap-1 align-items-center">
+                                    <!-- Campo "Add." saiu daqui (ticket "Add. → OBS."):
+                                         a adição da presbiopia agora é informada DENTRO
+                                         do modal da calculadora (lápis), único lugar que
+                                         a consome. O espaço vira o OBS. livre abaixo. -->
+                                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                                            :disabled="isLocked"
+                                            @click="openPresbyopiaCalc"
+                                            :title="tt('calc', 'Calcular presbiopia')">
+                                        <i class="fas fa-pencil-alt"></i>
                                     </button>
-                                    <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><button type="button" class="dropdown-item" @click="issueLensPrescription('dynamic')">Dinâmica</button></li>
-                                        <li><button type="button" class="dropdown-item" @click="issueLensPrescription('static')">Estática</button></li>
-                                        <li><button type="button" class="dropdown-item" @click="issueLensPrescription('presbyopia_dynamic')">Presb. dinâmica</button></li>
-                                        <li><button type="button" class="dropdown-item" @click="issueLensPrescription('presbyopia')">Presbiopia</button></li>
-                                    </ul>
+                                    <!--
+                                        Receituário de óculos: exclusivo para médicos (CFM Res. 2.227/2018).
+                                        Admin/secretária da clínica não pode emitir receituário — só visualizar.
+                                    -->
+                                    <div v-if="isEdit && isDoctor" class="btn-group" role="group">
+                                        <button type="button" class="btn btn-pink btn-sm dropdown-toggle"
+                                                data-bs-toggle="dropdown" aria-expanded="false"
+                                                :disabled="quickActionBusy || isLocked"
+                                                :title="tt('lens_prescription', 'Receituário de óculos')">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('dynamic')">Dinâmica</button></li>
+                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('static')">Estática</button></li>
+                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('presbyopia_dynamic')">Presb. dinâmica</button></li>
+                                            <li><button type="button" class="dropdown-item" @click="issueLensPrescription('presbyopia')">Presbiopia</button></li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                             <!-- Obs. da prescrição de lentes — MOVIDO do bloco
@@ -2015,25 +2049,6 @@ const serializedCids = computed(() => JSON.stringify(selectedCids.value));
                                 <textarea v-model="form.observation_of_lenses" name="observation_of_lenses" rows="1"
                                           class="form-control form-control-sm" :disabled="isLocked"
                                           :placeholder="tt('lenses_obs_ph', 'Uso contínuo, orientações, preferência de lente…')"></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- A/V com correção -->
-                    <div class="pmr-section mb-1" :style="sectionStyle('av_com')">
-                        <label class="pmr-label">{{ tt('av_with', 'A/V com correção') }}</label>
-                        <div class="d-flex gap-1 flex-wrap">
-                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
-                                <span class="input-group-text pmr-eye-badge">OD</span>
-                                <AcuitySelect v-model="form.visual_acuity_with_correction_right_id"
-                                              :options="visualAcuityTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
-                            </div>
-                            <div class="input-group input-group-sm flex-nowrap pmr-eye-group">
-                                <span class="input-group-text pmr-eye-badge">OE</span>
-                                <AcuitySelect v-model="form.visual_acuity_with_correction_left_id"
-                                              :options="visualAcuityTypes"
-                                              :placeholder="'—'" :disabled="isLocked" />
                             </div>
                         </div>
                     </div>

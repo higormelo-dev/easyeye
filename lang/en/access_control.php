@@ -111,4 +111,57 @@ return [
 
     // Browser errors
     'js_error_load' => 'Error loading user data.',
+
+    // Invitation for a user who already has an EasyEye login (another clinic).
+    // The response never tells whether the e-mail has an account.
+    'invitation' => [
+        'button'         => 'Invite existing user',
+        'title'          => 'Invite someone who already uses EasyEye',
+        'intro'          => 'Enter the e-mail the person uses to sign in to EasyEye and the profile they will have at this clinic. If the e-mail already has access, they will receive an invitation to accept.',
+        'email'          => 'E-mail',
+        'rule'           => 'Profile at this clinic',
+        'rule_hint'      => 'Doctors are invited through the doctors registration (with CRM).',
+        'submit'         => 'Send invitation',
+        'close'          => 'Close',
+        'sent'           => 'If this e-mail already has EasyEye access, it will receive an invitation. If it is not accepted, register the person as a new user.',
+        'plan_limit'     => 'The plan\'s user limit has been reached.',
+        'cancelled'      => 'Invitation cancelled.',
+        'pending_title'  => 'Pending invitations',
+        'pending_hint'   => 'Waiting for acceptance. Invitations to e-mails without EasyEye access reach no one and expire on their own.',
+        'col_email'      => 'E-mail',
+        'col_rule'       => 'Profile',
+        'col_sent_at'    => 'Sent on',
+        'col_expires_at' => 'Expires on',
+        'cancel'         => 'Cancel invitation',
+        'confirm_cancel' => 'Cancel this invitation?',
+
+        'page' => [
+            'title'   => 'Invitation to access :clinic',
+            'intro'   => ':clinic invited you to access EasyEye with them, using your usual login.',
+            'note'    => 'Your login, password and access to other clinics do not change.',
+            'role'    => 'Profile offered at this clinic: :role',
+            'accept'  => 'Accept invitation',
+            'decline' => 'Decline',
+            'closed'  => 'This invitation is no longer available (expired, declined or cancelled).',
+            'back'    => 'Go to my clinics',
+        ],
+
+        'result' => [
+            'accepted'       => 'Done! You now also have access to :clinic. Select the clinic to continue.',
+            'already_member' => 'You already have access to :clinic.',
+            'plan_limit'     => ':clinic has reached the plan\'s user limit. Ask the clinic to contact support.',
+            'closed'         => 'This invitation is no longer available (expired, declined or cancelled).',
+            'declined'       => 'Invitation declined.',
+        ],
+
+        'mail' => [
+            'subject'    => '[:clinic] Invitation to access EasyEye',
+            'greeting'   => 'Hello, :name!',
+            'intro'      => ':clinic invited you to access EasyEye with them.',
+            'login_note' => 'You sign in with your usual login — nothing changes at other clinics.',
+            'role'       => 'Profile offered: :role.',
+            'action'     => 'View invitation',
+            'expires'    => 'The invitation is valid for :days days. If you do not recognize this clinic, ignore this e-mail.',
+        ],
+    ],
 ];

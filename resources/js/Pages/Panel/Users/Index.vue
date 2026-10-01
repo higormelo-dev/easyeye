@@ -9,6 +9,8 @@ import { useTrans }    from '@/composables/useTrans.js';
 import UserTable       from './UserTable.vue';
 import UserCards       from './UserCards.vue';
 import UserFormModal   from './UserFormModal.vue';
+import UserInviteModal from './UserInviteModal.vue';
+import UserInvitationsPending from './UserInvitationsPending.vue';
 
 /**
  * Usuários da clínica — mesmo layout de Panel/Patients/Index: cabeçalho com
@@ -24,7 +26,13 @@ const props = defineProps({
     isClient:    { type: Boolean, default: true },
     filters:     { type: Object,  default: () => ({}) },   // { search, sort, direction } — normalizados
     t:           { type: Object,  default: () => ({}) },
+    // Convite a quem já usa o EasyEye: perfis convidáveis + pendentes.
+    invitableRoles:     { type: Object, default: () => ({}) },
+    pendingInvitations: { type: Array,  default: () => [] },
 });
+
+const inviteOpen = ref(false);
+const canInvite = computed(() => Object.keys(props.invitableRoles).length > 0);
 
 const { tx } = useTrans(() => props.t);
 // Mesma chave de antes: quem já tinha escolhido cards continua em cards.
@@ -118,6 +126,9 @@ function onToggleActive(user) {
                         <Link :href="route('panel.accesscontrol.roles.index')" class="btn btn-outline-secondary fs-13 btn-md">
                             <i class="ti ti-shield-lock me-1" aria-hidden="true"></i>{{ t.roles_link ?? 'Perfis e permissões' }}
                         </Link>
+                        <button v-if="canInvite" type="button" class="btn btn-outline-primary fs-13 btn-md" @click="inviteOpen = true">
+                            <i class="ti ti-mail-forward me-1" aria-hidden="true"></i>{{ t.invitation?.button }}
+                        </button>
                         <button type="button" class="btn btn-primary fs-13 btn-md" @click="openCreate">
                             <i class="ti ti-plus me-1" aria-hidden="true"></i>{{ t.new_user ?? 'Novo usuário' }}
                         </button>
@@ -165,6 +176,19 @@ function onToggleActive(user) {
                 @toggle-active="onToggleActive"
             />
         </div>
+
+        <UserInvitationsPending
+            v-if="pendingInvitations.length"
+            :invitations="pendingInvitations"
+            :t="t"
+        />
+
+        <UserInviteModal
+            :open="inviteOpen"
+            :roles="invitableRoles"
+            :t="t"
+            @close="inviteOpen = false"
+        />
 
         <UserFormModal
             :open="modalOpen"

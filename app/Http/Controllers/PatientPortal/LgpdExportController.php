@@ -39,18 +39,22 @@ class LgpdExportController extends Controller
         $account = Auth::guard('patient')->user();
 
         // Nunca 403: não revelar a um paciente que {patient} existe mas não é dele.
-        abort_unless((string) $patient->person_id === (string) $account->person_id, 404);
+        abort_unless($account->ownsPerson($patient->person_id), 404);
 
-        $person = $account->person;
+        // Dados do titular NESTA clínica (cada clínica tem o seu cadastro) —
+        // nunca o cadastro de outra clínica no lugar dele.
+        $person = $patient->person()->withTrashed()->first();
+
+        abort_if($person === null, 404);
 
         $lgpdRequest = $this->lgpdService->openRequest(
             entityId: (string) $patient->entity_id,
             type: LgpdRequestType::Access,
-            requesterName: $person?->full_name ?? $account->email,
+            requesterName: $person->full_name ?? $account->email,
             requesterEmail: $account->email,
             description: 'Exportação de dados pessoais solicitada pelo titular via Portal do Paciente (self-service).',
             patient: $patient,
-            requesterDocument: $person?->national_registry,
+            requesterDocument: $person->national_registry,
         );
 
         $data = $this->lgpdService->exportPatientData($patient);

@@ -40,7 +40,7 @@ class PatientDocumentAccessService
         // confirmado presente nos 3 models compartilháveis).
         $patient = Patient::query()->find($patientId);
 
-        if (! $patient || (string) $patient->person_id !== (string) $account->person_id) {
+        if (! $patient || ! $account->ownsPerson($patient->person_id)) {
             return false;
         }
 

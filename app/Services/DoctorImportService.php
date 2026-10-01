@@ -134,6 +134,7 @@ class DoctorImportService
     public function __construct(
         private readonly FeatureGateService $featureGate,
         private readonly PatientService $patientService,
+        private readonly DoctorInvitationService $invitations,
     ) {
     }
 
@@ -416,6 +417,15 @@ class DoctorImportService
     ): ?string {
         $email = trim((string) $data['email']);
 
+        // 0. Mesmo critério do cadastro manual (DoctorRequest): médico que já
+        //    tem login no EasyEye (outra clínica) só entra por convite — a
+        //    planilha nunca cria um segundo login para ele nem vincula o dele.
+        match ($this->invitations->detect($email, $this->onlyNumbers((string) $data['national_registry']), $entityId)['status']) {
+            DoctorInvitationService::DETECT_INVITE   => throw new RuntimeException(__('doctors.invitation.import_use_invite')),
+            DoctorInvitationService::DETECT_CONFLICT => throw new RuntimeException(__('doctors.invitation.conflict')),
+            default                                  => null,
+        };
+
         // 1+2. User (login GLOBAL) + EntityUser (vínculo de médico).
         //      E-mail existente só é aceito se já for médico desta clínica —
         //      e aí nem o login nem o vínculo são alterados (sem reativar
@@ -450,10 +460,11 @@ class DoctorImportService
             ]);
         }
 
-        // 3. People — CPF único; se já existe e é desta clínica (ou de
-        //    nenhuma), reaproveita COM UPDATE dos dados da planilha (mesmo
-        //    comportamento de findOrCreatePerson). CPF de outra clínica é
-        //    erro; People também em uso ativo por outra não é sobrescrito.
+        // 3. People — só o de MÉDICO desta clínica é reaproveitado (com UPDATE
+        //    dos dados da planilha, como no cadastro manual); CPF de outra
+        //    clínica ou de paciente gera o cadastro próprio desta clínica, sem
+        //    ler nem tocar no dela. People também em uso ativo por outra
+        //    clínica (cadastro antigo compartilhado) não é sobrescrito.
         $cpf = $this->onlyNumbers((string) $data['national_registry']);
 
         $cellphone = $this->onlyNumbers((string) ($data['cellphone'] ?? ''))
@@ -472,13 +483,12 @@ class DoctorImportService
         // cellphone é NOT NULL no schema; garante valor mesmo quando ausente.
         $personData['cellphone'] = $cellphone;
 
-        $person = People::withTrashed()->where('national_registry', $cpf)->first();
+        $person = $this->patientService->whereDoctorOfEntity(People::withTrashed(), $entityId)
+            ->where('national_registry', $cpf)
+            ->orderBy('created_at')
+            ->first();
 
         if ($person) {
-            if (! $this->patientService->personLinkableToEntity($person->id, $entityId)) {
-                throw new RuntimeException(__('shared_identity.import.cpf_linked_elsewhere'));
-            }
-
             if ($person->trashed()) {
                 $person->restore();
             }

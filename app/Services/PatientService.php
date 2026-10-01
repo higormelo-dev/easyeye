@@ -18,6 +18,8 @@ class PatientService
     public function create(PatientRequest $request): Patient
     {
         return DB::transaction(function () use ($request) {
+            Patient::lockRegistrations((string) session()->get('selected_entity_id'));
+
             $person = $this->findOrCreatePerson($request);
 
             return $this->findOrCreate($person->id, $request);
@@ -132,6 +134,20 @@ class PatientService
     }
 
     /**
+     * Restringe uma query de People aos cadastros de MÉDICO (inclusive
+     * excluídos) da clínica — sem os de paciente: o formulário de médico não
+     * reescreve a ficha de paciente da mesma pessoa.
+     *
+     * @param Builder<People> $people
+     *
+     * @return Builder<People>
+     */
+    public function whereDoctorOfEntity(Builder $people, string $entityId): Builder
+    {
+        return $people->whereIn('people.id', $this->doctorPersonIds($entityId, withTrashed: true));
+    }
+
+    /**
      * Exclusão de paciente/médico: o People só sai (soft delete) quando nenhum
      * paciente/médico ATIVO de QUALQUER clínica o usa. Antes a contagem passava
      * pelo EntityScope e só enxergava a clínica atual — excluir o paciente em A
@@ -222,41 +238,42 @@ class PatientService
     }
 
     /**
-     * Find or create person.
+     * Find or create person — SÓ entre os cadastros desta clínica.
      *
-     * O PatientRequest já barra CPF de People ativo; aqui só chega People
-     * EXCLUÍDO (soft delete), que é restaurado e sobrescrito com o formulário.
-     * Se ele ainda for usado por cadastro ativo de outra clínica (dados antigos
-     * da exclusão que apagava People compartilhado), vale a mesma regra do
-     * unique: CPF em uso — nunca reescreve o cadastro da outra clínica.
+     * O mesmo paciente pode ser atendido em várias clínicas, cada uma com o
+     * SEU People: um People de outra clínica (ativo ou excluído) nunca é
+     * reaproveitado, restaurado nem sobrescrito — o CPF existir em outro lugar
+     * só significa que esta clínica cria o próprio cadastro. Reaproveita apenas
+     * People de PACIENTE desta clínica (inclusive excluído) — o de um médico
+     * da clínica não, para o formulário do paciente não reescrever os dados
+     * dele; se o People também for usado por outra clínica (cadastro
+     * compartilhado antigo), fillPersonGuarded barra a alteração (422).
      *
      * @throws ValidationException
      */
     private function findOrCreatePerson(PatientRequest $request): People
     {
-        $existingPerson = People::query()
-            ->withTrashed()
-            ->where('national_registry', $request->national_registry)
-            ->first();
-
+        $entityId   = (string) session()->get('selected_entity_id');
         $personData = $this->getPersonDataFromRequest($request);
 
-        if ($existingPerson) {
-            if ($this->personSharedWithOtherEntities($existingPerson->id, (string) session()->get('selected_entity_id'))) {
-                throw ValidationException::withMessages([
-                    'national_registry' => __('validation.unique', ['attribute' => __('validation.attributes.national_registry')]),
-                ]);
-            }
+        $existingPerson = People::query()
+            ->withTrashed()
+            ->whereIn('people.id', $this->patientPersonIds($entityId, withTrashed: true))
+            ->where('national_registry', $request->national_registry)
+            ->orderBy('created_at')
+            ->first();
 
-            if ($existingPerson->trashed()) {
-                $existingPerson->restore();
-            }
-            $existingPerson->update($personData);
-
-            return $existingPerson->fresh();
+        if (! $existingPerson) {
+            return People::create($personData);
         }
 
-        return People::create($personData);
+        if ($existingPerson->trashed()) {
+            $existingPerson->restore();
+        }
+
+        $this->fillPersonGuarded($existingPerson, $personData, $entityId, 'national_registry')->save();
+
+        return $existingPerson->fresh();
     }
 
     /**

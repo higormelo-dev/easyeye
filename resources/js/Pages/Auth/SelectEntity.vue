@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, useForm, usePage } from '@inertiajs/vue3';
 import GuestLayout from '@/Layouts/GuestLayout.vue';
 import SearchSelect from '@/Components/Panel/SearchSelect.vue';
 import twostepIllustrationImg from '@img/system/auth/twostep-verification-illustration-img.png';
@@ -15,6 +15,9 @@ const props = defineProps({
 const entityOptions = computed(() =>
     Object.entries(props.entities).map(([id, name]) => ({ id, name })),
 );
+
+// Resultado de um convite de clínica (aceito/recusado/indisponível), já traduzido.
+const flash = computed(() => usePage().props.flash ?? {});
 
 const form = useForm({ entity_user_id: '' });
 const logoutForm = useForm({});
@@ -37,6 +40,9 @@ function logout() {
         subtitle="Selecione a clínica para continuar"
         :illustration-src="twostepIllustrationImg"
     >
+        <div v-if="flash.success" class="alert alert-success mb-4" role="status">{{ flash.success }}</div>
+        <div v-if="flash.error" class="alert alert-danger mb-4" role="alert">{{ flash.error }}</div>
+
         <div v-if="form.errors.entity_user_id" class="alert alert-danger mb-4">
             {{ form.errors.entity_user_id }}
         </div>

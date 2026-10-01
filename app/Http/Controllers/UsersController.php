@@ -6,8 +6,8 @@ use App\DTOs\ActionPolicy;
 use App\Http\Controllers\Concerns\RedirectsToListing;
 use App\Http\Requests\EntityUserRequest;
 use App\Http\Resources\EntityUserResource;
-use App\Models\{EntityUser, Role, SystemProfile};
-use App\Services\EntityUserService;
+use App\Models\{DoctorInvitation, EntityUser, EntityUserInvitation, Role, SystemProfile};
+use App\Services\{EntityUserService, UserInvitationService};
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\{JsonResponse, RedirectResponse, Request};
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -126,6 +126,26 @@ class UsersController extends Controller
                 'direction' => $sortDir,
             ],
             't' => trans('access_control'),
+            // Convite a quem já tem login no EasyEye (só clínicas-cliente).
+            // Lista o e-mail DIGITADO exista conta ou não — nada revela quem
+            // tem acesso (UserInvitationService).
+            'invitableRoles'     => $isClient ? array_intersect_key($rolesMap, array_flip(UserInvitationService::invitableRules())) : [],
+            'pendingInvitations' => fn () => $isClient ? EntityUserInvitation::query()
+                ->where('entity_id', $entityId)
+                // Recusado continua "pendente" até vencer: a recusa (só quem
+                // tem conta recusa) não pode revelar que a conta existe.
+                ->whereIn('status', [DoctorInvitation::STATUS_PENDING, DoctorInvitation::STATUS_DECLINED])
+                ->where('expires_at', '>', now())
+                ->latest('updated_at')
+                ->get()
+                ->map(fn (EntityUserInvitation $invitation): array => [
+                    'id'         => $invitation->id,
+                    'email'      => $invitation->email,
+                    'rule'       => $rolesMap[$invitation->rule] ?? $invitation->rule,
+                    'sent_at'    => $invitation->updated_at?->toIso8601String(),
+                    'expires_at' => $invitation->expires_at?->toIso8601String(),
+                ])
+                ->values() : [],
         ]);
     }
 

@@ -41,7 +41,10 @@ Route::prefix('portal-paciente')->name('patient-portal.')->group(function () {
     // `signed` valida a assinatura também no POST (ver AcceptInvitation.vue).
     Route::middleware('signed')->group(function () {
         Route::get('/convite/aceitar', [InvitationController::class, 'accept'])->name('invitation.accept');
-        Route::post('/convite/aceitar', [InvitationController::class, 'store'])->name('invitation.store');
+        // throttle: o POST também confirma a senha da conta (vínculo de clínica).
+        Route::post('/convite/aceitar', [InvitationController::class, 'store'])
+            ->middleware('throttle:patient-invitation')
+            ->name('invitation.store');
     });
 
     Route::post('/logout', [PatientAuthenticatedSessionController::class, 'destroy'])

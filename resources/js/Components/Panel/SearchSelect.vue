@@ -26,9 +26,11 @@ const props = defineProps({
     // default do tema = 10rem). Listas longas (ex.: acuidade visual) passam
     // um valor maior pra reduzir rolagem.
     listHeight:      { type: String,  default: '' },
-    // Seleção múltipla (mode="tags" do multiselect): v-model vira ARRAY e
-    // cada escolha aparece como chip removível individualmente — usado nas
+    // Seleção múltipla (mode="multiple" do multiselect): v-model vira ARRAY —
     // características de lente do prontuário (Multifocal + Antirreflexo...).
+    // O campo fica numa linha só (não cresce a cada escolha, como os chips do
+    // mode="tags" faziam): nomes separados por vírgula + quantidade; a lista
+    // inteira fica no title, no texto assistivo e no dropdown (desmarcar).
     multiple:        { type: Boolean, default: false },
     // Barra de filtro (busca .input-group-sm + selects lado a lado): sem
     // isso o select sai no tamanho "regular" da lib (~47px) enquanto o
@@ -130,19 +132,39 @@ watch(searchTerm, (q) => {
 function onSearchChange(q) {
     searchTerm.value = q ?? '';
 }
+
+// ── Seleção múltipla em uma linha ──────────────────────────────────────────
+// Rótulo do multiselect no mode="multiple": os nomes escolhidos, na ordem da
+// seleção. A lib usa o mesmo texto para leitores de tela (aria), então a
+// quantidade exibida ao lado pode ficar só visual.
+function multipleLabel(values) {
+    return (values ?? []).map((o) => o?.[props.labelKey]).filter((l) => l != null && l !== '').join(', ');
+}
+
+// Lista completa no hover (o rótulo da lib tem pointer-events: none).
+const selectedTitle = computed(() => {
+    if (!props.multiple) return undefined;
+
+    const byValue = new Map(effectiveOptions.value.map((o) => [o[props.valueKey], o]));
+
+    return multipleLabel(value.value.map((v) => byValue.get(v))) || undefined;
+});
 </script>
 
 <template>
     <Multiselect
         v-model="value"
         class="search-select"
-        :class="{ 'is-invalid': invalid, 'search-select--sm': sm }"
+        :class="{ 'is-invalid': invalid, 'search-select--sm': sm, 'search-select--multiple': multiple }"
         :style="listHeight ? { '--ms-max-height': listHeight } : {}"
         :options="effectiveOptions"
         :value-prop="valueKey"
         :label="labelKey"
         :track-by="labelKey"
-        :mode="multiple ? 'tags' : 'single'"
+        :mode="multiple ? 'multiple' : 'single'"
+        :hide-selected="multiple ? false : undefined"
+        :multiple-label="multipleLabel"
+        :title="selectedTitle"
         :searchable="searchable"
         :can-clear="clearable"
         :can-deselect="clearable"
@@ -152,7 +174,14 @@ function onSearchChange(q) {
         no-options-text="Nenhuma opção"
         no-results-text="Nada encontrado"
         @search-change="onSearchChange"
-    />
+    >
+        <template v-if="multiple" #multiplelabel="{ values }">
+            <div class="multiselect-multiple-label search-select__summary">
+                <span class="search-select__summary-text">{{ multipleLabel(values) }}</span>
+                <span v-if="values.length > 1" class="search-select__count" aria-hidden="true">{{ values.length }}</span>
+            </div>
+        </template>
+    </Multiselect>
 </template>
 
 <style src="@vueform/multiselect/themes/default.css"></style>
@@ -199,6 +228,45 @@ function onSearchChange(q) {
 .search-select--sm.multiselect .multiselect-wrapper {
     min-height: 0;
     height: 100%;
+}
+
+/* Seleção múltipla numa linha: nomes cortados com reticências e a
+   quantidade (mesma cor dos antigos chips) sempre visível ao lado. */
+.search-select__summary {
+    gap: .375rem;
+}
+.search-select__summary-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+/* Múltipla, lista aberta: marcadas com fundo claro + ✓ (em vez do bloco
+   verde contínuo do tema) — cada item fica distinto e desmarca no clique. */
+.search-select--multiple.multiselect {
+    --ms-option-bg-selected: rgba(16, 185, 129, .12);
+    --ms-option-color-selected: var(--bs-body-color, #212529);
+    --ms-option-bg-selected-pointed: rgba(16, 185, 129, .22);
+    --ms-option-color-selected-pointed: var(--bs-body-color, #212529);
+}
+.search-select--multiple .multiselect-option.is-selected::after {
+    content: '\2713';
+    margin-left: auto;
+    padding-left: .5rem;
+    color: #10b981;
+    font-weight: 700;
+}
+.search-select__count {
+    flex-shrink: 0;
+    min-width: 1.25rem;
+    padding: 0 .375rem;
+    border-radius: 999px;
+    background: var(--ms-tag-bg, #10b981);
+    color: var(--ms-tag-color, #fff);
+    font-size: .75rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    text-align: center;
 }
 
 .search-select.multiselect.is-active {
@@ -252,5 +320,12 @@ function onSearchChange(q) {
 
 :root[data-bs-theme=dark] .search-select.multiselect.is-active {
     --ms-border-color: var(--primary);
+}
+
+:root[data-bs-theme=dark] .search-select--multiple.multiselect {
+    --ms-option-bg-selected: rgba(16, 185, 129, .18);
+    --ms-option-color-selected: #dbe4ef;
+    --ms-option-bg-selected-pointed: rgba(16, 185, 129, .3);
+    --ms-option-color-selected-pointed: #fff;
 }
 </style>

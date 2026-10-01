@@ -45,8 +45,8 @@ class PreferencesController extends Controller
      * @var list<string>
      */
     private const RECORD_SECTIONS = [
-        'cromatica_ppc_cover', 'av_sem_tono', 'dinamica', 'estatica',
-        'adicao', 'av_com', 'biomicroscopia', 'fundoscopia', 'obs_geral',
+        'cromatica_ppc_cover', 'av_sem_tono', 'av_com', 'tonometria', 'dinamica', 'estatica',
+        'adicao', 'biomicroscopia', 'fundoscopia', 'obs_geral',
     ];
 
     public function update(Request $request): JsonResponse

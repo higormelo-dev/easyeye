@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\{
     AuthenticatedEntityController,
     AuthenticatedSessionController,
     ConfirmablePasswordController,
+    DoctorInvitationResponseController,
     EmailVerificationNotificationController,
     EmailVerificationPromptController,
     NewPasswordController,
@@ -11,6 +12,7 @@ use App\Http\Controllers\Auth\{
     PasswordResetLinkController,
     PhoneVerificationController,
     RegisteredUserController,
+    UserInvitationResponseController,
     VerifyEmailController
 };
 use Illuminate\Support\Facades\Route;
@@ -48,6 +50,28 @@ Route::middleware('auth')->group(function () {
 
     Route::post('select-entity', [AuthenticatedEntityController::class, 'store'])
         ->name('selectentity.store');
+
+    // Convite de clínica para médico que já tem login (link assinado do
+    // e-mail). Só o próprio convidado vê/responde (controller: 404 aos demais).
+    Route::middleware(['signed', 'verified'])->group(function () {
+        Route::get('convites/medico/{invitation}', [DoctorInvitationResponseController::class, 'show'])
+            ->name('doctor-invitations.show');
+        Route::post('convites/medico/{invitation}/aceitar', [DoctorInvitationResponseController::class, 'accept'])
+            ->middleware('throttle:10,1')
+            ->name('doctor-invitations.accept');
+        Route::post('convites/medico/{invitation}/recusar', [DoctorInvitationResponseController::class, 'decline'])
+            ->middleware('throttle:10,1')
+            ->name('doctor-invitations.decline');
+
+        Route::get('convites/usuario/{invitation}', [UserInvitationResponseController::class, 'show'])
+            ->name('user-invitations.show');
+        Route::post('convites/usuario/{invitation}/aceitar', [UserInvitationResponseController::class, 'accept'])
+            ->middleware('throttle:10,1')
+            ->name('user-invitations.accept');
+        Route::post('convites/usuario/{invitation}/recusar', [UserInvitationResponseController::class, 'decline'])
+            ->middleware('throttle:10,1')
+            ->name('user-invitations.decline');
+    });
 
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');

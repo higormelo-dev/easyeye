@@ -16,7 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
-use Illuminate\Support\Facades\{Blade, Gate, RateLimiter, URL};
+use Illuminate\Support\Facades\{Auth, Blade, Gate, RateLimiter, URL};
 use Illuminate\Support\{ServiceProvider, Str};
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\{PersonalAccessToken, Sanctum};
@@ -267,6 +267,43 @@ class AppServiceProvider extends ServiceProvider
             $key = Str::lower((string) $r->input('email')) . '|' . $r->ip();
 
             return Limit::perMinute(5)->by($key);
+        });
+
+        // Aceite de convite: o POST também confere a senha da conta logada
+        // (vincular clínica) — limite por CONTA do portal (não só por IP, que
+        // o guard "web" usaria por padrão); convidado sem sessão: por IP.
+        // Convite a médico com login existente: por CLÍNICA (evita varredura de
+        // quem tem login e e-mails em massa a partir de uma clínica).
+        RateLimiter::for('doctor-invitations', static function (Request $r) {
+            return [
+                Limit::perHour(20)->by('doctor-invitations|entity|' . (string) $r->session()->get('selected_entity_id', $r->ip())),
+                Limit::perHour(20)->by('doctor-invitations|user|' . ($r->user()?->id ?? $r->ip())),
+            ];
+        });
+
+        // Convite a usuário: a resposta não revela nada, mas cada convite pode
+        // gerar e-mail — limite por clínica e por usuário.
+        RateLimiter::for('user-invitations', static function (Request $r) {
+            return [
+                Limit::perHour(30)->by('user-invitations|entity|' . (string) $r->session()->get('selected_entity_id', $r->ip())),
+                Limit::perHour(30)->by('user-invitations|user|' . ($r->user()?->id ?? $r->ip())),
+            ];
+        });
+
+        // Cadastro de médico: a validação revela se o e-mail/CPF já tem login
+        // de médico no EasyEye (para oferecer o convite) — limite por usuário
+        // e por clínica contra varredura. Folgado para o uso normal.
+        RateLimiter::for('doctor-registrations', static function (Request $r) {
+            return [
+                Limit::perMinute(20)->by('doctor-registrations|user|' . ($r->user()?->id ?? $r->ip())),
+                Limit::perHour(200)->by('doctor-registrations|entity|' . (string) $r->session()->get('selected_entity_id', $r->ip())),
+            ];
+        });
+
+        RateLimiter::for('patient-invitation', static function (Request $r) {
+            $key = 'patient-invitation|' . (Auth::guard('patient')->id() ?? $r->ip());
+
+            return Limit::perMinute(6)->by($key);
         });
     }
 }

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\PatientPortal\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\PatientPortal\InvitationController;
+use App\Services\PatientAccountLinkService;
 use Illuminate\Http\{RedirectResponse, Request};
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +14,11 @@ use Inertia\{Inertia, Response};
 
 class PatientAuthenticatedSessionController extends Controller
 {
+    public function __construct(
+        private readonly PatientAccountLinkService $links,
+    ) {
+    }
+
     public function create(): Response|RedirectResponse
     {
         if (Auth::guard('patient')->check()) {
@@ -60,7 +67,35 @@ class PatientAuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // Veio de um convite de outra clínica (InvitationController::
+        // loginToLink): o próprio login conclui o vínculo — paciente leigo não
+        // passa por outra tela. Link revalidado (assinatura e prazo) e mesmo
+        // e-mail exigidos no serviço; se não der (e-mail diferente, já
+        // vinculado), volta ao convite, que explica o motivo.
+        $invitation = $request->session()->pull(InvitationController::INTENDED_KEY);
+
+        if (is_string($invitation) && $this->isPendingInvitation($invitation)) {
+            $linked = $this->links->linkFromInvitationUrl($guard->user(), $invitation);
+
+            return $linked !== null
+                ? redirect()->route('patient-portal.dashboard')
+                    ->with('status', __('patient_portal.invitation.linked', ['clinic' => $this->links->clinicLabel($linked)]))
+                : redirect()->to($invitation);
+        }
+
         return redirect()->route('patient-portal.dashboard');
+    }
+
+    /** Link do convite do portal, ainda dentro da validade (senão: painel). */
+    private function isPendingInvitation(string $url): bool
+    {
+        if (! str_starts_with($url, route('patient-portal.invitation.accept') . '?')) {
+            return false;
+        }
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        return isset($query['expires']) && (int) $query['expires'] > now()->getTimestamp();
     }
 
     /**

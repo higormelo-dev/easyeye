@@ -41,8 +41,8 @@ class PatientPortalInvitation extends Notification implements ShouldQueue
             ->subject("[{$this->clinicName}] Convite para o Portal do Paciente")
             ->greeting("Olá, {$this->patientName}!")
             ->line("A clínica **{$this->clinicName}** convidou você para acessar o **Portal do Paciente** do EasyEye.")
-            ->line('Com um único login, você poderá acompanhar todas as clínicas onde já foi atendido.')
-            ->action('Criar minha senha', $url)
+            ->line('Com um único login, você poderá acompanhar todas as clínicas onde já foi atendido. Se já tiver conta, basta entrar com sua senha para adicionar esta clínica.')
+            ->action('Aceitar convite', $url)
             ->line('Este link expira em 3 dias e só pode ser usado uma vez.')
             ->line('Se você não esperava este e-mail, pode ignorá-lo com segurança.')
             ->salutation("Atenciosamente — {$this->clinicName}");

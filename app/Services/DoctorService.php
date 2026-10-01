@@ -92,6 +92,56 @@ class DoctorService
     }
 
     /**
+     * Aceite de convite (DoctorInvitationService::accept): coloca o login
+     * EXISTENTE do médico nesta clínica com os dados que ELA digitou — cadastro
+     * (People) próprio da clínica; o login (nome/e-mail/senha) e os cadastros
+     * de outras clínicas não são tocados. Chamar dentro de transação.
+     *
+     * @param array<string, mixed> $data payload do convite (formulário de médico)
+     */
+    public function attachExistingUser(User $user, string $entityId, array $data, ?string $invitedBy = null): Doctor
+    {
+        $entityUser = EntityUser::query()->withTrashed()
+            ->where('user_id', $user->id)
+            ->where('entity_id', $entityId)
+            ->first();
+
+        if ($entityUser?->trashed()) {
+            $entityUser->restore();
+        }
+
+        $entityUser ??= new EntityUser(['entity_id' => $entityId, 'user_id' => $user->id, 'invited_by' => $invitedBy]);
+        $entityUser->fill(['rule' => 'doctor', 'active' => true, 'joined_at' => now()])->save();
+
+        $person = $this->findOrCreateClinicPerson($this->personData($data), $entityId);
+
+        $doctorData = [
+            'entity_user_id'   => $entityUser->id,
+            'person_id'        => $person->id,
+            'record'           => $data['record'] ?? null,
+            'record_specialty' => $data['record_specialty'] ?? null,
+            'cbo_code'         => $data['cbo_code'] ?? null,
+            'color'            => $data['color'] ?? null,
+            'partner'          => (bool) ($data['partner'] ?? false),
+            'observation'      => $data['observation'] ?? null,
+        ];
+
+        $doctor = Doctor::query()->withTrashed()->where('entity_user_id', $entityUser->id)->first();
+
+        if ($doctor?->trashed()) {
+            $doctor->restore();
+        }
+
+        if ($doctor) {
+            $doctor->update($doctorData);
+
+            return $doctor;
+        }
+
+        return Doctor::create($doctorData);
+    }
+
+    /**
      * Find by ID or Code including soft-deleted records.
      */
     public function findByIdOrCode(string $idOrCode): ?Doctor
@@ -113,24 +163,20 @@ class DoctorService
     }
 
     /**
-     * Find or create user.
+     * Cria o login do médico. Login EXISTENTE (mesmo e-mail, inclusive
+     * excluído) nunca é reaproveitado aqui: vincular o login de alguém a esta
+     * clínica só pelo convite que o próprio médico aceita
+     * (DoctorInvitationService). O DoctorRequest já desvia esse caso para o
+     * convite; isto é defesa em profundidade (takeover cross-tenant).
+     *
+     * @throws ValidationException
      */
     private function findOrCreateUser(DoctorRequest $request): User
     {
-        $existingUser = User::query()->withTrashed()
-            ->where('email', $request->email)->first();
-
-        if ($existingUser) {
-            // BUGFIX (revisao de seguranca): nunca sobrescrever nome/senha/verificacao de um User ja
-            // existente aqui -- isso permitia takeover de conta cross-tenant reaproveitando o email de
-            // login de outro usuario (o "people.email" validado pelo DoctorRequest nao cobre staff sem
-            // registro em "people"). Um User existente e apenas reaproveitado (e restaurado se estava
-            // soft-deleted), nunca mutado.
-            if ($existingUser->trashed()) {
-                $existingUser->restore();
-            }
-
-            return $existingUser;
+        if (User::query()->withTrashed()->whereRaw('lower(email) = ?', [mb_strtolower(trim((string) $request->email))])->exists()) {
+            throw ValidationException::withMessages([
+                'email' => __('validation.unique', ['attribute' => __('validation.attributes.email')]),
+            ]);
         }
 
         $user = User::create([
@@ -176,39 +222,40 @@ class DoctorService
     }
 
     /**
-     * Find or create person.
+     * Find or create person — só entre os cadastros de MÉDICO desta clínica.
      *
-     * O DoctorRequest já barra CPF de People ativo; aqui só chega People
-     * EXCLUÍDO. Se ele ainda for usado por cadastro ativo de outra clínica,
-     * vale a regra do unique (CPF em uso) — nunca reescreve o cadastro dela.
+     * O mesmo CPF pode ter um cadastro por clínica (médico em várias, ou
+     * paciente em outra): o de outra clínica, ativo ou excluído, nunca é lido,
+     * restaurado nem sobrescrito aqui; a ficha de paciente da própria clínica
+     * também não. Cadastro compartilhado antigo: fillPersonGuarded barra (422).
      *
      * @throws ValidationException
      */
     private function findOrCreatePerson(DoctorRequest $request): People
     {
-        $existingRecord = People::query()
-            ->withTrashed()
-            ->where('national_registry', $request->national_registry)
+        return $this->findOrCreateClinicPerson($this->getPersonFromRequest($request), (string) session()->get('selected_entity_id'));
+    }
+
+    /** @param array<string, mixed> $personData */
+    private function findOrCreateClinicPerson(array $personData, string $entityId): People
+    {
+        $existing = $this->patientService
+            ->whereDoctorOfEntity(People::query()->withTrashed(), $entityId)
+            ->where('national_registry', $personData['national_registry'] ?? null)
+            ->orderBy('created_at')
             ->first();
 
-        $recordData = $this->getPersonFromRequest($request);
-
-        if ($existingRecord) {
-            if ($this->patientService->personSharedWithOtherEntities($existingRecord->id, (string) session()->get('selected_entity_id'))) {
-                throw ValidationException::withMessages([
-                    'national_registry' => __('validation.unique', ['attribute' => __('validation.attributes.national_registry')]),
-                ]);
-            }
-
-            if ($existingRecord->trashed()) {
-                $existingRecord->restore();
-            }
-            $existingRecord->update($recordData);
-
-            return $existingRecord;
+        if (! $existing) {
+            return People::create($personData);
         }
 
-        return People::create($recordData);
+        if ($existing->trashed()) {
+            $existing->restore();
+        }
+
+        $this->patientService->fillPersonGuarded($existing, $personData, $entityId, 'national_registry')->save();
+
+        return $existing;
     }
 
     /**
@@ -251,32 +298,30 @@ class DoctorService
      */
     private function getPersonFromRequest(DoctorRequest $request): array
     {
-        return [
-            'full_name'              => $request->name,
-            'nickname'               => $request->nickname,
-            'birth_date'             => $request->birth_date,
-            'gender'                 => $request->gender,
-            'marital_status'         => $request->marital_status,
-            'email'                  => $request->email,
-            'mother_name'            => $request->mother_name,
-            'father_name'            => $request->father_name,
-            'national_registry'      => $request->national_registry,
-            'state_registry'         => $request->state_registry,
-            'state_registry_agency'  => $request->state_registry_agency,
-            'state_registry_initial' => $request->state_registry_initial,
-            'state_registry_date'    => $request->state_registry_date,
-            'telephone'              => $request->telephone,
-            'cellphone'              => $request->cellphone,
-            'whatsapp'               => $request->whatsapp,
-            'zipcode'                => $request->zipcode,
-            'address'                => $request->address,
-            'number'                 => $request->number,
-            'complement'             => $request->complement,
-            'district'               => $request->district,
-            'city'                   => $request->city,
-            'state'                  => $request->state,
-            'country'                => $request->country,
+        return $this->personData($request->all());
+    }
+
+    /**
+     * Dados pessoais (People) a partir do formulário de médico — também usado
+     * no aceite do convite (payload que a clínica digitou).
+     *
+     * @param array<string, mixed> $data
+     *
+     * @return array<string, mixed>
+     */
+    private function personData(array $data): array
+    {
+        $fields = [
+            'full_name'             => 'name', 'nickname' => 'nickname', 'birth_date' => 'birth_date', 'gender' => 'gender',
+            'marital_status'        => 'marital_status', 'email' => 'email', 'mother_name' => 'mother_name',
+            'father_name'           => 'father_name', 'national_registry' => 'national_registry', 'state_registry' => 'state_registry',
+            'state_registry_agency' => 'state_registry_agency', 'state_registry_initial' => 'state_registry_initial',
+            'state_registry_date'   => 'state_registry_date', 'telephone' => 'telephone', 'cellphone' => 'cellphone',
+            'whatsapp'              => 'whatsapp', 'zipcode' => 'zipcode', 'address' => 'address', 'number' => 'number',
+            'complement'            => 'complement', 'district' => 'district', 'city' => 'city', 'state' => 'state', 'country' => 'country',
         ];
+
+        return array_map(fn (string $input) => $data[$input] ?? null, $fields);
     }
 
     /**
